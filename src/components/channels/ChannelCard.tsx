@@ -20,7 +20,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
         setIsDisconnecting(true)
         try {
             await disconnectChannel(channel.id)
-        } catch (error) {
+        } catch {
             alert('Failed to disconnect')
         } finally {
             setIsDisconnecting(false)
@@ -50,13 +50,16 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
                             Active
                         </Badge>
-                        <button
-                            onClick={handleDisconnect}
-                            disabled={isDisconnecting}
-                            className="mt-4 w-full px-4 py-2 text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                        >
-                            {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                        </button>
+                        <div className="mt-4 w-full">
+                            <Button
+                                onClick={handleDisconnect}
+                                disabled={isDisconnecting}
+                                variant="danger"
+                                className="w-full"
+                            >
+                                {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                            </Button>
+                        </div>
                     </div>
                 </>
             ) : (

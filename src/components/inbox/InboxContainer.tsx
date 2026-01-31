@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Avatar, Badge, Button } from '@/design'
+import { Sidebar, SidebarGroup, SidebarItem, Avatar, EmptyState, IconButton } from '@/design'
 import { Conversation, Message } from '@/types/database'
-import { getConversations, getMessages, sendMessage, createMockConversation } from '@/lib/inbox/actions'
+import { getMessages, sendMessage, createMockConversation } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -16,7 +16,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
-    const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
 
@@ -25,7 +25,6 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         if (!selectedId) return
 
         async function loadMessages() {
-            setIsLoadingMessages(true)
             try {
                 const msgs = await getMessages(selectedId!)
                 setMessages(msgs)
@@ -36,7 +35,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
             } catch (error) {
                 console.error('Failed to load messages', error)
             } finally {
-                setIsLoadingMessages(false)
+                // Done
             }
         }
 
@@ -121,12 +120,8 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 title="Inbox"
                 actions={
                     <div className="flex gap-1">
-                        <button onClick={handleCreateMock} className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">add</span>
-                        </button>
-                        <button className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">search</span>
-                        </button>
+                        <IconButton onClick={handleCreateMock} icon="add" size="sm" />
+                        <IconButton icon="search" size="sm" />
                     </div>
                 }
             >
@@ -156,9 +151,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         <span className="material-symbols-outlined text-[18px] text-gray-500 group-hover:text-gray-900">keyboard_arrow_down</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <button className="p-1.5 hover:bg-gray-100 rounded text-gray-400">
-                            <span className="material-symbols-outlined text-[18px]">filter_list</span>
-                        </button>
+                        <IconButton icon="filter_list" size="sm" />
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -201,12 +194,8 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">open_in_new</span>
-                                </button>
-                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">close</span>
-                                </button>
+                                <IconButton icon="open_in_new" size="sm" />
+                                <IconButton icon="close" size="sm" />
                             </div>
                         </div>
 
@@ -268,15 +257,9 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         <div className="p-6 border-t border-gray-200 bg-white">
                             <div className="border border-gray-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all bg-white overflow-hidden">
                                 <div className="flex items-center gap-1 p-2 border-b border-gray-100 bg-gray-50/50">
-                                    <button className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
-                                        <span className="material-symbols-outlined text-[18px]">attach_file</span>
-                                    </button>
-                                    <button className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
-                                        <span className="material-symbols-outlined text-[18px]">image</span>
-                                    </button>
-                                    <button className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
-                                        <span className="material-symbols-outlined text-[18px]">sentiment_satisfied</span>
-                                    </button>
+                                    <IconButton icon="attach_file" size="md" />
+                                    <IconButton icon="image" size="md" />
+                                    <IconButton icon="sentiment_satisfied" size="md" />
                                 </div>
                                 <textarea
                                     value={input}
@@ -320,12 +303,8 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                 </span>
                             </div>
                             <div className="flex gap-2">
-                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">open_in_new</span>
-                                </button>
-                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">close</span>
-                                </button>
+                                <IconButton icon="open_in_new" size="sm" />
+                                <IconButton icon="close" size="sm" />
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -399,17 +378,21 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     </div>
                 </>
             ) : (
-                <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400">
-                    <span className="material-symbols-outlined text-6xl mb-4 opacity-20">inbox</span>
-                    <p className="text-lg font-medium text-gray-900">No conversation selected</p>
-                    <p className="text-sm text-gray-500 mb-4">Select a conversation or create a new one</p>
-                    <button
-                        onClick={handleCreateMock}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 shadow-sm transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">add</span>
-                        Create Demo Conversation
-                    </button>
+                <div className="flex-1 flex items-center justify-center">
+                    <EmptyState
+                        icon="inbox"
+                        title="No conversation selected"
+                        description="Select a conversation or create a new one"
+                        action={
+                            <button
+                                onClick={handleCreateMock}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 shadow-sm transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">add</span>
+                                Create Demo Conversation
+                            </button>
+                        }
+                    />
                 </div>
             )}
         </>

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
+import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, EmptyState } from '@/design'
 
 export default async function AdminOrganizationsPage() {
     const supabase = await createClient()
@@ -36,64 +37,67 @@ export default async function AdminOrganizationsPage() {
         .order('created_at', { ascending: false })
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <div className="flex items-center gap-4 mb-2">
-                        <Link href="/admin" className="text-zinc-400 hover:text-zinc-300">
-                            ← Back
-                        </Link>
-                    </div>
-                    <h1 className="text-3xl font-bold text-white">Organizations</h1>
-                    <p className="mt-2 text-zinc-400">Manage all organizations in the system</p>
-                </div>
-            </div>
+        <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
+            <PageHeader
+                title="Organizations"
+                breadcrumb={
+                    <Link href="/admin" className="text-gray-400 hover:text-gray-600 flex items-center gap-1 text-sm mr-2 transition-colors">
+                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        Back
+                    </Link>
+                }
+            />
 
-            <div className="rounded-xl bg-zinc-800/50 border border-zinc-700/50 overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-zinc-800">
-                        <tr>
-                            <th className="px-6 py-4 text-left text-sm font-medium text-zinc-300">Name</th>
-                            <th className="px-6 py-4 text-left text-sm font-medium text-zinc-300">Slug</th>
-                            <th className="px-6 py-4 text-left text-sm font-medium text-zinc-300">Members</th>
-                            <th className="px-6 py-4 text-left text-sm font-medium text-zinc-300">Created</th>
-                            <th className="px-6 py-4 text-right text-sm font-medium text-zinc-300">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-700/50">
-                        {organizations?.map((org) => (
-                            <tr key={org.id} className="hover:bg-zinc-700/20">
-                                <td className="px-6 py-4">
-                                    <span className="font-medium text-white">{org.name}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-sm text-zinc-400">{org.slug}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-sm text-zinc-300">
-                                        {(org.organization_members as unknown as { count: number }[])?.[0]?.count || 0}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-sm text-zinc-400">
-                                        {new Date(org.created_at).toLocaleDateString()}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <button className="text-sm text-blue-400 hover:text-blue-300 mr-3">
-                                        Edit
-                                    </button>
-                                    <button className="text-sm text-red-400 hover:text-red-300">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {(!organizations || organizations.length === 0) && (
-                    <div className="p-8 text-center text-zinc-500">No organizations found</div>
-                )}
+            <div className="flex-1 overflow-auto p-8">
+                <div className="max-w-6xl mx-auto space-y-8">
+                    <p className="text-gray-500">Manage all organizations in the system</p>
+
+                    <DataTable>
+                        {(!organizations || organizations.length === 0) ? (
+                            <EmptyState
+                                icon="domain"
+                                title="No organizations found"
+                                description="There are no organizations in the system yet."
+                            />
+                        ) : (
+                            <>
+                                <TableHead columns={['Name', 'Slug', 'Members', 'Created', 'Actions']} />
+                                <TableBody>
+                                    {organizations.map((org) => (
+                                        <TableRow key={org.id}>
+                                            <TableCell>
+                                                <span className="font-medium text-gray-900">{org.name}</span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm text-gray-500">{org.slug}</span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm text-gray-600">
+                                                    {(org.organization_members as unknown as { count: number }[])?.[0]?.count || 0}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm text-gray-500">
+                                                    {new Date(org.created_at).toLocaleDateString()}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                <div className="flex justify-end gap-3">
+                                                    <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                                                        Edit
+                                                    </button>
+                                                    <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </>
+                        )}
+                    </DataTable>
+                </div>
             </div>
         </div>
     )

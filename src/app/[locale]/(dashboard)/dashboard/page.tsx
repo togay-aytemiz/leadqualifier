@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getTranslations } from 'next-intl/server'
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Badge } from '@/design'
-import Link from 'next/link'
+import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Badge, StatCard } from '@/design'
 
 interface OrgData {
     name: string
@@ -62,37 +61,26 @@ export default async function DashboardPage() {
 
                         {/* Stats Cards */}
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            <Link href="/inbox" className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="h-10 w-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-blue-500">inbox</span>
-                                    </div>
-                                    <span className="material-symbols-outlined text-gray-300 group-hover:text-blue-500 transition-colors">arrow_outward</span>
-                                </div>
-                                <h3 className="text-sm font-medium text-gray-500 mb-1">Active Conversations</h3>
-                                <p className="text-3xl font-bold text-gray-900">0</p>
-                            </Link>
-
-                            <Link href="/skills" className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="h-10 w-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-purple-500">auto_awesome</span>
-                                    </div>
-                                    <span className="material-symbols-outlined text-gray-300 group-hover:text-purple-500 transition-colors">arrow_outward</span>
-                                </div>
-                                <h3 className="text-sm font-medium text-gray-500 mb-1">Skills</h3>
-                                <p className="text-3xl font-bold text-gray-900">0</p>
-                            </Link>
-
-                            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="h-10 w-10 bg-green-50 rounded-lg flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-green-500">people</span>
-                                    </div>
-                                </div>
-                                <h3 className="text-sm font-medium text-gray-500 mb-1">Organizations</h3>
-                                <p className="text-3xl font-bold text-gray-900">{memberships?.length || 0}</p>
-                            </div>
+                            <StatCard
+                                icon="inbox"
+                                iconColor="blue"
+                                title="Active Conversations"
+                                value={0}
+                                href="/inbox"
+                            />
+                            <StatCard
+                                icon="auto_awesome"
+                                iconColor="purple"
+                                title="Skills"
+                                value={0}
+                                href="/skills"
+                            />
+                            <StatCard
+                                icon="people"
+                                iconColor="green"
+                                title="Organizations"
+                                value={memberships?.length || 0}
+                            />
                         </div>
 
                         {/* Organization List */}
