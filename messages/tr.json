@@ -7,7 +7,16 @@
         "save": "Kaydet",
         "delete": "Sil",
         "edit": "Düzenle",
-        "back": "Geri"
+        "back": "Geri",
+        "create": "Oluştur",
+        "enable": "Etkinleştir",
+        "disable": "Devre Dışı Bırak",
+        "enabled": "Aktif",
+        "disabled": "Devre Dışı",
+        "actions": "İşlemler",
+        "confirm": "Onayla",
+        "success": "Başarılı",
+        "error": "Hata"
     },
     "auth": {
         "login": "Giriş Yap",
@@ -40,5 +49,42 @@
     "dashboard": {
         "title": "Panel",
         "welcome": "Hoş geldiniz, {name}!"
+    },
+    "skills": {
+        "title": "Beceriler",
+        "subtitle": "Botunuz için otomatik yanıt becerilerini yönetin",
+        "noSkills": "Henüz beceri yok. İlk becerinizi oluşturun!",
+        "createSkill": "Beceri Oluştur",
+        "editSkill": "Beceriyi Düzenle",
+        "deleteSkill": "Beceriyi Sil",
+        "deleteConfirm": "Bu beceriyi silmek istediğinizden emin misiniz?",
+        "skillTitle": "Beceri Başlığı",
+        "skillTitlePlaceholder": "örn. Fiyat Bilgisi",
+        "triggerExamples": "Tetikleyici İfadeler",
+        "triggerExamplesHint": "Bu beceriyi tetikleyecek ifadeler ekleyin (min 3)",
+        "triggerPlaceholder": "örn. Fiyatlarınız nedir?",
+        "addTrigger": "Tetikleyici Ekle",
+        "responseText": "Yanıt",
+        "responseTextPlaceholder": "Bu beceri tetiklendiğinde bot'un göndereceği mesaj",
+        "testSkill": "Beceriyi Test Et",
+        "testPlayground": "Test Alanı",
+        "testMessage": "Test Mesajı",
+        "testMessagePlaceholder": "Beceri eşleşmesini test etmek için mesaj yazın...",
+        "runTest": "Testi Çalıştır",
+        "matchedSkill": "Eşleşen Beceri",
+        "noMatch": "Eşleşen beceri bulunamadı",
+        "confidence": "Güven Skoru",
+        "response": "Yanıt",
+        "topMatches": "En İyi Eşleşmeler",
+        "created": "Beceri başarıyla oluşturuldu",
+        "updated": "Beceri başarıyla güncellendi",
+        "deleted": "Beceri başarıyla silindi"
+    },
+    "nav": {
+        "dashboard": "Panel",
+        "skills": "Beceriler",
+        "knowledgeBase": "Bilgi Tabanı",
+        "leads": "Müşteriler",
+        "settings": "Ayarlar"
     }
 }

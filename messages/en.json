@@ -7,7 +7,16 @@
         "save": "Save",
         "delete": "Delete",
         "edit": "Edit",
-        "back": "Back"
+        "back": "Back",
+        "create": "Create",
+        "enable": "Enable",
+        "disable": "Disable",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "actions": "Actions",
+        "confirm": "Confirm",
+        "success": "Success",
+        "error": "Error"
     },
     "auth": {
         "login": "Sign In",
@@ -40,5 +49,42 @@
     "dashboard": {
         "title": "Dashboard",
         "welcome": "Welcome, {name}!"
+    },
+    "skills": {
+        "title": "Skills",
+        "subtitle": "Manage auto-reply skills for your bot",
+        "noSkills": "No skills yet. Create your first skill!",
+        "createSkill": "Create Skill",
+        "editSkill": "Edit Skill",
+        "deleteSkill": "Delete Skill",
+        "deleteConfirm": "Are you sure you want to delete this skill?",
+        "skillTitle": "Skill Title",
+        "skillTitlePlaceholder": "e.g., Pricing Information",
+        "triggerExamples": "Trigger Phrases",
+        "triggerExamplesHint": "Add phrases that should trigger this skill (min 3)",
+        "triggerPlaceholder": "e.g., What are your prices?",
+        "addTrigger": "Add Trigger",
+        "responseText": "Response",
+        "responseTextPlaceholder": "The message the bot will send when this skill is triggered",
+        "testSkill": "Test Skill",
+        "testPlayground": "Test Playground",
+        "testMessage": "Test Message",
+        "testMessagePlaceholder": "Type a message to test skill matching...",
+        "runTest": "Run Test",
+        "matchedSkill": "Matched Skill",
+        "noMatch": "No matching skill found",
+        "confidence": "Confidence",
+        "response": "Response",
+        "topMatches": "Top Matches",
+        "created": "Skill created successfully",
+        "updated": "Skill updated successfully",
+        "deleted": "Skill deleted successfully"
+    },
+    "nav": {
+        "dashboard": "Dashboard",
+        "skills": "Skills",
+        "knowledgeBase": "Knowledge Base",
+        "leads": "Leads",
+        "settings": "Settings"
     }
 }
