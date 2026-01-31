@@ -16,6 +16,14 @@
 - Environment variables template (`.env.local.example`)
 - Comprehensive README with setup instructions
 - Project documentation (PRD, Roadmap, AGENTS.md)
+- **Phase 1: Multi-Tenant Infrastructure**
+  - Supabase migrations (schema, RLS policies, auth triggers)
+  - Database types (`src/types/database.ts`)
+  - Organizations, profiles, organization_members tables
+  - Auth pages (login, register) with i18n
+  - Protected dashboard with organization display
+  - OrganizationContext for client-side org management
+  - Sign out API route
 
 ### Changed
 - N/A
@@ -29,5 +37,6 @@
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.2.0 | 2026-01-31 | Phase 1: Multi-tenant infrastructure + auth |
 | 0.1.0 | 2026-01-31 | Phase 0: Project setup complete |
 | 0.0.0 | 2026-01-31 | Project kickoff, documentation created |
