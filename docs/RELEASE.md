@@ -31,6 +31,12 @@
   - Skills admin UI (list, create, edit pages)
   - Skill test playground with similarity matching
   - i18n translations for skills (EN/TR)
+- **Phase 3.5: WhatsApp Simulator**
+  - Realistic WhatsApp-style chat UI
+  - Real-time skill matching simulation
+  - Org-specific simulation context
+  - Debug panel with confidence scores and matched skill details
+  - Dynamic sensitivity threshold slider (0.0 - 1.0)
 
 ### Changed
 - N/A
@@ -44,6 +50,7 @@
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.3.5 | 2026-01-31 | Phase 3.5: WhatsApp Simulator & Dynamic Thresholds |
 | 0.3.0 | 2026-01-31 | Phase 3: Skill System |
 | 0.2.0 | 2026-01-31 | Phase 1: Multi-tenant infrastructure + auth |
 | 0.1.0 | 2026-01-31 | Phase 0: Project setup complete |

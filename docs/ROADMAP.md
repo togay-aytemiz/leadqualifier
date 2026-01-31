@@ -52,6 +52,15 @@
 - [x] **Skill Testing**
   - [x] "Test Skill" playground in admin
 
+## Phase 3.5: WhatsApp Simulator (In Progress) ✅
+- [x] **Chat Interface**
+  - [x] WhatsApp-like UI (bubbles, ticks, input)
+  - [x] Org-specific simulator URL
+- [x] **Simulation Logic**
+  - [x] Connect to Skill Matching Engine
+  - [x] Simulate typing delay
+  - [x] Debug mode for matching details
+
 ---
 
 ## Phase 4: Knowledge Base (RAG)

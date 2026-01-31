@@ -21,10 +21,14 @@ export default async function DashboardPage() {
         .single()
 
     // Get user's organizations
-    const { data: memberships } = await supabase
+    const { data: memberships, error } = await supabase
         .from('organization_members')
         .select('organization_id, role, organizations(name)')
         .eq('user_id', user?.id)
+
+    console.log('User ID:', user?.id)
+    console.log('Memberships Error:', error)
+    console.log('Memberships Data:', JSON.stringify(memberships, null, 2))
 
     const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User'
 
