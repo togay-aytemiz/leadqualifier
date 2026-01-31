@@ -92,6 +92,17 @@ export interface Message {
     created_at: string
 }
 
+export interface Channel {
+    id: string
+    organization_id: string
+    type: 'telegram' | 'whatsapp'
+    name: string
+    config: any
+    status: 'active' | 'disconnected' | 'error'
+    created_at: string
+    updated_at: string
+}
+
 export type SkillInsert = Omit<Skill, 'id' | 'created_at' | 'updated_at'>
 export type SkillUpdate = Partial<Omit<Skill, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
 
@@ -139,6 +150,11 @@ export interface Database {
                 Row: Message
                 Insert: MessageInsert
                 Update: MessageUpdate
+            }
+            channels: {
+                Row: Channel
+                Insert: Omit<Channel, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Channel, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
             }
         }
     }

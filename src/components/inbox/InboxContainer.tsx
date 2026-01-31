@@ -1,13 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { InboxLayout } from './InboxLayout'
-import { ConversationList } from './ConversationList'
-import { ChatWindow } from './ChatWindow'
-import { DetailsPanel } from './DetailsPanel'
+import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Avatar, Badge, Button } from '@/design'
 import { Conversation, Message } from '@/types/database'
 import { getConversations, getMessages, sendMessage, createMockConversation } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
+import { formatDistanceToNow, format } from 'date-fns'
 
 interface InboxContainerProps {
     initialConversations: Conversation[]
@@ -19,6 +17,8 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+    const [input, setInput] = useState('')
+    const [isSending, setIsSending] = useState(false)
 
     // Load messages when selected conversation changes
     useEffect(() => {
@@ -30,7 +30,6 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 const msgs = await getMessages(selectedId!)
                 setMessages(msgs)
 
-                // Mark as read locally (optimistic)
                 setConversations(prev => prev.map(c =>
                     c.id === selectedId ? { ...c, unread_count: 0 } : c
                 ))
@@ -48,7 +47,6 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     useEffect(() => {
         const supabase = createClient()
 
-        // Subscribe to new messages
         const channel = supabase
             .channel('inbox_realtime')
             .on(
@@ -57,12 +55,10 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 (payload) => {
                     const newMsg = payload.new as Message
 
-                    // If matches current conversation, add to list
                     if (newMsg.conversation_id === selectedId) {
                         setMessages(prev => [...prev, newMsg])
                     }
 
-                    // Update conversation last message time and unread count
                     setConversations(prev => prev.map(c => {
                         if (c.id === newMsg.conversation_id) {
                             return {
@@ -82,26 +78,27 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         }
     }, [selectedId])
 
-    const handleSendMessage = async (content: string) => {
-        if (!selectedId) return
+    const handleSendMessage = async () => {
+        if (!selectedId || !input.trim() || isSending) return
 
-        // Optimistic update
         const tempMsg: Message = {
             id: 'temp-' + Date.now(),
             conversation_id: selectedId,
             sender_type: 'user',
-            content,
+            content: input,
             metadata: {},
             created_at: new Date().toISOString()
         }
         setMessages(prev => [...prev, tempMsg])
+        setInput('')
+        setIsSending(true)
 
-        // Server action
         try {
-            await sendMessage(selectedId, content)
+            await sendMessage(selectedId, input)
         } catch (error) {
             console.error('Failed to send message', error)
-            // Rollback optimistic update if needed
+        } finally {
+            setIsSending(false)
         }
     }
 
@@ -118,37 +115,303 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const selectedConversation = conversations.find(c => c.id === selectedId)
 
     return (
-        <InboxLayout>
-            <ConversationList
-                conversations={conversations}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-            />
+        <>
+            {/* Inner Sidebar */}
+            <Sidebar
+                title="Inbox"
+                actions={
+                    <div className="flex gap-1">
+                        <button onClick={handleCreateMock} className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
+                            <span className="material-symbols-outlined text-[18px]">add</span>
+                        </button>
+                        <button className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
+                            <span className="material-symbols-outlined text-[18px]">search</span>
+                        </button>
+                    </div>
+                }
+            >
+                <SidebarGroup>
+                    <SidebarItem icon="inbox" label="Your Inbox" count={conversations.filter(c => c.unread_count > 0).length || undefined} active />
+                    <SidebarItem icon="alternate_email" label="Mentions" count={2} />
+                    <SidebarItem icon="edit" label="Created by you" count={6} />
+                </SidebarGroup>
+
+                <SidebarGroup title="Teams">
+                    <SidebarItem icon="group" label="Unassigned" count={8} />
+                    <SidebarItem icon="support_agent" label="Support Team" count={12} />
+                </SidebarGroup>
+
+                <SidebarGroup title="Views">
+                    <SidebarItem icon="warning" iconColor="text-yellow-500" label="Waiting premium" count={6} />
+                    <SidebarItem icon="mail" iconColor="text-blue-400" label="Emails" count={21} />
+                    <SidebarItem icon="call" iconColor="text-red-400" label="Calls in progress" count={16} />
+                </SidebarGroup>
+            </Sidebar>
+
+            {/* Conversation List */}
+            <div className="w-[320px] border-r border-gray-200 flex flex-col h-full bg-gray-50/30">
+                <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-white">
+                    <div className="flex items-center gap-1 cursor-pointer group">
+                        <span className="text-sm font-bold text-gray-900">{conversations.length} Open</span>
+                        <span className="material-symbols-outlined text-[18px] text-gray-500 group-hover:text-gray-900">keyboard_arrow_down</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button className="p-1.5 hover:bg-gray-100 rounded text-gray-400">
+                            <span className="material-symbols-outlined text-[18px]">filter_list</span>
+                        </button>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    {conversations.map(c => (
+                        <div
+                            key={c.id}
+                            onClick={() => setSelectedId(c.id)}
+                            className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""
+                                }`}
+                        >
+                            <div className="flex justify-between items-start mb-1.5">
+                                <div className="flex items-center gap-2.5">
+                                    <Avatar name={c.contact_name} size="sm" />
+                                    <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
+                                </div>
+                                <span className="text-xs text-gray-400">
+                                    {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false }).replace('about ', '')}
+                                </span>
+                            </div>
+                            <div className="pl-[34px]">
+                                <p className="text-sm font-medium text-gray-900 mb-1 capitalize">{c.platform}</p>
+                                <p className="text-xs text-gray-500 truncate leading-relaxed">{c.status}</p>
+                            </div>
+                            {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Main Chat */}
             {selectedConversation ? (
                 <>
-                    <ChatWindow
-                        conversation={selectedConversation}
-                        messages={messages}
-                        onSendMessage={handleSendMessage}
-                    />
-                    <DetailsPanel conversation={selectedConversation} />
+                    <div className="flex-1 flex flex-col bg-white min-w-0">
+                        <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 shrink-0 bg-white">
+                            <div className="flex items-center gap-3">
+                                <h2 className="font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">smart_toy</span>
+                                    AI Copilot
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
+                                    <span className="material-symbols-outlined text-[20px]">open_in_new</span>
+                                </button>
+                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
+                                    <span className="material-symbols-outlined text-[20px]">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gray-50/30">
+                            <div className="flex justify-center">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">Today</span>
+                            </div>
+                            {messages.map(m => {
+                                const isMe = m.sender_type === 'user'
+                                const isBot = m.sender_type === 'bot'
+                                const isSystem = m.sender_type === 'system'
+
+                                if (isSystem) {
+                                    return (
+                                        <div key={m.id} className="flex items-center justify-center w-full py-2">
+                                            <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                                                {m.content}
+                                            </span>
+                                        </div>
+                                    )
+                                }
+
+                                // Customer message (external)
+                                if (!isMe && !isBot) {
+                                    return (
+                                        <div key={m.id} className="flex items-end gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">
+                                                {selectedConversation.contact_name.charAt(0)}
+                                            </div>
+                                            <div className="flex flex-col gap-1 max-w-[80%]">
+                                                <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
+                                                    {m.content}
+                                                </div>
+                                                <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm')}</span>
+                                            </div>
+                                        </div>
+                                    )
+                                }
+
+                                // Agent/Bot message
+                                return (
+                                    <div key={m.id} className="flex items-end gap-3 justify-end">
+                                        <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                                            <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-50 text-purple-900' : 'bg-blue-100 text-blue-900'
+                                                }`}>
+                                                {m.content}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 mr-1">
+                                                <span className="text-xs text-gray-400">
+                                                    {isBot ? 'Fin AI' : 'You'} · {format(new Date(m.created_at), 'HH:mm')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        <div className="p-6 border-t border-gray-200 bg-white">
+                            <div className="border border-gray-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all bg-white overflow-hidden">
+                                <div className="flex items-center gap-1 p-2 border-b border-gray-100 bg-gray-50/50">
+                                    <button className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                                        <span className="material-symbols-outlined text-[18px]">attach_file</span>
+                                    </button>
+                                    <button className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                                        <span className="material-symbols-outlined text-[18px]">image</span>
+                                    </button>
+                                    <button className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                                        <span className="material-symbols-outlined text-[18px]">sentiment_satisfied</span>
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault()
+                                            handleSendMessage()
+                                        }
+                                    }}
+                                    className="w-full p-4 text-sm focus:outline-none min-h-[100px] resize-none"
+                                    placeholder="Write a reply..."
+                                />
+                                <div className="px-4 py-3 bg-white flex justify-between items-center">
+                                    <span className="text-xs text-gray-400 font-medium">⌘ Enter to send</span>
+                                    <div className="flex gap-3">
+                                        <button className="p-2 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors">
+                                            <span className="material-symbols-outlined">bolt</span>
+                                        </button>
+                                        <button
+                                            onClick={handleSendMessage}
+                                            disabled={!input.trim() || isSending}
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                                        >
+                                            Send Reply
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Details Panel */}
+                    <div className="w-[300px] border-l border-gray-200 bg-white flex flex-col shrink-0 h-full hidden xl:flex">
+                        <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-4">
+                                <h3 className="font-semibold text-gray-900">Details</h3>
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">smart_toy</span>
+                                    AI Copilot
+                                </span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
+                                    <span className="material-symbols-outlined text-[20px]">open_in_new</span>
+                                </button>
+                                <button className="text-gray-400 hover:text-gray-700 p-1.5 rounded hover:bg-gray-50 transition-colors">
+                                    <span className="material-symbols-outlined text-[20px]">close</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                            {/* Assignee */}
+                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                <span className="text-sm text-gray-500">Assignee</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="h-6 w-6 rounded-full bg-orange-100 flex items-center justify-center text-xs text-orange-600 font-medium">
+                                        {selectedConversation.contact_name.charAt(0)}
+                                    </div>
+                                    <span className="text-sm text-gray-900 font-medium">{selectedConversation.contact_name}</span>
+                                </div>
+                                <span className="text-sm text-gray-500">Team</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[16px] text-gray-400">inventory_2</span>
+                                    <span className="text-sm text-gray-900">Support</span>
+                                </div>
+                            </div>
+
+                            <hr className="border-gray-100" />
+
+                            {/* Ticket Attributes */}
+                            <div>
+                                <div className="flex items-center justify-between mb-4 group cursor-pointer">
+                                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Ticket Attributes</h4>
+                                    <span className="material-symbols-outlined text-gray-400 text-[18px] group-hover:text-gray-600 transition-colors">expand_less</span>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">Platform</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-[16px] text-gray-400">chat</span>
+                                            <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
+                                        <span className="text-sm text-gray-500 mt-0.5">Status</span>
+                                        <span className="text-sm text-gray-900 capitalize">{selectedConversation.status}</span>
+                                    </div>
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
+                                        <span className="text-sm text-gray-500 mt-0.5">Phone</span>
+                                        <span className="text-sm text-gray-900">{selectedConversation.contact_phone || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr className="border-gray-100" />
+
+                            {/* Conversation Attributes */}
+                            <div>
+                                <div className="flex items-center justify-between mb-4 group cursor-pointer">
+                                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Conversation Attributes</h4>
+                                    <span className="material-symbols-outlined text-gray-400 text-[18px] group-hover:text-gray-600 transition-colors">expand_less</span>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">Subject</span>
+                                        <span className="text-sm text-gray-400 hover:text-blue-500 cursor-pointer transition-colors">+ Add</span>
+                                    </div>
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">ID</span>
+                                        <span className="text-sm text-gray-900">#{selectedConversation.id.slice(0, 6)}</span>
+                                    </div>
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">Priority</span>
+                                        <span className="text-sm text-gray-900">Medium</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </>
             ) : (
-                <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-500">
-                    <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <p className="text-lg font-medium">No conversation selected</p>
-                    {conversations.length === 0 && (
-                        <button
-                            onClick={handleCreateMock}
-                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                        >
-                            Create Demo Conversation
-                        </button>
-                    )}
+                <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400">
+                    <span className="material-symbols-outlined text-6xl mb-4 opacity-20">inbox</span>
+                    <p className="text-lg font-medium text-gray-900">No conversation selected</p>
+                    <p className="text-sm text-gray-500 mb-4">Select a conversation or create a new one</p>
+                    <button
+                        onClick={handleCreateMock}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 shadow-sm transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        Create Demo Conversation
+                    </button>
                 </div>
             )}
-        </InboxLayout>
+        </>
     )
 }

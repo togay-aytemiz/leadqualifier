@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getTranslations } from 'next-intl/server'
+import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Badge } from '@/design'
+import Link from 'next/link'
 
 interface OrgData {
     name: string
@@ -13,78 +15,126 @@ export default async function DashboardPage() {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Get user's profile
     const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user?.id)
         .single()
 
-    // Get user's organizations
-    const { data: memberships, error } = await supabase
+    const { data: memberships } = await supabase
         .from('organization_members')
         .select('organization_id, role, organizations(name)')
         .eq('user_id', user?.id)
 
-    console.log('User ID:', user?.id)
-    console.log('Memberships Error:', error)
-    console.log('Memberships Data:', JSON.stringify(memberships, null, 2))
-
     const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User'
 
     return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold text-white">{t('title')}</h1>
-                <p className="mt-2 text-zinc-400">{t('welcome', { name: displayName })}</p>
-            </div>
+        <>
+            {/* Inner Sidebar */}
+            <Sidebar title="Overview">
+                <SidebarGroup>
+                    <SidebarItem icon="inbox" label="Your Inbox" count={5} active />
+                    <SidebarItem icon="alternate_email" label="Mentions" count={2} />
+                    <SidebarItem icon="edit" label="Created by you" count={6} />
+                </SidebarGroup>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {/* Stats cards placeholder */}
-                <div className="rounded-xl bg-zinc-800/50 p-6 border border-zinc-700/50">
-                    <h3 className="text-sm font-medium text-zinc-400">Organizations</h3>
-                    <p className="mt-2 text-3xl font-bold text-white">{memberships?.length || 0}</p>
-                </div>
+                <SidebarGroup title="Teams">
+                    <SidebarItem icon="group" label="Unassigned" count={8} />
+                    <SidebarItem icon="support_agent" label="Support Team" count={12} />
+                </SidebarGroup>
 
-                <div className="rounded-xl bg-zinc-800/50 p-6 border border-zinc-700/50">
-                    <h3 className="text-sm font-medium text-zinc-400">Leads</h3>
-                    <p className="mt-2 text-3xl font-bold text-white">0</p>
-                    <p className="mt-1 text-xs text-zinc-500">Coming in Phase 6</p>
-                </div>
+                <SidebarGroup title="Views">
+                    <SidebarItem icon="warning" iconColor="text-yellow-500" label="Waiting premium" count={6} />
+                    <SidebarItem icon="mail" iconColor="text-blue-400" label="Emails" count={21} />
+                    <SidebarItem icon="call" iconColor="text-red-400" label="Calls in progress" count={16} />
+                </SidebarGroup>
+            </Sidebar>
 
-                <div className="rounded-xl bg-zinc-800/50 p-6 border border-zinc-700/50">
-                    <h3 className="text-sm font-medium text-zinc-400">Skills</h3>
-                    <p className="mt-2 text-3xl font-bold text-white">0</p>
-                    <p className="mt-1 text-xs text-zinc-500">Coming in Phase 3</p>
-                </div>
-            </div>
+            {/* Main Content */}
+            <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
+                <PageHeader title={t('title')} />
 
-            {/* Organization list */}
-            <div className="rounded-xl bg-zinc-800/50 p-6 border border-zinc-700/50">
-                <h2 className="text-lg font-semibold text-white mb-4">Your Organizations</h2>
-                {memberships && memberships.length > 0 ? (
-                    <div className="space-y-3">
-                        {memberships.map((m) => {
-                            const org = m.organizations as unknown as OrgData | null
-                            return (
-                                <div
-                                    key={m.organization_id}
-                                    className="flex items-center justify-between rounded-lg bg-zinc-700/30 p-4"
-                                >
-                                    <div>
-                                        <p className="font-medium text-white">
-                                            {org?.name || 'Unknown'}
-                                        </p>
-                                        <p className="text-sm text-zinc-400 capitalize">{m.role}</p>
+                <div className="flex-1 overflow-auto p-8">
+                    <div className="max-w-6xl mx-auto space-y-8">
+                        <div>
+                            <p className="text-gray-500">{t('welcome', { name: displayName })}</p>
+                        </div>
+
+                        {/* Stats Cards */}
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            <Link href="/inbox" className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="h-10 w-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-blue-500">inbox</span>
+                                    </div>
+                                    <span className="material-symbols-outlined text-gray-300 group-hover:text-blue-500 transition-colors">arrow_outward</span>
+                                </div>
+                                <h3 className="text-sm font-medium text-gray-500 mb-1">Active Conversations</h3>
+                                <p className="text-3xl font-bold text-gray-900">0</p>
+                            </Link>
+
+                            <Link href="/skills" className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="h-10 w-10 bg-purple-50 rounded-lg flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-purple-500">auto_awesome</span>
+                                    </div>
+                                    <span className="material-symbols-outlined text-gray-300 group-hover:text-purple-500 transition-colors">arrow_outward</span>
+                                </div>
+                                <h3 className="text-sm font-medium text-gray-500 mb-1">Skills</h3>
+                                <p className="text-3xl font-bold text-gray-900">0</p>
+                            </Link>
+
+                            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="h-10 w-10 bg-green-50 rounded-lg flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-green-500">people</span>
                                     </div>
                                 </div>
-                            )
-                        })}
+                                <h3 className="text-sm font-medium text-gray-500 mb-1">Organizations</h3>
+                                <p className="text-3xl font-bold text-gray-900">{memberships?.length || 0}</p>
+                            </div>
+                        </div>
+
+                        {/* Organization List */}
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <h2 className="font-semibold text-gray-900">Your Organizations</h2>
+                            </div>
+
+                            {memberships && memberships.length > 0 ? (
+                                <div className="divide-y divide-gray-100">
+                                    {memberships.map((m) => {
+                                        const org = m.organizations as unknown as OrgData | null
+                                        return (
+                                            <div
+                                                key={m.organization_id}
+                                                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm">
+                                                        {org?.name?.charAt(0).toUpperCase() || 'O'}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">
+                                                            {org?.name || 'Unknown'}
+                                                        </p>
+                                                        <p className="text-sm text-gray-500 capitalize">{m.role}</p>
+                                                    </div>
+                                                </div>
+                                                <Badge variant="neutral">{m.role}</Badge>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="p-8 text-center text-gray-500">
+                                    No organizations yet. Create one to get started.
+                                </div>
+                            )}
+                        </div>
                     </div>
-                ) : (
-                    <p className="text-zinc-500">No organizations yet. They will be created when you sign up with Supabase.</p>
-                )}
+                </div>
             </div>
-        </div>
+        </>
     )
 }

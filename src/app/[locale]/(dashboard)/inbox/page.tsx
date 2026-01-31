@@ -11,11 +11,10 @@ export default async function InboxPage() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-        return null // Middleware handles redirect usually
+        redirect('/login')
     }
 
-    // Get user's first organization for now
-    // In a real app we'd get this from the URL params or a cookie selector
+    // Get user's first organization
     const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -40,8 +39,12 @@ export default async function InboxPage() {
 
     if (!organizationId) {
         return (
-            <div className="p-8 text-center text-gray-500">
-                You don't belong to any organization. Please contact admin.
+            <div className="flex-1 flex items-center justify-center bg-gray-50 text-gray-500">
+                <div className="text-center">
+                    <span className="material-symbols-outlined text-5xl mb-4 opacity-20 block">domain</span>
+                    <p className="text-lg font-medium text-gray-900">No Organization Found</p>
+                    <p className="text-sm text-gray-500">You need to be part of an organization to access the inbox.</p>
+                </div>
             </div>
         )
     }
