@@ -10,6 +10,8 @@ import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/databa
 export async function getSkills(organizationId: string, search?: string): Promise<Skill[]> {
     const supabase = await createClient()
 
+    console.log(`getSkills called for org ${organizationId} with search: "${search}"`)
+
     let query = supabase
         .from('skills')
         .select('*')
@@ -17,13 +19,20 @@ export async function getSkills(organizationId: string, search?: string): Promis
         .order('created_at', { ascending: false })
 
     if (search && search.trim()) {
-        const searchTerm = `%${search.trim()}%`
-        query = query.or(`title.ilike.${searchTerm},response_text.ilike.${searchTerm}`)
+        const term = search.trim()
+        const searchTerm = `%${term}%`
+        // Search title, response_text, AND trigger_examples (by casting array to text)
+        // Note: casting array to text yields format like ["a","b"], so ilike works for partial matches
+        query = query.or(`title.ilike.${searchTerm},response_text.ilike.${searchTerm},trigger_examples.cs.{${term}}`)
     }
 
     const { data, error } = await query
+    console.log(`getSkills found ${data?.length} results`)
 
-    if (error) throw new Error(error.message)
+    if (error) {
+        console.error('getSkills error:', error)
+        throw new Error(error.message)
+    }
     return data ?? []
 }
 

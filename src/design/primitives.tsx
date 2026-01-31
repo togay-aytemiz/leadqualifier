@@ -208,13 +208,13 @@ interface SearchInputProps {
 
 export function SearchInput({ placeholder = "Search...", value, onChange, className }: SearchInputProps) {
     return (
-        <div className={cn("relative w-64", className)}>
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-[18px]">search</span>
+        <div className={cn("relative w-full", className)}>
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">search</span>
             <input
                 type="text"
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm placeholder-gray-400"
+                className="w-full h-10 pl-10 pr-4 bg-gray-100 text-gray-900 border-none rounded-lg text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 shadow-none placeholder-gray-500 transition-all"
                 placeholder={placeholder}
             />
         </div>

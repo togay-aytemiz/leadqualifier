@@ -2,12 +2,19 @@ import { getSkills } from '@/lib/skills/actions'
 import { createClient } from '@/lib/supabase/server'
 import { SkillsContainer } from '@/components/skills/SkillsContainer'
 
+export const dynamic = 'force-dynamic'
+
 interface SkillsPageProps {
-    searchParams: { q?: string }
+    searchParams: Promise<{ q?: string }>
 }
 
 export default async function SkillsPage({ searchParams }: SkillsPageProps) {
     const supabase = await createClient()
+    const { q } = await searchParams
+    const query = q || ''
+
+    console.log('SkillsPage search query:', query)
+
 
     const {
         data: { user },
@@ -20,7 +27,7 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
         .single()
 
     const organizationId = membership?.organization_id
-    const query = searchParams?.q || ''
+
 
     let skills: Awaited<ReturnType<typeof getSkills>> = []
     if (organizationId) {

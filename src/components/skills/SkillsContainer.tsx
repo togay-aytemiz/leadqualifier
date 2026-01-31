@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
-import { Button, Input, TextArea, EmptyState, StatusDot } from '@/design'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
 
 interface SkillsContainerProps {
@@ -18,12 +17,20 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
     // Form state
     const [formData, setFormData] = useState({
         title: '',
         response_text: '',
-        triggers: ''
+        triggers: [''] // Start with one empty trigger
+    })
+
+    // To track dirty state
+    const [initialFormState, setInitialFormState] = useState({
+        title: '',
+        response_text: '',
+        triggers: ['']
     })
 
     // Sync skills when initialSkills changes (e.g. after search)
@@ -36,21 +43,40 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
         if (selectedSkillId) {
             const skill = skills.find(s => s.id === selectedSkillId)
             if (skill) {
-                setFormData({
+                const initialData = {
                     title: skill.title,
                     response_text: skill.response_text,
-                    triggers: skill.trigger_examples.join(', ')
-                })
+                    // Ensure at least 3 triggers for editing consistency if backend data is sparse
+                    triggers: ensureMinTriggers(skill.trigger_examples, 3)
+                }
+                setFormData(initialData)
+                setInitialFormState(initialData)
                 setIsCreating(false)
+                setShowDeleteConfirm(false)
             }
         } else if (isCreating) {
-            setFormData({
+            const initialData = {
                 title: '',
                 response_text: '',
-                triggers: ''
-            })
+                triggers: ['', '', ''] // 3 empty triggers for new skill
+            }
+            setFormData(initialData)
+            setInitialFormState(initialData)
+            setShowDeleteConfirm(false)
         }
     }, [selectedSkillId, isCreating, skills])
+
+    const ensureMinTriggers = (triggers: string[], min: number) => {
+        const newTriggers = [...triggers]
+        while (newTriggers.length < min) {
+            newTriggers.push('')
+        }
+        return newTriggers
+    }
+
+    const isDirty = useMemo(() => {
+        return JSON.stringify(formData) !== JSON.stringify(initialFormState)
+    }, [formData, initialFormState])
 
     const handleCreateNew = () => {
         setSelectedSkillId(null)
@@ -58,6 +84,11 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     }
 
     const handleSelectSkill = (id: string) => {
+        // If clicking same skill, do nothing
+        if (selectedSkillId === id) return
+
+        // If dirty, maybe warn? For now assume direct switch is okay, losing changes
+        // User asked for specific "Save" behavior, so switching discards changes naturally in this pattern
         setSelectedSkillId(id)
         setIsCreating(false)
     }
@@ -76,46 +107,125 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
         }
     }
 
+    const handleArchiveToggle = async () => {
+        if (!selectedSkillId) return
+        const skill = skills.find(s => s.id === selectedSkillId)
+        if (!skill) return
+
+        // Use the same logic as the list toggle
+        try {
+            await toggleSkill(skill.id, !skill.enabled)
+            router.refresh()
+            setSkills(prev => prev.map(s =>
+                s.id === skill.id ? { ...s, enabled: !s.enabled } : s
+            ))
+        } catch (error) {
+            console.error('Failed to toggle skill', error)
+        }
+    }
+
+    const handleTriggerChange = (index: number, value: string) => {
+        const newTriggers = [...formData.triggers]
+        newTriggers[index] = value
+        setFormData(prev => ({ ...prev, triggers: newTriggers }))
+    }
+
+    const handleAddTrigger = () => {
+        if (formData.triggers.length >= 10) return
+        setFormData(prev => ({ ...prev, triggers: [...prev.triggers, ''] }))
+    }
+
+    const handleRemoveTrigger = (index: number) => {
+        // Prevent removing if it's one of the first 3
+        if (index < 3) return
+
+        const newTriggers = [...formData.triggers]
+        newTriggers.splice(index, 1)
+        setFormData(prev => ({ ...prev, triggers: newTriggers }))
+    }
+
     const handleSave = async () => {
-        if (!formData.title.trim() || !formData.response_text.trim()) return
+        // Validate
+        if (!formData.title.trim()) {
+            alert('Skill Name is required')
+            return
+        }
+
+        // Check mandatory triggers (first 3) - strict check or loose? 
+        // Plan said first 3 mandatory. Let's assume non-empty.
+        const firstThree = formData.triggers.slice(0, 3)
+        if (firstThree.some(t => !t.trim())) {
+            alert('The first 3 triggers are mandatory.')
+            return
+        }
+
+        if (!formData.response_text.trim()) {
+            alert('Response Text is required')
+            return
+        }
 
         setIsSaving(true)
         try {
-            const triggers = formData.triggers.split(',').map(t => t.trim()).filter(Boolean)
+            const cleanTriggers = formData.triggers.map(t => t.trim()).filter(Boolean)
 
             if (isCreating) {
-                await createSkill({
+                const newSkill = await createSkill({
                     organization_id: organizationId,
                     title: formData.title,
                     response_text: formData.response_text,
-                    trigger_examples: triggers,
+                    trigger_examples: cleanTriggers,
                     enabled: true
                 })
+
+                // Refresh and select the new skill
+                router.refresh()
                 setIsCreating(false)
-                setSelectedSkillId(null) // Or select the new skill if we returned it
+
+                // Manually update local state to avoid flicker before refresh lands
+                const newSkillObj: Skill = {
+                    ...newSkill,
+                    // Fill default if needed, though createSkill returns full object
+                }
+                setSkills(prev => [newSkillObj, ...prev])
+                setSelectedSkillId(newSkill.id)
+
             } else if (selectedSkillId) {
                 await updateSkill(selectedSkillId, {
                     title: formData.title,
                     response_text: formData.response_text,
-                    trigger_examples: triggers
+                    trigger_examples: cleanTriggers
                 })
+                router.refresh()
+
+                // Update local state and re-init dirty check
+                setSkills(prev => prev.map(s =>
+                    s.id === selectedSkillId ? {
+                        ...s,
+                        title: formData.title,
+                        response_text: formData.response_text,
+                        trigger_examples: cleanTriggers
+                    } : s
+                ))
+                setInitialFormState(formData)
             }
-            router.refresh()
         } catch (error) {
             console.error('Failed to save skill', error)
+            alert('Failed to save changes')
         } finally {
             setIsSaving(false)
         }
     }
 
     const handleDelete = async () => {
-        if (!selectedSkillId || !confirm('Are you sure you want to delete this skill?')) return
+        if (!selectedSkillId) return
 
         setIsSaving(true)
         try {
             await deleteSkill(selectedSkillId)
             setSelectedSkillId(null)
+            setShowDeleteConfirm(false)
             router.refresh()
+            setSkills(prev => prev.filter(s => s.id !== selectedSkillId))
         } catch (error) {
             console.error('Failed to delete skill', error)
         } finally {
@@ -128,117 +238,215 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
 
     return (
         <div className="flex h-full bg-white border-t border-gray-200">
-            {/* Left Panel - List */}
-            <div className="w-[35%] flex flex-col border-r border-gray-200 bg-gray-50/30">
-                <div className="p-4 border-b border-gray-200 bg-white space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-gray-900">Skills</h2>
-                        <Button variant="ghost" size="icon" onClick={handleCreateNew} className="text-blue-600 hover:bg-blue-50">
-                            <span className="material-symbols-outlined">add</span>
-                        </Button>
+            {/* Left Panel - List (50%) */}
+            <div className="w-1/2 flex flex-col border-r border-gray-200 bg-white">
+                <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0 bg-white">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold text-gray-900">Skills</h2>
+                        <span className="text-gray-500 font-medium text-sm bg-gray-100 px-2 py-0.5 rounded-full">
+                            {skills.length}
+                        </span>
                     </div>
-                    <ClientSearchInput />
+                    <div className="flex items-center gap-3">
+                        <div className="w-80">
+                            <ClientSearchInput />
+                        </div>
+                        <button
+                            onClick={handleCreateNew}
+                            className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">add</span>
+                            Create
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {skills.map(skill => (
-                        <div
-                            key={skill.id}
-                            onClick={() => handleSelectSkill(skill.id)}
-                            className={`px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedSkillId === skill.id ? "bg-blue-50/30 ring-1 ring-inset ring-blue-500/20" : ""
-                                }`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className={`text-sm font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
-                                    {skill.title}
-                                </span>
-                                <button
-                                    onClick={(e) => handleToggleSkill(e, skill)}
-                                    className="p-1 hover:bg-gray-100 rounded focus:outline-none"
-                                >
-                                    <StatusDot active={skill.enabled} className="" />
-                                </button>
-                            </div>
-                            {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
+                    {skills.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 text-sm">
+                            No skills found. Create one to get started.
                         </div>
-                    ))}
-                    {skills.length === 0 && (
-                        <div className="p-8 text-center text-gray-400 text-sm">
-                            No skills found
+                    ) : (
+                        <div>
+                            {skills.map(skill => (
+                                <div
+                                    key={skill.id}
+                                    onClick={() => handleSelectSkill(skill.id)}
+                                    className={`px-6 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedSkillId === skill.id ? "bg-blue-50/40" : ""
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-base font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
+                                            {skill.title}
+                                        </span>
+                                        <div
+                                            role="button"
+                                            onClick={(e) => handleToggleSkill(e, skill)}
+                                            className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-200 transition-all ${skill.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                                            title={skill.enabled ? 'Active (Click to toggle)' : 'Inactive (Click to toggle)'}
+                                        />
+                                    </div>
+                                    {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Right Panel - Detail/Form */}
-            <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+            {/* Right Panel - Detail/Form (50%) */}
+            <div className="w-1/2 flex flex-col bg-white overflow-hidden relative">
                 {showForm ? (
-                    <div className="flex flex-col h-full">
+                    <div className="flex flex-col h-full bg-white">
                         {/* Header */}
-                        <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0 bg-white sticky top-0 z-10">
-                            <h3 className="font-bold text-gray-900 text-lg">
+                        <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
+                            <h3 className="font-bold text-gray-900 text-xl">
                                 {isCreating ? 'New Skill' : 'Edit Skill'}
                             </h3>
-                            <div className="flex gap-2">
+                            <div className="flex gap-3">
                                 {!isCreating && (
-                                    <Button variant="danger" size="sm" onClick={handleDelete} disabled={isSaving}>
-                                        Delete
-                                    </Button>
+                                    <>
+                                        <button
+                                            onClick={handleArchiveToggle}
+                                            className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            {selectedSkill?.enabled ? 'Archive' : 'Activate'}
+                                        </button>
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(true)}
+                                            className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            Delete
+                                        </button>
+                                    </>
                                 )}
-                                <Button variant="primary" size="sm" onClick={handleSave} disabled={isSaving}>
-                                    {isSaving ? 'Saving...' : 'Save Changes'}
-                                </Button>
+                                <button
+                                    onClick={handleSave}
+                                    disabled={!isDirty || isSaving}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
+                                >
+                                    Save Changes
+                                </button>
                             </div>
                         </div>
 
                         {/* Form Content */}
-                        <div className="p-8 space-y-6 max-w-2xl">
-                            <Input
-                                label="Skill Name"
-                                value={formData.title}
-                                onChange={(val) => setFormData(prev => ({ ...prev, title: val }))}
-                                placeholder="e.g. Pricing Inquiry"
-                                className="bg-white text-gray-900 border-gray-300"
-                            />
-
-                            <TextArea
-                                label="Response Text"
-                                value={formData.response_text}
-                                onChange={(val) => setFormData(prev => ({ ...prev, response_text: val }))}
-                                placeholder="The AI will respond with this text..."
-                                className="min-h-[150px] bg-white text-gray-900 border-gray-300 text-base"
-                            />
-
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase">
-                                    Triggers (Comma separated)
+                        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                            {/* Skill Name */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                    Skill Name
                                 </label>
-                                <div className="p-4 rounded-lg border border-gray-300 bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-                                    <textarea
-                                        value={formData.triggers}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, triggers: e.target.value }))}
-                                        placeholder="how much does it cost, what is the price, pricing plans..."
-                                        className="w-full text-sm text-gray-900 placeholder-gray-400 outline-none resize-none min-h-[100px]"
-                                    />
-                                    <p className="mt-2 text-xs text-gray-500">
-                                        Add multiple variations to help the AI understand better.
-                                    </p>
+                                <input
+                                    value={formData.title}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                                    placeholder="e.g. Pricing Inquiry"
+                                    className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                                />
+                            </div>
+
+                            {/* Triggers */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                        Triggers {formData.triggers.length}/10
+                                    </label>
+                                    <span className="text-xs text-gray-400">First 3 are mandatory</span>
                                 </div>
+                                <div className="space-y-2">
+                                    {formData.triggers.map((trigger, idx) => (
+                                        <div key={idx} className="flex gap-2 items-center">
+                                            <input
+                                                value={trigger}
+                                                onChange={(e) => handleTriggerChange(idx, e.target.value)}
+                                                placeholder={idx < 3 ? "Mandatory trigger phrase..." : "Optional variation..."}
+                                                className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
+                                                    }`}
+                                            />
+                                            {idx >= 3 && (
+                                                <button
+                                                    onClick={() => handleRemoveTrigger(idx)}
+                                                    className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Remove trigger"
+                                                >
+                                                    <span className="material-symbols-outlined text-[20px] font-light">delete</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                {formData.triggers.length < 10 && (
+                                    <button
+                                        onClick={handleAddTrigger}
+                                        className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">add</span>
+                                        Add Trigger
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Response Text */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                    Response Text
+                                </label>
+                                <textarea
+                                    value={formData.response_text}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
+                                    placeholder="The AI will respond with this text..."
+                                    className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
+                                />
                             </div>
                         </div>
+
+                        {/* Delete Confirmation Overlay */}
+                        {showDeleteConfirm && (
+                            <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+                                <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                                        <span className="material-symbols-outlined text-[24px]">warning</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-lg font-bold text-gray-900">Delete Skill?</h3>
+                                        <p className="text-sm text-gray-500">
+                                            This action cannot be undone. The skill will be permanently removed.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(false)}
+                                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleDelete}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
+                                        >
+                                            {isSaving ? 'Deleting...' : 'Delete'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center p-8">
-                        <EmptyState
-                            icon="auto_awesome"
-                            title="Select a skill"
-                            description="Select a skill from the list to edit details"
-                            action={
-                                <Button variant="primary" onClick={handleCreateNew}>
-                                    <span className="material-symbols-outlined text-[18px] mr-2">add</span>
-                                    Create New Skill
-                                </Button>
-                            }
-                        />
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                            <span className="material-symbols-outlined text-gray-400 text-[32px]">auto_awesome</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">No Skill Selected</h3>
+                        <p className="text-gray-500 text-sm max-w-xs mb-6">
+                            Select a skill from the list to view its details or create a new one to get started.
+                        </p>
+                        <button
+                            onClick={handleCreateNew}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">add</span>
+                            Create New Skill
+                        </button>
                     </div>
                 )}
             </div>
