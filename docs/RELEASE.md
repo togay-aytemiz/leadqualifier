@@ -24,6 +24,13 @@
   - Protected dashboard with organization display
   - OrganizationContext for client-side org management
   - Sign out API route
+- **Phase 3: Skill System**
+  - Skills table with pgvector for semantic search
+  - Embedding generation with OpenAI text-embedding-3-small
+  - Skill CRUD operations (create, edit, delete, toggle)
+  - Skills admin UI (list, create, edit pages)
+  - Skill test playground with similarity matching
+  - i18n translations for skills (EN/TR)
 
 ### Changed
 - N/A
@@ -37,6 +44,7 @@
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.3.0 | 2026-01-31 | Phase 3: Skill System |
 | 0.2.0 | 2026-01-31 | Phase 1: Multi-tenant infrastructure + auth |
 | 0.1.0 | 2026-01-31 | Phase 0: Project setup complete |
 | 0.0.0 | 2026-01-31 | Project kickoff, documentation created |

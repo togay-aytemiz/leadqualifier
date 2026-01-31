@@ -39,18 +39,18 @@
 
 ---
 
-## Phase 3: Skill System
-- [ ] **Skill CRUD**
-  - [ ] Create skill model
-  - [ ] Admin UI for skill management
-  - [ ] Enable/disable toggle
-- [ ] **Skill Matching Engine**
-  - [ ] Embedding generation for triggers
-  - [ ] Similarity search (top-5)
-  - [ ] LLM re-ranking
-  - [ ] Confidence threshold logic
-- [ ] **Skill Testing**
-  - [ ] "Test Skill" playground in admin
+## Phase 3: Skill System ✅
+- [x] **Skill CRUD**
+  - [x] Create skill model
+  - [x] Admin UI for skill management
+  - [x] Enable/disable toggle
+- [x] **Skill Matching Engine**
+  - [x] Embedding generation for triggers
+  - [x] Similarity search (top-5)
+  - [x] LLM re-ranking
+  - [x] Confidence threshold logic
+- [x] **Skill Testing**
+  - [x] "Test Skill" playground in admin
 
 ---
 
