@@ -1,9 +1,6 @@
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Organizations table
 CREATE TABLE organizations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -15,7 +12,7 @@ CREATE TYPE user_role AS ENUM ('owner', 'admin', 'member');
 
 -- Organization memberships (junction table)
 CREATE TABLE organization_members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role user_role NOT NULL DEFAULT 'member',

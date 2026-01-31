@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Skills table
 CREATE TABLE skills (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   trigger_examples TEXT[] NOT NULL DEFAULT '{}',
@@ -15,7 +15,7 @@ CREATE TABLE skills (
 
 -- Skill embeddings for semantic search
 CREATE TABLE skill_embeddings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
   trigger_text TEXT NOT NULL,
   embedding vector(1536),  -- OpenAI text-embedding-3-small dimension
