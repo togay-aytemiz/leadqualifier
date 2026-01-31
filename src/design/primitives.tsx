@@ -1,3 +1,5 @@
+'use client'
+
 import { cn } from '@/lib/utils'
 
 // --- Button ---
@@ -100,10 +102,10 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, actions, breadcrumb }: PageHeaderProps) {
     return (
-        <div className="h-16 border-b border-gray-200 flex items-center justify-between px-8 bg-white shrink-0 sticky top-0 z-10">
+        <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 bg-white shrink-0 sticky top-0 z-10">
             <div className="flex items-center gap-3">
                 {breadcrumb}
-                <h2 className="font-bold text-gray-900 text-xl">{title}</h2>
+                <h2 className="font-bold text-gray-900 text-lg">{title}</h2>
             </div>
             <div className="flex gap-3">
                 {actions}

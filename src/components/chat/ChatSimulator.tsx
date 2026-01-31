@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { ChatMessage, simulateChat } from '@/lib/chat/actions'
 import { ChatBubble } from './ChatBubble'
-import { createClient } from '@/lib/supabase/client'
+
 
 interface ChatSimulatorProps {
     organizationId: string
@@ -83,17 +83,17 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-10rem)]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full min-h-0">
             {/* Chat Window */}
-            <div className="lg:col-span-2 flex flex-col rounded-xl overflow-hidden border border-zinc-700 bg-[#efeae2]">
+            <div className="lg:col-span-2 flex flex-col rounded-xl overflow-hidden border border-gray-200 bg-[#efeae2] shadow-sm">
                 {/* Header */}
-                <div className="bg-[#202c33] px-4 py-3 flex items-center gap-3 border-b border-zinc-700">
-                    <div className="w-10 h-10 rounded-full bg-zinc-600 flex items-center justify-center text-white font-semibold">
+                <div className="bg-[#00a884] px-4 py-3 flex items-center gap-3 shadow-sm z-10">
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold backdrop-blur-sm">
                         {organizationName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                        <h3 className="text-white font-medium">{organizationName}</h3>
-                        <p className="text-xs text-zinc-400">Business Account</p>
+                        <h3 className="text-white font-medium text-base">{organizationName}</h3>
+                        <p className="text-white/80 text-xs">Business Account</p>
                     </div>
                 </div>
 
@@ -101,8 +101,8 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                 <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d936cd035c.png")', backgroundRepeat: 'repeat' }}>
                     {messages.length === 0 && (
                         <div className="flex justify-center mt-10">
-                            <span className="bg-[#1f2c34] text-[#ffd279] text-xs px-3 py-1.5 rounded-lg shadow-sm text-center">
-                                Messages are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.
+                            <span className="bg-[#fff5c4] text-gray-800 text-xs px-3 py-1.5 rounded-lg shadow-sm text-center border border-[#ffeeba]">
+                                Messages are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.
                             </span>
                         </div>
                     )}
@@ -115,9 +115,9 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                         <div className="flex w-full justify-start animate-fade-in">
                             <div className="bg-white rounded-lg rounded-tl-none px-4 py-3 shadow-sm">
                                 <div className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"></span>
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
                                 </div>
                             </div>
                         </div>
@@ -126,19 +126,19 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                 </div>
 
                 {/* Input */}
-                <div className="bg-[#202c33] px-4 py-3 border-t border-zinc-700">
+                <div className="bg-[#f0f2f5] px-4 py-3 border-t border-gray-200">
                     <form onSubmit={handleSend} className="flex gap-2">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Type a message"
-                            className="flex-1 bg-[#2a3942] text-white rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-zinc-500"
+                            className="flex-1 bg-white text-gray-900 rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 border border-gray-200 focus:border-[#00a884] transition-colors"
                         />
                         <button
                             type="submit"
                             disabled={!input.trim() || isTyping}
-                            className="bg-[#00a884] text-white p-2 rounded-lg hover:bg-[#008f6f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="bg-[#00a884] text-white p-2 rounded-lg hover:bg-[#008f6f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                         >
                             <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" className="" fill="currentColor" enableBackground="new 0 0 24 24"><title>send</title><path d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"></path></svg>
                         </button>
@@ -147,16 +147,16 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
             </div>
 
             {/* Debug Panel */}
-            <div className="hidden lg:block rounded-xl bg-zinc-800/50 border border-zinc-700/50 p-6 h-fit">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <div className="hidden lg:block rounded-xl bg-white border border-gray-200 p-6 h-fit shadow-sm">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-purple-600">bug_report</span>
                     Simulator Debug
                 </h3>
 
-                <div className="mb-6 p-4 rounded-lg bg-zinc-700/30 border border-zinc-600/30">
+                <div className="mb-6 p-4 rounded-lg bg-gray-50 border border-gray-100">
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Sensitivity</label>
-                        <span className="text-xs font-mono text-white bg-zinc-700 px-1.5 py-0.5 rounded">{threshold}</span>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sensitivity</label>
+                        <span className="text-xs font-mono text-gray-700 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">{threshold}</span>
                     </div>
                     <input
                         type="range"
@@ -165,9 +165,9 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                         step="0.05"
                         value={threshold}
                         onChange={(e) => setThreshold(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-[#00a884]"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#00a884]"
                     />
-                    <p className="text-[10px] text-zinc-500 mt-1.5">
+                    <p className="text-[10px] text-gray-500 mt-2">
                         Lower = More creative/loose<br />
                         Higher = More strict/exact
                     </p>
@@ -175,35 +175,35 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
 
                 {debugInfo ? (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                        <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                            <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Matched Skill</span>
-                            <p className="text-white font-medium mt-1">{debugInfo.title}</p>
+                        <div className="p-4 rounded-lg bg-green-50 border border-green-100">
+                            <span className="text-xs font-semibold text-green-600 uppercase tracking-wider">Matched Skill</span>
+                            <p className="text-gray-900 font-semibold mt-1">{debugInfo.title}</p>
                         </div>
 
-                        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                            <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Confidence Score</span>
-                            <div className="flex items-center gap-2 mt-1">
-                                <div className="flex-1 h-2 bg-blue-900 rounded-full overflow-hidden">
+                        <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+                            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Confidence Score</span>
+                            <div className="flex items-center gap-2 mt-2">
+                                <div className="flex-1 h-2 bg-blue-100 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-blue-500 transition-all duration-500"
+                                        className="h-full bg-blue-500 transition-all duration-500 rounded-full"
                                         style={{ width: `${Math.round(debugInfo.similarity * 100)}%` }}
                                     />
                                 </div>
-                                <span className="text-white font-mono text-sm">{(debugInfo.similarity * 100).toFixed(1)}%</span>
+                                <span className="text-gray-700 font-mono text-sm font-medium">{(debugInfo.similarity * 100).toFixed(1)}%</span>
                             </div>
                         </div>
 
-                        <div className="p-4 rounded-lg bg-zinc-700/30 border border-zinc-600/30">
-                            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Skill ID</span>
-                            <p className="text-zinc-500 text-xs font-mono mt-1 break-all">{debugInfo.id}</p>
+                        <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Skill ID</span>
+                            <p className="text-gray-500 text-xs font-mono mt-1 break-all bg-white p-1 rounded border border-gray-100">{debugInfo.id}</p>
                         </div>
                     </div>
                 ) : (
-                    <div className="text-center py-10">
-                        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3">
-                            <svg className="w-6 h-6 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    <div className="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                        <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                            <span className="material-symbols-outlined text-gray-400">chat_bubble_outline</span>
                         </div>
-                        <p className="text-zinc-500 text-sm">Send a message to see how the bot processes it.</p>
+                        <p className="text-gray-500 text-sm">Send a message to see how the bot processes it.</p>
                     </div>
                 )}
             </div>

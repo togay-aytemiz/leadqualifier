@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sidebar, SidebarGroup, SidebarItem, Avatar, EmptyState, IconButton } from '@/design'
+import { Avatar, EmptyState, IconButton } from '@/design'
 import { Conversation, Message } from '@/types/database'
 import { getMessages, sendMessage, createMockConversation } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
@@ -115,40 +115,12 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
 
     return (
         <>
-            {/* Inner Sidebar */}
-            <Sidebar
-                title="Inbox"
-                actions={
-                    <div className="flex gap-1">
-                        <IconButton onClick={handleCreateMock} icon="add" size="sm" />
-                        <IconButton icon="search" size="sm" />
-                    </div>
-                }
-            >
-                <SidebarGroup>
-                    <SidebarItem icon="inbox" label="Your Inbox" count={conversations.filter(c => c.unread_count > 0).length || undefined} active />
-                    <SidebarItem icon="alternate_email" label="Mentions" count={2} />
-                    <SidebarItem icon="edit" label="Created by you" count={6} />
-                </SidebarGroup>
-
-                <SidebarGroup title="Teams">
-                    <SidebarItem icon="group" label="Unassigned" count={8} />
-                    <SidebarItem icon="support_agent" label="Support Team" count={12} />
-                </SidebarGroup>
-
-                <SidebarGroup title="Views">
-                    <SidebarItem icon="warning" iconColor="text-yellow-500" label="Waiting premium" count={6} />
-                    <SidebarItem icon="mail" iconColor="text-blue-400" label="Emails" count={21} />
-                    <SidebarItem icon="call" iconColor="text-red-400" label="Calls in progress" count={16} />
-                </SidebarGroup>
-            </Sidebar>
-
             {/* Conversation List */}
             <div className="w-[320px] border-r border-gray-200 flex flex-col h-full bg-gray-50/30">
                 <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-white">
                     <div className="flex items-center gap-1 cursor-pointer group">
-                        <span className="text-sm font-bold text-gray-900">{conversations.length} Open</span>
-                        <span className="material-symbols-outlined text-[18px] text-gray-500 group-hover:text-gray-900">keyboard_arrow_down</span>
+                        <span className="text-lg font-bold text-gray-900">Inbox</span>
+                        <span className="material-symbols-outlined text-[20px] text-gray-500 group-hover:text-gray-900">keyboard_arrow_down</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <IconButton icon="filter_list" size="sm" />

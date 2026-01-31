@@ -4,19 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-interface GlobalRailProps {
-    userName?: string
-}
+
 
 // Internal nav items
 const navItems = [
     { id: 'inbox', href: '/inbox', label: 'Inbox', icon: 'inbox' },
-    { id: 'simulator', href: '/simulator', label: 'Chat', icon: 'chat_bubble' },
-    { id: 'skills', href: '/skills', label: 'Contacts', icon: 'people' },
-    { id: 'analytics', href: '/dashboard', label: 'Analytics', icon: 'analytics' },
+    { id: 'simulator', href: '/simulator', label: 'Simulator', icon: 'chat_bubble' },
+    { id: 'skills', href: '/skills', label: 'Skills', icon: 'auto_awesome' },
 ]
 
-export function GlobalRail({ userName = 'User' }: GlobalRailProps) {
+export function GlobalRail() {
     const pathname = usePathname()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
 

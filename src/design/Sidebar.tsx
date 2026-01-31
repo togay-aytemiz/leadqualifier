@@ -49,7 +49,7 @@ export function SidebarGroup({ title, children }: SidebarGroupProps) {
     return (
         <div className="space-y-1">
             {title && (
-                <div className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                <div className="px-3 text-xs font-semibold text-gray-500 mb-2">
                     {title}
                 </div>
             )}

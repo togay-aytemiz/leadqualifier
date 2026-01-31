@@ -7,14 +7,21 @@ import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/databa
 /**
  * Get all skills for an organization
  */
-export async function getSkills(organizationId: string): Promise<Skill[]> {
+export async function getSkills(organizationId: string, search?: string): Promise<Skill[]> {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    let query = supabase
         .from('skills')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
+
+    if (search && search.trim()) {
+        const searchTerm = `%${search.trim()}%`
+        query = query.or(`title.ilike.${searchTerm},response_text.ilike.${searchTerm}`)
+    }
+
+    const { data, error } = await query
 
     if (error) throw new Error(error.message)
     return data ?? []

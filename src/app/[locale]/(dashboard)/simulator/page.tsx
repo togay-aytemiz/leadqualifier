@@ -1,12 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { getTranslations } from 'next-intl/server'
+
 import { redirect } from 'next/navigation'
 import ChatSimulator from '@/components/chat/ChatSimulator'
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
+import { PageHeader } from '@/design'
 
 export default async function SimulatorPage() {
     const supabase = await createClient()
-    const t = await getTranslations('common')
 
     const {
         data: { user },
@@ -38,31 +37,20 @@ export default async function SimulatorPage() {
 
     return (
         <>
-            {/* Inner Sidebar */}
-            <Sidebar title="Simulator">
-                <SidebarGroup title="Testing">
-                    <SidebarItem icon="chat_bubble" label="Chat Simulator" active />
-                    <SidebarItem icon="play_circle" label="Scenarios" />
-                    <SidebarItem icon="analytics" label="Logs" />
-                </SidebarGroup>
-
-                <SidebarGroup title="Navigation">
-                    <SidebarItem icon="inbox" label="Go to Inbox" href="/inbox" />
-                    <SidebarItem icon="settings" label="Channel Settings" href="/settings/channels" />
-                </SidebarGroup>
-            </Sidebar>
-
             {/* Main Content */}
-            <div className="flex-1 bg-gray-50 flex flex-col min-w-0 overflow-hidden">
-                <PageHeader title="WhatsApp Simulator" />
+            {/* Main Content */}
+            <div className="flex-1 bg-gray-50 flex flex-col min-w-0 overflow-hidden h-full">
+                <PageHeader title="Messenger Simulator" />
 
-                <div className="flex-1 overflow-auto p-8">
-                    <div className="max-w-5xl mx-auto">
-                        <p className="text-gray-500 mb-6">Test your conversational agent in a realistic environment. Messages here do not persist.</p>
-                        <ChatSimulator
-                            organizationId={memberships.organization_id}
-                            organizationName={org.name}
-                        />
+                <div className="flex-1 min-h-0 p-6">
+                    <div className="max-w-6xl mx-auto h-full flex flex-col">
+                        <p className="text-gray-500 mb-4 shrink-0 px-1">Test your conversational agent in a realistic environment. Messages here do not persist.</p>
+                        <div className="flex-1 min-h-0">
+                            <ChatSimulator
+                                organizationId={memberships.organization_id}
+                                organizationName={org.name}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

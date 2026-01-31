@@ -42,17 +42,8 @@ export default async function ChannelsPage() {
         <>
             {/* Inner Sidebar */}
             <Sidebar title="Settings">
-                <SidebarGroup title="Project">
-                    <SidebarItem icon="dashboard" label="Overview" href="/dashboard" />
-                </SidebarGroup>
-
                 <SidebarGroup title="Integrations">
                     <SidebarItem icon="bolt" label="Channels" active />
-                </SidebarGroup>
-
-                <SidebarGroup title="Account">
-                    <SidebarItem icon="people" label="Members" />
-                    <SidebarItem icon="code" label="Environment" />
                 </SidebarGroup>
 
                 <SidebarGroup title="Billing">
