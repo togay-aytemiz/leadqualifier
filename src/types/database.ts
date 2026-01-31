@@ -63,8 +63,43 @@ export interface SkillMatch {
     similarity: number
 }
 
+// Inbox Types
+export type ConversationPlatform = 'whatsapp' | 'telegram' | 'simulator'
+export type ConversationStatus = 'open' | 'closed' | 'snoozed'
+export type MessageSenderType = 'user' | 'contact' | 'system' | 'bot'
+
+export interface Conversation {
+    id: string
+    organization_id: string
+    contact_name: string
+    contact_phone: string | null
+    platform: ConversationPlatform
+    status: ConversationStatus
+    assignee_id: string | null
+    last_message_at: string
+    unread_count: number
+    tags: string[]
+    created_at: string
+    updated_at: string
+}
+
+export interface Message {
+    id: string
+    conversation_id: string
+    sender_type: MessageSenderType
+    content: string
+    metadata: any
+    created_at: string
+}
+
 export type SkillInsert = Omit<Skill, 'id' | 'created_at' | 'updated_at'>
 export type SkillUpdate = Partial<Omit<Skill, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+
+export type ConversationInsert = Omit<Conversation, 'id' | 'created_at' | 'updated_at'>
+export type ConversationUpdate = Partial<Omit<Conversation, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+
+export type MessageInsert = Omit<Message, 'id' | 'created_at'>
+export type MessageUpdate = Partial<Omit<Message, 'id' | 'conversation_id' | 'created_at'>>
 
 // Database table types for Supabase
 export interface Database {
@@ -94,6 +129,16 @@ export interface Database {
                 Row: SkillEmbedding
                 Insert: Omit<SkillEmbedding, 'id' | 'created_at'>
                 Update: Partial<Omit<SkillEmbedding, 'id' | 'created_at'>>
+            }
+            conversations: {
+                Row: Conversation
+                Insert: ConversationInsert
+                Update: ConversationUpdate
+            }
+            messages: {
+                Row: Message
+                Insert: MessageInsert
+                Update: MessageUpdate
             }
         }
     }
