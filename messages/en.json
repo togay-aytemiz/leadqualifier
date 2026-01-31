@@ -1,6 +1,44 @@
 {
     "common": {
         "welcome": "Welcome to Lead Qualifier",
-        "loading": "Loading..."
+        "loading": "Loading...",
+        "submit": "Submit",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "back": "Back"
+    },
+    "auth": {
+        "login": "Sign In",
+        "register": "Sign Up",
+        "logout": "Sign Out",
+        "email": "Email",
+        "password": "Password",
+        "confirmPassword": "Confirm Password",
+        "fullName": "Full Name",
+        "companyName": "Company Name",
+        "forgotPassword": "Forgot password?",
+        "noAccount": "Don't have an account?",
+        "hasAccount": "Already have an account?",
+        "signInWith": "Sign in with",
+        "orContinueWith": "or continue with",
+        "loginTitle": "Welcome back",
+        "loginSubtitle": "Sign in to your account",
+        "registerTitle": "Create an account",
+        "registerSubtitle": "Start qualifying your leads today",
+        "errors": {
+            "invalidCredentials": "Invalid email or password",
+            "emailRequired": "Email is required",
+            "passwordRequired": "Password is required",
+            "passwordMismatch": "Passwords do not match",
+            "weakPassword": "Password must be at least 6 characters",
+            "emailInUse": "Email is already in use",
+            "generic": "Something went wrong. Please try again."
+        }
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "welcome": "Welcome, {name}!"
     }
 }

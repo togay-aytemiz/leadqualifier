@@ -1,6 +1,44 @@
 {
     "common": {
         "welcome": "Lead Qualifier'a Hoş Geldiniz",
-        "loading": "Yükleniyor..."
+        "loading": "Yükleniyor...",
+        "submit": "Gönder",
+        "cancel": "İptal",
+        "save": "Kaydet",
+        "delete": "Sil",
+        "edit": "Düzenle",
+        "back": "Geri"
+    },
+    "auth": {
+        "login": "Giriş Yap",
+        "register": "Kayıt Ol",
+        "logout": "Çıkış Yap",
+        "email": "E-posta",
+        "password": "Şifre",
+        "confirmPassword": "Şifre Tekrar",
+        "fullName": "Ad Soyad",
+        "companyName": "Şirket Adı",
+        "forgotPassword": "Şifremi unuttum",
+        "noAccount": "Hesabınız yok mu?",
+        "hasAccount": "Zaten hesabınız var mı?",
+        "signInWith": "ile giriş yap",
+        "orContinueWith": "veya devam et",
+        "loginTitle": "Tekrar hoş geldiniz",
+        "loginSubtitle": "Hesabınıza giriş yapın",
+        "registerTitle": "Hesap oluşturun",
+        "registerSubtitle": "Lead'lerinizi nitelendirmeye bugün başlayın",
+        "errors": {
+            "invalidCredentials": "Geçersiz e-posta veya şifre",
+            "emailRequired": "E-posta gerekli",
+            "passwordRequired": "Şifre gerekli",
+            "passwordMismatch": "Şifreler eşleşmiyor",
+            "weakPassword": "Şifre en az 6 karakter olmalı",
+            "emailInUse": "Bu e-posta zaten kullanımda",
+            "generic": "Bir hata oluştu. Lütfen tekrar deneyin."
+        }
+    },
+    "dashboard": {
+        "title": "Panel",
+        "welcome": "Hoş geldiniz, {name}!"
     }
 }
