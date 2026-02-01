@@ -321,7 +321,7 @@ export function Input({ label, error, className, onChange, ...props }: InputProp
                 {...props}
                 onChange={(e) => onChange?.(e.target.value)}
                 className={cn(
-                    "w-full h-10 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm",
+                    "w-full h-10 px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm bg-white text-gray-900",
                     error ? "border-red-300" : "border-gray-300",
                     className
                 )}
@@ -346,7 +346,7 @@ export function TextArea({ label, error, className, onChange, ...props }: TextAr
                 {...props}
                 onChange={(e) => onChange?.(e.target.value)}
                 className={cn(
-                    "w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm",
+                    "w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm bg-white text-gray-900",
                     error ? "border-red-300" : "border-gray-300",
                     className
                 )}
