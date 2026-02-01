@@ -19,7 +19,9 @@ export {
     TextArea,
     Modal,
     IconButton,
-    Alert
+    Alert,
+    Skeleton,
+    PageSkeleton
 } from './primitives'
 export { GlobalRail } from './GlobalRail'
 export { Sidebar, SidebarGroup, SidebarItem } from './Sidebar'

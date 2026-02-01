@@ -170,30 +170,40 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     className="flex-1 overflow-y-auto"
                     onScroll={handleScroll}
                 >
-                    {conversations.map(c => (
-                        <div
-                            key={c.id}
-                            onClick={() => setSelectedId(c.id)}
-                            className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""
-                                }`}
-                        >
-                            <div className="flex justify-between items-start mb-1.5">
-                                <div className="flex items-center gap-2.5">
-                                    <Avatar name={c.contact_name} size="sm" />
-                                    <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
-                                </div>
-                                <span className="text-xs text-gray-400">
-                                    {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false }).replace('about ', '')}
-                                </span>
+                    {conversations.length === 0 ? (
+                        <div className="flex flex-col items-center justify-start h-full p-6 pt-20 text-center">
+                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                                <Inbox className="text-gray-400" size={24} />
                             </div>
-                            <div className="pl-[34px] pr-2">
-                                <p className="text-sm text-gray-500 truncate leading-relaxed">
-                                    {c.messages?.[0]?.content || 'No messages yet'}
-                                </p>
-                            </div>
-                            {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
+                            <h3 className="text-sm font-medium text-gray-900">No messages</h3>
+                            <p className="text-xs text-gray-500 mt-1">New conversations will appear here when you receive messages.</p>
                         </div>
-                    ))}
+                    ) : (
+                        conversations.map(c => (
+                            <div
+                                key={c.id}
+                                onClick={() => setSelectedId(c.id)}
+                                className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""
+                                    }`}
+                            >
+                                <div className="flex justify-between items-start mb-1.5">
+                                    <div className="flex items-center gap-2.5">
+                                        <Avatar name={c.contact_name} size="sm" />
+                                        <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
+                                    </div>
+                                    <span className="text-xs text-gray-400">
+                                        {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false }).replace('about ', '')}
+                                    </span>
+                                </div>
+                                <div className="pl-[34px] pr-2">
+                                    <p className="text-sm text-gray-500 truncate leading-relaxed">
+                                        {c.messages?.[0]?.content || 'No messages yet'}
+                                    </p>
+                                </div>
+                                {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
+                            </div>
+                        ))
+                    )}
                     {loadingMore && (
                         <div className="p-4 flex justify-center">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>

@@ -37,6 +37,12 @@
   - Org-specific simulation context
   - Debug panel with confidence scores and matched skill details
   - Dynamic sensitivity threshold slider (0.0 - 1.0)
+- **Phase 3.6: Refinements & Inbox**
+  - **Refactoring:** Replaced all `material-symbols-outlined` with `lucide-react` icons for modern consistency.
+  - **Inbox:** Implemented lazy loading (infinite scroll) for conversations.
+  - **Inbox:** Added "Delete Conversation" functionality with cascading database deletes.
+  - **Inbox:** UI improvements (message previews, simplified list items).
+  - **Inbox:** Removed mock data creation; now fully driven by real database data.
 
 ### Changed
 - N/A

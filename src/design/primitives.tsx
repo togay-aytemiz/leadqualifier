@@ -434,3 +434,36 @@ export function Alert({ variant = 'error', children, className }: AlertProps) {
         </div>
     )
 }
+
+// --- Skeleton ---
+interface SkeletonProps {
+    className?: string
+}
+
+export function Skeleton({ className }: SkeletonProps) {
+    return (
+        <div className={cn("animate-pulse bg-gray-200 rounded", className)} />
+    )
+}
+
+// --- PageSkeleton ---
+export function PageSkeleton() {
+    return (
+        <div className="flex-1 flex flex-col min-w-0 bg-white">
+            <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+                <Skeleton className="h-6 w-32" />
+                <div className="flex gap-2">
+                    <Skeleton className="h-9 w-24" />
+                </div>
+            </div>
+            <div className="p-6 space-y-6">
+                <div className="grid gap-6 md:grid-cols-3">
+                    <Skeleton className="h-32 w-full rounded-xl" />
+                    <Skeleton className="h-32 w-full rounded-xl" />
+                    <Skeleton className="h-32 w-full rounded-xl" />
+                </div>
+                <Skeleton className="h-[400px] w-full rounded-xl" />
+            </div>
+        </div>
+    )
+}

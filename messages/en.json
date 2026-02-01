@@ -86,5 +86,25 @@
         "knowledgeBase": "Knowledge Base",
         "leads": "Leads",
         "settings": "Settings"
+    },
+    "General": {
+        "title": "General Settings",
+        "language": "Language",
+        "languageDescription": "Select your preferred language for the interface."
+    },
+    "Channels": {
+        "title": "Channels & Integrations",
+        "noOrganization": "No Organization Found",
+        "noOrganizationDesc": "You need to be part of an organization to manage channels."
+    },
+    "Sidebar": {
+        "settings": "Settings",
+        "preferences": "Preferences",
+        "general": "General",
+        "integrations": "Integrations",
+        "channels": "Channels",
+        "billing": "Billing",
+        "plans": "Plans",
+        "receipts": "Receipts"
     }
 }

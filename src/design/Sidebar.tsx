@@ -20,16 +20,7 @@ export function Sidebar({ title, children, actions }: SidebarProps) {
                 <div className="flex items-center gap-2 font-semibold text-gray-900">
                     <span>{title}</span>
                 </div>
-                {actions ? actions : (
-                    <div className="flex gap-1">
-                        <button className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
-                            <Plus size={18} />
-                        </button>
-                        <button className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
-                            <Search size={18} />
-                        </button>
-                    </div>
-                )}
+                {actions && actions}
             </div>
 
             {/* Content */}
@@ -61,7 +52,7 @@ export function SidebarGroup({ title, children }: SidebarGroupProps) {
 
 // --- Sidebar Item ---
 interface SidebarItemProps {
-    icon?: React.ElementType
+    icon?: React.ReactNode
     iconColor?: string
     label: string
     active?: boolean
@@ -71,7 +62,7 @@ interface SidebarItemProps {
     avatar?: string
 }
 
-export function SidebarItem({ icon: Icon, iconColor, label, active, count, onClick, href, avatar }: SidebarItemProps) {
+export function SidebarItem({ icon, iconColor, label, active, count, onClick, href, avatar }: SidebarItemProps) {
     const content = (
         <div
             onClick={onClick}
@@ -87,8 +78,8 @@ export function SidebarItem({ icon: Icon, iconColor, label, active, count, onCli
                     <div className="h-5 w-5 rounded-full bg-gray-200 overflow-hidden">
                         <img alt="User" className="h-full w-full object-cover" src={avatar} />
                     </div>
-                ) : Icon ? (
-                    <Icon className={cn("", iconColor || "text-gray-400")} size={18} />
+                ) : icon ? (
+                    <div className={cn("", iconColor || "text-gray-400")}>{icon}</div>
                 ) : null}
                 <span>{label}</span>
             </div>

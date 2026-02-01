@@ -45,11 +45,13 @@ Automate WhatsApp message handling:
 | Lead Extraction | AI summary + score (0-10) |
 | Human Takeover | Bot pauses when business replies |
 | Multi-Tenant | Organization-based isolation |
+| Multi-Tenant | Organization-based isolation |
 | Admin Panel | Leads, Skills, KB, Channels management |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete** |
 
 ### ❌ Out of Scope (Intentional)
-- Inbox / chat UI
 - Calendar integration
+- Auto follow-up sequences
 - Auto follow-up sequences
 - Campaigns / broadcasts
 - Advanced flow builder

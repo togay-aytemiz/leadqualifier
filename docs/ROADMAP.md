@@ -60,6 +60,18 @@
   - [x] Connect to Skill Matching Engine
   - [x] Simulate typing delay
   - [x] Debug mode for matching details
+- [x] **Dynamic Controls**
+  - [x] Sensitivity threshold slider
+
+## Phase 3.6: Refinements & Inbox ✅
+- [x] **Inbox UI**
+  - [x] Conversation list with lazy loading
+  - [x] Message history view
+  - [x] Delete conversation functionality
+  - [x] Real-time updates (via polling/subscriptions)
+- [x] **Refactoring**
+  - [x] Migrate to Lucide Icons
+  - [x] Primitive component cleanup
 
 ---
 
