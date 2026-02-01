@@ -5,7 +5,10 @@ import { matchSkills } from '@/lib/skills/actions'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: NextRequest) {
-    const secretToken = req.headers.get('x-telegram-bot-api-secret-token')
+    const headerSecret = req.headers.get('x-telegram-bot-api-secret-token')
+    const querySecret = req.nextUrl.searchParams.get('secret')
+    const secretToken = headerSecret || querySecret
+
     const update = await req.json()
 
     console.log('Telegram Webhook: Received update', {

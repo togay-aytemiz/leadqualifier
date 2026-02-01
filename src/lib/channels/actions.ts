@@ -40,7 +40,8 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
 
         if (appUrl) {
             console.log('Setting Telegram Webhook to:', `${appUrl}/api/webhooks/telegram`)
-            await client.setWebhook(`${appUrl}/api/webhooks/telegram`, webhookSecret)
+            // Pass secret in URL as query param to avoid header stripping issues
+            await client.setWebhook(`${appUrl}/api/webhooks/telegram?secret=${webhookSecret}`, webhookSecret)
         } else {
             console.error('APP_URL not defined. Env vars checks:', {
                 NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
