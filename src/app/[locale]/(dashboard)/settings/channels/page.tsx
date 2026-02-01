@@ -1,12 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { getChannels } from '@/lib/channels/actions'
-import { getLocale } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { ChannelsList } from '@/components/channels/ChannelsList'
 import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
 import { Zap, CreditCard, Receipt, Settings } from 'lucide-react'
 
 export default async function ChannelsPage() {
     const supabase = await createClient()
+    const locale = await getLocale()
+    const tSidebar = await getTranslations('Sidebar')
+    const tChannels = await getTranslations('Channels')
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
@@ -25,8 +28,8 @@ export default async function ChannelsPage() {
         return (
             <div className="flex-1 flex items-center justify-center text-gray-500">
                 <div className="text-center">
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">No Organization Found</h2>
-                    <p>You need to be part of an organization to manage channels.</p>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">{tChannels('noOrganization')}</h2>
+                    <p>{tChannels('noOrganizationDesc')}</p>
                 </div>
             </div>
         )
@@ -43,33 +46,28 @@ export default async function ChannelsPage() {
     return (
         <>
             {/* Inner Sidebar */}
-            <Sidebar title="Settings">
-                <SidebarGroup title="Preferences">
+            <Sidebar title={tSidebar('settings')}>
+                <SidebarGroup title={tSidebar('preferences')}>
                     <SidebarItem
                         icon={<Settings size={18} />}
-                        label="General"
-                        href={`/settings/general`} // Next.js Link should auto-handle locale if configured, or I might need to prepend locale? 
-                    // Wait, SidebarItem uses Link. If I use href="/settings/general" it might go to root /settings/General.
-                    // I should probably ensure it keeps the locale.
-                    // For now I'll use a relative path or just verify how other Links work.
-                    // The Sidebar component I saw earlier uses Link from 'next/link'.
-                    // `href` prop in SidebarItem.
+                        label={tSidebar('general')}
+                        href={locale === 'tr' ? '/settings/general' : `/${locale}/settings/general`}
                     />
                 </SidebarGroup>
 
-                <SidebarGroup title="Integrations">
-                    <SidebarItem icon={<Zap size={18} />} label="Channels" active />
+                <SidebarGroup title={tSidebar('integrations')}>
+                    <SidebarItem icon={<Zap size={18} />} label={tSidebar('channels')} active />
                 </SidebarGroup>
 
-                <SidebarGroup title="Billing">
-                    <SidebarItem icon={<CreditCard size={18} />} label="Plans" />
-                    <SidebarItem icon={<Receipt size={18} />} label="Receipts" />
+                <SidebarGroup title={tSidebar('billing')}>
+                    <SidebarItem icon={<CreditCard size={18} />} label={tSidebar('plans')} />
+                    <SidebarItem icon={<Receipt size={18} />} label={tSidebar('receipts')} />
                 </SidebarGroup>
             </Sidebar>
 
             {/* Main Content */}
             <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-                <PageHeader title="Channels & Integrations" />
+                <PageHeader title={tChannels('title')} />
 
                 <div className="flex-1 overflow-auto p-8">
                     <ChannelsList channels={channels || []} organizationId={organizationId} />

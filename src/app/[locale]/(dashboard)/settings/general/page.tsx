@@ -4,13 +4,15 @@ import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Globe } from 'lucide-react'
 import { useRouter, usePathname } from '@/i18n/navigation'
 import { useState, useTransition } from 'react'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 export default function GeneralSettingsPage() {
     const pathname = usePathname()
     const router = useRouter()
     const currentLocale = useLocale()
     const [isPending, startTransition] = useTransition()
+    const tGeneral = useTranslations('General')
+    const tSidebar = useTranslations('Sidebar')
 
     const handleLanguageChange = (newLang: string) => {
         const nextLocale = newLang as 'en' | 'tr'
@@ -20,38 +22,38 @@ export default function GeneralSettingsPage() {
     }
 
     return (
-        <div className="flex h-full bg-white">
+        <>
             {/* Inner Sidebar (Replicated) */}
-            <Sidebar title="Settings">
-                <SidebarGroup title="Preferences">
-                    <SidebarItem icon={<Settings size={18} />} label="General" active />
+            <Sidebar title={tSidebar('settings')}>
+                <SidebarGroup title={tSidebar('preferences')}>
+                    <SidebarItem icon={<Settings size={18} />} label={tSidebar('general')} active />
                 </SidebarGroup>
 
-                <SidebarGroup title="Integrations">
+                <SidebarGroup title={tSidebar('integrations')}>
                     <SidebarItem
                         icon={<Zap size={18} />}
-                        label="Channels"
+                        label={tSidebar('channels')}
                         href={currentLocale === 'tr' ? '/settings/channels' : `/${currentLocale}/settings/channels`}
                     />
                 </SidebarGroup>
 
-                <SidebarGroup title="Billing">
+                <SidebarGroup title={tSidebar('billing')}>
                     <SidebarItem
                         icon={<CreditCard size={18} />}
-                        label="Plans"
+                        label={tSidebar('plans')}
                         href="#" // Placeholder
                     />
                     <SidebarItem
                         icon={<Receipt size={18} />}
-                        label="Receipts"
+                        label={tSidebar('receipts')}
                         href="#" // Placeholder
                     />
                 </SidebarGroup>
             </Sidebar>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <PageHeader title="General Settings" />
+            <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
+                <PageHeader title={tGeneral('title')} />
 
                 <div className="flex-1 overflow-auto p-8">
                     <div className="w-full space-y-8">
@@ -62,8 +64,8 @@ export default function GeneralSettingsPage() {
                                     <Globe size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-semibold text-gray-900">Language</h3>
-                                    <p className="text-sm text-gray-500">Select your preferred language for the interface.</p>
+                                    <h3 className="text-base font-semibold text-gray-900">{tGeneral('language')}</h3>
+                                    <p className="text-sm text-gray-500">{tGeneral('languageDescription')}</p>
                                 </div>
                             </div>
 
@@ -100,6 +102,6 @@ export default function GeneralSettingsPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     )
 }

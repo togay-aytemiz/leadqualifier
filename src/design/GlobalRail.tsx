@@ -5,12 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Inbox, MessageSquare, Sparkles, Settings, Bot } from 'lucide-react'
 
-// Internal nav items
-const navItems = [
-    { id: 'inbox', href: '/inbox', label: 'Inbox', icon: Inbox },
-    { id: 'simulator', href: '/simulator', label: 'Simulator', icon: MessageSquare },
-    { id: 'skills', href: '/skills', label: 'Skills', icon: Sparkles },
-]
+import { useTranslations } from 'next-intl'
 
 interface GlobalRailProps {
     userName?: string
@@ -19,6 +14,13 @@ interface GlobalRailProps {
 export function GlobalRail({ userName }: GlobalRailProps) {
     const pathname = usePathname()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+    const t = useTranslations('nav')
+
+    const navItems = [
+        { id: 'inbox', href: '/inbox', label: t('inbox'), icon: Inbox },
+        { id: 'simulator', href: '/simulator', label: t('simulator'), icon: MessageSquare },
+        { id: 'skills', href: '/skills', label: t('skills'), icon: Sparkles },
+    ]
 
     return (
         <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 gap-6 shrink-0 h-screen">
@@ -43,6 +45,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                                     ? "bg-blue-50 text-blue-600"
                                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                             )}
+                            title={item.label}
                         >
                             <Icon size={20} />
                         </Link>
@@ -60,6 +63,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                             ? "bg-blue-50 text-blue-600"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                     )}
+                    title={t('settings')}
                 >
                     <Settings size={20} />
                 </Link>
