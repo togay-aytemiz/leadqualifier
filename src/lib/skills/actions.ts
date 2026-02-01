@@ -148,9 +148,10 @@ export async function matchSkills(
     query: string,
     organizationId: string,
     threshold: number = 0.5,
-    limit: number = 5
+    limit: number = 5,
+    customSupabase?: any
 ): Promise<SkillMatch[]> {
-    const supabase = await createClient()
+    const supabase = customSupabase || await createClient()
 
     // Generate embedding for the query
     const [queryEmbedding] = await generateEmbeddings([query])

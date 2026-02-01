@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Process AI Response (Skills)
-    const matchedSkills = await matchSkills(text, orgId)
+    const matchedSkills = await matchSkills(text, orgId, 0.5, 5, supabase)
     const bestMatch = matchedSkills?.[0]
 
     console.log('Telegram Webhook: Skill match result', {
