@@ -267,43 +267,26 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     {/* Details Panel */}
                     <div className="w-[300px] border-l border-gray-200 bg-white flex flex-col shrink-0 h-full hidden xl:flex">
                         <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
-                            <div className="flex items-center gap-4">
-                                <h3 className="font-semibold text-gray-900">Details</h3>
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[12px]">smart_toy</span>
-                                    AI Copilot
-                                </span>
-                            </div>
+                            <h3 className="font-semibold text-gray-900">Details</h3>
                             <div className="flex gap-2">
-                                <IconButton icon="open_in_new" size="sm" />
                                 <IconButton icon="close" size="sm" />
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                            {/* Assignee */}
-                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                <span className="text-sm text-gray-500">Assignee</span>
-                                <div className="flex items-center gap-2">
-                                    <div className="h-6 w-6 rounded-full bg-orange-100 flex items-center justify-center text-xs text-orange-600 font-medium">
-                                        {selectedConversation.contact_name.charAt(0)}
-                                    </div>
-                                    <span className="text-sm text-gray-900 font-medium">{selectedConversation.contact_name}</span>
+                            {/* Contact Profile */}
+                            <div className="flex flex-col items-center text-center">
+                                <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center text-xl text-blue-600 font-bold mb-3">
+                                    {selectedConversation.contact_name.charAt(0)}
                                 </div>
-                                <span className="text-sm text-gray-500">Team</span>
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[16px] text-gray-400">inventory_2</span>
-                                    <span className="text-sm text-gray-900">Support</span>
-                                </div>
+                                <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
+                                <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || 'No phone number'}</p>
                             </div>
 
                             <hr className="border-gray-100" />
 
-                            {/* Ticket Attributes */}
+                            {/* Key Information */}
                             <div>
-                                <div className="flex items-center justify-between mb-4 group cursor-pointer">
-                                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Ticket Attributes</h4>
-                                    <span className="material-symbols-outlined text-gray-400 text-[18px] group-hover:text-gray-600 transition-colors">expand_less</span>
-                                </div>
+                                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">Key Information</h4>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">Platform</span>
@@ -312,37 +295,13 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                             <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
-                                        <span className="text-sm text-gray-500 mt-0.5">Status</span>
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">Status</span>
                                         <span className="text-sm text-gray-900 capitalize">{selectedConversation.status}</span>
                                     </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
-                                        <span className="text-sm text-gray-500 mt-0.5">Phone</span>
-                                        <span className="text-sm text-gray-900">{selectedConversation.contact_phone || 'N/A'}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <hr className="border-gray-100" />
-
-                            {/* Conversation Attributes */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4 group cursor-pointer">
-                                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Conversation Attributes</h4>
-                                    <span className="material-symbols-outlined text-gray-400 text-[18px] group-hover:text-gray-600 transition-colors">expand_less</span>
-                                </div>
-                                <div className="space-y-3">
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">Subject</span>
-                                        <span className="text-sm text-gray-400 hover:text-blue-500 cursor-pointer transition-colors">+ Add</span>
-                                    </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">ID</span>
-                                        <span className="text-sm text-gray-900">#{selectedConversation.id.slice(0, 6)}</span>
-                                    </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">Priority</span>
-                                        <span className="text-sm text-gray-900">Medium</span>
+                                        <span className="text-sm text-gray-500">Received</span>
+                                        <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p')}</span>
                                     </div>
                                 </div>
                             </div>
