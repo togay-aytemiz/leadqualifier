@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getChannels } from '@/lib/channels/actions'
 import { ChannelsList } from '@/components/channels/ChannelsList'
 import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
+import { Zap, CreditCard, Receipt } from 'lucide-react'
 
 export default async function ChannelsPage() {
     const supabase = await createClient()
@@ -43,12 +44,12 @@ export default async function ChannelsPage() {
             {/* Inner Sidebar */}
             <Sidebar title="Settings">
                 <SidebarGroup title="Integrations">
-                    <SidebarItem icon="bolt" label="Channels" active />
+                    <SidebarItem icon={Zap} label="Channels" active />
                 </SidebarGroup>
 
                 <SidebarGroup title="Billing">
-                    <SidebarItem icon="credit_card" label="Plans" />
-                    <SidebarItem icon="receipt" label="Receipts" />
+                    <SidebarItem icon={CreditCard} label="Plans" />
+                    <SidebarItem icon={Receipt} label="Receipts" />
                 </SidebarGroup>
             </Sidebar>
 

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getConversations } from '@/lib/inbox/actions'
 import { InboxContainer } from '@/components/inbox/InboxContainer'
 import { redirect } from 'next/navigation'
+import { Building2 } from 'lucide-react'
 
 export default async function InboxPage() {
     const supabase = await createClient()
@@ -41,7 +42,7 @@ export default async function InboxPage() {
         return (
             <div className="flex-1 flex items-center justify-center bg-gray-50 text-gray-500">
                 <div className="text-center">
-                    <span className="material-symbols-outlined text-5xl mb-4 opacity-20 block">domain</span>
+                    <Building2 className="text-gray-300 mx-auto mb-4" size={48} />
                     <p className="text-lg font-medium text-gray-900">No Organization Found</p>
                     <p className="text-sm text-gray-500">You need to be part of an organization to access the inbox.</p>
                 </div>

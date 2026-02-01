@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { Search, X, ArrowUpRight } from 'lucide-react'
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -209,7 +210,7 @@ interface SearchInputProps {
 export function SearchInput({ placeholder = "Search...", value, onChange, className }: SearchInputProps) {
     return (
         <div className={cn("relative w-full", className)}>
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">search</span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
                 type="text"
                 value={value}
@@ -223,16 +224,18 @@ export function SearchInput({ placeholder = "Search...", value, onChange, classN
 
 // --- EmptyState ---
 interface EmptyStateProps {
-    icon: string
+    icon: React.ElementType
     title: string
     description?: string
     action?: React.ReactNode
 }
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
     return (
         <div className="p-12 text-center">
-            <span className="material-symbols-outlined text-gray-300 text-5xl mb-4 block">{icon}</span>
+            <div className="inline-flex items-center justify-center mb-4">
+                <Icon className="text-gray-300" size={48} />
+            </div>
             <p className="text-lg font-medium text-gray-900 mb-1">{title}</p>
             {description && <p className="text-sm text-gray-500 mb-4">{description}</p>}
             {action}
@@ -242,7 +245,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
 
 // --- StatCard ---
 interface StatCardProps {
-    icon: string
+    icon: React.ElementType
     iconColor?: 'blue' | 'purple' | 'green' | 'orange' | 'red'
     title: string
     value: string | number
@@ -250,7 +253,7 @@ interface StatCardProps {
     className?: string
 }
 
-export function StatCard({ icon, iconColor = 'blue', title, value, href, className }: StatCardProps) {
+export function StatCard({ icon: Icon, iconColor = 'blue', title, value, href, className }: StatCardProps) {
     const colorMap = {
         blue: { bg: 'bg-blue-50', text: 'text-blue-500', hover: 'group-hover:text-blue-500' },
         purple: { bg: 'bg-purple-50', text: 'text-purple-500', hover: 'group-hover:text-purple-500' },
@@ -264,10 +267,10 @@ export function StatCard({ icon, iconColor = 'blue', title, value, href, classNa
         <>
             <div className="flex items-center justify-between mb-4">
                 <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", colors.bg)}>
-                    <span className={cn("material-symbols-outlined", colors.text)}>{icon}</span>
+                    <Icon className={cn("", colors.text)} size={20} />
                 </div>
                 {href && (
-                    <span className={cn("material-symbols-outlined text-gray-300 transition-colors", colors.hover)}>arrow_outward</span>
+                    <ArrowUpRight className={cn("text-gray-300 transition-colors", colors.hover)} size={20} />
                 )}
             </div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">{title}</h3>
@@ -370,7 +373,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-900">{title}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                        <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
@@ -383,14 +386,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
 
 // --- IconButton ---
 interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    icon: string
+    icon: React.ElementType
     size?: 'sm' | 'md'
     variant?: 'ghost' | 'default'
 }
 
-export function IconButton({ icon, size = 'md', variant = 'ghost', className, ...props }: IconButtonProps) {
+export function IconButton({ icon: Icon, size = 'md', variant = 'ghost', className, ...props }: IconButtonProps) {
     const sizeClass = size === 'sm' ? 'p-1' : 'p-1.5'
-    const iconSize = size === 'sm' ? 'text-[18px]' : 'text-[20px]'
+    const iconSize = size === 'sm' ? 18 : 20
     const variantClass = variant === 'ghost'
         ? 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
         : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
@@ -405,7 +408,7 @@ export function IconButton({ icon, size = 'md', variant = 'ghost', className, ..
                 className
             )}
         >
-            <span className={cn("material-symbols-outlined", iconSize)}>{icon}</span>
+            <Icon size={iconSize} />
         </button>
     )
 }

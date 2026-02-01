@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { StatCard, PageHeader } from '@/design'
 import { Link } from '@/i18n/navigation'
+import { Building2, Users, Sparkles } from 'lucide-react'
 
 export default async function AdminPage() {
     const supabase = await createClient()
@@ -50,19 +51,19 @@ export default async function AdminPage() {
 
                     <div className="grid gap-6 md:grid-cols-3">
                         <StatCard
-                            icon="domain"
+                            icon={Building2}
                             iconColor="purple"
                             title="Total Organizations"
                             value={orgCount || 0}
                         />
                         <StatCard
-                            icon="people"
+                            icon={Users}
                             iconColor="blue"
                             title="Total Users"
                             value={userCount || 0}
                         />
                         <StatCard
-                            icon="auto_awesome"
+                            icon={Sparkles}
                             iconColor="green"
                             title="Total Skills"
                             value={skillCount || 0}
@@ -77,7 +78,7 @@ export default async function AdminPage() {
                                 className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-200"
                             >
                                 <div className="p-3 rounded-lg bg-purple-50">
-                                    <span className="material-symbols-outlined text-purple-500">domain</span>
+                                    <Building2 className="text-purple-500" size={24} />
                                 </div>
                                 <div>
                                     <p className="font-medium text-gray-900">Manage Organizations</p>
@@ -90,7 +91,7 @@ export default async function AdminPage() {
                                 className="flex items-center gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-200"
                             >
                                 <div className="p-3 rounded-lg bg-blue-50">
-                                    <span className="material-symbols-outlined text-blue-500">people</span>
+                                    <Users className="text-blue-500" size={24} />
                                 </div>
                                 <div>
                                     <p className="font-medium text-gray-900">Manage Users</p>

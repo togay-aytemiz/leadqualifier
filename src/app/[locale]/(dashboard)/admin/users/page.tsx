@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, EmptyState, Badge } from '@/design'
+import { ArrowLeft, Users } from 'lucide-react'
 
 export default async function AdminUsersPage() {
     const supabase = await createClient()
@@ -39,7 +40,7 @@ export default async function AdminUsersPage() {
                 title="Users"
                 breadcrumb={
                     <Link href="/admin" className="text-gray-400 hover:text-gray-600 flex items-center gap-1 text-sm mr-2 transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        <ArrowLeft size={18} />
                         Back
                     </Link>
                 }
@@ -52,7 +53,7 @@ export default async function AdminUsersPage() {
                     <DataTable>
                         {(!profiles || profiles.length === 0) ? (
                             <EmptyState
-                                icon="people"
+                                icon={Users}
                                 title="No users found"
                                 description="There are no users in the system yet."
                             />

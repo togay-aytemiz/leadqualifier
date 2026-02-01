@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
+import { Plus, Trash2, Sparkles, TriangleAlert } from 'lucide-react'
 
 interface SkillsContainerProps {
     initialSkills: Skill[]
@@ -255,7 +256,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             onClick={handleCreateNew}
                             className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
                         >
-                            <span className="material-symbols-outlined text-[18px]">add</span>
+                            <Plus size={18} />
                             Create
                         </button>
                     </div>
@@ -368,7 +369,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                                     className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                     title="Remove trigger"
                                                 >
-                                                    <span className="material-symbols-outlined text-[20px] font-light">delete</span>
+                                                    <Trash2 size={20} className="font-light" />
                                                 </button>
                                             )}
                                         </div>
@@ -379,7 +380,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                         onClick={handleAddTrigger}
                                         className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">add</span>
+                                        <Plus size={16} />
                                         Add Trigger
                                     </button>
                                 )}
@@ -404,7 +405,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center p-8">
                                 <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
                                     <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
-                                        <span className="material-symbols-outlined text-[24px]">warning</span>
+                                        <TriangleAlert size={24} />
                                     </div>
                                     <div className="space-y-1">
                                         <h3 className="text-lg font-bold text-gray-900">Delete Skill?</h3>
@@ -434,7 +435,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                            <span className="material-symbols-outlined text-gray-400 text-[32px]">auto_awesome</span>
+                            <Sparkles className="text-gray-400" size={32} />
                         </div>
                         <h3 className="text-lg font-bold text-gray-900 mb-2">No Skill Selected</h3>
                         <p className="text-gray-500 text-sm max-w-xs mb-6">
@@ -444,7 +445,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             onClick={handleCreateNew}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
                         >
-                            <span className="material-symbols-outlined text-[20px]">add</span>
+                            <Plus size={20} />
                             Create New Skill
                         </button>
                     </div>

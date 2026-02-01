@@ -3,21 +3,34 @@
 import { createClient } from '@/lib/supabase/server'
 import { Conversation, Message } from '@/types/database'
 
-export async function getConversations(organizationId: string) {
+export async function getConversations(organizationId: string, page: number = 0, pageSize: number = 20) {
     const supabase = await createClient()
+
+    const from = page * pageSize
+    const to = from + pageSize - 1
 
     const { data, error } = await supabase
         .from('conversations')
-        .select('*')
+        .select(`
+            *,
+            messages (
+                content,
+                created_at,
+                sender_type
+            )
+        `)
         .eq('organization_id', organizationId)
         .order('last_message_at', { ascending: false })
+        .order('created_at', { foreignTable: 'messages', ascending: false })
+        .limit(1, { foreignTable: 'messages' })
+        .range(from, to)
 
     if (error) {
         console.error('Error fetching conversations:', error)
         return []
     }
 
-    return data as Conversation[]
+    return data as any[]
 }
 
 export async function getMessages(conversationId: string) {
@@ -59,6 +72,34 @@ export async function sendMessage(conversationId: string, content: string) {
         .eq('id', conversationId)
 
     return data as Message
+}
+
+export async function deleteConversation(conversationId: string) {
+    const supabase = await createClient()
+
+    // 1. Delete messages first (if not cascading, but good practice to be explicit or if we want soft delete later)
+    const { error: msgError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationId)
+
+    if (msgError) {
+        console.error('Error deleting messages:', msgError)
+        throw msgError
+    }
+
+    // 2. Delete conversation
+    const { error: convError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId)
+
+    if (convError) {
+        console.error('Error deleting conversation:', convError)
+        throw convError
+    }
+
+    return true
 }
 
 export async function createMockConversation(organizationId: string) {

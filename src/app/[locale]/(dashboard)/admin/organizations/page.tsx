@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, EmptyState } from '@/design'
+import { ArrowLeft, Building2 } from 'lucide-react'
 
 export default async function AdminOrganizationsPage() {
     const supabase = await createClient()
@@ -42,7 +43,7 @@ export default async function AdminOrganizationsPage() {
                 title="Organizations"
                 breadcrumb={
                     <Link href="/admin" className="text-gray-400 hover:text-gray-600 flex items-center gap-1 text-sm mr-2 transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        <ArrowLeft size={18} />
                         Back
                     </Link>
                 }
@@ -55,7 +56,7 @@ export default async function AdminOrganizationsPage() {
                     <DataTable>
                         {(!organizations || organizations.length === 0) ? (
                             <EmptyState
-                                icon="domain"
+                                icon={Building2}
                                 title="No organizations found"
                                 description="There are no organizations in the system yet."
                             />

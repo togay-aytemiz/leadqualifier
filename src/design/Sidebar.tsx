@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import { ReactNode } from 'react'
 import Link from 'next/link'
+import { Plus, Search } from 'lucide-react'
 
 // --- Sidebar Container ---
 interface SidebarProps {
@@ -22,10 +23,10 @@ export function Sidebar({ title, children, actions }: SidebarProps) {
                 {actions ? actions : (
                     <div className="flex gap-1">
                         <button className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">add</span>
+                            <Plus size={18} />
                         </button>
                         <button className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">search</span>
+                            <Search size={18} />
                         </button>
                     </div>
                 )}
@@ -60,7 +61,7 @@ export function SidebarGroup({ title, children }: SidebarGroupProps) {
 
 // --- Sidebar Item ---
 interface SidebarItemProps {
-    icon?: string
+    icon?: React.ElementType
     iconColor?: string
     label: string
     active?: boolean
@@ -70,7 +71,7 @@ interface SidebarItemProps {
     avatar?: string
 }
 
-export function SidebarItem({ icon, iconColor, label, active, count, onClick, href, avatar }: SidebarItemProps) {
+export function SidebarItem({ icon: Icon, iconColor, label, active, count, onClick, href, avatar }: SidebarItemProps) {
     const content = (
         <div
             onClick={onClick}
@@ -86,10 +87,8 @@ export function SidebarItem({ icon, iconColor, label, active, count, onClick, hr
                     <div className="h-5 w-5 rounded-full bg-gray-200 overflow-hidden">
                         <img alt="User" className="h-full w-full object-cover" src={avatar} />
                     </div>
-                ) : icon ? (
-                    <span className={cn("material-symbols-outlined text-[18px]", iconColor || "text-gray-400")}>
-                        {icon}
-                    </span>
+                ) : Icon ? (
+                    <Icon className={cn("", iconColor || "text-gray-400")} size={18} />
                 ) : null}
                 <span>{label}</span>
             </div>

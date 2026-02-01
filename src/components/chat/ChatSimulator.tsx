@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { ChatMessage, simulateChat } from '@/lib/chat/actions'
 import { ChatBubble } from './ChatBubble'
+import { Send, Bug, MessageSquare } from 'lucide-react'
 
 
 interface ChatSimulatorProps {
@@ -140,7 +141,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                             disabled={!input.trim() || isTyping}
                             className="bg-[#00a884] text-white p-2 rounded-lg hover:bg-[#008f6f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                         >
-                            <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" className="" fill="currentColor" enableBackground="new 0 0 24 24"><title>send</title><path d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"></path></svg>
+                            <Send size={24} />
                         </button>
                     </form>
                 </div>
@@ -149,7 +150,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
             {/* Debug Panel */}
             <div className="hidden lg:block rounded-xl bg-white border border-gray-200 p-6 h-fit shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-purple-600">bug_report</span>
+                    <Bug className="text-purple-600" size={24} />
                     Simulator Debug
                 </h3>
 
@@ -201,7 +202,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                 ) : (
                     <div className="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-200">
                         <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
-                            <span className="material-symbols-outlined text-gray-400">chat_bubble_outline</span>
+                            <MessageSquare className="text-gray-400" size={24} />
                         </div>
                         <p className="text-gray-500 text-sm">Send a message to see how the bot processes it.</p>
                     </div>

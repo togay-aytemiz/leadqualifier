@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { Avatar, EmptyState, IconButton } from '@/design'
+import {
+    Inbox, Filter, ChevronDown, ExternalLink, X,
+    Paperclip, Image, Smile, Zap, Bot, Trash2, MessageSquare
+} from 'lucide-react'
 import { Conversation, Message } from '@/types/database'
-import { getMessages, sendMessage, createMockConversation } from '@/lib/inbox/actions'
+import { getMessages, sendMessage, getConversations, deleteConversation } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -13,12 +17,41 @@ interface InboxContainerProps {
 }
 
 export function InboxContainer({ initialConversations, organizationId }: InboxContainerProps) {
-    const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
+    const [conversations, setConversations] = useState<any[]>(initialConversations)
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
 
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
+
+    // Pagination state
+    const [page, setPage] = useState(1)
+    const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
+    const [loadingMore, setLoadingMore] = useState(false)
+
+    const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+        if (scrollHeight - scrollTop <= clientHeight + 50 && hasMore && !loadingMore) {
+            setLoadingMore(true)
+            try {
+                const nextConversations = await getConversations(organizationId, page)
+                if (nextConversations.length > 0) {
+                    setConversations(prev => {
+                        const existingIds = new Set(prev.map(c => c.id))
+                        const uniqueNew = nextConversations.filter(c => !existingIds.has(c.id))
+                        return [...prev, ...uniqueNew]
+                    })
+                    setPage(prev => prev + 1)
+                } else {
+                    setHasMore(false)
+                }
+            } catch (error) {
+                console.error('Failed to load more conversations', error)
+            } finally {
+                setLoadingMore(false)
+            }
+        }
+    }
 
     // Load messages when selected conversation changes
     useEffect(() => {
@@ -101,13 +134,20 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         }
     }
 
-    const handleCreateMock = async () => {
-        try {
-            const newConv = await createMockConversation(organizationId)
-            setConversations(prev => [newConv, ...prev])
-            setSelectedId(newConv.id)
-        } catch (error) {
-            console.error('Failed to create mock', error)
+
+
+    const handleDeleteConversation = async () => {
+        if (!selectedId) return
+
+        if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+            try {
+                await deleteConversation(selectedId)
+                setConversations(prev => prev.filter(c => c.id !== selectedId))
+                setSelectedId(null)
+            } catch (error) {
+                console.error('Failed to delete conversation', error)
+                alert('Failed to delete conversation')
+            }
         }
     }
 
@@ -120,13 +160,16 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-white">
                     <div className="flex items-center gap-1 cursor-pointer group">
                         <span className="text-lg font-bold text-gray-900">Inbox</span>
-                        <span className="material-symbols-outlined text-[20px] text-gray-500 group-hover:text-gray-900">keyboard_arrow_down</span>
+                        <ChevronDown className="text-gray-500 group-hover:text-gray-900" size={20} />
                     </div>
                     <div className="flex items-center gap-1">
-                        <IconButton icon="filter_list" size="sm" />
+                        <IconButton icon={Filter} size="sm" />
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div
+                    className="flex-1 overflow-y-auto"
+                    onScroll={handleScroll}
+                >
                     {conversations.map(c => (
                         <div
                             key={c.id}
@@ -143,189 +186,202 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                     {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false }).replace('about ', '')}
                                 </span>
                             </div>
-                            <div className="pl-[34px]">
-                                <p className="text-sm font-medium text-gray-900 mb-1 capitalize">{c.platform}</p>
-                                <p className="text-xs text-gray-500 truncate leading-relaxed">{c.status}</p>
+                            <div className="pl-[34px] pr-2">
+                                <p className="text-sm text-gray-500 truncate leading-relaxed">
+                                    {c.messages?.[0]?.content || 'No messages yet'}
+                                </p>
                             </div>
                             {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
                         </div>
                     ))}
+                    {loadingMore && (
+                        <div className="p-4 flex justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </div >
 
             {/* Main Chat */}
-            {selectedConversation ? (
-                <>
-                    <div className="flex-1 flex flex-col bg-white min-w-0">
-                        <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 shrink-0 bg-white">
-                            <div className="flex items-center gap-3">
-                                <h2 className="font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[12px]">smart_toy</span>
-                                    AI Copilot
-                                </span>
+            {
+                selectedConversation ? (
+                    <>
+                        <div className="flex-1 flex flex-col bg-white min-w-0">
+                            <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 shrink-0 bg-white">
+                                <div className="flex items-center gap-3">
+                                    <h2 className="font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
+                                        <Bot size={12} />
+                                        AI Copilot
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <IconButton icon={ExternalLink} size="sm" />
+                                    <IconButton icon={X} size="sm" />
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <IconButton icon="open_in_new" size="sm" />
-                                <IconButton icon="close" size="sm" />
-                            </div>
-                        </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gray-50/30">
-                            <div className="flex justify-center">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">Today</span>
-                            </div>
-                            {messages.map(m => {
-                                const isMe = m.sender_type === 'user'
-                                const isBot = m.sender_type === 'bot'
-                                const isSystem = m.sender_type === 'system'
+                            <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gray-50/30">
+                                <div className="flex justify-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">Today</span>
+                                </div>
+                                {messages.map(m => {
+                                    const isMe = m.sender_type === 'user'
+                                    const isBot = m.sender_type === 'bot'
+                                    const isSystem = m.sender_type === 'system'
 
-                                if (isSystem) {
-                                    return (
-                                        <div key={m.id} className="flex items-center justify-center w-full py-2">
-                                            <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                                                {m.content}
-                                            </span>
-                                        </div>
-                                    )
-                                }
-
-                                // Customer message (external)
-                                if (!isMe && !isBot) {
-                                    return (
-                                        <div key={m.id} className="flex items-end gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">
-                                                {selectedConversation.contact_name.charAt(0)}
-                                            </div>
-                                            <div className="flex flex-col gap-1 max-w-[80%]">
-                                                <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
+                                    if (isSystem) {
+                                        return (
+                                            <div key={m.id} className="flex items-center justify-center w-full py-2">
+                                                <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                                                     {m.content}
-                                                </div>
-                                                <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm')}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                }
-
-                                // Agent/Bot message
-                                return (
-                                    <div key={m.id} className="flex items-end gap-3 justify-end">
-                                        <div className="flex flex-col gap-1 items-end max-w-[80%]">
-                                            <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-50 text-purple-900' : 'bg-blue-100 text-blue-900'
-                                                }`}>
-                                                {m.content}
-                                            </div>
-                                            <div className="flex items-center gap-1.5 mr-1">
-                                                <span className="text-xs text-gray-400">
-                                                    {isBot ? 'Fin AI' : 'You'} · {format(new Date(m.created_at), 'HH:mm')}
                                                 </span>
                                             </div>
+                                        )
+                                    }
+
+                                    // Customer message (external)
+                                    if (!isMe && !isBot) {
+                                        return (
+                                            <div key={m.id} className="flex items-end gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">
+                                                    {selectedConversation.contact_name.charAt(0)}
+                                                </div>
+                                                <div className="flex flex-col gap-1 max-w-[80%]">
+                                                    <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
+                                                        {m.content}
+                                                    </div>
+                                                    <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm')}</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+
+                                    // Agent/Bot message
+                                    return (
+                                        <div key={m.id} className="flex items-end gap-3 justify-end">
+                                            <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                                                <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-50 text-purple-900' : 'bg-blue-100 text-blue-900'
+                                                    }`}>
+                                                    {m.content}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mr-1">
+                                                    <span className="text-xs text-gray-400">
+                                                        {isBot ? 'Fin AI' : 'You'} · {format(new Date(m.created_at), 'HH:mm')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            <div className="p-6 border-t border-gray-200 bg-white">
+                                <div className="border border-gray-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all bg-white overflow-hidden">
+                                    <div className="flex items-center gap-1 p-2 border-b border-gray-100 bg-gray-50/50">
+                                        <IconButton icon={Paperclip} size="md" />
+                                        <IconButton icon={Image} size="md" />
+                                        <IconButton icon={Smile} size="md" />
+                                    </div>
+                                    <textarea
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault()
+                                                handleSendMessage()
+                                            }
+                                        }}
+                                        className="w-full p-4 text-sm focus:outline-none min-h-[100px] resize-none"
+                                        placeholder="Write a reply..."
+                                    />
+                                    <div className="px-4 py-3 bg-white flex justify-between items-center">
+                                        <span className="text-xs text-gray-400 font-medium">⌘ Enter to send</span>
+                                        <div className="flex gap-3">
+                                            <button className="p-2 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors">
+                                                <Zap size={20} />
+                                            </button>
+                                            <button
+                                                onClick={handleSendMessage}
+                                                disabled={!input.trim() || isSending}
+                                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+                                            >
+                                                Send Reply
+                                            </button>
                                         </div>
                                     </div>
-                                )
-                            })}
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-200 bg-white">
-                            <div className="border border-gray-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all bg-white overflow-hidden">
-                                <div className="flex items-center gap-1 p-2 border-b border-gray-100 bg-gray-50/50">
-                                    <IconButton icon="attach_file" size="md" />
-                                    <IconButton icon="image" size="md" />
-                                    <IconButton icon="sentiment_satisfied" size="md" />
+                        {/* Details Panel */}
+                        <div className="w-[300px] border-l border-gray-200 bg-white flex flex-col shrink-0 h-full hidden xl:flex">
+                            <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
+                                <h3 className="font-semibold text-gray-900">Details</h3>
+                                <div className="flex gap-2">
+                                    <IconButton icon={X} size="sm" />
                                 </div>
-                                <textarea
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault()
-                                            handleSendMessage()
-                                        }
-                                    }}
-                                    className="w-full p-4 text-sm focus:outline-none min-h-[100px] resize-none"
-                                    placeholder="Write a reply..."
-                                />
-                                <div className="px-4 py-3 bg-white flex justify-between items-center">
-                                    <span className="text-xs text-gray-400 font-medium">⌘ Enter to send</span>
-                                    <div className="flex gap-3">
-                                        <button className="p-2 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors">
-                                            <span className="material-symbols-outlined">bolt</span>
-                                        </button>
-                                        <button
-                                            onClick={handleSendMessage}
-                                            disabled={!input.trim() || isSending}
-                                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
-                                        >
-                                            Send Reply
-                                        </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                                {/* Contact Profile */}
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center text-xl text-blue-600 font-bold mb-3">
+                                        {selectedConversation.contact_name.charAt(0)}
                                     </div>
+                                    <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
+                                    <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || 'No phone number'}</p>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Details Panel */}
-                    <div className="w-[300px] border-l border-gray-200 bg-white flex flex-col shrink-0 h-full hidden xl:flex">
-                        <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
-                            <h3 className="font-semibold text-gray-900">Details</h3>
-                            <div className="flex gap-2">
-                                <IconButton icon="close" size="sm" />
-                            </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                            {/* Contact Profile */}
-                            <div className="flex flex-col items-center text-center">
-                                <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center text-xl text-blue-600 font-bold mb-3">
-                                    {selectedConversation.contact_name.charAt(0)}
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || 'No phone number'}</p>
-                            </div>
+                                <hr className="border-gray-100" />
 
-                            <hr className="border-gray-100" />
-
-                            {/* Key Information */}
-                            <div>
-                                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">Key Information</h4>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">Platform</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-[16px] text-gray-400">chat</span>
-                                            <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
+                                {/* Key Information */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">Key Information</h4>
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">Platform</span>
+                                            <div className="flex items-center gap-2">
+                                                <MessageSquare size={16} className="text-gray-400" />
+                                                <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">Status</span>
+                                            <span className="text-sm text-gray-900 capitalize">{selectedConversation.status}</span>
+                                        </div>
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">Received</span>
+                                            <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p')}</span>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">Status</span>
-                                        <span className="text-sm text-gray-900 capitalize">{selectedConversation.status}</span>
-                                    </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">Received</span>
-                                        <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p')}</span>
-                                    </div>
+                                </div>
+
+                                <hr className="border-gray-100" />
+
+                                {/* Danger Zone */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-red-600 uppercase tracking-wide mb-4">Danger Zone</h4>
+                                    <button
+                                        onClick={handleDeleteConversation}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                                    >
+                                        <Trash2 size={18} />
+                                        Delete Conversation
+                                    </button>
                                 </div>
                             </div>
                         </div>
+                    </>
+                ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                        <EmptyState
+                            icon={Inbox}
+                            title="No conversation selected"
+                            description="Select a conversation from the list to view details"
+                        />
                     </div>
-                </>
-            ) : (
-                <div className="flex-1 flex items-center justify-center">
-                    <EmptyState
-                        icon="inbox"
-                        title="No conversation selected"
-                        description="Select a conversation or create a new one"
-                        action={
-                            <button
-                                onClick={handleCreateMock}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 shadow-sm transition-colors"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">add</span>
-                                Create Demo Conversation
-                            </button>
-                        }
-                    />
-                </div>
-            )}
+                )
+            }
         </>
     )
 }
