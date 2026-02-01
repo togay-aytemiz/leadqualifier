@@ -78,7 +78,15 @@
         "topMatches": "Top Matches",
         "created": "Skill created successfully",
         "updated": "Skill updated successfully",
-        "deleted": "Skill deleted successfully"
+        "deleted": "Skill deleted successfully",
+        "tabs": {
+            "core": "Core Skills",
+            "custom": "Custom Skills"
+        },
+        "core": {
+            "emptyTitle": "Core Skills Coming Soon",
+            "emptyDesc": "Pre-built skills for your business will appear here."
+        }
     },
     "nav": {
         "dashboard": "Dashboard",

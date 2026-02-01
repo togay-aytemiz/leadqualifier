@@ -80,7 +80,15 @@
         "noSelectionDesc": "Detaylarını görmek için listeden bir yetenek seçin veya yeni bir tane oluşturun.",
         "createButton": "Yeni Yetenek Oluştur",
         "noOrganization": "Organizasyon Bulunamadı",
-        "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyon oluşturun."
+        "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyon oluşturun.",
+        "tabs": {
+            "core": "Temel Yetenekler",
+            "custom": "Özel Yetenekler"
+        },
+        "core": {
+            "emptyTitle": "Temel Yetenekler Çok Yakında",
+            "emptyDesc": "İşletmeniz için hazır yetenekler burada görünecektir."
+        }
     },
     "simulator": {
         "title": "Mesajlaşma Simülatörü",

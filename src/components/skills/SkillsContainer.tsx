@@ -240,6 +240,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     const selectedSkill = skills.find(s => s.id === selectedSkillId)
     const showForm = isCreating || selectedSkill
 
+    const [activeTab, setActiveTab] = useState<'core' | 'custom'>('custom')
+
     return (
         <div className="flex h-full bg-white border-t border-gray-200">
             {/* Left Panel - List (50%) */}
@@ -264,194 +266,242 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                         </button>
                     </div>
                 </div>
+
+                {/* Tabs inside Left Panel */}
+                <div className="flex px-6 border-b border-gray-100 bg-white sticky top-0 z-10 shrink-0">
+                    <button
+                        onClick={() => setActiveTab('core')}
+                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors text-center ${activeTab === 'core'
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
+                            }`}
+                    >
+                        {t('tabs.core')}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('custom')}
+                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors text-center ${activeTab === 'custom'
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
+                            }`}
+                    >
+                        {t('tabs.custom')}
+                    </button>
+                </div>
+
                 <div className="flex-1 overflow-y-auto">
-                    {skills.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500 text-sm">
-                            {t('noSkills')}
+                    {activeTab === 'core' ? (
+                        /* Core Skills - Empty */
+                        <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
+                            <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center mb-3">
+                                <Sparkles size={24} />
+                            </div>
+                            <h3 className="text-sm font-bold text-gray-900 mb-1">{t('core.emptyTitle')}</h3>
+                            <p className="text-gray-500 text-xs max-w-[200px]">
+                                {t('core.emptyDesc')}
+                            </p>
                         </div>
                     ) : (
-                        <div>
-                            {skills.map(skill => (
-                                <div
-                                    key={skill.id}
-                                    onClick={() => handleSelectSkill(skill.id)}
-                                    className={`px-6 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedSkillId === skill.id ? "bg-blue-50/40" : ""
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-base font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
-                                            {skill.title}
-                                        </span>
-                                        <div
-                                            role="button"
-                                            onClick={(e) => handleToggleSkill(e, skill)}
-                                            className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-200 transition-all ${skill.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
-                                            title={skill.enabled ? t('activate') : t('archive')}
-                                        />
-                                    </div>
-                                    {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
+                        /* Custom Skills List */
+                        <>
+                            {skills.length === 0 ? (
+                                <div className="p-8 text-center text-gray-500 text-sm">
+                                    {t('noSkills')}
                                 </div>
-                            ))}
-                        </div>
+                            ) : (
+                                <div>
+                                    {skills.map(skill => (
+                                        <div
+                                            key={skill.id}
+                                            onClick={() => handleSelectSkill(skill.id)}
+                                            className={`px-6 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedSkillId === skill.id ? "bg-blue-50/40" : ""
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className={`text-base font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
+                                                    {skill.title}
+                                                </span>
+                                                <div
+                                                    role="button"
+                                                    onClick={(e) => handleToggleSkill(e, skill)}
+                                                    className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-200 transition-all ${skill.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                                                    title={skill.enabled ? t('activate') : t('archive')}
+                                                />
+                                            </div>
+                                            {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
 
             {/* Right Panel - Detail/Form (50%) */}
-            <div className="w-1/2 flex flex-col bg-white overflow-hidden relative">
-                {showForm ? (
-                    <div className="flex flex-col h-full bg-white">
-                        {/* Header */}
-                        <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
-                            <h3 className="font-bold text-gray-900 text-xl">
-                                {isCreating ? 'New Skill' : 'Edit Skill'}
-                            </h3>
-                            <div className="flex gap-3">
-                                {!isCreating && (
-                                    <>
-                                        <button
-                                            onClick={handleArchiveToggle}
-                                            className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
-                                        >
-                                            {selectedSkill?.enabled ? 'Archive' : 'Activate'}
-                                        </button>
-                                        <button
-                                            onClick={() => setShowDeleteConfirm(true)}
-                                            className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
-                                        >
-                                            Delete
-                                        </button>
-                                    </>
-                                )}
-                                <button
-                                    onClick={handleSave}
-                                    disabled={!isDirty || isSaving}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
-                                >
-                                    Save Changes
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Form Content */}
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                            {/* Skill Name */}
-                            <div className="space-y-2">
-                                <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                    {t('nameLabel')}
-                                </label>
-                                <input
-                                    value={formData.title}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                    placeholder={t('namePlaceholder')}
-                                    className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                                />
-                            </div>
-
-                            {/* Triggers */}
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                        {t('triggersLabel')} {formData.triggers.length}/10
-                                    </label>
-                                    <span className="text-xs text-gray-400">{t('triggersHint')}</span>
-                                </div>
-                                <div className="space-y-2">
-                                    {formData.triggers.map((trigger, idx) => (
-                                        <div key={idx} className="flex gap-2 items-center">
-                                            <input
-                                                value={trigger}
-                                                onChange={(e) => handleTriggerChange(idx, e.target.value)}
-                                                placeholder={idx < 3 ? t('triggerPlaceholderMandatory') : t('triggerPlaceholderOptional')}
-                                                className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
-                                                    }`}
-                                            />
-                                            {idx >= 3 && (
-                                                <button
-                                                    onClick={() => handleRemoveTrigger(idx)}
-                                                    className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Remove trigger"
-                                                >
-                                                    <Trash2 size={20} className="font-light" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                                {formData.triggers.length < 10 && (
-                                    <button
-                                        onClick={handleAddTrigger}
-                                        className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
-                                    >
-                                        <Plus size={16} />
-                                        {t('addTrigger')}
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Response Text */}
-                            <div className="space-y-2">
-                                <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                    {t('responseLabel')}
-                                </label>
-                                <textarea
-                                    value={formData.response_text}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
-                                    placeholder={t('responsePlaceholder')}
-                                    className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Delete Confirmation Overlay */}
-                        {showDeleteConfirm && (
-                            <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                                <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
-                                        <TriangleAlert size={24} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h3 className="text-lg font-bold text-gray-900">{t('deleteConfirm')}</h3>
-                                        <p className="text-sm text-gray-500">
-                                            {t('deleteConfirmDesc')}
-                                        </p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <button
-                                            onClick={() => setShowDeleteConfirm(false)}
-                                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-                                        >
-                                            {t('cancel')}
-                                        </button>
-                                        <button
-                                            onClick={handleDelete}
-                                            disabled={isSaving}
-                                            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
-                                        >
-                                            {isSaving ? t('deleting') : t('delete')}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+            <div className="w-1/2 flex flex-col bg-white overflow-hidden relative border-l border-gray-200 -ml-px">
+                {activeTab === 'core' ? (
+                    /* Empty Right Panel for Core */
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/30">
+                        <p className="text-gray-400 text-sm">Select a core skill to view details</p>
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                            <Sparkles className="text-gray-400" size={32} />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">{t('noSelection')}</h3>
-                        <p className="text-gray-500 text-sm max-w-xs mb-6">
-                            {t('noSelectionDesc')}
-                        </p>
-                        <button
-                            onClick={handleCreateNew}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
-                        >
-                            <Plus size={20} />
-                            {t('createButton')}
-                        </button>
-                    </div>
+                    <>
+                        {showForm ? (
+                            <div className="flex flex-col h-full bg-white">
+                                {/* Header */}
+                                <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
+                                    <h3 className="font-bold text-gray-900 text-xl">
+                                        {isCreating ? 'New Skill' : 'Edit Skill'}
+                                    </h3>
+                                    <div className="flex gap-3">
+                                        {!isCreating && (
+                                            <>
+                                                <button
+                                                    onClick={handleArchiveToggle}
+                                                    className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
+                                                >
+                                                    {selectedSkill?.enabled ? 'Archive' : 'Activate'}
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowDeleteConfirm(true)}
+                                                    className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </>
+                                        )}
+                                        <button
+                                            onClick={handleSave}
+                                            disabled={!isDirty || isSaving}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
+                                        >
+                                            Save Changes
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Form Content */}
+                                <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                                    {/* Skill Name */}
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                            {t('nameLabel')}
+                                        </label>
+                                        <input
+                                            value={formData.title}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                                            placeholder={t('namePlaceholder')}
+                                            className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                                        />
+                                    </div>
+
+                                    {/* Triggers */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                                {t('triggersLabel')} {formData.triggers.length}/10
+                                            </label>
+                                            <span className="text-xs text-gray-400">{t('triggersHint')}</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {formData.triggers.map((trigger, idx) => (
+                                                <div key={idx} className="flex gap-2 items-center">
+                                                    <input
+                                                        value={trigger}
+                                                        onChange={(e) => handleTriggerChange(idx, e.target.value)}
+                                                        placeholder={idx < 3 ? t('triggerPlaceholderMandatory') : t('triggerPlaceholderOptional')}
+                                                        className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
+                                                            }`}
+                                                    />
+                                                    {idx >= 3 && (
+                                                        <button
+                                                            onClick={() => handleRemoveTrigger(idx)}
+                                                            className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Remove trigger"
+                                                        >
+                                                            <Trash2 size={20} className="font-light" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {formData.triggers.length < 10 && (
+                                            <button
+                                                onClick={handleAddTrigger}
+                                                className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
+                                            >
+                                                <Plus size={16} />
+                                                {t('addTrigger')}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Response Text */}
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                            {t('responseLabel')}
+                                        </label>
+                                        <textarea
+                                            value={formData.response_text}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
+                                            placeholder={t('responsePlaceholder')}
+                                            className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Delete Confirmation Overlay */}
+                                {showDeleteConfirm && (
+                                    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+                                        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                                                <TriangleAlert size={24} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h3 className="text-lg font-bold text-gray-900">{t('deleteConfirm')}</h3>
+                                                <p className="text-sm text-gray-500">
+                                                    {t('deleteConfirmDesc')}
+                                                </p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                                <button
+                                                    onClick={() => setShowDeleteConfirm(false)}
+                                                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                                                >
+                                                    {t('cancel')}
+                                                </button>
+                                                <button
+                                                    onClick={handleDelete}
+                                                    disabled={isSaving}
+                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
+                                                >
+                                                    {isSaving ? t('deleting') : t('delete')}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
+                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                    <Sparkles className="text-gray-400" size={32} />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-2">{t('noSelection')}</h3>
+                                <p className="text-gray-500 text-sm max-w-xs mb-6">
+                                    {t('noSelectionDesc')}
+                                </p>
+                                <button
+                                    onClick={handleCreateNew}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
+                                >
+                                    <Plus size={20} />
+                                    {t('createButton')}
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
