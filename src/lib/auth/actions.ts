@@ -17,7 +17,7 @@ export async function login(formData: FormData) {
         return { error: error.message }
     }
 
-    redirect('/dashboard')
+    redirect('/inbox')
 }
 
 export async function register(formData: FormData) {
@@ -43,11 +43,11 @@ export async function register(formData: FormData) {
         return { error: error.message }
     }
 
-    redirect('/dashboard')
+    redirect('/inbox')
 }
 
 export async function logout() {
     const supabase = await createClient()
     await supabase.auth.signOut()
-    redirect('/login')
+    redirect('/register')
 }

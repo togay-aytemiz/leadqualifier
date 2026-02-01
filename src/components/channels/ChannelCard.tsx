@@ -24,7 +24,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
             await disconnectChannel(channel.id)
             setShowConfirm(false)
         } catch {
-            alert('Failed to disconnect')
+            console.error('Failed to disconnect')
         } finally {
             setIsDisconnecting(false)
         }

@@ -33,8 +33,9 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
 
         // 2. Set Webhook if APP_URL is defined
         let appUrl = process.env.NEXT_PUBLIC_APP_URL
-        if (!appUrl && process.env.VERCEL_URL) {
-            appUrl = `https://${process.env.VERCEL_URL}`
+        if (!appUrl) {
+            if (process.env.VERCEL_URL) appUrl = `https://${process.env.VERCEL_URL}`
+            else if (process.env.URL) appUrl = process.env.URL // Netlify
         }
 
         if (appUrl) {
