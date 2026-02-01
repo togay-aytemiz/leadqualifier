@@ -66,7 +66,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                     className="h-8 w-8 rounded-full bg-gray-200 mx-auto flex items-center justify-center text-xs font-medium text-gray-600"
                     title={userName}
                 >
-                    {userName ? userName[0].toUpperCase() : 'U'}
+                    {(userName?.[0] || 'U').toUpperCase()}
                 </div>
             </div>
         </div>
