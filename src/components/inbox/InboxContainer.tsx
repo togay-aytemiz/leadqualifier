@@ -127,7 +127,8 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 setSelectedId(null)
             } catch (error) {
                 console.error('Failed to delete conversation', error)
-                alert('Failed to delete conversation')
+                console.error('Failed to delete conversation', error)
+                // alert('Failed to delete conversation')
             }
         }
     }

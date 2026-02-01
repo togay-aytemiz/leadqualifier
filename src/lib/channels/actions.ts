@@ -39,9 +39,15 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
         }
 
         if (appUrl) {
+            console.log('Setting Telegram Webhook to:', `${appUrl}/api/webhooks/telegram`)
             await client.setWebhook(`${appUrl}/api/webhooks/telegram`, webhookSecret)
         } else {
-            console.warn('APP_URL not defined, skipping Telegram webhook registration')
+            console.error('APP_URL not defined. Env vars checks:', {
+                NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+                VERCEL_URL: process.env.VERCEL_URL,
+                URL: process.env.URL
+            })
+            throw new Error('System Configuration Error: Public App URL is not defined. Cannot register webhook.')
         }
 
         // 3. Save to DB
@@ -99,4 +105,25 @@ export async function disconnectChannel(channelId: string) {
     }
 
     revalidatePath('/settings/channels')
+}
+
+export async function debugTelegramChannel(channelId: string) {
+    const supabase = await createClient()
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('id', channelId)
+        .single()
+
+    if (channel && channel.type === 'telegram' && channel.config.bot_token) {
+        try {
+            const client = new TelegramClient(channel.config.bot_token)
+            const info = await client.getWebhookInfo()
+            return { success: true, info }
+        } catch (e: any) {
+            return { success: false, error: e.message }
+        }
+    }
+    return { success: false, error: 'Channel not found or not telegram' }
 }

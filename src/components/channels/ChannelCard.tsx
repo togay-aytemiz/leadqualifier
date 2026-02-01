@@ -2,7 +2,8 @@
 
 import { Channel } from '@/types/database'
 import { useState } from 'react'
-import { disconnectChannel } from '@/lib/channels/actions'
+import { Bug } from 'lucide-react'
+import { debugTelegramChannel, disconnectChannel } from '@/lib/channels/actions'
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 
@@ -15,6 +16,16 @@ interface ChannelCardProps {
 export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
+
+    const handleDebug = async () => {
+        if (!channel) return
+        const result = await debugTelegramChannel(channel.id)
+        if (result.success) {
+            alert(`Webhook Info:\n${JSON.stringify(result.info, null, 2)}`)
+        } else {
+            alert(`Debug Failed: ${result.error}`)
+        }
+    }
 
     const handleDisconnect = async () => {
         if (!channel) return
@@ -35,6 +46,11 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
     return (
         <>
             <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center relative overflow-hidden group shadow-sm hover:shadow-md transition-shadow">
+                {isConnected && (
+                    <button onClick={handleDebug} className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 p-1" title="Debug Webhook">
+                        <Bug size={16} />
+                    </button>
+                )}
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 text-3xl transition-transform group-hover:scale-110 ${type === 'telegram' ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'
                     }`}>
                     {type === 'telegram' ? (

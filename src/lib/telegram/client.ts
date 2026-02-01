@@ -45,4 +45,7 @@ export class TelegramClient {
             text,
         })
     }
+    async getWebhookInfo() {
+        return this.request('getWebhookInfo')
+    }
 }

@@ -23,6 +23,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     const [isCreating, setIsCreating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [validationError, setValidationError] = useState<string | null>(null)
 
     // Form state
     const [formData, setFormData] = useState({
@@ -150,9 +151,10 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     }
 
     const handleSave = async () => {
+        setValidationError(null)
         // Validate
         if (!formData.title.trim()) {
-            alert(t('nameLabel') + ' is required')
+            setValidationError(t('nameLabel') + ' is required')
             return
         }
 
@@ -160,12 +162,12 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
         // Plan said first 3 mandatory. Let's assume non-empty.
         const firstThree = formData.triggers.slice(0, 3)
         if (firstThree.some(t => !t.trim())) {
-            alert(t('triggersHint'))
+            setValidationError(t('triggersHint'))
             return
         }
 
         if (!formData.response_text.trim()) {
-            alert(t('responseLabel') + ' is required')
+            setValidationError(t('responseLabel') + ' is required')
             return
         }
 
@@ -215,7 +217,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
             }
         } catch (error) {
             console.error('Failed to save skill', error)
-            alert('Failed to save changes')
+            console.error('Failed to save skill', error)
+            setValidationError('Failed to save changes. Please try again.')
         } finally {
             setIsSaving(false)
         }
@@ -384,6 +387,11 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
 
                                 {/* Form Content */}
                                 <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                                    {validationError && (
+                                        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
+                                            {validationError}
+                                        </div>
+                                    )}
                                     {/* Skill Name */}
                                     <div className="space-y-2">
                                         <label className="block text-xs font-semibold text-gray-500 tracking-wider">
