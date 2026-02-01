@@ -7,12 +7,15 @@ import { ClientSearchInput } from '@/components/common/ClientSearchInput'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
 import { Plus, Trash2, Sparkles, TriangleAlert } from 'lucide-react'
 
+import { useTranslations } from 'next-intl'
+
 interface SkillsContainerProps {
     initialSkills: Skill[]
     organizationId: string
 }
 
 export function SkillsContainer({ initialSkills, organizationId }: SkillsContainerProps) {
+    const t = useTranslations('skills')
     const router = useRouter()
     const [skills, setSkills] = useState<Skill[]>(initialSkills)
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
@@ -148,7 +151,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     const handleSave = async () => {
         // Validate
         if (!formData.title.trim()) {
-            alert('Skill Name is required')
+            alert(t('nameLabel') + ' is required')
             return
         }
 
@@ -156,12 +159,12 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
         // Plan said first 3 mandatory. Let's assume non-empty.
         const firstThree = formData.triggers.slice(0, 3)
         if (firstThree.some(t => !t.trim())) {
-            alert('The first 3 triggers are mandatory.')
+            alert(t('triggersHint'))
             return
         }
 
         if (!formData.response_text.trim()) {
-            alert('Response Text is required')
+            alert(t('responseLabel') + ' is required')
             return
         }
 
@@ -243,7 +246,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
             <div className="w-1/2 flex flex-col border-r border-gray-200 bg-white">
                 <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0 bg-white">
                     <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-gray-900">Skills</h2>
+                        <h2 className="text-xl font-bold text-gray-900">{t('title')}</h2>
                         <span className="text-gray-500 font-medium text-sm bg-gray-100 px-2 py-0.5 rounded-full">
                             {skills.length}
                         </span>
@@ -257,14 +260,14 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
                         >
                             <Plus size={18} />
-                            Create
+                            {t('create')}
                         </button>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {skills.length === 0 ? (
                         <div className="p-8 text-center text-gray-500 text-sm">
-                            No skills found. Create one to get started.
+                            {t('noSkills')}
                         </div>
                     ) : (
                         <div>
@@ -283,7 +286,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                             role="button"
                                             onClick={(e) => handleToggleSkill(e, skill)}
                                             className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-200 transition-all ${skill.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
-                                            title={skill.enabled ? 'Active (Click to toggle)' : 'Inactive (Click to toggle)'}
+                                            title={skill.enabled ? t('activate') : t('archive')}
                                         />
                                     </div>
                                     {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
@@ -335,12 +338,12 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             {/* Skill Name */}
                             <div className="space-y-2">
                                 <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                    Skill Name
+                                    {t('nameLabel')}
                                 </label>
                                 <input
                                     value={formData.title}
                                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                    placeholder="e.g. Pricing Inquiry"
+                                    placeholder={t('namePlaceholder')}
                                     className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
                                 />
                             </div>
@@ -349,9 +352,9 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                        Triggers {formData.triggers.length}/10
+                                        {t('triggersLabel')} {formData.triggers.length}/10
                                     </label>
-                                    <span className="text-xs text-gray-400">First 3 are mandatory</span>
+                                    <span className="text-xs text-gray-400">{t('triggersHint')}</span>
                                 </div>
                                 <div className="space-y-2">
                                     {formData.triggers.map((trigger, idx) => (
@@ -359,7 +362,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                             <input
                                                 value={trigger}
                                                 onChange={(e) => handleTriggerChange(idx, e.target.value)}
-                                                placeholder={idx < 3 ? "Mandatory trigger phrase..." : "Optional variation..."}
+                                                placeholder={idx < 3 ? t('triggerPlaceholderMandatory') : t('triggerPlaceholderOptional')}
                                                 className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
                                                     }`}
                                             />
@@ -381,7 +384,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                         className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
                                     >
                                         <Plus size={16} />
-                                        Add Trigger
+                                        {t('addTrigger')}
                                     </button>
                                 )}
                             </div>
@@ -389,12 +392,12 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             {/* Response Text */}
                             <div className="space-y-2">
                                 <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                    Response Text
+                                    {t('responseLabel')}
                                 </label>
                                 <textarea
                                     value={formData.response_text}
                                     onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
-                                    placeholder="The AI will respond with this text..."
+                                    placeholder={t('responsePlaceholder')}
                                     className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
                                 />
                             </div>
@@ -408,9 +411,9 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                         <TriangleAlert size={24} />
                                     </div>
                                     <div className="space-y-1">
-                                        <h3 className="text-lg font-bold text-gray-900">Delete Skill?</h3>
+                                        <h3 className="text-lg font-bold text-gray-900">{t('deleteConfirm')}</h3>
                                         <p className="text-sm text-gray-500">
-                                            This action cannot be undone. The skill will be permanently removed.
+                                            {t('deleteConfirmDesc')}
                                         </p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3 pt-2">
@@ -418,14 +421,14 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                             onClick={() => setShowDeleteConfirm(false)}
                                             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
                                         >
-                                            Cancel
+                                            {t('cancel')}
                                         </button>
                                         <button
                                             onClick={handleDelete}
                                             disabled={isSaving}
                                             className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
                                         >
-                                            {isSaving ? 'Deleting...' : 'Delete'}
+                                            {isSaving ? t('deleting') : t('delete')}
                                         </button>
                                     </div>
                                 </div>
@@ -437,16 +440,16 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                             <Sparkles className="text-gray-400" size={32} />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">No Skill Selected</h3>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{t('noSelection')}</h3>
                         <p className="text-gray-500 text-sm max-w-xs mb-6">
-                            Select a skill from the list to view its details or create a new one to get started.
+                            {t('noSelectionDesc')}
                         </p>
                         <button
                             onClick={handleCreateNew}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
                         >
                             <Plus size={20} />
-                            Create New Skill
+                            {t('createButton')}
                         </button>
                     </div>
                 )}

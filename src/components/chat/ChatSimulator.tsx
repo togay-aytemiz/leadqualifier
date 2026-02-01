@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { ChatMessage, simulateChat } from '@/lib/chat/actions'
 import { ChatBubble } from './ChatBubble'
 import { Send, Bug, MessageSquare } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 
 interface ChatSimulatorProps {
@@ -13,6 +14,7 @@ interface ChatSimulatorProps {
 }
 
 export default function ChatSimulator({ organizationId, organizationName }: ChatSimulatorProps) {
+    const t = useTranslations('simulator')
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState('')
     const [isTyping, setIsTyping] = useState(false)
@@ -94,7 +96,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                     </div>
                     <div>
                         <h3 className="text-white font-medium text-base">{organizationName}</h3>
-                        <p className="text-white/80 text-xs">Business Account</p>
+                        <p className="text-white/80 text-xs">{t('businessAccount')}</p>
                     </div>
                 </div>
 
@@ -103,7 +105,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                     {messages.length === 0 && (
                         <div className="flex justify-center mt-10">
                             <span className="bg-[#fff5c4] text-gray-800 text-xs px-3 py-1.5 rounded-lg shadow-sm text-center border border-[#ffeeba]">
-                                Messages are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.
+                                {t('encryptionNotice')}
                             </span>
                         </div>
                     )}
@@ -133,7 +135,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Type a message"
+                            placeholder={t('typeMessage')}
                             className="flex-1 bg-white text-gray-900 rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 border border-gray-200 focus:border-[#00a884] transition-colors"
                         />
                         <button
@@ -151,12 +153,12 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
             <div className="hidden lg:block rounded-xl bg-white border border-gray-200 p-6 h-fit shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                     <Bug className="text-purple-600" size={24} />
-                    Simulator Debug
+                    {t('debug')}
                 </h3>
 
                 <div className="mb-6 p-4 rounded-lg bg-gray-50 border border-gray-100">
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sensitivity</label>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sensitivity')}</label>
                         <span className="text-xs font-mono text-gray-700 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">{threshold}</span>
                     </div>
                     <input
@@ -168,21 +170,20 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                         onChange={(e) => setThreshold(parseFloat(e.target.value))}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#00a884]"
                     />
-                    <p className="text-[10px] text-gray-500 mt-2">
-                        Lower = More creative/loose<br />
-                        Higher = More strict/exact
+                    <p className="text-[10px] text-gray-500 mt-2 whitespace-pre-line">
+                        {t('sensitivityHint')}
                     </p>
                 </div>
 
                 {debugInfo ? (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                         <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-                            <span className="text-xs font-semibold text-green-600 uppercase tracking-wider">Matched Skill</span>
+                            <span className="text-xs font-semibold text-green-600 uppercase tracking-wider">{t('matchedSkill')}</span>
                             <p className="text-gray-900 font-semibold mt-1">{debugInfo.title}</p>
                         </div>
 
                         <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-                            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Confidence Score</span>
+                            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">{t('confidenceScore')}</span>
                             <div className="flex items-center gap-2 mt-2">
                                 <div className="flex-1 h-2 bg-blue-100 rounded-full overflow-hidden">
                                     <div
@@ -195,7 +196,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                         </div>
 
                         <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
-                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Skill ID</span>
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('skillId')}</span>
                             <p className="text-gray-500 text-xs font-mono mt-1 break-all bg-white p-1 rounded border border-gray-100">{debugInfo.id}</p>
                         </div>
                     </div>
@@ -204,7 +205,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                         <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
                             <MessageSquare className="text-gray-400" size={24} />
                         </div>
-                        <p className="text-gray-500 text-sm">Send a message to see how the bot processes it.</p>
+                        <p className="text-gray-500 text-sm">{t('emptyDebug')}</p>
                     </div>
                 )}
             </div>

@@ -8,24 +8,30 @@ export async function POST(req: NextRequest) {
     const secretToken = req.headers.get('x-telegram-bot-api-secret-token')
     const update = await req.json()
 
+    console.log('Telegram Webhook: Received update', {
+        updateId: update.update_id,
+        hasMessage: !!update.message,
+        hasSecret: !!secretToken
+    })
+
     // 1. Basic Validation
     if (!update.message || !update.message.text) {
+        console.log('Telegram Webhook: Skipping non-text update')
         return NextResponse.json({ ok: true }) // Ignore non-text updates
     }
 
     const { chat, text, from } = update.message
     const chatId = chat.id.toString()
 
+    console.log('Telegram Webhook: Processing message', {
+        chatId,
+        text,
+        fromId: from.id
+    })
+
     const supabase = await createClient()
 
     // 2. Find Channel by Bot Token (We need to verify which bot this is)
-    // Telegram doesn't send the bot token in the webhook body, it sends it in the URL if we configured it so.
-    // However, we used a common URL. 
-    // Secure way: We send `webhook_secret` when setting webhook, and Telegram sends it back in header.
-    // We need to find the channel with this secret.
-
-    // If we didn't save secret (old code), we might have an issue. New code saves it.
-
     let channel;
 
     if (secretToken) {
@@ -35,10 +41,11 @@ export async function POST(req: NextRequest) {
             .eq('config->>webhook_secret', secretToken)
             .single()
         channel = data
+        console.log('Telegram Webhook: Channel lookup by secret', { found: !!data, channelId: data?.id })
+    } else {
+        console.warn('Telegram Webhook: Missing secret token')
     }
 
-    // Fallback or if secret logic fails/isn't set up yet? 
-    // If strictly enforcing security, we abort.
     if (!channel) {
         console.warn('Telegram Webhook: No matching channel found for secret')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -47,8 +54,6 @@ export async function POST(req: NextRequest) {
     const orgId = channel.organization_id
 
     // 3. Find or Create Conversation
-    // Helper to normalize phone/id. Telegram ID is numeric string.
-
     let { data: conversation } = await supabase
         .from('conversations')
         .select('*')
@@ -58,6 +63,7 @@ export async function POST(req: NextRequest) {
         .single()
 
     if (!conversation) {
+        console.log('Telegram Webhook: Creating new conversation')
         const { data: newConv, error } = await supabase
             .from('conversations')
             .insert({
@@ -73,14 +79,16 @@ export async function POST(req: NextRequest) {
             .single()
 
         if (error) {
-            console.error('Failed to create conversation', error)
+            console.error('Telegram Webhook: Failed to create conversation', error)
             return NextResponse.json({ error: 'DB Error' }, { status: 500 })
         }
         conversation = newConv
+    } else {
+        console.log('Telegram Webhook: Found existing conversation', conversation.id)
     }
 
     // 4. Save Incoming Message
-    await supabase.from('messages').insert({
+    const { error: msgError } = await supabase.from('messages').insert({
         id: uuidv4(),
         conversation_id: conversation.id,
         sender_type: 'contact',
@@ -88,11 +96,21 @@ export async function POST(req: NextRequest) {
         metadata: { telegram_message_id: update.message.message_id }
     })
 
-    // 5. Process AI Response (Skills)
-    // We can run this async or await it. Awaiting is safer for now.
+    if (msgError) {
+        console.error('Telegram Webhook: Failed to save message', msgError)
+    } else {
+        console.log('Telegram Webhook: Message saved successfully')
+    }
 
+    // 5. Process AI Response (Skills)
     const matchedSkills = await matchSkills(text, orgId)
     const bestMatch = matchedSkills?.[0]
+
+    console.log('Telegram Webhook: Skill match result', {
+        found: !!bestMatch,
+        skillId: bestMatch?.skill_id,
+        similarity: bestMatch?.similarity
+    })
 
     if (bestMatch) {
         // Send Response via Telegram
@@ -107,9 +125,26 @@ export async function POST(req: NextRequest) {
             content: bestMatch.response_text,
             metadata: { skill_id: bestMatch.skill_id }
         })
+        console.log('Telegram Webhook: Sent matched response')
     } else {
-        // Optional: Default fallback or silent? 
-        // For now silent.
+        // Fallback response for debugging/confirmation
+        console.log('Telegram Webhook: No skill matched, sending fallback')
+        const client = new TelegramClient(channel.config.bot_token)
+        // Check language logic later, for now hardcoded English/Turkish or just generic
+        // "Mesajınız alındı" (Message received)
+        const fallbackText = "Mesajınızı aldım, ancak buna uygun bir yanıtım yok. (I received your message but I don't have a specific response for it.)"
+
+        await client.sendMessage(chatId, fallbackText)
+
+        // Also save this fallback interaction? Maybe not to clutter, strictly for debugging now.
+        // Actually, saving it helps seeing it in Inbox
+        await supabase.from('messages').insert({
+            id: uuidv4(),
+            conversation_id: conversation.id,
+            sender_type: 'bot',
+            content: fallbackText,
+            metadata: { is_fallback: true }
+        })
     }
 
     return NextResponse.json({ ok: true })
