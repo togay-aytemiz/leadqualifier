@@ -22,7 +22,6 @@ export function ChannelsList({ channels, organizationId }: ChannelsListProps) {
     const handleConnectTelegram = async (token: string) => {
         const result = await connectTelegramChannel(organizationId, token)
         if (result.error) {
-            alert(result.error)
             throw new Error(result.error)
         }
         router.refresh()

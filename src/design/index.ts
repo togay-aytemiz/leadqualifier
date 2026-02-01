@@ -21,7 +21,8 @@ export {
     IconButton,
     Alert,
     Skeleton,
-    PageSkeleton
+    PageSkeleton,
+    ConfirmDialog
 } from './primitives'
 export { GlobalRail } from './GlobalRail'
 export { Sidebar, SidebarGroup, SidebarItem } from './Sidebar'

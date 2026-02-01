@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Search, X, ArrowUpRight } from 'lucide-react'
+import { Search, X, ArrowUpRight, TriangleAlert } from 'lucide-react'
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -463,6 +463,73 @@ export function PageSkeleton() {
                     <Skeleton className="h-32 w-full rounded-xl" />
                 </div>
                 <Skeleton className="h-[400px] w-full rounded-xl" />
+            </div>
+        </div>
+    )
+}
+
+// --- ConfirmDialog ---
+interface ConfirmDialogProps {
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText?: string
+    cancelText?: string
+    isDestructive?: boolean
+    isLoading?: boolean
+    onConfirm: () => void
+    onCancel: () => void
+}
+
+export function ConfirmDialog({
+    isOpen,
+    title,
+    description,
+    confirmText = "Confirm",
+    cancelText = "Cancel",
+    isDestructive = false,
+    isLoading = false,
+    onConfirm,
+    onCancel
+}: ConfirmDialogProps) {
+    if (!isOpen) return null
+
+    return (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in zoom-in-95 duration-200">
+                <div className={cn("w-12 h-12 rounded-full flex items-center justify-center mx-auto", isDestructive ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600")}>
+                    <TriangleAlert size={24} />
+                </div>
+                <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+                    <p className="text-sm text-gray-500">
+                        {description}
+                    </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                        onClick={onCancel}
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    >
+                        {cancelText}
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={isLoading}
+                        className={cn(
+                            "px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2",
+                            isDestructive ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+                        )}
+                    >
+                        {isLoading ? (
+                            <>
+                                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                {confirmText}
+                            </>
+                        ) : confirmText}
+                    </button>
+                </div>
             </div>
         </div>
     )

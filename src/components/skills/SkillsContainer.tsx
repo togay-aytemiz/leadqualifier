@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
+import { ConfirmDialog } from '@/design/primitives'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
 import { Plus, Trash2, Sparkles, TriangleAlert } from 'lucide-react'
 
@@ -451,37 +452,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                     </div>
                                 </div>
 
-                                {/* Delete Confirmation Overlay */}
-                                {showDeleteConfirm && (
-                                    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                                        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                                            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
-                                                <TriangleAlert size={24} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <h3 className="text-lg font-bold text-gray-900">{t('deleteConfirm')}</h3>
-                                                <p className="text-sm text-gray-500">
-                                                    {t('deleteConfirmDesc')}
-                                                </p>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3 pt-2">
-                                                <button
-                                                    onClick={() => setShowDeleteConfirm(false)}
-                                                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-                                                >
-                                                    {t('cancel')}
-                                                </button>
-                                                <button
-                                                    onClick={handleDelete}
-                                                    disabled={isSaving}
-                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
-                                                >
-                                                    {isSaving ? t('deleting') : t('delete')}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Delete Confirmation: Replaced by global ConfirmDialog below */}
                             </div>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
@@ -504,6 +475,18 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                     </>
                 )}
             </div>
+
+            <ConfirmDialog
+                isOpen={showDeleteConfirm}
+                title={t('deleteConfirm')}
+                description={t('deleteConfirmDesc')}
+                confirmText={t('delete')}
+                cancelText={t('cancel')}
+                isDestructive
+                isLoading={isSaving}
+                onConfirm={handleDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+            />
         </div>
     )
 }
