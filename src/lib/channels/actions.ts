@@ -19,25 +19,38 @@ export async function getChannels(organizationId: string) {
     return data
 }
 
+import { TelegramClient } from '@/lib/telegram/client'
+import { v4 as uuidv4 } from 'uuid'
+
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
     // 1. Validate Token with Telegram API
     try {
-        const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`)
-        const data = await response.json()
+        const client = new TelegramClient(botToken)
+        const botInfo = await client.getMe()
 
-        if (!data.ok) {
-            return { error: 'Invalid Bot Token. Please check and try again.' }
+        const botName = botInfo.first_name + (botInfo.username ? ` (@${botInfo.username})` : '')
+        const webhookSecret = uuidv4()
+
+        // 2. Set Webhook if APP_URL is defined
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null
+
+        if (appUrl) {
+            await client.setWebhook(`${appUrl}/api/webhooks/telegram`, webhookSecret)
+        } else {
+            console.warn('APP_URL not defined, skipping Telegram webhook registration')
         }
 
-        const botName = data.result.first_name + (data.result.username ? ` (@${data.result.username})` : '')
-
-        // 2. Save to DB
+        // 3. Save to DB
         const supabase = await createClient()
         const { error } = await supabase.from('channels').insert({
             organization_id: organizationId,
             type: 'telegram',
             name: botName,
-            config: { bot_token: botToken, username: data.result.username },
+            config: {
+                bot_token: botToken,
+                username: botInfo.username,
+                webhook_secret: webhookSecret
+            },
             status: 'active'
         })
 
@@ -53,6 +66,24 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
 
 export async function disconnectChannel(channelId: string) {
     const supabase = await createClient()
+
+    // Fetch channel first to get token
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('id', channelId)
+        .single()
+
+    if (channel && channel.type === 'telegram' && channel.config.bot_token) {
+        try {
+            const client = new TelegramClient(channel.config.bot_token)
+            await client.deleteWebhook()
+        } catch (e) {
+            console.error('Failed to delete Telegram webhook', e)
+            // Continue with DB deletion even if webhook fails
+        }
+    }
+
     const { error } = await supabase
         .from('channels')
         .delete()

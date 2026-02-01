@@ -13,7 +13,11 @@ const navItems = [
     { id: 'skills', href: '/skills', label: 'Skills', icon: 'auto_awesome' },
 ]
 
-export function GlobalRail() {
+interface GlobalRailProps {
+    userName?: string
+}
+
+export function GlobalRail({ userName }: GlobalRailProps) {
     const pathname = usePathname()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
 
@@ -58,7 +62,12 @@ export function GlobalRail() {
                 >
                     <span className="material-symbols-outlined">settings</span>
                 </Link>
-                <div className="h-8 w-8 rounded-full bg-gray-200 mx-auto" />
+                <div
+                    className="h-8 w-8 rounded-full bg-gray-200 mx-auto flex items-center justify-center text-xs font-medium text-gray-600"
+                    title={userName}
+                >
+                    {userName ? userName[0].toUpperCase() : 'U'}
+                </div>
             </div>
         </div>
     )
