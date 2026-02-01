@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { TelegramClient } from '@/lib/telegram/client'
 import { matchSkills } from '@/lib/skills/actions'
 import { v4 as uuidv4 } from 'uuid'
@@ -32,7 +32,11 @@ export async function POST(req: NextRequest) {
         fromId: from.id
     })
 
-    const supabase = await createClient()
+    // Use Service Role Key (Admin) to bypass RLS
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     // 2. Find Channel by Bot Token (We need to verify which bot this is)
     let channel;
@@ -43,6 +47,7 @@ export async function POST(req: NextRequest) {
             .select('*')
             .eq('config->>webhook_secret', secretToken)
             .single()
+
         channel = data
         console.log('Telegram Webhook: Channel lookup by secret', { found: !!data, channelId: data?.id })
     } else {
