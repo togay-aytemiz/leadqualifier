@@ -87,7 +87,8 @@
         "leads": "Leads",
         "settings": "Settings",
         "inbox": "Inbox",
-        "simulator": "Simulator"
+        "simulator": "Simulator",
+        "signout": "Sign out"
     },
     "inbox": {
         "title": "Inbox",

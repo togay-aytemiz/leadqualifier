@@ -105,7 +105,8 @@
         "leads": "Müşteriler",
         "settings": "Ayarlar",
         "inbox": "Gelen Kutusu",
-        "simulator": "Simülatör"
+        "simulator": "Simülatör",
+        "signout": "Çıkış Yap"
     },
     "inbox": {
         "title": "Gelen Kutusu",

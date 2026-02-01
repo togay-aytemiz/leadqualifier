@@ -2,11 +2,18 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ChatSimulator from '@/components/chat/ChatSimulator'
 import { PageHeader } from '@/design'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
-export default async function SimulatorPage() {
+interface SimulatorPageProps {
+    params: Promise<{ locale: string }>
+}
+
+export default async function SimulatorPage({ params }: SimulatorPageProps) {
+    const { locale } = await params
+    setRequestLocale(locale)
+
     const supabase = await createClient()
-    const t = await getTranslations('simulator')
+    const t = await getTranslations({ locale, namespace: 'simulator' })
 
     const {
         data: { user },
@@ -38,7 +45,6 @@ export default async function SimulatorPage() {
 
     return (
         <>
-            {/* Main Content */}
             {/* Main Content */}
             <div className="flex-1 bg-gray-50 flex flex-col min-w-0 overflow-hidden h-full">
                 <PageHeader title={t('title')} />
