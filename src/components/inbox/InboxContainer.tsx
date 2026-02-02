@@ -112,59 +112,80 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
 
     // ... re-insert realtime subscriptions ...
 
+    // Keep a ref to selectedId to use in realtime callbacks without re-subscribing
+    const selectedIdRef = useRef(selectedId)
+    useEffect(() => {
+        selectedIdRef.current = selectedId
+    }, [selectedId])
+
     useEffect(() => {
         const supabase = createClient()
-        const channel = supabase.channel('inbox_realtime')
+
+        console.log('Setting up Realtime subscription...')
+
+        const channel = supabase.channel('inbox_global')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
                 const newMsg = payload.new as Message
-                if (newMsg.conversation_id === selectedId) {
-                    // Check if we already added this optimistically (for system messages)
-                    // System messages have timestamps, so we depend on ID or content mostly.
-                    // For now, simple dedupe by ID if possible, but realtime gives real ID.
-                    // Optimistic ones had 'temp-sys-'. If we see real one, swap it?
-                    // Actually, just appending is fine. React key issue might happen if we don't clean up temps.
-                    // Let's just append.
+                console.log('Realtime Message received:', newMsg)
+
+                // 1. Update active chat if it matches selectedId
+                if (newMsg.conversation_id === selectedIdRef.current) {
                     setMessages(prev => {
-                        // Simple protection against duplicate real-time events for same ID
+                        // Check if we already have this message (dedupe real IDs)
                         if (prev.some(m => m.id === newMsg.id)) return prev;
-                        return [...prev, newMsg];
+
+                        // Dedupe optimistic messages:
+                        // If we find a temp message with same content & sender, remove it and add real one
+                        const isUserSender = newMsg.sender_type === 'user';
+
+                        // Filter out matching temp messages if it's a user message
+                        const filtered = isUserSender
+                            ? prev.filter(m => !(m.id.startsWith('temp-') && m.content === newMsg.content && m.sender_type === 'user'))
+                            : prev;
+
+                        return [...filtered, newMsg];
                     })
                 }
+
+                // 2. Update conversation list (unread, last_message, sort)
                 setConversations(prev => prev.map(c => {
                     if (c.id === newMsg.conversation_id) {
                         return {
                             ...c,
                             last_message_at: newMsg.created_at,
-                            unread_count: newMsg.conversation_id !== selectedId ? c.unread_count + 1 : 0
+                            // Only increment unread if it's NOT the currently open chat
+                            unread_count: newMsg.conversation_id !== selectedIdRef.current ? c.unread_count + 1 : 0,
+                            // If we have messages snippet in list, update it too
+                            messages: [{ content: newMsg.content, created_at: newMsg.created_at, sender_type: newMsg.sender_type } as any]
                         }
                     }
                     return c
                 }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
             })
-            .subscribe()
-        return () => { supabase.removeChannel(channel) }
-    }, [selectedId])
-
-    useEffect(() => {
-        const supabase = createClient()
-        const channel = supabase.channel('conversations_realtime')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
                 const updatedConv = payload.new as Conversation
+                console.log('Realtime Conversation update:', updatedConv)
+
                 setConversations(prev => prev.map(c => {
                     if (c.id === updatedConv.id) {
                         return {
                             ...c,
                             ...updatedConv,
-                            // Preserve joined fields that might not be in payload
-                            assignee: c.assignee // Realtime payload won't have this, so keep existing or it needs fetching
+                            assignee: c.assignee // Preserve joined relations
                         }
                     }
                     return c
                 }))
             })
-            .subscribe()
-        return () => { supabase.removeChannel(channel) }
-    }, [])
+            .subscribe((status) => {
+                console.log('Realtime Subscription Status:', status)
+            })
+
+        return () => {
+            console.log('Cleaning up Realtime subscription...')
+            supabase.removeChannel(channel)
+        }
+    }, []) // Empty dependency array = Stable Subscription
 
     const handleSendMessage = async () => {
         if (!selectedId || !input.trim() || isSending) return
