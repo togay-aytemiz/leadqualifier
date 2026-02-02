@@ -368,8 +368,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div
+            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <div
+                className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-900">{title}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors">

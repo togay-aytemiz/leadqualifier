@@ -236,7 +236,7 @@ export async function deleteCollection(id: string) {
     // Then delete the collection itself
     const { error } = await supabase.from('knowledge_collections').delete().eq('id', id)
     if (error) throw new Error(error.message)
-    revalidatePath('/knowledge')
+    revalidatePath('/knowledge', 'layout') // Ensure layout revalidates
 }
 
 export async function updateCollection(id: string, name: string) {
@@ -249,6 +249,6 @@ export async function updateCollection(id: string, name: string) {
         .single()
 
     if (error) throw new Error(error.message)
-    revalidatePath('/knowledge')
+    revalidatePath('/knowledge', 'layout')
     return data as KnowledgeCollection
 }

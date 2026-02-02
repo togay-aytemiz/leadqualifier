@@ -43,6 +43,10 @@ export default function KnowledgeBasePage() {
 
     useEffect(() => {
         loadData()
+
+        const handleUpdate = () => loadData()
+        window.addEventListener('knowledge-updated', handleUpdate)
+        return () => window.removeEventListener('knowledge-updated', handleUpdate)
     }, [collectionId])
 
     async function loadData() {
@@ -151,10 +155,11 @@ export default function KnowledgeBasePage() {
                                 collection={{ ...currentCollection, count: entries.length }}
                                 redirectOnDelete
                                 trigger={
-                                    <Button variant="secondary">
+                                    <Button variant="secondary" size="icon">
                                         <MoreHorizontal size={16} />
                                     </Button>
                                 }
+                                onUpdate={loadData}
                             />
                         )}
                         <NewContentButton collectionId={collectionId} />
@@ -207,6 +212,7 @@ export default function KnowledgeBasePage() {
                                             id={col.id}
                                             name={col.name}
                                             count={0}
+                                            onRefresh={loadData}
                                         />
                                     ))}
                                 </div>

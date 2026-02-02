@@ -24,6 +24,10 @@ export function KnowledgeSidebar() {
 
     useEffect(() => {
         loadSidebar()
+
+        const handleUpdate = () => loadSidebar()
+        window.addEventListener('knowledge-updated', handleUpdate)
+        return () => window.removeEventListener('knowledge-updated', handleUpdate)
     }, [])
 
     async function loadSidebar() {
@@ -110,6 +114,7 @@ export function KnowledgeSidebar() {
                                         collection={col}
                                         redirectOnDelete={currentCollectionId === col.id}
                                         onDeleteSuccess={loadSidebar} // Reload sidebar after delete
+                                        onUpdate={loadSidebar} // Reload sidebar after rename
                                     />
                                 </div>
                             </div>

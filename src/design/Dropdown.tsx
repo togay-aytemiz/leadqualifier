@@ -89,9 +89,9 @@ export function DropdownMenuItem({ children, onClick, className }: { children: R
     const context = useContext(DropdownContext)
 
     const handleClick = (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
         if (onClick) onClick(e)
-        // Optionally close on click, but let the user handle it via custom logic if they want? 
-        // Standard dropdown behavior is to close.
         context?.setIsOpen(false)
     }
 

@@ -199,7 +199,7 @@
     },
     "folderModal": {
         "title": "Yeni Klasör Oluştur",
-        "editTitle": "Klasörü Düzenle",
+        "editTitle": "Yeniden Adlandır",
         "nameLabel": "Klasör Adı",
         "namePlaceholder": "örn. Politikalar, Pazarlama...",
         "cancel": "İptal",

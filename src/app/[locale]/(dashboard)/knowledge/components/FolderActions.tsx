@@ -7,7 +7,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    ConfirmDialog
+    ConfirmDialog,
+    IconButton
 } from '@/design'
 import { useTranslations } from 'next-intl'
 import { deleteCollection, updateCollection } from '@/lib/knowledge-base/actions'
@@ -18,10 +19,11 @@ interface FolderActionsProps {
     collection: { id: string, name: string, count?: number }
     trigger?: React.ReactNode
     onDeleteSuccess?: () => void
+    onUpdate?: () => void
     redirectOnDelete?: boolean
 }
 
-export function FolderActions({ collection, trigger, onDeleteSuccess, redirectOnDelete }: FolderActionsProps) {
+export function FolderActions({ collection, trigger, onDeleteSuccess, onUpdate, redirectOnDelete }: FolderActionsProps) {
     const t = useTranslations('knowledge')
     const tDelete = useTranslations('deleteFolder')
     const tModal = useTranslations('folderModal')
@@ -33,7 +35,9 @@ export function FolderActions({ collection, trigger, onDeleteSuccess, redirectOn
 
     async function handleRename(name: string) {
         await updateCollection(collection.id, name)
+        window.dispatchEvent(new Event('knowledge-updated'))
         router.refresh()
+        if (onUpdate) onUpdate()
     }
 
     async function handleDelete() {
@@ -65,9 +69,12 @@ export function FolderActions({ collection, trigger, onDeleteSuccess, redirectOn
             <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                     {trigger || (
-                        <button className="p-1 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded transition-colors">
-                            <MoreHorizontal size={16} />
-                        </button>
+                        <IconButton
+                            icon={MoreHorizontal}
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-gray-600"
+                        />
                     )}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
