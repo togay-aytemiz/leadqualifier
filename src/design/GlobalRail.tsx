@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Inbox, MessageSquare, Sparkles, Settings, Bot, LogOut } from 'lucide-react'
+import { Inbox, MessageSquare, Sparkles, Settings, Bot, LogOut, BookOpen } from 'lucide-react'
 
 import { useTranslations } from 'next-intl'
 
@@ -20,6 +20,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
         { id: 'inbox', href: '/inbox', label: t('inbox'), icon: Inbox },
         { id: 'simulator', href: '/simulator', label: t('simulator'), icon: MessageSquare },
         { id: 'skills', href: '/skills', label: t('skills'), icon: Sparkles },
+        { id: 'knowledge', href: '/knowledge', label: 'Brain', icon: BookOpen },
     ]
 
     return (

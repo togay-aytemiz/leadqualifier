@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { generateEmbeddings, formatEmbeddingForPgvector } from './embeddings'
+import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
 
 /**

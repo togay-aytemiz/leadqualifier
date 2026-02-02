@@ -80,16 +80,16 @@
 
 ---
 
-## Phase 4: Knowledge Base (RAG)
-- [ ] **KB CRUD**
-  - [ ] Create KB entry model
-  - [ ] Category support
-  - [ ] Admin UI for KB management
-- [ ] **RAG Pipeline**
-  - [ ] Document chunking
-  - [ ] Embedding storage
-  - [ ] Retrieval logic
-  - [ ] Response generation from KB
+## Phase 4: Knowledge Base (RAG) ✅
+- [x] **KB CRUD**
+  - [x] Create KB entry model
+  - [x] Category support
+  - [x] Admin UI for KB management
+- [x] **RAG Pipeline**
+  - [x] Document chunking
+  - [x] Embedding storage
+  - [x] Retrieval logic
+  - [x] Response generation from KB
 
 ---
 

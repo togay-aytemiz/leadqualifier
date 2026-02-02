@@ -148,5 +148,65 @@
         "billing": "Billing",
         "plans": "Plans",
         "receipts": "Receipts"
+    },
+    "knowledge": {
+        "title": "Knowledge Base",
+        "newContent": "New Content",
+        "newFolder": "New Folder",
+        "home": "Home",
+        "loading": "Loading...",
+        "folders": "Folders",
+        "files": "Files",
+        "emptyFolder": "Empty Folder",
+        "emptyFolderDesc": "This folder has no content yet.",
+        "noContentYet": "No content yet",
+        "noContentYetDesc": "Create a folder or add content to set up your knowledge base.",
+        "failedToDelete": "Failed to delete",
+        "createTitle": "Create Content",
+        "editTitle": "Edit Content",
+        "form": {
+            "title": "Title",
+            "titlePlaceholder": "e.g. Return Policy",
+            "folder": "Folder",
+            "folderOptional": "Folder (Optional)",
+            "rootFolder": "No Folder (Root)",
+            "content": "Content",
+            "contentPlaceholder": "Write the content here...",
+            "save": "Save Content",
+            "saving": "Saving...",
+            "cancel": "Cancel",
+            "back": "Back"
+        },
+        "deleteConfirm": "Are you sure you want to delete this content?",
+        "folderModal": {
+            "title": "Create New Folder",
+            "nameLabel": "Folder Name",
+            "namePlaceholder": "e.g. Policies, Marketing...",
+            "cancel": "Cancel",
+            "create": "Create Folder",
+            "creating": "Creating..."
+        },
+        "sidebar": {
+            "title": "Knowledge",
+            "content": "Content",
+            "allContent": "All content",
+            "collections": "Collections"
+        },
+        "newContentButton": {
+            "selectSource": "SELECT SOURCE TYPE",
+            "freeform": "Freeform Text",
+            "pdf": "PDF Upload",
+            "github": "Github Repository",
+            "notion": "Notion",
+            "website": "Website URL",
+            "comingSoon": "Coming Soon"
+        },
+        "deleteFolder": {
+            "title": "Delete Folder",
+            "description": "This action cannot be undone. The folder and {count} items inside will be permanently deleted.",
+            "descriptionEmpty": "This action cannot be undone. The folder will be permanently deleted.",
+            "confirm": "Delete",
+            "cancel": "Cancel"
+        }
     }
 }

@@ -10,9 +10,10 @@ interface SidebarProps {
     title: string
     children: ReactNode
     actions?: ReactNode
+    footer?: ReactNode
 }
 
-export function Sidebar({ title, children, actions }: SidebarProps) {
+export function Sidebar({ title, children, actions, footer }: SidebarProps) {
     return (
         <div className="w-64 bg-gray-50/50 flex flex-col h-full border-r border-gray-200 shrink-0 font-sans">
             {/* Header */}
@@ -27,6 +28,13 @@ export function Sidebar({ title, children, actions }: SidebarProps) {
             <div className="p-3 space-y-6 overflow-y-auto flex-1">
                 {children}
             </div>
+
+            {/* Footer */}
+            {footer && (
+                <div className="shrink-0">
+                    {footer}
+                </div>
+            )}
         </div>
     )
 }

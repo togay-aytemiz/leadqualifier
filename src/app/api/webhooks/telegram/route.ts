@@ -196,18 +196,76 @@ export async function POST(req: NextRequest) {
                 updated_at: new Date().toISOString()
             })
             .eq('id', conversation.id)
+
+        return NextResponse.json({ ok: true })
     } else {
-        // Fallback response for debugging/confirmation
-        console.log('Telegram Webhook: No skill matched, sending fallback')
+        // 7. Fallback: Check Knowledge Base (RAG)
+        console.log('Telegram Webhook: No skill matched, searching Knowledge Base...')
+        const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions') // Dynamically import to avoid circular dep if any
+
+        const kbResults = await searchKnowledgeBase(text, orgId, 0.5, 3)
+
+        if (kbResults && kbResults.length > 0) {
+            console.log('Telegram Webhook: Knowledge Base match found', { count: kbResults.length })
+
+            // Generate RAG Response
+            // We'll use a direct OpenAI call here or a helper function. 
+            // For simplicity, let's assume we import OpenAI client here.
+            const { default: OpenAI } = await import('openai')
+            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+            const context = kbResults.map(r => r.content).join('\n---\n')
+
+            const systemPrompt = `You are a helpful assistant for a business. 
+Answer the user's question based strictly on the provided context below. 
+If the answer is not in the context, say you don't know and suggest contacting a human.
+Keep the answer concise and friendly (in Turkish or English depending on user).
+
+Context:
+${context}`
+
+            const completion = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0.3
+            })
+
+            const ragResponse = completion.choices[0]?.message?.content
+
+            if (ragResponse) {
+                const client = new TelegramClient(channel.config.bot_token)
+                await client.sendMessage(chatId, ragResponse)
+
+                // Save Bot Message (RAG)
+                await supabase.from('messages').insert({
+                    id: uuidv4(),
+                    conversation_id: conversation.id,
+                    organization_id: orgId,
+                    sender_type: 'bot',
+                    content: ragResponse,
+                    metadata: { is_rag: true, sources: kbResults.map(r => r.id) }
+                })
+
+                // Update conversation
+                await supabase.from('conversations')
+                    .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+                    .eq('id', conversation.id)
+
+                return NextResponse.json({ ok: true })
+            }
+        }
+
+        // 8. Final Fallback (No Skill, No Knowledge)
+        console.log('Telegram Webhook: No knowledge match, sending fallback')
         const client = new TelegramClient(channel.config.bot_token)
-        // Check language logic later, for now hardcoded English/Turkish or just generic
-        // "Mesajınız alındı" (Message received)
-        const fallbackText = "Mesajınızı aldım, ancak buna uygun bir yanıtım yok. (I received your message but I don't have a specific response for it.)"
+        const fallbackText = "Mesajınızı aldım. Şu an buna yanıt veremiyorum ancak sizi bir yetkiliye bağlıyorum. (I received your message but I don't have an answer instantly. Connecting you to a human.)"
 
         await client.sendMessage(chatId, fallbackText)
 
-        // Also save this fallback interaction? Maybe not to clutter, strictly for debugging now.
-        // Actually, saving it helps seeing it in Inbox
+        // Save final fallback
         await supabase.from('messages').insert({
             id: uuidv4(),
             conversation_id: conversation.id,
@@ -217,14 +275,10 @@ export async function POST(req: NextRequest) {
             metadata: { is_fallback: true }
         })
 
-        // Update conversation timestamp (No unread increment for bot replies)
         await supabase.from('conversations')
-            .update({
-                last_message_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
+            .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq('id', conversation.id)
-    }
 
-    return NextResponse.json({ ok: true })
+        return NextResponse.json({ ok: true })
+    }
 }

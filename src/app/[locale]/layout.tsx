@@ -38,7 +38,7 @@ export default async function LocaleLayout({ children, params }: Props) {
                     rel="stylesheet"
                 />
             </head>
-            <body className={`${inter.variable} font-sans antialiased bg-gray-50 text-gray-900`}>
+            <body className={`${inter.variable} font-sans antialiased bg-gray-50 text-gray-900`} suppressHydrationWarning>
                 <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
             </body>
         </html>

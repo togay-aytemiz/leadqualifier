@@ -166,5 +166,65 @@
         "billing": "Faturalandırma",
         "plans": "Planlar",
         "receipts": "Faturalar"
+    },
+    "knowledge": {
+        "title": "Bilgi Bankası",
+        "newContent": "Yeni İçerik",
+        "newFolder": "Yeni Klasör",
+        "home": "Ana Sayfa",
+        "loading": "Yükleniyor...",
+        "folders": "Klasörler",
+        "files": "Dosyalar",
+        "emptyFolder": "Boş Klasör",
+        "emptyFolderDesc": "Bu klasörde henüz içerik yok.",
+        "noContentYet": "Henüz içerik yok",
+        "noContentYetDesc": "Bilgi bankanızı oluşturmak için bir klasör oluşturun veya içerik ekleyin.",
+        "failedToDelete": "Silinemedi",
+        "createTitle": "İçerik Oluştur",
+        "editTitle": "İçeriği Düzenle",
+        "form": {
+            "title": "Başlık",
+            "titlePlaceholder": "örn. İade Politikası",
+            "folder": "Klasör",
+            "folderOptional": "Klasör (İsteğe Bağlı)",
+            "rootFolder": "Klasör Yok (Ana Dizin)",
+            "content": "İçerik",
+            "contentPlaceholder": "İçeriği buraya yazın...",
+            "save": "İçeriği Kaydet",
+            "saving": "Kaydediliyor...",
+            "cancel": "İptal",
+            "back": "Geri"
+        },
+        "deleteConfirm": "Bu içeriği silmek istediğinizden emin misiniz?",
+        "folderModal": {
+            "title": "Yeni Klasör Oluştur",
+            "nameLabel": "Klasör Adı",
+            "namePlaceholder": "örn. Politikalar, Pazarlama...",
+            "cancel": "İptal",
+            "create": "Klasör Oluştur",
+            "creating": "Oluşturuluyor..."
+        },
+        "sidebar": {
+            "title": "Bilgi Bankası",
+            "content": "İçerik",
+            "allContent": "Tüm İçerik",
+            "collections": "Koleksiyonlar"
+        },
+        "newContentButton": {
+            "selectSource": "KAYNAK TÜRÜ SEÇİN",
+            "freeform": "Serbest Metin",
+            "pdf": "PDF Yükle",
+            "github": "Github Deposu",
+            "notion": "Notion",
+            "website": "Web Sitesi",
+            "comingSoon": "Yakında"
+        },
+        "deleteFolder": {
+            "title": "Klasörü Sil",
+            "description": "Bu işlem geri alınamaz. Klasör ve içindeki {count} öğe kalıcı olarak silinecektir.",
+            "descriptionEmpty": "Bu işlem geri alınamaz. Klasör kalıcı olarak silinecektir.",
+            "confirm": "Sil",
+            "cancel": "İptal"
+        }
     }
 }
