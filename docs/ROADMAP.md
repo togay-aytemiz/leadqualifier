@@ -12,6 +12,7 @@
 - [x] Set up CI/CD pipeline (Vercel auto-deploys)
 - [x] Configure database (Supabase client ready)
 - [x] Set up environment variables
+- [x] Codify agent workflow rules (always provide commit message)
 
 ---
 
@@ -75,6 +76,7 @@
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
+  - [x] Realtime auth handshake for subscriptions
 
 ---
 

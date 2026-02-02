@@ -53,6 +53,7 @@
   - **Optimistic UI**: Instant feedback on send, with "temp" message deduplication logic.
   - **Inbox Polish**: Robust auto-scroll, "Unassigned" filters, and simplified Details Panel (Status/Platform icons refined).
   - **Developer**: Added error boundaries to `sendMessage` and strictly typed DB interfaces.
+- **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
 - N/A
@@ -60,6 +61,7 @@
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
 - Manual replies atomically assign the current operator to prevent "Unassigned" state until refresh.
+- Realtime subscriptions now attach the session token before subscribing (fixes missing live updates).
 
 ---
 

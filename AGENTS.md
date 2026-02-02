@@ -49,6 +49,7 @@ This is a **WhatsApp AI Lead Qualifier** SaaS for Turkish SMBs. The system:
 
 4. **Commit messages**
    - Reference the roadmap phase: `feat(phase-3): implement skill CRUD`
+   - **Always provide a commit message in every response** (even if no commit is requested)
 
 5. **Build Verification**
    - Run `npm run build` to ensure no regressions or type errors.

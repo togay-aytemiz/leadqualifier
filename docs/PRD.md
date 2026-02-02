@@ -233,3 +233,4 @@ MVP is successful when:
 | i18n | **TR + EN from day one** | Avoid retrofit pain |
 | Onboarding | **Concierge (MVP)** | Manual WhatsApp setup for 5 pilots |
 | Inbox Updates | **Atomic send RPC + realtime fallback** | Prevents unassigned state and keeps bot/user messages visible |
+| Dev Workflow | **Always provide commit message** | Ensures consistent handoff across iterations |

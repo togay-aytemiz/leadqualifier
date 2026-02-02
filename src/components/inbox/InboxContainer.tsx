@@ -206,117 +206,136 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     // ... re-insert realtime subscriptions ...
 
     useEffect(() => {
-        console.log('Setting up Realtime subscription...')
+        let channel: ReturnType<typeof supabase.channel> | null = null
+        let isMounted = true
 
-        const channel = supabase.channel('inbox_global')
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `organization_id=eq.${organizationId}`
-            }, (payload) => {
-                const newMsg = payload.new as Message
-                console.log('Realtime Message received:', newMsg)
+        const setupRealtime = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!isMounted) return
 
-                // 1. Update active chat if it matches selectedId
-                if (newMsg.conversation_id === selectedIdRef.current) {
-                    setMessages(prev => {
-                        // Check if we already have this message (dedupe real IDs)
-                        if (prev.some(m => m.id === newMsg.id)) return prev
+            if (session?.access_token) {
+                supabase.realtime.setAuth(session.access_token)
+            } else {
+                console.warn('Realtime: missing session, subscribing as anon')
+            }
 
-                        // Dedupe optimistic messages:
-                        // If we find a temp message with same content & sender, remove it and add real one
-                        const isUserSender = newMsg.sender_type === 'user'
+            console.log('Setting up Realtime subscription...')
 
-                        // Filter out matching temp messages if it's a user message
-                        const filtered = isUserSender
-                            ? prev.filter(m => !(m.id.startsWith('temp-') && m.content === newMsg.content && m.sender_type === 'user'))
-                            : prev
+            channel = supabase.channel('inbox_global')
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `organization_id=eq.${organizationId}`
+                }, (payload) => {
+                    const newMsg = payload.new as Message
+                    console.log('Realtime Message received:', newMsg)
 
-                        return [...filtered, newMsg]
+                    // 1. Update active chat if it matches selectedId
+                    if (newMsg.conversation_id === selectedIdRef.current) {
+                        setMessages(prev => {
+                            // Check if we already have this message (dedupe real IDs)
+                            if (prev.some(m => m.id === newMsg.id)) return prev
+
+                            // Dedupe optimistic messages:
+                            // If we find a temp message with same content & sender, remove it and add real one
+                            const isUserSender = newMsg.sender_type === 'user'
+
+                            // Filter out matching temp messages if it's a user message
+                            const filtered = isUserSender
+                                ? prev.filter(m => !(m.id.startsWith('temp-') && m.content === newMsg.content && m.sender_type === 'user'))
+                                : prev
+
+                            return [...filtered, newMsg]
+                        })
+                    }
+
+                    // 2. Update conversation list (unread, last_message, sort)
+                    setConversations(prev => prev.map(c => {
+                        if (c.id === newMsg.conversation_id) {
+                            return {
+                                ...c,
+                                last_message_at: newMsg.created_at,
+                                // Only increment unread if it's NOT the currently open chat
+                                unread_count: newMsg.conversation_id !== selectedIdRef.current ? c.unread_count + 1 : 0,
+                                // If we have messages snippet in list, update it too
+                                messages: [{ content: newMsg.content, created_at: newMsg.created_at, sender_type: newMsg.sender_type } as any]
+                            }
+                        }
+                        return c
+                    }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'conversations',
+                    filter: `organization_id=eq.${organizationId}`
+                }, (payload) => {
+                    const newOrUpdatedConv = payload.new as Conversation
+                    console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
+
+                    setConversations(prev => {
+                        // Check if exists
+                        const exists = prev.some(c => c.id === newOrUpdatedConv.id)
+
+                        if (exists) {
+                            // UPDATE logic
+                            return prev.map(c => {
+                                if (c.id === newOrUpdatedConv.id) {
+                                    const nextAssignee = newOrUpdatedConv.assignee_id
+                                        ? (assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? (c.assignee_id === newOrUpdatedConv.assignee_id ? c.assignee : null))
+                                        : null
+
+                                    return {
+                                        ...c,
+                                        ...newOrUpdatedConv,
+                                        assignee: nextAssignee
+                                    }
+                                }
+                                return c
+                            }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+                        } else {
+                            // INSERT logic (New conversation)
+                            // Note: We won't have the 'assignee' object populated (it's null or just ID) until a fetch,
+                            // but for a new open conversation that's fine.
+                            const nextAssignee = newOrUpdatedConv.assignee_id
+                                ? assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? null
+                                : null
+
+                            return [{ ...newOrUpdatedConv, assignee: nextAssignee }, ...prev]
+                                .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+                        }
                     })
-                }
 
-                // 2. Update conversation list (unread, last_message, sort)
-                setConversations(prev => prev.map(c => {
-                    if (c.id === newMsg.conversation_id) {
-                        return {
-                            ...c,
-                            last_message_at: newMsg.created_at,
-                            // Only increment unread if it's NOT the currently open chat
-                            unread_count: newMsg.conversation_id !== selectedIdRef.current ? c.unread_count + 1 : 0,
-                            // If we have messages snippet in list, update it too
-                            messages: [{ content: newMsg.content, created_at: newMsg.created_at, sender_type: newMsg.sender_type } as any]
+                    if (newOrUpdatedConv.assignee_id && !assigneeCacheRef.current[newOrUpdatedConv.assignee_id]) {
+                        resolveAssignee(newOrUpdatedConv.assignee_id).then((assignee) => {
+                            if (!assignee) return
+                            setConversations(prev => prev.map(c =>
+                                c.id === newOrUpdatedConv.id ? { ...c, assignee } : c
+                            ))
+                        })
+                    }
+
+                    if (newOrUpdatedConv.id === selectedIdRef.current) {
+                        const lastMessageAt = messagesRef.current[messagesRef.current.length - 1]?.created_at
+                        if (!lastMessageAt || new Date(newOrUpdatedConv.last_message_at).getTime() > new Date(lastMessageAt).getTime()) {
+                            refreshMessages(newOrUpdatedConv.id)
                         }
                     }
-                    return c
-                }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
-            })
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'conversations',
-                filter: `organization_id=eq.${organizationId}`
-            }, (payload) => {
-                const newOrUpdatedConv = payload.new as Conversation
-                console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
-
-                setConversations(prev => {
-                    // Check if exists
-                    const exists = prev.some(c => c.id === newOrUpdatedConv.id)
-
-                    if (exists) {
-                        // UPDATE logic
-                        return prev.map(c => {
-                            if (c.id === newOrUpdatedConv.id) {
-                                const nextAssignee = newOrUpdatedConv.assignee_id
-                                    ? (assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? (c.assignee_id === newOrUpdatedConv.assignee_id ? c.assignee : null))
-                                    : null
-
-                                return {
-                                    ...c,
-                                    ...newOrUpdatedConv,
-                                    assignee: nextAssignee
-                                }
-                            }
-                            return c
-                        }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
-                    } else {
-                        // INSERT logic (New conversation)
-                        // Note: We won't have the 'assignee' object populated (it's null or just ID) until a fetch,
-                        // but for a new open conversation that's fine.
-                        const nextAssignee = newOrUpdatedConv.assignee_id
-                            ? assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? null
-                            : null
-
-                        return [{ ...newOrUpdatedConv, assignee: nextAssignee }, ...prev]
-                            .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
-                    }
                 })
+                .subscribe((status) => {
+                    console.log('Realtime Subscription Status:', status)
+                })
+        }
 
-                if (newOrUpdatedConv.assignee_id && !assigneeCacheRef.current[newOrUpdatedConv.assignee_id]) {
-                    resolveAssignee(newOrUpdatedConv.assignee_id).then((assignee) => {
-                        if (!assignee) return
-                        setConversations(prev => prev.map(c =>
-                            c.id === newOrUpdatedConv.id ? { ...c, assignee } : c
-                        ))
-                    })
-                }
-
-                if (newOrUpdatedConv.id === selectedIdRef.current) {
-                    const lastMessageAt = messagesRef.current[messagesRef.current.length - 1]?.created_at
-                    if (!lastMessageAt || new Date(newOrUpdatedConv.last_message_at).getTime() > new Date(lastMessageAt).getTime()) {
-                        refreshMessages(newOrUpdatedConv.id)
-                    }
-                }
-            })
-            .subscribe((status) => {
-                console.log('Realtime Subscription Status:', status)
-            })
+        setupRealtime()
 
         return () => {
-            console.log('Cleaning up Realtime subscription...')
-            supabase.removeChannel(channel)
+            isMounted = false
+            if (channel) {
+                console.log('Cleaning up Realtime subscription...')
+                supabase.removeChannel(channel)
+            }
         }
     }, [organizationId, refreshMessages, resolveAssignee, supabase])
 
