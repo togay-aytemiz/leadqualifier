@@ -13,6 +13,12 @@ export async function getConversations(organizationId: string, page: number = 0,
         .from('conversations')
         .select(`
             *,
+            *,
+            active_agent,
+            assignee:assignee_id(
+                full_name,
+                email
+            ),
             messages (
                 content,
                 created_at,
@@ -53,11 +59,89 @@ export async function getMessages(conversationId: string) {
 export async function sendMessage(conversationId: string, content: string) {
     const supabase = await createClient()
 
+    // 1. Get conversation details to know platform and recipient
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('platform, contact_phone, organization_id')
+        .eq('id', conversationId)
+        .single()
+
+    if (!conversation) throw new Error('Conversation not found')
+
+    // 2. If Telegram, send via API
+    if (conversation.platform === 'telegram') {
+        // Find the active telegram channel for this org
+        const { data: channel } = await supabase
+            .from('channels')
+            .select('config')
+            .eq('organization_id', conversation.organization_id)
+            .eq('type', 'telegram')
+            .eq('status', 'active')
+            .single()
+
+        if (channel && channel.config?.bot_token) {
+            try {
+                const { TelegramClient } = await import('@/lib/telegram/client')
+                const client = new TelegramClient(channel.config.bot_token)
+                await client.sendMessage(conversation.contact_phone, content)
+            } catch (error) {
+                console.error('Failed to send Telegram message:', error)
+                throw new Error('Failed to send message to Telegram API')
+            }
+        } else {
+            console.warn('No active Telegram channel found for this organization')
+        }
+    }
+
+    // 3. Save to DB
     const { data, error } = await supabase
         .from('messages')
         .insert({
             conversation_id: conversationId,
             sender_type: 'user', // 'user' means the agent/admin sending the message
+            content
+        })
+        .select()
+        .single()
+
+    if (error) throw error
+
+    // Update conversation last_message_at
+    // Update conversation last_message_at AND set active_agent to operator AND assign to sender
+    const { data: { user } } = await supabase.auth.getUser()
+
+    await supabase
+        .from('conversations')
+        .update({
+            last_message_at: new Date().toISOString(),
+            active_agent: 'operator',
+            assignee_id: user?.id
+        })
+        .eq('id', conversationId)
+
+    return data as Message
+}
+
+export async function setConversationAgent(conversationId: string, agent: 'bot' | 'operator') {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('conversations')
+        .update({ active_agent: agent })
+        .eq('id', conversationId)
+
+    if (error) throw error
+    return true
+}
+
+export async function sendSystemMessage(conversationId: string, content: string) {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+        .from('messages')
+        .insert({
+            conversation_id: conversationId,
+            sender_type: 'system',
             content
         })
         .select()

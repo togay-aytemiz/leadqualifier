@@ -62,16 +62,18 @@ export async function POST(req: NextRequest) {
     const orgId = channel.organization_id
 
     // 3. Find or Create Conversation
+    // 3. Find or Create Conversation
     let { data: conversation } = await supabase
         .from('conversations')
         .select('*')
         .eq('organization_id', orgId)
         .eq('platform', 'telegram')
-        .eq('contact_phone', chatId) // Storing telegram chat_id in contact_phone for now
-        .single()
+        .eq('contact_phone', chatId.toString()) // Storing telegram chat_id in contact_phone for now
+        .limit(1)
+        .maybeSingle()
 
     if (!conversation) {
-        console.log('Telegram Webhook: Creating new conversation')
+        console.log('Telegram Webhook: Creating new conversation (not found)')
         const { data: newConv, error } = await supabase
             .from('conversations')
             .insert({
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest) {
                 organization_id: orgId,
                 platform: 'telegram',
                 contact_name: `${from.first_name} ${from.last_name || ''}`.trim(),
-                contact_phone: chatId,
+                contact_phone: chatId.toString(),
                 status: 'open',
                 unread_count: 0
             })
@@ -87,10 +89,32 @@ export async function POST(req: NextRequest) {
             .single()
 
         if (error) {
-            console.error('Telegram Webhook: Failed to create conversation', error)
-            return NextResponse.json({ error: 'DB Error' }, { status: 500 })
+            // Check for Unique Violation (Postgres code 23505)
+            // This happens if a conversation was created by another request in the split second between our select and insert
+            // or if the unique index prevents our insert.
+            if (error.code === '23505') {
+                console.log('Telegram Webhook: Unique violation (race condition), refetching existing conversation')
+                const { data: existingRetry } = await supabase
+                    .from('conversations')
+                    .select('*')
+                    .eq('organization_id', orgId)
+                    .eq('platform', 'telegram')
+                    .eq('contact_phone', chatId.toString())
+                    .single()
+
+                if (existingRetry) {
+                    conversation = existingRetry
+                } else {
+                    console.error('Telegram Webhook: Failed to refetch after unique violation')
+                    return NextResponse.json({ error: 'DB Error' }, { status: 500 })
+                }
+            } else {
+                console.error('Telegram Webhook: Failed to create conversation', error)
+                return NextResponse.json({ error: 'DB Error' }, { status: 500 })
+            }
+        } else {
+            conversation = newConv
         }
-        conversation = newConv
     } else {
         console.log('Telegram Webhook: Found existing conversation', conversation.id)
     }
@@ -110,7 +134,24 @@ export async function POST(req: NextRequest) {
         console.log('Telegram Webhook: Message saved successfully')
     }
 
-    // 5. Process AI Response (Skills)
+    // 5. Check Active Agent Status (Zero-Cost Check)
+    // We now use an explicit column on the conversation table.
+    // If active_agent is 'operator', we skip all AI processing immediately.
+
+    // Note: We need to ensure 'active_agent' is selected in step 3.
+    // Since we selected '*', it should be there.
+
+    console.log('Telegram Webhook: Checking Active Agent', {
+        conversationId: conversation.id,
+        activeAgent: conversation.active_agent
+    })
+
+    if (conversation.active_agent === 'operator') {
+        console.log('Telegram Webhook: Operator is explicitly active. SKIPPING AI REPLY.')
+        return NextResponse.json({ ok: true })
+    }
+
+    // 6. Process AI Response (Skills)
     const matchedSkills = await matchSkills(text, orgId, 0.5, 5, supabase)
     const bestMatch = matchedSkills?.[0]
 

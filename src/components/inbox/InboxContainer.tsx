@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Avatar, EmptyState, IconButton } from '@/design'
 import {
-    Inbox, Filter, ChevronDown, ExternalLink, X,
-    Paperclip, Image, Smile, Zap, Bot, Trash2, MessageSquare
+    Inbox, ChevronDown, ExternalLink, X,
+    Paperclip, Image, Smile, Zap, Bot, Trash2, MessageSquare, MoreHorizontal, LogOut, User
 } from 'lucide-react'
 import { Conversation, Message } from '@/types/database'
-import { getMessages, sendMessage, getConversations, deleteConversation } from '@/lib/inbox/actions'
+import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
+import { tr } from 'date-fns/locale'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface InboxContainerProps {
     initialConversations: Conversation[]
@@ -20,17 +21,22 @@ interface InboxContainerProps {
 
 export function InboxContainer({ initialConversations, organizationId }: InboxContainerProps) {
     const t = useTranslations('inbox')
+    const locale = useLocale()
+    const dateLocale = locale === 'tr' ? tr : undefined
     const [conversations, setConversations] = useState<any[]>(initialConversations)
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
-    // ... (rest of state omitted for brevity, logic remains same)
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
     const [loadingMore, setLoadingMore] = useState(false)
+    const [isDetailsMenuOpen, setIsDetailsMenuOpen] = useState(false)
+    const [isLeaving, setIsLeaving] = useState(false)
 
-    // ... handleScroll ...
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+
     const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
         if (scrollHeight - scrollTop <= clientHeight + 50 && hasMore && !loadingMore) {
@@ -55,7 +61,6 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         }
     }
 
-    // ... useEffects ...
     useEffect(() => {
         if (!selectedId) return
         async function loadMessages() {
@@ -72,13 +77,58 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         loadMessages()
     }, [selectedId])
 
+    // Scroll Management
+    const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+        if (!messagesEndRef.current) return
+
+        // Use setTimeout to ensure DOM is fully rendered/layout updated
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' })
+        }, 100)
+    }
+
+    // Effect for conversation switch (Instant scroll)
+    useEffect(() => {
+        scrollToBottom('auto')
+    }, [selectedId])
+
+    // Effect for new messages (Smooth scroll)
+    // We strictly track 'messages' length or content change?
+    // Just messages dependency is fine, but we need to avoid fighting with selectedId.
+    // Actually, separating them is safer.
+    const prevMessagesLength = useRef(0)
+    useEffect(() => {
+        if (messages.length > prevMessagesLength.current) {
+            scrollToBottom('smooth')
+        }
+        prevMessagesLength.current = messages.length
+    }, [messages])
+
+    // Also force scroll on mount/updates just in case
+    // useEffect(() => { scrollToBottom() }, [])
+    // No, better to be specific.
+
+    // Check if we need to scroll when isLeaving changes (optimistic update changes messages, so handled above)
+
+    // ... re-insert realtime subscriptions ...
+
     useEffect(() => {
         const supabase = createClient()
         const channel = supabase.channel('inbox_realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
                 const newMsg = payload.new as Message
                 if (newMsg.conversation_id === selectedId) {
-                    setMessages(prev => [...prev, newMsg])
+                    // Check if we already added this optimistically (for system messages)
+                    // System messages have timestamps, so we depend on ID or content mostly.
+                    // For now, simple dedupe by ID if possible, but realtime gives real ID.
+                    // Optimistic ones had 'temp-sys-'. If we see real one, swap it?
+                    // Actually, just appending is fine. React key issue might happen if we don't clean up temps.
+                    // Let's just append.
+                    setMessages(prev => {
+                        // Simple protection against duplicate real-time events for same ID
+                        if (prev.some(m => m.id === newMsg.id)) return prev;
+                        return [...prev, newMsg];
+                    })
                 }
                 setConversations(prev => prev.map(c => {
                     if (c.id === newMsg.conversation_id) {
@@ -95,6 +145,26 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         return () => { supabase.removeChannel(channel) }
     }, [selectedId])
 
+    useEffect(() => {
+        const supabase = createClient()
+        const channel = supabase.channel('conversations_realtime')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
+                const updatedConv = payload.new as Conversation
+                setConversations(prev => prev.map(c => {
+                    if (c.id === updatedConv.id) {
+                        return {
+                            ...c,
+                            ...updatedConv,
+                            // Preserve joined fields that might not be in payload
+                            assignee: c.assignee // Realtime payload won't have this, so keep existing or it needs fetching
+                        }
+                    }
+                    return c
+                }))
+            })
+            .subscribe()
+        return () => { supabase.removeChannel(channel) }
+    }, [])
 
     const handleSendMessage = async () => {
         if (!selectedId || !input.trim() || isSending) return
@@ -107,6 +177,16 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
             created_at: new Date().toISOString()
         }
         setMessages(prev => [...prev, tempMsg])
+
+        // Optimistically set active agent to operator
+        setConversations(prev => prev.map(c =>
+            c.id === selectedId ? {
+                ...c,
+                active_agent: 'operator',
+                last_message_at: new Date().toISOString()
+            } : c
+        ))
+
         setInput('')
         setIsSending(true)
         try {
@@ -127,13 +207,60 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 setSelectedId(null)
             } catch (error) {
                 console.error('Failed to delete conversation', error)
-                console.error('Failed to delete conversation', error)
-                // alert('Failed to delete conversation')
             }
         }
     }
 
+    const handleLeaveConversation = async () => {
+        if (!selectedId || isLeaving) return
+
+        setIsLeaving(true)
+        const content = `${t('operator')} ${t('leftSession')}`
+
+        // Optimistic update
+        const tempMsg: Message = {
+            id: 'temp-sys-' + Date.now(),
+            conversation_id: selectedId,
+            sender_type: 'system',
+            content: content,
+            metadata: {},
+            created_at: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, tempMsg])
+
+        try {
+            // Send a system message to mark the end of operator session
+            await sendSystemMessage(selectedId, content)
+            // Explicitly set agent back to bot
+            await setConversationAgent(selectedId, 'bot')
+
+            // Update local state
+            setConversations(prev => prev.map(c =>
+                c.id === selectedId ? { ...c, active_agent: 'bot' } : c
+            ))
+        } catch (e) {
+            console.error(e)
+            // Ideally remove optimistic message here on fail
+        } finally {
+            setIsLeaving(false)
+        }
+    }
+
     const selectedConversation = conversations.find(c => c.id === selectedId)
+
+    // Calculate active agent based on last outgoing message
+    const lastOutgoingMessage = messages
+        .slice()
+        .reverse()
+        .find(m => m.sender_type === 'user' || m.sender_type === 'bot' || m.sender_type === 'system')
+
+    // Default to AI if no history, otherwise check who sent last
+    // If system sent last (e.g. "Operator left"), it defaults to AI (operator only if 'user')
+    // const activeAgent = lastOutgoingMessage?.sender_type === 'user' ? 'operator' : 'ai'
+
+    // NEW: Use explicit state from conversation
+    // Fallback to 'ai' (bot) if undefined (e.g. old data or optimistic new conv)
+    const activeAgent = selectedConversation?.active_agent === 'operator' ? 'operator' : 'ai'
 
     return (
         <>
@@ -143,9 +270,6 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     <div className="flex items-center gap-1 cursor-pointer group">
                         <span className="text-lg font-bold text-gray-900">{t('title')}</span>
                         <ChevronDown className="text-gray-500 group-hover:text-gray-900" size={20} />
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <IconButton icon={Filter} size="sm" />
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
@@ -170,7 +294,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                         <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
                                     </div>
                                     <span className="text-xs text-gray-400">
-                                        {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false }).replace('about ', '')}
+                                        {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
                                     </span>
                                 </div>
                                 <div className="pl-[34px] pr-2">
@@ -197,14 +321,17 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 shrink-0 bg-white">
                             <div className="flex items-center gap-3">
                                 <h2 className="font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
-                                    <Bot size={12} />
-                                    {t('copilot')}
-                                </span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <IconButton icon={ExternalLink} size="sm" />
-                                <IconButton icon={X} size="sm" />
+                                <span className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition-colors ${activeAgent === 'ai'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-100'
+                                    : 'bg-blue-50 text-blue-700 border-blue-100'
+                                    }`}>
+                                    {activeAgent === 'ai' ? <Bot size={14} /> : <Zap size={14} />}
+                                    <span className="font-medium">
+                                        {activeAgent === 'ai' ? t('copilot') : t('operator')}
+                                    </span>
+                                </span>
                             </div>
                         </div>
 
@@ -237,7 +364,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                                 <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
                                                     {m.content}
                                                 </div>
-                                                <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm')}</span>
+                                                <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
                                             </div>
                                         </div>
                                     )
@@ -251,13 +378,14 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                             </div>
                                             <div className="flex items-center gap-1.5 mr-1">
                                                 <span className="text-xs text-gray-400">
-                                                    {isBot ? t('botName') : t('you')} · {format(new Date(m.created_at), 'HH:mm')}
+                                                    {isBot ? t('botName') : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
                                 )
                             })}
+                            <div ref={messagesEndRef} />
                         </div>
 
                         <div className="p-6 border-t border-gray-200 bg-white">
@@ -299,14 +427,40 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     </div>
 
                     {/* Details Panel */}
-                    <div className="w-[300px] border-l border-gray-200 bg-white flex flex-col shrink-0 h-full hidden xl:flex">
+                    <div className="w-[360px] border-l border-gray-200 bg-white flex flex-col shrink-0 h-full hidden xl:flex">
                         <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0">
                             <h3 className="font-semibold text-gray-900">{t('details')}</h3>
-                            <div className="flex gap-2">
-                                <IconButton icon={X} size="sm" />
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsDetailsMenuOpen(!isDetailsMenuOpen)}
+                                    className="p-1 hover:bg-gray-100 rounded text-gray-500"
+                                >
+                                    <MoreHorizontal size={20} />
+                                </button>
+
+                                {isDetailsMenuOpen && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-10"
+                                            onClick={() => setIsDetailsMenuOpen(false)}
+                                        />
+                                        <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 shadow-lg rounded-lg z-20 py-1">
+                                            <button
+                                                onClick={() => {
+                                                    handleDeleteConversation()
+                                                    setIsDetailsMenuOpen(false)
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                            >
+                                                <Trash2 size={16} />
+                                                {t('deleteConversation')}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
                             <div className="flex flex-col items-center text-center">
                                 <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center text-xl text-blue-600 font-bold mb-3">
                                     {selectedConversation.contact_name.charAt(0)}
@@ -315,43 +469,73 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                 <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || 'No phone number'}</p>
                             </div>
 
-                            <hr className="border-gray-100" />
+                            <hr className="border-gray-100 my-6" />
 
-                            <div>
+                            <div className="flex-1">
                                 <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">{t('keyInfo')}</h4>
                                 <div className="space-y-4">
+                                    {/* Active Agent Status */}
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">{t('activeAgent')}</span>
+                                        <div className="flex items-start flex-col gap-1">
+                                            {activeAgent === 'ai' ? (
+                                                <span className="text-xs text-purple-700 font-medium bg-purple-50 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
+                                                    <Bot size={12} />
+                                                    {t('copilot')}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
+                                                    <Zap size={12} />
+                                                    {t('operator')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Assigned Operator */}
+                                    {activeAgent === 'operator' && (
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">{t('operator')}</span>
+                                            <div className="text-sm text-gray-900">
+                                                {selectedConversation.assignee ? (
+                                                    <span>{selectedConversation.assignee.full_name}</span>
+                                                ) : (
+                                                    <span className="text-orange-500 text-xs font-medium">Unassigned</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">{t('platform')}</span>
                                         <div className="flex items-center gap-2">
-                                            <MessageSquare size={16} className="text-gray-400" />
                                             <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">{t('status')}</span>
-                                        <span className="text-sm text-gray-900 capitalize">{selectedConversation.status}</span>
-                                    </div>
+
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">{t('received')}</span>
-                                        <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p')}</span>
+                                        <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p', { locale: dateLocale })}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <hr className="border-gray-100" />
+                            <hr className="border-gray-100 my-6" />
 
-                            <div>
-                                <h4 className="text-xs font-bold text-red-600 uppercase tracking-wide mb-4">{t('dangerZone')}</h4>
-                                <button
-                                    onClick={handleDeleteConversation}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                                >
-                                    <Trash2 size={18} />
-                                    {t('deleteConversation')}
-                                </button>
+                            <div className="mt-auto">
+                                {activeAgent === 'operator' && (
+                                    <button
+                                        onClick={handleLeaveConversation}
+                                        disabled={isLeaving}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <LogOut size={18} />
+                                        {isLeaving ? 'Leaving...' : t('leaveConversation')}
+                                    </button>
+                                )}
                             </div>
                         </div>
-                    </div>
+                    </div >
                 </>
             ) : (
                 <div className="flex-1 flex items-center justify-center">
