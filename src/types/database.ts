@@ -76,6 +76,7 @@ export interface Conversation {
     platform: ConversationPlatform
     status: ConversationStatus
     assignee_id: string | null
+    active_agent: 'bot' | 'operator'
     last_message_at: string
     unread_count: number
     tags: string[]

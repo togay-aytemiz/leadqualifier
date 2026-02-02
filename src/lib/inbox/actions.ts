@@ -110,7 +110,7 @@ export async function sendMessage(conversationId: string, content: string) {
     // Update conversation last_message_at AND set active_agent to operator AND assign to sender
     const { data: { user } } = await supabase.auth.getUser()
 
-    await supabase
+    const { error: updateError } = await supabase
         .from('conversations')
         .update({
             last_message_at: new Date().toISOString(),
@@ -118,6 +118,11 @@ export async function sendMessage(conversationId: string, content: string) {
             assignee_id: user?.id
         })
         .eq('id', conversationId)
+
+    if (updateError) {
+        console.error('Failed to update conversation state:', updateError)
+        throw updateError
+    }
 
     return data as Message
 }

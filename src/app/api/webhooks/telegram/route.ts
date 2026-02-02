@@ -143,11 +143,13 @@ export async function POST(req: NextRequest) {
 
     console.log('Telegram Webhook: Checking Active Agent', {
         conversationId: conversation.id,
-        activeAgent: conversation.active_agent
+        activeAgent: conversation.active_agent,
+        assigneeId: conversation.assignee_id
     })
 
-    if (conversation.active_agent === 'operator') {
-        console.log('Telegram Webhook: Operator is explicitly active. SKIPPING AI REPLY.')
+    // Skip AI if Operator is explicitly active OR if an operator is assigned
+    if (conversation.active_agent === 'operator' || conversation.assignee_id) {
+        console.log('Telegram Webhook: Operator active or Assigned. SKIPPING AI REPLY.')
         return NextResponse.json({ ok: true })
     }
 
