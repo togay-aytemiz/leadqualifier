@@ -58,7 +58,8 @@
 - N/A
 
 ### Fixed
-- N/A
+- Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
+- Manual replies atomically assign the current operator to prevent "Unassigned" state until refresh.
 
 ---
 

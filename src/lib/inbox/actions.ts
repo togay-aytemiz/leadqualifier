@@ -56,7 +56,10 @@ export async function getMessages(conversationId: string) {
     return data as Message[]
 }
 
-export async function sendMessage(conversationId: string, content: string) {
+export async function sendMessage(
+    conversationId: string,
+    content: string
+): Promise<{ message: Message; conversation: Conversation }> {
     const supabase = await createClient()
 
     // 1. Get conversation details to know platform and recipient
@@ -93,39 +96,16 @@ export async function sendMessage(conversationId: string, content: string) {
         }
     }
 
-    // 3. Save to DB
-    const { data, error } = await supabase
-        .from('messages')
-        .insert({
-            conversation_id: conversationId,
-            organization_id: conversation.organization_id,
-            sender_type: 'user', // 'user' means the agent/admin sending the message
-            content
-        })
-        .select()
-        .single()
+    // 3. Save to DB + assign operator atomically
+    const { data, error } = await supabase.rpc('send_operator_message', {
+        p_conversation_id: conversationId,
+        p_content: content
+    })
 
     if (error) throw error
+    if (!data) throw new Error('Failed to send message')
 
-    // Update conversation last_message_at
-    // Update conversation last_message_at AND set active_agent to operator AND assign to sender
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error: updateError } = await supabase
-        .from('conversations')
-        .update({
-            last_message_at: new Date().toISOString(),
-            active_agent: 'operator',
-            assignee_id: user?.id
-        })
-        .eq('id', conversationId)
-
-    if (updateError) {
-        console.error('Failed to update conversation state:', updateError)
-        throw updateError
-    }
-
-    return data as Message
+    return data as { message: Message; conversation: Conversation }
 }
 
 export async function setConversationAgent(conversationId: string, agent: 'bot' | 'operator') {

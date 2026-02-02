@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-01-31  
+> **Last Updated:** 2026-02-02  
 > Mark items with `[x]` when completed.
 
 ---
@@ -72,6 +72,9 @@
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
+- [x] **Inbox Reliability**
+  - [x] Atomic operator assignment on manual send
+  - [x] Message refresh fallback for bot/contact updates
 
 ---
 

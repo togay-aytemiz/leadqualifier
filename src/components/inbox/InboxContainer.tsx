@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Avatar, EmptyState, IconButton } from '@/design'
 import {
     Inbox, ChevronDown, ExternalLink, X,
     Paperclip, Image, Smile, Zap, Bot, Trash2, MessageSquare, MoreHorizontal, LogOut, User
 } from 'lucide-react'
-import { Conversation, Message } from '@/types/database'
+import { Conversation, Message, Profile } from '@/types/database'
 import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -18,6 +18,9 @@ interface InboxContainerProps {
     initialConversations: Conversation[]
     organizationId: string
 }
+
+type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
+type Assignee = Pick<Profile, 'full_name' | 'email'>
 
 export function InboxContainer({ initialConversations, organizationId }: InboxContainerProps) {
     const t = useTranslations('inbox')
@@ -33,8 +36,24 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const [loadingMore, setLoadingMore] = useState(false)
     const [isDetailsMenuOpen, setIsDetailsMenuOpen] = useState(false)
     const [isLeaving, setIsLeaving] = useState(false)
+    const [currentUserProfile, setCurrentUserProfile] = useState<ProfileLite | null>(null)
+
+    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+    if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+    }
+    const supabase = supabaseRef.current
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const messagesRef = useRef<Message[]>([])
+    const refreshInFlightRef = useRef(false)
+    const refreshRequestRef = useRef<string | null>(null)
+    const assigneeCacheRef = useRef<Record<string, Assignee>>({})
+    const selectedIdRef = useRef(selectedId)
+
+    useEffect(() => {
+        selectedIdRef.current = selectedId
+    }, [selectedId])
 
 
     const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
@@ -61,21 +80,95 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         }
     }
 
-    useEffect(() => {
-        if (!selectedId) return
-        async function loadMessages() {
-            try {
-                const msgs = await getMessages(selectedId!)
+    const refreshMessages = useCallback(async (conversationId: string) => {
+        refreshRequestRef.current = conversationId
+        if (refreshInFlightRef.current) return
+        refreshInFlightRef.current = true
+        try {
+            while (refreshRequestRef.current) {
+                const nextId = refreshRequestRef.current
+                refreshRequestRef.current = null
+                const msgs = await getMessages(nextId)
+                if (selectedIdRef.current !== nextId) continue
                 setMessages(msgs)
                 setConversations(prev => prev.map(c =>
-                    c.id === selectedId ? { ...c, unread_count: 0 } : c
+                    c.id === nextId ? { ...c, unread_count: 0 } : c
                 ))
-            } catch (error) {
-                console.error('Failed to load messages', error)
             }
+        } catch (error) {
+            console.error('Failed to refresh messages', error)
+        } finally {
+            refreshInFlightRef.current = false
         }
-        loadMessages()
-    }, [selectedId])
+    }, [])
+
+    const resolveAssignee = useCallback(async (assigneeId: string | null) => {
+        if (!assigneeId) return null
+        const cached = assigneeCacheRef.current[assigneeId]
+        if (cached) return cached
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('id', assigneeId)
+            .single()
+
+        if (error || !data) {
+            console.error('Failed to load assignee profile', error)
+            return null
+        }
+
+        const assignee: Assignee = {
+            full_name: data.full_name,
+            email: data.email
+        }
+        assigneeCacheRef.current[assigneeId] = assignee
+        return assignee
+    }, [supabase])
+
+    useEffect(() => {
+        messagesRef.current = messages
+    }, [messages])
+
+    useEffect(() => {
+        let isMounted = true
+
+        const loadProfile = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .eq('id', user.id)
+                .single()
+
+            if (!isMounted || error || !data) return
+
+            const profile: ProfileLite = {
+                id: data.id,
+                full_name: data.full_name,
+                email: data.email
+            }
+
+            assigneeCacheRef.current[data.id] = {
+                full_name: data.full_name,
+                email: data.email
+            }
+            setCurrentUserProfile(profile)
+        }
+
+        loadProfile()
+
+        return () => {
+            isMounted = false
+        }
+    }, [supabase])
+
+    useEffect(() => {
+        if (!selectedId) return
+        refreshMessages(selectedId)
+    }, [refreshMessages, selectedId])
 
     // Scroll Management
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -112,19 +205,16 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
 
     // ... re-insert realtime subscriptions ...
 
-    // Keep a ref to selectedId to use in realtime callbacks without re-subscribing
-    const selectedIdRef = useRef(selectedId)
     useEffect(() => {
-        selectedIdRef.current = selectedId
-    }, [selectedId])
-
-    useEffect(() => {
-        const supabase = createClient()
-
         console.log('Setting up Realtime subscription...')
 
         const channel = supabase.channel('inbox_global')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `organization_id=eq.${organizationId}`
+            }, (payload) => {
                 const newMsg = payload.new as Message
                 console.log('Realtime Message received:', newMsg)
 
@@ -132,18 +222,18 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 if (newMsg.conversation_id === selectedIdRef.current) {
                     setMessages(prev => {
                         // Check if we already have this message (dedupe real IDs)
-                        if (prev.some(m => m.id === newMsg.id)) return prev;
+                        if (prev.some(m => m.id === newMsg.id)) return prev
 
                         // Dedupe optimistic messages:
                         // If we find a temp message with same content & sender, remove it and add real one
-                        const isUserSender = newMsg.sender_type === 'user';
+                        const isUserSender = newMsg.sender_type === 'user'
 
                         // Filter out matching temp messages if it's a user message
                         const filtered = isUserSender
                             ? prev.filter(m => !(m.id.startsWith('temp-') && m.content === newMsg.content && m.sender_type === 'user'))
-                            : prev;
+                            : prev
 
-                        return [...filtered, newMsg];
+                        return [...filtered, newMsg]
                     })
                 }
 
@@ -162,7 +252,12 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     return c
                 }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'conversations',
+                filter: `organization_id=eq.${organizationId}`
+            }, (payload) => {
                 const newOrUpdatedConv = payload.new as Conversation
                 console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
 
@@ -174,22 +269,46 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         // UPDATE logic
                         return prev.map(c => {
                             if (c.id === newOrUpdatedConv.id) {
+                                const nextAssignee = newOrUpdatedConv.assignee_id
+                                    ? (assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? (c.assignee_id === newOrUpdatedConv.assignee_id ? c.assignee : null))
+                                    : null
+
                                 return {
                                     ...c,
                                     ...newOrUpdatedConv,
-                                    assignee: c.assignee // Preserve joined relations if possible, or we might need to fetch
+                                    assignee: nextAssignee
                                 }
                             }
                             return c
                         }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
                     } else {
                         // INSERT logic (New conversation)
-                        // Note: We won't have the 'assignee' object populated (it's null or just ID) until a fetch, 
+                        // Note: We won't have the 'assignee' object populated (it's null or just ID) until a fetch,
                         // but for a new open conversation that's fine.
-                        return [newOrUpdatedConv, ...prev]
+                        const nextAssignee = newOrUpdatedConv.assignee_id
+                            ? assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? null
+                            : null
+
+                        return [{ ...newOrUpdatedConv, assignee: nextAssignee }, ...prev]
                             .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
                     }
                 })
+
+                if (newOrUpdatedConv.assignee_id && !assigneeCacheRef.current[newOrUpdatedConv.assignee_id]) {
+                    resolveAssignee(newOrUpdatedConv.assignee_id).then((assignee) => {
+                        if (!assignee) return
+                        setConversations(prev => prev.map(c =>
+                            c.id === newOrUpdatedConv.id ? { ...c, assignee } : c
+                        ))
+                    })
+                }
+
+                if (newOrUpdatedConv.id === selectedIdRef.current) {
+                    const lastMessageAt = messagesRef.current[messagesRef.current.length - 1]?.created_at
+                    if (!lastMessageAt || new Date(newOrUpdatedConv.last_message_at).getTime() > new Date(lastMessageAt).getTime()) {
+                        refreshMessages(newOrUpdatedConv.id)
+                    }
+                }
             })
             .subscribe((status) => {
                 console.log('Realtime Subscription Status:', status)
@@ -199,7 +318,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
             console.log('Cleaning up Realtime subscription...')
             supabase.removeChannel(channel)
         }
-    }, []) // Empty dependency array = Stable Subscription
+    }, [organizationId, refreshMessages, resolveAssignee, supabase])
 
     const handleSendMessage = async () => {
         if (!selectedId || !input.trim() || isSending) return
@@ -214,10 +333,16 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         setMessages(prev => [...prev, tempMsg])
 
         // Optimistically set active agent to operator
+        const optimisticAssignee: Assignee | null = currentUserProfile
+            ? { full_name: currentUserProfile.full_name, email: currentUserProfile.email }
+            : null
+
         setConversations(prev => prev.map(c =>
             c.id === selectedId ? {
                 ...c,
                 active_agent: 'operator',
+                assignee_id: currentUserProfile?.id ?? c.assignee_id,
+                assignee: optimisticAssignee ?? c.assignee,
                 last_message_at: new Date().toISOString()
             } : c
         ))
@@ -225,7 +350,20 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         setInput('')
         setIsSending(true)
         try {
-            await sendMessage(selectedId, input)
+            const result = await sendMessage(selectedId, input)
+            if (result?.conversation) {
+                const assignee = await resolveAssignee(result.conversation.assignee_id ?? null)
+                setConversations(prev => prev.map(c =>
+                    c.id === selectedId
+                        ? {
+                            ...c,
+                            ...result.conversation,
+                            assignee: assignee ?? c.assignee
+                        }
+                        : c
+                ))
+            }
+            await refreshMessages(selectedId)
         } catch (error) {
             console.error('Failed to send message', error)
         } finally {

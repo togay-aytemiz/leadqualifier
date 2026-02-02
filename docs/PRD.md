@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-01-31  
+> **Last Updated:** 2026-02-02  
 > **Status:** In Development
 
 ---
@@ -232,3 +232,4 @@ MVP is successful when:
 | Hosting | **Vercel** | Optimal for Next.js, generous free tier |
 | i18n | **TR + EN from day one** | Avoid retrofit pain |
 | Onboarding | **Concierge (MVP)** | Manual WhatsApp setup for 5 pilots |
+| Inbox Updates | **Atomic send RPC + realtime fallback** | Prevents unassigned state and keeps bot/user messages visible |
