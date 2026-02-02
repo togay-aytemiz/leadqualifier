@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { Plus, FolderPlus, Search, ChevronRight, Home, Trash2 } from 'lucide-react'
-import { Button, PageHeader, EmptyState } from '@/design'
+import { Plus, FolderPlus, Search, ChevronRight, Home, Trash2, MoreHorizontal } from 'lucide-react'
+import { Button, PageHeader, EmptyState, ConfirmDialog } from '@/design'
 import { KnowledgeTable } from './components/KnowledgeTable'
 import { FolderCard } from './components/FolderCard'
 
-import { CreateFolderModal } from './components/CreateFolderModal'
+import { FolderModal } from './components/FolderModal'
 import { NewContentButton } from './components/NewContentButton'
+import { FolderActions } from './components/FolderActions'
 import {
     getKnowledgeBaseEntries,
     createKnowledgeBaseEntry,
@@ -23,6 +24,8 @@ import { useTranslations } from 'next-intl'
 
 export default function KnowledgeBasePage() {
     const t = useTranslations('knowledge')
+    const tSidebar = useTranslations('sidebar')
+    const tCommon = useTranslations('deleteFolder')
     const searchParams = useSearchParams()
     const router = useRouter()
 
@@ -34,7 +37,6 @@ export default function KnowledgeBasePage() {
     const [collections, setCollections] = useState<KnowledgeCollection[]>([])
     const [currentCollection, setCurrentCollection] = useState<KnowledgeCollection | null>(null)
     const [loading, setLoading] = useState(true)
-    const [isPending, startTransition] = useTransition()
 
     // Modal State
     const [showFolderModal, setShowFolderModal] = useState(false)
@@ -69,37 +71,44 @@ export default function KnowledgeBasePage() {
         }
     }
 
+    // Confirm Dialog State (Only for File Entries now)
+    const [deleteDialog, setDeleteDialog] = useState<{
+        isOpen: boolean,
+        id: string | null,
+        message: string,
+        isLoading: boolean
+    }>({
+        isOpen: false,
+        id: null,
+        message: '',
+        isLoading: false
+    })
+
     function handleDelete(id: string) {
-        if (!confirm(t('deleteConfirm'))) return
-        startTransition(async () => {
-            try {
-                await deleteKnowledgeBaseEntry(id)
-                setEntries(entries.filter(e => e.id !== id))
-            } catch (err) {
-                alert(t('failedToDelete'))
-            }
+        setDeleteDialog({
+            isOpen: true,
+            id,
+            message: t('deleteConfirm'),
+            isLoading: false
         })
     }
 
-    async function handleDeleteCurrentFolder() {
-        if (!collectionId) return
-        const count = entries.length
-        const message = count > 0
-            ? `Are you sure you want to delete this folder? ${count} items inside will also be deleted.`
-            : 'Are you sure you want to delete this folder?'
+    async function handleConfirmAction() {
+        if (!deleteDialog.id) return
 
-        if (!confirm(message)) return
+        setDeleteDialog(prev => ({ ...prev, isLoading: true }))
 
         try {
-            await deleteCollection(collectionId)
-            router.push('/knowledge')
+            await deleteKnowledgeBaseEntry(deleteDialog.id)
+            setEntries(entries.filter(e => e.id !== deleteDialog.id))
+            setDeleteDialog(prev => ({ ...prev, isOpen: false }))
         } catch (error) {
             console.error(error)
-            alert('Failed to delete folder')
+            alert(t('failedToDelete'))
+        } finally {
+            setDeleteDialog(prev => ({ ...prev, isLoading: false }))
         }
     }
-
-
 
     async function handleSubmitFolder(name: string) {
         await createCollection(name)
@@ -112,7 +121,7 @@ export default function KnowledgeBasePage() {
     return (
         <div className="flex flex-col h-full bg-white">
             <PageHeader
-                title={currentCollection ? currentCollection.name : t('sidebar.allContent')}
+                title={currentCollection ? currentCollection.name : tSidebar('allContent')}
                 breadcrumb={
                     currentCollection ? (
                         <div className="flex items-center text-sm text-gray-500 mr-2">
@@ -121,7 +130,7 @@ export default function KnowledgeBasePage() {
                                 onClick={() => router.push('/knowledge')}
                             >
                                 <Home size={14} className="mr-1" />
-                                {t('sidebar.allContent')}
+                                {tSidebar('allContent')}
                             </span>
                             <ChevronRight size={14} className="mx-1" />
                         </div>
@@ -129,17 +138,24 @@ export default function KnowledgeBasePage() {
                 }
                 actions={
                     <div className="flex gap-2">
-                        {/* Only show "New Folder" at root, but user asked for both always available or similar */}
+                        {/* Only show "New Folder" at root */}
                         {!collectionId && (
-                            <Button variant="secondary" size="sm" onClick={() => setShowFolderModal(true)}>
+                            <Button variant="secondary" onClick={() => setShowFolderModal(true)}>
                                 <FolderPlus size={16} className="mr-2" />
                                 {t('newFolder')}
                             </Button>
                         )}
-                        {collectionId && (
-                            <Button variant="ghost" size="sm" onClick={handleDeleteCurrentFolder} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                                <Trash2 size={16} />
-                            </Button>
+                        {/* Folder Actions (Delete/Rename) */}
+                        {collectionId && currentCollection && (
+                            <FolderActions
+                                collection={{ ...currentCollection, count: entries.length }}
+                                redirectOnDelete
+                                trigger={
+                                    <Button variant="secondary">
+                                        <MoreHorizontal size={16} />
+                                    </Button>
+                                }
+                            />
                         )}
                         <NewContentButton collectionId={collectionId} />
                     </div>
@@ -209,10 +225,22 @@ export default function KnowledgeBasePage() {
             </div>
 
             {/* Modals */}
-            <CreateFolderModal
+            <FolderModal
                 isOpen={showFolderModal}
                 onClose={() => setShowFolderModal(false)}
                 onSubmit={handleSubmitFolder}
+            />
+
+            <ConfirmDialog
+                isOpen={deleteDialog.isOpen}
+                onCancel={() => setDeleteDialog(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={handleConfirmAction}
+                title={t('deleteConfirm')}
+                description={deleteDialog.message}
+                confirmText={tCommon('confirm')}
+                cancelText={tCommon('cancel')}
+                isDestructive
+                isLoading={deleteDialog.isLoading}
             />
         </div>
     )

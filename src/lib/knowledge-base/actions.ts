@@ -224,7 +224,31 @@ function listToTree(collections: any[], files: any[]): SidebarCollection[] {
 
 export async function deleteCollection(id: string) {
     const supabase = await createClient()
+
+    // Explicitly delete all knowledge entries in this collection first
+    const { error: filesError } = await supabase
+        .from('knowledge_base')
+        .delete()
+        .eq('collection_id', id)
+
+    if (filesError) throw new Error(filesError.message)
+
+    // Then delete the collection itself
     const { error } = await supabase.from('knowledge_collections').delete().eq('id', id)
     if (error) throw new Error(error.message)
     revalidatePath('/knowledge')
+}
+
+export async function updateCollection(id: string, name: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('knowledge_collections')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/knowledge')
+    return data as KnowledgeCollection
 }

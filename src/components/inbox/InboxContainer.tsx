@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Avatar, EmptyState, IconButton } from '@/design'
+import { Avatar, EmptyState, IconButton, ConfirmDialog } from '@/design'
 import {
     Inbox, ChevronDown, ExternalLink, X,
     Paperclip, Image, Smile, Zap, Bot, Trash2, MessageSquare, MoreHorizontal, LogOut, User
@@ -37,6 +37,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const [isDetailsMenuOpen, setIsDetailsMenuOpen] = useState(false)
     const [isLeaving, setIsLeaving] = useState(false)
     const [currentUserProfile, setCurrentUserProfile] = useState<ProfileLite | null>(null)
+    const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, isLoading: false })
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -390,16 +391,23 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
         }
     }
 
-    const handleDeleteConversation = async () => {
+    const handleDeleteConversation = () => {
         if (!selectedId) return
-        if (window.confirm(t('deleteConfirm'))) {
-            try {
-                await deleteConversation(selectedId)
-                setConversations(prev => prev.filter(c => c.id !== selectedId))
-                setSelectedId(null)
-            } catch (error) {
-                console.error('Failed to delete conversation', error)
-            }
+        setDeleteDialog({ isOpen: true, isLoading: false })
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!selectedId) return
+
+        setDeleteDialog(prev => ({ ...prev, isLoading: true }))
+        try {
+            await deleteConversation(selectedId)
+            setConversations(prev => prev.filter(c => c.id !== selectedId))
+            setSelectedId(null)
+            setDeleteDialog({ isOpen: false, isLoading: false })
+        } catch (error) {
+            console.error('Failed to delete conversation', error)
+            setDeleteDialog(prev => ({ ...prev, isLoading: false }))
         }
     }
 
@@ -738,6 +746,18 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     />
                 </div>
             )}
+
+            <ConfirmDialog
+                isOpen={deleteDialog.isOpen}
+                onCancel={() => setDeleteDialog(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={handleConfirmDelete}
+                title={t('deleteConversation')}
+                description={t('deleteConfirm')}
+                confirmText={t('deleteConversation')}
+                cancelText={t('cancel')}
+                isDestructive
+                isLoading={deleteDialog.isLoading}
+            />
         </>
     )
 }

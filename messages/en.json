@@ -177,36 +177,39 @@
             "cancel": "Cancel",
             "back": "Back"
         },
-        "deleteConfirm": "Are you sure you want to delete this content?",
-        "folderModal": {
-            "title": "Create New Folder",
-            "nameLabel": "Folder Name",
-            "namePlaceholder": "e.g. Policies, Marketing...",
-            "cancel": "Cancel",
-            "create": "Create Folder",
-            "creating": "Creating..."
-        },
-        "sidebar": {
-            "title": "Knowledge",
-            "content": "Content",
-            "allContent": "All content",
-            "collections": "Collections"
-        },
-        "newContentButton": {
-            "selectSource": "SELECT SOURCE TYPE",
-            "freeform": "Freeform Text",
-            "pdf": "PDF Upload",
-            "github": "Github Repository",
-            "notion": "Notion",
-            "website": "Website URL",
-            "comingSoon": "Coming Soon"
-        },
-        "deleteFolder": {
-            "title": "Delete Folder",
-            "description": "This action cannot be undone. The folder and {count} items inside will be permanently deleted.",
-            "descriptionEmpty": "This action cannot be undone. The folder will be permanently deleted.",
-            "confirm": "Delete",
-            "cancel": "Cancel"
-        }
+        "deleteConfirm": "Are you sure you want to delete this content?"
+    },
+    "folderModal": {
+        "title": "Create New Folder",
+        "editTitle": "Edit Folder",
+        "nameLabel": "Folder Name",
+        "namePlaceholder": "e.g. Policies, Marketing...",
+        "cancel": "Cancel",
+        "create": "Create Folder",
+        "save": "Save Changes",
+        "creating": "Creating...",
+        "saving": "Saving..."
+    },
+    "sidebar": {
+        "title": "Knowledge",
+        "content": "Content",
+        "allContent": "All content",
+        "collections": "Collections"
+    },
+    "newContentButton": {
+        "selectSource": "SELECT SOURCE TYPE",
+        "freeform": "Freeform Text",
+        "pdf": "PDF Upload",
+        "github": "Github Repository",
+        "notion": "Notion",
+        "website": "Website URL",
+        "comingSoon": "Coming Soon"
+    },
+    "deleteFolder": {
+        "title": "Delete Folder",
+        "description": "This action cannot be undone. The folder and {count} items inside will be permanently deleted.",
+        "descriptionEmpty": "This action cannot be undone. The folder will be permanently deleted.",
+        "confirm": "Delete",
+        "cancel": "Cancel"
     }
 }

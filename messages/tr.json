@@ -195,36 +195,39 @@
             "cancel": "İptal",
             "back": "Geri"
         },
-        "deleteConfirm": "Bu içeriği silmek istediğinizden emin misiniz?",
-        "folderModal": {
-            "title": "Yeni Klasör Oluştur",
-            "nameLabel": "Klasör Adı",
-            "namePlaceholder": "örn. Politikalar, Pazarlama...",
-            "cancel": "İptal",
-            "create": "Klasör Oluştur",
-            "creating": "Oluşturuluyor..."
-        },
-        "sidebar": {
-            "title": "Bilgi Bankası",
-            "content": "İçerik",
-            "allContent": "Tüm İçerik",
-            "collections": "Koleksiyonlar"
-        },
-        "newContentButton": {
-            "selectSource": "KAYNAK TÜRÜ SEÇİN",
-            "freeform": "Serbest Metin",
-            "pdf": "PDF Yükle",
-            "github": "Github Deposu",
-            "notion": "Notion",
-            "website": "Web Sitesi",
-            "comingSoon": "Yakında"
-        },
-        "deleteFolder": {
-            "title": "Klasörü Sil",
-            "description": "Bu işlem geri alınamaz. Klasör ve içindeki {count} öğe kalıcı olarak silinecektir.",
-            "descriptionEmpty": "Bu işlem geri alınamaz. Klasör kalıcı olarak silinecektir.",
-            "confirm": "Sil",
-            "cancel": "İptal"
-        }
+        "deleteConfirm": "Bu içeriği silmek istediğinizden emin misiniz?"
+    },
+    "folderModal": {
+        "title": "Yeni Klasör Oluştur",
+        "editTitle": "Klasörü Düzenle",
+        "nameLabel": "Klasör Adı",
+        "namePlaceholder": "örn. Politikalar, Pazarlama...",
+        "cancel": "İptal",
+        "create": "Klasör Oluştur",
+        "save": "Kaydet",
+        "creating": "Oluşturuluyor...",
+        "saving": "Kaydediliyor..."
+    },
+    "sidebar": {
+        "title": "Bilgi Bankası",
+        "content": "İçerik",
+        "allContent": "Tüm İçerik",
+        "collections": "Koleksiyonlar"
+    },
+    "newContentButton": {
+        "selectSource": "KAYNAK TÜRÜ SEÇİN",
+        "freeform": "Serbest Metin",
+        "pdf": "PDF Yükle",
+        "github": "Github Deposu",
+        "notion": "Notion",
+        "website": "Web Sitesi",
+        "comingSoon": "Yakında"
+    },
+    "deleteFolder": {
+        "title": "Klasörü Sil",
+        "description": "Bu işlem geri alınamaz. Klasör ve içindeki {count} öğe kalıcı olarak silinecektir.",
+        "descriptionEmpty": "Bu işlem geri alınamaz. Klasör kalıcı olarak silinecektir.",
+        "confirm": "Sil",
+        "cancel": "İptal"
     }
 }

@@ -1,18 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, Trash2, FolderPlus } from 'lucide-react'
-import { Sidebar, SidebarGroup, SidebarItem, Button, ConfirmDialog } from '@/design'
-import { getSidebarData, SidebarCollection, deleteCollection, createCollection } from '@/lib/knowledge-base/actions'
+import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
+import { Sidebar, SidebarGroup, SidebarItem, Button } from '@/design'
+import { getSidebarData, SidebarCollection, createCollection } from '@/lib/knowledge-base/actions'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
-import { CreateFolderModal } from './CreateFolderModal'
+import { FolderModal } from './FolderModal'
 import { NewContentButton } from './NewContentButton'
+import { FolderActions } from './FolderActions'
 
 export function KnowledgeSidebar() {
-    const t = useTranslations('knowledge.sidebar')
-    const tCommon = useTranslations('knowledge')
+    const t = useTranslations('sidebar')
     const [data, setData] = useState<SidebarCollection[]>([])
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -38,46 +38,9 @@ export function KnowledgeSidebar() {
         }
     }
 
-    const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean, id: string | null, message: string, isLoading: boolean }>({
-        isOpen: false,
-        id: null,
-        message: '',
-        isLoading: false
-    })
-
     function toggleExpand(id: string, e: React.MouseEvent) {
         e.stopPropagation()
         setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
-    }
-
-    async function handleDeleteClick(id: string, count: number, e: React.MouseEvent) {
-        e.stopPropagation()
-        const message = count > 0
-            ? tCommon('deleteFolder.description', { count })
-            : tCommon('deleteFolder.descriptionEmpty')
-
-        setDeleteDialog({
-            isOpen: true,
-            id,
-            message,
-            isLoading: false
-        })
-    }
-
-    async function handleConfirmDelete() {
-        if (!deleteDialog.id) return
-
-        setDeleteDialog(prev => ({ ...prev, isLoading: true }))
-        try {
-            await deleteCollection(deleteDialog.id)
-            await loadSidebar()
-            if (currentCollectionId === deleteDialog.id) router.push('/knowledge')
-            setDeleteDialog(prev => ({ ...prev, isOpen: false, id: null }))
-        } catch (error) {
-            console.error(error)
-            alert(tCommon('failedToDelete'))
-            setDeleteDialog(prev => ({ ...prev, isLoading: false }))
-        }
     }
 
     async function handleCreateFolder(name: string) {
@@ -96,7 +59,7 @@ export function KnowledgeSidebar() {
                         onClick={() => setShowFolderModal(true)}
                     >
                         <FolderPlus size={16} className="mr-2 text-gray-500" />
-                        {tCommon('newFolder')}
+                        {useTranslations('folderModal')('create')}
                     </Button>
                     <NewContentButton
                         collectionId={currentCollectionId}
@@ -143,12 +106,11 @@ export function KnowledgeSidebar() {
                                     <span className="text-xs text-gray-400 ml-1">({col.count})</span>
                                 </div>
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={(e) => handleDeleteClick(col.id, col.count, e)}
-                                        className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded"
-                                    >
-                                        <Trash2 size={13} />
-                                    </button>
+                                    <FolderActions
+                                        collection={col}
+                                        redirectOnDelete={currentCollectionId === col.id}
+                                        onDeleteSuccess={loadSidebar} // Reload sidebar after delete
+                                    />
                                 </div>
                             </div>
 
@@ -177,22 +139,10 @@ export function KnowledgeSidebar() {
                 </div>
             </SidebarGroup>
 
-            <CreateFolderModal
+            <FolderModal
                 isOpen={showFolderModal}
                 onClose={() => setShowFolderModal(false)}
                 onSubmit={handleCreateFolder}
-            />
-
-            <ConfirmDialog
-                isOpen={deleteDialog.isOpen}
-                onCancel={() => setDeleteDialog(prev => ({ ...prev, isOpen: false }))}
-                onConfirm={handleConfirmDelete}
-                title={tCommon('deleteFolder.title')}
-                description={deleteDialog.message}
-                confirmText={tCommon('deleteFolder.confirm')}
-                cancelText={tCommon('deleteFolder.cancel')}
-                isDestructive
-                isLoading={deleteDialog.isLoading}
             />
         </Sidebar>
     )

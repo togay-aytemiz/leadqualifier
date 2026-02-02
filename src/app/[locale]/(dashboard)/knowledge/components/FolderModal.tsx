@@ -4,16 +4,27 @@ import { useState } from 'react'
 import { Modal, Input, Button } from '@/design'
 import { useTranslations } from 'next-intl'
 
-interface CreateFolderModalProps {
+interface FolderModalProps {
     isOpen: boolean
     onClose: () => void
     onSubmit: (name: string) => Promise<void>
+    initialName?: string
 }
 
-export function CreateFolderModal({ isOpen, onClose, onSubmit }: CreateFolderModalProps) {
+export function FolderModal({ isOpen, onClose, onSubmit, initialName = '' }: FolderModalProps) {
     const t = useTranslations('folderModal')
     const [name, setName] = useState('')
     const [loading, setLoading] = useState(false)
+
+    // Sync name when modal opens
+    // Using a simple effect to reset name when isOpen becomes true
+    const [prevOpen, setPrevOpen] = useState(false)
+    if (isOpen && !prevOpen) {
+        setPrevOpen(true)
+        setName(initialName)
+    } else if (!isOpen && prevOpen) {
+        setPrevOpen(false)
+    }
 
     async function handleSubmit() {
         if (!name.trim()) return
@@ -29,8 +40,10 @@ export function CreateFolderModal({ isOpen, onClose, onSubmit }: CreateFolderMod
         }
     }
 
+    const isEdit = !!initialName
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={t('title')}>
+        <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? t('editTitle') : t('title')}>
             <div className="space-y-4">
                 <Input
                     label={t('nameLabel')}
@@ -42,7 +55,7 @@ export function CreateFolderModal({ isOpen, onClose, onSubmit }: CreateFolderMod
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={onClose}>{t('cancel')}</Button>
                     <Button onClick={handleSubmit} disabled={loading || !name.trim()}>
-                        {loading ? t('creating') : t('create')}
+                        {loading ? (isEdit ? t('saving') : t('creating')) : (isEdit ? t('save') : t('create'))}
                     </Button>
                 </div>
             </div>
