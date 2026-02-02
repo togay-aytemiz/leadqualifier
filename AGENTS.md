@@ -65,7 +65,9 @@ This is a **WhatsApp AI Lead Qualifier** SaaS for Turkish SMBs. The system:
 ### Architecture
 - **Multi-tenant first** — All data isolated by `organization_id`
 - **Supabase RLS** — Row-level security for data isolation
+- **Supabase RLS** — Row-level security for data isolation
 - **Edge functions** — For serverless API endpoints
+- **Realtime** — Use `supabase_realtime` for live features (Inbox)
 
 ### AI Features
 - **No hallucination** — AI responds ONLY from Skills/KB
@@ -140,7 +142,7 @@ test: description             # Adding tests
 ## 🚫 Out of Scope (MVP)
 
 Do NOT implement these features:
-- Inbox / chat UI
+Do NOT implement these features:
 - Calendar integration
 - Auto follow-up sequences
 - Campaigns / broadcasts

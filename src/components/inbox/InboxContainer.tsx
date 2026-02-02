@@ -162,20 +162,34 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     return c
                 }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
             })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
-                const updatedConv = payload.new as Conversation
-                console.log('Realtime Conversation update:', updatedConv)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+                const newOrUpdatedConv = payload.new as Conversation
+                console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
 
-                setConversations(prev => prev.map(c => {
-                    if (c.id === updatedConv.id) {
-                        return {
-                            ...c,
-                            ...updatedConv,
-                            assignee: c.assignee // Preserve joined relations
-                        }
+                setConversations(prev => {
+                    // Check if exists
+                    const exists = prev.some(c => c.id === newOrUpdatedConv.id)
+
+                    if (exists) {
+                        // UPDATE logic
+                        return prev.map(c => {
+                            if (c.id === newOrUpdatedConv.id) {
+                                return {
+                                    ...c,
+                                    ...newOrUpdatedConv,
+                                    assignee: c.assignee // Preserve joined relations if possible, or we might need to fetch
+                                }
+                            }
+                            return c
+                        }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+                    } else {
+                        // INSERT logic (New conversation)
+                        // Note: We won't have the 'assignee' object populated (it's null or just ID) until a fetch, 
+                        // but for a new open conversation that's fine.
+                        return [newOrUpdatedConv, ...prev]
+                            .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
                     }
-                    return c
-                }))
+                })
             })
             .subscribe((status) => {
                 console.log('Realtime Subscription Status:', status)

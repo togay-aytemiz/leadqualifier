@@ -47,7 +47,7 @@ Automate WhatsApp message handling:
 | Multi-Tenant | Organization-based isolation |
 | Multi-Tenant | Organization-based isolation |
 | Admin Panel | Leads, Skills, KB, Channels management |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete** |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system** |
 
 ### ❌ Out of Scope (Intentional)
 - Calendar integration
@@ -139,12 +139,12 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ### 4.5 Human Takeover
 
-**Trigger:** Business owner sends ANY message from their WhatsApp
-
-**Behavior:**
-- Bot immediately stops responding
-- No skill/AI replies until re-enabled
-- Admin panel shows "Resume Bot" button
+**Trigger:** Business owner sends ANY message from their WhatsApp OR claims via Inbox.
+ **Behavior:**
+- **Explicit State:** `active_agent` switches to 'operator'.
+- **Assignee Lock:** Operator is assigned (`assignee_id`), strictly blocking AI.
+- **AI Silence:** Bot ignores all incoming messages while operator is active.
+- **Resume:** Operator (or Admin) must explicitly "Leave Conversation" to resume Bot.
 
 ---
 
@@ -206,7 +206,8 @@ MVP is successful when:
 
 | Feature | Priority |
 |---------|----------|
-| Inbox UI | High |
+| Feature | Priority |
+|---------|----------|
 | Calendar/Booking | High |
 | Flow Builder | Medium |
 | Auto Follow-up | Medium |
@@ -227,6 +228,7 @@ MVP is successful when:
 | WhatsApp | **Meta Cloud API** | Free tier (1000 conv/mo), direct integration |
 | AI/LLM | **OpenAI GPT-4o-mini** | Cost-effective, good Turkish support |
 | Embeddings | **OpenAI + Supabase pgvector** | All-in-one, no extra services |
+| Realtime | **Supabase Realtime** | Live inbox updates (Postgres changes) |
 | Hosting | **Vercel** | Optimal for Next.js, generous free tier |
 | i18n | **TR + EN from day one** | Avoid retrofit pain |
 | Onboarding | **Concierge (MVP)** | Manual WhatsApp setup for 5 pilots |

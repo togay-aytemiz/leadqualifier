@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
     const { error: msgError } = await supabase.from('messages').insert({
         id: uuidv4(),
         conversation_id: conversation.id,
+        organization_id: orgId,
         sender_type: 'contact',
         content: text,
         metadata: { telegram_message_id: update.message.message_id }
@@ -132,6 +133,15 @@ export async function POST(req: NextRequest) {
         console.error('Telegram Webhook: Failed to save message', msgError)
     } else {
         console.log('Telegram Webhook: Message saved successfully')
+
+        // Update conversation: Bump timestamp + increment unread count for user messages
+        await supabase.from('conversations')
+            .update({
+                last_message_at: new Date().toISOString(),
+                unread_count: conversation.unread_count + 1,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id)
     }
 
     // 5. Check Active Agent Status (Zero-Cost Check)
@@ -172,11 +182,20 @@ export async function POST(req: NextRequest) {
         await supabase.from('messages').insert({
             id: uuidv4(),
             conversation_id: conversation.id,
+            organization_id: orgId,
             sender_type: 'bot',
             content: bestMatch.response_text,
             metadata: { skill_id: bestMatch.skill_id }
         })
         console.log('Telegram Webhook: Sent matched response')
+
+        // Update conversation timestamp (No unread increment for bot replies)
+        await supabase.from('conversations')
+            .update({
+                last_message_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id)
     } else {
         // Fallback response for debugging/confirmation
         console.log('Telegram Webhook: No skill matched, sending fallback')
@@ -192,10 +211,19 @@ export async function POST(req: NextRequest) {
         await supabase.from('messages').insert({
             id: uuidv4(),
             conversation_id: conversation.id,
+            organization_id: orgId,
             sender_type: 'bot',
             content: fallbackText,
             metadata: { is_fallback: true }
         })
+
+        // Update conversation timestamp (No unread increment for bot replies)
+        await supabase.from('conversations')
+            .update({
+                last_message_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id)
     }
 
     return NextResponse.json({ ok: true })

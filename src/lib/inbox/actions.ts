@@ -98,6 +98,7 @@ export async function sendMessage(conversationId: string, content: string) {
         .from('messages')
         .insert({
             conversation_id: conversationId,
+            organization_id: conversation.organization_id,
             sender_type: 'user', // 'user' means the agent/admin sending the message
             content
         })
@@ -130,9 +131,15 @@ export async function sendMessage(conversationId: string, content: string) {
 export async function setConversationAgent(conversationId: string, agent: 'bot' | 'operator') {
     const supabase = await createClient()
 
+    // If switching to bot, we MUST clear the assignee_id to release the lock in webhook
+    const updates: any = { active_agent: agent }
+    if (agent === 'bot') {
+        updates.assignee_id = null
+    }
+
     const { error } = await supabase
         .from('conversations')
-        .update({ active_agent: agent })
+        .update(updates)
         .eq('id', conversationId)
 
     if (error) throw error
@@ -142,10 +149,20 @@ export async function setConversationAgent(conversationId: string, agent: 'bot' 
 export async function sendSystemMessage(conversationId: string, content: string) {
     const supabase = await createClient()
 
+    // 1. Get conversation details (need org ID)
+    const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('organization_id')
+        .eq('id', conversationId)
+        .single()
+
+    if (convError || !conversation) throw new Error('Conversation not found')
+
     const { data, error } = await supabase
         .from('messages')
         .insert({
             conversation_id: conversationId,
+            organization_id: conversation.organization_id,
             sender_type: 'system',
             content
         })
@@ -215,24 +232,28 @@ export async function createMockConversation(organizationId: string) {
     await supabase.from('messages').insert([
         {
             conversation_id: conv.id,
+            organization_id: organizationId,
             sender_type: 'contact',
             content: 'Hey there, can you help me find my order? I think it should have been delivered by now but I haven\'t received it.',
             created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString() // 1 hour ago
         },
         {
             conversation_id: conv.id,
+            organization_id: organizationId,
             sender_type: 'system',
             content: 'Bot started serving this conversation.',
             created_at: new Date(Date.now() - 1000 * 60 * 59).toISOString()
         },
         {
             conversation_id: conv.id,
+            organization_id: organizationId,
             sender_type: 'bot',
             content: 'Hi Alexandra! No problem let me look into this for you. What is your order number?',
             created_at: new Date(Date.now() - 1000 * 60 * 59).toISOString()
         },
         {
             conversation_id: conv.id,
+            organization_id: organizationId,
             sender_type: 'contact',
             content: 'Here you go: #004325.',
             created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString()

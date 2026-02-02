@@ -44,6 +44,16 @@
   - **Inbox:** UI improvements (message previews, simplified list items).
   - **Inbox:** Removed mock data creation; now fully driven by real database data.
 
+### Added
+- **v0.4.0: Active Agent & Realtime Inbox**
+  - **Explicit Active State**: Added `active_agent` column ('bot' | 'operator') to prevent AI interference.
+  - **Double-Lock Logic**: AI is now blocked if `active_agent === 'operator'` OR `assignee_id` is present.
+  - **Assignee System**: Operators can "Claim" conversations; replying automatically assigns the user.
+  - **Realtime Updates**: Enabled `supabase_realtime` for instant message delivery and inbox sorting.
+  - **Optimistic UI**: Instant feedback on send, with "temp" message deduplication logic.
+  - **Inbox Polish**: Robust auto-scroll, "Unassigned" filters, and simplified Details Panel (Status/Platform icons refined).
+  - **Developer**: Added error boundaries to `sendMessage` and strictly typed DB interfaces.
+
 ### Changed
 - N/A
 
@@ -56,6 +66,7 @@
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.4.0 | 2026-02-02 | Active Agent State, Realtime Inbox, & Assignee System |
 | 0.3.5 | 2026-01-31 | Phase 3.5: WhatsApp Simulator & Dynamic Thresholds |
 | 0.3.0 | 2026-01-31 | Phase 3: Skill System |
 | 0.2.0 | 2026-01-31 | Phase 1: Multi-tenant infrastructure + auth |

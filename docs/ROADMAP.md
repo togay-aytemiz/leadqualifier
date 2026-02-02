@@ -89,14 +89,14 @@
 ---
 
 ## Phase 5: AI Auto-Reply Engine
-- [ ] **Reply Router**
-  - [ ] Skill → KB → Human fallback chain
-  - [ ] Response formatting
-  - [ ] Error handling
-- [ ] **Human Takeover**
-  - [ ] Detect business reply
-  - [ ] Pause bot automatically
-  - [ ] "Resume Bot" in admin panel
+- [x] **Reply Router**
+  - [x] Skill → KB → Human fallback chain
+  - [x] Response formatting
+  - [x] Error handling
+- [x] **Human Takeover**
+  - [x] Detect business reply (or Inbox claim)
+  - [x] Pause bot automatically (Active Agent State)
+  - [x] "Resume Bot" via "Leave Conversation"
 
 ---
 
@@ -161,7 +161,6 @@
 ---
 
 ## Post-MVP (Future)
-- [ ] Inbox UI
 - [ ] Calendar / booking integration
 - [ ] Flow builder
 - [ ] Auto follow-up sequences
