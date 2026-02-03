@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-02  
+> **Last Updated:** 2026-02-03  
 > **Status:** In Development
 
 ---
@@ -106,6 +106,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Triggered when no skill matches
 - AI generates response strictly from KB
 - If KB has no answer → human handoff
+ - Documents are chunked with overlap and embedded per chunk
+ - Retrieval is chunk-level with context budgets to avoid long prompts
 
 ---
 
@@ -218,6 +220,9 @@ MVP is successful when:
 ## Appendix: Tech Decisions ✅
 
 > Finalized: 2026-01-31
+
+- **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
+- **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

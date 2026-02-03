@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-02  
+> **Last Updated:** 2026-02-03  
 > Mark items with `[x]` when completed.
 
 ---
@@ -61,6 +61,7 @@
   - [x] Connect to Skill Matching Engine
   - [x] Simulate typing delay
   - [x] Debug mode for matching details
+  - [x] **RAG Fallback:** Matches production logic (KB search if no skill found)
 - [x] **Dynamic Controls**
   - [x] Sensitivity threshold slider
 
@@ -82,14 +83,15 @@
 
 ## Phase 4: Knowledge Base (RAG) ✅
 - [x] **KB CRUD**
-  - [x] Create KB entry model
-  - [x] Category support
-  - [x] Admin UI for KB management
+- [x] Create KB entry model
+- [x] Category support
+- [x] Admin UI for KB management
 - [x] **RAG Pipeline**
-  - [x] Document chunking
-  - [x] Embedding storage
-  - [x] Retrieval logic
-  - [x] Response generation from KB
+- [x] Document chunking
+- [x] Embedding storage
+- [x] Retrieval logic
+- [x] Response generation from KB
+- [x] **Enterprise RAG Hardening:** Documents + chunks schema, token-budgeted context, and consistent fallback handling
 
 ---
 

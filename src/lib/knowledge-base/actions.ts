@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { generateEmbedding, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
+import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
+import { chunkText } from '@/lib/knowledge-base/chunking'
 import { revalidatePath } from 'next/cache'
 
 export interface KnowledgeCollection {
@@ -21,6 +22,9 @@ export interface KnowledgeBaseEntry {
     title: string
     type: 'article' | 'snippet' | 'pdf'
     content: string
+    source?: string
+    language?: string | null
+    status?: 'ready' | 'processing' | 'error'
     created_at: string
     updated_at: string
     collection?: KnowledgeCollection | null
@@ -69,7 +73,7 @@ export async function getCollections() {
     // Get counts for each collection
     // This could be optimized with a join/count query but for now this is simple and robust with RLS
     const { data: counts, error: countError } = await supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .select('collection_id')
 
     if (countError) throw new Error(countError.message)
@@ -116,35 +120,42 @@ export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
     const supabase = await createClient()
     const organizationId = await getUserOrganization(supabase)
 
-    // 1. Generate embedding
-    const embedding = await generateEmbedding(entry.content)
-
-    // 2. Insert into DB
+    // 1. Insert document in processing state
     const { data, error } = await supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .insert({
             content: entry.content,
             title: entry.title,
             type: entry.type,
             collection_id: entry.collection_id,
-            embedding: formatEmbeddingForPgvector(embedding),
-            organization_id: organizationId
+            organization_id: organizationId,
+            source: 'manual',
+            status: 'processing'
         })
         .select()
         .single()
 
-    if (error) {
-        console.error('Failed to create knowledge base entry:', error)
-        throw new Error(error.message)
+    if (error || !data) {
+        console.error('Failed to create knowledge document:', error)
+        throw new Error(error?.message ?? 'Failed to create knowledge document')
+    }
+
+    try {
+        await buildAndStoreChunks(supabase, organizationId, data.id, entry.content)
+        await supabase.from('knowledge_documents').update({ status: 'ready' }).eq('id', data.id)
+    } catch (err) {
+        console.error('Failed to build knowledge chunks:', err)
+        await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', data.id)
+        throw err
     }
 
     revalidatePath('/knowledge')
-    return data as KnowledgeBaseEntry
+    return { ...data, status: 'ready' } as KnowledgeBaseEntry
 }
 
 export async function deleteKnowledgeBaseEntry(id: string) {
     const supabase = await createClient()
-    const { error } = await supabase.from('knowledge_base').delete().eq('id', id)
+    const { error } = await supabase.from('knowledge_documents').delete().eq('id', id)
     if (error) throw new Error(error.message)
     revalidatePath('/knowledge')
 }
@@ -152,7 +163,7 @@ export async function deleteKnowledgeBaseEntry(id: string) {
 export async function getKnowledgeBaseEntry(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .select(`
             id, organization_id, content, title, type, collection_id, created_at, updated_at,
             collection:knowledge_collections(*)
@@ -171,21 +182,42 @@ export async function getKnowledgeBaseEntry(id: string) {
 export async function updateKnowledgeBaseEntry(id: string, entry: Partial<KnowledgeBaseInsert>) {
     const supabase = await createClient()
 
-    // If content changed, regenerate embedding
+    const contentChanged = typeof entry.content === 'string'
+
+    // If content changed, mark as processing so retrieval skips it
     let updates: any = { ...entry }
-    if (entry.content) {
-        const embedding = await generateEmbedding(entry.content)
-        updates.embedding = formatEmbeddingForPgvector(embedding)
+    if (contentChanged) {
+        updates.status = 'processing'
     }
 
     const { data, error } = await supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .update(updates)
         .eq('id', id)
         .select()
         .single()
 
-    if (error) throw new Error(error.message)
+    if (error || !data) throw new Error(error?.message ?? 'Failed to update knowledge document')
+
+    if (contentChanged) {
+        try {
+            await supabase.from('knowledge_chunks').delete().eq('document_id', id)
+            await buildAndStoreChunks(supabase, data.organization_id, id, entry.content ?? '')
+            const { data: readyDoc } = await supabase
+                .from('knowledge_documents')
+                .update({ status: 'ready' })
+                .eq('id', id)
+                .select()
+                .single()
+
+            revalidatePath('/knowledge')
+            return (readyDoc ?? data) as KnowledgeBaseEntry
+        } catch (err) {
+            await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', id)
+            throw err
+        }
+    }
+
     revalidatePath('/knowledge')
     return data as KnowledgeBaseEntry
 }
@@ -197,7 +229,7 @@ export async function getKnowledgeBaseEntries(collectionId?: string | null) {
     // For now, reliance on RLS for SELECT is standard in Supabase apps unless we need optimization.
 
     let query = supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .select(`
             id, organization_id, content, title, type, collection_id, created_at, updated_at,
             collection:knowledge_collections(*)
@@ -227,16 +259,25 @@ export async function searchKnowledgeBase(
     query: string,
     organizationId: string,
     threshold = 0.5,
-    limit = 3
+    limit = 3,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: any
+    }
 ) {
-    const supabase = await createClient()
+    const supabase = options?.supabase || await createClient()
     const embedding = await generateEmbedding(query)
 
-    const { data, error } = await supabase.rpc('match_knowledge_base', {
+    const { data, error } = await supabase.rpc('match_knowledge_chunks', {
         query_embedding: formatEmbeddingForPgvector(embedding),
         match_threshold: threshold,
         match_count: limit,
-        filter_org_id: organizationId
+        filter_org_id: organizationId,
+        filter_collection_id: options?.collectionId ?? null,
+        filter_type: options?.type ?? null,
+        filter_language: options?.language ?? null
     })
 
     if (error) {
@@ -244,7 +285,14 @@ export async function searchKnowledgeBase(
         return []
     }
 
-    return data as { id: string, content: string, similarity: number }[]
+    return data as {
+        chunk_id: string
+        document_id: string
+        document_title: string
+        document_type: string
+        content: string
+        similarity: number
+    }[]
 }
 export interface SidebarCollection extends KnowledgeCollection {
     files: Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>[]
@@ -264,7 +312,7 @@ export async function getSidebarData() {
 
     // 2. Get Files (only needed fields)
     const { data: files, error: filesError } = await supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .select('id, title, type, collection_id')
         .order('title')
 
@@ -286,12 +334,39 @@ function listToTree(collections: any[], files: any[]): SidebarCollection[] {
     })
 }
 
+async function buildAndStoreChunks(
+    supabase: any,
+    organizationId: string,
+    documentId: string,
+    content: string
+) {
+    const chunks = chunkText(content)
+    if (chunks.length === 0) return
+
+    const embeddings = await generateEmbeddings(chunks.map((chunk) => chunk.content))
+
+    const rows = chunks.map((chunk, index) => ({
+        document_id: documentId,
+        organization_id: organizationId,
+        chunk_index: index,
+        content: chunk.content,
+        token_count: chunk.tokenCount,
+        embedding: formatEmbeddingForPgvector(embeddings[index] ?? [])
+    }))
+
+    const { error } = await supabase.from('knowledge_chunks').insert(rows)
+    if (error) {
+        console.error('Failed to insert knowledge chunks:', error)
+        throw new Error(error.message)
+    }
+}
+
 export async function deleteCollection(id: string) {
     const supabase = await createClient()
 
     // Explicitly delete all knowledge entries in this collection first
     const { error: filesError } = await supabase
-        .from('knowledge_base')
+        .from('knowledge_documents')
         .delete()
         .eq('collection_id', id)
 

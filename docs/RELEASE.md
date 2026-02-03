@@ -43,6 +43,12 @@
   - **Inbox:** Added "Delete Conversation" functionality with cascading database deletes.
   - **Inbox:** UI improvements (message previews, simplified list items).
   - **Inbox:** Removed mock data creation; now fully driven by real database data.
+- **Enterprise RAG Hardening:** Knowledge documents + chunks schema, chunking with overlap, token-budgeted context assembly, and chunk-level retrieval RPC with service-role-safe search for webhooks.
+
+### Added
+- **v0.5.0: Knowledge Base Parity**
+  - **Simulator RAG Fallback:** Implemented RAG (Retrieval-Augmented Generation) in the `ChatSimulator`. It now falls back to the Knowledge Base (OpenAI + Embeddings) if no skill matches, mirroring the production Telegram behavior.
+  - **Documentation:** Updated PRD and Roadmap to reflect current status.
 
 ### Added
 - **v0.4.0: Active Agent & Realtime Inbox**
@@ -62,6 +68,7 @@
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
 - Manual replies atomically assign the current operator to prevent "Unassigned" state until refresh.
 - Realtime subscriptions now attach the session token before subscribing (fixes missing live updates).
+- RAG now enforces NO_ANSWER fallback and handles retrieval errors without failing the webhook.
 
 ---
 
@@ -69,6 +76,7 @@
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.5.0 | 2026-02-02 | Knowledge Base Parity (Simulator RAG) |
 | 0.4.0 | 2026-02-02 | Active Agent State, Realtime Inbox, & Assignee System |
 | 0.3.5 | 2026-01-31 | Phase 3.5: WhatsApp Simulator & Dynamic Thresholds |
 | 0.3.0 | 2026-01-31 | Phase 3: Skill System |
