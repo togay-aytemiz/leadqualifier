@@ -1,5 +1,6 @@
 import { Conversation } from '@/types/database'
 import { formatDistanceToNow } from 'date-fns'
+import { useTranslations } from 'next-intl'
 
 interface ConversationListProps {
     conversations: Conversation[]
@@ -8,10 +9,11 @@ interface ConversationListProps {
 }
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
+    const t = useTranslations('inbox')
     return (
         <aside className="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="font-bold text-lg text-gray-800">Inbox</h2>
+                <h2 className="font-bold text-lg text-gray-800">{t('title')}</h2>
                 <div className="flex space-x-1">
                     <button className="p-1 rounded hover:bg-gray-100 text-gray-500">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -80,7 +80,7 @@ export function SkillTestPlayground({ organizationId }: SkillTestPlaygroundProps
                                 </div>
                                 <div>
                                     <p className="text-sm text-zinc-400 mb-1">{t('matchedTrigger')}</p>
-                                    <p className="text-zinc-300">&quot;{bestMatch.trigger_text}&quot;</p>
+                                    <p className="text-zinc-300">"{bestMatch.trigger_text}"</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-zinc-400 mb-1">{t('response')}:</p>
@@ -104,7 +104,7 @@ export function SkillTestPlayground({ organizationId }: SkillTestPlaygroundProps
                                     >
                                         <div>
                                             <span className="text-white font-medium">{match.title}</span>
-                                            <span className="ml-2 text-sm text-zinc-400">&quot;{match.trigger_text}&quot;</span>
+                                            <span className="ml-2 text-sm text-zinc-400">"{match.trigger_text}"</span>
                                         </div>
                                         <span className="text-zinc-400">{(match.similarity * 100).toFixed(1)}%</span>
                                     </div>

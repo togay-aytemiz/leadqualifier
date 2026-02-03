@@ -16,7 +16,13 @@
         "actions": "Actions",
         "confirm": "Confirm",
         "success": "Success",
-        "error": "Error"
+        "error": "Error",
+        "search": "Search...",
+        "appName": "Lead Qualifier",
+        "adminBadge": "Admin",
+        "loggedInAs": "Logged in as",
+        "defaultUserName": "User",
+        "defaultUserInitial": "U"
     },
     "auth": {
         "login": "Sign In",
@@ -27,6 +33,10 @@
         "confirmPassword": "Confirm Password",
         "fullName": "Full Name",
         "companyName": "Company Name",
+        "fullNamePlaceholder": "Jane Doe",
+        "companyNamePlaceholder": "Company name (optional)",
+        "emailPlaceholder": "you@example.com",
+        "passwordPlaceholder": "••••••••",
         "forgotPassword": "Forgot password?",
         "noAccount": "Don't have an account?",
         "hasAccount": "Already have an account?",
@@ -54,22 +64,29 @@
         "title": "Skills",
         "subtitle": "Manage auto-reply skills for your bot",
         "noSkills": "No skills yet. Create your first skill!",
+        "create": "Create",
         "newSkill": "New Skill",
-        "createSkill": "Create Skill",
         "editSkill": "Edit Skill",
-        "deleteSkill": "Delete Skill",
+        "delete": "Delete",
         "deleteConfirm": "Are you sure you want to delete this skill?",
+        "deleteConfirmDesc": "This action cannot be undone. The skill will be permanently deleted.",
         "searchPlaceholder": "Search skills...",
-        "skillTitle": "Skill Title",
-        "skillTitlePlaceholder": "e.g., Pricing Information",
-        "triggerExamples": "Trigger Phrases",
-        "triggerExamplesHint": "Add phrases that should trigger this skill (min 3)",
-        "triggerPlaceholder": "e.g., What are your prices?",
+        "archive": "Archive",
+        "activate": "Activate",
+        "saveChanges": "Save Changes",
+        "nameLabel": "Skill Name",
+        "namePlaceholder": "e.g., Pricing Information",
+        "triggersLabel": "Trigger Phrases",
+        "triggersHint": "First 3 are required",
         "addTrigger": "Add Trigger",
-        "responseText": "Response",
-        "responseTextPlaceholder": "The message the bot will send when this skill is triggered",
-        "testSkill": "Test Skill",
-        "testPlayground": "Test Playground",
+        "triggerPlaceholderMandatory": "Required trigger phrase...",
+        "triggerPlaceholderOptional": "Optional variation...",
+        "responseLabel": "Response Text",
+        "responsePlaceholder": "The bot will respond with this message...",
+        "noSelection": "No Skill Selected",
+        "noSelectionDesc": "Select a skill from the list or create a new one.",
+        "createButton": "Create New Skill",
+        "matchedTrigger": "Matched trigger:",
         "testMessage": "Test Message",
         "testMessagePlaceholder": "Type a message to test skill matching...",
         "runTest": "Run Test",
@@ -78,16 +95,32 @@
         "confidence": "Confidence",
         "response": "Response",
         "topMatches": "Top Matches",
-        "created": "Skill created successfully",
-        "updated": "Skill updated successfully",
-        "deleted": "Skill deleted successfully",
+        "moreTriggers": "+{count} more",
+        "skillTitle": "Skill Title",
+        "skillTitlePlaceholder": "e.g., Pricing Information",
+        "triggerExamples": "Trigger Phrases",
+        "triggerExamplesHint": "Add phrases that should trigger this skill (min 3)",
+        "triggerPlaceholder": "e.g., What are your prices?",
+        "responseText": "Response",
+        "responseTextPlaceholder": "The message the bot will send when this skill is triggered",
+        "removeTrigger": "Remove trigger",
+        "validation": {
+            "required": "{field} is required",
+            "triggersRequired": "The first 3 trigger phrases are required",
+            "minTriggers": "At least 3 trigger phrases are required",
+            "saveFailed": "Failed to save changes. Please try again.",
+            "genericError": "Something went wrong. Please try again."
+        },
+        "noOrganization": "No Organization Found",
+        "noOrganizationDesc": "You need to be part of an organization to manage skills.",
         "tabs": {
             "core": "Core Skills",
             "custom": "Custom Skills"
         },
         "core": {
             "emptyTitle": "Core Skills Coming Soon",
-            "emptyDesc": "Pre-built skills for your business will appear here."
+            "emptyDesc": "Pre-built skills for your business will appear here.",
+            "selectPrompt": "Select a core skill to view details"
         }
     },
     "nav": {
@@ -116,10 +149,16 @@
         "sendShortcut": "⌘ Enter to send",
         "sendButton": "Send Reply",
         "details": "Details",
+        "conversationAttributes": "Conversation Attributes",
+        "id": "ID",
         "keyInfo": "Key Information",
         "platform": "Platform",
         "status": "Status",
         "received": "Received",
+        "created": "Created",
+        "tags": "Tags",
+        "noTags": "No tags",
+        "addTag": "Add",
         "dangerZone": "Danger Zone",
         "deleteConversation": "Delete Conversation",
         "leaveConversation": "Leave Conversation",
@@ -129,17 +168,80 @@
         "noSelection": "No conversation selected",
         "noSelectionDesc": "Select a conversation from the list to view details",
         "noOrg": "No Organization Found",
-        "noOrgDesc": "You need to be part of an organization to access the inbox."
+        "noOrgDesc": "You need to be part of an organization to access the inbox.",
+        "noPhoneNumber": "No phone number",
+        "unassigned": "Unassigned",
+        "leaving": "Leaving..."
+    },
+    "simulator": {
+        "title": "Simulator",
+        "description": "Test your bot in a realistic environment. Messages here are not saved.",
+        "businessAccount": "Business Account",
+        "encryptionNotice": "Messages are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.",
+        "typeMessage": "Type a message",
+        "debug": "Simulator Debug",
+        "sensitivity": "Sensitivity",
+        "sensitivityHint": "Low = More creative/flexible\nHigh = More strict/precise",
+        "matchedSkill": "Matched Skill",
+        "confidenceScore": "Confidence Score",
+        "tokenUsage": "Token Usage",
+        "inputTokens": "Input Tokens",
+        "outputTokens": "Output Tokens",
+        "totalTokens": "Total Tokens",
+        "routerTokens": "Router Tokens",
+        "ragTokens": "RAG Tokens",
+        "conversationTotals": "Conversation Totals",
+        "tokenUsageInline": "tokens: {input} in / {output} out",
+        "skillId": "Skill ID",
+        "emptyDebug": "Send a message to see how the bot works.",
+        "noOrganization": "No Organization Found",
+        "noOrganizationDesc": "You need to be part of an organization to use the simulator."
     },
     "General": {
         "title": "General Settings",
         "language": "Language",
-        "languageDescription": "Select your preferred language for the interface."
+        "languageDescription": "Select your preferred language for the interface.",
+        "languageEnglish": "English",
+        "languageTurkish": "Turkish (Türkçe)"
     },
     "Channels": {
         "title": "Channels & Integrations",
         "noOrganization": "No Organization Found",
-        "noOrganizationDesc": "You need to be part of an organization to manage channels."
+        "noOrganizationDesc": "You need to be part of an organization to manage channels.",
+        "description": "Connect messaging platforms to start receiving leads into your inbox.",
+        "whatsappComingSoon": "WhatsApp integration coming soon! Contact support for early access.",
+        "types": {
+            "telegram": "Telegram",
+            "whatsapp": "WhatsApp"
+        },
+        "status": {
+            "active": "Active",
+            "notConnected": "Not connected"
+        },
+        "actions": {
+            "connect": "Connect",
+            "disconnect": "Disconnect",
+            "cancel": "Cancel"
+        },
+        "debug": {
+            "tooltip": "Debug Webhook",
+            "webhookInfo": "Webhook Info:\n{info}",
+            "webhookFailed": "Debug Failed: {error}"
+        },
+        "confirmDisconnectTitle": "Disconnect Channel?",
+        "confirmDisconnectDesc": "Are you sure you want to disconnect this channel? The bot will stop responding to messages.",
+        "connectTelegramTitle": "Connect Telegram Bot",
+        "connectTelegramHelpTitle": "How to get your Bot Token:",
+        "connectTelegramSteps": {
+            "step1": "Open Telegram and search for <botFather>@BotFather</botFather>",
+            "step2": "Send <newbot>/newbot</newbot> to create a new bot",
+            "step3": "Copy the API token that looks like <tokenFormat>123456:ABC...</tokenFormat>"
+        },
+        "botTokenLabel": "Bot Token",
+        "botTokenPlaceholder": "123456789:ABCDEF...",
+        "connectTelegramError": "Failed to connect",
+        "validating": "Validating...",
+        "connectBot": "Connect Bot"
     },
     "Sidebar": {
         "settings": "Settings",
@@ -164,6 +266,7 @@
         "noContentYet": "No content yet",
         "noContentYetDesc": "Create a folder or add content to set up your knowledge base.",
         "failedToDelete": "Failed to delete",
+        "failedToSave": "Failed to save content",
         "createTitle": "Create Content",
         "editTitle": "Edit Content",
         "form": {
@@ -200,6 +303,7 @@
             "pdf": "PDF",
             "internal": "Internal"
         },
+        "itemsCount": "{count, plural, one {# item} other {# items}}",
         "delete": "Delete",
         "newContentButton": {
             "selectSource": "SELECT SOURCE TYPE",
@@ -226,7 +330,8 @@
         "title": "Knowledge",
         "content": "Content",
         "allContent": "All content",
-        "collections": "Collections"
+        "collections": "Collections",
+        "empty": "Empty"
     },
     "deleteFolder": {
         "title": "Delete Folder",
@@ -234,5 +339,50 @@
         "descriptionEmpty": "This action cannot be undone. The folder will be permanently deleted.",
         "confirm": "Delete",
         "cancel": "Cancel"
+    },
+    "admin": {
+        "dashboardTitle": "Admin Dashboard",
+        "overview": "System-wide overview and settings",
+        "stats": {
+            "organizations": "Total Organizations",
+            "users": "Total Users",
+            "skills": "Total Skills"
+        },
+        "quickActions": "Quick Actions",
+        "manageOrganizations": "Manage Organizations",
+        "manageOrganizationsDesc": "Create, edit, delete organizations",
+        "manageUsers": "Manage Users",
+        "manageUsersDesc": "View and manage all users",
+        "organizations": {
+            "title": "Organizations",
+            "description": "Manage all organizations in the system",
+            "emptyTitle": "No organizations found",
+            "emptyDesc": "There are no organizations in the system yet.",
+            "columns": {
+                "name": "Name",
+                "slug": "Slug",
+                "members": "Members",
+                "created": "Created"
+            }
+        },
+        "users": {
+            "title": "Users",
+            "description": "Manage all users in the system",
+            "emptyTitle": "No users found",
+            "emptyDesc": "There are no users in the system yet.",
+            "columns": {
+                "name": "Name",
+                "email": "Email",
+                "role": "Role",
+                "created": "Created"
+            },
+            "roles": {
+                "systemAdmin": "System Admin",
+                "user": "User"
+            },
+            "actions": {
+                "makeAdmin": "Make Admin"
+            }
+        }
     }
 }

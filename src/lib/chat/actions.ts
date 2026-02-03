@@ -3,6 +3,7 @@
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
+import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 
 export interface ChatMessage {
     id: string
@@ -10,6 +11,11 @@ export interface ChatMessage {
     content: string
     timestamp: Date
     status: 'sent' | 'delivered' | 'read'
+    tokenUsage?: {
+        inputTokens: number
+        outputTokens: number
+        totalTokens: number
+    }
 }
 
 export interface SimulationResponse {
@@ -19,6 +25,21 @@ export interface SimulationResponse {
         title: string
         similarity: number
     }
+    tokenUsage?: {
+        inputTokens: number
+        outputTokens: number
+        totalTokens: number
+        router?: {
+            inputTokens: number
+            outputTokens: number
+            totalTokens: number
+        }
+        rag?: {
+            inputTokens: number
+            outputTokens: number
+            totalTokens: number
+        }
+    }
 }
 
 export async function simulateChat(
@@ -27,10 +48,18 @@ export async function simulateChat(
     threshold: number = 0.5,
     history: ConversationTurn[] = []
 ): Promise<SimulationResponse> {
+    let totalInputTokens = 0
+    let totalOutputTokens = 0
+    let routerInputTokens = 0
+    let routerOutputTokens = 0
+    let ragInputTokens = 0
+    let ragOutputTokens = 0
+
     // 1. Match skills with ZERO threshold to get ANY match for debugging
     console.log(`Simulating chat for: "${message}" in org: ${organizationId} with threshold: ${threshold}`)
     const matches = await matchSkills(message, organizationId, 0.0)
     console.log('Matches found:', JSON.stringify(matches, null, 2))
+    // Only count tokens actually sent to LLM endpoints. Skill-only paths should be zero.
 
     const activeThreshold = threshold; // Use dynamic threshold
     const bestMatch = matches?.[0];
@@ -44,21 +73,57 @@ export async function simulateChat(
                 title: bestMatch.title,
                 similarity: bestMatch.similarity,
             },
+            tokenUsage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                router: {
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 0
+                },
+                rag: {
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 0
+                }
+            }
         }
     }
 
     // 3. Fallback: Decide if Knowledge Base should be used
     try {
         const decision = await decideKnowledgeBaseRoute(message, history)
+        if (decision.usage) {
+            routerInputTokens += decision.usage.inputTokens
+            routerOutputTokens += decision.usage.outputTokens
+        }
 
         if (!decision.route_to_kb) {
+            totalInputTokens += routerInputTokens
+            totalOutputTokens += routerOutputTokens
             return {
                 response: "I'm not sure how to respond to that. Can you rephrase? (No skill or knowledge found)",
                 matchedSkill: bestMatch ? {
                     id: bestMatch.skill_id,
                     title: bestMatch.title,
                     similarity: bestMatch.similarity,
-                } : undefined
+                } : undefined,
+                tokenUsage: {
+                    inputTokens: totalInputTokens,
+                    outputTokens: totalOutputTokens,
+                    totalTokens: totalInputTokens + totalOutputTokens,
+                    router: {
+                        inputTokens: routerInputTokens,
+                        outputTokens: routerOutputTokens,
+                        totalTokens: routerInputTokens + routerOutputTokens
+                    },
+                    rag: {
+                        inputTokens: 0,
+                        outputTokens: 0,
+                        totalTokens: 0
+                    }
+                }
             }
         }
 
@@ -94,15 +159,39 @@ ${context}`
             })
 
             const ragResponse = completion.choices[0]?.message?.content
-
             const normalizedResponse = ragResponse?.trim() ?? ''
+
+            if (completion.usage) {
+                ragInputTokens += completion.usage.prompt_tokens ?? 0
+                ragOutputTokens += completion.usage.completion_tokens ?? 0
+            } else {
+                ragInputTokens += estimateTokenCount(systemPrompt) + estimateTokenCount(message)
+                ragOutputTokens += estimateTokenCount(normalizedResponse)
+            }
             if (normalizedResponse && !normalizedResponse.includes(noAnswerToken)) {
+                totalInputTokens += routerInputTokens + ragInputTokens
+                totalOutputTokens += routerOutputTokens + ragOutputTokens
                 return {
                     response: normalizedResponse,
                     matchedSkill: {
                         id: 'rag-knowledge-base',
                         title: '📚 Knowledge Base',
                         similarity: kbResults[0].similarity
+                    },
+                    tokenUsage: {
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens,
+                        totalTokens: totalInputTokens + totalOutputTokens,
+                        router: {
+                            inputTokens: routerInputTokens,
+                            outputTokens: routerOutputTokens,
+                            totalTokens: routerInputTokens + routerOutputTokens
+                        },
+                        rag: {
+                            inputTokens: ragInputTokens,
+                            outputTokens: ragOutputTokens,
+                            totalTokens: ragInputTokens + ragOutputTokens
+                        }
                     }
                 }
             }
@@ -112,12 +201,29 @@ ${context}`
     }
 
     // 4. Final Fallback
+    totalInputTokens += routerInputTokens + ragInputTokens
+    totalOutputTokens += routerOutputTokens + ragOutputTokens
     return {
         response: "I'm not sure how to respond to that. Can you rephrase? (No skill or knowledge found)",
         matchedSkill: bestMatch ? {
             id: bestMatch.skill_id,
             title: bestMatch.title,
             similarity: bestMatch.similarity,
-        } : undefined
+        } : undefined,
+        tokenUsage: {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            totalTokens: totalInputTokens + totalOutputTokens,
+            router: {
+                inputTokens: routerInputTokens,
+                outputTokens: routerOutputTokens,
+                totalTokens: routerInputTokens + routerOutputTokens
+            },
+            rag: {
+                inputTokens: ragInputTokens,
+                outputTokens: ragOutputTokens,
+                totalTokens: ragInputTokens + ragOutputTokens
+            }
+        }
     }
 }

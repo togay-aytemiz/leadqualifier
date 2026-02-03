@@ -16,7 +16,13 @@
         "actions": "İşlemler",
         "confirm": "Onayla",
         "success": "Başarılı",
-        "error": "Hata"
+        "error": "Hata",
+        "search": "Ara...",
+        "appName": "Lead Qualifier",
+        "adminBadge": "Admin",
+        "loggedInAs": "Oturum açan",
+        "defaultUserName": "Kullanıcı",
+        "defaultUserInitial": "K"
     },
     "auth": {
         "login": "Giriş Yap",
@@ -27,6 +33,10 @@
         "confirmPassword": "Şifre Tekrar",
         "fullName": "Ad Soyad",
         "companyName": "Şirket Adı",
+        "fullNamePlaceholder": "Ahmet Yılmaz",
+        "companyNamePlaceholder": "Şirket Adı (opsiyonel)",
+        "emailPlaceholder": "ornek@email.com",
+        "passwordPlaceholder": "••••••••",
         "forgotPassword": "Şifremi unuttum",
         "noAccount": "Hesabınız yok mu?",
         "hasAccount": "Zaten hesabınız var mı?",
@@ -57,17 +67,13 @@
         "create": "Oluştur",
         "newSkill": "Yeni Yetenek",
         "editSkill": "Yeteneği Düzenle",
-        "deleteSkill": "Yeteneği Sil",
-        "deleteConfirm": "Yeteneği Sil?",
+        "delete": "Sil",
+        "deleteConfirm": "Bu yeteneği silmek istediğinizden emin misiniz?",
         "deleteConfirmDesc": "Bu işlem geri alınamaz. Yetenek kalıcı olarak silinecektir.",
         "searchPlaceholder": "Yetenek ara...",
         "archive": "Arşivle",
         "activate": "Aktifleştir",
-        "delete": "Sil",
-        "deleting": "Siliniyor...",
-        "save": "Değişiklikleri Kaydet",
-        "saving": "Kaydediliyor...",
-        "cancel": "İptal",
+        "saveChanges": "Değişiklikleri Kaydet",
         "nameLabel": "Yetenek Adı",
         "namePlaceholder": "örn. Fiyat Bilgisi",
         "triggersLabel": "Tetikleyiciler",
@@ -80,32 +86,42 @@
         "noSelection": "Yetenek Seçilmedi",
         "noSelectionDesc": "Detaylarını görmek için listeden bir yetenek seçin veya yeni bir tane oluşturun.",
         "createButton": "Yeni Yetenek Oluştur",
+        "matchedTrigger": "Eşleşen tetikleyici:",
+        "testMessage": "Test Mesajı",
+        "testMessagePlaceholder": "Yetenek eşleştirmeyi test etmek için bir mesaj yazın...",
+        "runTest": "Test Et",
+        "matchedSkill": "Eşleşen Yetenek",
+        "noMatch": "Eşleşen yetenek bulunamadı",
+        "confidence": "Güven",
+        "response": "Yanıt",
+        "topMatches": "En İyi Eşleşmeler",
+        "moreTriggers": "+{count} tane daha",
+        "skillTitle": "Yetenek Başlığı",
+        "skillTitlePlaceholder": "örn. Fiyat Bilgisi",
+        "triggerExamples": "Tetikleyici İfadeler",
+        "triggerExamplesHint": "Yetenek tetikleyecek ifadeleri ekleyin (min 3)",
+        "triggerPlaceholder": "örn. Fiyatlarınız nedir?",
+        "responseText": "Yanıt",
+        "responseTextPlaceholder": "Yetenek tetiklendiğinde botun göndereceği mesaj",
+        "removeTrigger": "Tetikleyiciyi kaldır",
+        "validation": {
+            "required": "{field} gerekli",
+            "triggersRequired": "İlk 3 tetikleyici ifade zorunludur",
+            "minTriggers": "En az 3 tetikleyici ifade gereklidir",
+            "saveFailed": "Değişiklikler kaydedilemedi. Lütfen tekrar deneyin.",
+            "genericError": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
+        },
         "noOrganization": "Organizasyon Bulunamadı",
-        "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyon oluşturun.",
+        "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyonun parçası olmalısınız.",
         "tabs": {
             "core": "Temel Yetenekler",
             "custom": "Özel Yetenekler"
         },
         "core": {
             "emptyTitle": "Temel Yetenekler Çok Yakında",
-            "emptyDesc": "İşletmeniz için hazır yetenekler burada görünecektir."
+            "emptyDesc": "İşletmeniz için hazır yetenekler burada görünecektir.",
+            "selectPrompt": "Detayları görmek için bir temel yetenek seçin"
         }
-    },
-    "simulator": {
-        "title": "Mesajlaşma Simülatörü",
-        "description": "Botunuzu gerçekçi bir ortamda test edin. Buradaki mesajlar kaydedilmez.",
-        "businessAccount": "İşletme Hesabı",
-        "encryptionNotice": "Mesajlar uçtan uca şifrelenmiştir. Bu sohbetin dışındaki hiç kimse, Messenger bile, bunları okuyamaz veya dinleyemez.",
-        "typeMessage": "Bir mesaj yazın",
-        "debug": "Simülatör Hata Ayıklama",
-        "sensitivity": "Hassasiyet",
-        "sensitivityHint": "Düşük = Daha yaratıcı/esnek\nYüksek = Daha katı/kesin",
-        "matchedSkill": "Eşleşen Yetenek",
-        "confidenceScore": "Güven Skoru",
-        "skillId": "Yetenek ID",
-        "emptyDebug": "Botun nasıl işlediğini görmek için bir mesaj gönderin.",
-        "noOrganization": "Organizasyon Bulunamadı",
-        "noOrganizationDesc": "Simülatörü kullanmak için bir organizasyon oluşturun."
     },
     "nav": {
         "dashboard": "Panel",
@@ -133,31 +149,99 @@
         "sendShortcut": "Göndermek için ⌘ Enter",
         "sendButton": "Yanıtı Gönder",
         "details": "Detaylar",
+        "conversationAttributes": "Konuşma Özellikleri",
+        "id": "ID",
         "keyInfo": "Önemli Bilgiler",
         "platform": "Platform",
         "status": "Durum",
         "received": "Alındı",
+        "created": "Oluşturulma",
+        "tags": "Etiketler",
+        "noTags": "Etiket yok",
+        "addTag": "Ekle",
         "dangerZone": "Tehlike Bölgesi",
         "deleteConversation": "Konuşmayı Sil",
         "leaveConversation": "Konuşmadan Ayrıl",
-        "leftSession": "oturumdan ayrıldı",
-        "options": "Seçenekler",
         "deleteConfirm": "Bu konuşmayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
         "cancel": "İptal",
+        "leftSession": "oturumdan ayrıldı",
         "noSelection": "Konuşma seçilmedi",
         "noSelectionDesc": "Detayları görmek için listeden bir konuşma seçin",
         "noOrg": "Organizasyon Bulunamadı",
-        "noOrgDesc": "Gelen kutusuna erişmek için bir organizasyonun parçası olmalısınız."
+        "noOrgDesc": "Gelen kutusuna erişmek için bir organizasyonun parçası olmalısınız.",
+        "noPhoneNumber": "Telefon numarası yok",
+        "unassigned": "Atanmamış",
+        "leaving": "Ayrılıyor..."
+    },
+    "simulator": {
+        "title": "Mesajlaşma Simülatörü",
+        "description": "Botunuzu gerçekçi bir ortamda test edin. Buradaki mesajlar kaydedilmez.",
+        "businessAccount": "İşletme Hesabı",
+        "encryptionNotice": "Mesajlar uçtan uca şifrelenmiştir. Bu sohbetin dışındaki hiç kimse, Messenger bile, bunları okuyamaz veya dinleyemez.",
+        "typeMessage": "Bir mesaj yazın",
+        "debug": "Simülatör Hata Ayıklama",
+        "sensitivity": "Hassasiyet",
+        "sensitivityHint": "Düşük = Daha yaratıcı/esnek\nYüksek = Daha katı/kesin",
+        "matchedSkill": "Eşleşen Yetenek",
+        "confidenceScore": "Güven Skoru",
+        "tokenUsage": "Token Kullanımı",
+        "inputTokens": "Giriş Tokenları",
+        "outputTokens": "Çıkış Tokenları",
+        "totalTokens": "Toplam Token",
+        "routerTokens": "Router Tokenları",
+        "ragTokens": "RAG Tokenları",
+        "conversationTotals": "Konuşma Toplamı",
+        "tokenUsageInline": "tokenlar: {input} giriş / {output} çıkış",
+        "skillId": "Yetenek ID",
+        "emptyDebug": "Botun nasıl işlediğini görmek için bir mesaj gönderin.",
+        "noOrganization": "Organizasyon Bulunamadı",
+        "noOrganizationDesc": "Simülatörü kullanmak için bir organizasyon oluşturun."
     },
     "General": {
         "title": "Genel Ayarlar",
         "language": "Dil",
-        "languageDescription": "Arayüz için tercih ettiğiniz dili seçin."
+        "languageDescription": "Arayüz için tercih ettiğiniz dili seçin.",
+        "languageEnglish": "İngilizce",
+        "languageTurkish": "Türkçe"
     },
     "Channels": {
         "title": "Kanallar & Entegrasyonlar",
         "noOrganization": "Organizasyon Bulunamadı",
-        "noOrganizationDesc": "Kanalları yönetmek için bir organizasyonun parçası olmalısınız."
+        "noOrganizationDesc": "Kanalları yönetmek için bir organizasyonun parçası olmalısınız.",
+        "description": "Gelen kutunuza müşteri almaya başlamak için mesajlaşma platformlarını bağlayın.",
+        "whatsappComingSoon": "WhatsApp entegrasyonu yakında! Erken erişim için destekle iletişime geçin.",
+        "types": {
+            "telegram": "Telegram",
+            "whatsapp": "WhatsApp"
+        },
+        "status": {
+            "active": "Aktif",
+            "notConnected": "Bağlı değil"
+        },
+        "actions": {
+            "connect": "Bağla",
+            "disconnect": "Bağlantıyı Kes",
+            "cancel": "İptal"
+        },
+        "debug": {
+            "tooltip": "Webhook Hata Ayıklama",
+            "webhookInfo": "Webhook Bilgisi:\n{info}",
+            "webhookFailed": "Hata Ayıklama Başarısız: {error}"
+        },
+        "confirmDisconnectTitle": "Kanalın Bağlantısı Kesilsin mi?",
+        "confirmDisconnectDesc": "Bu kanalın bağlantısını kesmek istediğinizden emin misiniz? Bot mesajlara yanıt vermeyi durdurur.",
+        "connectTelegramTitle": "Telegram Botu Bağla",
+        "connectTelegramHelpTitle": "Bot Token'ınızı nasıl alırsınız:",
+        "connectTelegramSteps": {
+            "step1": "Telegram'ı açın ve <botFather>@BotFather</botFather> aratın",
+            "step2": "Yeni bir bot oluşturmak için <newbot>/newbot</newbot> gönderin",
+            "step3": "<tokenFormat>123456:ABC...</tokenFormat> gibi görünen API token'ı kopyalayın"
+        },
+        "botTokenLabel": "Bot Token",
+        "botTokenPlaceholder": "123456789:ABCDEF...",
+        "connectTelegramError": "Bağlantı kurulamadı",
+        "validating": "Doğrulanıyor...",
+        "connectBot": "Botu Bağla"
     },
     "Sidebar": {
         "settings": "Ayarlar",
@@ -182,6 +266,7 @@
         "noContentYet": "Henüz içerik yok",
         "noContentYetDesc": "Bilgi bankanızı oluşturmak için bir klasör oluşturun veya içerik ekleyin.",
         "failedToDelete": "Silinemedi",
+        "failedToSave": "İçerik kaydedilemedi",
         "createTitle": "İçerik Oluştur",
         "editTitle": "İçeriği Düzenle",
         "form": {
@@ -218,6 +303,7 @@
             "pdf": "PDF",
             "internal": "Dahili"
         },
+        "itemsCount": "{count} öğe",
         "delete": "Sil",
         "newContentButton": {
             "selectSource": "KAYNAK TÜRÜ SEÇİN",
@@ -231,12 +317,12 @@
     },
     "folderModal": {
         "title": "Yeni Klasör Oluştur",
-        "editTitle": "Yeniden Adlandır",
+        "editTitle": "Klasörü Düzenle",
         "nameLabel": "Klasör Adı",
         "namePlaceholder": "örn. Politikalar, Pazarlama...",
         "cancel": "İptal",
         "create": "Klasör Oluştur",
-        "save": "Kaydet",
+        "save": "Değişiklikleri Kaydet",
         "creating": "Oluşturuluyor...",
         "saving": "Kaydediliyor..."
     },
@@ -244,7 +330,8 @@
         "title": "Bilgi Bankası",
         "content": "İçerik",
         "allContent": "Tüm İçerik",
-        "collections": "Koleksiyonlar"
+        "collections": "Koleksiyonlar",
+        "empty": "Boş"
     },
     "deleteFolder": {
         "title": "Klasörü Sil",
@@ -252,5 +339,50 @@
         "descriptionEmpty": "Bu işlem geri alınamaz. Klasör kalıcı olarak silinecektir.",
         "confirm": "Sil",
         "cancel": "İptal"
+    },
+    "admin": {
+        "dashboardTitle": "Yönetici Paneli",
+        "overview": "Sistem genel görünümü ve ayarlar",
+        "stats": {
+            "organizations": "Toplam Organizasyonlar",
+            "users": "Toplam Kullanıcılar",
+            "skills": "Toplam Yetenekler"
+        },
+        "quickActions": "Hızlı İşlemler",
+        "manageOrganizations": "Organizasyonları Yönet",
+        "manageOrganizationsDesc": "Organizasyonları oluşturun, düzenleyin, silin",
+        "manageUsers": "Kullanıcıları Yönet",
+        "manageUsersDesc": "Tüm kullanıcıları görüntüleyin ve yönetin",
+        "organizations": {
+            "title": "Organizasyonlar",
+            "description": "Sistemdeki tüm organizasyonları yönetin",
+            "emptyTitle": "Organizasyon bulunamadı",
+            "emptyDesc": "Sistemde henüz organizasyon yok.",
+            "columns": {
+                "name": "Ad",
+                "slug": "Kısa Ad",
+                "members": "Üyeler",
+                "created": "Oluşturulma"
+            }
+        },
+        "users": {
+            "title": "Kullanıcılar",
+            "description": "Sistemdeki tüm kullanıcıları yönetin",
+            "emptyTitle": "Kullanıcı bulunamadı",
+            "emptyDesc": "Sistemde henüz kullanıcı yok.",
+            "columns": {
+                "name": "Ad",
+                "email": "E-posta",
+                "role": "Rol",
+                "created": "Oluşturulma"
+            },
+            "roles": {
+                "systemAdmin": "Sistem Yöneticisi",
+                "user": "Kullanıcı"
+            },
+            "actions": {
+                "makeAdmin": "Yönetici Yap"
+            }
+        }
     }
 }

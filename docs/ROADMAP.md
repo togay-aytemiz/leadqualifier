@@ -65,6 +65,8 @@
   - [x] **RAG Fallback:** Matches production logic (KB search if no skill found)
 - [x] **Dynamic Controls**
   - [x] Sensitivity threshold slider
+  - [x] Token usage breakdown (input/output) per message
+  - [x] Conversation-level token usage totals
 
 ## Phase 3.6: Refinements & Inbox ✅
 - [x] **Inbox UI**
@@ -79,6 +81,9 @@
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
   - [x] Realtime auth handshake for subscriptions
+- [x] **Internationalization**
+  - [x] Remove hardcoded UI strings
+  - [x] Enforce EN/TR parity with automated checks
 
 ---
 
@@ -97,6 +102,7 @@
 - [x] **Enterprise RAG Hardening:** Documents + chunks schema, token-budgeted context, and consistent fallback handling
 - [x] **Legacy Cleanup:** Remove `knowledge_base` in favor of documents/chunks
 - [x] **Contextual KB Routing:** LLM decides KB usage and rewrites follow-up queries
+  - [x] Include last bot reply + last 5 user messages with timestamps
 
 ---
 

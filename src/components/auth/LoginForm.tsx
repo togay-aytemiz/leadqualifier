@@ -7,6 +7,7 @@ import { Link } from '@/i18n/navigation'
 
 export function LoginForm() {
     const t = useTranslations('auth')
+    const tc = useTranslations('common')
     const [state, formAction, pending] = useActionState(
         async (_prevState: { error?: string } | null, formData: FormData) => {
             return await login(formData)
@@ -39,7 +40,7 @@ export function LoginForm() {
                         required
                         autoComplete="email"
                         className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="ornek@email.com"
+                        placeholder={t('emailPlaceholder')}
                     />
                 </div>
 
@@ -54,7 +55,7 @@ export function LoginForm() {
                         required
                         autoComplete="current-password"
                         className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="••••••••"
+                        placeholder={t('passwordPlaceholder')}
                     />
                 </div>
 
@@ -63,7 +64,7 @@ export function LoginForm() {
                     disabled={pending}
                     className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {pending ? '...' : t('login')}
+                    {pending ? tc('loading') : t('login')}
                 </button>
             </form>
 

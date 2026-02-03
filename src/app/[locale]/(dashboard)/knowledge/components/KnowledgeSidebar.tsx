@@ -134,7 +134,7 @@ export function KnowledgeSidebar() {
                                     ))}
                                     {col.files.length === 0 && (
                                         <div className="px-2 py-1.5 text-xs text-gray-400 italic">
-                                            Empty
+                                            {t('empty')}
                                         </div>
                                     )}
                                 </div>

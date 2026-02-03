@@ -152,7 +152,7 @@ export function KnowledgeContainer({
                 {/* Filters Bar */}
                 <div className="flex justify-end items-center bg-white p-1">
                     <div className="text-sm text-gray-500 font-medium">
-                        {entries.length + collections.length} items
+                        {t('itemsCount', { count: entries.length + collections.length })}
                     </div>
                 </div>
 

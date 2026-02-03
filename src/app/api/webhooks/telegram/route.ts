@@ -223,12 +223,13 @@ export async function POST(req: NextRequest) {
             })
 
             const history = trimmedHistory
-                .slice(0, 3)
+                .slice(0, 6)
                 .reverse()
                 .filter((msg) => typeof msg.content === 'string' && msg.content.trim().length > 0)
                 .map((msg) => ({
                     role: msg.sender_type === 'contact' ? 'user' : 'assistant',
-                    content: msg.content
+                    content: msg.content,
+                    timestamp: msg.created_at
                 }))
 
             const decision = await decideKnowledgeBaseRoute(text, history)

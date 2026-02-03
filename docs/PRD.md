@@ -72,6 +72,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Rules:**
 - AI responds ONLY from Skill/KB content
 - No hallucination — unknown = human handoff
+- Simulator includes token usage visibility for debugging
+ - Token usage is shown per message and as a conversation total in the simulator
 
 ---
 
@@ -109,6 +111,7 @@ Customer Message → Skill Match? → Yes → Skill Response
  - Documents are chunked with overlap and embedded per chunk
  - Retrieval is chunk-level with context budgets to avoid long prompts
  - Follow-up questions are rewritten into standalone KB queries via LLM routing
+ - LLM routing receives the latest bot reply plus the last 5 user messages with timestamps
 
 ---
 
@@ -228,6 +231,7 @@ MVP is successful when:
 - **Font Strategy:** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
+- **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

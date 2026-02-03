@@ -1,6 +1,7 @@
 import { Conversation, Message } from '@/types/database'
 import { format } from 'date-fns'
 import { useState, useRef, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface ChatWindowProps {
     conversation: Conversation
@@ -9,6 +10,7 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindowProps) {
+    const t = useTranslations('inbox')
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
     const endRef = useRef<HTMLDivElement>(null)
@@ -76,7 +78,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
                         <div key={msg.id} className={`flex items-start space-x-3 ${isMe || isBot ? 'flex-row-reverse space-x-reverse' : ''}`}>
                             <div className={`h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs text-white ${isBot ? 'bg-purple-600' : isMe ? 'bg-blue-600' : 'bg-gray-400'
                                 }`}>
-                                {isBot ? 'AI' : isMe ? 'You' : conversation.contact_name.charAt(0)}
+                                {isBot ? t('botName') : isMe ? t('you') : conversation.contact_name.charAt(0)}
                             </div>
 
                             <div className={`flex flex-col space-y-1 max-w-xl ${isMe || isBot ? 'items-end' : ''}`}>
@@ -105,7 +107,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         className="w-full bg-transparent border-none resize-none focus:ring-0 text-sm text-gray-800 px-2 h-16 placeholder-gray-400 focus:outline-none"
-                        placeholder="Type a message..."
+                        placeholder={t('replyPlaceholder')}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()
@@ -122,7 +124,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
                             disabled={!input.trim() || isSending}
                             className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white transition-colors text-sm font-medium px-4 py-1.5 rounded-lg disabled:opacity-50"
                         >
-                            <span>Send</span>
+                            <span>{t('sendButton')}</span>
                         </button>
                     </div>
                 </form>

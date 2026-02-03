@@ -39,7 +39,7 @@ export function OrgSwitcher({ organizations, currentOrgId, onSwitch, isSystemAdm
             </div>
             {isSystemAdmin && (
                 <span className="ml-2 px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded-full">
-                    Admin
+                    {t('adminBadge')}
                 </span>
             )}
         </div>

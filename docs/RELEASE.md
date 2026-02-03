@@ -46,6 +46,10 @@
 - **Enterprise RAG Hardening:** Knowledge documents + chunks schema, chunking with overlap, token-budgeted context assembly, and chunk-level retrieval RPC with service-role-safe search for webhooks.
 - Knowledge Base UI now shows indexing status badges (Ready / Processing / Error).
 - Contextual KB routing with LLM-based decision + follow-up query rewrite.
+- Router now receives the last bot reply and the last five user messages with timestamps to improve follow-up handling.
+- Simulator now shows per-message token usage (input/output/total) plus router/RAG breakdown and conversation totals in debug and bubbles.
+- Automated i18n guard: hardcoded UI string scan + EN/TR key parity check (`npm run i18n:check`) wired into lint.
+- Expanded EN/TR translations for admin, channels, simulator, inbox details, and auth placeholders.
 
 ### Added
 - **v0.5.0: Knowledge Base Parity**
@@ -66,6 +70,8 @@
 ### Changed
 - Use system fonts in the app shell to avoid build-time Google Fonts fetches.
 - Removed legacy `knowledge_base` table in favor of documents/chunks.
+- Replaced remaining hardcoded UI strings with translation keys across the app.
+- Updated AGENTS.md to enforce multilingual-first feature development.
 
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.

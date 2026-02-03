@@ -1,20 +1,28 @@
 'use server'
 
 import OpenAI from 'openai'
+import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 
 export interface ConversationTurn {
     role: 'user' | 'assistant'
     content: string
+    timestamp?: string
 }
 
 export interface KnowledgeRouteDecision {
     route_to_kb: boolean
     rewritten_query: string
     reason: string
+    usage?: {
+        inputTokens: number
+        outputTokens: number
+        totalTokens: number
+    }
 }
 
-const MAX_HISTORY_ITEMS = 3
+const MAX_HISTORY_ITEMS = 6
 const MAX_CHARS_PER_MESSAGE = 400
+const MAX_USER_TURNS = 5
 
 function truncate(text: string, maxChars: number) {
     if (text.length <= maxChars) return text
@@ -24,12 +32,37 @@ function truncate(text: string, maxChars: number) {
 function formatHistory(history: ConversationTurn[]) {
     if (history.length === 0) return 'No prior messages.'
 
-    return history
+    const filtered: ConversationTurn[] = []
+    let userCount = 0
+
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+        const turn = history[i]
+        if (turn.role === 'user') {
+            if (userCount >= MAX_USER_TURNS) continue
+            userCount += 1
+            filtered.push(turn)
+            continue
+        }
+        if (turn.role === 'assistant') {
+            const lastAssistant = filtered.find((item) => item.role === 'assistant')
+            if (!lastAssistant) {
+                filtered.push(turn)
+            }
+        }
+    }
+
+    const ordered = filtered
+        .reverse()
         .slice(-MAX_HISTORY_ITEMS)
-        .map((turn) => {
+
+    return ordered
+        .map((turn, index) => {
             const roleLabel = turn.role === 'assistant' ? 'Assistant' : 'User'
+            const timestamp = turn.timestamp
+                ? new Date(turn.timestamp).toISOString()
+                : `step-${index + 1}`
             const content = truncate(turn.content.replace(/\s+/g, ' ').trim(), MAX_CHARS_PER_MESSAGE)
-            return `${roleLabel}: ${content}`
+            return `${index + 1}. [${timestamp}] ${roleLabel}: ${content}`
         })
         .join('\n')
 }
@@ -43,14 +76,26 @@ function normalizeDecision(latestMessage: string, parsed: any): KnowledgeRouteDe
         return {
             route_to_kb: false,
             rewritten_query: '',
-            reason
+            reason,
+            usage: parsed?.usage
         }
     }
 
     return {
         route_to_kb: true,
         rewritten_query: rewrittenQueryRaw || latestMessage,
-        reason
+        reason,
+        usage: parsed?.usage
+    }
+}
+
+function buildUsageEstimate(systemPrompt: string, userPrompt: string, output: string) {
+    const inputTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt)
+    const outputTokens = estimateTokenCount(output)
+    return {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens
     }
 }
 
@@ -75,7 +120,9 @@ export async function decideKnowledgeBaseRoute(
 
     const systemPrompt = `You are a routing assistant for a business chatbot.
 Decide if the latest user message should be answered by the Knowledge Base (hours, pricing, policies, services).
+Use the recent conversation history below, which includes timestamps and ordering.
 If it is a follow-up question, rewrite it into a standalone query in the user's language.
+Short day/time follow-ups like "pazar?", "cuma?" or "yarın?" should be treated as KB-related follow-ups.
 Return ONLY valid JSON with keys: route_to_kb (boolean), rewritten_query (string), reason (string).
 If route_to_kb is false, rewritten_query must be an empty string.`
 
@@ -98,18 +145,28 @@ If route_to_kb is false, rewritten_query must be an empty string.`
             return {
                 route_to_kb: true,
                 rewritten_query: trimmedMessage,
-                reason: 'empty_router_response'
+                reason: 'empty_router_response',
+                usage: buildUsageEstimate(systemPrompt, userPrompt, '')
             }
         }
 
         const parsed = JSON.parse(content)
-        return normalizeDecision(trimmedMessage, parsed)
+        const usage = completion.usage
+            ? {
+                inputTokens: completion.usage.prompt_tokens ?? 0,
+                outputTokens: completion.usage.completion_tokens ?? 0,
+                totalTokens: completion.usage.total_tokens ?? (completion.usage.prompt_tokens ?? 0) + (completion.usage.completion_tokens ?? 0)
+            }
+            : buildUsageEstimate(systemPrompt, userPrompt, content)
+
+        return normalizeDecision(trimmedMessage, { ...parsed, usage })
     } catch (error) {
         console.error('KB routing error:', error)
         return {
             route_to_kb: true,
             rewritten_query: trimmedMessage,
-            reason: 'router_error'
+            reason: 'router_error',
+            usage: buildUsageEstimate(systemPrompt, userPrompt, '')
         }
     }
 }

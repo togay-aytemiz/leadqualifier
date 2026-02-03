@@ -84,7 +84,7 @@ export function SidebarItem({ icon, iconColor, label, active, count, onClick, hr
             <div className="flex items-center gap-2.5">
                 {avatar ? (
                     <div className="h-5 w-5 rounded-full bg-gray-200 overflow-hidden">
-                        <img alt="User" className="h-full w-full object-cover" src={avatar} />
+                        <img alt={label} className="h-full w-full object-cover" src={avatar} />
                     </div>
                 ) : icon ? (
                     <div className={cn("", iconColor || "text-gray-400")}>{icon}</div>

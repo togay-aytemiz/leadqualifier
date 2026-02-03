@@ -7,6 +7,7 @@ import { Link } from '@/i18n/navigation'
 
 export function RegisterForm() {
     const t = useTranslations('auth')
+    const tc = useTranslations('common')
     const [state, formAction, pending] = useActionState(
         async (_prevState: { error?: string } | null, formData: FormData) => {
             return await register(formData)
@@ -39,7 +40,7 @@ export function RegisterForm() {
                         required
                         autoComplete="name"
                         className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Ahmet Yılmaz"
+                        placeholder={t('fullNamePlaceholder')}
                     />
                 </div>
 
@@ -53,7 +54,7 @@ export function RegisterForm() {
                         type="text"
                         autoComplete="organization"
                         className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Şirket Adı (opsiyonel)"
+                        placeholder={t('companyNamePlaceholder')}
                     />
                 </div>
 
@@ -68,7 +69,7 @@ export function RegisterForm() {
                         required
                         autoComplete="email"
                         className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="ornek@email.com"
+                        placeholder={t('emailPlaceholder')}
                     />
                 </div>
 
@@ -84,7 +85,7 @@ export function RegisterForm() {
                         minLength={6}
                         autoComplete="new-password"
                         className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="••••••••"
+                        placeholder={t('passwordPlaceholder')}
                     />
                 </div>
 
@@ -93,7 +94,7 @@ export function RegisterForm() {
                     disabled={pending}
                     className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {pending ? '...' : t('register')}
+                    {pending ? tc('loading') : t('register')}
                 </button>
             </form>
 

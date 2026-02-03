@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { ChatMessage, simulateChat } from '@/lib/chat/actions'
 import { ChatBubble } from './ChatBubble'
@@ -20,7 +20,25 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
     const [isTyping, setIsTyping] = useState(false)
     const [threshold, setThreshold] = useState(0.6)
     const [debugInfo, setDebugInfo] = useState<any>(null)
+    const [tokenUsage, setTokenUsage] = useState<{
+        inputTokens: number
+        outputTokens: number
+        totalTokens: number
+        router?: { inputTokens: number, outputTokens: number, totalTokens: number }
+        rag?: { inputTokens: number, outputTokens: number, totalTokens: number }
+    } | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    const conversationTotals = useMemo(() => {
+        const totals = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+        for (const msg of messages) {
+            if (!msg.tokenUsage) continue
+            totals.inputTokens += msg.tokenUsage.inputTokens
+            totals.outputTokens += msg.tokenUsage.outputTokens
+        }
+        totals.totalTokens = totals.inputTokens + totals.outputTokens
+        return totals
+    }, [messages])
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -35,10 +53,11 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
         if (!input.trim()) return
 
         const history = messages
-            .slice(-3)
+            .slice(-8)
             .map((msg) => ({
                 role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.content
+                content: msg.content,
+                timestamp: msg.timestamp.toISOString()
             }))
 
         const userMsg: ChatMessage = {
@@ -53,6 +72,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
         setInput('')
         setIsTyping(true)
         setDebugInfo(null)
+        setTokenUsage(null)
 
         // Update status to read after short delay
         setTimeout(() => {
@@ -72,12 +92,36 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
 
             setTimeout(() => {
                 setIsTyping(false)
+                if (response.tokenUsage) {
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === userMsg.id
+                                ? {
+                                    ...m,
+                                    tokenUsage: {
+                                        inputTokens: response.tokenUsage.inputTokens,
+                                        outputTokens: 0,
+                                        totalTokens: response.tokenUsage.inputTokens
+                                    }
+                                }
+                                : m
+                        )
+                    )
+                    setTokenUsage(response.tokenUsage)
+                }
                 const systemMsg: ChatMessage = {
                     id: uuidv4(),
                     role: 'system',
                     content: response.response,
                     timestamp: new Date(),
                     status: 'read',
+                    tokenUsage: response.tokenUsage
+                        ? {
+                            inputTokens: 0,
+                            outputTokens: response.tokenUsage.outputTokens,
+                            totalTokens: response.tokenUsage.outputTokens
+                        }
+                        : undefined
                 }
                 setMessages((prev) => [...prev, systemMsg])
 
@@ -181,6 +225,82 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
                         {t('sensitivityHint')}
                     </p>
                 </div>
+
+                {tokenUsage && (
+                    <div className="mb-4 p-4 rounded-lg bg-purple-50 border border-purple-100">
+                        <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider">{t('tokenUsage')}</span>
+                        <div className="mt-2 text-sm text-purple-900 space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span>{t('inputTokens')}</span>
+                                <span className="font-mono">{tokenUsage.inputTokens}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span>{t('outputTokens')}</span>
+                                <span className="font-mono">{tokenUsage.outputTokens}</span>
+                            </div>
+                            <div className="flex items-center justify-between font-semibold">
+                                <span>{t('totalTokens')}</span>
+                                <span className="font-mono">{tokenUsage.totalTokens}</span>
+                            </div>
+                        </div>
+                        {(tokenUsage.router || tokenUsage.rag) && (
+                            <div className="mt-3 space-y-2 text-xs text-purple-800">
+                                {tokenUsage.router && (
+                                    <div className="rounded-md bg-white/70 border border-purple-100 px-2 py-1">
+                                        <div className="flex items-center justify-between font-semibold">
+                                            <span>{t('routerTokens')}</span>
+                                            <span className="font-mono">{tokenUsage.router.totalTokens}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span>{t('inputTokens')}</span>
+                                            <span className="font-mono">{tokenUsage.router.inputTokens}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span>{t('outputTokens')}</span>
+                                            <span className="font-mono">{tokenUsage.router.outputTokens}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {tokenUsage.rag && (
+                                    <div className="rounded-md bg-white/70 border border-purple-100 px-2 py-1">
+                                        <div className="flex items-center justify-between font-semibold">
+                                            <span>{t('ragTokens')}</span>
+                                            <span className="font-mono">{tokenUsage.rag.totalTokens}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span>{t('inputTokens')}</span>
+                                            <span className="font-mono">{tokenUsage.rag.inputTokens}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span>{t('outputTokens')}</span>
+                                            <span className="font-mono">{tokenUsage.rag.outputTokens}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {conversationTotals.totalTokens > 0 && (
+                    <div className="mb-4 p-4 rounded-lg bg-indigo-50 border border-indigo-100">
+                        <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">{t('conversationTotals')}</span>
+                        <div className="mt-2 text-sm text-indigo-900 space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span>{t('inputTokens')}</span>
+                                <span className="font-mono">{conversationTotals.inputTokens}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span>{t('outputTokens')}</span>
+                                <span className="font-mono">{conversationTotals.outputTokens}</span>
+                            </div>
+                            <div className="flex items-center justify-between font-semibold">
+                                <span>{t('totalTokens')}</span>
+                                <span className="font-mono">{conversationTotals.totalTokens}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {debugInfo ? (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
