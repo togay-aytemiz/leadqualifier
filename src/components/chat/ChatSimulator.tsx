@@ -34,6 +34,13 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
         e.preventDefault()
         if (!input.trim()) return
 
+        const history = messages
+            .slice(-3)
+            .map((msg) => ({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: msg.content
+            }))
+
         const userMsg: ChatMessage = {
             id: uuidv4(),
             role: 'user',
@@ -57,7 +64,7 @@ export default function ChatSimulator({ organizationId, organizationName }: Chat
         try {
             // Simulate network delay + typing
             const startTime = Date.now()
-            const response = await simulateChat(userMsg.content, organizationId, threshold)
+            const response = await simulateChat(userMsg.content, organizationId, threshold, history)
             const endTime = Date.now()
 
             // Ensure at least 1.5s typing animation

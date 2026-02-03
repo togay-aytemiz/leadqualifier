@@ -108,6 +108,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - If KB has no answer → human handoff
  - Documents are chunked with overlap and embedded per chunk
  - Retrieval is chunk-level with context budgets to avoid long prompts
+ - Follow-up questions are rewritten into standalone KB queries via LLM routing
 
 ---
 
@@ -226,6 +227,7 @@ MVP is successful when:
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
 - **Font Strategy:** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
+- **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

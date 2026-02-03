@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getLocale } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, EmptyState } from '@/design'
 import { ArrowLeft, Building2 } from 'lucide-react'
@@ -8,6 +8,8 @@ import { ArrowLeft, Building2 } from 'lucide-react'
 export default async function AdminOrganizationsPage() {
     const supabase = await createClient()
     const locale = await getLocale()
+    const tAdmin = await getTranslations('admin')
+    const tCommon = await getTranslations('common')
 
     const {
         data: { user },
@@ -40,29 +42,35 @@ export default async function AdminOrganizationsPage() {
     return (
         <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
             <PageHeader
-                title="Organizations"
+                title={tAdmin('organizations.title')}
                 breadcrumb={
                     <Link href="/admin" className="text-gray-400 hover:text-gray-600 flex items-center gap-1 text-sm mr-2 transition-colors">
                         <ArrowLeft size={18} />
-                        Back
+                        {tCommon('back')}
                     </Link>
                 }
             />
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-6xl mx-auto space-y-8">
-                    <p className="text-gray-500">Manage all organizations in the system</p>
+                    <p className="text-gray-500">{tAdmin('organizations.description')}</p>
 
                     <DataTable>
                         {(!organizations || organizations.length === 0) ? (
                             <EmptyState
                                 icon={Building2}
-                                title="No organizations found"
-                                description="There are no organizations in the system yet."
+                                title={tAdmin('organizations.emptyTitle')}
+                                description={tAdmin('organizations.emptyDesc')}
                             />
                         ) : (
                             <>
-                                <TableHead columns={['Name', 'Slug', 'Members', 'Created', 'Actions']} />
+                                <TableHead columns={[
+                                    tAdmin('organizations.columns.name'),
+                                    tAdmin('organizations.columns.slug'),
+                                    tAdmin('organizations.columns.members'),
+                                    tAdmin('organizations.columns.created'),
+                                    tCommon('actions')
+                                ]} />
                                 <TableBody>
                                     {organizations.map((org) => (
                                         <TableRow key={org.id}>
@@ -85,10 +93,10 @@ export default async function AdminOrganizationsPage() {
                                             <TableCell align="right">
                                                 <div className="flex justify-end gap-3">
                                                     <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                                                        Edit
+                                                        {tCommon('edit')}
                                                     </button>
                                                     <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                                                        Delete
+                                                        {tCommon('delete')}
                                                     </button>
                                                 </div>
                                             </TableCell>

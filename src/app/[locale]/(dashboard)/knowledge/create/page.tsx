@@ -44,7 +44,7 @@ export default function CreateContentPage() {
             router.refresh()
         } catch (error) {
             console.error(error)
-            alert('Failed to save content')
+            alert(t('failedToSave'))
             setLoading(false)
         }
     }

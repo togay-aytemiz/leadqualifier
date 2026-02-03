@@ -3,12 +3,14 @@
 import { SearchInput } from '@/design'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface ClientSearchInputProps {
     placeholder?: string
 }
 
-export function ClientSearchInput({ placeholder = "Search..." }: ClientSearchInputProps) {
+export function ClientSearchInput({ placeholder }: ClientSearchInputProps) {
+    const t = useTranslations('common')
     const searchParams = useSearchParams()
     const pathname = usePathname()
     const { replace } = useRouter()
@@ -49,7 +51,7 @@ export function ClientSearchInput({ placeholder = "Search..." }: ClientSearchInp
 
     return (
         <SearchInput
-            placeholder={placeholder}
+            placeholder={placeholder ?? t('search')}
             value={inputValue}
             onChange={setInputValue}
         />

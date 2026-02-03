@@ -1,6 +1,7 @@
 import { Folder, MoreVertical } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FolderActions } from './FolderActions'
+import { useTranslations } from 'next-intl'
 
 interface FolderCardProps {
     id: string
@@ -10,6 +11,7 @@ interface FolderCardProps {
 }
 
 export function FolderCard({ id, name, count = 0, onRefresh }: FolderCardProps) {
+    const t = useTranslations('knowledge')
     const router = useRouter()
 
     const handleRefresh = () => {
@@ -40,7 +42,7 @@ export function FolderCard({ id, name, count = 0, onRefresh }: FolderCardProps) 
                 </div>
             </div>
             <h3 className="font-semibold text-gray-900 truncate" title={name}>{name}</h3>
-            <p className="text-xs text-gray-500 mt-1">{count} items</p>
+            <p className="text-xs text-gray-500 mt-1">{t('itemsCount', { count })}</p>
         </div>
     )
 }

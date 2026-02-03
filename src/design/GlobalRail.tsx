@@ -15,12 +15,13 @@ export function GlobalRail({ userName }: GlobalRailProps) {
     const pathname = usePathname()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
     const t = useTranslations('nav')
+    const tc = useTranslations('common')
 
     const navItems = [
         { id: 'inbox', href: '/inbox', label: t('inbox'), icon: Inbox },
         { id: 'simulator', href: '/simulator', label: t('simulator'), icon: MessageSquare },
         { id: 'skills', href: '/skills', label: t('skills'), icon: Sparkles },
-        { id: 'knowledge', href: '/knowledge', label: 'Brain', icon: BookOpen },
+        { id: 'knowledge', href: '/knowledge', label: t('knowledgeBase'), icon: BookOpen },
     ]
 
     return (
@@ -74,14 +75,14 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                         className="h-8 w-8 rounded-full bg-gray-200 mx-auto flex items-center justify-center text-xs font-medium text-gray-600 hover:ring-2 hover:ring-blue-100 transition-all outline-none"
                         title={userName}
                     >
-                        {(userName?.[0] || 'U').toUpperCase()}
+                        {(userName?.[0] || tc('defaultUserInitial')).toUpperCase()}
                     </button>
 
                     {/* Popover Menu - Visible on Hover/Focus-within */}
                     <div className="absolute left-full bottom-0 ml-2 mb-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-all duration-200 z-50">
                         <div className="px-3 py-2 border-b border-gray-50">
-                            <p className="text-xs text-gray-500 truncate">Logged in as</p>
-                            <p className="text-sm font-medium text-gray-900 truncate" title={userName}>{userName || 'User'}</p>
+                            <p className="text-xs text-gray-500 truncate">{tc('loggedInAs')}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate" title={userName}>{userName || tc('defaultUserName')}</p>
                         </div>
                         <div className="p-1">
                             <form action="/api/auth/signout" method="POST">

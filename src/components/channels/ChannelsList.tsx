@@ -6,6 +6,7 @@ import { ChannelCard } from '@/components/channels/ChannelCard'
 import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal'
 import { connectTelegramChannel } from '@/lib/channels/actions'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface ChannelsListProps {
     channels: Channel[]
@@ -13,6 +14,7 @@ interface ChannelsListProps {
 }
 
 export function ChannelsList({ channels, organizationId }: ChannelsListProps) {
+    const t = useTranslations('Channels')
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
     const router = useRouter()
 
@@ -28,12 +30,12 @@ export function ChannelsList({ channels, organizationId }: ChannelsListProps) {
     }
 
     const handleConnectWhatsApp = () => {
-        alert('WhatsApp integration coming soon! Contact support for early access.')
+        alert(t('whatsappComingSoon'))
     }
 
     return (
         <div className="max-w-4xl">
-            <p className="text-gray-500 mb-8">Connect messaging platforms to start receiving leads into your inbox.</p>
+            <p className="text-gray-500 mb-8">{t('description')}</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <ChannelCard

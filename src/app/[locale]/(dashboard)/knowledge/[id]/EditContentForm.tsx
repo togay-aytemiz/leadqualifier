@@ -76,7 +76,7 @@ export function EditContentForm({
             // Actually router.refresh() will re-run the server component, which passes new "initial" props
         } catch (error) {
             console.error(error)
-            alert('Failed to save content')
+            alert(t('failedToSave'))
             setSaving(false)
         }
     }
@@ -89,7 +89,7 @@ export function EditContentForm({
             router.refresh()
         } catch (error) {
             console.error(error)
-            alert('Failed to delete content')
+            alert(t('failedToDelete'))
             setSaving(false)
         }
     }

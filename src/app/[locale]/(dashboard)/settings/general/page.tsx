@@ -81,7 +81,7 @@ export default function GeneralSettingsPage() {
                                         }`}>
                                         {currentLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                                     </div>
-                                    <span className="text-sm font-medium text-gray-900">English</span>
+                                    <span className="text-sm font-medium text-gray-900">{tGeneral('languageEnglish')}</span>
                                 </div>
 
                                 <div
@@ -95,7 +95,7 @@ export default function GeneralSettingsPage() {
                                         }`}>
                                         {currentLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                                     </div>
-                                    <span className="text-sm font-medium text-gray-900">Turkish (Türkçe)</span>
+                                    <span className="text-sm font-medium text-gray-900">{tGeneral('languageTurkish')}</span>
                                 </div>
                             </div>
                         </div>

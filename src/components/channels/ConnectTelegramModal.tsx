@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Button, Modal, Input, Alert } from '@/design'
+import { useTranslations } from 'next-intl'
 
 interface ConnectTelegramModalProps {
     isOpen: boolean
@@ -10,6 +11,7 @@ interface ConnectTelegramModalProps {
 }
 
 export function ConnectTelegramModal({ isOpen, onClose, onConnect }: ConnectTelegramModalProps) {
+    const t = useTranslations('Channels')
     const [token, setToken] = useState('')
     const [isConnecting, setIsConnecting] = useState(false)
     const [error, setError] = useState('')
@@ -26,30 +28,42 @@ export function ConnectTelegramModal({ isOpen, onClose, onConnect }: ConnectTele
             setToken('')
             onClose()
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to connect')
+            setError(err instanceof Error ? err.message : t('connectTelegramError'))
         } finally {
             setIsConnecting(false)
         }
     }
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Connect Telegram Bot">
+        <Modal isOpen={isOpen} onClose={onClose} title={t('connectTelegramTitle')}>
             <form onSubmit={handleSubmit} className="space-y-5">
                 <Alert variant="info">
-                    <p className="font-medium mb-2">How to get your Bot Token:</p>
+                    <p className="font-medium mb-2">{t('connectTelegramHelpTitle')}</p>
                     <ol className="list-decimal list-inside space-y-1 text-blue-700">
-                        <li>Open Telegram and search for <strong>@BotFather</strong></li>
-                        <li>Send <code className="bg-blue-100 px-1 rounded">/newbot</code> to create a new bot</li>
-                        <li>Copy the API token that looks like <code className="bg-blue-100 px-1 rounded">123456:ABC...</code></li>
+                        <li>
+                            {t.rich('connectTelegramSteps.step1', {
+                                botFather: (chunks) => <strong>{chunks}</strong>
+                            })}
+                        </li>
+                        <li>
+                            {t.rich('connectTelegramSteps.step2', {
+                                newbot: (chunks) => <code className="bg-blue-100 px-1 rounded">{chunks}</code>
+                            })}
+                        </li>
+                        <li>
+                            {t.rich('connectTelegramSteps.step3', {
+                                tokenFormat: (chunks) => <code className="bg-blue-100 px-1 rounded">{chunks}</code>
+                            })}
+                        </li>
                     </ol>
                 </Alert>
 
                 <div>
                     <Input
-                        label="Bot Token"
+                        label={t('botTokenLabel')}
                         value={token}
                         onChange={(val: string) => setToken(val)}
-                        placeholder="123456789:ABCDEF..."
+                        placeholder={t('botTokenPlaceholder')}
                         className="font-mono bg-white"
                         autoFocus
                     />
@@ -57,9 +71,9 @@ export function ConnectTelegramModal({ isOpen, onClose, onConnect }: ConnectTele
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button type="button" variant="secondary" onClick={onClose}>{t('actions.cancel')}</Button>
                     <Button type="submit" disabled={!token.trim() || isConnecting}>
-                        {isConnecting ? 'Validating...' : 'Connect Bot'}
+                        {isConnecting ? t('validating') : t('connectBot')}
                     </Button>
                 </div>
             </form>

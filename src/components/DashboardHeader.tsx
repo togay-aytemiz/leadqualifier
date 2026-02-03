@@ -4,6 +4,7 @@ import { User } from '@supabase/supabase-js'
 import type { Profile, Organization } from '@/types/database'
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface DashboardHeaderProps {
     user: User
@@ -13,6 +14,8 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ user, profile, organizations, isSystemAdmin }: DashboardHeaderProps) {
+    const tCommon = useTranslations('common')
+    const tNav = useTranslations('nav')
     const router = useRouter()
     const pathname = usePathname()
 
@@ -38,7 +41,7 @@ export function DashboardHeader({ user, profile, organizations, isSystemAdmin }:
         <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-50">
             <div className="flex h-16 items-center justify-between px-6">
                 <div className="flex items-center gap-6">
-                    <span className="text-lg font-semibold text-white">Lead Qualifier</span>
+                    <span className="text-lg font-semibold text-white">{tCommon('appName')}</span>
 
                     {/* Org Switcher */}
                     {organizations.length > 0 && (
@@ -56,7 +59,7 @@ export function DashboardHeader({ user, profile, organizations, isSystemAdmin }:
                             </select>
                             {isSystemAdmin && (
                                 <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full font-medium">
-                                    Admin
+                                    {tCommon('adminBadge')}
                                 </span>
                             )}
                         </div>
@@ -75,7 +78,7 @@ export function DashboardHeader({ user, profile, organizations, isSystemAdmin }:
                             type="submit"
                             className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700"
                         >
-                            Çıkış
+                            {tNav('signout')}
                         </button>
                     </form>
                 </div>

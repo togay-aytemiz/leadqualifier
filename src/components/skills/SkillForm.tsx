@@ -44,7 +44,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
 
         const validTriggers = triggers.filter((t) => t.trim() !== '')
         if (validTriggers.length < 3) {
-            setError('At least 3 trigger phrases are required')
+            setError(t('validation.minTriggers'))
             return
         }
 
@@ -69,7 +69,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
             router.push('/skills')
             router.refresh()
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Something went wrong')
+            setError(err instanceof Error ? err.message : t('validation.genericError'))
         } finally {
             setIsSubmitting(false)
         }
@@ -141,7 +141,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
                     type="submit"
                     disabled={isSubmitting}
                 >
-                    {isSubmitting ? '...' : tc('save')}
+                    {isSubmitting ? tc('loading') : tc('save')}
                 </Button>
                 <Button
                     type="button"

@@ -65,7 +65,7 @@ export function SkillCard({ skill }: SkillCardProps) {
                             ))}
                             {skill.trigger_examples.length > 3 && (
                                 <span className="px-2 py-1 text-xs text-gray-500">
-                                    +{skill.trigger_examples.length - 3} more
+                                    {t('moreTriggers', { count: skill.trigger_examples.length - 3 })}
                                 </span>
                             )}
                         </div>

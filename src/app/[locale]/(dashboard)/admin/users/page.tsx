@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getLocale } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, EmptyState, Badge } from '@/design'
 import { ArrowLeft, Users } from 'lucide-react'
@@ -8,6 +8,8 @@ import { ArrowLeft, Users } from 'lucide-react'
 export default async function AdminUsersPage() {
     const supabase = await createClient()
     const locale = await getLocale()
+    const tAdmin = await getTranslations('admin')
+    const tCommon = await getTranslations('common')
 
     const {
         data: { user },
@@ -37,29 +39,35 @@ export default async function AdminUsersPage() {
     return (
         <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
             <PageHeader
-                title="Users"
+                title={tAdmin('users.title')}
                 breadcrumb={
                     <Link href="/admin" className="text-gray-400 hover:text-gray-600 flex items-center gap-1 text-sm mr-2 transition-colors">
                         <ArrowLeft size={18} />
-                        Back
+                        {tCommon('back')}
                     </Link>
                 }
             />
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-6xl mx-auto space-y-8">
-                    <p className="text-gray-500">Manage all users in the system</p>
+                    <p className="text-gray-500">{tAdmin('users.description')}</p>
 
                     <DataTable>
                         {(!profiles || profiles.length === 0) ? (
                             <EmptyState
                                 icon={Users}
-                                title="No users found"
-                                description="There are no users in the system yet."
+                                title={tAdmin('users.emptyTitle')}
+                                description={tAdmin('users.emptyDesc')}
                             />
                         ) : (
                             <>
-                                <TableHead columns={['Name', 'Email', 'Role', 'Created', 'Actions']} />
+                                <TableHead columns={[
+                                    tAdmin('users.columns.name'),
+                                    tAdmin('users.columns.email'),
+                                    tAdmin('users.columns.role'),
+                                    tAdmin('users.columns.created'),
+                                    tCommon('actions')
+                                ]} />
                                 <TableBody>
                                     {profiles.map((p) => (
                                         <TableRow key={p.id}>
@@ -71,9 +79,9 @@ export default async function AdminUsersPage() {
                                             </TableCell>
                                             <TableCell>
                                                 {p.is_system_admin ? (
-                                                    <Badge variant="purple">System Admin</Badge>
+                                                    <Badge variant="purple">{tAdmin('users.roles.systemAdmin')}</Badge>
                                                 ) : (
-                                                    <Badge variant="neutral">User</Badge>
+                                                    <Badge variant="neutral">{tAdmin('users.roles.user')}</Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell>
@@ -84,11 +92,11 @@ export default async function AdminUsersPage() {
                                             <TableCell align="right">
                                                 <div className="flex justify-end gap-3">
                                                     <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                                                        Edit
+                                                        {tCommon('edit')}
                                                     </button>
                                                     {!p.is_system_admin && (
                                                         <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                                                            Make Admin
+                                                            {tAdmin('users.actions.makeAdmin')}
                                                         </button>
                                                     )}
                                                 </div>

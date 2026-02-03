@@ -2,6 +2,7 @@
 
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
+import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
 
 export interface ChatMessage {
     id: string
@@ -23,7 +24,8 @@ export interface SimulationResponse {
 export async function simulateChat(
     message: string,
     organizationId: string,
-    threshold: number = 0.5
+    threshold: number = 0.5,
+    history: ConversationTurn[] = []
 ): Promise<SimulationResponse> {
     // 1. Match skills with ZERO threshold to get ANY match for debugging
     console.log(`Simulating chat for: "${message}" in org: ${organizationId} with threshold: ${threshold}`)
@@ -45,10 +47,24 @@ export async function simulateChat(
         }
     }
 
-    // 3. Fallback: Check Knowledge Base (RAG)
+    // 3. Fallback: Decide if Knowledge Base should be used
     try {
+        const decision = await decideKnowledgeBaseRoute(message, history)
+
+        if (!decision.route_to_kb) {
+            return {
+                response: "I'm not sure how to respond to that. Can you rephrase? (No skill or knowledge found)",
+                matchedSkill: bestMatch ? {
+                    id: bestMatch.skill_id,
+                    title: bestMatch.title,
+                    similarity: bestMatch.similarity,
+                } : undefined
+            }
+        }
+
+        const query = decision.rewritten_query || message
         const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions')
-        const kbResults = await searchKnowledgeBase(message, organizationId, 0.5, 6)
+        const kbResults = await searchKnowledgeBase(query, organizationId, 0.5, 6)
 
         if (kbResults && kbResults.length > 0) {
             const { default: OpenAI } = await import('openai')

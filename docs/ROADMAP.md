@@ -96,6 +96,7 @@
 - [x] Response generation from KB
 - [x] **Enterprise RAG Hardening:** Documents + chunks schema, token-budgeted context, and consistent fallback handling
 - [x] **Legacy Cleanup:** Remove `knowledge_base` in favor of documents/chunks
+- [x] **Contextual KB Routing:** LLM decides KB usage and rewrites follow-up queries
 
 ---
 

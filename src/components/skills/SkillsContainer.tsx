@@ -155,7 +155,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
         setValidationError(null)
         // Validate
         if (!formData.title.trim()) {
-            setValidationError(t('nameLabel') + ' is required')
+            setValidationError(t('validation.required', { field: t('nameLabel') }))
             return
         }
 
@@ -163,12 +163,12 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
         // Plan said first 3 mandatory. Let's assume non-empty.
         const firstThree = formData.triggers.slice(0, 3)
         if (firstThree.some(t => !t.trim())) {
-            setValidationError(t('triggersHint'))
+            setValidationError(t('validation.triggersRequired'))
             return
         }
 
         if (!formData.response_text.trim()) {
-            setValidationError(t('responseLabel') + ' is required')
+            setValidationError(t('validation.required', { field: t('responseLabel') }))
             return
         }
 
@@ -218,8 +218,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
             }
         } catch (error) {
             console.error('Failed to save skill', error)
-            console.error('Failed to save skill', error)
-            setValidationError('Failed to save changes. Please try again.')
+            setValidationError(t('validation.saveFailed'))
         } finally {
             setIsSaving(false)
         }
@@ -345,7 +344,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                 {activeTab === 'core' ? (
                     /* Empty Right Panel for Core */
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/30">
-                        <p className="text-gray-400 text-sm">Select a core skill to view details</p>
+                        <p className="text-gray-400 text-sm">{t('core.selectPrompt')}</p>
                     </div>
                 ) : (
                     <>
@@ -363,13 +362,13 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                                     onClick={handleArchiveToggle}
                                                     className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
                                                 >
-                                                    {selectedSkill?.enabled ? 'Archive' : 'Activate'}
+                                                    {selectedSkill?.enabled ? t('archive') : t('activate')}
                                                 </button>
                                                 <button
                                                     onClick={() => setShowDeleteConfirm(true)}
                                                     className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
                                                 >
-                                                    Delete
+                                                    {t('delete')}
                                                 </button>
                                             </>
                                         )}
@@ -378,7 +377,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                             disabled={!isDirty || isSaving}
                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
                                         >
-                                            Save Changes
+                                            {t('saveChanges')}
                                         </button>
                                     </div>
                                 </div>
@@ -425,7 +424,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                                         <button
                                                             onClick={() => handleRemoveTrigger(idx)}
                                                             className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Remove trigger"
+                                                            title={t('removeTrigger')}
                                                         >
                                                             <Trash2 size={20} className="font-light" />
                                                         </button>

@@ -6,6 +6,7 @@ import { Bug } from 'lucide-react'
 import { debugTelegramChannel, disconnectChannel } from '@/lib/channels/actions'
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
+import { useTranslations } from 'next-intl'
 
 interface ChannelCardProps {
     channel?: Channel
@@ -14,6 +15,7 @@ interface ChannelCardProps {
 }
 
 export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
+    const t = useTranslations('Channels')
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
 
@@ -21,9 +23,9 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
         if (!channel) return
         const result = await debugTelegramChannel(channel.id)
         if (result.success) {
-            alert(`Webhook Info:\n${JSON.stringify(result.info, null, 2)}`)
+            alert(t('debug.webhookInfo', { info: JSON.stringify(result.info, null, 2) }))
         } else {
-            alert(`Debug Failed: ${result.error}`)
+            alert(t('debug.webhookFailed', { error: result.error }))
         }
     }
 
@@ -47,7 +49,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
         <>
             <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center relative overflow-hidden group shadow-sm hover:shadow-md transition-shadow">
                 {isConnected && (
-                    <button onClick={handleDebug} className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 p-1" title="Debug Webhook">
+                    <button onClick={handleDebug} className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 p-1" title={t('debug.tooltip')}>
                         <Bug size={16} />
                     </button>
                 )}
@@ -60,7 +62,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
                     )}
                 </div>
 
-                <h3 className="text-lg font-semibold text-gray-900 mb-1 capitalize">{type}</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1 capitalize">{t(`types.${type}`)}</h3>
 
                 {isConnected ? (
                     <>
@@ -68,7 +70,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
                         <div className="mt-auto">
                             <Badge variant="success">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
-                                Active
+                                {t('status.active')}
                             </Badge>
                             <div className="mt-4 w-full">
                                 <Button
@@ -77,16 +79,16 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
                                     variant="danger"
                                     className="w-full"
                                 >
-                                    Disconnect
+                                    {t('actions.disconnect')}
                                 </Button>
                             </div>
                         </div>
                     </>
                 ) : (
                     <>
-                        <p className="text-gray-400 text-sm mb-6">Not connected</p>
+                        <p className="text-gray-400 text-sm mb-6">{t('status.notConnected')}</p>
                         <Button onClick={onConnect} variant="secondary" className="mt-auto w-full">
-                            Connect
+                            {t('actions.connect')}
                         </Button>
                     </>
                 )}
@@ -94,10 +96,10 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
 
             <ConfirmDialog
                 isOpen={showConfirm}
-                title="Disconnect Channel?"
-                description="Are you sure you want to disconnect this channel? The bot will stop responding to messages."
-                confirmText="Disconnect"
-                cancelText="Cancel"
+                title={t('confirmDisconnectTitle')}
+                description={t('confirmDisconnectDesc')}
+                confirmText={t('actions.disconnect')}
+                cancelText={t('actions.cancel')}
                 isDestructive
                 isLoading={isDisconnecting}
                 onConfirm={handleDisconnect}

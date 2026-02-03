@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { TelegramClient } from '@/lib/telegram/client'
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
+import { decideKnowledgeBaseRoute } from '@/lib/knowledge-base/router'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: NextRequest) {
@@ -205,21 +206,50 @@ export async function POST(req: NextRequest) {
 
         try {
             const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions') // Dynamically import to avoid circular dep if any
-            const kbResults = await searchKnowledgeBase(text, orgId, 0.5, 6, { supabase })
+            const { data: recentMessages, error: historyError } = await supabase
+                .from('messages')
+                .select('sender_type, content, created_at')
+                .eq('conversation_id', conversation.id)
+                .order('created_at', { ascending: false })
+                .limit(4)
 
-            if (kbResults && kbResults.length > 0) {
-                console.log('Telegram Webhook: Knowledge Base match found', { count: kbResults.length })
+            if (historyError) {
+                console.warn('Telegram Webhook: Failed to load history for KB routing', historyError)
+            }
 
-                const { context, chunks } = buildRagContext(kbResults)
-                if (!context) {
-                    throw new Error('RAG context is empty')
-                }
+            const trimmedHistory = (recentMessages ?? []).filter((msg, index) => {
+                if (index !== 0) return true
+                return !(msg.sender_type === 'contact' && msg.content === text)
+            })
 
-                const noAnswerToken = 'NO_ANSWER'
-                const { default: OpenAI } = await import('openai')
-                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+            const history = trimmedHistory
+                .slice(0, 3)
+                .reverse()
+                .filter((msg) => typeof msg.content === 'string' && msg.content.trim().length > 0)
+                .map((msg) => ({
+                    role: msg.sender_type === 'contact' ? 'user' : 'assistant',
+                    content: msg.content
+                }))
 
-                const systemPrompt = `You are a helpful assistant for a business. 
+            const decision = await decideKnowledgeBaseRoute(text, history)
+
+            if (decision.route_to_kb) {
+                const query = decision.rewritten_query || text
+                const kbResults = await searchKnowledgeBase(query, orgId, 0.5, 6, { supabase })
+
+                if (kbResults && kbResults.length > 0) {
+                    console.log('Telegram Webhook: Knowledge Base match found', { count: kbResults.length })
+
+                    const { context, chunks } = buildRagContext(kbResults)
+                    if (!context) {
+                        throw new Error('RAG context is empty')
+                    }
+
+                    const noAnswerToken = 'NO_ANSWER'
+                    const { default: OpenAI } = await import('openai')
+                    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+                    const systemPrompt = `You are a helpful assistant for a business. 
 Answer the user's question based strictly on the provided context below. 
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Keep the answer concise and friendly (in Turkish or English depending on user).
@@ -227,38 +257,41 @@ Keep the answer concise and friendly (in Turkish or English depending on user).
 Context:
 ${context}`
 
-                const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: text }
-                    ],
-                    temperature: 0.3
-                })
-
-                const ragResponse = completion.choices[0]?.message?.content?.trim()
-
-                if (ragResponse && !ragResponse.includes(noAnswerToken)) {
-                    const client = new TelegramClient(channel.config.bot_token)
-                    await client.sendMessage(chatId, ragResponse)
-
-                    // Save Bot Message (RAG)
-                    await supabase.from('messages').insert({
-                        id: uuidv4(),
-                        conversation_id: conversation.id,
-                        organization_id: orgId,
-                        sender_type: 'bot',
-                        content: ragResponse,
-                        metadata: { is_rag: true, sources: chunks.map(r => r.document_id).filter(Boolean) }
+                    const completion = await openai.chat.completions.create({
+                        model: 'gpt-4o-mini',
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: text }
+                        ],
+                        temperature: 0.3
                     })
 
-                    // Update conversation
-                    await supabase.from('conversations')
-                        .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-                        .eq('id', conversation.id)
+                    const ragResponse = completion.choices[0]?.message?.content?.trim()
 
-                    return NextResponse.json({ ok: true })
+                    if (ragResponse && !ragResponse.includes(noAnswerToken)) {
+                        const client = new TelegramClient(channel.config.bot_token)
+                        await client.sendMessage(chatId, ragResponse)
+
+                        // Save Bot Message (RAG)
+                        await supabase.from('messages').insert({
+                            id: uuidv4(),
+                            conversation_id: conversation.id,
+                            organization_id: orgId,
+                            sender_type: 'bot',
+                            content: ragResponse,
+                            metadata: { is_rag: true, sources: chunks.map(r => r.document_id).filter(Boolean) }
+                        })
+
+                        // Update conversation
+                        await supabase.from('conversations')
+                            .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+                            .eq('id', conversation.id)
+
+                        return NextResponse.json({ ok: true })
+                    }
                 }
+            } else {
+                console.log('Telegram Webhook: KB routing declined', { reason: decision.reason })
             }
         } catch (error) {
             console.error('Telegram Webhook: RAG error', error)

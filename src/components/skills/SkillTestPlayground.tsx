@@ -11,6 +11,7 @@ interface SkillTestPlaygroundProps {
 
 export function SkillTestPlayground({ organizationId }: SkillTestPlaygroundProps) {
     const t = useTranslations('skills')
+    const tc = useTranslations('common')
     const [message, setMessage] = useState('')
     const [results, setResults] = useState<SkillMatch[]>([])
     const [isPending, startTransition] = useTransition()
@@ -52,7 +53,7 @@ export function SkillTestPlayground({ organizationId }: SkillTestPlaygroundProps
                         disabled={isPending || !message.trim()}
                         className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isPending ? '...' : t('runTest')}
+                        {isPending ? tc('loading') : t('runTest')}
                     </button>
                 </div>
             </div>
@@ -78,7 +79,7 @@ export function SkillTestPlayground({ organizationId }: SkillTestPlaygroundProps
                                     </span>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-zinc-400 mb-1">Matched trigger:</p>
+                                    <p className="text-sm text-zinc-400 mb-1">{t('matchedTrigger')}</p>
                                     <p className="text-zinc-300">&quot;{bestMatch.trigger_text}&quot;</p>
                                 </div>
                                 <div>

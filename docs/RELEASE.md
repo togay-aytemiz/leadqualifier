@@ -45,6 +45,7 @@
   - **Inbox:** Removed mock data creation; now fully driven by real database data.
 - **Enterprise RAG Hardening:** Knowledge documents + chunks schema, chunking with overlap, token-budgeted context assembly, and chunk-level retrieval RPC with service-role-safe search for webhooks.
 - Knowledge Base UI now shows indexing status badges (Ready / Processing / Error).
+- Contextual KB routing with LLM-based decision + follow-up query rewrite.
 
 ### Added
 - **v0.5.0: Knowledge Base Parity**

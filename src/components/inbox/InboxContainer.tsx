@@ -666,7 +666,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                     {selectedConversation.contact_name.charAt(0)}
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || 'No phone number'}</p>
+                                <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                             </div>
 
                             <hr className="border-gray-100 my-6" />
@@ -700,7 +700,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                                 {selectedConversation.assignee ? (
                                                     <span>{selectedConversation.assignee.full_name}</span>
                                                 ) : (
-                                                    <span className="text-orange-500 text-xs font-medium">Unassigned</span>
+                                                    <span className="text-orange-500 text-xs font-medium">{t('unassigned')}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -730,7 +730,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                         className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <LogOut size={18} />
-                                        {isLeaving ? 'Leaving...' : t('leaveConversation')}
+                                        {isLeaving ? t('leaving') : t('leaveConversation')}
                                     </button>
                                 )}
                             </div>
