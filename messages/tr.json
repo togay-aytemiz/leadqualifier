@@ -201,9 +201,16 @@
         "table": {
             "title": "Başlık",
             "type": "Tür",
+            "status": "Durum",
             "collection": "Koleksiyon",
             "date": "Tarih",
             "actions": ""
+        },
+        "statusLabel": "Durum",
+        "statuses": {
+            "ready": "Hazır",
+            "processing": "İşleniyor",
+            "error": "Hata"
         },
         "types": {
             "article": "Serbest Metin",

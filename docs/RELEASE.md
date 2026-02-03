@@ -44,6 +44,7 @@
   - **Inbox:** UI improvements (message previews, simplified list items).
   - **Inbox:** Removed mock data creation; now fully driven by real database data.
 - **Enterprise RAG Hardening:** Knowledge documents + chunks schema, chunking with overlap, token-budgeted context assembly, and chunk-level retrieval RPC with service-role-safe search for webhooks.
+- Knowledge Base UI now shows indexing status badges (Ready / Processing / Error).
 
 ### Added
 - **v0.5.0: Knowledge Base Parity**
@@ -62,7 +63,7 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
-- N/A
+- Use system fonts in the app shell to avoid build-time Google Fonts fetches.
 
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.

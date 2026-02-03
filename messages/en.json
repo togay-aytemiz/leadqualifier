@@ -183,9 +183,16 @@
         "table": {
             "title": "Title",
             "type": "Type",
+            "status": "Status",
             "collection": "Collection",
             "date": "Date",
             "actions": ""
+        },
+        "statusLabel": "Status",
+        "statuses": {
+            "ready": "Ready",
+            "processing": "Processing",
+            "error": "Error"
         },
         "types": {
             "article": "Freeform Text",

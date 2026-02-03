@@ -165,7 +165,7 @@ export async function getKnowledgeBaseEntry(id: string) {
     const { data, error } = await supabase
         .from('knowledge_documents')
         .select(`
-            id, organization_id, content, title, type, collection_id, created_at, updated_at,
+            id, organization_id, content, title, type, collection_id, status, created_at, updated_at,
             collection:knowledge_collections(*)
         `)
         .eq('id', id)
@@ -231,7 +231,7 @@ export async function getKnowledgeBaseEntries(collectionId?: string | null) {
     let query = supabase
         .from('knowledge_documents')
         .select(`
-            id, organization_id, content, title, type, collection_id, created_at, updated_at,
+            id, organization_id, content, title, type, collection_id, status, created_at, updated_at,
             collection:knowledge_collections(*)
         `)
         .order('created_at', { ascending: false })

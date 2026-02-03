@@ -18,7 +18,7 @@ export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
     const t = useTranslations('knowledge.table')
     const tCommon = useTranslations('knowledge')
     const locale = useLocale()
-    const columns = [t('title'), t('type'), t('collection'), t('date'), '']
+    const columns = [t('title'), t('type'), t('status'), t('collection'), t('date'), '']
 
     function getTypeIcon(type: string) {
         switch (type) {
@@ -39,6 +39,18 @@ export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
             case 'snippet': return <Badge variant="neutral">{label}</Badge>
             case 'pdf': return <Badge variant="error">{label}</Badge>
             case 'internal': return <Badge variant="warning">{label}</Badge>
+            default: return <Badge variant="neutral">{label}</Badge>
+        }
+    }
+
+    function getStatusBadge(status?: KnowledgeBaseEntry['status']) {
+        const safeStatus = status ?? 'ready'
+        const label = tCommon(`statuses.${safeStatus}`)
+
+        switch (safeStatus) {
+            case 'ready': return <Badge variant="success">{label}</Badge>
+            case 'processing': return <Badge variant="warning">{label}</Badge>
+            case 'error': return <Badge variant="error">{label}</Badge>
             default: return <Badge variant="neutral">{label}</Badge>
         }
     }
@@ -69,6 +81,11 @@ export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
                         {/* Type */}
                         <TableCell>
                             {getTypeBadge(entry.type)}
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell>
+                            {getStatusBadge(entry.status)}
                         </TableCell>
 
                         {/* Collection */}

@@ -165,6 +165,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 5.3 Knowledge Base
 - CRUD with categories
 - Rich text editor
+ - Show indexing status (Ready / Processing / Error)
 
 ### 5.4 Channels
 - WhatsApp number + connection status
@@ -223,6 +224,7 @@ MVP is successful when:
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
+- **Font Strategy:** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

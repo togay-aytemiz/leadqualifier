@@ -1,15 +1,9 @@
 import type { Metadata } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
-import { Inter } from 'next/font/google'
 import { notFound } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import '../globals.css'
-
-const inter = Inter({
-    variable: '--font-inter',
-    subsets: ['latin'],
-})
 
 export const metadata: Metadata = {
     title: 'Lead Qualifier',
@@ -38,7 +32,7 @@ export default async function LocaleLayout({ children, params }: Props) {
                     rel="stylesheet"
                 />
             </head>
-            <body className={`${inter.variable} font-sans antialiased bg-gray-50 text-gray-900`} suppressHydrationWarning>
+            <body className="font-sans antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>
                 <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
             </body>
         </html>

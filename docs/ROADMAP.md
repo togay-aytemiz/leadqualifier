@@ -13,6 +13,7 @@
 - [x] Configure database (Supabase client ready)
 - [x] Set up environment variables
 - [x] Codify agent workflow rules (always provide commit message)
+- [x] Use system fonts in app shell to avoid CI font-fetch issues
 
 ---
 
@@ -83,9 +84,11 @@
 
 ## Phase 4: Knowledge Base (RAG) ✅
 - [x] **KB CRUD**
-- [x] Create KB entry model
-- [x] Category support
-- [x] Admin UI for KB management
+  - [x] Create KB entry model
+  - [x] Category support
+  - [x] Admin UI for KB management
+- [x] **KB Status UI**
+  - [x] Show indexing status per entry (Ready / Processing / Error)
 - [x] **RAG Pipeline**
 - [x] Document chunking
 - [x] Embedding storage

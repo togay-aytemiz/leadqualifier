@@ -20,6 +20,7 @@ export default async function EditContentPage({ params }: EditPageProps) {
             initialTitle={entry.title}
             initialContent={entry.content}
             initialCollectionId={entry.collection_id}
+            initialStatus={entry.status ?? 'ready'}
             collections={collections}
         />
     )

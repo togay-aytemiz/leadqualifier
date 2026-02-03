@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
-import { Button, PageHeader, Input, TextArea, ConfirmDialog } from '@/design'
+import { Button, PageHeader, Input, TextArea, ConfirmDialog, Badge } from '@/design'
 import { updateKnowledgeBaseEntry, deleteKnowledgeBaseEntry, KnowledgeCollection } from '@/lib/knowledge-base/actions'
 import { useTranslations } from 'next-intl'
 
@@ -12,6 +12,7 @@ interface EditContentFormProps {
     initialTitle: string
     initialContent: string
     initialCollectionId: string | null
+    initialStatus: 'ready' | 'processing' | 'error'
     collections: KnowledgeCollection[]
 }
 
@@ -20,6 +21,7 @@ export function EditContentForm({
     initialTitle,
     initialContent,
     initialCollectionId,
+    initialStatus,
     collections
 }: EditContentFormProps) {
     const t = useTranslations('knowledge')
@@ -40,6 +42,20 @@ export function EditContentForm({
         content !== initialContent ||
         collectionId !== (initialCollectionId || '')
     )
+
+    function getStatusBadge(status: EditContentFormProps['initialStatus']) {
+        const label = t(`statuses.${status}`)
+        switch (status) {
+            case 'ready':
+                return <Badge variant="success">{label}</Badge>
+            case 'processing':
+                return <Badge variant="warning">{label}</Badge>
+            case 'error':
+                return <Badge variant="error">{label}</Badge>
+            default:
+                return <Badge variant="neutral">{label}</Badge>
+        }
+    }
 
     async function handleSubmit() {
         if (!title.trim() || !content.trim()) return
@@ -117,6 +133,11 @@ export function EditContentForm({
 
             <div className="flex-1 overflow-auto bg-white p-8">
                 <div className="max-w-4xl space-y-8">
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                        <span className="text-xs font-semibold uppercase text-gray-500">{t('statusLabel')}</span>
+                        {getStatusBadge(initialStatus)}
+                    </div>
+
                     <Input
                         label={t('form.title')}
                         value={title}
