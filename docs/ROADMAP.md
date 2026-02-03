@@ -67,6 +67,8 @@
   - [x] Sensitivity threshold slider
   - [x] Token usage breakdown (input/output) per message
   - [x] Conversation-level token usage totals
+  - [x] Hide debug token breakdown (keep per-message + conversation totals)
+- [x] **Fallback Guidance:** Offer topic suggestions from skills/KB when no match is found
 
 ## Phase 3.6: Refinements & Inbox ✅
 - [x] **Inbox UI**
@@ -103,6 +105,12 @@
 - [x] **Legacy Cleanup:** Remove `knowledge_base` in favor of documents/chunks
 - [x] **Contextual KB Routing:** LLM decides KB usage and rewrites follow-up queries
   - [x] Include last bot reply + last 5 user messages with timestamps
+- [x] **KB Routing Heuristics:** Definition-style questions route to KB when routing is uncertain
+- [x] **Chunk Overlap Alignment:** Overlap respects paragraph/sentence boundaries to avoid mid-sentence splits
+- [x] **KB Sidebar Sync:** Ensure folder create/delete triggers sidebar refresh
+- [x] **KB Sidebar Uncategorized:** Show uncategorized items (max 10) with expand and correct all-content counts
+- [x] **KB Terminology:** Replace "collection" labels with "folder" in UI copy
+- [x] **KB Keyword Fallback:** Use keyword search when embedding lookup fails or returns no matches
 
 ---
 
@@ -111,6 +119,9 @@
   - [x] Skill → KB → Human fallback chain
   - [x] Response formatting
   - [x] Error handling
+- [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
+- [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
+- [x] **Profile/Organization Settings:** Basic pages for user and org details
 - [x] **Human Takeover**
   - [x] Detect business reply (or Inbox claim)
   - [x] Pause bot automatically (Active Agent State)

@@ -201,14 +201,19 @@
         "title": "General Settings",
         "language": "Language",
         "languageDescription": "Select your preferred language for the interface.",
+        "languageSummary": "Current: {language}",
         "languageEnglish": "English",
-        "languageTurkish": "Turkish (Türkçe)"
+        "languageTurkish": "Turkish (Türkçe)",
+        "save": "Save changes",
+        "saving": "Saving..."
     },
     "Channels": {
-        "title": "Channels & Integrations",
+        "title": "Channels",
         "noOrganization": "No Organization Found",
         "noOrganizationDesc": "You need to be part of an organization to manage channels.",
         "description": "Connect messaging platforms to start receiving leads into your inbox.",
+        "summary": "Connected: {connected} / {total}",
+        "save": "Save changes",
         "whatsappComingSoon": "WhatsApp integration coming soon! Contact support for early access.",
         "types": {
             "telegram": "Telegram",
@@ -246,12 +251,64 @@
     "Sidebar": {
         "settings": "Settings",
         "preferences": "Preferences",
+        "profile": "Profile",
+        "organization": "Organization",
         "general": "General",
+        "ai": "AI",
         "integrations": "Integrations",
         "channels": "Channels",
         "billing": "Billing",
         "plans": "Plans",
         "receipts": "Receipts"
+    },
+    "aiSettings": {
+        "pageTitle": "AI Settings",
+        "title": "AI Settings",
+        "description": "Tune how the bot responds when it can’t find a Skill or Knowledge Base match.",
+        "thresholdTitle": "Sensitivity",
+        "thresholdDescription": "Applies to both Skills and Knowledge Base matching. Higher = stricter match (fewer replies). Lower = looser match (more replies).",
+        "threshold": "Sensitivity",
+        "thresholdSummary": "Current: {value}",
+        "promptTitle": "AI Prompt",
+        "promptDescription": "If no Skill or Knowledge Base match is found, the bot will respond using the prompt below.",
+        "promptLabel": "AI prompt",
+        "promptSummary": "Length: {count} characters",
+        "save": "Save changes",
+        "saving": "Saving...",
+        "saved": "Saved",
+        "saveError": "Failed to save settings. Please try again.",
+        "noOrganization": "No Organization Found",
+        "noOrganizationDesc": "You need to be part of an organization to manage AI settings."
+    },
+    "profileSettings": {
+        "pageTitle": "Profile",
+        "description": "Manage your personal details and security options.",
+        "nameTitle": "Name",
+        "nameDescription": "This name is visible to your team.",
+        "nameLabel": "Full name",
+        "nameSummary": "Current: {name}",
+        "emailTitle": "Email",
+        "emailDescription": "This email is used to sign in.",
+        "emailLabel": "Email address",
+        "emailSummary": "Current: {email}",
+        "save": "Save changes",
+        "saving": "Saving...",
+        "saved": "Saved",
+        "saveError": "Failed to save profile. Please try again."
+    },
+    "organizationSettings": {
+        "pageTitle": "Organization",
+        "description": "Manage your organization profile and defaults.",
+        "nameTitle": "Organization name",
+        "nameDescription": "Shown to your team and in shared views.",
+        "nameLabel": "Organization name",
+        "nameSummary": "Current: {name}",
+        "save": "Save changes",
+        "saving": "Saving...",
+        "saved": "Saved",
+        "saveError": "Failed to save organization. Please try again.",
+        "noOrganization": "No Organization Found",
+        "noOrganizationDesc": "You need to be part of an organization to manage organization settings."
     },
     "knowledge": {
         "title": "Knowledge Base",
@@ -287,7 +344,7 @@
             "title": "Title",
             "type": "Type",
             "status": "Status",
-            "collection": "Collection",
+            "collection": "Folder",
             "date": "Date",
             "actions": ""
         },
@@ -326,12 +383,22 @@
         "creating": "Creating...",
         "saving": "Saving..."
     },
+    "unsavedChanges": {
+        "title": "Unsaved changes",
+        "description": "You have unsaved changes. Save before leaving?",
+        "stay": "Stay",
+        "discard": "Discard",
+        "save": "Save and leave"
+    },
     "sidebar": {
         "title": "Knowledge",
         "content": "Content",
         "allContent": "All content",
-        "collections": "Collections",
-        "empty": "Empty"
+        "collections": "Folders",
+        "empty": "Empty",
+        "uncategorized": "No folder",
+        "showAll": "Show all ({count})",
+        "showLess": "Show less"
     },
     "deleteFolder": {
         "title": "Delete Folder",

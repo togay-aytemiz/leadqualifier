@@ -268,22 +268,42 @@ export async function searchKnowledgeBase(
     }
 ) {
     const supabase = options?.supabase || await createClient()
-    const embedding = await generateEmbedding(query)
+    let data: any[] | null = null
 
-    const { data, error } = await supabase.rpc('match_knowledge_chunks', {
-        query_embedding: formatEmbeddingForPgvector(embedding),
-        match_threshold: threshold,
-        match_count: limit,
-        filter_org_id: organizationId,
-        filter_collection_id: options?.collectionId ?? null,
-        filter_type: options?.type ?? null,
-        filter_language: options?.language ?? null
-    })
+    try {
+        const embedding = await generateEmbedding(query)
+        const { data: result, error } = await supabase.rpc('match_knowledge_chunks', {
+            query_embedding: formatEmbeddingForPgvector(embedding),
+            match_threshold: threshold,
+            match_count: limit,
+            filter_org_id: organizationId,
+            filter_collection_id: options?.collectionId ?? null,
+            filter_type: options?.type ?? null,
+            filter_language: options?.language ?? null
+        })
 
-    if (error) {
-        console.error('RAG Search failed:', error)
-        return []
+        if (error) {
+            console.error('RAG Search failed:', error)
+        } else {
+            data = result
+        }
+    } catch (error) {
+        console.error('Embedding generation failed:', error)
     }
+
+    if (!data || data.length === 0) {
+        const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, limit, {
+            collectionId: options?.collectionId ?? null,
+            type: options?.type ?? null,
+            language: options?.language ?? null,
+            supabase
+        })
+        if (fallbackResults.length > 0) {
+            return fallbackResults
+        }
+    }
+
+    if (!data) return []
 
     return data as {
         chunk_id: string
@@ -297,6 +317,14 @@ export async function searchKnowledgeBase(
 export interface SidebarCollection extends KnowledgeCollection {
     files: Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>[]
     count: number
+}
+
+export type SidebarFile = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>
+
+export interface SidebarData {
+    collections: SidebarCollection[]
+    uncategorized: SidebarFile[]
+    totalCount: number
 }
 
 export async function getSidebarData() {
@@ -320,7 +348,19 @@ export async function getSidebarData() {
 
     // 3. Merge data
     const sidebarData: SidebarCollection[] = listToTree(collections, files)
-    return sidebarData
+    const uncategorized = files
+        .filter(f => !f.collection_id)
+        .map((file: any) => ({
+            id: file.id,
+            title: file.title,
+            type: file.type
+        })) as SidebarFile[]
+
+    return {
+        collections: sidebarData,
+        uncategorized,
+        totalCount: files.length
+    } as SidebarData
 }
 
 function listToTree(collections: any[], files: any[]): SidebarCollection[] {
@@ -332,6 +372,117 @@ function listToTree(collections: any[], files: any[]): SidebarCollection[] {
             count: colFiles.length
         }
     })
+}
+
+const KEYWORD_STOPWORDS = new Set([
+    'nedir',
+    'ne',
+    'neye',
+    'neden',
+    'nasıl',
+    'hangi',
+    'kaç',
+    'zaman',
+    'kim',
+    'nereye',
+    'nerede',
+    'ücret',
+    'fiyat',
+    'randevu',
+    'iptal',
+    'iade',
+    'kampanya',
+    'indirim',
+    'paket',
+    'süre',
+    'saat',
+    'gün',
+    'policy',
+    'price',
+    'pricing',
+    'when',
+    'what',
+    'why',
+    'who',
+    'how',
+    'which'
+])
+
+function extractKeywordTokens(query: string): string[] {
+    const normalized = query
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .trim()
+
+    if (!normalized) return []
+
+    const tokens = normalized.split(/\s+/).filter(Boolean)
+    const keywords = tokens.filter(token => token.length >= 3 && !KEYWORD_STOPWORDS.has(token))
+    const unique = Array.from(new Set(keywords))
+
+    if (unique.length > 0) {
+        return unique.slice(0, 5)
+    }
+
+    return Array.from(new Set(tokens.filter(token => token.length >= 3))).slice(0, 5)
+}
+
+function sanitizeKeyword(keyword: string): string {
+    return keyword.replace(/[%_]/g, '')
+}
+
+async function searchKnowledgeBaseByKeyword(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: any
+    }
+) {
+    const supabase = options?.supabase || await createClient()
+    const keywords = extractKeywordTokens(query)
+    if (keywords.length === 0) return []
+
+    const filters = keywords
+        .map((keyword) => `content.ilike.%${sanitizeKeyword(keyword)}%`)
+        .join(',')
+
+    let fallbackQuery = supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, content, knowledge_documents(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .or(filters)
+        .limit(limit)
+
+    if (options?.collectionId) {
+        fallbackQuery = fallbackQuery.eq('knowledge_documents.collection_id', options.collectionId)
+    }
+    if (options?.type) {
+        fallbackQuery = fallbackQuery.eq('knowledge_documents.type', options.type)
+    }
+    if (options?.language) {
+        fallbackQuery = fallbackQuery.eq('knowledge_documents.language', options.language)
+    }
+
+    const { data, error } = await fallbackQuery
+    if (error || !data) {
+        console.error('Keyword fallback search failed:', error)
+        return []
+    }
+
+    return (data as any[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => ({
+            chunk_id: row.id as string,
+            document_id: row.document_id as string,
+            document_title: row.knowledge_documents?.title ?? 'Untitled',
+            document_type: row.knowledge_documents?.type ?? 'article',
+            content: row.content as string,
+            similarity: 0.2
+        }))
 }
 
 async function buildAndStoreChunks(

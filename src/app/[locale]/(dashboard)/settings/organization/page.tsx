@@ -1,24 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
-import { getChannels } from '@/lib/channels/actions'
 import { getLocale, getTranslations } from 'next-intl/server'
-import { ChannelsList } from '@/components/channels/ChannelsList'
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Button } from '@/design'
+import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
-import { SettingsSection } from '@/components/settings/SettingsSection'
+import OrganizationSettingsClient from './OrganizationSettingsClient'
 
-export default async function ChannelsPage() {
+export default async function OrganizationSettingsPage() {
     const supabase = await createClient()
     const locale = await getLocale()
     const tSidebar = await getTranslations('Sidebar')
-    const tChannels = await getTranslations('Channels')
+    const tOrg = await getTranslations('organizationSettings')
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    // Get organization from user's membership (accessible to all org members)
     const { data: membership } = await supabase
         .from('organization_members')
-        .select('organization_id, role')
+        .select('organization_id')
         .eq('user_id', user.id)
         .limit(1)
         .single()
@@ -29,20 +26,21 @@ export default async function ChannelsPage() {
         return (
             <div className="flex-1 flex items-center justify-center text-gray-500">
                 <div className="text-center">
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">{tChannels('noOrganization')}</h2>
-                    <p>{tChannels('noOrganizationDesc')}</p>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">{tOrg('noOrganization')}</h2>
+                    <p>{tOrg('noOrganizationDesc')}</p>
                 </div>
             </div>
         )
     }
 
-    const channels = await getChannels(organizationId)
-    const totalChannels = 2
-    const connectedChannels = (channels || []).filter(channel => channel.status === 'active').length
+    const { data: organization } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', organizationId)
+        .single()
 
     return (
         <>
-            {/* Inner Sidebar */}
             <Sidebar title={tSidebar('settings')}>
                 <SidebarGroup title={tSidebar('preferences')}>
                     <SidebarItem
@@ -50,11 +48,7 @@ export default async function ChannelsPage() {
                         label={tSidebar('profile')}
                         href={locale === 'tr' ? '/settings/profile' : `/${locale}/settings/profile`}
                     />
-                    <SidebarItem
-                        icon={<Building2 size={18} />}
-                        label={tSidebar('organization')}
-                        href={locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`}
-                    />
+                    <SidebarItem icon={<Building2 size={18} />} label={tSidebar('organization')} active />
                     <SidebarItem
                         icon={<Settings size={18} />}
                         label={tSidebar('general')}
@@ -68,7 +62,11 @@ export default async function ChannelsPage() {
                 </SidebarGroup>
 
                 <SidebarGroup title={tSidebar('integrations')}>
-                    <SidebarItem icon={<Zap size={18} />} label={tSidebar('channels')} active />
+                    <SidebarItem
+                        icon={<Zap size={18} />}
+                        label={tSidebar('channels')}
+                        href={locale === 'tr' ? '/settings/channels' : `/${locale}/settings/channels`}
+                    />
                 </SidebarGroup>
 
                 <SidebarGroup title={tSidebar('billing')}>
@@ -77,29 +75,8 @@ export default async function ChannelsPage() {
                 </SidebarGroup>
             </Sidebar>
 
-            {/* Main Content */}
             <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-                <PageHeader
-                    title={tChannels('title')}
-                    actions={
-                        <Button disabled>
-                            {tChannels('save')}
-                        </Button>
-                    }
-                />
-
-                <div className="flex-1 overflow-auto p-8">
-                    <div className="max-w-5xl">
-                        <SettingsSection
-                            title={tChannels('title')}
-                            description={tChannels('description')}
-                            summary={tChannels('summary', { connected: connectedChannels, total: totalChannels })}
-                            layout="wide"
-                        >
-                            <ChannelsList channels={channels || []} organizationId={organizationId} showDescription={false} />
-                        </SettingsSection>
-                    </div>
-                </div>
+                <OrganizationSettingsClient initialName={organization?.name ?? ''} />
             </div>
         </>
     )

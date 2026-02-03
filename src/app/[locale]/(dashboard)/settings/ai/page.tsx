@@ -1,21 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
-import { getChannels } from '@/lib/channels/actions'
 import { getLocale, getTranslations } from 'next-intl/server'
-import { ChannelsList } from '@/components/channels/ChannelsList'
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Button } from '@/design'
+import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
-import { SettingsSection } from '@/components/settings/SettingsSection'
+import AiSettingsClient from './AiSettingsClient'
+import { getOrgAiSettings } from '@/lib/ai/settings'
 
-export default async function ChannelsPage() {
+export default async function AiSettingsPage() {
     const supabase = await createClient()
     const locale = await getLocale()
     const tSidebar = await getTranslations('Sidebar')
-    const tChannels = await getTranslations('Channels')
+    const tAi = await getTranslations('aiSettings')
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    // Get organization from user's membership (accessible to all org members)
     const { data: membership } = await supabase
         .from('organization_members')
         .select('organization_id, role')
@@ -29,16 +27,14 @@ export default async function ChannelsPage() {
         return (
             <div className="flex-1 flex items-center justify-center text-gray-500">
                 <div className="text-center">
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">{tChannels('noOrganization')}</h2>
-                    <p>{tChannels('noOrganizationDesc')}</p>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">{tAi('noOrganization')}</h2>
+                    <p>{tAi('noOrganizationDesc')}</p>
                 </div>
             </div>
         )
     }
 
-    const channels = await getChannels(organizationId)
-    const totalChannels = 2
-    const connectedChannels = (channels || []).filter(channel => channel.status === 'active').length
+    const aiSettings = await getOrgAiSettings(organizationId, { supabase })
 
     return (
         <>
@@ -60,15 +56,15 @@ export default async function ChannelsPage() {
                         label={tSidebar('general')}
                         href={locale === 'tr' ? '/settings/general' : `/${locale}/settings/general`}
                     />
-                    <SidebarItem
-                        icon={<Sparkles size={18} />}
-                        label={tSidebar('ai')}
-                        href={locale === 'tr' ? '/settings/ai' : `/${locale}/settings/ai`}
-                    />
+                    <SidebarItem icon={<Sparkles size={18} />} label={tSidebar('ai')} active />
                 </SidebarGroup>
 
                 <SidebarGroup title={tSidebar('integrations')}>
-                    <SidebarItem icon={<Zap size={18} />} label={tSidebar('channels')} active />
+                    <SidebarItem
+                        icon={<Zap size={18} />}
+                        label={tSidebar('channels')}
+                        href={locale === 'tr' ? '/settings/channels' : `/${locale}/settings/channels`}
+                    />
                 </SidebarGroup>
 
                 <SidebarGroup title={tSidebar('billing')}>
@@ -79,27 +75,7 @@ export default async function ChannelsPage() {
 
             {/* Main Content */}
             <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-                <PageHeader
-                    title={tChannels('title')}
-                    actions={
-                        <Button disabled>
-                            {tChannels('save')}
-                        </Button>
-                    }
-                />
-
-                <div className="flex-1 overflow-auto p-8">
-                    <div className="max-w-5xl">
-                        <SettingsSection
-                            title={tChannels('title')}
-                            description={tChannels('description')}
-                            summary={tChannels('summary', { connected: connectedChannels, total: totalChannels })}
-                            layout="wide"
-                        >
-                            <ChannelsList channels={channels || []} organizationId={organizationId} showDescription={false} />
-                        </SettingsSection>
-                    </div>
-                </div>
+                <AiSettingsClient initialSettings={aiSettings} />
             </div>
         </>
     )

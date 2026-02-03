@@ -23,6 +23,35 @@ export interface KnowledgeRouteDecision {
 const MAX_HISTORY_ITEMS = 6
 const MAX_CHARS_PER_MESSAGE = 400
 const MAX_USER_TURNS = 5
+const KNOWLEDGE_HINTS = [
+    'nedir',
+    'ne demek',
+    'ne anlama',
+    'ne zaman',
+    'kaç',
+    'hangi',
+    'nasıl',
+    'nerede',
+    'neden',
+    'kim',
+    'ücret',
+    'fiyat',
+    'randevu',
+    'iptal',
+    'iade',
+    'kampanya',
+    'indirim',
+    'paket',
+    'süre',
+    'saat',
+    'gün',
+    'politika',
+    'kural',
+    'protokol',
+    'tanım',
+    'terim',
+    'kısaltma'
+]
 
 function truncate(text: string, maxChars: number) {
     if (text.length <= maxChars) return text
@@ -99,6 +128,13 @@ function buildUsageEstimate(systemPrompt: string, userPrompt: string, output: st
     }
 }
 
+function looksLikeKnowledgeQuestion(message: string): boolean {
+    const normalized = message.trim().toLowerCase()
+    if (!normalized) return false
+    if (normalized.includes('?')) return true
+    return KNOWLEDGE_HINTS.some((hint) => normalized.includes(hint))
+}
+
 export async function decideKnowledgeBaseRoute(
     latestMessage: string,
     history: ConversationTurn[] = []
@@ -119,12 +155,13 @@ export async function decideKnowledgeBaseRoute(
     const conversation = formatHistory(history)
 
     const systemPrompt = `You are a routing assistant for a business chatbot.
-Decide if the latest user message should be answered by the Knowledge Base (hours, pricing, policies, services).
+Decide if the latest user message should be answered by the Knowledge Base (hours, pricing, policies, services, definitions, internal terms, abbreviations).
 Use the recent conversation history below, which includes timestamps and ordering.
 If it is a follow-up question, rewrite it into a standalone query in the user's language.
 Short day/time follow-ups like "pazar?", "cuma?" or "yarın?" should be treated as KB-related follow-ups.
 Return ONLY valid JSON with keys: route_to_kb (boolean), rewritten_query (string), reason (string).
-If route_to_kb is false, rewritten_query must be an empty string.`
+If route_to_kb is false, rewritten_query must be an empty string.
+If you are unsure, set route_to_kb to true.`
 
     const userPrompt = `Recent conversation:\n${conversation}\n\nLatest user message: ${trimmedMessage}`
 
@@ -159,7 +196,16 @@ If route_to_kb is false, rewritten_query must be an empty string.`
             }
             : buildUsageEstimate(systemPrompt, userPrompt, content)
 
-        return normalizeDecision(trimmedMessage, { ...parsed, usage })
+        const decision = normalizeDecision(trimmedMessage, { ...parsed, usage })
+        if (!decision.route_to_kb && looksLikeKnowledgeQuestion(trimmedMessage)) {
+            return {
+                route_to_kb: true,
+                rewritten_query: trimmedMessage,
+                reason: decision.reason ? `${decision.reason};heuristic_question` : 'heuristic_question',
+                usage
+            }
+        }
+        return decision
     } catch (error) {
         console.error('KB routing error:', error)
         return {

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import ChatSimulator from '@/components/chat/ChatSimulator'
 import { PageHeader } from '@/design'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { getOrgAiSettings } from '@/lib/ai/settings'
 
 interface SimulatorPageProps {
     params: Promise<{ locale: string }>
@@ -42,6 +43,7 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
     }
 
     const org = memberships.organizations as unknown as { name: string }
+    const aiSettings = await getOrgAiSettings(memberships.organization_id, { supabase })
 
     return (
         <>
@@ -56,6 +58,7 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
                             <ChatSimulator
                                 organizationId={memberships.organization_id}
                                 organizationName={org.name}
+                                defaultMatchThreshold={aiSettings.match_threshold}
                             />
                         </div>
                     </div>

@@ -72,12 +72,26 @@
 - Removed legacy `knowledge_base` table in favor of documents/chunks.
 - Replaced remaining hardcoded UI strings with translation keys across the app.
 - Updated AGENTS.md to enforce multilingual-first feature development.
+- KB routing now favors definition-style questions and retries with a lower similarity threshold when initial KB search is empty.
+- Chunk overlap now aligns to paragraph/sentence boundaries to avoid mid-sentence splits.
+- Knowledge sidebar now lists uncategorized items (max 10 with expand) and shows accurate all-content counts.
+- Simulator debug panel now hides per-request token breakdown (per-bubble + conversation totals remain).
+- Knowledge Base UI terminology now uses "folder" instead of "collection".
+- Knowledge Base search now falls back to keyword matching when embeddings fail or return no results.
+- Simulator fallback now suggests available topics based on existing skills and knowledge documents when no match is found.
+- Org-level AI settings with always-on Flexible mode, single threshold, and single prompt for fallback behavior.
+- Settings pages now use a two-column section layout for clearer configuration.
+- Added Profile and Organization settings pages with header save + unsaved change confirmation.
+- Settings pages now show a top-right save button that activates only when changes are detected.
+- Channels page title standardized to "Channels" with wider channel cards.
 
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
 - Manual replies atomically assign the current operator to prevent "Unassigned" state until refresh.
 - Realtime subscriptions now attach the session token before subscribing (fixes missing live updates).
 - RAG now enforces NO_ANSWER fallback and handles retrieval errors without failing the webhook.
+- Knowledge base sidebar now refreshes after folder create/delete actions triggered outside the sidebar.
+- Simulator KB fallback now answers definition-style questions that previously fell through routing.
 
 ---
 

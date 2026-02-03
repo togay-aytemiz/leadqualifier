@@ -1,0 +1,39 @@
+import type { ReactNode } from 'react'
+
+interface SettingsSectionProps {
+    title: string
+    description?: string
+    summary?: string
+    layout?: 'default' | 'wide'
+    children: ReactNode
+}
+
+const layoutClasses = {
+    default: {
+        left: 'lg:col-span-4',
+        right: 'lg:col-span-8'
+    },
+    wide: {
+        left: 'lg:col-span-3',
+        right: 'lg:col-span-9'
+    }
+}
+
+export function SettingsSection({ title, description, summary, layout = 'default', children }: SettingsSectionProps) {
+    const columns = layoutClasses[layout] ?? layoutClasses.default
+
+    return (
+        <div className="py-6 border-b border-gray-200 last:border-b-0">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className={columns.left}>
+                    <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+                    {description && <p className="mt-2 text-sm text-gray-500">{description}</p>}
+                </div>
+                <div className={columns.right}>
+                    {summary && <p className="text-xs font-semibold text-gray-500 mb-3">{summary}</p>}
+                    {children}
+                </div>
+            </div>
+        </div>
+    )
+}

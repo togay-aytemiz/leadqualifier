@@ -8,6 +8,17 @@ export interface Organization {
     updated_at: string
 }
 
+export type AiMode = 'strict' | 'flexible'
+
+export interface OrganizationAiSettings {
+    organization_id: string
+    mode: AiMode
+    match_threshold: number
+    prompt: string
+    created_at: string
+    updated_at: string
+}
+
 export interface OrganizationMember {
     id: string
     organization_id: string

@@ -90,6 +90,7 @@ export function KnowledgeContainer({
 
     async function handleSubmitFolder(name: string) {
         await createCollection(name)
+        window.dispatchEvent(new Event('knowledge-updated'))
         // Refresh server data
         router.refresh()
         // Optimistic update for immediate feedback (though refresh usually fast enough)

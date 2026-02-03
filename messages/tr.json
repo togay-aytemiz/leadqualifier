@@ -201,14 +201,19 @@
         "title": "Genel Ayarlar",
         "language": "Dil",
         "languageDescription": "Arayüz için tercih ettiğiniz dili seçin.",
+        "languageSummary": "Şu an: {language}",
         "languageEnglish": "İngilizce",
-        "languageTurkish": "Türkçe"
+        "languageTurkish": "Türkçe",
+        "save": "Değişiklikleri Kaydet",
+        "saving": "Kaydediliyor..."
     },
     "Channels": {
-        "title": "Kanallar & Entegrasyonlar",
+        "title": "Kanallar",
         "noOrganization": "Organizasyon Bulunamadı",
         "noOrganizationDesc": "Kanalları yönetmek için bir organizasyonun parçası olmalısınız.",
         "description": "Gelen kutunuza müşteri almaya başlamak için mesajlaşma platformlarını bağlayın.",
+        "summary": "Bağlı: {connected} / {total}",
+        "save": "Değişiklikleri Kaydet",
         "whatsappComingSoon": "WhatsApp entegrasyonu yakında! Erken erişim için destekle iletişime geçin.",
         "types": {
             "telegram": "Telegram",
@@ -246,12 +251,64 @@
     "Sidebar": {
         "settings": "Ayarlar",
         "preferences": "Tercihler",
+        "profile": "Profil",
+        "organization": "Organizasyon",
         "general": "Genel",
+        "ai": "Yapay Zeka",
         "integrations": "Entegrasyonlar",
         "channels": "Kanallar",
         "billing": "Faturalandırma",
         "plans": "Planlar",
         "receipts": "Faturalar"
+    },
+    "aiSettings": {
+        "pageTitle": "AI Ayarları",
+        "title": "AI Ayarları",
+        "description": "Skill veya Bilgi Bankası eşleşmesi bulunamazsa botun nasıl yanıt vereceğini ayarlayın.",
+        "thresholdTitle": "Hassasiyet",
+        "thresholdDescription": "Skill ve Bilgi Bankası eşleşmelerine birlikte uygulanır. Yüksek = daha sıkı eşleşme (daha az yanıt). Düşük = daha esnek eşleşme (daha çok yanıt).",
+        "threshold": "Hassasiyet",
+        "thresholdSummary": "Şu an: {value}",
+        "promptTitle": "AI Prompt",
+        "promptDescription": "Skill veya Bilgi Bankası eşleşmesi bulunamazsa bot, aşağıdaki prompta göre yanıt verir.",
+        "promptLabel": "AI prompt",
+        "promptSummary": "Uzunluk: {count} karakter",
+        "save": "Değişiklikleri Kaydet",
+        "saving": "Kaydediliyor...",
+        "saved": "Kaydedildi",
+        "saveError": "Ayarlar kaydedilemedi. Lütfen tekrar deneyin.",
+        "noOrganization": "Organizasyon Bulunamadı",
+        "noOrganizationDesc": "AI ayarlarını yönetmek için bir organizasyona bağlı olmalısınız."
+    },
+    "profileSettings": {
+        "pageTitle": "Profil",
+        "description": "Kişisel bilgilerinizi ve güvenlik seçeneklerinizi yönetin.",
+        "nameTitle": "Ad Soyad",
+        "nameDescription": "Bu isim ekibiniz tarafından görülür.",
+        "nameLabel": "Ad Soyad",
+        "nameSummary": "Şu an: {name}",
+        "emailTitle": "E-posta",
+        "emailDescription": "Giriş için kullanılan e-posta adresi.",
+        "emailLabel": "E-posta adresi",
+        "emailSummary": "Şu an: {email}",
+        "save": "Değişiklikleri Kaydet",
+        "saving": "Kaydediliyor...",
+        "saved": "Kaydedildi",
+        "saveError": "Profil kaydedilemedi. Lütfen tekrar deneyin."
+    },
+    "organizationSettings": {
+        "pageTitle": "Organizasyon",
+        "description": "Organizasyon profilinizi ve varsayılanları yönetin.",
+        "nameTitle": "Şirket adı",
+        "nameDescription": "Ekibinize ve paylaşılan görünümlere yansır.",
+        "nameLabel": "Şirket adı",
+        "nameSummary": "Şu an: {name}",
+        "save": "Değişiklikleri Kaydet",
+        "saving": "Kaydediliyor...",
+        "saved": "Kaydedildi",
+        "saveError": "Organizasyon kaydedilemedi. Lütfen tekrar deneyin.",
+        "noOrganization": "Organizasyon Bulunamadı",
+        "noOrganizationDesc": "Organizasyon ayarlarını yönetmek için bir organizasyona bağlı olmalısınız."
     },
     "knowledge": {
         "title": "Bilgi Bankası",
@@ -287,7 +344,7 @@
             "title": "Başlık",
             "type": "Tür",
             "status": "Durum",
-            "collection": "Koleksiyon",
+            "collection": "Klasör",
             "date": "Tarih",
             "actions": ""
         },
@@ -326,12 +383,22 @@
         "creating": "Oluşturuluyor...",
         "saving": "Kaydediliyor..."
     },
+    "unsavedChanges": {
+        "title": "Kaydedilmemiş değişiklikler",
+        "description": "Kaydedilmemiş değişiklikler var. Çıkmadan önce kaydedilsin mi?",
+        "stay": "Kal",
+        "discard": "İptal et",
+        "save": "Kaydet ve devam et"
+    },
     "sidebar": {
         "title": "Bilgi Bankası",
         "content": "İçerik",
         "allContent": "Tüm İçerik",
-        "collections": "Koleksiyonlar",
-        "empty": "Boş"
+        "collections": "Klasörler",
+        "empty": "Boş",
+        "uncategorized": "Klasörsüz",
+        "showAll": "Tümünü göster ({count})",
+        "showLess": "Daha az göster"
     },
     "deleteFolder": {
         "title": "Klasörü Sil",

@@ -44,6 +44,7 @@ export function FolderActions({ collection, trigger, onDeleteSuccess, onUpdate, 
         setIsDeleting(true)
         try {
             await deleteCollection(collection.id)
+            window.dispatchEvent(new Event('knowledge-updated'))
             if (redirectOnDelete) {
                 router.push('/knowledge')
             } else {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
 import { Sidebar, SidebarGroup, SidebarItem, Button } from '@/design'
-import { getSidebarData, SidebarCollection, createCollection } from '@/lib/knowledge-base/actions'
+import { getSidebarData, type SidebarData, createCollection } from '@/lib/knowledge-base/actions'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,7 @@ import { FolderActions } from './FolderActions'
 
 export function KnowledgeSidebar() {
     const t = useTranslations('sidebar')
-    const [data, setData] = useState<SidebarCollection[]>([])
+    const [data, setData] = useState<SidebarData | null>(null)
     const router = useRouter()
     const searchParams = useSearchParams()
     const currentCollectionId = searchParams.get('collectionId')
@@ -21,6 +21,15 @@ export function KnowledgeSidebar() {
     // New state for folder modal
     const [showFolderModal, setShowFolderModal] = useState(false)
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+    const [showAllUncategorized, setShowAllUncategorized] = useState(false)
+
+    const collections = data?.collections ?? []
+    const uncategorized = data?.uncategorized ?? []
+    const totalCount = data?.totalCount ?? 0
+    const uncategorizedLimit = 10
+    const visibleUncategorized = showAllUncategorized
+        ? uncategorized
+        : uncategorized.slice(0, uncategorizedLimit)
 
     useEffect(() => {
         loadSidebar()
@@ -35,8 +44,9 @@ export function KnowledgeSidebar() {
             const sidebarData = await getSidebarData()
             setData(sidebarData)
             const initialExpanded: Record<string, boolean> = {}
-            sidebarData.forEach(c => initialExpanded[c.id] = true)
+            sidebarData.collections.forEach(c => initialExpanded[c.id] = true)
             setExpanded(initialExpanded)
+            setShowAllUncategorized(false)
         } catch (error) {
             console.error(error)
         }
@@ -78,15 +88,45 @@ export function KnowledgeSidebar() {
                 <SidebarItem
                     icon={<LayoutGrid size={18} />}
                     label={t('allContent')}
-                    count={data.reduce((acc, col) => acc + col.count, 0)}
+                    count={totalCount}
                     active={!currentCollectionId}
                     onClick={() => router.push('/knowledge')}
                 />
+                {uncategorized.length > 0 && (
+                    <div className="mt-3">
+                        <div className="px-3 text-xs font-semibold text-gray-500 mb-2 flex items-center justify-between">
+                            <span>{t('uncategorized')}</span>
+                            <span className="text-xs text-gray-400">{uncategorized.length}</span>
+                        </div>
+                        <div className="space-y-0.5">
+                            {visibleUncategorized.map(file => (
+                                <div
+                                    key={file.id}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 rounded-md cursor-pointer truncate"
+                                >
+                                    <FileText size={14} className="text-gray-400 shrink-0" />
+                                    <span className="truncate">{file.title}</span>
+                                </div>
+                            ))}
+                        </div>
+                        {uncategorized.length > uncategorizedLimit && (
+                            <button
+                                type="button"
+                                onClick={() => setShowAllUncategorized((prev) => !prev)}
+                                className="mt-1 ml-3 text-xs text-blue-600 hover:text-blue-700"
+                            >
+                                {showAllUncategorized
+                                    ? t('showLess')
+                                    : t('showAll', { count: uncategorized.length })}
+                            </button>
+                        )}
+                    </div>
+                )}
             </SidebarGroup>
 
             <SidebarGroup title={t('collections')}>
                 <div className="space-y-1">
-                    {data.map(col => (
+                    {collections.map(col => (
                         <div key={col.id}>
                             {/* Collection Header */}
                             <div

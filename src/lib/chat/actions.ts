@@ -4,6 +4,9 @@ import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
+import { buildFallbackResponse } from '@/lib/ai/fallback'
+import { getOrgAiSettings } from '@/lib/ai/settings'
+import { DEFAULT_FLEXIBLE_PROMPT } from '@/lib/ai/prompts'
 
 export interface ChatMessage {
     id: string
@@ -45,7 +48,7 @@ export interface SimulationResponse {
 export async function simulateChat(
     message: string,
     organizationId: string,
-    threshold: number = 0.5,
+    threshold?: number,
     history: ConversationTurn[] = []
 ): Promise<SimulationResponse> {
     let totalInputTokens = 0
@@ -55,13 +58,17 @@ export async function simulateChat(
     let ragInputTokens = 0
     let ragOutputTokens = 0
 
+    const aiSettings = await getOrgAiSettings(organizationId)
+    const matchThreshold = typeof threshold === 'number' ? threshold : aiSettings.match_threshold
+    const kbThreshold = matchThreshold
+
     // 1. Match skills with ZERO threshold to get ANY match for debugging
     console.log(`Simulating chat for: "${message}" in org: ${organizationId} with threshold: ${threshold}`)
     const matches = await matchSkills(message, organizationId, 0.0)
     console.log('Matches found:', JSON.stringify(matches, null, 2))
     // Only count tokens actually sent to LLM endpoints. Skill-only paths should be zero.
 
-    const activeThreshold = threshold; // Use dynamic threshold
+    const activeThreshold = matchThreshold
     const bestMatch = matches?.[0];
 
     // 2. Determine response
@@ -100,10 +107,15 @@ export async function simulateChat(
         }
 
         if (!decision.route_to_kb) {
+            const fallbackResponse = await buildFallbackResponse({
+                organizationId,
+                message,
+                aiSettings
+            })
             totalInputTokens += routerInputTokens
             totalOutputTokens += routerOutputTokens
             return {
-                response: "I'm not sure how to respond to that. Can you rephrase? (No skill or knowledge found)",
+                response: fallbackResponse,
                 matchedSkill: bestMatch ? {
                     id: bestMatch.skill_id,
                     title: bestMatch.title,
@@ -129,7 +141,11 @@ export async function simulateChat(
 
         const query = decision.rewritten_query || message
         const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions')
-        const kbResults = await searchKnowledgeBase(query, organizationId, 0.5, 6)
+        let kbResults = await searchKnowledgeBase(query, organizationId, kbThreshold, 6)
+        if (!kbResults || kbResults.length === 0) {
+            const fallbackThreshold = Math.max(0.1, kbThreshold - 0.15)
+            kbResults = await searchKnowledgeBase(query, organizationId, fallbackThreshold, 6)
+        }
 
         if (kbResults && kbResults.length > 0) {
             const { default: OpenAI } = await import('openai')
@@ -141,8 +157,10 @@ export async function simulateChat(
             }
 
             const noAnswerToken = 'NO_ANSWER'
-            const systemPrompt = `You are a helpful assistant for a business. 
-Answer the user's question based strictly on the provided context below. 
+            const basePrompt = aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT
+            const systemPrompt = `${basePrompt}
+
+Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Keep the answer concise and friendly.
 
@@ -201,10 +219,15 @@ ${context}`
     }
 
     // 4. Final Fallback
+    const fallbackResponse = await buildFallbackResponse({
+        organizationId,
+        message,
+        aiSettings
+    })
     totalInputTokens += routerInputTokens + ragInputTokens
     totalOutputTokens += routerOutputTokens + ragOutputTokens
     return {
-        response: "I'm not sure how to respond to that. Can you rephrase? (No skill or knowledge found)",
+        response: fallbackResponse,
         matchedSkill: bestMatch ? {
             id: bestMatch.skill_id,
             title: bestMatch.title,

@@ -140,12 +140,17 @@ function buildChunksWithOverlap(
             const tokenCount = estimateTokenCount(chunkContent)
             chunks.push({ content: chunkContent, tokenCount })
 
-            const overlapText = overlapTokens > 0
-                ? getOverlapText(chunkContent, overlapTokens)
-                : ''
+            const overlap = overlapTokens > 0
+                ? getOverlapSegments(currentSegments, overlapTokens)
+                : { segments: [], tokenCount: 0 }
 
-            currentSegments = overlapText ? [overlapText] : []
-            currentTokens = overlapText ? estimateTokenCount(overlapText) : 0
+            currentSegments = overlap.segments
+            currentTokens = overlap.tokenCount
+
+            if (currentTokens + segmentTokens > maxTokens) {
+                currentSegments = []
+                currentTokens = 0
+            }
         }
 
         currentSegments.push(segment)
@@ -160,10 +165,34 @@ function buildChunksWithOverlap(
     return chunks
 }
 
-function getOverlapText(text: string, overlapTokens: number): string {
-    const words = splitWords(text)
-    if (words.length <= overlapTokens) return text
-    return words.slice(words.length - overlapTokens).join(' ')
+function getOverlapSegments(
+    segments: string[],
+    overlapTokens: number
+): { segments: string[]; tokenCount: number } {
+    if (overlapTokens <= 0) return { segments: [], tokenCount: 0 }
+
+    const overlapSegments: string[] = []
+    let tokenCount = 0
+
+    for (let i = segments.length - 1; i >= 0; i -= 1) {
+        const segment = segments[i]
+        const segmentTokens = estimateTokenCount(segment)
+        if (segmentTokens === 0) continue
+
+        if (tokenCount + segmentTokens > overlapTokens && overlapSegments.length > 0) {
+            break
+        }
+
+        overlapSegments.push(segment)
+        tokenCount += segmentTokens
+
+        if (tokenCount >= overlapTokens) {
+            break
+        }
+    }
+
+    overlapSegments.reverse()
+    return { segments: overlapSegments, tokenCount }
 }
 
 function splitWords(text: string): string[] {

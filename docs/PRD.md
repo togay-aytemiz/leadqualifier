@@ -74,6 +74,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - No hallucination — unknown = human handoff
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
+ - If no skill/KB match, bot suggests available topics using existing skills/KB titles
+ - Org-level AI settings control strict/flexible modes, a single sensitivity threshold, and prompt-driven fallback behavior
 
 ---
 
@@ -112,6 +114,9 @@ Customer Message → Skill Match? → Yes → Skill Response
  - Retrieval is chunk-level with context budgets to avoid long prompts
  - Follow-up questions are rewritten into standalone KB queries via LLM routing
  - LLM routing receives the latest bot reply plus the last 5 user messages with timestamps
+ - Router uses definition-style question heuristics to avoid missing KB lookups
+ - Chunk overlap aligns to paragraph/sentence boundaries to preserve context
+ - Keyword fallback is used when embedding search fails or returns no matches
 
 ---
 
@@ -167,14 +172,24 @@ Customer Message → Skill Match? → Yes → Skill Response
 - "Test Skill" playground
 
 ### 5.3 Knowledge Base
-- CRUD with categories
+- CRUD with folders
 - Rich text editor
  - Show indexing status (Ready / Processing / Error)
+ - Sidebar shows uncategorized items (max 10 with expand) and accurate all-content counts
 
 ### 5.4 Channels
 - WhatsApp number + connection status
 - Provider badge
 - Test message (sandbox)
+
+### 5.5 AI Settings
+- Always-on Flexible mode (no mode selection)
+- Single sensitivity threshold (applies to Skill + KB)
+- Single prompt field (used as the base prompt for fallback responses)
+
+### 5.6 Profile & Organization Settings
+- Profile: name and email visibility (future password management)
+- Organization: company name and future org-level defaults
 
 ---
 
@@ -231,7 +246,12 @@ MVP is successful when:
 - **Font Strategy:** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
+- **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
+- **Chunk Overlap Alignment:** Overlap prefers paragraph/sentence boundaries and drops overlap when it would exceed max tokens.
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
+- **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
+- **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
+- **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

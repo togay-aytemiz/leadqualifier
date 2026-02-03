@@ -11,9 +11,10 @@ import { useTranslations } from 'next-intl'
 interface ChannelsListProps {
     channels: Channel[]
     organizationId: string
+    showDescription?: boolean
 }
 
-export function ChannelsList({ channels, organizationId }: ChannelsListProps) {
+export function ChannelsList({ channels, organizationId, showDescription = true }: ChannelsListProps) {
     const t = useTranslations('Channels')
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
     const router = useRouter()
@@ -34,10 +35,10 @@ export function ChannelsList({ channels, organizationId }: ChannelsListProps) {
     }
 
     return (
-        <div className="max-w-4xl">
-            <p className="text-gray-500 mb-8">{t('description')}</p>
+        <div>
+            {showDescription && <p className="text-gray-500 mb-8">{t('description')}</p>}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ChannelCard
                     type="telegram"
                     channel={telegramChannel}

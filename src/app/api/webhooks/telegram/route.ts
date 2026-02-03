@@ -4,6 +4,9 @@ import { TelegramClient } from '@/lib/telegram/client'
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute } from '@/lib/knowledge-base/router'
+import { getOrgAiSettings } from '@/lib/ai/settings'
+import { DEFAULT_FLEXIBLE_PROMPT } from '@/lib/ai/prompts'
+import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: NextRequest) {
@@ -62,6 +65,9 @@ export async function POST(req: NextRequest) {
     }
 
     const orgId = channel.organization_id
+    const aiSettings = await getOrgAiSettings(orgId, { supabase })
+    const matchThreshold = aiSettings.match_threshold
+    const kbThreshold = matchThreshold
 
     // 3. Find or Create Conversation
     // 3. Find or Create Conversation
@@ -166,7 +172,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Process AI Response (Skills)
-    const matchedSkills = await matchSkills(text, orgId, 0.5, 5, supabase)
+    const matchedSkills = await matchSkills(text, orgId, matchThreshold, 5, supabase)
     const bestMatch = matchedSkills?.[0]
 
     console.log('Telegram Webhook: Skill match result', {
@@ -236,7 +242,11 @@ export async function POST(req: NextRequest) {
 
             if (decision.route_to_kb) {
                 const query = decision.rewritten_query || text
-                const kbResults = await searchKnowledgeBase(query, orgId, 0.5, 6, { supabase })
+                let kbResults = await searchKnowledgeBase(query, orgId, kbThreshold, 6, { supabase })
+                if (!kbResults || kbResults.length === 0) {
+                    const fallbackThreshold = Math.max(0.1, kbThreshold - 0.15)
+                    kbResults = await searchKnowledgeBase(query, orgId, fallbackThreshold, 6, { supabase })
+                }
 
                 if (kbResults && kbResults.length > 0) {
                     console.log('Telegram Webhook: Knowledge Base match found', { count: kbResults.length })
@@ -250,8 +260,10 @@ export async function POST(req: NextRequest) {
                     const { default: OpenAI } = await import('openai')
                     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-                    const systemPrompt = `You are a helpful assistant for a business. 
-Answer the user's question based strictly on the provided context below. 
+                    const basePrompt = aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT
+                    const systemPrompt = `${basePrompt}
+
+Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Keep the answer concise and friendly (in Turkish or English depending on user).
 
@@ -301,7 +313,12 @@ ${context}`
         // 8. Final Fallback (No Skill, No Knowledge)
         console.log('Telegram Webhook: No knowledge match, sending fallback')
         const client = new TelegramClient(channel.config.bot_token)
-        const fallbackText = "Mesajınızı aldım. Şu an buna yanıt veremiyorum ancak sizi bir yetkiliye bağlıyorum. (I received your message but I don't have an answer instantly. Connecting you to a human.)"
+        const fallbackText = await buildFallbackResponse({
+            organizationId: orgId,
+            message: text,
+            aiSettings,
+            supabase
+        })
 
         await client.sendMessage(chatId, fallbackText)
 
