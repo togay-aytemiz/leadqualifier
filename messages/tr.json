@@ -204,6 +204,22 @@
             "collection": "Koleksiyon",
             "date": "Tarih",
             "actions": ""
+        },
+        "types": {
+            "article": "Serbest Metin",
+            "snippet": "Parça",
+            "pdf": "PDF",
+            "internal": "Dahili"
+        },
+        "delete": "Sil",
+        "newContentButton": {
+            "selectSource": "KAYNAK TÜRÜ SEÇİN",
+            "freeform": "Serbest Metin",
+            "pdf": "PDF Yükle",
+            "github": "Github Deposu",
+            "notion": "Notion",
+            "website": "Web Sitesi",
+            "comingSoon": "Yakında"
         }
     },
     "folderModal": {
@@ -222,15 +238,6 @@
         "content": "İçerik",
         "allContent": "Tüm İçerik",
         "collections": "Koleksiyonlar"
-    },
-    "newContentButton": {
-        "selectSource": "KAYNAK TÜRÜ SEÇİN",
-        "freeform": "Serbest Metin",
-        "pdf": "PDF Yükle",
-        "github": "Github Deposu",
-        "notion": "Notion",
-        "website": "Web Sitesi",
-        "comingSoon": "Yakında"
     },
     "deleteFolder": {
         "title": "Klasörü Sil",

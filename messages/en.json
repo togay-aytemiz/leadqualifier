@@ -186,6 +186,22 @@
             "collection": "Collection",
             "date": "Date",
             "actions": ""
+        },
+        "types": {
+            "article": "Freeform Text",
+            "snippet": "Snippet",
+            "pdf": "PDF",
+            "internal": "Internal"
+        },
+        "delete": "Delete",
+        "newContentButton": {
+            "selectSource": "SELECT SOURCE TYPE",
+            "freeform": "Freeform Text",
+            "pdf": "PDF Upload",
+            "github": "Github Repository",
+            "notion": "Notion",
+            "website": "Website URL",
+            "comingSoon": "Coming Soon"
         }
     },
     "folderModal": {
@@ -204,15 +220,6 @@
         "content": "Content",
         "allContent": "All content",
         "collections": "Collections"
-    },
-    "newContentButton": {
-        "selectSource": "SELECT SOURCE TYPE",
-        "freeform": "Freeform Text",
-        "pdf": "PDF Upload",
-        "github": "Github Repository",
-        "notion": "Notion",
-        "website": "Website URL",
-        "comingSoon": "Coming Soon"
     },
     "deleteFolder": {
         "title": "Delete Folder",

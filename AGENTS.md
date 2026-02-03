@@ -81,6 +81,7 @@ This is a **WhatsApp AI Lead Qualifier** SaaS for Turkish SMBs. The system:
 
 - **Always maintain TR and EN Support:** Every new UI text must be translatable.
 - **No Hardcoded Strings:** Use `messages/en.json` and `messages/tr.json` for all visible text.
+- **Strict Translation Consistency:** Ensure `messages/tr.json` is always a mirror of `messages/en.json`. Verify no keys are missing.
 - **Hooks:** Use `useTranslations` (for Client Components) or `getTranslations` (for Server Components).
 
 ---

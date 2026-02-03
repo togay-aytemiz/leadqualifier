@@ -28,35 +28,37 @@ export function NewContentButton({ collectionId, className }: NewContentButtonPr
     const router = useRouter()
     const [open, setOpen] = useState(false)
 
+    const tBtn = useTranslations('knowledge.newContentButton')
+
     const options = [
         {
             icon: <FileText size={16} className="text-blue-500" />,
-            label: 'Freeform text',
+            label: tBtn('freeform'),
             onClick: () => router.push(collectionId ? `/knowledge/create?collectionId=${collectionId}` : '/knowledge/create')
         },
         {
             icon: <Upload size={16} className="text-red-500" />,
-            label: 'PDF Upload',
+            label: tBtn('pdf'),
             onClick: () => { }, // TODO: Implement
             badge: null
         },
         {
             icon: <Github size={16} className="text-gray-700" />,
-            label: 'Github Repository',
+            label: tBtn('github'),
             onClick: () => { }, // TODO: Implement
-            badge: 'Yakında'
+            badge: tBtn('comingSoon')
         },
         {
             icon: <FileCode size={16} className="text-gray-500" />, // Using FileCode for Notion as placeholder
-            label: 'Notion',
+            label: tBtn('notion'),
             onClick: () => { }, // TODO: Implement
-            badge: 'Yakında'
+            badge: tBtn('comingSoon')
         },
         {
             icon: <Globe size={16} className="text-gray-400" />,
-            label: 'Website URL',
+            label: tBtn('website'),
             onClick: () => { }, // TODO: Implement
-            badge: 'Yakında'
+            badge: tBtn('comingSoon')
         }
     ]
 
@@ -76,7 +78,7 @@ export function NewContentButton({ collectionId, className }: NewContentButtonPr
                     align="end"
                 >
                     <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100 mb-1">
-                        Select Source Type
+                        {tBtn('selectSource')}
                     </div>
                     <div className="space-y-0.5">
                         {options.map((opt, i) => (

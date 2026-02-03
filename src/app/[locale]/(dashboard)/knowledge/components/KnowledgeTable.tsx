@@ -16,6 +16,7 @@ interface KnowledgeTableProps {
 
 export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
     const t = useTranslations('knowledge.table')
+    const tCommon = useTranslations('knowledge')
     const locale = useLocale()
     const columns = [t('title'), t('type'), t('collection'), t('date'), '']
 
@@ -30,15 +31,15 @@ export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
     }
 
     function getTypeBadge(type: string) {
-        // Translation for types could be added here if needed, for now just capitalizing
-        const typeLabel = type.charAt(0).toUpperCase() + type.slice(1)
+        // Map database types to translation keys
+        const label = tCommon(`types.${type}`)
 
         switch (type) {
-            case 'article': return <Badge variant="info">{typeLabel}</Badge>
-            case 'snippet': return <Badge variant="neutral">{typeLabel}</Badge>
-            case 'pdf': return <Badge variant="error">{typeLabel}</Badge>
-            case 'internal': return <Badge variant="warning">{typeLabel}</Badge>
-            default: return <Badge variant="neutral">{typeLabel}</Badge>
+            case 'article': return <Badge variant="info">{label}</Badge>
+            case 'snippet': return <Badge variant="neutral">{label}</Badge>
+            case 'pdf': return <Badge variant="error">{label}</Badge>
+            case 'internal': return <Badge variant="warning">{label}</Badge>
+            default: return <Badge variant="neutral">{label}</Badge>
         }
     }
 
