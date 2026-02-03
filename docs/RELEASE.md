@@ -64,6 +64,7 @@
 
 ### Changed
 - Use system fonts in the app shell to avoid build-time Google Fonts fetches.
+- Removed legacy `knowledge_base` table in favor of documents/chunks.
 
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.

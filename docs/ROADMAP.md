@@ -95,6 +95,7 @@
 - [x] Retrieval logic
 - [x] Response generation from KB
 - [x] **Enterprise RAG Hardening:** Documents + chunks schema, token-budgeted context, and consistent fallback handling
+- [x] **Legacy Cleanup:** Remove `knowledge_base` in favor of documents/chunks
 
 ---
 

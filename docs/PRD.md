@@ -225,6 +225,7 @@ MVP is successful when:
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
 - **Font Strategy:** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
+- **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
