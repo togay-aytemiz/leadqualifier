@@ -11,6 +11,7 @@ export interface KnowledgeCollection {
     description: string | null
     icon: string
     created_at: string
+    count?: number
 }
 
 export interface KnowledgeBaseEntry {
@@ -56,13 +57,35 @@ async function getUserOrganization(supabase: any) {
 
 export async function getCollections() {
     const supabase = await createClient()
-    const { data, error } = await supabase
+
+    // Get collections
+    const { data: collections, error } = await supabase
         .from('knowledge_collections')
         .select('*')
         .order('name')
 
     if (error) throw new Error(error.message)
-    return data as KnowledgeCollection[]
+
+    // Get counts for each collection
+    // This could be optimized with a join/count query but for now this is simple and robust with RLS
+    const { data: counts, error: countError } = await supabase
+        .from('knowledge_base')
+        .select('collection_id')
+
+    if (countError) throw new Error(countError.message)
+
+    // Map counts
+    const countMap = new Map<string, number>()
+    counts.forEach((item: any) => {
+        if (item.collection_id) {
+            countMap.set(item.collection_id, (countMap.get(item.collection_id) || 0) + 1)
+        }
+    })
+
+    return collections.map(col => ({
+        ...col,
+        count: countMap.get(col.id) || 0
+    })) as KnowledgeCollection[]
 }
 
 export async function createCollection(name: string, description?: string, icon: string = 'folder') {
@@ -124,6 +147,47 @@ export async function deleteKnowledgeBaseEntry(id: string) {
     const { error } = await supabase.from('knowledge_base').delete().eq('id', id)
     if (error) throw new Error(error.message)
     revalidatePath('/knowledge')
+}
+
+export async function getKnowledgeBaseEntry(id: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('knowledge_base')
+        .select(`
+            id, organization_id, content, title, type, collection_id, created_at, updated_at,
+            collection:knowledge_collections(*)
+        `)
+        .eq('id', id)
+        .single()
+
+    if (error) throw new Error(error.message)
+
+    return {
+        ...data,
+        collection: Array.isArray(data.collection) ? data.collection[0] : data.collection
+    } as KnowledgeBaseEntry
+}
+
+export async function updateKnowledgeBaseEntry(id: string, entry: Partial<KnowledgeBaseInsert>) {
+    const supabase = await createClient()
+
+    // If content changed, regenerate embedding
+    let updates: any = { ...entry }
+    if (entry.content) {
+        const embedding = await generateEmbedding(entry.content)
+        updates.embedding = formatEmbeddingForPgvector(embedding)
+    }
+
+    const { data, error } = await supabase
+        .from('knowledge_base')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/knowledge')
+    return data as KnowledgeBaseEntry
 }
 
 export async function getKnowledgeBaseEntries(collectionId?: string | null) {

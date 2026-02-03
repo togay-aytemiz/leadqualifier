@@ -1,12 +1,13 @@
-'use client'
-
 import { format } from 'date-fns'
-import { FileText, File, Scissors, Lock, Check, X, Folder } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { tr } from 'date-fns/locale'
+import { FileText, File, Scissors, Lock, Check, X, Folder, ChevronRight, Eye } from 'lucide-react'
 import {
     DataTable, TableHead, TableBody, TableRow, TableCell, Badge
 } from '@/design'
 import { KnowledgeBaseEntry } from '@/lib/knowledge-base/actions'
 import { cn } from '@/lib/utils'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface KnowledgeTableProps {
     entries: KnowledgeBaseEntry[]
@@ -14,7 +15,9 @@ interface KnowledgeTableProps {
 }
 
 export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
-    const columns = ['Title', 'Type', 'Collection', 'AI Agent', 'Date']
+    const t = useTranslations('knowledge.table')
+    const locale = useLocale()
+    const columns = [t('title'), t('type'), t('collection'), t('date'), '']
 
     function getTypeIcon(type: string) {
         switch (type) {
@@ -27,21 +30,30 @@ export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
     }
 
     function getTypeBadge(type: string) {
+        // Translation for types could be added here if needed, for now just capitalizing
+        const typeLabel = type.charAt(0).toUpperCase() + type.slice(1)
+
         switch (type) {
-            case 'article': return <Badge variant="info">Article</Badge>
-            case 'snippet': return <Badge variant="neutral">Snippet</Badge>
-            case 'pdf': return <Badge variant="error">PDF</Badge>
-            case 'internal': return <Badge variant="warning">Internal</Badge>
-            default: return <Badge variant="neutral">{type}</Badge>
+            case 'article': return <Badge variant="info">{typeLabel}</Badge>
+            case 'snippet': return <Badge variant="neutral">{typeLabel}</Badge>
+            case 'pdf': return <Badge variant="error">{typeLabel}</Badge>
+            case 'internal': return <Badge variant="warning">{typeLabel}</Badge>
+            default: return <Badge variant="neutral">{typeLabel}</Badge>
         }
     }
+
+    const router = useRouter()
 
     return (
         <DataTable>
             <TableHead columns={columns} />
             <TableBody>
                 {entries.map(entry => (
-                    <TableRow key={entry.id} className="group">
+                    <TableRow
+                        key={entry.id}
+                        className="group cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => router.push(`/knowledge/${entry.id}`)}
+                    >
                         {/* Title */}
                         <TableCell>
                             <div className="flex items-center gap-3">
@@ -70,20 +82,18 @@ export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {
                             )}
                         </TableCell>
 
-                        {/* AI Agent Status (Mock logic: if content > 10 chars, it's active) */}
-                        <TableCell align="center">
-                            {entry.content.length > 10 ? (
-                                <Check size={18} className="text-green-500 mx-auto" />
-                            ) : (
-                                <X size={18} className="text-gray-300 mx-auto" />
-                            )}
-                        </TableCell>
-
                         {/* Date */}
                         <TableCell>
                             <span className="text-sm text-gray-500">
-                                {format(new Date(entry.created_at), 'MMM d, yyy')}
+                                {format(new Date(entry.created_at), 'd MMM yyyy', { locale: locale === 'tr' ? tr : undefined })}
                             </span>
+                        </TableCell>
+
+                        {/* Action Arrow */}
+                        <TableCell align="right">
+                            <div className="text-gray-400 group-hover:text-blue-600 transition-colors flex justify-end">
+                                <ChevronRight size={20} />
+                            </div>
                         </TableCell>
                     </TableRow>
                 ))}

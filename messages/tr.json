@@ -60,6 +60,7 @@
         "deleteSkill": "Yeteneği Sil",
         "deleteConfirm": "Yeteneği Sil?",
         "deleteConfirmDesc": "Bu işlem geri alınamaz. Yetenek kalıcı olarak silinecektir.",
+        "searchPlaceholder": "Yetenek ara...",
         "archive": "Arşivle",
         "activate": "Aktifleştir",
         "delete": "Sil",
@@ -142,6 +143,7 @@
         "leftSession": "oturumdan ayrıldı",
         "options": "Seçenekler",
         "deleteConfirm": "Bu konuşmayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+        "cancel": "İptal",
         "noSelection": "Konuşma seçilmedi",
         "noSelectionDesc": "Detayları görmek için listeden bir konuşma seçin",
         "noOrg": "Organizasyon Bulunamadı",
@@ -195,7 +197,14 @@
             "cancel": "İptal",
             "back": "Geri"
         },
-        "deleteConfirm": "Bu içeriği silmek istediğinizden emin misiniz?"
+        "deleteConfirm": "Bu içeriği silmek istediğinizden emin misiniz?",
+        "table": {
+            "title": "Başlık",
+            "type": "Tür",
+            "collection": "Koleksiyon",
+            "date": "Tarih",
+            "actions": ""
+        }
     },
     "folderModal": {
         "title": "Yeni Klasör Oluştur",

@@ -2,13 +2,19 @@
 
 import { SearchInput } from '@/design'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 
-export function ClientSearchInput() {
+interface ClientSearchInputProps {
+    placeholder?: string
+}
+
+export function ClientSearchInput({ placeholder = "Search..." }: ClientSearchInputProps) {
     const searchParams = useSearchParams()
     const pathname = usePathname()
     const { replace } = useRouter()
     const [inputValue, setInputValue] = useState(searchParams.get('q') || '')
+
+    const isMounted = useRef(false)
 
     // Debounce function
     const debouncedSearch = useCallback((term: string) => {
@@ -26,6 +32,12 @@ export function ClientSearchInput() {
     }, [searchParams, pathname, replace])
 
     useEffect(() => {
+        // Skip the first run on mount
+        if (!isMounted.current) {
+            isMounted.current = true
+            return
+        }
+
         const handler = setTimeout(() => {
             debouncedSearch(inputValue)
         }, 300)
@@ -37,7 +49,7 @@ export function ClientSearchInput() {
 
     return (
         <SearchInput
-            placeholder="Search skills..."
+            placeholder={placeholder}
             value={inputValue}
             onChange={setInputValue}
         />

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
-import { ConfirmDialog } from '@/design/primitives'
+import { ConfirmDialog, Badge } from '@/design/primitives'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
 import { Plus, Trash2, Sparkles, TriangleAlert } from 'lucide-react'
 
@@ -17,6 +17,7 @@ interface SkillsContainerProps {
 
 export function SkillsContainer({ initialSkills, organizationId }: SkillsContainerProps) {
     const t = useTranslations('skills')
+    const tc = useTranslations('common')
     const router = useRouter()
     const [skills, setSkills] = useState<Skill[]>(initialSkills)
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
@@ -248,8 +249,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
 
     return (
         <div className="flex h-full bg-white border-t border-gray-200">
-            {/* Left Panel - List (50%) */}
-            <div className="w-1/2 flex flex-col border-r border-gray-200 bg-white">
+            {/* Left Panel - List (33%) */}
+            <div className="w-1/3 flex flex-col border-r border-gray-200 bg-white">
                 <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0 bg-white">
                     <div className="flex items-center gap-3">
                         <h2 className="text-xl font-bold text-gray-900">{t('title')}</h2>
@@ -259,7 +260,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="w-80">
-                            <ClientSearchInput />
+                            <ClientSearchInput placeholder={t('searchPlaceholder')} />
                         </div>
                         <button
                             onClick={handleCreateNew}
@@ -325,12 +326,9 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                                 <span className={`text-base font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
                                                     {skill.title}
                                                 </span>
-                                                <div
-                                                    role="button"
-                                                    onClick={(e) => handleToggleSkill(e, skill)}
-                                                    className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-200 transition-all ${skill.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
-                                                    title={skill.enabled ? t('activate') : t('archive')}
-                                                />
+                                                <Badge variant={skill.enabled ? 'success' : 'neutral'}>
+                                                    {skill.enabled ? tc('enabled') : tc('disabled')}
+                                                </Badge>
                                             </div>
                                             {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
                                         </div>
@@ -342,8 +340,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                 </div>
             </div>
 
-            {/* Right Panel - Detail/Form (50%) */}
-            <div className="w-1/2 flex flex-col bg-white overflow-hidden relative border-l border-gray-200 -ml-px">
+            {/* Right Panel - Detail/Form (66%) */}
+            <div className="flex-1 flex flex-col bg-white overflow-hidden relative border-l border-gray-200 -ml-px">
                 {activeTab === 'core' ? (
                     /* Empty Right Panel for Core */
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/30">
@@ -356,7 +354,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                 {/* Header */}
                                 <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
                                     <h3 className="font-bold text-gray-900 text-xl">
-                                        {isCreating ? 'New Skill' : 'Edit Skill'}
+                                        {isCreating ? t('newSkill') : t('editSkill')}
                                     </h3>
                                     <div className="flex gap-3">
                                         {!isCreating && (
