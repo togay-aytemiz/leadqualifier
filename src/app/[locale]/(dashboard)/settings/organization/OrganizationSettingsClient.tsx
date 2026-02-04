@@ -82,7 +82,6 @@ export default function OrganizationSettingsClient({ initialName }: Organization
                     <SettingsSection
                         title={t('nameTitle')}
                         description={t('nameDescription')}
-                        summary={t('nameSummary', { name: name || '-' })}
                     >
                         <label className="text-sm font-medium text-gray-700">{t('nameLabel')}</label>
                         <input

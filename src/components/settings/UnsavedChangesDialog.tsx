@@ -30,14 +30,28 @@ export function UnsavedChangesDialog({
     return (
         <Modal isOpen={isOpen} onClose={onStay} title={title}>
             <p className="text-sm text-gray-600">{description}</p>
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Button variant="secondary" onClick={onStay} disabled={isSaving}>
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-2">
+                <Button
+                    variant="secondary"
+                    className="w-full sm:w-auto"
+                    onClick={onStay}
+                    disabled={isSaving}
+                >
                     {stayText}
                 </Button>
-                <Button variant="outline" onClick={onDiscard} disabled={isSaving}>
+                <Button
+                    variant="danger"
+                    className="w-full sm:w-auto"
+                    onClick={onDiscard}
+                    disabled={isSaving}
+                >
                     {discardText}
                 </Button>
-                <Button onClick={onSave} disabled={isSaving}>
+                <Button
+                    className="w-full sm:w-auto whitespace-nowrap"
+                    onClick={onSave}
+                    disabled={isSaving}
+                >
                     {saveText}
                 </Button>
             </div>

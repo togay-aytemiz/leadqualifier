@@ -83,7 +83,6 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
                     <SettingsSection
                         title={t('nameTitle')}
                         description={t('nameDescription')}
-                        summary={t('nameSummary', { name: name || '-' })}
                     >
                         <label className="text-sm font-medium text-gray-700">{t('nameLabel')}</label>
                         <input
@@ -97,7 +96,6 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
                     <SettingsSection
                         title={t('emailTitle')}
                         description={t('emailDescription')}
-                        summary={t('emailSummary', { email })}
                     >
                         <label className="text-sm font-medium text-gray-700">{t('emailLabel')}</label>
                         <input

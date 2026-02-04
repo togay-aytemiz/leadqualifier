@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-03  
+> **Last Updated:** 2026-02-04  
 > **Status:** In Development
 
 ---
@@ -251,7 +251,10 @@ MVP is successful when:
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
+- **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
+- **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
+- **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

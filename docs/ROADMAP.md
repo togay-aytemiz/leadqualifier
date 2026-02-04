@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-03  
+> **Last Updated:** 2026-02-04  
 > Mark items with `[x]` when completed.
 
 ---
@@ -121,6 +121,8 @@
   - [x] Error handling
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
+- [x] **Settings UX:** Remove redundant current-value summaries above inputs
+- [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details
 - [x] **Human Takeover**
   - [x] Detect business reply (or Inbox claim)

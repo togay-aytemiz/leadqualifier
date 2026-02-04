@@ -93,11 +93,7 @@ async function renderFlexibleFallback(
         ? formatTopicList(topics)
         : formatTopicList(isLikelyTurkish(message) ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
 
-    const systemPrompt = `${prompt || DEFAULT_FLEXIBLE_PROMPT}
-
-You are generating a fallback response because no skill or KB match was found.
-Use ONLY the topics provided. Do not invent new topics or details.
-Keep it to 1-2 short sentences and ask a single clarifying question.`
+    const systemPrompt = prompt || DEFAULT_FLEXIBLE_PROMPT
 
     const userPrompt = `Available topics: ${topicsList}\n\nUser message: ${message}`
 

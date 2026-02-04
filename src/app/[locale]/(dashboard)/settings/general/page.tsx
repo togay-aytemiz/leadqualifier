@@ -138,9 +138,6 @@ export default function GeneralSettingsPage() {
                         <SettingsSection
                             title={tGeneral('language')}
                             description={tGeneral('languageDescription')}
-                            summary={tGeneral('languageSummary', {
-                                language: selectedLocale === 'en' ? tGeneral('languageEnglish') : tGeneral('languageTurkish')
-                            })}
                         >
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div

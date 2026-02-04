@@ -23,7 +23,6 @@ export default function AiSettingsForm({
             <SettingsSection
                 title={t('thresholdTitle')}
                 description={t('thresholdDescription')}
-                summary={t('thresholdSummary', { value: matchThreshold.toFixed(2) })}
             >
                 <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-gray-700">{t('threshold')}</label>
@@ -43,7 +42,6 @@ export default function AiSettingsForm({
             <SettingsSection
                 title={t('promptTitle')}
                 description={t('promptDescription')}
-                summary={t('promptSummary', { count: prompt.trim().length })}
             >
                 <label className="text-sm font-medium text-gray-700">{t('promptLabel')}</label>
                 <textarea

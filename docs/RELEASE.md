@@ -83,8 +83,11 @@
 - Settings pages now use a two-column section layout for clearer configuration.
 - Added Profile and Organization settings pages with header save + unsaved change confirmation.
 - Settings pages now show a top-right save button that activates only when changes are detected.
+- Removed redundant current-value summaries above settings inputs and selections.
+- Unsaved changes modal now uses soft-danger discard, single-line save CTA, and content-hugging secondary buttons.
 - Channels page title standardized to "Channels" with wider channel cards.
 - AI settings load now falls back quietly unless debug logging is enabled.
+- Flexible fallback now uses only the UI-configured prompt (no hardcoded system append).
 
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
