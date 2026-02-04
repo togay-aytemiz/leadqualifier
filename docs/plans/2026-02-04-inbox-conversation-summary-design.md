@@ -1,7 +1,7 @@
 # Inbox Conversation Summary -- Design
 
 ## Overview
-Add an on-demand conversation summary in the Inbox composer area. The summary is produced only when the user clicks a button, and it is derived strictly from the last five user messages plus the last bot message (with timestamps and order preserved). The UI shows a single short paragraph summary (no raw messages in the panel).
+Add an on-demand conversation summary in the Inbox composer area. The summary is produced only when the user opens the accordion or hits refresh, and it is derived strictly from the last five user messages plus the last bot message (with timestamps and order preserved). The UI shows a single short paragraph summary (no raw messages in the panel).
 
 ## Goals
 - Provide a quick, human-readable recap for operators.
@@ -14,12 +14,15 @@ Add an on-demand conversation summary in the Inbox composer area. The summary is
 - No full transcript rendering in the panel.
 
 ## UX & Behavior
-- A "Conversation Summary" button appears above the input field.
-- The button is always visible.
-- It is disabled when there are fewer than 5 user messages or no bot message; hover shows tooltip: "Not enough messages for a summary."
-- On click, the inline panel opens above the input and shows a loading state.
-- Success shows a single-paragraph summary. A second click re-runs the summary.
-- Switching conversations clears summary state and closes the panel.
+- The summary area is an accordion placed above the AI banner and above the input field.
+- The header row is content-hug (not full width).
+- The refresh icon is only visible after a summary finishes generating (success or error) while the accordion is open.
+- The header and refresh are disabled when there are fewer than 5 user messages or no bot message; hover shows tooltip: "Not enough messages for a summary."
+- Opening the accordion triggers a summary only when there is no existing summary yet.
+- The refresh icon always re-generates the summary without requiring a close/open cycle.
+- While loading, show an animated blue-gradient skeleton; the panel expands to full width once the summary arrives.
+- The panel animates open/close (height + opacity).
+- Switching conversations clears summary state and collapses the accordion.
 
 ## Architecture & Data Flow
 - UI state in `InboxContainer`: `summaryStatus` (idle/loading/success/error) + `summaryText`.
@@ -41,7 +44,7 @@ Add an on-demand conversation summary in the Inbox composer area. The summary is
 
 ## i18n
 - All UI text uses `messages/en.json` and `messages/tr.json` with mirrored keys.
-- Keys: `inbox.summary.button`, `inbox.summary.loading`, `inbox.summary.error`, `inbox.summary.tooltip.insufficient`.
+- Keys: `inbox.summary.button`, `inbox.summary.loading`, `inbox.summary.error`, `inbox.summary.refresh`, `inbox.summary.tooltip.insufficient`.
 
 ## Testing
 - Manual: enabled/disabled states, tooltip text, loading, error, success, and conversation switching.
@@ -50,4 +53,5 @@ Add an on-demand conversation summary in the Inbox composer area. The summary is
 ## Decisions
 - On-demand only (no background refresh or cache).
 - Summary-only display (no raw message list).
-- Button always visible; disabled + tooltip when insufficient messages.
+- Accordion header always visible; disabled + tooltip when insufficient messages.
+- Refresh control lives in the header and re-generates the summary on demand.

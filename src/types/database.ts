@@ -15,6 +15,7 @@ export interface OrganizationAiSettings {
     mode: AiMode
     match_threshold: number
     prompt: string
+    bot_name: string
     created_at: string
     updated_at: string
 }

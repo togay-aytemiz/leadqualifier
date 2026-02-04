@@ -257,18 +257,17 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                             {skills.length}
                         </span>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-80">
-                            <ClientSearchInput placeholder={t('searchPlaceholder')} />
-                        </div>
-                        <button
-                            onClick={handleCreateNew}
-                            className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
-                        >
-                            <Plus size={18} />
-                            {t('create')}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleCreateNew}
+                        className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
+                    >
+                        <Plus size={18} />
+                        {t('create')}
+                    </button>
+                </div>
+
+                <div className="px-6 py-3 border-b border-gray-100 bg-white shrink-0">
+                    <ClientSearchInput placeholder={t('searchPlaceholder')} />
                 </div>
 
                 {/* Tabs inside Left Panel */}

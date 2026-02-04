@@ -7,5 +7,18 @@ Never invent prices, policies, services, or guarantees.
 If you are unsure, ask a single clarifying question.
 When generating fallback guidance, only use the provided list of topics.`
 
+export const DEFAULT_BOT_NAME = 'Bot'
+
 export const DEFAULT_STRICT_BASE_PROMPT =
     'You are a helpful assistant for a business. Keep answers concise, accurate, and grounded in provided context.'
+
+export function normalizeBotName(value?: string | null) {
+    const trimmed = (value ?? '').toString().trim()
+    return trimmed || DEFAULT_BOT_NAME
+}
+
+export function withBotNamePrompt(basePrompt: string, botName?: string | null) {
+    const name = normalizeBotName(botName)
+    const hydratedPrompt = basePrompt.replace(/\{bot_name\}/gi, name)
+    return `${hydratedPrompt}\n\nYou are the AI assistant for this business, and your name is "${name}". If the user asks who you are or your name, respond with "${name}".`
+}

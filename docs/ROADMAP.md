@@ -81,7 +81,9 @@
   - [x] Delete conversation functionality
   - [x] Composer banner copy + centered layout
   - [x] Details avatar initials match conversation list
+  - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
+  - [x] On-demand conversation summary (button + inline panel)
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
@@ -131,8 +133,13 @@
   - [x] Skill → KB → Topic-guided fallback response
   - [x] Response formatting
   - [x] Error handling
+- [ ] **Bot Mode (Org-Level)**
+  - [ ] Active / Shadow / Off (Simulator excluded)
+  - [ ] AI Settings selector + sidebar status indicator
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
 - [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
+- [x] **AI Settings:** Configurable bot name (org-level)
+- [x] **Inbox UI:** Show configured bot name in chat labels
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
@@ -176,6 +183,7 @@
   - [ ] "Open in WhatsApp" button
 - [x] **Skills Management**
   - [x] CRUD UI
+  - [x] Search positioned above tabs with always-visible add CTA
   - [ ] Test playground
 - [x] **Knowledge Base UI**
   - [x] CRUD with categories

@@ -175,6 +175,15 @@
   "botActiveBody": "Manuel mesaj göndermek için devralın.",
   "sendShortcut": "Göndermek için ⌘ Enter",
         "sendButton": "Yanıtı Gönder",
+        "summary": {
+            "button": "Konuşma Özeti",
+            "loading": "Özet hazırlanıyor...",
+            "error": "Özet alınamadı. Tekrar deneyin.",
+            "refresh": "Özeti yenile",
+            "tooltip": {
+                "insufficient": "Özet için yeterli mesaj yok"
+            }
+        },
         "details": "Detaylar",
         "conversationAttributes": "Konuşma Özellikleri",
         "id": "ID",
@@ -289,10 +298,14 @@
         "receipts": "Faturalar"
     },
     "aiSettings": {
-        "pageTitle": "AI Ayarları",
-        "title": "AI Ayarları",
-        "description": "Yetenek veya Bilgi Bankası eşleşmesi bulunamazsa botun nasıl yanıt vereceğini ayarlayın.",
-        "thresholdTitle": "Hassasiyet",
+    "pageTitle": "AI Ayarları",
+    "title": "AI Ayarları",
+    "description": "Yetenek veya Bilgi Bankası eşleşmesi bulunamazsa botun nasıl yanıt vereceğini ayarlayın.",
+    "botNameTitle": "Bot adı",
+    "botNameDescription": "Kullanıcılara gösterilir ve yapay zeka cevaplarında kullanılır.",
+    "botNameLabel": "Bot adı",
+    "botNamePlaceholder": "Bot",
+    "thresholdTitle": "Hassasiyet",
         "thresholdDescription": "Yetenek ve Bilgi Bankası eşleşmelerine birlikte uygulanır.\nYüksek: daha sıkı eşleşme (daha az yanıt).\nDüşük: daha esnek eşleşme (daha çok yanıt).",
         "threshold": "Hassasiyet",
         "thresholdSummary": "Şu an: {value}",

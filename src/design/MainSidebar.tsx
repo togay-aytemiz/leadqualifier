@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import {
     ArrowLeftFromLine,
     ArrowRightFromLine,
@@ -31,6 +32,29 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     const tSidebar = useTranslations('mainSidebar')
 
     const [collapsed, setCollapsed] = useState(false)
+    const [hasUnread, setHasUnread] = useState(false)
+    const [organizationId, setOrganizationId] = useState<string | null>(null)
+
+    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+    if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+    }
+    const supabase = supabaseRef.current
+
+    const refreshUnread = useCallback(async (orgId: string) => {
+        const { count, error } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', orgId)
+            .gt('unread_count', 0)
+
+        if (error) {
+            console.error('Failed to load unread indicator', error)
+            return
+        }
+
+        setHasUnread((count ?? 0) > 0)
+    }, [supabase])
 
     useEffect(() => {
         try {
@@ -48,6 +72,86 @@ export function MainSidebar({ userName }: MainSidebarProps) {
             // ignore persistence errors
         }
     }, [collapsed])
+
+    useEffect(() => {
+        let isMounted = true
+
+        const loadOrganization = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_system_admin')
+                .eq('id', user.id)
+                .single()
+
+            let orgId: string | null = null
+
+            if (profile?.is_system_admin) {
+                const { data: org } = await supabase
+                    .from('organizations')
+                    .select('id')
+                    .limit(1)
+                    .single()
+                orgId = org?.id ?? null
+            } else {
+                const { data: membership } = await supabase
+                    .from('organization_members')
+                    .select('organization_id')
+                    .eq('user_id', user.id)
+                    .limit(1)
+                    .single()
+                orgId = membership?.organization_id ?? null
+            }
+
+            if (!isMounted || !orgId) return
+
+            setOrganizationId(orgId)
+            await refreshUnread(orgId)
+        }
+
+        loadOrganization()
+
+        return () => {
+            isMounted = false
+        }
+    }, [refreshUnread, supabase])
+
+    useEffect(() => {
+        if (!organizationId) return
+        let channel: ReturnType<typeof supabase.channel> | null = null
+        let isMounted = true
+
+        const setupRealtime = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!isMounted) return
+
+            if (session?.access_token) {
+                supabase.realtime.setAuth(session.access_token)
+            }
+
+            channel = supabase.channel(`sidebar_unread_${organizationId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'conversations',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    refreshUnread(organizationId)
+                })
+                .subscribe()
+        }
+
+        setupRealtime()
+
+        return () => {
+            isMounted = false
+            if (channel) {
+                supabase.removeChannel(channel)
+            }
+        }
+    }, [organizationId, refreshUnread, supabase])
 
     const sections = useMemo(
         () => [
@@ -149,6 +253,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                                 {section.items.map(item => {
                                     const isActive = pathWithoutLocale.startsWith(item.href)
                                     const Icon = item.icon
+                                    const showUnread = item.id === 'inbox' && hasUnread
                                     return (
                                         <Link
                                             key={item.id}
@@ -166,13 +271,18 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                                                     : 'text-slate-600 hover:bg-white hover:text-slate-900'
                                             )}
                                         >
-                                            <Icon
-                                                size={18}
-                                                className={cn(
-                                                    'shrink-0',
-                                                    isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                            <span className="relative flex items-center">
+                                                <Icon
+                                                    size={18}
+                                                    className={cn(
+                                                        'shrink-0',
+                                                        isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                                    )}
+                                                />
+                                                {showUnread && collapsed && (
+                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-slate-50" />
                                                 )}
-                                            />
+                                            </span>
                                             <span
                                                 className={cn(
                                                     'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
@@ -183,6 +293,14 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                                             >
                                                 {item.label}
                                             </span>
+                                            {showUnread && !collapsed && (
+                                                <span
+                                                    className={cn(
+                                                        'ml-auto h-2 w-2 rounded-full ring-2',
+                                                        isActive ? 'bg-white ring-blue-200' : 'bg-blue-500 ring-white'
+                                                    )}
+                                                />
+                                            )}
                                         </Link>
                                     )
                                 })}

@@ -6,7 +6,7 @@ import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { getOrgAiSettings } from '@/lib/ai/settings'
-import { DEFAULT_FLEXIBLE_PROMPT } from '@/lib/ai/prompts'
+import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 
 export interface ChatMessage {
     id: string
@@ -157,7 +157,7 @@ export async function simulateChat(
             }
 
             const noAnswerToken = 'NO_ANSWER'
-            const basePrompt = aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT
+            const basePrompt = withBotNamePrompt(aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT, aiSettings.bot_name)
             const systemPrompt = `${basePrompt}
 
 Answer the user's question based strictly on the provided context below.

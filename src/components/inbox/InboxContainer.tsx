@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog } from '@/design'
 import {
     Inbox, ChevronDown,
-    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw
 } from 'lucide-react'
 import { Conversation, Message, Profile } from '@/types/database'
-import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent } from '@/lib/inbox/actions'
+import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -17,12 +17,13 @@ import { useTranslations, useLocale } from 'next-intl'
 interface InboxContainerProps {
     initialConversations: Conversation[]
     organizationId: string
+    botName?: string
 }
 
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 
-export function InboxContainer({ initialConversations, organizationId }: InboxContainerProps) {
+export function InboxContainer({ initialConversations, organizationId, botName }: InboxContainerProps) {
     const t = useTranslations('inbox')
     const locale = useLocale()
     const dateLocale = locale === 'tr' ? tr : undefined
@@ -31,6 +32,9 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
+    const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+    const [summaryText, setSummaryText] = useState('')
+    const [isSummaryOpen, setIsSummaryOpen] = useState(false)
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -54,6 +58,12 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
 
     useEffect(() => {
         selectedIdRef.current = selectedId
+    }, [selectedId])
+
+    useEffect(() => {
+        setSummaryStatus('idle')
+        setSummaryText('')
+        setIsSummaryOpen(false)
     }, [selectedId])
 
 
@@ -95,6 +105,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                 setConversations(prev => prev.map(c =>
                     c.id === nextId ? { ...c, unread_count: 0 } : c
                 ))
+                await markConversationRead(nextId)
             }
         } catch (error) {
             console.error('Failed to refresh messages', error)
@@ -254,11 +265,14 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                     // 2. Update conversation list (unread, last_message, sort)
                     setConversations(prev => prev.map(c => {
                         if (c.id === newMsg.conversation_id) {
+                            const shouldIncrementUnread = newMsg.sender_type === 'contact'
                             return {
                                 ...c,
                                 last_message_at: newMsg.created_at,
                                 // Only increment unread if it's NOT the currently open chat
-                                unread_count: newMsg.conversation_id !== selectedIdRef.current ? c.unread_count + 1 : 0,
+                                unread_count: newMsg.conversation_id !== selectedIdRef.current
+                                    ? (shouldIncrementUnread ? c.unread_count + 1 : c.unread_count)
+                                    : 0,
                                 // If we have messages snippet in list, update it too
                                 messages: [{ content: newMsg.content, created_at: newMsg.created_at, sender_type: newMsg.sender_type } as any]
                             }
@@ -339,6 +353,39 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
             }
         }
     }, [organizationId, refreshMessages, resolveAssignee, supabase])
+
+    const handleFetchSummary = async () => {
+        if (!selectedId || summaryStatus === 'loading') return
+        setSummaryStatus('loading')
+        setSummaryText('')
+        try {
+            const result = await getConversationSummary(selectedId, organizationId)
+            if (result.ok) {
+                setSummaryText(result.summary)
+                setSummaryStatus('success')
+                return
+            }
+            setSummaryStatus('error')
+        } catch (error) {
+            console.error('Failed to generate summary', error)
+            setSummaryStatus('error')
+        }
+    }
+
+    const handleToggleSummary = async () => {
+        if (summaryHeaderDisabled) return
+        const nextOpen = !isSummaryOpen
+        setIsSummaryOpen(nextOpen)
+        if (nextOpen && summaryStatus === 'idle' && !summaryText) {
+            await handleFetchSummary()
+        }
+    }
+
+    const handleRefreshSummary = async () => {
+        if (summaryRefreshDisabled) return
+        setIsSummaryOpen(true)
+        await handleFetchSummary()
+    }
 
     const handleSendMessage = async () => {
         if (!selectedId || !input.trim() || isSending) return
@@ -463,6 +510,12 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     const activeAgent = selectedConversation?.active_agent === 'operator' ? 'operator' : 'ai'
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
     const canSend = !!input.trim() && !isSending
+    const contactMessageCount = messages.filter(m => m.sender_type === 'contact').length
+    const hasBotMessage = messages.some(m => m.sender_type === 'bot')
+    const canSummarize = contactMessageCount >= 5 && hasBotMessage
+    const summaryHeaderDisabled = !canSummarize
+    const summaryRefreshDisabled = !canSummarize || summaryStatus === 'loading'
+    const showSummaryRefresh = isSummaryOpen && (summaryStatus === 'success' || summaryStatus === 'error')
 
     return (
         <>
@@ -495,9 +548,14 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                         <Avatar name={c.contact_name} size="sm" />
                                         <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
                                     </div>
-                                    <span className="text-xs text-gray-400">
-                                        {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">
+                                            {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
+                                        </span>
+                                        {c.unread_count > 0 && (
+                                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="pl-[34px] pr-2">
                                     <p className="text-sm text-gray-500 truncate leading-relaxed">
@@ -580,7 +638,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                                             </div>
                                             <div className="flex items-center gap-1.5 mr-1">
                                                 <span className="text-xs text-gray-400">
-                                                    {isBot ? t('botName') : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                                                    {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                 </span>
                                             </div>
                                         </div>
@@ -591,6 +649,75 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         </div>
 
                         <div className="p-6 border-t border-gray-200 bg-white">
+                            <div className="mb-2">
+                                <div
+                                    className="relative inline-flex group"
+                                    title={!canSummarize ? t('summary.tooltip.insufficient') : undefined}
+                                >
+                                    <div className={`inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 transition-all duration-300 ${summaryHeaderDisabled ? 'opacity-60' : ''}`}>
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleSummary}
+                                            disabled={summaryHeaderDisabled}
+                                            aria-expanded={isSummaryOpen}
+                                            aria-controls="conversation-summary-panel"
+                                            className="flex items-center gap-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronDown className={`transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`} size={16} />
+                                            {t('summary.button')}
+                                        </button>
+                                        {showSummaryRefresh && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRefreshSummary}
+                                                disabled={summaryRefreshDisabled}
+                                                className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                            >
+                                                <RotateCw size={16} />
+                                                <span className="sr-only">{t('summary.refresh')}</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                    {!canSummarize && (
+                                        <div className="pointer-events-none absolute left-0 top-full mt-2 z-10 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                                            {t('summary.tooltip.insufficient')}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div
+                                    id="conversation-summary-panel"
+                                    aria-hidden={!isSummaryOpen}
+                                    className={`mt-3 overflow-hidden transition-all duration-300 ease-out ${isSummaryOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}
+                                >
+                                    <div className={`w-full transition-all duration-300 ease-out ${summaryStatus === 'success' ? 'max-w-full' : 'max-w-[520px]'}`}>
+                                        <div className={`rounded-2xl border px-4 py-3 shadow-sm transition-all duration-300 ${summaryStatus === 'loading'
+                                            ? 'border-blue-100 bg-blue-50/60'
+                                            : 'border-gray-200 bg-white'
+                                            }`}
+                                        >
+                                            {summaryStatus === 'loading' && (
+                                                <div className="space-y-2">
+                                                    <div className="h-4 w-3/4 rounded-md bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 animate-pulse" />
+                                                    <div className="h-4 w-11/12 rounded-md bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 animate-pulse" />
+                                                    <div className="h-4 w-2/3 rounded-md bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 animate-pulse" />
+                                                </div>
+                                            )}
+                                            {summaryStatus === 'success' && (
+                                                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                                    {summaryText}
+                                                </p>
+                                            )}
+                                            {summaryStatus === 'error' && (
+                                                <p className="text-sm text-red-600">
+                                                    {t('summary.error')}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {activeAgent === 'ai' && (
                                 <div className="mb-4 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 flex items-center gap-3">
                                     <div className="h-9 w-9 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center text-yellow-700 shrink-0">

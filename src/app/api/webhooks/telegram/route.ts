@@ -5,7 +5,7 @@ import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
 import { getOrgAiSettings } from '@/lib/ai/settings'
-import { DEFAULT_FLEXIBLE_PROMPT } from '@/lib/ai/prompts'
+import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
                     const { default: OpenAI } = await import('openai')
                     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-                    const basePrompt = aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT
+                    const basePrompt = withBotNamePrompt(aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT, aiSettings.bot_name)
                     const systemPrompt = `${basePrompt}
 
 Answer the user's question based strictly on the provided context below.

@@ -3,7 +3,7 @@
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { getOrgAiSettings } from '@/lib/ai/settings'
-import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT } from '@/lib/ai/prompts'
+import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT, withBotNamePrompt } from '@/lib/ai/prompts'
 import type { OrganizationAiSettings } from '@/types/database'
 
 const FALLBACK_TOPICS_TR = ['fiyatlar', 'randevu', 'iptal/iade', 'hizmetler']
@@ -82,7 +82,8 @@ function renderStrictFallback(text: string, topics: string[], message: string) {
 async function renderFlexibleFallback(
     prompt: string,
     topics: string[],
-    message: string
+    message: string,
+    botName?: string
 ): Promise<string> {
     if (!process.env.OPENAI_API_KEY) {
         return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, message)
@@ -93,7 +94,7 @@ async function renderFlexibleFallback(
         ? formatTopicList(topics)
         : formatTopicList(isLikelyTurkish(message) ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
 
-    const systemPrompt = prompt || DEFAULT_FLEXIBLE_PROMPT
+    const systemPrompt = withBotNamePrompt(prompt || DEFAULT_FLEXIBLE_PROMPT, botName)
 
     const userPrompt = `Available topics: ${topicsList}\n\nUser message: ${message}`
 
@@ -129,6 +130,7 @@ export async function buildFallbackResponse(options: {
     return renderFlexibleFallback(
         aiSettings.prompt,
         topics,
-        options.message
+        options.message,
+        aiSettings.bot_name
     )
 }

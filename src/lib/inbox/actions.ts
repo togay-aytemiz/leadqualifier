@@ -1,7 +1,13 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { withBotNamePrompt } from '@/lib/ai/prompts'
+import { getOrgAiSettings } from '@/lib/ai/settings'
 import { Conversation, Message } from '@/types/database'
+
+export type ConversationSummaryResult =
+    | { ok: true; summary: string }
+    | { ok: false; reason: 'insufficient_data' | 'missing_api_key' | 'request_failed' }
 
 export async function getConversations(organizationId: string, page: number = 0, pageSize: number = 20) {
     const supabase = await createClient()
@@ -54,6 +60,122 @@ export async function getMessages(conversationId: string) {
     }
 
     return data as Message[]
+}
+
+const SUMMARY_USER_LIMIT = 5
+const SUMMARY_MAX_CHARS = 600
+
+type SummaryMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
+
+function truncateSummaryText(text: string, maxChars: number) {
+    const normalized = text.replace(/\s+/g, ' ').trim()
+    if (normalized.length <= maxChars) return normalized
+    return `${normalized.slice(0, Math.max(0, maxChars - 3))}...`
+}
+
+function formatSummaryMessages(messages: SummaryMessage[], botName: string) {
+    return messages.map((message, index) => {
+        const roleLabel = message.sender_type === 'bot' ? botName : 'User'
+        const timestamp = new Date(message.created_at).toISOString()
+        const content = truncateSummaryText(message.content ?? '', SUMMARY_MAX_CHARS)
+        return `${index + 1}. [${timestamp}] ${roleLabel}: ${content}`
+    }).join('\n')
+}
+
+export async function getConversationSummary(
+    conversationId: string,
+    organizationId: string
+): Promise<ConversationSummaryResult> {
+    if (!process.env.OPENAI_API_KEY) {
+        return { ok: false, reason: 'missing_api_key' }
+    }
+
+    const supabase = await createClient()
+    const aiSettings = await getOrgAiSettings(organizationId, { supabase })
+
+    const [contactResult, botResult] = await Promise.all([
+        supabase
+            .from('messages')
+            .select('content, created_at, sender_type')
+            .eq('conversation_id', conversationId)
+            .eq('organization_id', organizationId)
+            .eq('sender_type', 'contact')
+            .order('created_at', { ascending: false })
+            .limit(SUMMARY_USER_LIMIT),
+        supabase
+            .from('messages')
+            .select('content, created_at, sender_type')
+            .eq('conversation_id', conversationId)
+            .eq('organization_id', organizationId)
+            .eq('sender_type', 'bot')
+            .order('created_at', { ascending: false })
+            .limit(1)
+    ])
+
+    if (contactResult.error || botResult.error) {
+        console.error('Error fetching summary messages:', contactResult.error || botResult.error)
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    const contactMessages = (contactResult.data ?? []) as SummaryMessage[]
+    const botMessage = (botResult.data ?? [])[0] as SummaryMessage | undefined
+
+    if (contactMessages.length < SUMMARY_USER_LIMIT || !botMessage) {
+        return { ok: false, reason: 'insufficient_data' }
+    }
+
+    const combined = [...contactMessages, botMessage]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+    const formattedMessages = formatSummaryMessages(combined, aiSettings.bot_name)
+
+    try {
+        const { default: OpenAI } = await import('openai')
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+        const basePrompt = [
+            'You summarize only from the provided messages.',
+            'Do not add facts or assumptions.',
+            'Respond with a single paragraph in Turkish, 2-3 sentences.'
+        ].join(' ')
+        const systemPrompt = withBotNamePrompt(basePrompt, aiSettings.bot_name)
+        const userPrompt = `Summarize the conversation using only the messages below:\n${formattedMessages}`
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.2,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ]
+        })
+
+        const summary = completion.choices[0]?.message?.content?.trim()
+        if (!summary) {
+            return { ok: false, reason: 'request_failed' }
+        }
+
+        return { ok: true, summary }
+    } catch (error) {
+        console.error('Summary request failed:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+}
+
+export async function markConversationRead(conversationId: string) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('conversations')
+        .update({
+            unread_count: 0,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId)
+        .gt('unread_count', 0)
+
+    if (error) {
+        console.error('Error marking conversation as read:', error)
+    }
 }
 
 export async function sendMessage(

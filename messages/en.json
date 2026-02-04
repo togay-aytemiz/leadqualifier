@@ -175,6 +175,15 @@
   "botActiveBody": "Take over to send messages manually.",
   "sendShortcut": "⌘ Enter to send",
         "sendButton": "Send Reply",
+        "summary": {
+            "button": "Conversation Summary",
+            "loading": "Preparing summary...",
+            "error": "Summary unavailable. Try again.",
+            "refresh": "Refresh summary",
+            "tooltip": {
+                "insufficient": "Not enough messages for a summary"
+            }
+        },
         "details": "Details",
         "conversationAttributes": "Conversation Attributes",
         "id": "ID",
@@ -289,10 +298,14 @@
         "receipts": "Receipts"
     },
     "aiSettings": {
-        "pageTitle": "AI Settings",
-        "title": "AI Settings",
-        "description": "Tune how the bot responds when it can’t find a Skill or Knowledge Base match.",
-        "thresholdTitle": "Sensitivity",
+    "pageTitle": "AI Settings",
+    "title": "AI Settings",
+    "description": "Tune how the bot responds when it can’t find a Skill or Knowledge Base match.",
+    "botNameTitle": "Bot name",
+    "botNameDescription": "Shown to users and used in AI responses.",
+    "botNameLabel": "Bot name",
+    "botNamePlaceholder": "Bot",
+    "thresholdTitle": "Sensitivity",
         "thresholdDescription": "Applies to both Skills and Knowledge Base matching. Higher = stricter match (fewer replies). Lower = looser match (more replies).",
         "threshold": "Sensitivity",
         "thresholdSummary": "Current: {value}",

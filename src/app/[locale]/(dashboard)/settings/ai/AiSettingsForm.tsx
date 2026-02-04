@@ -4,15 +4,19 @@ import { useTranslations } from 'next-intl'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 
 interface AiSettingsFormProps {
+    botName: string
     matchThreshold: number
     prompt: string
+    onBotNameChange: (value: string) => void
     onMatchThresholdChange: (value: number) => void
     onPromptChange: (value: string) => void
 }
 
 export default function AiSettingsForm({
+    botName,
     matchThreshold,
     prompt,
+    onBotNameChange,
     onMatchThresholdChange,
     onPromptChange
 }: AiSettingsFormProps) {
@@ -20,6 +24,20 @@ export default function AiSettingsForm({
 
     return (
         <div className="max-w-5xl">
+            <SettingsSection
+                title={t('botNameTitle')}
+                description={t('botNameDescription')}
+            >
+                <label className="text-sm font-medium text-gray-700">{t('botNameLabel')}</label>
+                <input
+                    type="text"
+                    value={botName}
+                    onChange={(e) => onBotNameChange(e.target.value)}
+                    placeholder={t('botNamePlaceholder')}
+                    className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                />
+            </SettingsSection>
+
             <SettingsSection
                 title={t('thresholdTitle')}
                 description={t('thresholdDescription')}

@@ -9,6 +9,9 @@
 ### Added
 - Auth password recovery flow (Forgot Password + Reset Password screens).
 - Profile settings password section with reset link CTA and cooldown.
+- Inbox conversation summary (on-demand button + inline panel).
+- AI settings bot name (org-level) used in AI prompts and summaries.
+- Inbox chat labels now show the configured bot name.
 - Next.js 14 project with App Router and TypeScript
 - Strict TypeScript configuration (`noUncheckedIndexedAccess`, `noImplicitReturns`)
 - Prettier + ESLint with strict rules
@@ -58,6 +61,7 @@
 - Simulator now shows per-message token usage (input/output/total) plus router/RAG breakdown and conversation totals in debug and bubbles.
 - Automated i18n guard: hardcoded UI string scan + EN/TR key parity check (`npm run i18n:check`) wired into lint.
 - Expanded EN/TR translations for admin, channels, simulator, inbox details, and auth placeholders.
+- Inbox unread indicators now appear in the main sidebar and conversation list.
 
 ### Added
 - **v0.5.0: Knowledge Base Parity**
@@ -76,6 +80,10 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Docs: define org-level bot mode (Active/Shadow/Off) and sidebar status indicator placement.
+- Docs: add inbox conversation summary design spec.
+- Inbox summary UI refined to hide refresh until summary completes, with reduced spacing above the AI banner.
+- Skills list: moved search above tabs and kept the add button visible in the header.
 - Auth screens redesigned to align with the settings UI (light theme, updated form styling).
 - Docs: Updated PRD/Roadmap to reflect Telegram sandbox integration and current implementation status.
 - Inbox composer banner copy now references the AI assistant and centers the banner content vertically.
@@ -111,6 +119,7 @@
 - RAG now enforces NO_ANSWER fallback and handles retrieval errors without failing the webhook.
 - Knowledge base sidebar now refreshes after folder create/delete actions triggered outside the sidebar.
 - Simulator KB fallback now answers definition-style questions that previously fell through routing.
+- Inbox unread counts now reset on open and only increment for contact messages.
 
 ---
 

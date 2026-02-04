@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getConversations } from '@/lib/inbox/actions'
+import { getOrgAiSettings } from '@/lib/ai/settings'
 import { InboxContainer } from '@/components/inbox/InboxContainer'
 import { redirect } from 'next/navigation'
 import { Building2 } from 'lucide-react'
@@ -52,12 +53,16 @@ export default async function InboxPage() {
         )
     }
 
-    const conversations = await getConversations(organizationId)
+    const [conversations, aiSettings] = await Promise.all([
+        getConversations(organizationId),
+        getOrgAiSettings(organizationId, { supabase })
+    ])
 
     return (
         <InboxContainer
             initialConversations={conversations}
             organizationId={organizationId}
+            botName={aiSettings.bot_name}
         />
     )
 }

@@ -17,6 +17,7 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const t = useTranslations('aiSettings')
     const tUnsaved = useTranslations('unsavedChanges')
     const initialRef = useRef(initialSettings)
+    const [botName, setBotName] = useState(initialSettings.bot_name)
     const [matchThreshold, setMatchThreshold] = useState(initialSettings.match_threshold)
     const [prompt, setPrompt] = useState(initialSettings.prompt)
     const [isSaving, setIsSaving] = useState(false)
@@ -25,10 +26,11 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
 
     const isDirty = useMemo(() => {
         return (
+            botName !== initialRef.current.bot_name ||
             matchThreshold !== initialRef.current.match_threshold ||
             prompt !== initialRef.current.prompt
         )
-    }, [matchThreshold, prompt])
+    }, [botName, matchThreshold, prompt])
 
     useEffect(() => {
         if (isDirty) {
@@ -41,16 +43,16 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
         setSaveError(null)
         setSaved(false)
         try {
-            await updateOrgAiSettings({
+            const savedSettings = await updateOrgAiSettings({
                 mode: 'flexible',
+                bot_name: botName,
                 match_threshold: matchThreshold,
                 prompt
             })
-            initialRef.current = {
-                ...initialRef.current,
-                match_threshold: matchThreshold,
-                prompt
-            }
+            initialRef.current = savedSettings
+            setBotName(savedSettings.bot_name)
+            setMatchThreshold(savedSettings.match_threshold)
+            setPrompt(savedSettings.prompt)
             setSaved(true)
             return true
         } catch (error) {
@@ -63,6 +65,7 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     }
 
     const handleDiscard = () => {
+        setBotName(initialRef.current.bot_name)
         setMatchThreshold(initialRef.current.match_threshold)
         setPrompt(initialRef.current.prompt)
         setSaved(false)
@@ -93,8 +96,10 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                     {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
                 </div>
                 <AiSettingsForm
+                    botName={botName}
                     matchThreshold={matchThreshold}
                     prompt={prompt}
+                    onBotNameChange={setBotName}
                     onMatchThresholdChange={setMatchThreshold}
                     onPromptChange={setPrompt}
                 />

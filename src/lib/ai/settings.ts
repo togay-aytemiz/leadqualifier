@@ -2,12 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { OrganizationAiSettings, AiMode } from '@/types/database'
-import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT } from '@/lib/ai/prompts'
+import { DEFAULT_BOT_NAME, DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT, normalizeBotName } from '@/lib/ai/prompts'
 
 const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'> = {
     mode: 'flexible',
     match_threshold: 0.6,
-    prompt: DEFAULT_FLEXIBLE_PROMPT
+    prompt: DEFAULT_FLEXIBLE_PROMPT,
+    bot_name: DEFAULT_BOT_NAME
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -37,7 +38,8 @@ function applyAiDefaults(
     return {
         mode,
         match_threshold: clamp(Number(settings?.match_threshold ?? DEFAULT_AI_SETTINGS.match_threshold), 0, 1),
-        prompt: resolvePrompt(settings?.prompt)
+        prompt: resolvePrompt(settings?.prompt),
+        bot_name: normalizeBotName(settings?.bot_name)
     }
 }
 

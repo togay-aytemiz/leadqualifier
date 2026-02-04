@@ -46,7 +46,7 @@ Automate WhatsApp message handling:
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system** | Implemented |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary** | Implemented |
 
 ### ❌ Out of Scope (Intentional)
 - Calendar integration
@@ -70,6 +70,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Rules:**
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
+- Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
  - If no skill/KB match, bot suggests available topics using existing skills/KB titles
@@ -184,6 +185,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Always-on Flexible mode (no mode selection)
 - Single sensitivity threshold (applies to Skill + KB)
 - Single prompt field (used as the base prompt for fallback responses)
+- Configurable bot name (org-level) used in AI responses, summaries, and inbox labels
+- Bot mode selector (Active / Shadow / Off) applies org-wide and excludes Simulator
 - TR copy uses "Yetenek" terminology and "Yapay Zeka Talimatı" label for clarity
 
 ### 5.6 Profile & Organization Settings
@@ -254,15 +257,18 @@ MVP is successful when:
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
+- **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
 - **Inbox Details:** Use consistent contact initials between list avatars and details panel.
+- **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
+- **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
