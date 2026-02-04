@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint && npm run i18n:check",
     "i18n:check": "node scripts/i18n/check-i18n.js",
+    "test": "vitest",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {
@@ -37,6 +38,7 @@
     "prettier": "^3.8.1",
     "supabase": "^2.74.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^1.6.0"
   }
 }
