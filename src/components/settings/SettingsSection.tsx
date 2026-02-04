@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 interface SettingsSectionProps {
     title: string
     description?: string
+    descriptionAddon?: ReactNode
     summary?: string
     layout?: 'default' | 'wide'
     children: ReactNode
@@ -19,7 +20,7 @@ const layoutClasses = {
     }
 }
 
-export function SettingsSection({ title, description, summary, layout = 'default', children }: SettingsSectionProps) {
+export function SettingsSection({ title, description, descriptionAddon, summary, layout = 'default', children }: SettingsSectionProps) {
     const columns = layoutClasses[layout] ?? layoutClasses.default
 
     return (
@@ -29,6 +30,11 @@ export function SettingsSection({ title, description, summary, layout = 'default
                     <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
                     {description && (
                         <p className="mt-2 text-sm text-gray-500 whitespace-pre-line">{description}</p>
+                    )}
+                    {descriptionAddon && (
+                        <div className="mt-2">
+                            {descriptionAddon}
+                        </div>
                     )}
                 </div>
                 <div className={columns.right}>

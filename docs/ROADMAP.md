@@ -144,6 +144,9 @@
 - [x] **AI Settings:** Configurable bot name (org-level)
 - [x] **Inbox UI:** Show configured bot name in chat labels
 - [x] **Usage & Billing:** Track monthly (UTC) + total AI token usage
+- [x] **Usage & Billing:** Breakdown by summary, messages, and lead extraction
+- [x] **Usage & Billing UI:** Show the UTC month label in the monthly card header
+- [x] **Usage & Billing UI:** Place “Detayları gör” link under the UTC note
 - [x] **Settings UX:** Save buttons show a transient success state and clear dirty-state across settings pages
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs

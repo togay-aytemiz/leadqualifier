@@ -2,7 +2,24 @@
 
 import { createClient } from '@/lib/supabase/server'
 
-export type AiUsageCategory = 'router' | 'rag' | 'fallback' | 'summary'
+export type AiUsageCategory = 'router' | 'rag' | 'fallback' | 'summary' | 'lead_extraction'
+
+export interface AiUsageTotals {
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+}
+
+export interface AiUsageSummary {
+    month: string
+    timezone: 'UTC'
+    monthly: AiUsageTotals
+    total: AiUsageTotals
+    monthlyByCategory: Record<string, AiUsageTotals>
+    totalByCategory: Record<string, AiUsageTotals>
+    monthlyCount: number
+    totalCount: number
+}
 
 interface RecordAiUsageInput {
     organizationId: string
@@ -61,7 +78,7 @@ export async function recordAiUsage({
     }
 }
 
-function sumUsage(rows: Array<{ input_tokens: number; output_tokens: number; total_tokens: number }>) {
+function sumUsage(rows: Array<{ input_tokens: number; output_tokens: number; total_tokens: number }>): AiUsageTotals {
     return rows.reduce(
         (acc, row) => {
             acc.inputTokens += row.input_tokens ?? 0
@@ -73,24 +90,47 @@ function sumUsage(rows: Array<{ input_tokens: number; output_tokens: number; tot
     )
 }
 
-export async function getOrgAiUsageSummary(organizationId: string, options?: { supabase?: any }) {
+function sumUsageByCategory(
+    rows: Array<{ category: string; input_tokens: number; output_tokens: number; total_tokens: number }>,
+    categories: string[]
+) {
+    const totals: Record<string, AiUsageTotals> = {}
+    categories.forEach((category) => {
+        totals[category] = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+    })
+
+    for (const row of rows) {
+        const key = row.category
+        if (!totals[key]) {
+            totals[key] = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+        }
+        totals[key].inputTokens += row.input_tokens ?? 0
+        totals[key].outputTokens += row.output_tokens ?? 0
+        totals[key].totalTokens += row.total_tokens ?? 0
+    }
+
+    return totals
+}
+
+export async function getOrgAiUsageSummary(organizationId: string, options?: { supabase?: any }): Promise<AiUsageSummary> {
     const supabase = options?.supabase ?? await createClient()
 
     const now = new Date()
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
     const monthKey = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`
+    const categories: string[] = ['router', 'rag', 'fallback', 'summary', 'lead_extraction']
 
     const [monthlyResult, totalResult] = await Promise.all([
         supabase
             .from('organization_ai_usage')
-            .select('input_tokens, output_tokens, total_tokens')
+            .select('category, input_tokens, output_tokens, total_tokens')
             .eq('organization_id', organizationId)
             .gte('created_at', monthStart.toISOString())
             .lt('created_at', monthEnd.toISOString()),
         supabase
             .from('organization_ai_usage')
-            .select('input_tokens, output_tokens, total_tokens')
+            .select('category, input_tokens, output_tokens, total_tokens')
             .eq('organization_id', organizationId)
     ])
 
@@ -102,14 +142,16 @@ export async function getOrgAiUsageSummary(organizationId: string, options?: { s
         console.error('Failed to load total AI usage:', totalResult.error)
     }
 
-    const monthlyRows = (monthlyResult.data ?? []) as Array<{ input_tokens: number; output_tokens: number; total_tokens: number }>
-    const totalRows = (totalResult.data ?? []) as Array<{ input_tokens: number; output_tokens: number; total_tokens: number }>
+    const monthlyRows = (monthlyResult.data ?? []) as Array<{ category: string; input_tokens: number; output_tokens: number; total_tokens: number }>
+    const totalRows = (totalResult.data ?? []) as Array<{ category: string; input_tokens: number; output_tokens: number; total_tokens: number }>
 
     return {
         month: monthKey,
         timezone: 'UTC',
         monthly: sumUsage(monthlyRows),
         total: sumUsage(totalRows),
+        monthlyByCategory: sumUsageByCategory(monthlyRows, categories),
+        totalByCategory: sumUsageByCategory(totalRows, categories),
         monthlyCount: monthlyRows.length,
         totalCount: totalRows.length
     }

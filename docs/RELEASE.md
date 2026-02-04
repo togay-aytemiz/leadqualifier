@@ -14,6 +14,9 @@
 - AI settings bot name (org-level) used in AI prompts and summaries.
 - Inbox chat labels now show the configured bot name.
 - Usage & Billing settings with monthly (UTC) + total AI token tracking.
+- Usage & Billing now shows a breakdown for summary, messages, and lead extraction.
+- Usage & Billing monthly card now displays the UTC month label (e.g., February 2026).
+- Usage & Billing detail link is now placed under the UTC note text.
 - Next.js 14 project with App Router and TypeScript
 - Strict TypeScript configuration (`noUncheckedIndexedAccess`, `noImplicitReturns`)
 - Prettier + ESLint with strict rules

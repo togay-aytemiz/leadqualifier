@@ -200,6 +200,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 5.7 Usage & Billing (Implemented)
 - Track org-level AI token usage (monthly UTC + total)
 - Includes production AI paths: router, RAG, fallback, and summaries
+- Report usage breakdown by summary, messages (router/RAG/fallback), and lead extraction
+- Monthly usage card surfaces the UTC month label (e.g., February 2026)
+- Usage details link appears under the UTC note in the Usage & Billing section
 - Every new token-consuming feature must log usage events
 
 ---

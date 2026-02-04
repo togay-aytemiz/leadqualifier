@@ -4,6 +4,7 @@ import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { getOrgAiUsageSummary } from '@/lib/ai/usage'
+import { UsageBreakdownDetails } from './UsageBreakdownDetails'
 
 export default async function BillingSettingsPage() {
     const supabase = await createClient()
@@ -36,6 +37,15 @@ export default async function BillingSettingsPage() {
 
     const usage = await getOrgAiUsageSummary(organizationId, { supabase })
     const formatNumber = new Intl.NumberFormat(locale)
+    const [year, month] = usage.month.split('-').map(Number)
+    const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getUTCFullYear()
+    const safeMonth = Number.isFinite(month ?? Number.NaN) ? (month as number) : new Date().getUTCMonth() + 1
+    const monthDate = new Date(Date.UTC(safeYear, safeMonth - 1, 1))
+    const monthLabel = new Intl.DateTimeFormat(locale, {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC'
+    }).format(monthDate)
 
     const monthlyTotal = usage.monthly.totalTokens
     const totalTotal = usage.total.totalTokens
@@ -98,11 +108,16 @@ export default async function BillingSettingsPage() {
 
                         <SettingsSection
                             title={tBilling('title')}
-                            description={tBilling('utcNote', { month: usage.month })}
+                            description={tBilling('utcNote')}
+                            descriptionAddon={<UsageBreakdownDetails usage={usage} />}
                         >
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('monthLabel')}</p>
+                                    <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
+                                        <span className="uppercase">{tBilling('monthLabel')}</span>
+                                        <span className="text-[11px]">•</span>
+                                        <span className="normal-case font-medium">{monthLabel}</span>
+                                    </div>
                                     <p className="mt-2 text-2xl font-semibold text-gray-900">
                                         {formatNumber.format(monthlyTotal)}
                                         <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
