@@ -89,6 +89,7 @@
         "delete": "Sil",
         "deleteConfirm": "Bu yeteneği silmek istediğinizden emin misiniz?",
         "deleteConfirmDesc": "Bu işlem geri alınamaz. Yetenek kalıcı olarak silinecektir.",
+        "cancel": "Vazgeç",
         "searchPlaceholder": "Yetenek ara...",
         "archive": "Arşivle",
         "activate": "Aktifleştir",
