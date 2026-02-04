@@ -10,7 +10,8 @@ interface OfferingProfileSectionProps {
     catalogEnabled: boolean
     pendingUpdates: Array<{ id: string; proposed_summary: string }>
     pendingCandidates: Array<{ id: string; proposed_name: string }>
-    onSave: (summary: string, catalogEnabled: boolean) => Promise<void>
+    onSummaryChange: (value: string) => void
+    onCatalogEnabledChange: (value: boolean) => void
     onApproveUpdate: (id: string) => Promise<void>
     onRejectUpdate: (id: string) => Promise<void>
     onApproveCandidate: (id: string) => Promise<void>
@@ -22,16 +23,16 @@ export function OfferingProfileSection({
     catalogEnabled: initialCatalogEnabled,
     pendingUpdates,
     pendingCandidates,
-    onSave,
+    onSummaryChange,
+    onCatalogEnabledChange,
     onApproveUpdate,
     onRejectUpdate,
     onApproveCandidate,
     onRejectCandidate
 }: OfferingProfileSectionProps) {
-    const t = useTranslations('aiSettings')
+    const t = useTranslations('organizationSettings')
     const [summary, setSummary] = useState(initialSummary)
     const [catalogEnabled, setCatalogEnabled] = useState(initialCatalogEnabled)
-    const [isSaving, setIsSaving] = useState(false)
 
     useEffect(() => {
         setSummary(initialSummary)
@@ -41,38 +42,34 @@ export function OfferingProfileSection({
         setCatalogEnabled(initialCatalogEnabled)
     }, [initialCatalogEnabled])
 
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            await onSave(summary, catalogEnabled)
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
     return (
         <SettingsSection title={t('offeringProfileTitle')} description={t('offeringProfileDescription')}>
             <div className="space-y-4">
-                <label className="text-sm font-medium text-gray-700">{t('offeringProfileLabel')}</label>
                 <textarea
                     rows={6}
                     value={summary}
-                    onChange={(e) => setSummary(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                    onChange={(e) => {
+                        const next = e.target.value
+                        setSummary(next)
+                        onSummaryChange(next)
+                    }}
+                    placeholder={t('offeringProfilePlaceholder')}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
                 />
 
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input
                         type="checkbox"
                         checked={catalogEnabled}
-                        onChange={(e) => setCatalogEnabled(e.target.checked)}
+                        onChange={(e) => {
+                            const next = e.target.checked
+                            setCatalogEnabled(next)
+                            onCatalogEnabledChange(next)
+                        }}
                     />
                     {t('catalogEnabledLabel')}
                 </label>
-
-                <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? t('saving') : t('offeringProfileSave')}
-                </Button>
+                <p className="text-xs text-gray-500">{t('catalogEnabledHelp')}</p>
 
                 {pendingUpdates.length > 0 && (
                     <div className="border-t pt-4">
@@ -102,6 +99,10 @@ export function OfferingProfileSection({
                             </div>
                         ))}
                     </div>
+                )}
+
+                {pendingUpdates.length === 0 && (!catalogEnabled || pendingCandidates.length === 0) && (
+                    <p className="text-xs text-gray-500">{t('offeringProfileEmpty')}</p>
                 )}
             </div>
         </SettingsSection>

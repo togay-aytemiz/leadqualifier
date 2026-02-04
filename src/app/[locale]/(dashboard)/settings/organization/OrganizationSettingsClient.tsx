@@ -5,23 +5,74 @@ import { useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
+import type { OfferingProfile, OfferingProfileUpdate, ServiceCandidate } from '@/types/database'
+import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
+import {
+    approveProfileUpdate,
+    approveServiceCandidate,
+    rejectProfileUpdate,
+    rejectServiceCandidate,
+    updateOfferingProfileSummary
+} from '@/lib/leads/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 
 interface OrganizationSettingsClientProps {
     initialName: string
+    organizationId: string
+    offeringProfile: OfferingProfile | null
+    pendingProfileUpdates: OfferingProfileUpdate[]
+    pendingCandidates: ServiceCandidate[]
 }
 
-export default function OrganizationSettingsClient({ initialName }: OrganizationSettingsClientProps) {
+export default function OrganizationSettingsClient({
+    initialName,
+    organizationId,
+    offeringProfile,
+    pendingProfileUpdates: initialPendingUpdates,
+    pendingCandidates: initialPendingCandidates
+}: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
-    const [baseline, setBaseline] = useState({ name: initialName })
+    const [baseline, setBaseline] = useState({
+        name: initialName,
+        profileSummary: offeringProfile?.summary ?? '',
+        catalogEnabled: offeringProfile?.catalog_enabled ?? true
+    })
     const [name, setName] = useState(initialName)
+    const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
+    const [catalogEnabled, setCatalogEnabled] = useState(offeringProfile?.catalog_enabled ?? true)
+    const [pendingProfileUpdates, setPendingProfileUpdates] = useState(initialPendingUpdates)
+    const [pendingCandidates, setPendingCandidates] = useState(initialPendingCandidates)
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
 
-    const isDirty = useMemo(() => name !== baseline.name, [name, baseline])
+    const isDirty = useMemo(() => {
+        return (
+            name !== baseline.name ||
+            profileSummary !== baseline.profileSummary ||
+            catalogEnabled !== baseline.catalogEnabled
+        )
+    }, [name, profileSummary, catalogEnabled, baseline])
+
+    useEffect(() => {
+        setProfileSummary(offeringProfile?.summary ?? '')
+        setCatalogEnabled(offeringProfile?.catalog_enabled ?? true)
+        setBaseline(prev => ({
+            ...prev,
+            profileSummary: offeringProfile?.summary ?? '',
+            catalogEnabled: offeringProfile?.catalog_enabled ?? true
+        }))
+    }, [offeringProfile])
+
+    useEffect(() => {
+        setPendingProfileUpdates(initialPendingUpdates)
+    }, [initialPendingUpdates])
+
+    useEffect(() => {
+        setPendingCandidates(initialPendingCandidates)
+    }, [initialPendingCandidates])
 
     useEffect(() => {
         if (isDirty) {
@@ -43,8 +94,16 @@ export default function OrganizationSettingsClient({ initialName }: Organization
         setSaveError(null)
         setSaved(false)
         try {
-            await updateOrganizationName(name)
-            setBaseline({ name })
+            if (name !== baseline.name) {
+                await updateOrganizationName(name)
+            }
+            if (
+                profileSummary !== baseline.profileSummary ||
+                catalogEnabled !== baseline.catalogEnabled
+            ) {
+                await updateOfferingProfileSummary(organizationId, profileSummary, catalogEnabled)
+            }
+            setBaseline({ name, profileSummary, catalogEnabled })
             setSaved(true)
             return true
         } catch (error) {
@@ -58,8 +117,35 @@ export default function OrganizationSettingsClient({ initialName }: Organization
 
     const handleDiscard = () => {
         setName(baseline.name)
+        setProfileSummary(baseline.profileSummary)
+        setCatalogEnabled(baseline.catalogEnabled)
         setSaveError(null)
         setSaved(false)
+    }
+
+    const handleApproveUpdate = async (id: string) => {
+        const match = pendingProfileUpdates.find((item) => item.id === id)
+        await approveProfileUpdate(id)
+        setPendingProfileUpdates((items) => items.filter((item) => item.id !== id))
+        if (match?.proposed_summary) {
+            setProfileSummary(match.proposed_summary)
+            setBaseline(prev => ({ ...prev, profileSummary: match.proposed_summary }))
+        }
+    }
+
+    const handleRejectUpdate = async (id: string) => {
+        await rejectProfileUpdate(id)
+        setPendingProfileUpdates((items) => items.filter((item) => item.id !== id))
+    }
+
+    const handleApproveCandidate = async (id: string) => {
+        await approveServiceCandidate(id)
+        setPendingCandidates((items) => items.filter((item) => item.id !== id))
+    }
+
+    const handleRejectCandidate = async (id: string) => {
+        await rejectServiceCandidate(id)
+        setPendingCandidates((items) => items.filter((item) => item.id !== id))
     }
 
     const guard = useUnsavedChangesGuard({
@@ -102,6 +188,19 @@ export default function OrganizationSettingsClient({ initialName }: Organization
                             className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
                         />
                     </SettingsSection>
+
+                    <OfferingProfileSection
+                        summary={profileSummary}
+                        catalogEnabled={catalogEnabled}
+                        pendingUpdates={pendingProfileUpdates}
+                        pendingCandidates={pendingCandidates}
+                        onSummaryChange={setProfileSummary}
+                        onCatalogEnabledChange={setCatalogEnabled}
+                        onApproveUpdate={handleApproveUpdate}
+                        onRejectUpdate={handleRejectUpdate}
+                        onApproveCandidate={handleApproveCandidate}
+                        onRejectCandidate={handleRejectCandidate}
+                    />
                 </div>
             </div>
 

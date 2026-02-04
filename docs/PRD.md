@@ -292,6 +292,7 @@ MVP is successful when:
 - **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and require admin approval before the service can be used in extraction.
 - **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; profile updates are proposed from Skills/KB with admin approval.
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
+- **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

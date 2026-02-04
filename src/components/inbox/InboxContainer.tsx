@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Avatar, EmptyState, IconButton, ConfirmDialog } from '@/design'
+import { Avatar, Badge, EmptyState, IconButton, ConfirmDialog } from '@/design'
 import {
     Inbox, ChevronDown,
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw
 } from 'lucide-react'
-import { Conversation, Message, Profile } from '@/types/database'
-import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary } from '@/lib/inbox/actions'
+import { Conversation, Lead, Message, Profile } from '@/types/database'
+import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary, getConversationLead } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -30,6 +30,7 @@ export function InboxContainer({ initialConversations, organizationId, botName }
     const [conversations, setConversations] = useState<any[]>(initialConversations)
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
+    const [lead, setLead] = useState<Lead | null>(null)
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
     const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -55,6 +56,12 @@ export function InboxContainer({ initialConversations, organizationId, botName }
     const refreshRequestRef = useRef<string | null>(null)
     const assigneeCacheRef = useRef<Record<string, Assignee>>({})
     const selectedIdRef = useRef(selectedId)
+    const leadStatusLabels: Record<string, string> = {
+        hot: t('leadStatusHot'),
+        warm: t('leadStatusWarm'),
+        cold: t('leadStatusCold'),
+        ignored: t('leadStatusIgnored')
+    }
 
     useEffect(() => {
         selectedIdRef.current = selectedId
@@ -91,6 +98,16 @@ export function InboxContainer({ initialConversations, organizationId, botName }
         }
     }
 
+    const refreshLead = useCallback(async (conversationId: string) => {
+        try {
+            const result = await getConversationLead(conversationId)
+            if (selectedIdRef.current !== conversationId) return
+            setLead(result)
+        } catch (error) {
+            console.error('Failed to refresh lead', error)
+        }
+    }, [])
+
     const refreshMessages = useCallback(async (conversationId: string) => {
         refreshRequestRef.current = conversationId
         if (refreshInFlightRef.current) return
@@ -106,13 +123,14 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                     c.id === nextId ? { ...c, unread_count: 0 } : c
                 ))
                 await markConversationRead(nextId)
+                await refreshLead(nextId)
             }
         } catch (error) {
             console.error('Failed to refresh messages', error)
         } finally {
             refreshInFlightRef.current = false
         }
-    }, [])
+    }, [refreshLead])
 
     const resolveAssignee = useCallback(async (assigneeId: string | null) => {
         if (!assigneeId) return null
@@ -178,9 +196,13 @@ export function InboxContainer({ initialConversations, organizationId, botName }
     }, [supabase])
 
     useEffect(() => {
-        if (!selectedId) return
+        if (!selectedId) {
+            setLead(null)
+            return
+        }
         refreshMessages(selectedId)
-    }, [refreshMessages, selectedId])
+        refreshLead(selectedId)
+    }, [refreshMessages, refreshLead, selectedId])
 
     // Scroll Management
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -854,6 +876,50 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                                         <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p', { locale: dateLocale })}</span>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="mt-6">
+                                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">{t('leadTitle')}</h4>
+                                {lead ? (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">{t('leadStatus')}</span>
+                                            <Badge variant={
+                                                lead.status === 'hot'
+                                                    ? 'error'
+                                                    : lead.status === 'warm'
+                                                        ? 'warning'
+                                                        : lead.status === 'ignored'
+                                                            ? 'info'
+                                                            : 'neutral'
+                                            }>
+                                                {leadStatusLabels[lead.status] ?? lead.status}
+                                            </Badge>
+                                        </div>
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">{t('leadScore')}</span>
+                                            <span className="text-sm text-gray-900">{lead.total_score}</span>
+                                        </div>
+                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                            <span className="text-sm text-gray-500">{t('leadService')}</span>
+                                            <span className="text-sm text-gray-900">{lead.service_type || t('leadUnknown')}</span>
+                                        </div>
+                                        {lead.summary && (
+                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
+                                                <span className="text-sm text-gray-500">{t('leadSummary')}</span>
+                                                <span className="text-sm text-gray-900 whitespace-pre-wrap">{lead.summary}</span>
+                                            </div>
+                                        )}
+                                        {lead.updated_at && (
+                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                                <span className="text-sm text-gray-500">{t('leadUpdated')}</span>
+                                                <span className="text-sm text-gray-900">{format(new Date(lead.updated_at), 'PP p', { locale: dateLocale })}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
+                                )}
                             </div>
 
                             <hr className="border-gray-100 my-6" />

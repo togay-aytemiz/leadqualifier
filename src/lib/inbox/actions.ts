@@ -5,7 +5,7 @@ import { withBotNamePrompt } from '@/lib/ai/prompts'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { Conversation, Message } from '@/types/database'
+import { Conversation, Lead, Message } from '@/types/database'
 
 export type ConversationSummaryResult =
     | { ok: true; summary: string }
@@ -62,6 +62,23 @@ export async function getMessages(conversationId: string) {
     }
 
     return data as Message[]
+}
+
+export async function getConversationLead(conversationId: string): Promise<Lead | null> {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .maybeSingle()
+
+    if (error) {
+        console.error('Error fetching lead:', error)
+        return null
+    }
+
+    return (data as Lead) ?? null
 }
 
 const SUMMARY_USER_LIMIT = 5

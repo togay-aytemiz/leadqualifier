@@ -10,6 +10,7 @@
 - Lead extraction schema (offering profile, service catalog, candidates, leads).
 - Lead extraction worker wired to Telegram webhook with token usage logging.
 - Offering Profile settings UI with pending profile updates and service candidate approvals.
+- Inbox details now show a read-only lead snapshot (status, score, service, summary).
 - Lead scoring helpers and extraction parsing utilities.
 - Lead extraction design spec (hybrid service catalog, offering profile, non-business skip, async per-message snapshot).
 - Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
@@ -90,6 +91,7 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Offering Profile management moved to Organization Settings for clearer org-level ownership.
 - Bot mode copy refined (TR: “Dinleyici”, clearer descriptions) and radio indicator sizing aligned.
 - Active mode TR copy now mentions background lead extraction.
 - Sidebar bot status dot now uses green/amber/red for Active/Dinleyici/Kapalı.

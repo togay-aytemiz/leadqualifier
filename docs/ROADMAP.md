@@ -188,6 +188,8 @@
 - [x] **Lead Status**
   - [x] Hot / Warm / Cold classification
   - [x] Status update triggers
+- [x] **Inbox Lead Details**
+  - [x] Read-only lead snapshot in conversation details
 
 ---
 
