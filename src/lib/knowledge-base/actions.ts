@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { chunkText } from '@/lib/knowledge-base/chunking'
+import { proposeOfferingProfileUpdate, proposeServiceCandidate } from '@/lib/leads/offering-profile'
 import { revalidatePath } from 'next/cache'
 
 export interface KnowledgeCollection {
@@ -149,6 +150,25 @@ export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
         throw err
     }
 
+    try {
+        await proposeServiceCandidate({
+            organizationId,
+            sourceType: 'knowledge',
+            sourceId: data.id,
+            name: data.title,
+            supabase
+        })
+        await proposeOfferingProfileUpdate({
+            organizationId,
+            sourceType: 'knowledge',
+            sourceId: data.id,
+            content: `${data.title}\n${entry.content}`,
+            supabase
+        })
+    } catch (error) {
+        console.error('Failed to propose knowledge-based offerings:', error)
+    }
+
     revalidatePath('/knowledge')
     return { ...data, status: 'ready' } as KnowledgeBaseEntry
 }
@@ -210,11 +230,54 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
                 .select()
                 .single()
 
+            const finalDoc = (readyDoc ?? data) as KnowledgeBaseEntry
+            if (entry.title || entry.content) {
+                try {
+                    await proposeServiceCandidate({
+                        organizationId: finalDoc.organization_id,
+                        sourceType: 'knowledge',
+                        sourceId: finalDoc.id,
+                        name: finalDoc.title,
+                        supabase
+                    })
+                    await proposeOfferingProfileUpdate({
+                        organizationId: finalDoc.organization_id,
+                        sourceType: 'knowledge',
+                        sourceId: finalDoc.id,
+                        content: `${finalDoc.title}\n${entry.content ?? finalDoc.content}`,
+                        supabase
+                    })
+                } catch (error) {
+                    console.error('Failed to propose knowledge-based offerings:', error)
+                }
+            }
+
             revalidatePath('/knowledge')
-            return (readyDoc ?? data) as KnowledgeBaseEntry
+            return finalDoc
         } catch (err) {
             await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', id)
             throw err
+        }
+    }
+
+    if (entry.title) {
+        try {
+            await proposeServiceCandidate({
+                organizationId: data.organization_id,
+                sourceType: 'knowledge',
+                sourceId: data.id,
+                name: data.title,
+                supabase
+            })
+            await proposeOfferingProfileUpdate({
+                organizationId: data.organization_id,
+                sourceType: 'knowledge',
+                sourceId: data.id,
+                content: `${data.title}\n${data.content}`,
+                supabase
+            })
+        } catch (error) {
+            console.error('Failed to propose knowledge-based offerings:', error)
         }
     }
 

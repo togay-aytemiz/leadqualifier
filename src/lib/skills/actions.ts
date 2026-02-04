@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
+import { proposeOfferingProfileUpdate, proposeServiceCandidate } from '@/lib/leads/offering-profile'
 
 /**
  * Get all skills for an organization
@@ -66,6 +67,25 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
     // Generate and store embeddings for trigger examples
     await generateAndStoreEmbeddings(data.id, skill.trigger_examples)
 
+    try {
+        await proposeServiceCandidate({
+            organizationId: data.organization_id,
+            sourceType: 'skill',
+            sourceId: data.id,
+            name: data.title,
+            supabase
+        })
+        await proposeOfferingProfileUpdate({
+            organizationId: data.organization_id,
+            sourceType: 'skill',
+            sourceId: data.id,
+            content: `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`,
+            supabase
+        })
+    } catch (error) {
+        console.error('Failed to propose skill-based offerings:', error)
+    }
+
     return data
 }
 
@@ -91,6 +111,28 @@ export async function updateSkill(
 
         // Generate new embeddings
         await generateAndStoreEmbeddings(skillId, updates.trigger_examples)
+    }
+
+    const shouldPropose = Boolean(updates.title || updates.response_text || updates.trigger_examples)
+    if (shouldPropose) {
+        try {
+            await proposeServiceCandidate({
+                organizationId: data.organization_id,
+                sourceType: 'skill',
+                sourceId: data.id,
+                name: data.title,
+                supabase
+            })
+            await proposeOfferingProfileUpdate({
+                organizationId: data.organization_id,
+                sourceType: 'skill',
+                sourceId: data.id,
+                content: `${data.title}\n${(updates.trigger_examples ?? currentTriggers ?? []).join('\n')}\n${data.response_text}`,
+                supabase
+            })
+        } catch (error) {
+            console.error('Failed to propose skill-based offerings:', error)
+        }
     }
 
     return data
