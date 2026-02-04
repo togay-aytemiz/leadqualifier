@@ -48,10 +48,33 @@ export default function GeneralSettingsPage() {
         setSelectedLocale(currentLocale)
     }
 
+    const transformPendingHref = (href: string) => {
+        if (selectedLocale === currentLocale) return href
+
+        const hasLocalePrefix = (locale: string, path: string) =>
+            path === `/${locale}` || path.startsWith(`/${locale}/`)
+
+        let nextHref = href
+
+        if (currentLocale !== 'tr' && hasLocalePrefix(currentLocale, nextHref)) {
+            nextHref = nextHref.replace(new RegExp(`^/${currentLocale}(?=/|$)`), '')
+            if (!nextHref.startsWith('/')) {
+                nextHref = `/${nextHref}`
+            }
+        }
+
+        if (selectedLocale !== 'tr' && !hasLocalePrefix(selectedLocale, nextHref)) {
+            nextHref = `/${selectedLocale}${nextHref}`
+        }
+
+        return nextHref || '/'
+    }
+
     const guard = useUnsavedChangesGuard({
         isDirty,
         onSave: handleSave,
-        onDiscard: handleDiscard
+        onDiscard: handleDiscard,
+        transformPendingHref
     })
 
     return (

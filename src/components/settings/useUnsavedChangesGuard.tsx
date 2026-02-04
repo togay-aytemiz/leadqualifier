@@ -7,6 +7,7 @@ interface UnsavedChangesGuardOptions {
     isDirty: boolean
     onSave: () => Promise<boolean> | boolean
     onDiscard: () => void
+    transformPendingHref?: (href: string) => string
 }
 
 function getCurrentUrl() {
@@ -18,7 +19,7 @@ function isModifiedClick(event: MouseEvent) {
     return event.metaKey || event.altKey || event.ctrlKey || event.shiftKey || event.button !== 0
 }
 
-export function useUnsavedChangesGuard({ isDirty, onSave, onDiscard }: UnsavedChangesGuardOptions) {
+export function useUnsavedChangesGuard({ isDirty, onSave, onDiscard, transformPendingHref }: UnsavedChangesGuardOptions) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
@@ -111,7 +112,8 @@ export function useUnsavedChangesGuard({ isDirty, onSave, onDiscard }: UnsavedCh
             const pending = pendingHrefRef.current
             closeDialog()
             if (pending) {
-                router.push(pending)
+                const target = transformPendingHref ? transformPendingHref(pending) : pending
+                router.push(target)
             }
         } finally {
             setIsSaving(false)

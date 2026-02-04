@@ -84,6 +84,7 @@
 - Added Profile and Organization settings pages with header save + unsaved change confirmation.
 - Settings pages now show a top-right save button that activates only when changes are detected.
 - Channels page title standardized to "Channels" with wider channel cards.
+- AI settings load now falls back quietly unless debug logging is enabled.
 
 ### Fixed
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.

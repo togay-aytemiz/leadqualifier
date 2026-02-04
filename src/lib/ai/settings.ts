@@ -51,7 +51,9 @@ export async function getOrgAiSettings(organizationId: string, options?: { supab
         .maybeSingle()
 
     if (error) {
-        console.error('Failed to load AI settings:', error)
+        if (process.env.AI_SETTINGS_DEBUG === '1') {
+            console.error('Failed to load AI settings:', error)
+        }
         return applyAiDefaults(null)
     }
 
