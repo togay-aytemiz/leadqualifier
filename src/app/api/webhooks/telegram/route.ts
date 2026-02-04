@@ -10,6 +10,7 @@ import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { resolveBotModeAction } from '@/lib/ai/bot-mode'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { runLeadExtraction } from '@/lib/leads/extraction'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: NextRequest) {
@@ -175,10 +176,16 @@ export async function POST(req: NextRequest) {
     }
 
     const { allowReplies, allowLeadExtraction } = resolveBotModeAction(aiSettings.bot_mode ?? 'active')
+    if (allowLeadExtraction) {
+        await runLeadExtraction({
+            organizationId: orgId,
+            conversationId: conversation.id,
+            latestMessage: text,
+            supabase,
+            source: 'telegram'
+        })
+    }
     if (!allowReplies) {
-        if (allowLeadExtraction) {
-            // TODO(phase-6): run lead extraction only
-        }
         return NextResponse.json({ ok: true })
     }
 
