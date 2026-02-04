@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useActionState } from 'react'
 import { login } from '@/lib/auth/actions'
 import { Link } from '@/i18n/navigation'
+import { Button } from '@/design'
 
 export function LoginForm() {
     const t = useTranslations('auth')
@@ -16,21 +17,21 @@ export function LoginForm() {
     )
 
     return (
-        <div className="rounded-2xl bg-zinc-800/50 p-8 shadow-xl backdrop-blur-sm border border-zinc-700/50">
+        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
             <div className="mb-8 text-center">
-                <h1 className="text-2xl font-bold text-white">{t('loginTitle')}</h1>
-                <p className="mt-2 text-zinc-400">{t('loginSubtitle')}</p>
+                <h1 className="text-2xl font-bold text-gray-900">{t('loginTitle')}</h1>
+                <p className="mt-2 text-sm text-gray-500">{t('loginSubtitle')}</p>
             </div>
 
             <form action={formAction} className="space-y-6">
                 {state?.error && (
-                    <div className="rounded-lg bg-red-500/10 p-4 text-sm text-red-400 border border-red-500/20">
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         {state.error}
                     </div>
                 )}
 
                 <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-zinc-300">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                         {t('email')}
                     </label>
                     <input
@@ -39,13 +40,13 @@ export function LoginForm() {
                         type="email"
                         required
                         autoComplete="email"
-                        className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                         placeholder={t('emailPlaceholder')}
                     />
                 </div>
 
                 <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-zinc-300">
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                         {t('password')}
                     </label>
                     <input
@@ -54,23 +55,28 @@ export function LoginForm() {
                         type="password"
                         required
                         autoComplete="current-password"
-                        className="mt-2 block w-full rounded-lg border border-zinc-600 bg-zinc-700/50 px-4 py-3 text-white placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                         placeholder={t('passwordPlaceholder')}
                     />
+                    <div className="mt-2 text-right">
+                        <Link href="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                            {t('forgotPassword')}
+                        </Link>
+                    </div>
                 </div>
 
-                <button
+                <Button
                     type="submit"
                     disabled={pending}
-                    className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full h-10"
                 >
                     {pending ? tc('loading') : t('login')}
-                </button>
+                </Button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-zinc-400">
+            <p className="mt-6 text-center text-sm text-gray-500">
                 {t('noAccount')}{' '}
-                <Link href="/register" className="font-medium text-blue-400 hover:text-blue-300">
+                <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
                     {t('register')}
                 </Link>
             </p>

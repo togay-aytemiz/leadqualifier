@@ -27,7 +27,9 @@ export function SettingsSection({ title, description, summary, layout = 'default
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className={columns.left}>
                     <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-                    {description && <p className="mt-2 text-sm text-gray-500">{description}</p>}
+                    {description && (
+                        <p className="mt-2 text-sm text-gray-500 whitespace-pre-line">{description}</p>
+                    )}
                 </div>
                 <div className={columns.right}>
                     {summary && <p className="text-xs font-semibold text-gray-500 mb-3">{summary}</p>}

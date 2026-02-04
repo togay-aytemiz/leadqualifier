@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog } from '@/design'
 import {
-    Inbox, ChevronDown, ExternalLink, X,
-    Paperclip, Image, Smile, Zap, Bot, Trash2, MessageSquare, MoreHorizontal, LogOut, User
+    Inbox, ChevronDown,
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send
 } from 'lucide-react'
 import { Conversation, Message, Profile } from '@/types/database'
 import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent } from '@/lib/inbox/actions'
@@ -461,6 +461,8 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
     // NEW: Use explicit state from conversation
     // Fallback to 'ai' (bot) if undefined (e.g. old data or optimistic new conv)
     const activeAgent = selectedConversation?.active_agent === 'operator' ? 'operator' : 'ai'
+    const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
+    const canSend = !!input.trim() && !isSending
 
     return (
         <>
@@ -589,39 +591,48 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         </div>
 
                         <div className="p-6 border-t border-gray-200 bg-white">
-                            <div className="border border-gray-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all bg-white overflow-hidden">
-                                <div className="flex items-center gap-1 p-2 border-b border-gray-100 bg-gray-50/50">
-                                    <IconButton icon={Paperclip} size="md" />
-                                    <IconButton icon={Image} size="md" />
-                                    <IconButton icon={Smile} size="md" />
-                                </div>
-                                <textarea
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault()
-                                            handleSendMessage()
-                                        }
-                                    }}
-                                    className="w-full p-4 text-sm focus:outline-none min-h-[100px] resize-none"
-                                    placeholder={t('replyPlaceholder')}
-                                />
-                                <div className="px-4 py-3 bg-white flex justify-between items-center">
-                                    <span className="text-xs text-gray-400 font-medium">{t('sendShortcut')}</span>
-                                    <div className="flex gap-3">
-                                        <button className="p-2 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors">
-                                            <Zap size={20} />
-                                        </button>
-                                        <button
-                                            onClick={handleSendMessage}
-                                            disabled={!input.trim() || isSending}
-                                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
-                                        >
-                                            {t('sendButton')}
-                                        </button>
+                            {activeAgent === 'ai' && (
+                                <div className="mb-4 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 flex items-center gap-3">
+                                    <div className="h-9 w-9 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center text-yellow-700 shrink-0">
+                                        <Bot size={18} />
+                                    </div>
+                                    <div className="text-sm text-yellow-900 leading-relaxed">
+                                        <span className="font-semibold">{t('botActiveTitle')}</span>
+                                        <span className="ml-1 text-yellow-800">{t('botActiveBody')}</span>
                                     </div>
                                 </div>
+                            )}
+
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 flex-1 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+                                    <IconButton icon={Paperclip} size="sm" />
+                                    <IconButton icon={Image} size="sm" />
+                                    <div className="h-6 w-px bg-gray-200 mx-1" />
+                                    <textarea
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault()
+                                                handleSendMessage()
+                                            }
+                                        }}
+                                        rows={1}
+                                        className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 h-6 min-h-[24px]"
+                                        placeholder={inputPlaceholder}
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSendMessage}
+                                    disabled={!canSend}
+                                    className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${canSend
+                                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                        : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
+                                        }`}
+                                >
+                                    <Send size={18} />
+                                    {t('sendButton')}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -662,9 +673,7 @@ export function InboxContainer({ initialConversations, organizationId }: InboxCo
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 flex flex-col">
                             <div className="flex flex-col items-center text-center">
-                                <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center text-xl text-blue-600 font-bold mb-3">
-                                    {selectedConversation.contact_name.charAt(0)}
-                                </div>
+                                <Avatar name={selectedConversation.contact_name} size="lg" className="mb-3 text-base" />
                                 <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
                                 <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                             </div>

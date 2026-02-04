@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateProfile } from '@/lib/profile/actions'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
+import { requestPasswordReset } from '@/lib/auth/actions'
 
 interface ProfileSettingsClientProps {
     initialName: string
@@ -16,11 +17,19 @@ interface ProfileSettingsClientProps {
 export default function ProfileSettingsClient({ initialName, email }: ProfileSettingsClientProps) {
     const t = useTranslations('profileSettings')
     const tUnsaved = useTranslations('unsavedChanges')
+    const locale = useLocale()
     const initialRef = useRef({ name: initialName })
     const [name, setName] = useState(initialName)
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
+    const [cooldown, setCooldown] = useState(0)
+    const [resetState, resetAction, resetPending] = useActionState(
+        async (_prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
+            return await requestPasswordReset(formData)
+        },
+        null
+    )
 
     const isDirty = useMemo(() => name !== initialRef.current.name, [name])
 
@@ -29,6 +38,18 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
             setSaved(false)
         }
     }, [isDirty])
+
+    useEffect(() => {
+        if (resetState?.success) {
+            setCooldown(120)
+        }
+    }, [resetState?.success])
+
+    useEffect(() => {
+        if (cooldown <= 0) return
+        const timer = setTimeout(() => setCooldown((prev) => Math.max(prev - 1, 0)), 1000)
+        return () => clearTimeout(timer)
+    }, [cooldown])
 
     const handleSave = async () => {
         if (!isDirty) return true
@@ -104,6 +125,31 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
                             readOnly
                             className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
                         />
+                        <p className="mt-2 text-xs text-gray-500">{t('emailImmutableNote')}</p>
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={t('passwordTitle')}
+                        description={t('passwordDescription')}
+                    >
+                        <form action={resetAction} className="flex flex-wrap items-center gap-3">
+                            <input type="hidden" name="email" value={email} />
+                            <input type="hidden" name="locale" value={locale} />
+                            <Button
+                                type="submit"
+                                disabled={resetPending || cooldown > 0 || !email}
+                            >
+                                {cooldown > 0
+                                    ? t('passwordResetCooldown', { seconds: cooldown })
+                                    : t('passwordChangeButton')}
+                            </Button>
+                        </form>
+                        {resetState?.success && (
+                            <p className="mt-2 text-sm text-green-600">{t('passwordResetSent')}</p>
+                        )}
+                        {resetState?.error && (
+                            <p className="mt-2 text-sm text-red-600">{t('passwordResetError')}</p>
+                        )}
                     </SettingsSection>
                 </div>
             </div>

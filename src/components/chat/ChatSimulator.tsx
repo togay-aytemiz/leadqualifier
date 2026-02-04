@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { ChatMessage, simulateChat } from '@/lib/chat/actions'
+import type { ConversationTurn } from '@/lib/knowledge-base/router'
 import { ChatBubble } from './ChatBubble'
 import { Send, Bug, MessageSquare } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -46,7 +47,7 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
         e.preventDefault()
         if (!input.trim()) return
 
-        const history = messages
+        const history: ConversationTurn[] = messages
             .slice(-8)
             .map((msg) => ({
                 role: msg.role === 'user' ? 'user' : 'assistant',
@@ -79,22 +80,23 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
             const startTime = Date.now()
             const response = await simulateChat(userMsg.content, organizationId, threshold, history)
             const endTime = Date.now()
+            const tokenUsage = response.tokenUsage
 
             // Ensure at least 1.5s typing animation
             const remainingTime = Math.max(0, 1500 - (endTime - startTime))
 
             setTimeout(() => {
                 setIsTyping(false)
-                if (response.tokenUsage) {
+                if (tokenUsage) {
                     setMessages((prev) =>
                         prev.map((m) =>
                             m.id === userMsg.id
                                 ? {
                                     ...m,
                                     tokenUsage: {
-                                        inputTokens: response.tokenUsage.inputTokens,
+                                        inputTokens: tokenUsage.inputTokens,
                                         outputTokens: 0,
-                                        totalTokens: response.tokenUsage.inputTokens
+                                        totalTokens: tokenUsage.inputTokens
                                     }
                                 }
                                 : m
@@ -107,11 +109,11 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
                     content: response.response,
                     timestamp: new Date(),
                     status: 'read',
-                    tokenUsage: response.tokenUsage
+                    tokenUsage: tokenUsage
                         ? {
                             inputTokens: 0,
-                            outputTokens: response.tokenUsage.outputTokens,
-                            totalTokens: response.tokenUsage.outputTokens
+                            outputTokens: tokenUsage.outputTokens,
+                            totalTokens: tokenUsage.outputTokens
                         }
                         : undefined
                 }

@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- Auth password recovery flow (Forgot Password + Reset Password screens).
+- Profile settings password section with reset link CTA and cooldown.
 - Next.js 14 project with App Router and TypeScript
 - Strict TypeScript configuration (`noUncheckedIndexedAccess`, `noImplicitReturns`)
 - Prettier + ESLint with strict rules
@@ -42,6 +44,7 @@
   - **Inbox:** Implemented lazy loading (infinite scroll) for conversations.
   - **Inbox:** Added "Delete Conversation" functionality with cascading database deletes.
   - **Inbox:** UI improvements (message previews, simplified list items).
+  - **Inbox:** Composer banner and takeover placeholder to surface bot-active state.
   - **Inbox:** Removed mock data creation; now fully driven by real database data.
 - Crisp-inspired main sidebar with collapsible state and active navigation pill.
 - Refined collapsed sidebar icon sizing and header toggle placement.
@@ -73,6 +76,9 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Auth screens redesigned to align with the settings UI (light theme, updated form styling).
+- Docs: Updated PRD/Roadmap to reflect Telegram sandbox integration and current implementation status.
+- Inbox composer banner copy now references the AI assistant and centers the banner content vertically.
 - Global font updated to Plus Jakarta Sans via Google Fonts import.
 - Sidebar toggle now uses arrow-from-line icons for clearer affordance.
 - Removed legacy `knowledge_base` table in favor of documents/chunks.
@@ -94,11 +100,14 @@
 - Channels page title standardized to "Channels" with wider channel cards.
 - AI settings load now falls back quietly unless debug logging is enabled.
 - Flexible fallback now uses only the UI-configured prompt (no hardcoded system append).
+- Localized AI settings copy in Turkish (Yetenek terminology + clearer sensitivity helper text).
 
 ### Fixed
+- TypeScript build errors in Telegram webhook + Simulator history typing and KB router/chunking index guards.
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
 - Manual replies atomically assign the current operator to prevent "Unassigned" state until refresh.
 - Realtime subscriptions now attach the session token before subscribing (fixes missing live updates).
+- Inbox details avatar now uses full initials to match the conversation list.
 - RAG now enforces NO_ANSWER fallback and handles retrieval errors without failing the webhook.
 - Knowledge base sidebar now refreshes after folder create/delete actions triggered outside the sidebar.
 - Simulator KB fallback now answers definition-style questions that previously fell through routing.

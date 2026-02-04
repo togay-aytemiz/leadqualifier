@@ -66,6 +66,7 @@ function formatHistory(history: ConversationTurn[]) {
 
     for (let i = history.length - 1; i >= 0; i -= 1) {
         const turn = history[i]
+        if (!turn) continue
         if (turn.role === 'user') {
             if (userCount >= MAX_USER_TURNS) continue
             userCount += 1

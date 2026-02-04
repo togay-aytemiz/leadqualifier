@@ -187,6 +187,7 @@ ${context}`
                 ragOutputTokens += estimateTokenCount(normalizedResponse)
             }
             if (normalizedResponse && !normalizedResponse.includes(noAnswerToken)) {
+                const topResult = kbResults[0]
                 totalInputTokens += routerInputTokens + ragInputTokens
                 totalOutputTokens += routerOutputTokens + ragOutputTokens
                 return {
@@ -194,7 +195,7 @@ ${context}`
                     matchedSkill: {
                         id: 'rag-knowledge-base',
                         title: '📚 Knowledge Base',
-                        similarity: kbResults[0].similarity
+                        similarity: topResult?.similarity ?? 0
                     },
                     tokenUsage: {
                         inputTokens: totalInputTokens,

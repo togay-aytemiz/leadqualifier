@@ -176,6 +176,7 @@ function getOverlapSegments(
 
     for (let i = segments.length - 1; i >= 0; i -= 1) {
         const segment = segments[i]
+        if (!segment) continue
         const segmentTokens = estimateTokenCount(segment)
         if (segmentTokens === 0) continue
 

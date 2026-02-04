@@ -35,23 +35,21 @@ Automate WhatsApp message handling:
 
 ## 3. MVP Scope
 
-### ✅ In Scope
-| Feature | Description |
-|---------|-------------|
-| WhatsApp Integration | Single number per org |
-| AI Auto-Reply | Skill-based + KB fallback |
-| User-Generated Skills | Custom intent → response mappings |
-| Knowledge Base (RAG) | FAQ, packages, policies |
-| Lead Extraction | AI summary + score (0-10) |
-| Human Takeover | Bot pauses when business replies |
-| Multi-Tenant | Organization-based isolation |
-| Multi-Tenant | Organization-based isolation |
-| Admin Panel | Leads, Skills, KB, Channels management |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system** |
+### ✅ In Scope (Target MVP)
+| Feature | Description | Status (2026-02-04) |
+|---------|-------------|--------------------|
+| WhatsApp Integration | Single number per org | Planned (WhatsApp UI placeholder only; Telegram sandbox channel implemented) |
+| AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + Simulator |
+| User-Generated Skills | Custom intent → response mappings | Implemented |
+| Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
+| Lead Extraction | AI summary + score (0-10) | Not implemented |
+| Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
+| Multi-Tenant | Organization-based isolation | Implemented |
+| Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system** | Implemented |
 
 ### ❌ Out of Scope (Intentional)
 - Calendar integration
-- Auto follow-up sequences
 - Auto follow-up sequences
 - Campaigns / broadcasts
 - Advanced flow builder
@@ -60,18 +58,18 @@ Automate WhatsApp message handling:
 
 ## 4. Core Features
 
-### 4.1 WhatsApp Auto-Reply Engine
+### 4.1 Messaging Auto-Reply Engine (Telegram now, WhatsApp planned)
 
 **Flow:**
 ```
 Customer Message → Skill Match? → Yes → Skill Response
                               → No  → KB Match? → Yes → RAG Response
-                                               → No  → "Let me connect you with our team"
+                                               → No  → Fallback Response (topics + clarifying question)
 ```
 
 **Rules:**
-- AI responds ONLY from Skill/KB content
-- No hallucination — unknown = human handoff
+- Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
+- No hallucination — if unsure, ask a single clarifying question (or suggest topics)
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
  - If no skill/KB match, bot suggests available topics using existing skills/KB titles
@@ -95,7 +93,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 1. User message → embedding
 2. Compare with skill embeddings (top-5 similarity)
 3. LLM re-rank → `skill_id` + `confidence` (0-1)
-4. If `confidence < threshold` → fallback to KB or human
+4. If `confidence < threshold` → fallback to KB or topic-guided fallback response
 
 ---
 
@@ -109,7 +107,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Behavior:**
 - Triggered when no skill matches
 - AI generates response strictly from KB
-- If KB has no answer → human handoff
+- If KB has no answer → topic-guided fallback response
  - Documents are chunked with overlap and embedded per chunk
  - Retrieval is chunk-level with context budgets to avoid long prompts
  - Follow-up questions are rewritten into standalone KB queries via LLM routing
@@ -120,7 +118,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ---
 
-### 4.4 Lead Extraction & Qualification
+### 4.4 Lead Extraction & Qualification (Planned)
 
 **AI extracts per conversation:**
 | Field | Example |
@@ -161,34 +159,36 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ## 5. Admin Panel
 
-### 5.1 Lead List
+### 5.1 Lead List (Planned)
 - Name, phone, status (Hot/Warm/Cold)
 - Score, AI Summary, last message time
 - "Open in WhatsApp" button
 
-### 5.2 Skills Management
+### 5.2 Skills Management (Implemented; Playground Planned)
 - CRUD operations
 - Enable/disable toggle
-- "Test Skill" playground
+- No per-skill playground yet (use Simulator for end-to-end testing)
 
-### 5.3 Knowledge Base
+### 5.3 Knowledge Base (Implemented)
 - CRUD with folders
 - Rich text editor
  - Show indexing status (Ready / Processing / Error)
  - Sidebar shows uncategorized items (max 10 with expand) and accurate all-content counts
 
-### 5.4 Channels
-- WhatsApp number + connection status
-- Provider badge
-- Test message (sandbox)
+### 5.4 Channels (Telegram Implemented, WhatsApp Planned)
+- Telegram bot connection + status
+- WhatsApp placeholder in UI (no provider integration yet)
+- Debug webhook info for Telegram
 
-### 5.5 AI Settings
+### 5.5 AI Settings (Implemented)
 - Always-on Flexible mode (no mode selection)
 - Single sensitivity threshold (applies to Skill + KB)
 - Single prompt field (used as the base prompt for fallback responses)
+- TR copy uses "Yetenek" terminology and "Yapay Zeka Talimatı" label for clarity
 
 ### 5.6 Profile & Organization Settings
-- Profile: name and email visibility (future password management)
+- Profile: name and email visibility (email is read-only)
+- Profile security: password recovery via email reset link (Forgot + Reset)
 - Organization: company name and future org-level defaults
 
 ---
@@ -199,7 +199,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 |---------|----------------|
 | Organization | 1 customer = 1 org |
 | Data Isolation | All tables have `organization_id` |
-| Platform Admin | Org switcher for support/debug |
+| Platform Admin | System admin dashboard + org/user lists (org switcher not yet implemented) |
 
 ---
 
@@ -219,15 +219,13 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 MVP is successful when:
 - [ ] 5 pilot customers actively using
-- [ ] ≥50% of daily WhatsApp messages handled by bot
+- [ ] ≥50% of daily inbound messages handled by bot
 - [ ] Users report "time saved"
 
 ---
 
 ## 9. Future Roadmap (Post-MVP)
 
-| Feature | Priority |
-|---------|----------|
 | Feature | Priority |
 |---------|----------|
 | Calendar/Booking | High |
@@ -257,9 +255,14 @@ MVP is successful when:
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
+- **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
+- **Inbox Details:** Use consistent contact initials between list avatars and details panel.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
+- **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
+- **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
+- **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

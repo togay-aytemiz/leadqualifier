@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { TelegramClient } from '@/lib/telegram/client'
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
-import { decideKnowledgeBaseRoute } from '@/lib/knowledge-base/router'
+import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT } from '@/lib/ai/prompts'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
@@ -228,13 +228,13 @@ export async function POST(req: NextRequest) {
                 return !(msg.sender_type === 'contact' && msg.content === text)
             })
 
-            const history = trimmedHistory
+            const history: ConversationTurn[] = trimmedHistory
                 .slice(0, 6)
                 .reverse()
                 .filter((msg) => typeof msg.content === 'string' && msg.content.trim().length > 0)
                 .map((msg) => ({
                     role: msg.sender_type === 'contact' ? 'user' : 'assistant',
-                    content: msg.content,
+                    content: msg.content as string,
                     timestamp: msg.created_at
                 }))
 

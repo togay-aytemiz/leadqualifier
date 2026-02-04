@@ -29,15 +29,19 @@
 
 ---
 
-## Phase 2: WhatsApp Integration
-- [ ] **Provider Setup**
+## Phase 2: Messaging Channels (WhatsApp Pending)
+- [ ] **WhatsApp (Meta Cloud API)**
   - [ ] Choose provider (Twilio / 360dialog / Meta Cloud API)
   - [ ] Webhook endpoint for incoming messages
   - [ ] Outgoing message API
-- [ ] **Message Handling**
-  - [ ] Store incoming messages
-  - [ ] Store outgoing messages
-  - [ ] Conversation threading
+- [x] **Telegram (Sandbox)**
+  - [x] Channel connect + webhook registration
+  - [x] Incoming message webhook
+  - [x] Outgoing message API
+- [x] **Message Handling Core**
+  - [x] Store incoming messages
+  - [x] Store outgoing messages
+  - [x] Conversation threading
 
 ---
 
@@ -51,10 +55,10 @@
   - [x] Similarity search (top-5)
   - [x] LLM re-ranking
   - [x] Confidence threshold logic
-- [x] **Skill Testing**
-  - [x] "Test Skill" playground in admin
+- [ ] **Skill Testing**
+  - [ ] Per-skill playground in admin (use Simulator for now)
 
-## Phase 3.5: WhatsApp Simulator (In Progress) ✅
+## Phase 3.5: Chat Simulator (WhatsApp-Style UI) ✅
 - [x] **Chat Interface**
   - [x] WhatsApp-like UI (bubbles, ticks, input)
   - [x] Org-specific simulator URL
@@ -75,6 +79,8 @@
   - [x] Conversation list with lazy loading
   - [x] Message history view
   - [x] Delete conversation functionality
+  - [x] Composer banner copy + centered layout
+  - [x] Details avatar initials match conversation list
   - [x] Real-time updates (via polling/subscriptions)
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
@@ -120,16 +126,22 @@
 
 ---
 
-## Phase 5: AI Auto-Reply Engine
+## Phase 5: AI Auto-Reply Engine ✅
 - [x] **Reply Router**
-  - [x] Skill → KB → Human fallback chain
+  - [x] Skill → KB → Topic-guided fallback response
   - [x] Response formatting
   - [x] Error handling
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
+- [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details
+- [x] **Auth UX Refresh**
+  - [x] Sign In redesign (settings-aligned UI)
+  - [x] Sign Up redesign (settings-aligned UI)
+  - [x] Password Recovery flow (forgot + reset)
+  - [x] Profile security: password reset CTA + email immutable note
 - [x] **Human Takeover**
   - [x] Detect business reply (or Inbox claim)
   - [x] Pause bot automatically (Active Agent State)
@@ -162,19 +174,21 @@
   - [ ] Filterable/sortable table
   - [ ] Score, summary, status display
   - [ ] "Open in WhatsApp" button
-- [ ] **Skills Management**
-  - [ ] CRUD UI
+- [x] **Skills Management**
+  - [x] CRUD UI
   - [ ] Test playground
-- [ ] **Knowledge Base UI**
-  - [ ] CRUD with categories
-  - [ ] Rich text editor
-- [ ] **Channels**
-  - [ ] WhatsApp connection status
+- [x] **Knowledge Base UI**
+  - [x] CRUD with categories
+  - [x] Rich text editor
+- [x] **Channels**
+  - [x] Telegram connection status + debug
+  - [ ] WhatsApp connection status (placeholder only)
   - [ ] Test message sandbox
 
 ---
 
 ## Phase 8: Platform Admin Features
+- [x] System admin dashboard + organizations/users lists
 - [ ] Organization switcher
 - [ ] Cross-org debugging tools
 - [ ] Usage analytics per org
@@ -182,6 +196,7 @@
 ---
 
 ## Phase 9: Testing & QA
+- [x] Address strict TypeScript build errors (router history typing + indexed access guards)
 - [ ] Unit tests for core logic
 - [ ] Integration tests for WhatsApp flow
 - [ ] E2E tests for admin panel
