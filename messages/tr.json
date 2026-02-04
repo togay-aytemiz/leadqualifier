@@ -155,7 +155,11 @@
     "mainSidebar": {
         "workspace": "Çalışma Alanı",
         "aiTools": "Yapay Zeka Araçları",
-        "other": "Diğer"
+        "other": "Diğer",
+        "botStatusLabel": "Bot",
+        "botStatusActive": "Aktif",
+        "botStatusShadow": "Dinleyici",
+        "botStatusOff": "Kapalı"
     },
     "inbox": {
         "title": "Gelen Kutusu",
@@ -233,16 +237,17 @@
         "noOrganization": "Organizasyon Bulunamadı",
         "noOrganizationDesc": "Simülatörü kullanmak için bir organizasyon oluşturun."
     },
-    "General": {
-        "title": "Genel Ayarlar",
-        "language": "Dil",
-        "languageDescription": "Arayüz için tercih ettiğiniz dili seçin.",
-        "languageSummary": "Şu an: {language}",
-        "languageEnglish": "İngilizce",
-        "languageTurkish": "Türkçe",
-        "save": "Değişiklikleri Kaydet",
-        "saving": "Kaydediliyor..."
-    },
+  "General": {
+    "title": "Genel Ayarlar",
+    "language": "Dil",
+    "languageDescription": "Arayüz için tercih ettiğiniz dili seçin.",
+    "languageSummary": "Şu an: {language}",
+    "languageEnglish": "İngilizce",
+    "languageTurkish": "Türkçe",
+    "save": "Değişiklikleri Kaydet",
+    "saving": "Kaydediliyor...",
+    "saved": "Kaydedildi"
+  },
     "Channels": {
         "title": "Kanallar",
         "noOrganization": "Organizasyon Bulunamadı",
@@ -284,23 +289,45 @@
         "validating": "Doğrulanıyor...",
         "connectBot": "Botu Bağla"
     },
-    "Sidebar": {
-        "settings": "Ayarlar",
-        "preferences": "Tercihler",
-        "profile": "Profil",
-        "organization": "Organizasyon",
-        "general": "Genel",
-        "ai": "Yapay Zeka",
-        "integrations": "Entegrasyonlar",
-        "channels": "Kanallar",
-        "billing": "Faturalandırma",
-        "plans": "Planlar",
-        "receipts": "Faturalar"
-    },
+  "Sidebar": {
+    "settings": "Ayarlar",
+    "preferences": "Tercihler",
+    "profile": "Profil",
+    "organization": "Organizasyon",
+    "general": "Genel",
+    "ai": "Yapay Zeka",
+    "integrations": "Entegrasyonlar",
+    "channels": "Kanallar",
+    "billing": "Faturalandırma",
+    "plans": "Planlar",
+    "receipts": "Kullanım ve Faturalandırma"
+  },
+  "billingUsage": {
+    "pageTitle": "Kullanım ve Faturalandırma",
+    "title": "Yapay Zeka Kullanımı",
+    "description": "Üretim ortamındaki yapay zeka özelliklerinin token kullanımını takip edin.",
+    "monthLabel": "Bu ay",
+    "totalLabel": "Toplam",
+    "inputLabel": "Girdi",
+    "outputLabel": "Çıktı",
+    "tokensLabel": "token",
+    "utcNote": "Aylık kullanım UTC takvim ayına göre hesaplanır ({month}).",
+    "emptyState": "Henüz kullanım verisi yok.",
+    "noOrganization": "Organizasyon Bulunamadı",
+    "noOrganizationDesc": "Kullanım verilerini görmek için bir organizasyona bağlı olmalısınız."
+  },
     "aiSettings": {
     "pageTitle": "AI Ayarları",
     "title": "AI Ayarları",
     "description": "Yetenek veya Bilgi Bankası eşleşmesi bulunamazsa botun nasıl yanıt vereceğini ayarlayın.",
+    "botModeTitle": "Bot durumu",
+    "botModeDescription": "Telegram/WhatsApp için geçerlidir. Simülatör etkilenmez.",
+    "botModeActive": "Aktif",
+    "botModeActiveDescription": "Bot yanıt verir; arka planda lead çıkarımı çalışır.",
+    "botModeShadow": "Dinleyici",
+    "botModeShadowDescription": "Yanıt göndermez; arka planda lead çıkarımı çalışır.",
+    "botModeOff": "Kapalı",
+    "botModeOffDescription": "Bot işlemez; yalnızca mesajlar kaydedilir.",
     "botNameTitle": "Bot adı",
     "botNameDescription": "Kullanıcılara gösterilir ve yapay zeka cevaplarında kullanılır.",
     "botNameLabel": "Bot adı",

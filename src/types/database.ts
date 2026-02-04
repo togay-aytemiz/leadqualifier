@@ -9,15 +9,29 @@ export interface Organization {
 }
 
 export type AiMode = 'strict' | 'flexible'
+export type AiBotMode = 'active' | 'shadow' | 'off'
 
 export interface OrganizationAiSettings {
     organization_id: string
     mode: AiMode
     match_threshold: number
     prompt: string
+    bot_mode: AiBotMode
     bot_name: string
     created_at: string
     updated_at: string
+}
+
+export interface OrganizationAiUsage {
+    id: string
+    organization_id: string
+    category: string
+    model: string
+    input_tokens: number
+    output_tokens: number
+    total_tokens: number
+    metadata: any
+    created_at: string
 }
 
 export interface OrganizationMember {
@@ -168,6 +182,11 @@ export interface Database {
                 Row: Channel
                 Insert: Omit<Channel, 'id' | 'created_at' | 'updated_at'>
                 Update: Partial<Omit<Channel, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            organization_ai_usage: {
+                Row: OrganizationAiUsage
+                Insert: Omit<OrganizationAiUsage, 'id' | 'created_at'>
+                Update: Partial<Omit<OrganizationAiUsage, 'id' | 'organization_id' | 'created_at'>>
             }
         }
     }

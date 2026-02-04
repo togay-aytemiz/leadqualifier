@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import type { AiBotMode } from '@/types/database'
 import {
     ArrowLeftFromLine,
     ArrowRightFromLine,
@@ -34,6 +35,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     const [collapsed, setCollapsed] = useState(false)
     const [hasUnread, setHasUnread] = useState(false)
     const [organizationId, setOrganizationId] = useState<string | null>(null)
+    const [botMode, setBotMode] = useState<AiBotMode>('active')
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -54,6 +56,26 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         }
 
         setHasUnread((count ?? 0) > 0)
+    }, [supabase])
+
+    const fetchBotMode = useCallback(async (orgId: string) => {
+        const { data, error } = await supabase
+            .from('organization_ai_settings')
+            .select('bot_mode')
+            .eq('organization_id', orgId)
+            .maybeSingle()
+
+        if (error) {
+            console.error('Failed to load bot mode', error)
+            return
+        }
+
+        const mode = data?.bot_mode
+        if (mode === 'active' || mode === 'shadow' || mode === 'off') {
+            setBotMode(mode)
+        } else {
+            setBotMode('active')
+        }
     }, [supabase])
 
     useEffect(() => {
@@ -109,6 +131,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
 
             setOrganizationId(orgId)
             await refreshUnread(orgId)
+            await fetchBotMode(orgId)
         }
 
         loadOrganization()
@@ -116,7 +139,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         return () => {
             isMounted = false
         }
-    }, [refreshUnread, supabase])
+    }, [fetchBotMode, refreshUnread, supabase])
 
     useEffect(() => {
         if (!organizationId) return
@@ -153,6 +176,13 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         }
     }, [organizationId, refreshUnread, supabase])
 
+    useEffect(() => {
+        if (!organizationId) return
+        const handler = () => fetchBotMode(organizationId)
+        window.addEventListener('ai-settings-updated', handler)
+        return () => window.removeEventListener('ai-settings-updated', handler)
+    }, [fetchBotMode, organizationId])
+
     const sections = useMemo(
         () => [
             {
@@ -187,6 +217,16 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     )
 
     const toggleLabel = collapsed ? tCommon('expandSidebar') : tCommon('collapseSidebar')
+    const botModeLabel = useMemo(() => {
+        if (botMode === 'shadow') return tSidebar('botStatusShadow')
+        if (botMode === 'off') return tSidebar('botStatusOff')
+        return tSidebar('botStatusActive')
+    }, [botMode, tSidebar])
+    const botModeDot = botMode === 'shadow'
+        ? 'bg-amber-500'
+        : botMode === 'off'
+            ? 'bg-red-500'
+            : 'bg-emerald-500'
 
     return (
         <aside
@@ -235,6 +275,29 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                         {collapsed ? <ArrowRightFromLine size={16} /> : <ArrowLeftFromLine size={16} />}
                     </button>
                 </div>
+            </div>
+
+            <div className="px-3 pb-2">
+                <Link
+                    href="/settings/ai"
+                    prefetch={false}
+                    title={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                    aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                    className={cn(
+                        'group flex items-center rounded-xl text-xs font-medium text-slate-600 transition-colors duration-150 motion-reduce:transition-none hover:bg-white hover:text-slate-900',
+                        collapsed ? 'mx-auto h-9 w-9 justify-center' : 'w-full gap-2 px-3 py-2'
+                    )}
+                >
+                    <span className={cn('h-2.5 w-2.5 rounded-full', botModeDot)} />
+                    {collapsed ? (
+                        <span className="sr-only">{`${tSidebar('botStatusLabel')}: ${botModeLabel}`}</span>
+                    ) : (
+                        <>
+                            <span className="text-xs text-slate-500">{tSidebar('botStatusLabel')}</span>
+                            <span className="ml-auto text-xs font-semibold text-slate-900">{botModeLabel}</span>
+                        </>
+                    )}
+                </Link>
             </div>
 
             <nav className="flex-1 px-3 pt-3">

@@ -7,6 +7,9 @@ import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
+import { resolveBotModeAction } from '@/lib/ai/bot-mode'
+import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
+import { recordAiUsage } from '@/lib/ai/usage'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: NextRequest) {
@@ -171,6 +174,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
     }
 
+    const { allowReplies, allowLeadExtraction } = resolveBotModeAction(aiSettings.bot_mode ?? 'active')
+    if (!allowReplies) {
+        if (allowLeadExtraction) {
+            // TODO(phase-6): run lead extraction only
+        }
+        return NextResponse.json({ ok: true })
+    }
+
     // 6. Process AI Response (Skills)
     const matchedSkills = await matchSkills(text, orgId, matchThreshold, 5, supabase)
     const bestMatch = matchedSkills?.[0]
@@ -239,6 +250,21 @@ export async function POST(req: NextRequest) {
                 }))
 
             const decision = await decideKnowledgeBaseRoute(text, history)
+            if (decision.usage) {
+                await recordAiUsage({
+                    organizationId: orgId,
+                    category: 'router',
+                    model: 'gpt-4o-mini',
+                    inputTokens: decision.usage.inputTokens,
+                    outputTokens: decision.usage.outputTokens,
+                    totalTokens: decision.usage.totalTokens,
+                    metadata: {
+                        conversation_id: conversation.id,
+                        reason: decision.reason
+                    },
+                    supabase
+                })
+            }
 
             if (decision.route_to_kb) {
                 const query = decision.rewritten_query || text
@@ -280,6 +306,31 @@ ${context}`
                     })
 
                     const ragResponse = completion.choices[0]?.message?.content?.trim()
+                    const ragUsage = completion.usage
+                        ? {
+                            inputTokens: completion.usage.prompt_tokens ?? 0,
+                            outputTokens: completion.usage.completion_tokens ?? 0,
+                            totalTokens: completion.usage.total_tokens ?? (completion.usage.prompt_tokens ?? 0) + (completion.usage.completion_tokens ?? 0)
+                        }
+                        : {
+                            inputTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(text),
+                            outputTokens: estimateTokenCount(ragResponse ?? ''),
+                            totalTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(text) + estimateTokenCount(ragResponse ?? '')
+                        }
+
+                    await recordAiUsage({
+                        organizationId: orgId,
+                        category: 'rag',
+                        model: 'gpt-4o-mini',
+                        inputTokens: ragUsage.inputTokens,
+                        outputTokens: ragUsage.outputTokens,
+                        totalTokens: ragUsage.totalTokens,
+                        metadata: {
+                            conversation_id: conversation.id,
+                            document_count: kbResults.length
+                        },
+                        supabase
+                    })
 
                     if (ragResponse && !ragResponse.includes(noAnswerToken)) {
                         const client = new TelegramClient(channel.config.bot_token)
@@ -317,7 +368,11 @@ ${context}`
             organizationId: orgId,
             message: text,
             aiSettings,
-            supabase
+            supabase,
+            usageMetadata: {
+                conversation_id: conversation.id,
+                source: 'telegram'
+            }
         })
 
         await client.sendMessage(chatId, fallbackText)

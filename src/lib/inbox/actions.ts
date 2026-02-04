@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { withBotNamePrompt } from '@/lib/ai/prompts'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
+import { recordAiUsage } from '@/lib/ai/usage'
 import { Conversation, Message } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -147,6 +149,31 @@ export async function getConversationSummary(
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
             ]
+        })
+
+        const usage = completion.usage
+            ? {
+                inputTokens: completion.usage.prompt_tokens ?? 0,
+                outputTokens: completion.usage.completion_tokens ?? 0,
+                totalTokens: completion.usage.total_tokens ?? (completion.usage.prompt_tokens ?? 0) + (completion.usage.completion_tokens ?? 0)
+            }
+            : {
+                inputTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt),
+                outputTokens: estimateTokenCount(completion.choices[0]?.message?.content ?? ''),
+                totalTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt) + estimateTokenCount(completion.choices[0]?.message?.content ?? '')
+            }
+
+        await recordAiUsage({
+            organizationId,
+            category: 'summary',
+            model: 'gpt-4o-mini',
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
+            metadata: {
+                conversation_id: conversationId
+            },
+            supabase
         })
 
         const summary = completion.choices[0]?.message?.content?.trim()

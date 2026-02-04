@@ -110,7 +110,8 @@ export async function simulateChat(
             const fallbackResponse = await buildFallbackResponse({
                 organizationId,
                 message,
-                aiSettings
+                aiSettings,
+                trackUsage: false
             })
             totalInputTokens += routerInputTokens
             totalOutputTokens += routerOutputTokens
@@ -223,7 +224,8 @@ ${context}`
     const fallbackResponse = await buildFallbackResponse({
         organizationId,
         message,
-        aiSettings
+        aiSettings,
+        trackUsage: false
     })
     totalInputTokens += routerInputTokens + ragInputTokens
     totalOutputTokens += routerOutputTokens + ragOutputTokens

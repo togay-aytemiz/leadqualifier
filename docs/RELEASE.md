@@ -7,11 +7,13 @@
 ## [Unreleased]
 
 ### Added
+- Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
 - Auth password recovery flow (Forgot Password + Reset Password screens).
 - Profile settings password section with reset link CTA and cooldown.
 - Inbox conversation summary (on-demand button + inline panel).
 - AI settings bot name (org-level) used in AI prompts and summaries.
 - Inbox chat labels now show the configured bot name.
+- Usage & Billing settings with monthly (UTC) + total AI token tracking.
 - Next.js 14 project with App Router and TypeScript
 - Strict TypeScript configuration (`noUncheckedIndexedAccess`, `noImplicitReturns`)
 - Prettier + ESLint with strict rules
@@ -80,6 +82,9 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Bot mode copy refined (TR: “Dinleyici”, clearer descriptions) and radio indicator sizing aligned.
+- Active mode TR copy now mentions background lead extraction.
+- Sidebar bot status dot now uses green/amber/red for Active/Dinleyici/Kapalı.
 - Docs: define org-level bot mode (Active/Shadow/Off) and sidebar status indicator placement.
 - Docs: add inbox conversation summary design spec.
 - Inbox summary UI refined to hide refresh until summary completes, with reduced spacing above the AI banner.
@@ -120,6 +125,7 @@
 - Knowledge base sidebar now refreshes after folder create/delete actions triggered outside the sidebar.
 - Simulator KB fallback now answers definition-style questions that previously fell through routing.
 - Inbox unread counts now reset on open and only increment for contact messages.
+- Settings save buttons now reset clean state and avoid stray unsaved-change prompts.
 
 ---
 

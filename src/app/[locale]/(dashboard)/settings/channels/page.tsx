@@ -73,7 +73,11 @@ export default async function ChannelsPage() {
 
                 <SidebarGroup title={tSidebar('billing')}>
                     <SidebarItem icon={<CreditCard size={18} />} label={tSidebar('plans')} />
-                    <SidebarItem icon={<Receipt size={18} />} label={tSidebar('receipts')} />
+                    <SidebarItem
+                        icon={<Receipt size={18} />}
+                        label={tSidebar('receipts')}
+                        href={locale === 'tr' ? '/settings/billing' : `/${locale}/settings/billing`}
+                    />
                 </SidebarGroup>
             </Sidebar>
 

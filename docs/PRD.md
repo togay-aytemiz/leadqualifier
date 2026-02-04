@@ -188,11 +188,19 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Configurable bot name (org-level) used in AI responses, summaries, and inbox labels
 - Bot mode selector (Active / Shadow / Off) applies org-wide and excludes Simulator
 - TR copy uses "Yetenek" terminology and "Yapay Zeka Talimatı" label for clarity
+- TR copy labels Shadow mode as "Dinleyici" for clarity
+- TR copy for Active mode highlights background lead extraction
+- Sidebar status dots map to green/amber/red for Active/Dinleyici/Kapalı
 
 ### 5.6 Profile & Organization Settings
 - Profile: name and email visibility (email is read-only)
 - Profile security: password recovery via email reset link (Forgot + Reset)
 - Organization: company name and future org-level defaults
+
+### 5.7 Usage & Billing (Implemented)
+- Track org-level AI token usage (monthly UTC + total)
+- Includes production AI paths: router, RAG, fallback, and summaries
+- Every new token-consuming feature must log usage events
 
 ---
 
@@ -258,6 +266,7 @@ MVP is successful when:
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
+- **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
 - **Inbox Details:** Use consistent contact initials between list avatars and details panel.
@@ -265,6 +274,7 @@ MVP is successful when:
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
+- **Settings Save Feedback:** Show saved state via the save button (no inline “Saved” text) and clear dirty-state after persistence across settings pages.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.

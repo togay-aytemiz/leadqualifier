@@ -2,28 +2,72 @@
 
 import { useTranslations } from 'next-intl'
 import { SettingsSection } from '@/components/settings/SettingsSection'
+import type { AiBotMode } from '@/types/database'
 
 interface AiSettingsFormProps {
     botName: string
+    botMode: AiBotMode
     matchThreshold: number
     prompt: string
     onBotNameChange: (value: string) => void
+    onBotModeChange: (value: AiBotMode) => void
     onMatchThresholdChange: (value: number) => void
     onPromptChange: (value: string) => void
 }
 
 export default function AiSettingsForm({
     botName,
+    botMode,
     matchThreshold,
     prompt,
     onBotNameChange,
+    onBotModeChange,
     onMatchThresholdChange,
     onPromptChange
 }: AiSettingsFormProps) {
     const t = useTranslations('aiSettings')
+    const options: Array<{ value: AiBotMode; label: string; description: string }> = [
+        { value: 'active', label: t('botModeActive'), description: t('botModeActiveDescription') },
+        { value: 'shadow', label: t('botModeShadow'), description: t('botModeShadowDescription') },
+        { value: 'off', label: t('botModeOff'), description: t('botModeOffDescription') }
+    ]
 
     return (
         <div className="max-w-5xl">
+            <SettingsSection
+                title={t('botModeTitle')}
+                description={t('botModeDescription')}
+            >
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {options.map(option => {
+                        const isSelected = botMode === option.value
+                        return (
+                            <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => onBotModeChange(option.value)}
+                                className={`w-full rounded-lg border p-4 text-left transition-colors ${isSelected
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div
+                                        className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 grid place-items-center ${isSelected ? 'border-blue-500' : 'border-gray-300'}`}
+                                    >
+                                        {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900">{option.label}</p>
+                                        <p className="mt-1 text-xs text-gray-500">{option.description}</p>
+                                    </div>
+                                </div>
+                            </button>
+                        )
+                    })}
+                </div>
+            </SettingsSection>
+
             <SettingsSection
                 title={t('botNameTitle')}
                 description={t('botNameDescription')}

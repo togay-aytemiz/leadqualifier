@@ -19,9 +19,12 @@ export default function GeneralSettingsPage() {
     const tSidebar = useTranslations('Sidebar')
     const tUnsaved = useTranslations('unsavedChanges')
     const [selectedLocale, setSelectedLocale] = useState(currentLocale)
+    const [baselineLocale, setBaselineLocale] = useState(currentLocale)
     const [isSaving, setIsSaving] = useState(false)
+    const [saved, setSaved] = useState(false)
+    const [saveRequested, setSaveRequested] = useState(false)
 
-    const isDirty = useMemo(() => selectedLocale !== currentLocale, [selectedLocale, currentLocale])
+    const isDirty = useMemo(() => selectedLocale !== baselineLocale, [selectedLocale, baselineLocale])
 
     const handleLanguageChange = (newLang: string) => {
         const nextLocale = newLang as 'en' | 'tr'
@@ -31,7 +34,10 @@ export default function GeneralSettingsPage() {
     const handleSave = async () => {
         if (!isDirty) return true
         setIsSaving(true)
+        setSaveRequested(true)
         const nextLocale = selectedLocale as 'en' | 'tr'
+        setBaselineLocale(nextLocale)
+        setSaved(false)
         startTransition(() => {
             router.replace(pathname, { locale: nextLocale })
         })
@@ -40,9 +46,34 @@ export default function GeneralSettingsPage() {
 
     useEffect(() => {
         if (!isPending) {
+            if (saveRequested) {
+                setSaved(true)
+                setSaveRequested(false)
+            }
             setIsSaving(false)
         }
     }, [isPending])
+
+    useEffect(() => {
+        if (isDirty) {
+            setSaved(false)
+        }
+    }, [isDirty])
+
+    useEffect(() => {
+        if (!saved) return
+        const timeout = window.setTimeout(() => {
+            setSaved(false)
+        }, 2500)
+        return () => window.clearTimeout(timeout)
+    }, [saved])
+
+    useEffect(() => {
+        setSelectedLocale(currentLocale)
+        setBaselineLocale(currentLocale)
+        setSaveRequested(false)
+        setSaved(false)
+    }, [currentLocale])
 
     const handleDiscard = () => {
         setSelectedLocale(currentLocale)
@@ -117,7 +148,7 @@ export default function GeneralSettingsPage() {
                     <SidebarItem
                         icon={<Receipt size={18} />}
                         label={tSidebar('receipts')}
-                        href="#" // Placeholder
+                        href={currentLocale === 'tr' ? '/settings/billing' : `/${currentLocale}/settings/billing`}
                     />
                 </SidebarGroup>
             </Sidebar>
@@ -127,11 +158,15 @@ export default function GeneralSettingsPage() {
                 <PageHeader
                     title={tGeneral('title')}
                     actions={
-                        <Button onClick={handleSave} disabled={!isDirty || isSaving}>
-                            {isSaving ? tGeneral('saving') : tGeneral('save')}
-                        </Button>
-                    }
-                />
+                    <Button
+                        onClick={handleSave}
+                        disabled={!isDirty || isSaving}
+                        className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
+                    >
+                        {saved ? tGeneral('saved') : isSaving ? tGeneral('saving') : tGeneral('save')}
+                    </Button>
+                }
+            />
 
                 <div className="flex-1 overflow-auto p-8">
                     <div className="max-w-5xl">

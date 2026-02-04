@@ -133,13 +133,18 @@
   - [x] Skill → KB → Topic-guided fallback response
   - [x] Response formatting
   - [x] Error handling
-- [ ] **Bot Mode (Org-Level)**
-  - [ ] Active / Shadow / Off (Simulator excluded)
-  - [ ] AI Settings selector + sidebar status indicator
+- [x] **Bot Mode (Org-Level)**
+  - [x] Active / Shadow / Off (Simulator excluded)
+  - [x] AI Settings selector + sidebar status indicator
+  - [x] Turkish copy refinements (Dinleyici label + clearer descriptions)
+  - [x] Active mode copy mentions background lead extraction
+  - [x] Sidebar status dot uses green/amber/red for Active/Dinleyici/Kapalı
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
 - [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
 - [x] **AI Settings:** Configurable bot name (org-level)
 - [x] **Inbox UI:** Show configured bot name in chat labels
+- [x] **Usage & Billing:** Track monthly (UTC) + total AI token usage
+- [x] **Settings UX:** Save buttons show a transient success state and clear dirty-state across settings pages
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger

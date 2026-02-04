@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import AiSettingsForm from './AiSettingsForm'
@@ -16,8 +16,9 @@ interface AiSettingsClientProps {
 export default function AiSettingsClient({ initialSettings }: AiSettingsClientProps) {
     const t = useTranslations('aiSettings')
     const tUnsaved = useTranslations('unsavedChanges')
-    const initialRef = useRef(initialSettings)
+    const [baseline, setBaseline] = useState(initialSettings)
     const [botName, setBotName] = useState(initialSettings.bot_name)
+    const [botMode, setBotMode] = useState(initialSettings.bot_mode)
     const [matchThreshold, setMatchThreshold] = useState(initialSettings.match_threshold)
     const [prompt, setPrompt] = useState(initialSettings.prompt)
     const [isSaving, setIsSaving] = useState(false)
@@ -26,17 +27,26 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
 
     const isDirty = useMemo(() => {
         return (
-            botName !== initialRef.current.bot_name ||
-            matchThreshold !== initialRef.current.match_threshold ||
-            prompt !== initialRef.current.prompt
+            botName !== baseline.bot_name ||
+            botMode !== baseline.bot_mode ||
+            matchThreshold !== baseline.match_threshold ||
+            prompt !== baseline.prompt
         )
-    }, [botName, matchThreshold, prompt])
+    }, [botName, botMode, matchThreshold, prompt, baseline])
 
     useEffect(() => {
         if (isDirty) {
             setSaved(false)
         }
     }, [isDirty])
+
+    useEffect(() => {
+        if (!saved) return
+        const timeout = window.setTimeout(() => {
+            setSaved(false)
+        }, 2500)
+        return () => window.clearTimeout(timeout)
+    }, [saved])
 
     const handleSave = async () => {
         setIsSaving(true)
@@ -46,14 +56,19 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             const savedSettings = await updateOrgAiSettings({
                 mode: 'flexible',
                 bot_name: botName,
+                bot_mode: botMode,
                 match_threshold: matchThreshold,
                 prompt
             })
-            initialRef.current = savedSettings
+            setBaseline(savedSettings)
             setBotName(savedSettings.bot_name)
+            setBotMode(savedSettings.bot_mode)
             setMatchThreshold(savedSettings.match_threshold)
             setPrompt(savedSettings.prompt)
             setSaved(true)
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('ai-settings-updated'))
+            }
             return true
         } catch (error) {
             console.error(error)
@@ -65,9 +80,10 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     }
 
     const handleDiscard = () => {
-        setBotName(initialRef.current.bot_name)
-        setMatchThreshold(initialRef.current.match_threshold)
-        setPrompt(initialRef.current.prompt)
+        setBotName(baseline.bot_name)
+        setBotMode(baseline.bot_mode)
+        setMatchThreshold(baseline.match_threshold)
+        setPrompt(baseline.prompt)
         setSaved(false)
         setSaveError(null)
     }
@@ -83,8 +99,12 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             <PageHeader
                 title={t('pageTitle')}
                 actions={
-                    <Button onClick={handleSave} disabled={!isDirty || isSaving}>
-                        {isSaving ? t('saving') : t('save')}
+                    <Button
+                        onClick={handleSave}
+                        disabled={!isDirty || isSaving}
+                        className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
+                    >
+                        {saved ? t('saved') : isSaving ? t('saving') : t('save')}
                     </Button>
                 }
             />
@@ -92,14 +112,15 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-5xl mb-6">
                     <p className="text-sm text-gray-500">{t('description')}</p>
-                    {saved && <p className="mt-2 text-sm text-green-600">{t('saved')}</p>}
                     {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
                 </div>
                 <AiSettingsForm
                     botName={botName}
+                    botMode={botMode}
                     matchThreshold={matchThreshold}
                     prompt={prompt}
                     onBotNameChange={setBotName}
+                    onBotModeChange={setBotMode}
                     onMatchThresholdChange={setMatchThreshold}
                     onPromptChange={setPrompt}
                 />

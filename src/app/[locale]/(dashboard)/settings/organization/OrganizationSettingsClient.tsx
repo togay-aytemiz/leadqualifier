@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
@@ -15,19 +15,27 @@ interface OrganizationSettingsClientProps {
 export default function OrganizationSettingsClient({ initialName }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
-    const initialRef = useRef({ name: initialName })
+    const [baseline, setBaseline] = useState({ name: initialName })
     const [name, setName] = useState(initialName)
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
 
-    const isDirty = useMemo(() => name !== initialRef.current.name, [name])
+    const isDirty = useMemo(() => name !== baseline.name, [name, baseline])
 
     useEffect(() => {
         if (isDirty) {
             setSaved(false)
         }
     }, [isDirty])
+
+    useEffect(() => {
+        if (!saved) return
+        const timeout = window.setTimeout(() => {
+            setSaved(false)
+        }, 2500)
+        return () => window.clearTimeout(timeout)
+    }, [saved])
 
     const handleSave = async () => {
         if (!isDirty) return true
@@ -36,7 +44,7 @@ export default function OrganizationSettingsClient({ initialName }: Organization
         setSaved(false)
         try {
             await updateOrganizationName(name)
-            initialRef.current = { name }
+            setBaseline({ name })
             setSaved(true)
             return true
         } catch (error) {
@@ -49,7 +57,7 @@ export default function OrganizationSettingsClient({ initialName }: Organization
     }
 
     const handleDiscard = () => {
-        setName(initialRef.current.name)
+        setName(baseline.name)
         setSaveError(null)
         setSaved(false)
     }
@@ -65,8 +73,12 @@ export default function OrganizationSettingsClient({ initialName }: Organization
             <PageHeader
                 title={t('pageTitle')}
                 actions={
-                    <Button onClick={handleSave} disabled={!isDirty || isSaving}>
-                        {isSaving ? t('saving') : t('save')}
+                    <Button
+                        onClick={handleSave}
+                        disabled={!isDirty || isSaving}
+                        className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
+                    >
+                        {saved ? t('saved') : isSaving ? t('saving') : t('save')}
                     </Button>
                 }
             />
@@ -74,7 +86,6 @@ export default function OrganizationSettingsClient({ initialName }: Organization
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-5xl mb-6">
                     <p className="text-sm text-gray-500">{t('description')}</p>
-                    {saved && <p className="mt-2 text-sm text-green-600">{t('saved')}</p>}
                     {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
                 </div>
 

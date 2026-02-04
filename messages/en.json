@@ -155,7 +155,11 @@
     "mainSidebar": {
         "workspace": "Workspace",
         "aiTools": "AI Tools",
-        "other": "Other"
+        "other": "Other",
+        "botStatusLabel": "Bot",
+        "botStatusActive": "Active",
+        "botStatusShadow": "Shadow",
+        "botStatusOff": "Off"
     },
     "inbox": {
         "title": "Inbox",
@@ -233,16 +237,17 @@
         "noOrganization": "No Organization Found",
         "noOrganizationDesc": "You need to be part of an organization to use the simulator."
     },
-    "General": {
-        "title": "General Settings",
-        "language": "Language",
-        "languageDescription": "Select your preferred language for the interface.",
-        "languageSummary": "Current: {language}",
-        "languageEnglish": "English",
-        "languageTurkish": "Turkish (Türkçe)",
-        "save": "Save changes",
-        "saving": "Saving..."
-    },
+  "General": {
+    "title": "General Settings",
+    "language": "Language",
+    "languageDescription": "Select your preferred language for the interface.",
+    "languageSummary": "Current: {language}",
+    "languageEnglish": "English",
+    "languageTurkish": "Turkish (Türkçe)",
+    "save": "Save changes",
+    "saving": "Saving...",
+    "saved": "Saved"
+  },
     "Channels": {
         "title": "Channels",
         "noOrganization": "No Organization Found",
@@ -284,23 +289,45 @@
         "validating": "Validating...",
         "connectBot": "Connect Bot"
     },
-    "Sidebar": {
-        "settings": "Settings",
-        "preferences": "Preferences",
-        "profile": "Profile",
-        "organization": "Organization",
-        "general": "General",
-        "ai": "AI",
-        "integrations": "Integrations",
-        "channels": "Channels",
-        "billing": "Billing",
-        "plans": "Plans",
-        "receipts": "Receipts"
-    },
+  "Sidebar": {
+    "settings": "Settings",
+    "preferences": "Preferences",
+    "profile": "Profile",
+    "organization": "Organization",
+    "general": "General",
+    "ai": "AI",
+    "integrations": "Integrations",
+    "channels": "Channels",
+    "billing": "Billing",
+    "plans": "Plans",
+    "receipts": "Usage & Billing"
+  },
+  "billingUsage": {
+    "pageTitle": "Usage & Billing",
+    "title": "AI Usage",
+    "description": "Track AI token usage across production features.",
+    "monthLabel": "This month",
+    "totalLabel": "All-time total",
+    "inputLabel": "Input",
+    "outputLabel": "Output",
+    "tokensLabel": "tokens",
+    "utcNote": "Monthly usage is based on the UTC calendar month ({month}).",
+    "emptyState": "No usage data yet.",
+    "noOrganization": "No Organization Found",
+    "noOrganizationDesc": "You need to be part of an organization to view usage."
+  },
     "aiSettings": {
     "pageTitle": "AI Settings",
     "title": "AI Settings",
     "description": "Tune how the bot responds when it can’t find a Skill or Knowledge Base match.",
+    "botModeTitle": "Bot mode",
+    "botModeDescription": "Applies to Telegram/WhatsApp. Simulator is unaffected.",
+    "botModeActive": "Active",
+    "botModeActiveDescription": "Bot replies to messages (Skills → KB → fallback).",
+    "botModeShadow": "Shadow",
+    "botModeShadowDescription": "No replies; lead extraction only.",
+    "botModeOff": "Off",
+    "botModeOffDescription": "No AI processing; only messages are stored.",
     "botNameTitle": "Bot name",
     "botNameDescription": "Shown to users and used in AI responses.",
     "botNameLabel": "Bot name",
