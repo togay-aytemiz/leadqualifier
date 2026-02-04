@@ -293,6 +293,7 @@ MVP is successful when:
 - **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; profile updates are proposed from Skills/KB with admin approval.
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
+- **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

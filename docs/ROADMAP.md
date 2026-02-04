@@ -150,6 +150,7 @@
 - [x] **Settings UX:** Save buttons show a transient success state and clear dirty-state across settings pages
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
+- [x] **Settings UX:** Align settings column widths and remove duplicate field labels for cleaner alignment
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details
 - [x] **Auth UX Refresh**

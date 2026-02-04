@@ -72,13 +72,13 @@ export default function AiSettingsForm({
                 title={t('botNameTitle')}
                 description={t('botNameDescription')}
             >
-                <label className="text-sm font-medium text-gray-700">{t('botNameLabel')}</label>
                 <input
                     type="text"
                     value={botName}
                     onChange={(e) => onBotNameChange(e.target.value)}
                     placeholder={t('botNamePlaceholder')}
-                    className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                    aria-label={t('botNameLabel')}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
                 />
             </SettingsSection>
 
@@ -86,31 +86,31 @@ export default function AiSettingsForm({
                 title={t('thresholdTitle')}
                 description={t('thresholdDescription')}
             >
-                <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">{t('threshold')}</label>
+                <div className="flex items-center gap-3">
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={matchThreshold}
+                        onChange={(e) => onMatchThresholdChange(parseFloat(e.target.value))}
+                        aria-label={t('threshold')}
+                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    />
                     <span className="text-xs font-mono text-gray-500">{matchThreshold.toFixed(2)}</span>
                 </div>
-                <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={matchThreshold}
-                    onChange={(e) => onMatchThresholdChange(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                />
             </SettingsSection>
 
             <SettingsSection
                 title={t('promptTitle')}
                 description={t('promptDescription')}
             >
-                <label className="text-sm font-medium text-gray-700">{t('promptLabel')}</label>
                 <textarea
                     rows={6}
                     value={prompt}
                     onChange={(e) => onPromptChange(e.target.value)}
-                    className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                    aria-label={t('promptLabel')}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
                 />
             </SettingsSection>
         </div>

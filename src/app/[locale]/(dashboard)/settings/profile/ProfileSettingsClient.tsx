@@ -116,12 +116,12 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
                         title={t('nameTitle')}
                         description={t('nameDescription')}
                     >
-                        <label className="text-sm font-medium text-gray-700">{t('nameLabel')}</label>
                         <input
                             type="text"
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                            aria-label={t('nameLabel')}
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
                         />
                     </SettingsSection>
 
@@ -129,12 +129,12 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
                         title={t('emailTitle')}
                         description={t('emailDescription')}
                     >
-                        <label className="text-sm font-medium text-gray-700">{t('emailLabel')}</label>
                         <input
                             type="email"
                             value={email}
                             readOnly
-                            className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                            aria-label={t('emailLabel')}
+                            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
                         />
                         <p className="mt-2 text-xs text-gray-500">{t('emailImmutableNote')}</p>
                     </SettingsSection>

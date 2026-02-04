@@ -180,12 +180,12 @@ export default function OrganizationSettingsClient({
                         title={t('nameTitle')}
                         description={t('nameDescription')}
                     >
-                        <label className="text-sm font-medium text-gray-700">{t('nameLabel')}</label>
                         <input
                             type="text"
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                            aria-label={t('nameLabel')}
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
                         />
                     </SettingsSection>
 

@@ -11,12 +11,12 @@ interface SettingsSectionProps {
 
 const layoutClasses = {
     default: {
-        left: 'lg:col-span-4',
-        right: 'lg:col-span-8'
+        left: 'lg:col-span-4 w-full lg:max-w-[300px]',
+        right: 'lg:col-span-8 w-full lg:max-w-[720px]'
     },
     wide: {
-        left: 'lg:col-span-3',
-        right: 'lg:col-span-9'
+        left: 'lg:col-span-3 w-full lg:max-w-[300px]',
+        right: 'lg:col-span-9 w-full lg:max-w-[840px]'
     }
 }
 

@@ -92,6 +92,7 @@
 
 ### Changed
 - Offering Profile management moved to Organization Settings for clearer org-level ownership.
+- Settings forms now use consistent column widths and inputs align with section titles (no duplicate field labels).
 - Bot mode copy refined (TR: “Dinleyici”, clearer descriptions) and radio indicator sizing aligned.
 - Active mode TR copy now mentions background lead extraction.
 - Sidebar bot status dot now uses green/amber/red for Active/Dinleyici/Kapalı.
