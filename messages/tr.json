@@ -356,7 +356,16 @@
         "saved": "Kaydedildi",
         "saveError": "Ayarlar kaydedilemedi. Lütfen tekrar deneyin.",
         "noOrganization": "Organizasyon Bulunamadı",
-        "noOrganizationDesc": "AI ayarlarını yönetmek için bir organizasyona bağlı olmalısınız."
+        "noOrganizationDesc": "AI ayarlarını yönetmek için bir organizasyona bağlı olmalısınız.",
+        "offeringProfileTitle": "Hizmet Profili",
+        "offeringProfileDescription": "Hizmet kapsamınızı özetleyin; katalog olmasa bile lead çıkarımı uyum kontrolü yapar.",
+        "offeringProfileLabel": "Profil özeti",
+        "catalogEnabledLabel": "Hizmet kataloğunu etkinleştir",
+        "offeringProfileSave": "Profili kaydet",
+        "pendingProfileUpdates": "Bekleyen profil güncellemeleri",
+        "pendingServiceCandidates": "Bekleyen hizmet adayları",
+        "approve": "Onayla",
+        "reject": "Reddet"
     },
     "profileSettings": {
         "pageTitle": "Profil",

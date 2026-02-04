@@ -356,7 +356,16 @@
         "saved": "Saved",
         "saveError": "Failed to save settings. Please try again.",
         "noOrganization": "No Organization Found",
-        "noOrganizationDesc": "You need to be part of an organization to manage AI settings."
+        "noOrganizationDesc": "You need to be part of an organization to manage AI settings.",
+        "offeringProfileTitle": "Offering Profile",
+        "offeringProfileDescription": "Summarize what you offer so lead extraction can match fit even without a catalog.",
+        "offeringProfileLabel": "Profile summary",
+        "catalogEnabledLabel": "Enable service catalog",
+        "offeringProfileSave": "Save profile",
+        "pendingProfileUpdates": "Pending profile updates",
+        "pendingServiceCandidates": "Pending service candidates",
+        "approve": "Approve",
+        "reject": "Reject"
     },
     "profileSettings": {
         "pageTitle": "Profile",

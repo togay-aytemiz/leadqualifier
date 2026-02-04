@@ -4,16 +4,34 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import AiSettingsForm from './AiSettingsForm'
-import type { OrganizationAiSettings } from '@/types/database'
+import type { OrganizationAiSettings, OfferingProfile, OfferingProfileUpdate, ServiceCandidate } from '@/types/database'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
+import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
+import {
+    approveProfileUpdate,
+    approveServiceCandidate,
+    rejectProfileUpdate,
+    rejectServiceCandidate,
+    updateOfferingProfileSummary
+} from '@/lib/leads/settings'
 
 interface AiSettingsClientProps {
     initialSettings: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'>
+    organizationId: string
+    offeringProfile: OfferingProfile | null
+    pendingProfileUpdates: OfferingProfileUpdate[]
+    pendingCandidates: ServiceCandidate[]
 }
 
-export default function AiSettingsClient({ initialSettings }: AiSettingsClientProps) {
+export default function AiSettingsClient({
+    initialSettings,
+    organizationId,
+    offeringProfile,
+    pendingProfileUpdates: initialPendingUpdates,
+    pendingCandidates: initialPendingCandidates
+}: AiSettingsClientProps) {
     const t = useTranslations('aiSettings')
     const tUnsaved = useTranslations('unsavedChanges')
     const [baseline, setBaseline] = useState(initialSettings)
@@ -24,6 +42,10 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
+    const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
+    const [catalogEnabled, setCatalogEnabled] = useState(offeringProfile?.catalog_enabled ?? true)
+    const [pendingProfileUpdates, setPendingProfileUpdates] = useState(initialPendingUpdates)
+    const [pendingCandidates, setPendingCandidates] = useState(initialPendingCandidates)
 
     const isDirty = useMemo(() => {
         return (
@@ -47,6 +69,19 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
         }, 2500)
         return () => window.clearTimeout(timeout)
     }, [saved])
+
+    useEffect(() => {
+        setProfileSummary(offeringProfile?.summary ?? '')
+        setCatalogEnabled(offeringProfile?.catalog_enabled ?? true)
+    }, [offeringProfile])
+
+    useEffect(() => {
+        setPendingProfileUpdates(initialPendingUpdates)
+    }, [initialPendingUpdates])
+
+    useEffect(() => {
+        setPendingCandidates(initialPendingCandidates)
+    }, [initialPendingCandidates])
 
     const handleSave = async () => {
         setIsSaving(true)
@@ -88,6 +123,36 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
         setSaveError(null)
     }
 
+    const handleSaveOfferingProfile = async (summary: string, enabled: boolean) => {
+        await updateOfferingProfileSummary(organizationId, summary, enabled)
+        setProfileSummary(summary)
+        setCatalogEnabled(enabled)
+    }
+
+    const handleApproveUpdate = async (id: string) => {
+        const match = pendingProfileUpdates.find((item) => item.id === id)
+        await approveProfileUpdate(id)
+        setPendingProfileUpdates((items) => items.filter((item) => item.id !== id))
+        if (match?.proposed_summary) {
+            setProfileSummary(match.proposed_summary)
+        }
+    }
+
+    const handleRejectUpdate = async (id: string) => {
+        await rejectProfileUpdate(id)
+        setPendingProfileUpdates((items) => items.filter((item) => item.id !== id))
+    }
+
+    const handleApproveCandidate = async (id: string) => {
+        await approveServiceCandidate(id)
+        setPendingCandidates((items) => items.filter((item) => item.id !== id))
+    }
+
+    const handleRejectCandidate = async (id: string) => {
+        await rejectServiceCandidate(id)
+        setPendingCandidates((items) => items.filter((item) => item.id !== id))
+    }
+
     const guard = useUnsavedChangesGuard({
         isDirty,
         onSave: handleSave,
@@ -123,6 +188,17 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                     onBotModeChange={setBotMode}
                     onMatchThresholdChange={setMatchThreshold}
                     onPromptChange={setPrompt}
+                />
+                <OfferingProfileSection
+                    summary={profileSummary}
+                    catalogEnabled={catalogEnabled}
+                    pendingUpdates={pendingProfileUpdates}
+                    pendingCandidates={pendingCandidates}
+                    onSave={handleSaveOfferingProfile}
+                    onApproveUpdate={handleApproveUpdate}
+                    onRejectUpdate={handleRejectUpdate}
+                    onApproveCandidate={handleApproveCandidate}
+                    onRejectCandidate={handleRejectCandidate}
                 />
             </div>
 

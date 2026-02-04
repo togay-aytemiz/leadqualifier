@@ -4,6 +4,7 @@ import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
 import AiSettingsClient from './AiSettingsClient'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getOfferingProfile, getPendingProfileUpdates, getServiceCandidates } from '@/lib/leads/settings'
 
 export default async function AiSettingsPage() {
     const supabase = await createClient()
@@ -34,7 +35,12 @@ export default async function AiSettingsPage() {
         )
     }
 
-    const aiSettings = await getOrgAiSettings(organizationId, { supabase })
+    const [aiSettings, offeringProfile, pendingProfileUpdates, pendingCandidates] = await Promise.all([
+        getOrgAiSettings(organizationId, { supabase }),
+        getOfferingProfile(organizationId),
+        getPendingProfileUpdates(organizationId),
+        getServiceCandidates(organizationId)
+    ])
 
     return (
         <>
@@ -79,7 +85,13 @@ export default async function AiSettingsPage() {
 
             {/* Main Content */}
             <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-                <AiSettingsClient initialSettings={aiSettings} />
+                <AiSettingsClient
+                    initialSettings={aiSettings}
+                    organizationId={organizationId}
+                    offeringProfile={offeringProfile}
+                    pendingProfileUpdates={pendingProfileUpdates}
+                    pendingCandidates={pendingCandidates}
+                />
             </div>
         </>
     )
