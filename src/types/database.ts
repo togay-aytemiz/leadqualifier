@@ -130,6 +130,68 @@ export interface Channel {
     updated_at: string
 }
 
+export type LeadStatus = 'hot' | 'warm' | 'cold' | 'ignored'
+export type ServiceCandidateStatus = 'pending' | 'approved' | 'rejected'
+
+export interface OfferingProfile {
+    organization_id: string
+    summary: string
+    catalog_enabled: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface OfferingProfileUpdate {
+    id: string
+    organization_id: string
+    source_type: 'skill' | 'knowledge'
+    source_id: string | null
+    proposed_summary: string
+    status: ServiceCandidateStatus
+    created_at: string
+    reviewed_at: string | null
+    reviewed_by: string | null
+}
+
+export interface ServiceCatalogItem {
+    id: string
+    organization_id: string
+    name: string
+    aliases: string[]
+    active: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface ServiceCandidate {
+    id: string
+    organization_id: string
+    source_type: 'skill' | 'knowledge'
+    source_id: string | null
+    proposed_name: string
+    status: ServiceCandidateStatus
+    created_at: string
+    reviewed_at: string | null
+    reviewed_by: string | null
+}
+
+export interface Lead {
+    id: string
+    organization_id: string
+    conversation_id: string
+    service_type: string | null
+    service_fit: number
+    intent_score: number
+    total_score: number
+    status: LeadStatus
+    summary: string | null
+    extracted_fields: any
+    non_business: boolean
+    last_message_at: string | null
+    created_at: string
+    updated_at: string
+}
+
 export type SkillInsert = Omit<Skill, 'id' | 'created_at' | 'updated_at'>
 export type SkillUpdate = Partial<Omit<Skill, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
 
@@ -187,6 +249,31 @@ export interface Database {
                 Row: OrganizationAiUsage
                 Insert: Omit<OrganizationAiUsage, 'id' | 'created_at'>
                 Update: Partial<Omit<OrganizationAiUsage, 'id' | 'organization_id' | 'created_at'>>
+            }
+            offering_profiles: {
+                Row: OfferingProfile
+                Insert: Omit<OfferingProfile, 'created_at' | 'updated_at'>
+                Update: Partial<Omit<OfferingProfile, 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            offering_profile_updates: {
+                Row: OfferingProfileUpdate
+                Insert: Omit<OfferingProfileUpdate, 'id' | 'created_at'>
+                Update: Partial<Omit<OfferingProfileUpdate, 'id' | 'organization_id' | 'created_at'>>
+            }
+            service_catalog: {
+                Row: ServiceCatalogItem
+                Insert: Omit<ServiceCatalogItem, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<ServiceCatalogItem, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            service_candidates: {
+                Row: ServiceCandidate
+                Insert: Omit<ServiceCandidate, 'id' | 'created_at'>
+                Update: Partial<Omit<ServiceCandidate, 'id' | 'organization_id' | 'created_at'>>
+            }
+            leads: {
+                Row: Lead
+                Insert: Omit<Lead, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Lead, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
             }
         }
     }
