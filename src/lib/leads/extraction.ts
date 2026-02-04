@@ -58,10 +58,16 @@ export async function runLeadExtraction(options: {
 }) {
     const supabase = options.supabase ?? await createClient()
 
-    const [{ data: profile }, { data: catalog }, { data: messages }] = await Promise.all([
-        supabase.from('offering_profiles').select('summary, catalog_enabled').eq('organization_id', options.organizationId).maybeSingle(),
+    const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }] = await Promise.all([
+        supabase.from('offering_profiles').select('summary, catalog_enabled, ai_suggestions_enabled').eq('organization_id', options.organizationId).maybeSingle(),
         supabase.from('service_catalog').select('name, aliases, active').eq('organization_id', options.organizationId).eq('active', true),
-        supabase.from('messages').select('sender_type, content, created_at').eq('conversation_id', options.conversationId).order('created_at', { ascending: false }).limit(10)
+        supabase.from('messages').select('sender_type, content, created_at').eq('conversation_id', options.conversationId).order('created_at', { ascending: false }).limit(10),
+        supabase
+            .from('offering_profile_suggestions')
+            .select('content')
+            .eq('organization_id', options.organizationId)
+            .order('created_at', { ascending: false })
+            .limit(5)
     ])
 
     if (!process.env.OPENAI_API_KEY) return
@@ -69,7 +75,17 @@ export async function runLeadExtraction(options: {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const catalogList = (catalog ?? []).map((row: any) => row.name).join(', ')
     const contextMessages = (messages ?? []).reverse().map((msg: any) => `${msg.sender_type}: ${msg.content}`)
-    const userPrompt = `Offering profile:\n${profile?.summary ?? ''}\n\nCatalog:${catalogList}\n\nConversation:\n${contextMessages.join('\n')}`
+    const suggestionText = (profile?.ai_suggestions_enabled ? (suggestions ?? []).map((item: any) => `- ${item.content}`) : [])
+        .reverse()
+        .join('\n')
+    const profileText = [
+        (profile?.summary ?? '').trim(),
+        suggestionText ? `AI suggestions:\n${suggestionText}` : ''
+    ]
+        .filter(Boolean)
+        .join('\n\n')
+
+    const userPrompt = `Offering profile:\n${profileText}\n\nCatalog:${catalogList}\n\nConversation:\n${contextMessages.join('\n')}`
 
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -86,9 +102,10 @@ export async function runLeadExtraction(options: {
     const catalogEnabled = profile?.catalog_enabled ?? true
     const hasCatalogMatch = catalogEnabled && matchesCatalog(extracted.service_type, catalog ?? [])
 
+    const hasProfileContent = Boolean((profile?.summary ?? '').trim() || suggestionText)
     const signals = {
         hasCatalogMatch,
-        hasProfileMatch: Boolean(profile?.summary),
+        hasProfileMatch: hasProfileContent,
         hasDate: Boolean(extracted.desired_date),
         hasBudget: Array.isArray(extracted.budget_signals) && extracted.budget_signals.length > 0,
         isDecisive: Array.isArray(extracted.intent_signals) && extracted.intent_signals.includes('decisive'),

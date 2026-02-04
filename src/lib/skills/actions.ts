@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
-import { proposeOfferingProfileUpdate, proposeServiceCandidate } from '@/lib/leads/offering-profile'
+import { appendOfferingProfileSuggestion, proposeServiceCandidate } from '@/lib/leads/offering-profile'
 
 /**
  * Get all skills for an organization
@@ -75,7 +75,7 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
             name: data.title,
             supabase
         })
-        await proposeOfferingProfileUpdate({
+        await appendOfferingProfileSuggestion({
             organizationId: data.organization_id,
             sourceType: 'skill',
             sourceId: data.id,
@@ -123,7 +123,7 @@ export async function updateSkill(
                 name: data.title,
                 supabase
             })
-            await proposeOfferingProfileUpdate({
+            await appendOfferingProfileSuggestion({
                 organizationId: data.organization_id,
                 sourceType: 'skill',
                 sourceId: data.id,

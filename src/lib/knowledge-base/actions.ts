@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { chunkText } from '@/lib/knowledge-base/chunking'
-import { proposeOfferingProfileUpdate, proposeServiceCandidate } from '@/lib/leads/offering-profile'
+import { appendOfferingProfileSuggestion, proposeServiceCandidate } from '@/lib/leads/offering-profile'
 import { revalidatePath } from 'next/cache'
 
 export interface KnowledgeCollection {
@@ -158,7 +158,7 @@ export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
             name: data.title,
             supabase
         })
-        await proposeOfferingProfileUpdate({
+        await appendOfferingProfileSuggestion({
             organizationId,
             sourceType: 'knowledge',
             sourceId: data.id,
@@ -240,7 +240,7 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
                         name: finalDoc.title,
                         supabase
                     })
-                    await proposeOfferingProfileUpdate({
+                    await appendOfferingProfileSuggestion({
                         organizationId: finalDoc.organization_id,
                         sourceType: 'knowledge',
                         sourceId: finalDoc.id,
@@ -269,7 +269,7 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
                 name: data.title,
                 supabase
             })
-            await proposeOfferingProfileUpdate({
+            await appendOfferingProfileSuggestion({
                 organizationId: data.organization_id,
                 sourceType: 'knowledge',
                 sourceId: data.id,

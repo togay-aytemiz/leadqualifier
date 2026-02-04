@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
 import OrganizationSettingsClient from './OrganizationSettingsClient'
-import { getOfferingProfile, getPendingProfileUpdates, getServiceCandidates } from '@/lib/leads/settings'
+import { getOfferingProfile, getOfferingProfileSuggestions } from '@/lib/leads/settings'
 
 export default async function OrganizationSettingsPage() {
     const supabase = await createClient()
@@ -34,15 +34,14 @@ export default async function OrganizationSettingsPage() {
         )
     }
 
-    const [{ data: organization }, offeringProfile, pendingProfileUpdates, pendingCandidates] = await Promise.all([
+    const [{ data: organization }, offeringProfile, offeringProfileSuggestions] = await Promise.all([
         supabase
             .from('organizations')
             .select('name')
             .eq('id', organizationId)
             .single(),
         getOfferingProfile(organizationId),
-        getPendingProfileUpdates(organizationId),
-        getServiceCandidates(organizationId)
+        getOfferingProfileSuggestions(organizationId)
     ])
 
     return (
@@ -90,8 +89,7 @@ export default async function OrganizationSettingsPage() {
                     initialName={organization?.name ?? ''}
                     organizationId={organizationId}
                     offeringProfile={offeringProfile}
-                    pendingProfileUpdates={pendingProfileUpdates}
-                    pendingCandidates={pendingCandidates}
+                    offeringProfileSuggestions={offeringProfileSuggestions}
                 />
             </div>
         </>

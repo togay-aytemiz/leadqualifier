@@ -172,6 +172,7 @@
 - [x] **Offering Profile (Catalog Optional)**
   - [x] Generate profile summary from Skills/KB
   - [x] Admin review + edit flow
+  - [x] Manual profile + AI suggestions toggle (append-only)
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
   - [x] Admin approval workflow

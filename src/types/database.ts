@@ -137,8 +137,18 @@ export interface OfferingProfile {
     organization_id: string
     summary: string
     catalog_enabled: boolean
+    ai_suggestions_enabled: boolean
     created_at: string
     updated_at: string
+}
+
+export interface OfferingProfileSuggestion {
+    id: string
+    organization_id: string
+    source_type: 'skill' | 'knowledge' | 'batch'
+    source_id: string | null
+    content: string
+    created_at: string
 }
 
 export interface OfferingProfileUpdate {
@@ -254,6 +264,11 @@ export interface Database {
                 Row: OfferingProfile
                 Insert: Omit<OfferingProfile, 'created_at' | 'updated_at'>
                 Update: Partial<Omit<OfferingProfile, 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            offering_profile_suggestions: {
+                Row: OfferingProfileSuggestion
+                Insert: Omit<OfferingProfileSuggestion, 'id' | 'created_at'>
+                Update: Partial<Omit<OfferingProfileSuggestion, 'id' | 'organization_id' | 'created_at'>>
             }
             offering_profile_updates: {
                 Row: OfferingProfileUpdate

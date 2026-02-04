@@ -1,46 +1,35 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { useTranslations } from 'next-intl'
 
 interface OfferingProfileSectionProps {
     summary: string
-    catalogEnabled: boolean
-    pendingUpdates: Array<{ id: string; proposed_summary: string }>
-    pendingCandidates: Array<{ id: string; proposed_name: string }>
+    aiSuggestionsEnabled: boolean
+    suggestions: Array<{ id: string; content: string; created_at: string }>
     onSummaryChange: (value: string) => void
-    onCatalogEnabledChange: (value: boolean) => void
-    onApproveUpdate: (id: string) => Promise<void>
-    onRejectUpdate: (id: string) => Promise<void>
-    onApproveCandidate: (id: string) => Promise<void>
-    onRejectCandidate: (id: string) => Promise<void>
+    onAiSuggestionsEnabledChange: (value: boolean) => void
 }
 
 export function OfferingProfileSection({
     summary: initialSummary,
-    catalogEnabled: initialCatalogEnabled,
-    pendingUpdates,
-    pendingCandidates,
+    aiSuggestionsEnabled: initialAiSuggestionsEnabled,
+    suggestions,
     onSummaryChange,
-    onCatalogEnabledChange,
-    onApproveUpdate,
-    onRejectUpdate,
-    onApproveCandidate,
-    onRejectCandidate
+    onAiSuggestionsEnabledChange
 }: OfferingProfileSectionProps) {
     const t = useTranslations('organizationSettings')
     const [summary, setSummary] = useState(initialSummary)
-    const [catalogEnabled, setCatalogEnabled] = useState(initialCatalogEnabled)
+    const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(initialAiSuggestionsEnabled)
 
     useEffect(() => {
         setSummary(initialSummary)
     }, [initialSummary])
 
     useEffect(() => {
-        setCatalogEnabled(initialCatalogEnabled)
-    }, [initialCatalogEnabled])
+        setAiSuggestionsEnabled(initialAiSuggestionsEnabled)
+    }, [initialAiSuggestionsEnabled])
 
     return (
         <SettingsSection title={t('offeringProfileTitle')} description={t('offeringProfileDescription')}>
@@ -61,50 +50,39 @@ export function OfferingProfileSection({
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input
                         type="checkbox"
-                        checked={catalogEnabled}
+                        checked={aiSuggestionsEnabled}
                         onChange={(e) => {
                             const next = e.target.checked
-                            setCatalogEnabled(next)
-                            onCatalogEnabledChange(next)
+                            setAiSuggestionsEnabled(next)
+                            onAiSuggestionsEnabledChange(next)
                         }}
                     />
-                    {t('catalogEnabledLabel')}
+                    {t('offeringProfileAiToggleLabel')}
                 </label>
-                <p className="text-xs text-gray-500">{t('catalogEnabledHelp')}</p>
+                <p className="text-xs text-gray-500">{t('offeringProfileAiToggleHelp')}</p>
 
-                {pendingUpdates.length > 0 && (
-                    <div className="border-t pt-4">
-                        <p className="text-sm font-medium text-gray-900">{t('pendingProfileUpdates')}</p>
-                        {pendingUpdates.map((item) => (
-                            <div key={item.id} className="mt-2 rounded-lg border p-3">
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.proposed_summary}</p>
-                                <div className="mt-2 flex gap-2">
-                                    <Button onClick={() => onApproveUpdate(item.id)}>{t('approve')}</Button>
-                                    <Button variant="secondary" onClick={() => onRejectUpdate(item.id)}>{t('reject')}</Button>
-                                </div>
-                            </div>
-                        ))}
+                <div className="border-t pt-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900">{t('offeringProfileSuggestionsTitle')}</p>
+                        {aiSuggestionsEnabled && (
+                            <span className="text-xs text-gray-500">{t('offeringProfileSuggestionsNote')}</span>
+                        )}
                     </div>
-                )}
-
-                {catalogEnabled && pendingCandidates.length > 0 && (
-                    <div className="border-t pt-4">
-                        <p className="text-sm font-medium text-gray-900">{t('pendingServiceCandidates')}</p>
-                        {pendingCandidates.map((item) => (
-                            <div key={item.id} className="mt-2 rounded-lg border p-3 flex items-center justify-between">
-                                <span className="text-sm text-gray-700">{item.proposed_name}</span>
-                                <div className="flex gap-2">
-                                    <Button onClick={() => onApproveCandidate(item.id)}>{t('approve')}</Button>
-                                    <Button variant="secondary" onClick={() => onRejectCandidate(item.id)}>{t('reject')}</Button>
+                    {suggestions.length === 0 ? (
+                        <p className="mt-2 text-xs text-gray-500">{t('offeringProfileSuggestionsEmpty')}</p>
+                    ) : (
+                        <div className="mt-3 space-y-3">
+                            {suggestions.map((item) => (
+                                <div key={item.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.content}</p>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        {new Date(item.created_at).toLocaleString()}
+                                    </p>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {pendingUpdates.length === 0 && (!catalogEnabled || pendingCandidates.length === 0) && (
-                    <p className="text-xs text-gray-500">{t('offeringProfileEmpty')}</p>
-                )}
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </SettingsSection>
     )

@@ -5,15 +5,9 @@ import { useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
-import type { OfferingProfile, OfferingProfileUpdate, ServiceCandidate } from '@/types/database'
+import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
-import {
-    approveProfileUpdate,
-    approveServiceCandidate,
-    rejectProfileUpdate,
-    rejectServiceCandidate,
-    updateOfferingProfileSummary
-} from '@/lib/leads/settings'
+import { getOfferingProfileSuggestions, updateOfferingProfileSummary } from '@/lib/leads/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 
@@ -21,29 +15,26 @@ interface OrganizationSettingsClientProps {
     initialName: string
     organizationId: string
     offeringProfile: OfferingProfile | null
-    pendingProfileUpdates: OfferingProfileUpdate[]
-    pendingCandidates: ServiceCandidate[]
+    offeringProfileSuggestions: OfferingProfileSuggestion[]
 }
 
 export default function OrganizationSettingsClient({
     initialName,
     organizationId,
     offeringProfile,
-    pendingProfileUpdates: initialPendingUpdates,
-    pendingCandidates: initialPendingCandidates
+    offeringProfileSuggestions: initialSuggestions
 }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
     const [baseline, setBaseline] = useState({
         name: initialName,
         profileSummary: offeringProfile?.summary ?? '',
-        catalogEnabled: offeringProfile?.catalog_enabled ?? true
+        aiSuggestionsEnabled: offeringProfile?.ai_suggestions_enabled ?? false
     })
     const [name, setName] = useState(initialName)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
-    const [catalogEnabled, setCatalogEnabled] = useState(offeringProfile?.catalog_enabled ?? true)
-    const [pendingProfileUpdates, setPendingProfileUpdates] = useState(initialPendingUpdates)
-    const [pendingCandidates, setPendingCandidates] = useState(initialPendingCandidates)
+    const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
+    const [suggestions, setSuggestions] = useState(initialSuggestions)
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
@@ -52,27 +43,23 @@ export default function OrganizationSettingsClient({
         return (
             name !== baseline.name ||
             profileSummary !== baseline.profileSummary ||
-            catalogEnabled !== baseline.catalogEnabled
+            aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
         )
-    }, [name, profileSummary, catalogEnabled, baseline])
+    }, [name, profileSummary, aiSuggestionsEnabled, baseline])
 
     useEffect(() => {
         setProfileSummary(offeringProfile?.summary ?? '')
-        setCatalogEnabled(offeringProfile?.catalog_enabled ?? true)
+        setAiSuggestionsEnabled(offeringProfile?.ai_suggestions_enabled ?? false)
         setBaseline(prev => ({
             ...prev,
             profileSummary: offeringProfile?.summary ?? '',
-            catalogEnabled: offeringProfile?.catalog_enabled ?? true
+            aiSuggestionsEnabled: offeringProfile?.ai_suggestions_enabled ?? false
         }))
     }, [offeringProfile])
 
     useEffect(() => {
-        setPendingProfileUpdates(initialPendingUpdates)
-    }, [initialPendingUpdates])
-
-    useEffect(() => {
-        setPendingCandidates(initialPendingCandidates)
-    }, [initialPendingCandidates])
+        setSuggestions(initialSuggestions)
+    }, [initialSuggestions])
 
     useEffect(() => {
         if (isDirty) {
@@ -99,11 +86,13 @@ export default function OrganizationSettingsClient({
             }
             if (
                 profileSummary !== baseline.profileSummary ||
-                catalogEnabled !== baseline.catalogEnabled
+                aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
             ) {
-                await updateOfferingProfileSummary(organizationId, profileSummary, catalogEnabled)
+                await updateOfferingProfileSummary(organizationId, profileSummary, aiSuggestionsEnabled)
+                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId)
+                setSuggestions(refreshedSuggestions)
             }
-            setBaseline({ name, profileSummary, catalogEnabled })
+            setBaseline({ name, profileSummary, aiSuggestionsEnabled })
             setSaved(true)
             return true
         } catch (error) {
@@ -118,34 +107,9 @@ export default function OrganizationSettingsClient({
     const handleDiscard = () => {
         setName(baseline.name)
         setProfileSummary(baseline.profileSummary)
-        setCatalogEnabled(baseline.catalogEnabled)
+        setAiSuggestionsEnabled(baseline.aiSuggestionsEnabled)
         setSaveError(null)
         setSaved(false)
-    }
-
-    const handleApproveUpdate = async (id: string) => {
-        const match = pendingProfileUpdates.find((item) => item.id === id)
-        await approveProfileUpdate(id)
-        setPendingProfileUpdates((items) => items.filter((item) => item.id !== id))
-        if (match?.proposed_summary) {
-            setProfileSummary(match.proposed_summary)
-            setBaseline(prev => ({ ...prev, profileSummary: match.proposed_summary }))
-        }
-    }
-
-    const handleRejectUpdate = async (id: string) => {
-        await rejectProfileUpdate(id)
-        setPendingProfileUpdates((items) => items.filter((item) => item.id !== id))
-    }
-
-    const handleApproveCandidate = async (id: string) => {
-        await approveServiceCandidate(id)
-        setPendingCandidates((items) => items.filter((item) => item.id !== id))
-    }
-
-    const handleRejectCandidate = async (id: string) => {
-        await rejectServiceCandidate(id)
-        setPendingCandidates((items) => items.filter((item) => item.id !== id))
     }
 
     const guard = useUnsavedChangesGuard({
@@ -191,15 +155,10 @@ export default function OrganizationSettingsClient({
 
                     <OfferingProfileSection
                         summary={profileSummary}
-                        catalogEnabled={catalogEnabled}
-                        pendingUpdates={pendingProfileUpdates}
-                        pendingCandidates={pendingCandidates}
+                        aiSuggestionsEnabled={aiSuggestionsEnabled}
+                        suggestions={suggestions}
                         onSummaryChange={setProfileSummary}
-                        onCatalogEnabledChange={setCatalogEnabled}
-                        onApproveUpdate={handleApproveUpdate}
-                        onRejectUpdate={handleRejectUpdate}
-                        onApproveCandidate={handleApproveCandidate}
-                        onRejectCandidate={handleRejectCandidate}
+                        onAiSuggestionsEnabledChange={setAiSuggestionsEnabled}
                     />
                 </div>
             </div>
