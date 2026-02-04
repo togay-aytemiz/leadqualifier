@@ -42,7 +42,7 @@ Automate WhatsApp message handling:
 | AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + Simulator |
 | User-Generated Skills | Custom intent → response mappings | Implemented |
 | Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
-| Lead Extraction | AI summary + score (0-10) | Not implemented |
+| Lead Extraction | AI summary + score (0-10) | Implemented (Telegram only; Lead UI pending) |
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
@@ -144,6 +144,12 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 **AI Summary (auto-generated):**
 > "User wants newborn shoot. Considering mid-October, budget-conscious. Manual follow-up recommended."
+
+**Rules:**
+- Extraction runs asynchronously on every new customer message (conversation snapshot update).
+- `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
+- If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
+- Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
 
@@ -282,6 +288,10 @@ MVP is successful when:
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
+- **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
+- **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and require admin approval before the service can be used in extraction.
+- **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; profile updates are proposed from Skills/KB with admin approval.
+- **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

@@ -7,6 +7,11 @@
 ## [Unreleased]
 
 ### Added
+- Lead extraction schema (offering profile, service catalog, candidates, leads).
+- Lead extraction worker wired to Telegram webhook with token usage logging.
+- Offering Profile settings UI with pending profile updates and service candidate approvals.
+- Lead scoring helpers and extraction parsing utilities.
+- Lead extraction design spec (hybrid service catalog, offering profile, non-business skip, async per-message snapshot).
 - Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
 - Auth password recovery flow (Forgot Password + Reset Password screens).
 - Profile settings password section with reset link CTA and cooldown.

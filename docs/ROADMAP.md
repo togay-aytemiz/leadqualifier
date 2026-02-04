@@ -165,19 +165,29 @@
 ---
 
 ## Phase 6: Lead Extraction & Qualification
-- [ ] **Lead Model**
-  - [ ] Create lead schema
-  - [ ] Link to conversations
-- [ ] **AI Extraction**
-  - [ ] Extract: service, date, location, budget
-  - [ ] Intent analysis
-  - [ ] Risk signal detection
-- [ ] **Lead Scoring**
-  - [ ] Implement 0-10 scoring algorithm
-  - [ ] Auto-generate AI summary
-- [ ] **Lead Status**
-  - [ ] Hot / Warm / Cold classification
-  - [ ] Status update triggers
+- [x] **Lead Model**
+  - [x] Create lead schema
+  - [x] Link to conversations
+- [x] **Offering Profile (Catalog Optional)**
+  - [x] Generate profile summary from Skills/KB
+  - [x] Admin review + edit flow
+- [x] **Service Catalog (Hybrid)**
+  - [x] Auto-propose services from Skills/KB
+  - [x] Admin approval workflow
+- [x] **Non-Business Classification**
+  - [x] Detect personal/non-business chats
+  - [x] Skip lead extraction and scoring when flagged
+- [x] **AI Extraction**
+  - [x] Async extraction on each new customer message
+  - [x] Extract: service, date, location, budget
+  - [x] Intent analysis
+  - [x] Risk signal detection
+- [x] **Lead Scoring**
+  - [x] Implement 0-10 scoring algorithm
+  - [x] Auto-generate AI summary
+- [x] **Lead Status**
+  - [x] Hot / Warm / Cold classification
+  - [x] Status update triggers
 
 ---
 
