@@ -1,4 +1,4 @@
-# Inbox Conversation Summary — Design
+# Inbox Conversation Summary -- Design
 
 ## Overview
 Add an on-demand conversation summary in the Inbox composer area. The summary is produced only when the user clicks a button, and it is derived strictly from the last five user messages plus the last bot message (with timestamps and order preserved). The UI shows a single short paragraph summary (no raw messages in the panel).
@@ -6,7 +6,7 @@ Add an on-demand conversation summary in the Inbox composer area. The summary is
 ## Goals
 - Provide a quick, human-readable recap for operators.
 - Keep token usage fully user-controlled (no background refresh).
-- Preserve “no hallucination” behavior by grounding on message history only.
+- Preserve "no hallucination" behavior by grounding on message history only.
 
 ## Non-Goals
 - No automatic refresh or scheduled summaries.
@@ -14,9 +14,9 @@ Add an on-demand conversation summary in the Inbox composer area. The summary is
 - No full transcript rendering in the panel.
 
 ## UX & Behavior
-- A “Conversation Summary” button appears above the input field.
+- A "Conversation Summary" button appears above the input field.
 - The button is always visible.
-- It is disabled when there are fewer than 5 user messages or no bot message; hover shows tooltip: “Not enough messages for a summary.”
+- It is disabled when there are fewer than 5 user messages or no bot message; hover shows tooltip: "Not enough messages for a summary."
 - On click, the inline panel opens above the input and shows a loading state.
 - Success shows a single-paragraph summary. A second click re-runs the summary.
 - Switching conversations clears summary state and closes the panel.
@@ -29,15 +29,15 @@ Add an on-demand conversation summary in the Inbox composer area. The summary is
 - No background job or cache; each click triggers a fresh model call.
 
 ## Prompt & Safety
-- System: “Summarize only from the provided messages. Do not add facts.”
-- User: “Summarize in Turkish, 2–3 sentences, single paragraph.”
-- If insufficient data, return a “not enough data” error without calling the model.
+- System: "Summarize only from the provided messages. Do not add facts."
+- User: "Summarize in Turkish, 2-3 sentences, single paragraph."
+- If insufficient data, return a "not enough data" error without calling the model.
 - Truncate long messages server-side (per-message max length) to protect token limits.
 
 ## Error Handling
-- Data missing → disabled button + tooltip (client), and server returns a safe error if called.
-- Model/API failure → inline error text and allow retry.
-- Unexpected response → fallback error message.
+- Data missing -> disabled button + tooltip (client), and server returns a safe error if called.
+- Model/API failure -> inline error text and allow retry.
+- Unexpected response -> fallback error message.
 
 ## i18n
 - All UI text uses `messages/en.json` and `messages/tr.json` with mirrored keys.
