@@ -22,7 +22,9 @@
         "adminBadge": "Admin",
         "loggedInAs": "Oturum açan",
         "defaultUserName": "Kullanıcı",
-        "defaultUserInitial": "K"
+        "defaultUserInitial": "K",
+        "collapseSidebar": "Kenar çubuğunu daralt",
+        "expandSidebar": "Kenar çubuğunu genişlet"
     },
     "auth": {
         "login": "Giriş Yap",
@@ -132,6 +134,11 @@
         "inbox": "Gelen Kutusu",
         "simulator": "Simülatör",
         "signout": "Çıkış Yap"
+    },
+    "mainSidebar": {
+        "workspace": "Çalışma Alanı",
+        "aiTools": "Yapay Zeka Araçları",
+        "other": "Diğer"
     },
     "inbox": {
         "title": "Gelen Kutusu",

@@ -1,0 +1,302 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { cn } from '@/lib/utils'
+import {
+    ArrowLeftFromLine,
+    ArrowRightFromLine,
+    BookOpen,
+    Bot,
+    Inbox,
+    LogOut,
+    MessageSquare,
+    Settings,
+    Sparkles,
+} from 'lucide-react'
+
+const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
+
+interface MainSidebarProps {
+    userName?: string
+}
+
+export function MainSidebar({ userName }: MainSidebarProps) {
+    const pathname = usePathname()
+    const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+    const tNav = useTranslations('nav')
+    const tCommon = useTranslations('common')
+    const tSidebar = useTranslations('mainSidebar')
+
+    const [collapsed, setCollapsed] = useState(false)
+
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY)
+            setCollapsed(stored === 'true')
+        } catch {
+            setCollapsed(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, collapsed ? 'true' : 'false')
+        } catch {
+            // ignore persistence errors
+        }
+    }, [collapsed])
+
+    const sections = useMemo(
+        () => [
+            {
+                id: 'workspace',
+                label: tSidebar('workspace'),
+                items: [
+                    { id: 'inbox', href: '/inbox', label: tNav('inbox'), icon: Inbox },
+                    { id: 'simulator', href: '/simulator', label: tNav('simulator'), icon: MessageSquare },
+                ],
+            },
+            {
+                id: 'ai',
+                label: tSidebar('aiTools'),
+                items: [
+                    { id: 'skills', href: '/skills', label: tNav('skills'), icon: Sparkles },
+                    { id: 'knowledge', href: '/knowledge', label: tNav('knowledgeBase'), icon: BookOpen },
+                ],
+            },
+        ],
+        [tNav, tSidebar]
+    )
+
+    const footerSections = useMemo(
+        () => [
+            {
+                id: 'other',
+                label: tSidebar('other'),
+                items: [{ id: 'settings', href: '/settings/channels', label: tNav('settings'), icon: Settings }],
+            },
+        ],
+        [tNav, tSidebar]
+    )
+
+    const toggleLabel = collapsed ? tCommon('expandSidebar') : tCommon('collapseSidebar')
+
+    return (
+        <aside
+            className={cn(
+                'relative flex h-screen shrink-0 flex-col border-r border-slate-200/80 bg-slate-50/70 text-slate-900 transition-[width] duration-200 motion-reduce:transition-none',
+                collapsed ? 'w-[76px]' : 'w-[264px]'
+            )}
+            data-collapsed={collapsed ? 'true' : 'false'}
+        >
+            <div className="px-4 pt-4 pb-3">
+                <div
+                    className={cn(
+                        'flex items-center',
+                        collapsed ? 'flex-col gap-3' : 'justify-between gap-3'
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'flex items-center',
+                            collapsed ? 'w-full justify-center gap-0' : 'gap-3'
+                        )}
+                    >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-900 shadow-sm ring-1 ring-slate-200">
+                            <Bot size={20} />
+                        </div>
+                        <div
+                            className={cn(
+                                'flex flex-col transition-all duration-200 motion-reduce:transition-none',
+                                collapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'opacity-100'
+                            )}
+                        >
+                            <span className="text-sm font-semibold tracking-tight">{tCommon('appName')}</span>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCollapsed(prev => !prev)}
+                        className={cn(
+                            'inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200',
+                            'motion-reduce:transition-none'
+                        )}
+                        aria-label={toggleLabel}
+                        aria-expanded={!collapsed}
+                        title={toggleLabel}
+                    >
+                        {collapsed ? <ArrowRightFromLine size={16} /> : <ArrowLeftFromLine size={16} />}
+                    </button>
+                </div>
+            </div>
+
+            <nav className="flex-1 px-3 pt-3">
+                <div className="space-y-4">
+                    {sections.map(section => (
+                        <div key={section.id} className="space-y-2">
+                            <p
+                                className={cn(
+                                    'px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400',
+                                    collapsed && 'sr-only'
+                                )}
+                            >
+                                {section.label}
+                            </p>
+                            <div className="space-y-1">
+                                {section.items.map(item => {
+                                    const isActive = pathWithoutLocale.startsWith(item.href)
+                                    const Icon = item.icon
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            href={item.href}
+                                            prefetch={false}
+                                            title={item.label}
+                                            aria-label={item.label}
+                                            className={cn(
+                                                'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
+                                                collapsed
+                                                    ? 'mx-auto h-11 w-11 justify-center gap-0'
+                                                    : 'w-full gap-3 px-3 py-2',
+                                                isActive
+                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                                            )}
+                                        >
+                                            <Icon
+                                                size={18}
+                                                className={cn(
+                                                    'shrink-0',
+                                                    isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                                )}
+                                            />
+                                            <span
+                                                className={cn(
+                                                    'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
+                                                    collapsed
+                                                        ? 'w-0 translate-x-2 overflow-hidden opacity-0'
+                                                        : 'opacity-100'
+                                                )}
+                                            >
+                                                {item.label}
+                                            </span>
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </nav>
+
+            <div className="px-3 pb-3">
+                <div className="space-y-2">
+                    {footerSections.map(section => (
+                        <div key={section.id} className="space-y-2">
+                            <p
+                                className={cn(
+                                    'px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400',
+                                    collapsed && 'sr-only'
+                                )}
+                            >
+                                {section.label}
+                            </p>
+                            <div className="space-y-1">
+                                {section.items.map(item => {
+                                    const isActive = pathWithoutLocale.startsWith('/settings')
+                                    const Icon = item.icon
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            href={item.href}
+                                            prefetch={false}
+                                            title={item.label}
+                                            aria-label={item.label}
+                                            className={cn(
+                                                'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
+                                                collapsed
+                                                    ? 'mx-auto h-11 w-11 justify-center gap-0'
+                                                    : 'w-full gap-3 px-3 py-2',
+                                                isActive
+                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                                            )}
+                                        >
+                                            <Icon
+                                                size={18}
+                                                className={cn(
+                                                    'shrink-0',
+                                                    isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                                )}
+                                            />
+                                            <span
+                                                className={cn(
+                                                    'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
+                                                    collapsed
+                                                        ? 'w-0 translate-x-2 overflow-hidden opacity-0'
+                                                        : 'opacity-100'
+                                                )}
+                                            >
+                                                {item.label}
+                                            </span>
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="px-3 pb-4">
+                <div className="relative group">
+                    <button
+                        className={cn(
+                            'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white hover:text-slate-900',
+                            collapsed && 'justify-center px-2'
+                        )}
+                        title={userName}
+                        type="button"
+                    >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                            {(userName?.[0] || tCommon('defaultUserInitial')).toUpperCase()}
+                        </div>
+                        <div
+                            className={cn(
+                                'min-w-0 flex-1 transition-all duration-200 motion-reduce:transition-none',
+                                collapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'opacity-100'
+                            )}
+                        >
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                                {userName || tCommon('defaultUserName')}
+                            </p>
+                        </div>
+                    </button>
+
+                    <div className="absolute left-full bottom-0 ml-2 w-52 rounded-lg border border-gray-100 bg-white py-1 shadow-lg invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-all duration-200 motion-reduce:transition-none z-50">
+                        <div className="px-3 py-2 border-b border-gray-50">
+                            <p className="text-xs text-gray-500 truncate">{tCommon('loggedInAs')}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate" title={userName}>
+                                {userName || tCommon('defaultUserName')}
+                            </p>
+                        </div>
+                        <div className="p-1">
+                            <form action="/api/auth/signout" method="POST">
+                                <button
+                                    type="submit"
+                                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center gap-2"
+                                >
+                                    <LogOut size={16} />
+                                    {tNav('signout')}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    )
+}

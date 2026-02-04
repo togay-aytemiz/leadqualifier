@@ -79,6 +79,12 @@
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
+- [x] **Navigation Shell**
+  - [x] Crisp-inspired main sidebar with collapse toggle and persisted state
+  - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
+  - [x] Centered collapsed logo alignment
+  - [x] Eyebrow section labels for grouped navigation
+  - [x] Increased spacing between header and first sidebar section
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates

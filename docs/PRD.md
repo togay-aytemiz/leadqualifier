@@ -243,7 +243,12 @@ MVP is successful when:
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
-- **Font Strategy:** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
+- **Font Strategy (Initial):** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
+- **Font Update:** Adopt Plus Jakarta Sans via CSS `@import` for the main sidebar’s crisp visual language. This supersedes the system-font-only decision since we are not using Next.js font fetching in CI and accept the lightweight web font load.
+- **Sidebar UI Refinement:** Collapsed-state icon pills are centered and the expand/collapse toggle sits alongside the app name, using arrow-from-line icons for clarity.
+- **Sidebar UI Refinement:** Collapsed logo alignment is centered to match the navigation icon stack.
+- **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
+- **Sidebar Spacing:** Add top padding between the header block and first navigation section for visual separation.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.

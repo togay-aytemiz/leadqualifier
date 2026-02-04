@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { GlobalRail } from '@/design'
+import { MainSidebar } from '@/design'
 
 export default async function DashboardLayout({
     children,
@@ -21,7 +21,7 @@ export default async function DashboardLayout({
 
     return (
         <div className="flex h-screen w-full bg-gray-50 overflow-hidden">
-            <GlobalRail userName={userName} />
+            <MainSidebar userName={userName} />
             <div className="flex-1 flex min-w-0 overflow-hidden">
                 {children}
             </div>

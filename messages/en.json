@@ -22,7 +22,9 @@
         "adminBadge": "Admin",
         "loggedInAs": "Logged in as",
         "defaultUserName": "User",
-        "defaultUserInitial": "U"
+        "defaultUserInitial": "U",
+        "collapseSidebar": "Collapse sidebar",
+        "expandSidebar": "Expand sidebar"
     },
     "auth": {
         "login": "Sign In",
@@ -132,6 +134,11 @@
         "inbox": "Inbox",
         "simulator": "Simulator",
         "signout": "Sign out"
+    },
+    "mainSidebar": {
+        "workspace": "Workspace",
+        "aiTools": "AI Tools",
+        "other": "Other"
     },
     "inbox": {
         "title": "Inbox",

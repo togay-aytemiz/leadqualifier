@@ -25,6 +25,6 @@ export {
     ConfirmDialog
 } from './primitives'
 export { GlobalRail } from './GlobalRail'
+export { MainSidebar } from './MainSidebar'
 export { Sidebar, SidebarGroup, SidebarItem } from './Sidebar'
 export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './Dropdown'
-

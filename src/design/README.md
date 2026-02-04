@@ -34,7 +34,7 @@
 - Info: Blue-500 (#3B82F6)
 
 ## Typography
-- Font: Inter (system fallback)
+- Font: Plus Jakarta Sans (system fallback)
 - Sizes: xs(12px), sm(14px), base(16px), lg(18px), xl(20px), 2xl(24px)
 - Weights: normal(400), medium(500), semibold(600), bold(700)
 
@@ -42,22 +42,22 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ [GLOBAL RAIL]  │ [INNER SIDEBAR]  │  [MAIN CONTENT]             │
-│ 72px           │ 280px            │  flex-1                      │
-│ Icons only     │ Search + Groups  │  PageHeader + Body           │
-│ Logo on top    │ Context-specific │  Scrollable                  │
+│ [MAIN SIDEBAR] │ [INNER SIDEBAR]  │  [MAIN CONTENT]             │
+│ 264px/76px     │ 280px            │  flex-1                      │
+│ Collapsible    │ Search + Groups  │  PageHeader + Body           │
+│ Logo + Nav     │ Context-specific │  Scrollable                  │
 │ Avatar bottom  │                  │                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Components
 
-### GlobalRail
-- Width: 72px
-- Background: white
-- Border-right: 1px gray-200
-- Items: Icon buttons with tooltip on hover
-- Active state: bg-primary-50, text-primary-600
+### MainSidebar
+- Width: 264px (expanded) / 76px (collapsed)
+- Background: slate-50/70
+- Border-right: 1px slate-200/80
+- Items: Icon + label; active uses primary blue pill
+- Toggle: Netlify-style chip below the logo
 
 ### Sidebar
 - Width: 280px

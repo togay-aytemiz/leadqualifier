@@ -43,6 +43,11 @@
   - **Inbox:** Added "Delete Conversation" functionality with cascading database deletes.
   - **Inbox:** UI improvements (message previews, simplified list items).
   - **Inbox:** Removed mock data creation; now fully driven by real database data.
+- Crisp-inspired main sidebar with collapsible state and active navigation pill.
+- Refined collapsed sidebar icon sizing and header toggle placement.
+- Centered collapsed logo alignment to match icon stack.
+- Eyebrow section labels added for Workspace, AI Tools, and Other groups.
+- Added extra top padding between the sidebar header and first section label.
 - **Enterprise RAG Hardening:** Knowledge documents + chunks schema, chunking with overlap, token-budgeted context assembly, and chunk-level retrieval RPC with service-role-safe search for webhooks.
 - Knowledge Base UI now shows indexing status badges (Ready / Processing / Error).
 - Contextual KB routing with LLM-based decision + follow-up query rewrite.
@@ -68,7 +73,8 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
-- Use system fonts in the app shell to avoid build-time Google Fonts fetches.
+- Global font updated to Plus Jakarta Sans via Google Fonts import.
+- Sidebar toggle now uses arrow-from-line icons for clearer affordance.
 - Removed legacy `knowledge_base` table in favor of documents/chunks.
 - Replaced remaining hardcoded UI strings with translation keys across the app.
 - Updated AGENTS.md to enforce multilingual-first feature development.
