@@ -1,5 +1,3 @@
-'use server'
-
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
