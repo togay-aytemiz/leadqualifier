@@ -18,7 +18,7 @@ import {
     getKnowledgeBaseEntries
 } from '@/lib/knowledge-base/actions'
 import { useRouter } from 'next/navigation'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 
 interface KnowledgeContainerProps {
@@ -43,7 +43,6 @@ export function KnowledgeContainer({
     const t = useTranslations('knowledge')
     const tSidebar = useTranslations('sidebar')
     const tCommon = useTranslations('deleteFolder')
-    const locale = useLocale()
     const router = useRouter()
 
     // State (initialized from props, updated by local actions or refreshes)
@@ -70,15 +69,11 @@ export function KnowledgeContainer({
     const refreshPendingSuggestions = useCallback(async () => {
         if (!organizationId) return
 
-        let query = supabase
+        const query = supabase
             .from('offering_profile_suggestions')
             .select('id', { count: 'exact', head: true })
             .eq('organization_id', organizationId)
             .or('status.eq.pending,status.is.null')
-
-        if (locale?.trim()) {
-            query = query.eq('locale', locale)
-        }
 
         const { count, error } = await query
         if (error) {
@@ -86,7 +81,7 @@ export function KnowledgeContainer({
             return
         }
         setPendingSuggestions(count ?? 0)
-    }, [locale, organizationId, supabase])
+    }, [organizationId, supabase])
 
     useEffect(() => {
         if (!organizationId || !aiSuggestionsEnabled) return

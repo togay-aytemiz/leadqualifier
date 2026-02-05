@@ -128,6 +128,8 @@
 - [x] **KB Sidebar Realtime:** Refresh sidebar immediately on knowledge document/collection changes
 - [x] **KB Async Processing:** Save/create/update return immediately; background processing updates status with polling
 - [x] **KB Realtime Publication:** Enable knowledge tables in Supabase realtime for instant sidebar updates
+- [x] **KB Realtime Deletes:** Enable replica identity full so delete events include org context
+- [x] **Suggestions Realtime Publication:** Add offering profile suggestions to Supabase realtime publication
 - [x] **KB Sidebar Uncategorized:** Show uncategorized items (max 10) with expand and correct all-content counts
 - [x] **KB Terminology:** Replace "collection" labels with "folder" in UI copy
 - [x] **KB Keyword Fallback:** Use keyword search when embedding lookup fails or returns no matches

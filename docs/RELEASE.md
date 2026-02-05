@@ -15,6 +15,8 @@
 - Knowledge Base banner surfaces pending AI suggestions and links to Organization settings.
 - Knowledge Base async processing endpoint with client-side enqueue after save/update.
 - Supabase realtime publication now includes knowledge tables for instant sidebar updates.
+- Knowledge Base realtime delete events now include full row data for filtered subscriptions.
+- Supabase realtime publication now includes offering profile suggestions for indicator updates.
 - Pending AI suggestion indicators in settings sidebar and organization profile section.
 - Main sidebar Settings indicator for pending AI suggestions.
 - Locale-aware AI suggestion generation and localized timestamps in settings.

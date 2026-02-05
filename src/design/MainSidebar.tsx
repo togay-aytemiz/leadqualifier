@@ -67,10 +67,6 @@ export function MainSidebar({ userName }: MainSidebarProps) {
             .eq('organization_id', orgId)
             .or('status.eq.pending,status.is.null')
 
-        if (currentLocale?.trim()) {
-            query = query.eq('locale', currentLocale)
-        }
-
         const { count, error } = await query
 
         if (error) {

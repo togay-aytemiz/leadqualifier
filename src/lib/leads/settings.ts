@@ -126,15 +126,11 @@ export async function updateOfferingProfileSuggestionStatus(
 
 export async function getPendingOfferingProfileSuggestionCount(organizationId: string, locale?: string) {
     const supabase = await createClient()
-    let query = supabase
+    const query = supabase
         .from('offering_profile_suggestions')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .or('status.eq.pending,status.is.null')
-
-    if (locale?.trim()) {
-        query = query.eq('locale', locale)
-    }
 
     const { count } = await query
     return count ?? 0
