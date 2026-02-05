@@ -6,9 +6,22 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { normalizeServiceName, isNewCandidate } from '@/lib/leads/catalog'
 
-const SUGGESTION_SYSTEM_PROMPT = `You generate AI suggestions for a business offering profile.
+const DEFAULT_SUGGESTION_LOCALE = 'tr'
+
+const SUGGESTION_LANGUAGE_BY_LOCALE: Record<string, string> = {
+    tr: 'Turkish',
+    en: 'English'
+}
+
+const buildSuggestionSystemPrompt = (language: string) => `You generate AI suggestions for a business offering profile.
 Keep it short, clear, and grounded in the provided content.
+Write the suggestion in ${language}.
 Return JSON: { suggestion: string } only.`
+
+const resolveSuggestionLanguage = (locale?: string | null) => {
+    const key = locale ?? DEFAULT_SUGGESTION_LOCALE
+    return SUGGESTION_LANGUAGE_BY_LOCALE[key] ?? SUGGESTION_LANGUAGE_BY_LOCALE[DEFAULT_SUGGESTION_LOCALE] ?? 'Turkish'
+}
 
 function parseSuggestion(raw: string) {
     try {
@@ -30,13 +43,16 @@ async function createSuggestion(options: {
     const supabase = options.supabase ?? await createClient()
     const { data: profile } = await supabase
         .from('offering_profiles')
-        .select('ai_suggestions_enabled')
+        .select('ai_suggestions_enabled, ai_suggestions_locale')
         .eq('organization_id', options.organizationId)
         .maybeSingle()
 
     if (!profile?.ai_suggestions_enabled) return null
 
     if (!process.env.OPENAI_API_KEY) return null
+
+    const language = resolveSuggestionLanguage(profile?.ai_suggestions_locale)
+    const systemPrompt = buildSuggestionSystemPrompt(language)
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const userPrompt = `New content:\n${options.content}`
@@ -45,7 +61,7 @@ async function createSuggestion(options: {
         model: 'gpt-4o-mini',
         temperature: 0.2,
         messages: [
-            { role: 'system', content: SUGGESTION_SYSTEM_PROMPT },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ]
     })
@@ -60,7 +76,8 @@ async function createSuggestion(options: {
         organization_id: options.organizationId,
         source_type: options.sourceType,
         source_id: options.sourceId ?? null,
-        content: suggestion
+        content: suggestion,
+        status: 'pending'
     })
 
     if (completion.usage) {
@@ -75,13 +92,15 @@ async function createSuggestion(options: {
             supabase
         })
     } else {
+        const promptTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt)
+        const outputTokens = estimateTokenCount(response)
         await recordAiUsage({
             organizationId: options.organizationId,
             category: 'lead_extraction',
             model: 'gpt-4o-mini',
-            inputTokens: estimateTokenCount(SUGGESTION_SYSTEM_PROMPT) + estimateTokenCount(userPrompt),
-            outputTokens: estimateTokenCount(response),
-            totalTokens: estimateTokenCount(SUGGESTION_SYSTEM_PROMPT) + estimateTokenCount(userPrompt) + estimateTokenCount(response),
+            inputTokens: promptTokens,
+            outputTokens,
+            totalTokens: promptTokens + outputTokens,
             metadata: { source: 'offering_profile_suggestion', source_type: options.sourceType },
             supabase
         })

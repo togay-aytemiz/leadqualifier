@@ -66,6 +66,7 @@ export async function runLeadExtraction(options: {
             .from('offering_profile_suggestions')
             .select('content')
             .eq('organization_id', options.organizationId)
+            .eq('status', 'approved')
             .order('created_at', { ascending: false })
             .limit(5)
     ])
@@ -75,7 +76,8 @@ export async function runLeadExtraction(options: {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const catalogList = (catalog ?? []).map((row: any) => row.name).join(', ')
     const contextMessages = (messages ?? []).reverse().map((msg: any) => `${msg.sender_type}: ${msg.content}`)
-    const suggestionText = (profile?.ai_suggestions_enabled ? (suggestions ?? []).map((item: any) => `- ${item.content}`) : [])
+    const suggestionText = (suggestions ?? [])
+        .map((item: any) => `- ${item.content}`)
         .reverse()
         .join('\n')
     const profileText = [

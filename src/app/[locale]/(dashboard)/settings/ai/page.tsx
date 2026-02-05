@@ -4,6 +4,7 @@ import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
 import AiSettingsClient from './AiSettingsClient'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 
 export default async function AiSettingsPage() {
     const supabase = await createClient()
@@ -34,7 +35,10 @@ export default async function AiSettingsPage() {
         )
     }
 
-    const aiSettings = await getOrgAiSettings(organizationId, { supabase })
+    const [aiSettings, pendingCount] = await Promise.all([
+        getOrgAiSettings(organizationId, { supabase }),
+        getPendingOfferingProfileSuggestionCount(organizationId)
+    ])
 
     return (
         <>
@@ -50,6 +54,7 @@ export default async function AiSettingsPage() {
                         icon={<Building2 size={18} />}
                         label={tSidebar('organization')}
                         href={locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`}
+                        indicator={pendingCount > 0}
                     />
                     <SidebarItem
                         icon={<Settings size={18} />}

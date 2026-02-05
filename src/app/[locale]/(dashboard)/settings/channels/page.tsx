@@ -5,6 +5,7 @@ import { ChannelsList } from '@/components/channels/ChannelsList'
 import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Button } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
 import { SettingsSection } from '@/components/settings/SettingsSection'
+import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 
 export default async function ChannelsPage() {
     const supabase = await createClient()
@@ -36,7 +37,10 @@ export default async function ChannelsPage() {
         )
     }
 
-    const channels = await getChannels(organizationId)
+    const [channels, pendingCount] = await Promise.all([
+        getChannels(organizationId),
+        getPendingOfferingProfileSuggestionCount(organizationId)
+    ])
     const totalChannels = 2
     const connectedChannels = (channels || []).filter(channel => channel.status === 'active').length
 
@@ -54,6 +58,7 @@ export default async function ChannelsPage() {
                         icon={<Building2 size={18} />}
                         label={tSidebar('organization')}
                         href={locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`}
+                        indicator={pendingCount > 0}
                     />
                     <SidebarItem
                         icon={<Settings size={18} />}

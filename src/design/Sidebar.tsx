@@ -65,12 +65,13 @@ interface SidebarItemProps {
     label: string
     active?: boolean
     count?: string | number
+    indicator?: boolean
     onClick?: () => void
     href?: string
     avatar?: string
 }
 
-export function SidebarItem({ icon, iconColor, label, active, count, onClick, href, avatar }: SidebarItemProps) {
+export function SidebarItem({ icon, iconColor, label, active, count, indicator, onClick, href, avatar }: SidebarItemProps) {
     const content = (
         <div
             onClick={onClick}
@@ -91,9 +92,11 @@ export function SidebarItem({ icon, iconColor, label, active, count, onClick, hr
                 ) : null}
                 <span>{label}</span>
             </div>
-            {count !== undefined && (
+            {indicator ? (
+                <span className="h-2 w-2 rounded-full bg-blue-500" aria-hidden />
+            ) : count !== undefined ? (
                 <span className="text-xs text-gray-400">{count}</span>
-            )}
+            ) : null}
         </div>
     )
 

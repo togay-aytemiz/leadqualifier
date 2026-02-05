@@ -44,6 +44,8 @@ export default async function OrganizationSettingsPage() {
         getOfferingProfileSuggestions(organizationId)
     ])
 
+    const pendingCount = offeringProfileSuggestions.filter((item) => item.status === 'pending').length
+
     return (
         <>
             <Sidebar title={tSidebar('settings')}>
@@ -53,7 +55,12 @@ export default async function OrganizationSettingsPage() {
                         label={tSidebar('profile')}
                         href={locale === 'tr' ? '/settings/profile' : `/${locale}/settings/profile`}
                     />
-                    <SidebarItem icon={<Building2 size={18} />} label={tSidebar('organization')} active />
+                    <SidebarItem
+                        icon={<Building2 size={18} />}
+                        label={tSidebar('organization')}
+                        active
+                        indicator={pendingCount > 0}
+                    />
                     <SidebarItem
                         icon={<Settings size={18} />}
                         label={tSidebar('general')}

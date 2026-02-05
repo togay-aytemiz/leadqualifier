@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-04  
+> **Last Updated:** 2026-02-05  
 > Mark items with `[x]` when completed.
 
 ---
@@ -173,6 +173,10 @@
   - [x] Generate profile summary from Skills/KB
   - [x] Admin review + edit flow
   - [x] Manual profile + AI suggestions toggle (append-only)
+  - [x] AI suggestions review tabs (pending/approved/rejected) with accept/reject actions
+  - [x] Approved-only AI suggestions used in lead extraction
+  - [x] Locale-aware AI suggestions + localized timestamps
+  - [x] Pending suggestion indicators in settings (sidebar + section)
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
   - [x] Admin approval workflow

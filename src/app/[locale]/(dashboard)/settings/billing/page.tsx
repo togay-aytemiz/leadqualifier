@@ -5,6 +5,7 @@ import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'l
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { getOrgAiUsageSummary } from '@/lib/ai/usage'
 import { UsageBreakdownDetails } from './UsageBreakdownDetails'
+import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 
 export default async function BillingSettingsPage() {
     const supabase = await createClient()
@@ -35,7 +36,10 @@ export default async function BillingSettingsPage() {
         )
     }
 
-    const usage = await getOrgAiUsageSummary(organizationId, { supabase })
+    const [usage, pendingCount] = await Promise.all([
+        getOrgAiUsageSummary(organizationId, { supabase }),
+        getPendingOfferingProfileSuggestionCount(organizationId)
+    ])
     const formatNumber = new Intl.NumberFormat(locale)
     const [year, month] = usage.month.split('-').map(Number)
     const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getUTCFullYear()
@@ -63,6 +67,7 @@ export default async function BillingSettingsPage() {
                         icon={<Building2 size={18} />}
                         label={tSidebar('organization')}
                         href={locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`}
+                        indicator={pendingCount > 0}
                     />
                     <SidebarItem
                         icon={<Settings size={18} />}

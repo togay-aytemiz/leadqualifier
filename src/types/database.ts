@@ -138,6 +138,7 @@ export interface OfferingProfile {
     summary: string
     catalog_enabled: boolean
     ai_suggestions_enabled: boolean
+    ai_suggestions_locale: string
     created_at: string
     updated_at: string
 }
@@ -148,7 +149,10 @@ export interface OfferingProfileSuggestion {
     source_type: 'skill' | 'knowledge' | 'batch'
     source_id: string | null
     content: string
+    status: ServiceCandidateStatus
     created_at: string
+    reviewed_at: string | null
+    reviewed_by: string | null
 }
 
 export interface OfferingProfileUpdate {

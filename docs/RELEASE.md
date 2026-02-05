@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Added
+- Offering Profile AI suggestions review workflow (pending/approved/rejected tabs, accept/reject actions, empty states, and show-more).
+- Pending AI suggestion indicators in settings sidebar and organization profile section.
+- Locale-aware AI suggestion generation and localized timestamps in settings.
 - Lead extraction schema (offering profile, service catalog, candidates, leads).
 - Lead extraction worker wired to Telegram webhook with token usage logging.
 - Offering Profile settings UI with pending profile updates and service candidate approvals.
@@ -91,6 +94,8 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Lead extraction now uses only approved Offering Profile AI suggestions.
+- New AI suggestions start in a pending state until reviewed.
 - Offering Profile management moved to Organization Settings for clearer org-level ownership.
 - Settings forms now use consistent column widths and inputs align with section titles (no duplicate field labels).
 - Offering Profile now supports manual text plus optional AI suggestions that append below without overwriting.

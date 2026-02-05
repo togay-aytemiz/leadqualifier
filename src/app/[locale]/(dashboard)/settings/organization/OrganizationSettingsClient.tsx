@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
-import { getOfferingProfileSuggestions, updateOfferingProfileSummary } from '@/lib/leads/settings'
+import { getOfferingProfileSuggestions, updateOfferingProfileSummary, updateOfferingProfileSuggestionStatus } from '@/lib/leads/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 
@@ -26,6 +26,7 @@ export default function OrganizationSettingsClient({
 }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
+    const locale = useLocale()
     const [baseline, setBaseline] = useState({
         name: initialName,
         profileSummary: offeringProfile?.summary ?? '',
@@ -88,7 +89,7 @@ export default function OrganizationSettingsClient({
                 profileSummary !== baseline.profileSummary ||
                 aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
             ) {
-                await updateOfferingProfileSummary(organizationId, profileSummary, aiSuggestionsEnabled)
+                await updateOfferingProfileSummary(organizationId, profileSummary, aiSuggestionsEnabled, locale)
                 const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId)
                 setSuggestions(refreshedSuggestions)
             }
@@ -101,6 +102,16 @@ export default function OrganizationSettingsClient({
             return false
         } finally {
             setIsSaving(false)
+        }
+    }
+
+    const handleReviewSuggestion = async (suggestionId: string, status: 'approved' | 'rejected') => {
+        try {
+            await updateOfferingProfileSuggestionStatus(organizationId, suggestionId, status)
+            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId)
+            setSuggestions(refreshedSuggestions)
+        } catch (error) {
+            console.error(error)
         }
     }
 
@@ -159,6 +170,7 @@ export default function OrganizationSettingsClient({
                         suggestions={suggestions}
                         onSummaryChange={setProfileSummary}
                         onAiSuggestionsEnabledChange={setAiSuggestionsEnabled}
+                        onReviewSuggestion={handleReviewSuggestion}
                     />
                 </div>
             </div>
