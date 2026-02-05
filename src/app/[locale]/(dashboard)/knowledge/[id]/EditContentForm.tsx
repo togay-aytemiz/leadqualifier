@@ -62,13 +62,24 @@ export function EditContentForm({
 
         setSaving(true)
         try {
-            await updateKnowledgeBaseEntry(id, {
+            const updated = await updateKnowledgeBaseEntry(id, {
                 title,
                 content,
                 collection_id: collectionId || null
             })
 
             setSaving(false)
+            window.dispatchEvent(new Event('knowledge-updated'))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
+
+            if (updated?.id) {
+                void fetch('/api/knowledge/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: updated.id }),
+                    keepalive: true
+                })
+            }
             router.refresh()
             // We don't get new props immediately, so we can't easily reset isDirty without reloading
             // But router.refresh() should re-render this component with new props if the page re-fetches
@@ -86,6 +97,8 @@ export function EditContentForm({
         try {
             await deleteKnowledgeBaseEntry(id)
             router.push('/knowledge')
+            window.dispatchEvent(new Event('knowledge-updated'))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
             router.refresh()
         } catch (error) {
             console.error(error)

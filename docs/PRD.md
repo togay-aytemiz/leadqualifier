@@ -149,7 +149,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Extraction runs asynchronously on every new customer message (conversation snapshot update).
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
-- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + up to 5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions). Generation always follows the active UI locale (no dual-language generation).
+- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation).
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
@@ -274,6 +274,12 @@ MVP is successful when:
 - **Chunk Overlap Alignment:** Overlap prefers paragraph/sentence boundaries and drops overlap when it would exceed max tokens.
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
+- **KB Sidebar Refresh:** Dispatch `knowledge-updated` on content create/update/delete and surface pending AI suggestions via a KB banner linked to Organization settings.
+- **KB Sidebar Navigation:** Allow clicking files in the sidebar to open the document detail view.
+- **KB Sidebar Focus:** Highlight the active document and add spacing between the All Content and Uncategorized sections.
+- **KB Sidebar Realtime:** Subscribe to knowledge document/collection changes to refresh the sidebar immediately.
+- **KB Async Processing:** Save/update returns immediately with `processing` status; background processor builds chunks, generates suggestions, and UI polls until ready/error.
+- **KB Realtime Publication:** Add knowledge tables to Supabase realtime publication so sidebar updates instantly on deletes.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
@@ -294,6 +300,7 @@ MVP is successful when:
 - **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; AI suggestions are generated from Skills/KB in org language using a hybrid format (intro + up to 5 bullets), start pending, can propose updates to existing approved suggestions, and only approved suggestions are used for extraction.
 - **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.
 - **Offering Profile Context:** Suggestion generation includes the manual summary plus approved/rejected suggestion history for better alignment.
+- **Offering Profile Formatting:** Suggestions must include a short intro plus 3-5 labeled bullets; if output is too sparse, retry generation.
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.

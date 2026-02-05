@@ -122,6 +122,12 @@
 - [x] **KB Routing Heuristics:** Definition-style questions route to KB when routing is uncertain
 - [x] **Chunk Overlap Alignment:** Overlap respects paragraph/sentence boundaries to avoid mid-sentence splits
 - [x] **KB Sidebar Sync:** Ensure folder create/delete triggers sidebar refresh
+- [x] **KB Sidebar Sync:** Refresh counts on content create/update/delete events
+- [x] **KB Sidebar Navigation:** Clicking files in the sidebar opens the document detail view
+- [x] **KB Sidebar Focus:** Highlight the active document in the sidebar and add spacing between sections
+- [x] **KB Sidebar Realtime:** Refresh sidebar immediately on knowledge document/collection changes
+- [x] **KB Async Processing:** Save/create/update return immediately; background processing updates status with polling
+- [x] **KB Realtime Publication:** Enable knowledge tables in Supabase realtime for instant sidebar updates
 - [x] **KB Sidebar Uncategorized:** Show uncategorized items (max 10) with expand and correct all-content counts
 - [x] **KB Terminology:** Replace "collection" labels with "folder" in UI copy
 - [x] **KB Keyword Fallback:** Use keyword search when embedding lookup fails or returns no matches
@@ -187,6 +193,9 @@
   - [x] Pending indicators refresh after review actions
   - [x] Hybrid AI suggestions (intro + up to 5 bullets) with update proposals for conflicting content
   - [x] Suggestion generation uses manual summary plus approved/rejected history for context
+  - [x] Knowledge Base banner surfaces pending AI suggestions with quick link to Organization settings
+  - [x] AI suggestions enforce 3-5 bullet hybrid format with retry on sparse output
+  - [x] Knowledge Base banner copy updated to “Hizmet profili önerileri hazır” and spaced from header
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
   - [x] Admin approval workflow

@@ -14,7 +14,7 @@ const SUGGESTION_LANGUAGE_BY_LOCALE: Record<string, string> = {
     en: 'English'
 }
 
-const buildSuggestionSystemPrompt = (language: string) => `You generate a service offering profile suggestion for a business.
+const buildSuggestionSystemPrompt = (language: string, labels: string) => `You generate a service offering profile suggestion for a business.
 Only use the provided content. Do not give business advice.
 Use the offering profile summary plus approved/rejected suggestions as context.
 Treat approved suggestions as confirmed scope.
@@ -22,8 +22,9 @@ Avoid repeating rejected suggestions unless new content explicitly changes the s
 Write the suggestion in ${language}.
 Format:
 - One short intro sentence.
-- Up to 5 bullet points total. Each bullet starts with a category label.
-Use labels in the same language: "Sunulanlar", "Sunulmayanlar", "Koşullar" (Turkish) or "Offered", "Not offered", "Conditions" (English).
+- 3 to 5 bullet points total. Each bullet starts with a category label and a colon.
+- Include concrete constraints (e.g., time window, eligibility limits, not-offered items) when present.
+Use labels in the same language. Allowed labels: ${labels}.
 If existing approved suggestions are provided and new content conflicts or overlaps, set update_index to the 1-based item to update.
 Otherwise, set update_index to null.
 Return JSON: { suggestion: string, update_index: number | null } only.`
@@ -31,6 +32,71 @@ Return JSON: { suggestion: string, update_index: number | null } only.`
 const resolveSuggestionLanguage = (locale?: string | null) => {
     const key = locale ?? DEFAULT_SUGGESTION_LOCALE
     return SUGGESTION_LANGUAGE_BY_LOCALE[key] ?? SUGGESTION_LANGUAGE_BY_LOCALE[DEFAULT_SUGGESTION_LOCALE] ?? 'Turkish'
+}
+
+const SUGGESTION_LABELS_BY_LOCALE: Record<string, string[]> = {
+    tr: ['Sunulanlar', 'Sunulmayanlar', 'Koşullar'],
+    en: ['Offered', 'Not offered', 'Conditions']
+}
+
+const resolveSuggestionLabels = (locale?: string | null) => {
+    const key = locale ?? DEFAULT_SUGGESTION_LOCALE
+    return SUGGESTION_LABELS_BY_LOCALE[key] ?? SUGGESTION_LABELS_BY_LOCALE[DEFAULT_SUGGESTION_LOCALE] ?? ['Offered', 'Not offered', 'Conditions']
+}
+
+const hasValidHybridFormat = (text: string, labels: string[]) => {
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean)
+    if (lines.length < 3) return false
+    const bulletLines = lines.filter(line => line.startsWith('- '))
+    if (bulletLines.length < 3) return false
+    const labelPattern = new RegExp(`^-\\s*(${labels.map(label => label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('|')})\\s*:`, 'i')
+    const labeledBullets = bulletLines.filter(line => labelPattern.test(line))
+    return labeledBullets.length >= 2
+}
+
+const buildRepairSystemPrompt = (language: string, labels: string) => `Rewrite the draft into the required service offering profile format.
+Write in ${language}. Keep the same meaning but add missing details from the provided content.
+Format:
+- One short intro sentence.
+- 3 to 5 bullet points total. Each bullet starts with a category label and a colon.
+Use labels in the same language. Allowed labels: ${labels}.
+Return JSON: { suggestion: string, update_index: number | null } only.`
+
+async function recordSuggestionUsage(options: {
+    organizationId: string
+    supabase: any
+    systemPrompt: string
+    userPrompt: string
+    response: string
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null
+    sourceType: 'skill' | 'knowledge' | 'batch'
+}) {
+    const { organizationId, supabase, systemPrompt, userPrompt, response, usage, sourceType } = options
+    if (usage) {
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_extraction',
+            model: 'gpt-4o-mini',
+            inputTokens: usage.prompt_tokens ?? 0,
+            outputTokens: usage.completion_tokens ?? 0,
+            totalTokens: usage.total_tokens ?? 0,
+            metadata: { source: 'offering_profile_suggestion', source_type: sourceType },
+            supabase
+        })
+    } else {
+        const promptTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt)
+        const outputTokens = estimateTokenCount(response)
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_extraction',
+            model: 'gpt-4o-mini',
+            inputTokens: promptTokens,
+            outputTokens,
+            totalTokens: promptTokens + outputTokens,
+            metadata: { source: 'offering_profile_suggestion', source_type: sourceType },
+            supabase
+        })
+    }
 }
 
 async function createSuggestion(options: {
@@ -53,7 +119,9 @@ async function createSuggestion(options: {
 
     const locale = profile?.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
     const language = resolveSuggestionLanguage(locale)
-    const systemPrompt = buildSuggestionSystemPrompt(language)
+    const labels = resolveSuggestionLabels(locale)
+    const labelsText = labels.join(', ')
+    const systemPrompt = buildSuggestionSystemPrompt(language, labelsText)
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const { data: approvedSuggestions } = await supabase
@@ -97,6 +165,7 @@ async function createSuggestion(options: {
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0.2,
+        max_tokens: 260,
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -106,8 +175,45 @@ async function createSuggestion(options: {
     const response = completion.choices[0]?.message?.content?.trim()
     if (!response) return null
 
-    const parsed = parseSuggestionPayload(response)
+    await recordSuggestionUsage({
+        organizationId: options.organizationId,
+        supabase,
+        systemPrompt,
+        userPrompt,
+        response,
+        usage: completion.usage,
+        sourceType: options.sourceType
+    })
+
+    let parsed = parseSuggestionPayload(response)
     if (!parsed) return null
+    if (!hasValidHybridFormat(parsed.suggestion, labels)) {
+        const repairSystemPrompt = buildRepairSystemPrompt(language, labelsText)
+        const repairUserPrompt = `New content:\n${options.content}\n\n${summaryBlock}\n\n${approvedBlock}\n\n${rejectedBlock}\n\nDraft:\n${parsed.suggestion}`
+        const repairCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.2,
+            max_tokens: 260,
+            messages: [
+                { role: 'system', content: repairSystemPrompt },
+                { role: 'user', content: repairUserPrompt }
+            ]
+        })
+        const repairResponse = repairCompletion.choices[0]?.message?.content?.trim()
+        if (!repairResponse) return null
+        await recordSuggestionUsage({
+            organizationId: options.organizationId,
+            supabase,
+            systemPrompt: repairSystemPrompt,
+            userPrompt: repairUserPrompt,
+            response: repairResponse,
+            usage: repairCompletion.usage,
+            sourceType: options.sourceType
+        })
+        const repaired = parseSuggestionPayload(repairResponse)
+        if (!repaired || !hasValidHybridFormat(repaired.suggestion, labels)) return null
+        parsed = repaired
+    }
     const updateTarget = parsed.updateIndex ? approvedSuggestions?.[parsed.updateIndex - 1] : null
 
     await supabase.from('offering_profile_suggestions').insert({
@@ -119,32 +225,6 @@ async function createSuggestion(options: {
         locale,
         update_of: updateTarget?.id ?? null
     })
-
-    if (completion.usage) {
-        await recordAiUsage({
-            organizationId: options.organizationId,
-            category: 'lead_extraction',
-            model: 'gpt-4o-mini',
-            inputTokens: completion.usage.prompt_tokens ?? 0,
-            outputTokens: completion.usage.completion_tokens ?? 0,
-            totalTokens: completion.usage.total_tokens ?? 0,
-            metadata: { source: 'offering_profile_suggestion', source_type: options.sourceType },
-            supabase
-        })
-    } else {
-        const promptTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt)
-        const outputTokens = estimateTokenCount(response)
-        await recordAiUsage({
-            organizationId: options.organizationId,
-            category: 'lead_extraction',
-            model: 'gpt-4o-mini',
-            inputTokens: promptTokens,
-            outputTokens,
-            totalTokens: promptTokens + outputTokens,
-            metadata: { source: 'offering_profile_suggestion', source_type: options.sourceType },
-            supabase
-        })
-    }
 
     return parsed.suggestion
 }

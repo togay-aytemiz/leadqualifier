@@ -31,12 +31,24 @@ export default function CreateContentPage() {
 
         setLoading(true)
         try {
-            await createKnowledgeBaseEntry({
+            const created = await createKnowledgeBaseEntry({
                 title,
                 content,
                 type: 'article', // Default for now
                 collection_id: collectionId || null
             })
+
+            window.dispatchEvent(new Event('knowledge-updated'))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
+
+            if (created?.id) {
+                void fetch('/api/knowledge/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: created.id }),
+                    keepalive: true
+                })
+            }
 
             // Redirect back to the collection or root
             const target = collectionId ? `/knowledge?collectionId=${collectionId}` : '/knowledge'

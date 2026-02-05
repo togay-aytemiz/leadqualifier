@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
 import { Sidebar, SidebarGroup, SidebarItem, Button } from '@/design'
 import { getSidebarData, type SidebarData, createCollection } from '@/lib/knowledge-base/actions'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import { FolderModal } from './FolderModal'
 import { NewContentButton } from './NewContentButton'
 import { FolderActions } from './FolderActions'
@@ -17,11 +18,13 @@ export function KnowledgeSidebar() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const currentCollectionId = searchParams.get('collectionId')
+    const pathname = usePathname()
 
     // New state for folder modal
     const [showFolderModal, setShowFolderModal] = useState(false)
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
     const [showAllUncategorized, setShowAllUncategorized] = useState(false)
+    const [organizationId, setOrganizationId] = useState<string | null>(null)
 
     const collections = data?.collections ?? []
     const uncategorized = data?.uncategorized ?? []
@@ -31,15 +34,21 @@ export function KnowledgeSidebar() {
         ? uncategorized
         : uncategorized.slice(0, uncategorizedLimit)
 
-    useEffect(() => {
-        loadSidebar()
+    const currentFileId = useMemo(() => {
+        const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+        if (!pathWithoutLocale.startsWith('/knowledge/')) return null
+        if (pathWithoutLocale.startsWith('/knowledge/create')) return null
+        const parts = pathWithoutLocale.split('/').filter(Boolean)
+        return parts.length >= 2 ? parts[1] : null
+    }, [pathname])
 
-        const handleUpdate = () => loadSidebar()
-        window.addEventListener('knowledge-updated', handleUpdate)
-        return () => window.removeEventListener('knowledge-updated', handleUpdate)
-    }, [])
+    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+    if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+    }
+    const supabase = supabaseRef.current
 
-    async function loadSidebar() {
+    const loadSidebar = useCallback(async () => {
         try {
             const sidebarData = await getSidebarData()
             setData(sidebarData)
@@ -50,7 +59,83 @@ export function KnowledgeSidebar() {
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [])
+
+    useEffect(() => {
+        loadSidebar()
+
+        const handleUpdate = () => loadSidebar()
+        window.addEventListener('knowledge-updated', handleUpdate)
+        return () => window.removeEventListener('knowledge-updated', handleUpdate)
+    }, [loadSidebar])
+
+    useEffect(() => {
+        let isMounted = true
+
+        const loadOrganization = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: membership } = await supabase
+                .from('organization_members')
+                .select('organization_id')
+                .eq('user_id', user.id)
+                .limit(1)
+                .single()
+
+            if (!isMounted) return
+            setOrganizationId(membership?.organization_id ?? null)
+        }
+
+        loadOrganization()
+
+        return () => {
+            isMounted = false
+        }
+    }, [supabase])
+
+    useEffect(() => {
+        if (!organizationId) return
+        let channel: ReturnType<typeof supabase.channel> | null = null
+        let isMounted = true
+
+        const setupRealtime = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!isMounted) return
+
+            if (session?.access_token) {
+                supabase.realtime.setAuth(session.access_token)
+            }
+
+            channel = supabase.channel(`knowledge_sidebar_${organizationId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'knowledge_documents',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    loadSidebar()
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'knowledge_collections',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    loadSidebar()
+                })
+                .subscribe()
+        }
+
+        setupRealtime()
+
+        return () => {
+            isMounted = false
+            if (channel) {
+                supabase.removeChannel(channel)
+            }
+        }
+    }, [loadSidebar, organizationId, supabase])
 
     function toggleExpand(id: string, e: React.MouseEvent) {
         e.stopPropagation()
@@ -93,7 +178,7 @@ export function KnowledgeSidebar() {
                     onClick={() => router.push('/knowledge')}
                 />
                 {uncategorized.length > 0 && (
-                    <div className="mt-3">
+                    <div className="mt-5">
                         <div className="px-3 text-xs font-semibold text-gray-500 mb-2 flex items-center justify-between">
                             <span>{t('uncategorized')}</span>
                             <span className="text-xs text-gray-400">{uncategorized.length}</span>
@@ -102,7 +187,13 @@ export function KnowledgeSidebar() {
                             {visibleUncategorized.map(file => (
                                 <div
                                     key={file.id}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 rounded-md cursor-pointer truncate"
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md cursor-pointer truncate",
+                                        file.id === currentFileId
+                                            ? "bg-blue-50/70 text-blue-700"
+                                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
+                                    )}
+                                    onClick={() => router.push(`/knowledge/${file.id}`)}
                                 >
                                     <FileText size={14} className="text-gray-400 shrink-0" />
                                     <span className="truncate">{file.title}</span>
@@ -165,8 +256,13 @@ export function KnowledgeSidebar() {
                                     {col.files.map(file => (
                                         <div
                                             key={file.id}
-                                            className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md cursor-pointer truncate"
-                                        // Future: onClick={() => router.push(`/knowledge/file/${file.id}`)}
+                                            className={cn(
+                                                "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer truncate",
+                                                file.id === currentFileId
+                                                    ? "bg-blue-50/70 text-blue-700"
+                                                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                                            )}
+                                            onClick={() => router.push(`/knowledge/${file.id}`)}
                                         >
                                             <FileText size={14} className="text-gray-400 shrink-0" />
                                             <span className="truncate">{file.title}</span>

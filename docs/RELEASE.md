@@ -11,6 +11,10 @@
 - Offering Profile AI suggestions manual generate action (shown when no suggestions exist).
 - Offering Profile AI suggestions now use a hybrid format (intro + up to 5 bullets) and support update proposals for conflicting content.
 - Offering Profile AI suggestions now consider manual summary plus approved/rejected history for better alignment.
+- Offering Profile AI suggestions now enforce 3-5 labeled bullets and retry when output is too sparse.
+- Knowledge Base banner surfaces pending AI suggestions and links to Organization settings.
+- Knowledge Base async processing endpoint with client-side enqueue after save/update.
+- Supabase realtime publication now includes knowledge tables for instant sidebar updates.
 - Pending AI suggestion indicators in settings sidebar and organization profile section.
 - Main sidebar Settings indicator for pending AI suggestions.
 - Locale-aware AI suggestion generation and localized timestamps in settings.
@@ -121,6 +125,13 @@
 - Inbox composer banner copy now references the AI assistant and centers the banner content vertically.
 - Global font updated to Plus Jakarta Sans via Google Fonts import.
 - Sidebar toggle now uses arrow-from-line icons for clearer affordance.
+- Knowledge Base banner copy now emphasizes service profile suggestions and adds spacing from the header.
+- Knowledge Base save/update now return immediately with background processing and UI polling.
+
+### Fixed
+- Knowledge Base sidebar file clicks now open the document details view.
+- Knowledge Base sidebar now highlights the active document and adds spacing between All Content and Uncategorized sections.
+- Knowledge Base sidebar now refreshes immediately via realtime document/collection updates.
 - Removed legacy `knowledge_base` table in favor of documents/chunks.
 - Replaced remaining hardcoded UI strings with translation keys across the app.
 - Updated AGENTS.md to enforce multilingual-first feature development.

@@ -141,36 +141,8 @@ export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
         throw new Error(error?.message ?? 'Failed to create knowledge document')
     }
 
-    try {
-        await buildAndStoreChunks(supabase, organizationId, data.id, entry.content)
-        await supabase.from('knowledge_documents').update({ status: 'ready' }).eq('id', data.id)
-    } catch (err) {
-        console.error('Failed to build knowledge chunks:', err)
-        await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', data.id)
-        throw err
-    }
-
-    try {
-        await proposeServiceCandidate({
-            organizationId,
-            sourceType: 'knowledge',
-            sourceId: data.id,
-            name: data.title,
-            supabase
-        })
-        await appendOfferingProfileSuggestion({
-            organizationId,
-            sourceType: 'knowledge',
-            sourceId: data.id,
-            content: `${data.title}\n${entry.content}`,
-            supabase
-        })
-    } catch (error) {
-        console.error('Failed to propose knowledge-based offerings:', error)
-    }
-
     revalidatePath('/knowledge')
-    return { ...data, status: 'ready' } as KnowledgeBaseEntry
+    return data as KnowledgeBaseEntry
 }
 
 export async function deleteKnowledgeBaseEntry(id: string) {
@@ -178,6 +150,58 @@ export async function deleteKnowledgeBaseEntry(id: string) {
     const { error } = await supabase.from('knowledge_documents').delete().eq('id', id)
     if (error) throw new Error(error.message)
     revalidatePath('/knowledge')
+}
+
+export async function processKnowledgeDocument(documentId: string, supabaseOverride?: any) {
+    const supabase = supabaseOverride ?? await createClient()
+    const { data, error } = await supabase
+        .from('knowledge_documents')
+        .select('id, organization_id, title, content')
+        .eq('id', documentId)
+        .single()
+
+    if (error || !data) {
+        throw new Error(error?.message ?? 'Knowledge document not found')
+    }
+
+    try {
+        await supabase.from('knowledge_chunks').delete().eq('document_id', data.id)
+        await buildAndStoreChunks(supabase, data.organization_id, data.id, data.content ?? '')
+        const { data: readyDoc } = await supabase
+            .from('knowledge_documents')
+            .update({ status: 'ready' })
+            .eq('id', data.id)
+            .select()
+            .single()
+
+        const finalDoc = (readyDoc ?? data) as KnowledgeBaseEntry
+
+        try {
+            await proposeServiceCandidate({
+                organizationId: finalDoc.organization_id,
+                sourceType: 'knowledge',
+                sourceId: finalDoc.id,
+                name: finalDoc.title,
+                supabase
+            })
+            await appendOfferingProfileSuggestion({
+                organizationId: finalDoc.organization_id,
+                sourceType: 'knowledge',
+                sourceId: finalDoc.id,
+                content: `${finalDoc.title}\n${finalDoc.content}`,
+                supabase
+            })
+        } catch (error) {
+            console.error('Failed to propose knowledge-based offerings:', error)
+        }
+
+        revalidatePath('/knowledge')
+        return finalDoc
+    } catch (err) {
+        console.error('Failed to build knowledge chunks:', err)
+        await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', data.id)
+        throw err
+    }
 }
 
 export async function getKnowledgeBaseEntry(id: string) {
@@ -203,10 +227,11 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
     const supabase = await createClient()
 
     const contentChanged = typeof entry.content === 'string'
+    const titleChanged = typeof entry.title === 'string'
 
-    // If content changed, mark as processing so retrieval skips it
+    // If content or title changed, mark as processing so retrieval skips it
     let updates: any = { ...entry }
-    if (contentChanged) {
+    if (contentChanged || titleChanged) {
         updates.status = 'processing'
     }
 
@@ -218,68 +243,6 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
         .single()
 
     if (error || !data) throw new Error(error?.message ?? 'Failed to update knowledge document')
-
-    if (contentChanged) {
-        try {
-            await supabase.from('knowledge_chunks').delete().eq('document_id', id)
-            await buildAndStoreChunks(supabase, data.organization_id, id, entry.content ?? '')
-            const { data: readyDoc } = await supabase
-                .from('knowledge_documents')
-                .update({ status: 'ready' })
-                .eq('id', id)
-                .select()
-                .single()
-
-            const finalDoc = (readyDoc ?? data) as KnowledgeBaseEntry
-            if (entry.title || entry.content) {
-                try {
-                    await proposeServiceCandidate({
-                        organizationId: finalDoc.organization_id,
-                        sourceType: 'knowledge',
-                        sourceId: finalDoc.id,
-                        name: finalDoc.title,
-                        supabase
-                    })
-                    await appendOfferingProfileSuggestion({
-                        organizationId: finalDoc.organization_id,
-                        sourceType: 'knowledge',
-                        sourceId: finalDoc.id,
-                        content: `${finalDoc.title}\n${entry.content ?? finalDoc.content}`,
-                        supabase
-                    })
-                } catch (error) {
-                    console.error('Failed to propose knowledge-based offerings:', error)
-                }
-            }
-
-            revalidatePath('/knowledge')
-            return finalDoc
-        } catch (err) {
-            await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', id)
-            throw err
-        }
-    }
-
-    if (entry.title) {
-        try {
-            await proposeServiceCandidate({
-                organizationId: data.organization_id,
-                sourceType: 'knowledge',
-                sourceId: data.id,
-                name: data.title,
-                supabase
-            })
-            await appendOfferingProfileSuggestion({
-                organizationId: data.organization_id,
-                sourceType: 'knowledge',
-                sourceId: data.id,
-                content: `${data.title}\n${data.content}`,
-                supabase
-            })
-        } catch (error) {
-            console.error('Failed to propose knowledge-based offerings:', error)
-        }
-    }
 
     revalidatePath('/knowledge')
     return data as KnowledgeBaseEntry

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Plus, FolderPlus, Home, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { Button, PageHeader, ConfirmDialog } from '@/design'
 import { KnowledgeTable } from './KnowledgeTable'
@@ -17,35 +18,121 @@ import {
     getKnowledgeBaseEntries
 } from '@/lib/knowledge-base/actions'
 import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
+import { createClient } from '@/lib/supabase/client'
 
 interface KnowledgeContainerProps {
     initialEntries: KnowledgeBaseEntry[]
     initialCollections: KnowledgeCollection[]
     currentCollection: KnowledgeCollection | null
     collectionId?: string | null
+    organizationId?: string | null
+    aiSuggestionsEnabled?: boolean
+    initialPendingSuggestions?: number
 }
 
 export function KnowledgeContainer({
     initialEntries,
     initialCollections,
     currentCollection,
-    collectionId
+    collectionId,
+    organizationId,
+    aiSuggestionsEnabled = false,
+    initialPendingSuggestions = 0
 }: KnowledgeContainerProps) {
     const t = useTranslations('knowledge')
     const tSidebar = useTranslations('sidebar')
     const tCommon = useTranslations('deleteFolder')
+    const locale = useLocale()
     const router = useRouter()
 
     // State (initialized from props, updated by local actions or refreshes)
     const [entries, setEntries] = useState<KnowledgeBaseEntry[]>(initialEntries)
     const [collections, setCollections] = useState<KnowledgeCollection[]>(initialCollections)
+    const [pendingSuggestions, setPendingSuggestions] = useState(initialPendingSuggestions)
 
     // Sync state if props change (re-validation)
     useEffect(() => {
         setEntries(initialEntries)
         setCollections(initialCollections)
     }, [initialEntries, initialCollections])
+
+    useEffect(() => {
+        setPendingSuggestions(initialPendingSuggestions)
+    }, [initialPendingSuggestions])
+
+    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+    if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+    }
+    const supabase = supabaseRef.current
+
+    const refreshPendingSuggestions = useCallback(async () => {
+        if (!organizationId) return
+
+        let query = supabase
+            .from('offering_profile_suggestions')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', organizationId)
+            .or('status.eq.pending,status.is.null')
+
+        if (locale?.trim()) {
+            query = query.eq('locale', locale)
+        }
+
+        const { count, error } = await query
+        if (error) {
+            console.error('Failed to load pending suggestions', error)
+            return
+        }
+        setPendingSuggestions(count ?? 0)
+    }, [locale, organizationId, supabase])
+
+    useEffect(() => {
+        if (!organizationId || !aiSuggestionsEnabled) return
+        refreshPendingSuggestions()
+    }, [aiSuggestionsEnabled, organizationId, refreshPendingSuggestions])
+
+    useEffect(() => {
+        if (!organizationId || !aiSuggestionsEnabled) return
+        let suggestionChannel: ReturnType<typeof supabase.channel> | null = null
+        let isMounted = true
+
+        const setupRealtime = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!isMounted) return
+            if (session?.access_token) {
+                supabase.realtime.setAuth(session.access_token)
+            }
+
+            suggestionChannel = supabase.channel(`knowledge_suggestions_${organizationId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'offering_profile_suggestions',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    refreshPendingSuggestions()
+                })
+                .subscribe()
+        }
+
+        setupRealtime()
+
+        return () => {
+            isMounted = false
+            if (suggestionChannel) {
+                supabase.removeChannel(suggestionChannel)
+            }
+        }
+    }, [aiSuggestionsEnabled, organizationId, refreshPendingSuggestions, supabase])
+
+    useEffect(() => {
+        if (!organizationId || !aiSuggestionsEnabled) return
+        const handler = () => refreshPendingSuggestions()
+        window.addEventListener('pending-suggestions-updated', handler)
+        return () => window.removeEventListener('pending-suggestions-updated', handler)
+    }, [aiSuggestionsEnabled, organizationId, refreshPendingSuggestions])
 
     // Modals
     const [showFolderModal, setShowFolderModal] = useState(false)
@@ -78,6 +165,8 @@ export function KnowledgeContainer({
         try {
             await deleteKnowledgeBaseEntry(deleteDialog.id)
             setEntries(prev => prev.filter(e => e.id !== deleteDialog.id))
+            window.dispatchEvent(new Event('knowledge-updated'))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
             setDeleteDialog(prev => ({ ...prev, isOpen: false }))
             router.refresh()
         } catch (error) {
@@ -103,6 +192,18 @@ export function KnowledgeContainer({
     }
 
     const isEmpty = entries.length === 0 && collections.length === 0
+
+    useEffect(() => {
+        const hasProcessing = entries.some(entry => entry.status === 'processing')
+        if (!hasProcessing) return
+
+        const intervalId = window.setInterval(() => {
+            router.refresh()
+            window.dispatchEvent(new Event('knowledge-updated'))
+        }, 5000)
+
+        return () => window.clearInterval(intervalId)
+    }, [entries, router])
 
     return (
         <div className="flex flex-col h-full bg-white">
@@ -148,6 +249,23 @@ export function KnowledgeContainer({
                     </div>
                 }
             />
+
+            {aiSuggestionsEnabled && pendingSuggestions > 0 && (
+                <div className="px-8 mt-4">
+                    <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-900 flex items-center justify-between gap-4">
+                        <div>
+                            <p className="font-semibold">{t('aiSuggestionsBannerTitle')}</p>
+                            <p className="text-xs text-blue-700">{t('aiSuggestionsBannerDescription', { count: pendingSuggestions })}</p>
+                        </div>
+                        <Link
+                            href="/settings/organization"
+                            className="text-xs font-semibold text-blue-700 hover:text-blue-800"
+                        >
+                            {t('aiSuggestionsBannerCta')}
+                        </Link>
+                    </div>
+                </div>
+            )}
 
             <div className="p-6 space-y-6 flex-1 overflow-auto">
                 {/* Filters Bar */}

@@ -1,6 +1,5 @@
-import { getSkills } from '@/lib/skills/actions'
 import { createClient } from '@/lib/supabase/server'
-import { getTranslations } from 'next-intl/server'
+import { getLocale } from 'next-intl/server'
 import {
     getKnowledgeBaseEntries,
     getCollections,
@@ -8,6 +7,7 @@ import {
     KnowledgeBaseEntry
 } from '@/lib/knowledge-base/actions'
 import { KnowledgeContainer } from './components/KnowledgeContainer'
+import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +16,8 @@ interface KnowledgePageProps {
 }
 
 export default async function KnowledgeBasePage({ searchParams }: KnowledgePageProps) {
-    const t = await getTranslations('knowledge')
+    const locale = await getLocale()
+    const supabase = await createClient()
     const { collectionId } = await searchParams
 
     // Fetch data in parallel
@@ -39,12 +40,42 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
         displayCollections = allCollections
     }
 
+    const { data: { user } } = await supabase.auth.getUser()
+    let organizationId: string | null = null
+    let aiSuggestionsEnabled = false
+    let pendingSuggestions = 0
+
+    if (user) {
+        const { data: membership } = await supabase
+            .from('organization_members')
+            .select('organization_id')
+            .eq('user_id', user.id)
+            .limit(1)
+            .single()
+
+        organizationId = membership?.organization_id ?? null
+
+        if (organizationId) {
+            const { data: profile } = await supabase
+                .from('offering_profiles')
+                .select('ai_suggestions_enabled')
+                .eq('organization_id', organizationId)
+                .maybeSingle()
+
+            aiSuggestionsEnabled = profile?.ai_suggestions_enabled ?? false
+            pendingSuggestions = await getPendingOfferingProfileSuggestionCount(organizationId, locale)
+        }
+    }
+
     return (
         <KnowledgeContainer
             initialEntries={entries}
             initialCollections={displayCollections}
             currentCollection={currentCollection}
             collectionId={collectionId}
+            organizationId={organizationId}
+            aiSuggestionsEnabled={aiSuggestionsEnabled}
+            initialPendingSuggestions={pendingSuggestions}
         />
     )
 }
