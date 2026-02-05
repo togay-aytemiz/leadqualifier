@@ -63,6 +63,7 @@ export default async function InboxPage() {
             initialConversations={conversations}
             organizationId={organizationId}
             botName={aiSettings.bot_name}
+            botMode={aiSettings.bot_mode}
         />
     )
 }

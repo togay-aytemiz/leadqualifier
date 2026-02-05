@@ -22,7 +22,7 @@ export function scoreLead(input: LeadSignalInput) {
 
     if (input.hasDate) intentScore += 2
     if (input.hasBudget) intentScore += 2
-    if (input.isDecisive) intentScore += 2
+    if (input.isDecisive) intentScore += 3
     if (input.isUrgent) intentScore += 2
     if (input.isIndecisive) intentScore -= 2
     if (input.isFarFuture) intentScore -= 1

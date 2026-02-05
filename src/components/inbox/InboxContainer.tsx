@@ -1,29 +1,33 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Avatar, Badge, EmptyState, IconButton, ConfirmDialog } from '@/design'
+import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal } from '@/design'
 import {
     Inbox, ChevronDown,
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw
 } from 'lucide-react'
+import { FaTelegram } from 'react-icons/fa'
+import { IoLogoWhatsapp } from 'react-icons/io5'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
-import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary, getConversationLead } from '@/lib/inbox/actions'
+import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary, getConversationLead, getLeadScoreReasoning, refreshConversationLead } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
 import { useTranslations, useLocale } from 'next-intl'
+import type { AiBotMode } from '@/types/database'
 
 interface InboxContainerProps {
     initialConversations: Conversation[]
     organizationId: string
     botName?: string
+    botMode?: AiBotMode
 }
 
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 
-export function InboxContainer({ initialConversations, organizationId, botName }: InboxContainerProps) {
+export function InboxContainer({ initialConversations, organizationId, botName, botMode }: InboxContainerProps) {
     const t = useTranslations('inbox')
     const locale = useLocale()
     const dateLocale = locale === 'tr' ? tr : undefined
@@ -36,6 +40,13 @@ export function InboxContainer({ initialConversations, organizationId, botName }
     const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
     const [summaryText, setSummaryText] = useState('')
     const [isSummaryOpen, setIsSummaryOpen] = useState(false)
+    const [scoreReasonStatus, setScoreReasonStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+    const [scoreReasonText, setScoreReasonText] = useState('')
+    const [scoreReasonError, setScoreReasonError] = useState<'missing_api_key' | 'missing_lead' | 'request_failed' | null>(null)
+    const [isScoreReasonOpen, setIsScoreReasonOpen] = useState(false)
+    const [leadRefreshStatus, setLeadRefreshStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+    const [leadRefreshError, setLeadRefreshError] = useState<'missing_api_key' | 'missing_conversation' | 'request_failed' | null>(null)
+    const [leadAutoRefreshStatus, setLeadAutoRefreshStatus] = useState<'idle' | 'loading'>('idle')
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -52,10 +63,13 @@ export function InboxContainer({ initialConversations, organizationId, botName }
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const messagesRef = useRef<Message[]>([])
+    const leadRef = useRef<Lead | null>(null)
     const refreshInFlightRef = useRef(false)
     const refreshRequestRef = useRef<string | null>(null)
     const assigneeCacheRef = useRef<Record<string, Assignee>>({})
     const selectedIdRef = useRef(selectedId)
+    const leadRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const leadAutoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const leadStatusLabels: Record<string, string> = {
         hot: t('leadStatusHot'),
         warm: t('leadStatusWarm'),
@@ -71,6 +85,21 @@ export function InboxContainer({ initialConversations, organizationId, botName }
         setSummaryStatus('idle')
         setSummaryText('')
         setIsSummaryOpen(false)
+        setScoreReasonStatus('idle')
+        setScoreReasonText('')
+        setScoreReasonError(null)
+        setIsScoreReasonOpen(false)
+        setLeadRefreshStatus('idle')
+        setLeadRefreshError(null)
+        setLeadAutoRefreshStatus('idle')
+        if (leadRefreshTimeoutRef.current) {
+            clearTimeout(leadRefreshTimeoutRef.current)
+            leadRefreshTimeoutRef.current = null
+        }
+        if (leadAutoRefreshTimeoutRef.current) {
+            clearTimeout(leadAutoRefreshTimeoutRef.current)
+            leadAutoRefreshTimeoutRef.current = null
+        }
     }, [selectedId])
 
 
@@ -103,10 +132,40 @@ export function InboxContainer({ initialConversations, organizationId, botName }
             const result = await getConversationLead(conversationId)
             if (selectedIdRef.current !== conversationId) return
             setLead(result)
+            return result
         } catch (error) {
             console.error('Failed to refresh lead', error)
         }
+        return null
     }, [])
+
+    const scheduleLeadAutoRefresh = useCallback((conversationId: string) => {
+        if (!conversationId) return
+        if (leadAutoRefreshTimeoutRef.current) {
+            clearTimeout(leadAutoRefreshTimeoutRef.current)
+            leadAutoRefreshTimeoutRef.current = null
+        }
+        const baselineUpdatedAt = leadRef.current?.updated_at ?? null
+        let attempts = 0
+        setLeadAutoRefreshStatus('loading')
+
+        const run = async () => {
+            attempts += 1
+            const nextLead = await refreshLead(conversationId)
+            const nextUpdatedAt = nextLead?.updated_at ?? null
+            if (nextUpdatedAt && nextUpdatedAt !== baselineUpdatedAt) {
+                setLeadAutoRefreshStatus('idle')
+                return
+            }
+            if (attempts >= 4) {
+                setLeadAutoRefreshStatus('idle')
+                return
+            }
+            leadAutoRefreshTimeoutRef.current = setTimeout(run, 2000)
+        }
+
+        leadAutoRefreshTimeoutRef.current = setTimeout(run, 1500)
+    }, [refreshLead])
 
     const refreshMessages = useCallback(async (conversationId: string) => {
         refreshRequestRef.current = conversationId
@@ -159,6 +218,10 @@ export function InboxContainer({ initialConversations, organizationId, botName }
     useEffect(() => {
         messagesRef.current = messages
     }, [messages])
+
+    useEffect(() => {
+        leadRef.current = lead
+    }, [lead])
 
     useEffect(() => {
         let isMounted = true
@@ -284,6 +347,10 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                         })
                     }
 
+                    if (newMsg.sender_type === 'contact' && newMsg.conversation_id === selectedIdRef.current) {
+                        scheduleLeadAutoRefresh(newMsg.conversation_id)
+                    }
+
                     // 2. Update conversation list (unread, last_message, sort)
                     setConversations(prev => prev.map(c => {
                         if (c.id === newMsg.conversation_id) {
@@ -374,7 +441,7 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                 supabase.removeChannel(channel)
             }
         }
-    }, [organizationId, refreshMessages, resolveAssignee, supabase])
+    }, [organizationId, refreshMessages, resolveAssignee, scheduleLeadAutoRefresh, supabase])
 
     const handleFetchSummary = async () => {
         if (!selectedId || summaryStatus === 'loading') return
@@ -407,6 +474,61 @@ export function InboxContainer({ initialConversations, organizationId, botName }
         if (summaryRefreshDisabled) return
         setIsSummaryOpen(true)
         await handleFetchSummary()
+    }
+
+    const handleFetchScoreReason = async () => {
+        if (!selectedId || scoreReasonStatus === 'loading') return
+        setScoreReasonStatus('loading')
+        setScoreReasonText('')
+        setScoreReasonError(null)
+        try {
+            const statusLabel = lead?.status ? (leadStatusLabels[lead.status] ?? lead.status) : undefined
+            const result = await getLeadScoreReasoning(selectedId, organizationId, locale, statusLabel)
+            if (result.ok) {
+                setScoreReasonText(result.reasoning)
+                setScoreReasonStatus('success')
+                return
+            }
+            setScoreReasonError(result.reason)
+            setScoreReasonStatus('error')
+        } catch (error) {
+            console.error('Failed to get score reasoning', error)
+            setScoreReasonError('request_failed')
+            setScoreReasonStatus('error')
+        }
+    }
+
+    const handleOpenScoreReason = async () => {
+        setIsScoreReasonOpen(true)
+        if (scoreReasonStatus === 'idle' || scoreReasonStatus === 'error') {
+            await handleFetchScoreReason()
+        }
+    }
+
+    const handleRefreshLead = async () => {
+        if (!selectedId || leadRefreshStatus === 'loading') return
+        setLeadRefreshStatus('loading')
+        setLeadRefreshError(null)
+        try {
+            const result = await refreshConversationLead(selectedId, organizationId)
+            if (result.ok) {
+                await refreshLead(selectedId)
+                setLeadRefreshStatus('success')
+                if (leadRefreshTimeoutRef.current) {
+                    clearTimeout(leadRefreshTimeoutRef.current)
+                }
+                leadRefreshTimeoutRef.current = setTimeout(() => {
+                    setLeadRefreshStatus('idle')
+                }, 2500)
+                return
+            }
+            setLeadRefreshError(result.reason)
+            setLeadRefreshStatus('error')
+        } catch (error) {
+            console.error('Manual lead refresh failed', error)
+            setLeadRefreshError('request_failed')
+            setLeadRefreshStatus('error')
+        }
     }
 
     const handleSendMessage = async () => {
@@ -538,6 +660,24 @@ export function InboxContainer({ initialConversations, organizationId, botName }
     const summaryHeaderDisabled = !canSummarize
     const summaryRefreshDisabled = !canSummarize || summaryStatus === 'loading'
     const showSummaryRefresh = isSummaryOpen && (summaryStatus === 'success' || summaryStatus === 'error')
+    const scoreReasonMessage = scoreReasonError === 'missing_api_key'
+        ? t('scoreReasonMissing')
+        : scoreReasonError === 'missing_lead'
+            ? t('scoreReasonNoLead')
+            : t('scoreReasonError')
+    const resolvedBotMode = (botMode ?? 'active')
+    const operatorActive = selectedConversation?.active_agent === 'operator' || Boolean(selectedConversation?.assignee_id)
+    const leadExtractionPaused = Boolean(selectedConversation) && (operatorActive || resolvedBotMode === 'off')
+    const pauseReasons: string[] = []
+    if (operatorActive) pauseReasons.push(t('leadPausedReasonOperator'))
+    if (resolvedBotMode === 'off') pauseReasons.push(t('leadPausedReasonAiOff'))
+    const pauseReasonText = pauseReasons.join(t('leadPausedReasonSeparator'))
+    const leadRefreshMessage = leadRefreshError === 'missing_api_key'
+        ? t('leadRefreshMissing')
+        : leadRefreshError === 'missing_conversation'
+            ? t('leadRefreshMissingConversation')
+            : t('leadRefreshError')
+    const isLeadUpdating = leadRefreshStatus === 'loading' || leadAutoRefreshStatus === 'loading'
 
     return (
         <>
@@ -567,7 +707,18 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                             >
                                 <div className="flex justify-between items-start mb-1.5">
                                     <div className="flex items-center gap-2.5">
-                                        <Avatar name={c.contact_name} size="sm" />
+                                        <div className="relative">
+                                            <Avatar name={c.contact_name} size="sm" />
+                                            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
+                                                {c.platform === 'telegram' ? (
+                                                    <FaTelegram className="text-[#229ED9]" size={18} />
+                                                ) : c.platform === 'whatsapp' ? (
+                                                    <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                                ) : (
+                                                    <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
+                                                )}
+                                            </span>
+                                        </div>
                                         <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -579,7 +730,7 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                                         )}
                                     </div>
                                 </div>
-                                <div className="pl-[34px] pr-2">
+                                <div className="pl-[42px] pr-2">
                                     <p className="text-sm text-gray-500 truncate leading-relaxed">
                                         {c.messages?.[0]?.content || t('noMessagesYet')}
                                     </p>
@@ -639,9 +790,7 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                                 if (!isMe && !isBot) {
                                     return (
                                         <div key={m.id} className="flex items-end gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">
-                                                {selectedConversation.contact_name.charAt(0)}
-                                            </div>
+                                            <Avatar name={selectedConversation.contact_name} size="md" />
                                             <div className="flex flex-col gap-1 max-w-[80%]">
                                                 <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
                                                     {m.content}
@@ -867,6 +1016,15 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">{t('platform')}</span>
                                         <div className="flex items-center gap-2">
+                                            <span className="h-4 w-4 inline-flex items-center justify-center">
+                                                {selectedConversation.platform === 'telegram' ? (
+                                                    <FaTelegram className="text-[#229ED9]" size={16} />
+                                                ) : selectedConversation.platform === 'whatsapp' ? (
+                                                    <IoLogoWhatsapp className="text-[#25D366]" size={16} />
+                                                ) : (
+                                                    <span className="text-[10px] font-semibold text-gray-400 uppercase">S</span>
+                                                )}
+                                            </span>
                                             <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
                                         </div>
                                     </div>
@@ -876,50 +1034,96 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                                         <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p', { locale: dateLocale })}</span>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="mt-6">
-                                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">{t('leadTitle')}</h4>
-                                {lead ? (
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                            <span className="text-sm text-gray-500">{t('leadStatus')}</span>
-                                            <Badge variant={
-                                                lead.status === 'hot'
-                                                    ? 'error'
-                                                    : lead.status === 'warm'
-                                                        ? 'warning'
-                                                        : lead.status === 'ignored'
-                                                            ? 'info'
-                                                            : 'neutral'
-                                            }>
-                                                {leadStatusLabels[lead.status] ?? lead.status}
-                                            </Badge>
+                                <hr className="border-gray-100/60 my-6" />
+
+                                <div className="mt-6">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">{t('leadTitle')}</h4>
+                                            <span className="text-[10px] uppercase tracking-wide text-gray-500 border border-gray-200 bg-gray-50 px-2 py-0.5 rounded-full">
+                                                {t('leadAiExtraction')}
+                                            </span>
                                         </div>
-                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                            <span className="text-sm text-gray-500">{t('leadScore')}</span>
-                                            <span className="text-sm text-gray-900">{lead.total_score}</span>
-                                        </div>
-                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                            <span className="text-sm text-gray-500">{t('leadService')}</span>
-                                            <span className="text-sm text-gray-900">{lead.service_type || t('leadUnknown')}</span>
-                                        </div>
-                                        {lead.summary && (
-                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
-                                                <span className="text-sm text-gray-500">{t('leadSummary')}</span>
-                                                <span className="text-sm text-gray-900 whitespace-pre-wrap">{lead.summary}</span>
-                                            </div>
-                                        )}
-                                        {lead.updated_at && (
-                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                                <span className="text-sm text-gray-500">{t('leadUpdated')}</span>
-                                                <span className="text-sm text-gray-900">{format(new Date(lead.updated_at), 'PP p', { locale: dateLocale })}</span>
-                                            </div>
+                                        {isLeadUpdating && (
+                                            <span className="text-xs font-semibold text-emerald-600">{t('leadUpdating')}</span>
                                         )}
                                     </div>
-                                ) : (
-                                    <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
-                                )}
+                                    {leadExtractionPaused && (
+                                        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 flex items-start justify-between gap-3">
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-semibold text-amber-900">{t('leadPausedTitle')}</p>
+                                                <p className="text-xs text-amber-800">{pauseReasonText}</p>
+                                                {leadRefreshStatus === 'error' && (
+                                                    <p className="text-xs text-red-600">{leadRefreshMessage}</p>
+                                                )}
+                                                {leadRefreshStatus === 'success' && (
+                                                    <p className="text-xs text-green-700">{t('leadRefreshSuccess')}</p>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleRefreshLead}
+                                                disabled={leadRefreshStatus === 'loading'}
+                                                className={`shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 transition-colors ${leadRefreshStatus === 'loading' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            >
+                                                {leadRefreshStatus === 'loading' ? t('leadRefreshLoading') : t('leadRefresh')}
+                                            </button>
+                                        </div>
+                                    )}
+                                    {lead ? (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                                <span className="text-sm text-gray-500">{t('leadStatus')}</span>
+                                                <div className="flex items-center gap-2 text-sm text-gray-900">
+                                                    <span
+                                                        className={`h-2 w-2 rounded-full ${lead.status === 'hot'
+                                                            ? 'bg-red-500'
+                                                            : lead.status === 'warm'
+                                                                ? 'bg-amber-500'
+                                                                : lead.status === 'ignored'
+                                                                    ? 'bg-blue-500'
+                                                                    : 'bg-gray-400'
+                                                            }`}
+                                                    />
+                                                    <span>{leadStatusLabels[lead.status] ?? lead.status}</span>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                                <span className="text-sm text-gray-500">{t('leadScore')}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-gray-900">{lead.total_score}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleOpenScoreReason}
+                                                        disabled={scoreReasonStatus === 'loading'}
+                                                        className={`text-xs font-medium text-blue-600 hover:text-blue-700 ${scoreReasonStatus === 'loading' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        {t('scoreReason')}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                                <span className="text-sm text-gray-500">{t('leadService')}</span>
+                                                <span className="text-sm text-gray-900">{lead.service_type || t('leadUnknown')}</span>
+                                            </div>
+                                            {lead.summary && (
+                                                <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
+                                                    <span className="text-sm text-gray-500">{t('leadSummary')}</span>
+                                                    <span className="text-sm text-gray-900 whitespace-pre-wrap">{lead.summary}</span>
+                                                </div>
+                                            )}
+                                            {lead.updated_at && (
+                                                <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                                    <span className="text-sm text-gray-500">{t('leadUpdated')}</span>
+                                                    <span className="text-sm text-gray-900">{format(new Date(lead.updated_at), 'PP p', { locale: dateLocale })}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
+                                    )}
+                                </div>
                             </div>
 
                             <hr className="border-gray-100 my-6" />
@@ -960,6 +1164,28 @@ export function InboxContainer({ initialConversations, organizationId, botName }
                 isDestructive
                 isLoading={deleteDialog.isLoading}
             />
+
+            <Modal
+                isOpen={isScoreReasonOpen}
+                onClose={() => setIsScoreReasonOpen(false)}
+                title={t('scoreReasonTitle')}
+            >
+                {scoreReasonStatus === 'loading' && (
+                    <div className="space-y-2">
+                        <div className="h-4 w-3/4 rounded-md bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 animate-pulse" />
+                        <div className="h-4 w-11/12 rounded-md bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 animate-pulse" />
+                        <div className="h-4 w-2/3 rounded-md bg-gradient-to-r from-blue-50 via-blue-100 to-blue-50 animate-pulse" />
+                    </div>
+                )}
+                {scoreReasonStatus === 'success' && (
+                    <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {scoreReasonText}
+                    </div>
+                )}
+                {scoreReasonStatus === 'error' && (
+                    <p className="text-sm text-red-600">{scoreReasonMessage}</p>
+                )}
+            </Modal>
         </>
     )
 }

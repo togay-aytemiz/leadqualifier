@@ -81,6 +81,19 @@
   - [x] Delete conversation functionality
   - [x] Composer banner copy + centered layout
   - [x] Details avatar initials match conversation list
+  - [x] Conversation avatars use shared initials/colors across list, chat, and details
+  - [x] Lead snapshot grouped under Key Information with contact header restored
+  - [x] Score reasoning UI uses locale-aware copy and labels
+  - [x] Lead extraction paused notice + manual refresh in details panel
+  - [x] Lead snapshot header shows AI extraction chip and status uses dot + text
+  - [x] Platform row shows channel icon and channel cards use consistent icon sizing
+  - [x] Platform icons now use react-icons with brand colors
+  - [x] Inbox list avatars include platform badges for quick channel recognition
+  - [x] Inbox list platform badges enlarged with brand-colored icons
+  - [x] Inbox list platform badges centered under avatars
+  - [x] Inbox list platform badges adjusted for size and placement
+  - [x] Inbox list platform badges lowered and icon size increased
+  - [x] Inbox list platform badges lowered further with thinner borders
   - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)
@@ -212,14 +225,21 @@
   - [x] Extract: service, date, location, budget
   - [x] Intent analysis
   - [x] Risk signal detection
+- [x] **Extraction Reliability**
+  - [x] Parse fenced or noisy JSON outputs safely
+  - [x] Label customer vs assistant messages and respect customer negations
+  - [x] Use last 5 customer messages and LLM-provided score/status
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
   - [x] Auto-generate AI summary
+  - [x] Keyword-based intent fallback + score reasoning modal
 - [x] **Lead Status**
   - [x] Hot / Warm / Cold classification
   - [x] Status update triggers
 - [x] **Inbox Lead Details**
   - [x] Read-only lead snapshot in conversation details
+  - [x] Lead header shows "Updating" indicator during extraction
+  - [x] Keep "Updated" timestamp visible while updating
 
 ---
 

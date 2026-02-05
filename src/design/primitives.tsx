@@ -68,7 +68,7 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, size = 'md', className }: AvatarProps) {
-    const sizeClass = size === 'sm' ? "h-6 w-6 text-[10px]" : size === 'lg' ? "h-12 w-12 text-sm" : "h-8 w-8 text-xs"
+    const sizeClass = size === 'sm' ? "h-8 w-8 text-[11px]" : size === 'lg' ? "h-12 w-12 text-sm" : "h-8 w-8 text-xs"
     const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     const colors = [
         "bg-red-100 text-red-600",

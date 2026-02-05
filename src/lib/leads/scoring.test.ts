@@ -32,6 +32,21 @@ describe('scoreLead', () => {
         expect(result.status).toBe('cold')
     })
 
+    it('treats decisive intent as warm with profile match', () => {
+        const result = scoreLead({
+            hasCatalogMatch: false,
+            hasProfileMatch: true,
+            hasDate: false,
+            hasBudget: false,
+            isDecisive: true,
+            isUrgent: false,
+            isIndecisive: false,
+            isFarFuture: false
+        })
+        expect(result.totalScore).toBe(5)
+        expect(result.status).toBe('warm')
+    })
+
     it('marks ignored when non-business', () => {
         const result = scoreLead({
             hasCatalogMatch: true,

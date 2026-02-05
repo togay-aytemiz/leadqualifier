@@ -137,7 +137,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 | Clear date | +2 |
 | Clear service | +2 |
 | Budget alignment | +2 |
-| Decisive language | +2 |
+| Decisive booking intent | +3 |
 | Urgency | +2 |
 | Indecisive language | -2 |
 | Far-future date | -1 |
@@ -147,8 +147,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 **Rules:**
 - Extraction runs asynchronously on every new customer message (conversation snapshot update).
+- Intent signals are extracted by the LLM (no deterministic keyword fallback while LLM scoring is active).
+- Inbox can request an on-demand score reasoning summary grounded only in extracted signals and scoring inputs.
+- Inbox lead header shows an "Updating" indicator while extraction is in progress.
+- "Updated" timestamp remains visible while the updating indicator is shown.
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
+- Service type inference prioritizes customer messages, ignores assistant-only suggestions, and respects explicit negations.
+- Lead score and status are produced directly by the LLM using the latest 5 customer messages only (assistant messages excluded).
 - Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation). Rejected suggestions can be archived for audit (excluded from AI context), and users can regenerate suggestions whenever there are no pending items.
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
@@ -290,6 +296,17 @@ MVP is successful when:
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
 - **Inbox Details:** Use consistent contact initials between list avatars and details panel.
+- **Inbox Avatars:** Use the shared Avatar component across list, chat, and details to keep initials/colors consistent.
+- **Inbox Details Layout:** Keep the contact header block and group the lead snapshot under Key Information for faster scanning.
+- **Lead Extraction Pause UI:** If the operator is active or AI is off, surface a paused notice and allow a manual lead refresh from inbox details.
+- **Lead Snapshot Styling:** Show a minimal AI extraction micro-label and render lead status as text with a small color dot.
+- **Platform Row Icon:** Show the channel icon next to the platform value; use consistent icon sizing across channel cards and brand-colored react-icons.
+- **Inbox List Badges:** Show a small platform badge on conversation avatars so the channel is visible at a glance.
+- **Inbox Badge Styling:** Use brand-colored icons with a light backdrop for legibility on avatar colors.
+- **Inbox Badge Placement:** Center the platform badge beneath the avatar to reduce corner crowding.
+- **Inbox Badge Scale:** Increase badge/icon size slightly and reduce border weight for better legibility.
+- **Inbox Badge Offset:** Drop the badge a bit lower and further emphasize the brand icon.
+- **Inbox Badge Fine-Tuning:** Allow incremental offset and border tweaks for visual balance.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
@@ -300,6 +317,9 @@ MVP is successful when:
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
+- **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.
+- **Lead Scoring Transparency:** Weight decisive booking intent higher (+3), add keyword fallback for intent signals, and expose on-demand score reasoning grounded in extracted inputs.
+- **Lead Score UX:** Reasoning copy respects the active UI locale and uses localized status labels.
 - **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and require admin approval before the service can be used in extraction.
 - **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; AI suggestions are generated from Skills/KB in org language using a hybrid format (intro + up to 5 bullets), start pending, can propose updates to existing approved suggestions, and only approved suggestions are used for extraction.
 - **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.

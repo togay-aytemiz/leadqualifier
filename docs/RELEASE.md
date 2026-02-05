@@ -29,6 +29,11 @@
 - Lead extraction worker wired to Telegram webhook with token usage logging.
 - Offering Profile settings UI with pending profile updates and service candidate approvals.
 - Inbox details now show a read-only lead snapshot (status, score, service, summary).
+- Inbox lead score reasoning modal (on-demand AI explanation of the current score).
+- Inbox details now place contact info under Key Information and keep status badges content-hugging.
+- Inbox details now show a paused lead extraction notice with a manual refresh action.
+- Inbox lead header now shows an updating indicator while extraction runs.
+- Inbox lead header keeps the updated timestamp visible while updating.
 - Lead scoring helpers and extraction parsing utilities.
 - Lead extraction design spec (hybrid service catalog, offering profile, non-business skip, async per-message snapshot).
 - Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
@@ -110,6 +115,20 @@
 
 ### Changed
 - Turkish UI copy now uses "Kişi" instead of "Lead".
+- Lead scoring now weights decisive booking intent higher and augments intent signals with keyword heuristics.
+- Inbox details now keep the contact header while grouping the lead snapshot under Key Information.
+- Lead score reasoning now respects the active UI language and uses localized status labels.
+- Inbox lead score link text updated and "Received" label now shows as "Created" in English and "Oluşturuldu" in Turkish.
+- Lead snapshot header now shows an AI extraction micro-label and status uses a minimal dot + text treatment.
+- AI extraction micro-label now sits next to the lead header for tighter alignment.
+- Platform row now displays the channel icon and channel cards use consistent icon sizing.
+- Platform icons now use react-icons with brand colors for Telegram and WhatsApp.
+- Inbox list avatars now include platform badges for quick channel identification.
+- Inbox list platform badges now use larger, brand-colored icons with a light backdrop.
+- Inbox list platform badges now sit centered beneath avatars.
+- Inbox list platform badges are larger with a thinner border and lower placement.
+- Inbox list platform badges moved further down with larger icons and lighter borders.
+- Inbox list platform badges lowered again with thinner borders and larger icons.
 - Offering Profile suggestions now support archiving rejected items (audit-only) with an archived tab, and the generate button appears whenever there are no pending items.
 - Knowledge Base pending AI suggestions banner now uses an amber tone for better visibility.
 - Lead extraction now uses only approved Offering Profile AI suggestions.
@@ -132,6 +151,7 @@
 - Sidebar toggle now uses arrow-from-line icons for clearer affordance.
 - Knowledge Base banner copy now emphasizes service profile suggestions and adds spacing from the header.
 - Knowledge Base save/update now return immediately with background processing and UI polling.
+- Lead scoring now uses LLM-provided score/status from the latest 5 customer messages (assistant messages excluded).
 
 ### Fixed
 - Knowledge Base sidebar file clicks now open the document details view.
@@ -157,6 +177,9 @@
 - AI settings load now falls back quietly unless debug logging is enabled.
 - Flexible fallback now uses only the UI-configured prompt (no hardcoded system append).
 - Localized AI settings copy in Turkish (Yetenek terminology + clearer sensitivity helper text).
+- Inbox conversation avatars now use the shared Avatar component for consistent initials and colors.
+- Lead extraction now parses fenced or noisy JSON outputs so lead snapshots update correctly.
+- Lead extraction now prioritizes customer messages and avoids assistant-only service inference.
 
 ### Fixed
 - TypeScript build errors in Telegram webhook + Simulator history typing and KB router/chunking index guards.

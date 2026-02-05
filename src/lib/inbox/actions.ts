@@ -1,15 +1,26 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import OpenAI from 'openai'
 import { withBotNamePrompt } from '@/lib/ai/prompts'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { matchesCatalog } from '@/lib/leads/catalog'
+import { runLeadExtraction } from '@/lib/leads/extraction'
 import { Conversation, Lead, Message } from '@/types/database'
 
 export type ConversationSummaryResult =
     | { ok: true; summary: string }
     | { ok: false; reason: 'insufficient_data' | 'missing_api_key' | 'request_failed' }
+
+export type LeadScoreReasonResult =
+    | { ok: true; reasoning: string }
+    | { ok: false; reason: 'missing_api_key' | 'missing_lead' | 'request_failed' }
+
+export type LeadRefreshResult =
+    | { ok: true }
+    | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'request_failed' }
 
 export async function getConversations(organizationId: string, page: number = 0, pageSize: number = 20) {
     const supabase = await createClient()
@@ -201,6 +212,183 @@ export async function getConversationSummary(
         return { ok: true, summary }
     } catch (error) {
         console.error('Summary request failed:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+}
+
+export async function getLeadScoreReasoning(
+    conversationId: string,
+    organizationId: string,
+    locale: string = 'tr',
+    statusLabel?: string
+): Promise<LeadScoreReasonResult> {
+    if (!process.env.OPENAI_API_KEY) {
+        return { ok: false, reason: 'missing_api_key' }
+    }
+
+    const supabase = await createClient()
+
+    const [{ data: lead }, { data: profile }, { data: catalog }, { data: suggestions }] = await Promise.all([
+        supabase
+            .from('leads')
+            .select('*')
+            .eq('conversation_id', conversationId)
+            .eq('organization_id', organizationId)
+            .maybeSingle(),
+        supabase
+            .from('offering_profiles')
+            .select('summary, catalog_enabled')
+            .eq('organization_id', organizationId)
+            .maybeSingle(),
+        supabase
+            .from('service_catalog')
+            .select('name, aliases, active')
+            .eq('organization_id', organizationId)
+            .eq('active', true),
+        supabase
+            .from('offering_profile_suggestions')
+            .select('content')
+            .eq('organization_id', organizationId)
+            .eq('status', 'approved')
+            .is('archived_at', null)
+            .is('update_of', null)
+            .order('created_at', { ascending: false })
+            .limit(5)
+    ])
+
+    if (!lead) {
+        return { ok: false, reason: 'missing_lead' }
+    }
+
+    const suggestionText = (suggestions ?? [])
+        .map((item: any) => `- ${item.content}`)
+        .reverse()
+        .join('\n')
+
+    const catalogEnabled = profile?.catalog_enabled ?? true
+    const hasCatalogMatch = catalogEnabled && matchesCatalog(lead.service_type, catalog ?? [])
+    const hasProfileContent = Boolean((profile?.summary ?? '').trim() || suggestionText)
+
+    const extractedFields = (lead.extracted_fields ?? {}) as {
+        desired_date?: string | null
+        location?: string | null
+        budget_signals?: string[]
+        intent_signals?: string[]
+        risk_signals?: string[]
+    }
+
+    const intentSignals = Array.isArray(extractedFields.intent_signals) ? extractedFields.intent_signals : []
+    const budgetSignals = Array.isArray(extractedFields.budget_signals) ? extractedFields.budget_signals : []
+
+    const responseLanguage = locale === 'tr' ? 'Turkish' : 'English'
+
+    try {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+        const systemPrompt = [
+            'You explain why the lead score has its current value.',
+            'The score and status are produced by lead extraction (LLM output).',
+            'Use only the provided extracted data and profile/catalog context.',
+            'Do not infer facts that are not present.',
+            `Respond in ${responseLanguage} with 2-4 short bullet points.`,
+            statusLabel ? 'Use the provided status label verbatim; do not translate or use English status keys.' : 'Avoid English status keys.',
+            'If data is missing, mention that explicitly.'
+        ].join(' ')
+        const userPrompt = `Score payload:\n${JSON.stringify({
+            score: {
+                total: lead.total_score,
+                status_label: statusLabel ?? null,
+                status: lead.status
+            },
+            service_type: lead.service_type,
+            extracted_fields: {
+                desired_date: extractedFields.desired_date ?? null,
+                location: extractedFields.location ?? null,
+                budget_signals: budgetSignals,
+                intent_signals: intentSignals,
+                risk_signals: extractedFields.risk_signals ?? []
+            },
+            profile: {
+                has_catalog_match: hasCatalogMatch,
+                has_profile_content: hasProfileContent
+            }
+        }, null, 2)}`
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.2,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ]
+        })
+
+        const usage = completion.usage
+            ? {
+                inputTokens: completion.usage.prompt_tokens ?? 0,
+                outputTokens: completion.usage.completion_tokens ?? 0,
+                totalTokens: completion.usage.total_tokens ?? (completion.usage.prompt_tokens ?? 0) + (completion.usage.completion_tokens ?? 0)
+            }
+            : {
+                inputTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt),
+                outputTokens: estimateTokenCount(completion.choices[0]?.message?.content ?? ''),
+                totalTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt) + estimateTokenCount(completion.choices[0]?.message?.content ?? '')
+            }
+
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_reasoning',
+            model: 'gpt-4o-mini',
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            totalTokens: usage.totalTokens,
+            metadata: {
+                conversation_id: conversationId
+            },
+            supabase
+        })
+
+        const reasoning = completion.choices[0]?.message?.content?.trim()
+        if (!reasoning) {
+            return { ok: false, reason: 'request_failed' }
+        }
+
+        return { ok: true, reasoning }
+    } catch (error) {
+        console.error('Lead score reasoning failed:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+}
+
+export async function refreshConversationLead(
+    conversationId: string,
+    organizationId: string
+): Promise<LeadRefreshResult> {
+    if (!process.env.OPENAI_API_KEY) {
+        return { ok: false, reason: 'missing_api_key' }
+    }
+
+    const supabase = await createClient()
+
+    const { data: conversation, error } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('id', conversationId)
+        .eq('organization_id', organizationId)
+        .maybeSingle()
+
+    if (error || !conversation) {
+        return { ok: false, reason: 'missing_conversation' }
+    }
+
+    try {
+        await runLeadExtraction({
+            organizationId,
+            conversationId,
+            supabase
+        })
+        return { ok: true }
+    } catch (error) {
+        console.error('Manual lead refresh failed:', error)
         return { ok: false, reason: 'request_failed' }
     }
 }

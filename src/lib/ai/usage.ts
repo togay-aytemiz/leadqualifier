@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 
-export type AiUsageCategory = 'router' | 'rag' | 'fallback' | 'summary' | 'lead_extraction'
+export type AiUsageCategory = 'router' | 'rag' | 'fallback' | 'summary' | 'lead_extraction' | 'lead_reasoning'
 
 export interface AiUsageTotals {
     inputTokens: number
