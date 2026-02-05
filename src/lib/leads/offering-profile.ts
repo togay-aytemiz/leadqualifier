@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { normalizeServiceName, isNewCandidate } from '@/lib/leads/catalog'
+import { parseSuggestionPayload } from '@/lib/leads/offering-profile-utils'
 
 const DEFAULT_SUGGESTION_LOCALE = 'tr'
 
@@ -13,24 +14,20 @@ const SUGGESTION_LANGUAGE_BY_LOCALE: Record<string, string> = {
     en: 'English'
 }
 
-const buildSuggestionSystemPrompt = (language: string) => `You generate AI suggestions for a business offering profile.
-Keep it short, clear, and grounded in the provided content.
+const buildSuggestionSystemPrompt = (language: string) => `You generate a service offering profile suggestion for a business.
+Only use the provided content. Do not give business advice.
 Write the suggestion in ${language}.
-Return JSON: { suggestion: string } only.`
+Format:
+- One short intro sentence.
+- Up to 5 bullet points total. Each bullet starts with a category label.
+Use labels in the same language: "Sunulanlar", "Sunulmayanlar", "Koşullar" (Turkish) or "Offered", "Not offered", "Conditions" (English).
+If existing approved suggestions are provided and new content conflicts or overlaps, set update_index to the 1-based item to update.
+Otherwise, set update_index to null.
+Return JSON: { suggestion: string, update_index: number | null } only.`
 
 const resolveSuggestionLanguage = (locale?: string | null) => {
     const key = locale ?? DEFAULT_SUGGESTION_LOCALE
     return SUGGESTION_LANGUAGE_BY_LOCALE[key] ?? SUGGESTION_LANGUAGE_BY_LOCALE[DEFAULT_SUGGESTION_LOCALE] ?? 'Turkish'
-}
-
-function parseSuggestion(raw: string) {
-    try {
-        const parsed = JSON.parse(raw)
-        const suggestion = (parsed.suggestion ?? '').toString().trim()
-        return suggestion || null
-    } catch {
-        return null
-    }
 }
 
 async function createSuggestion(options: {
@@ -56,7 +53,23 @@ async function createSuggestion(options: {
     const systemPrompt = buildSuggestionSystemPrompt(language)
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const userPrompt = `New content:\n${options.content}`
+    const { data: approvedSuggestions } = await supabase
+        .from('offering_profile_suggestions')
+        .select('id, content')
+        .eq('organization_id', options.organizationId)
+        .eq('status', 'approved')
+        .eq('locale', locale)
+        .is('update_of', null)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+    const approvedList = (approvedSuggestions ?? [])
+        .map((item: any, index: number) => `${index + 1}. ${item.content}`)
+        .join('\n')
+    const approvedBlock = approvedList
+        ? `Existing approved suggestions (use these indices for update_index):\n${approvedList}`
+        : 'Existing approved suggestions: none'
+    const userPrompt = `New content:\n${options.content}\n\n${approvedBlock}`
 
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -70,16 +83,18 @@ async function createSuggestion(options: {
     const response = completion.choices[0]?.message?.content?.trim()
     if (!response) return null
 
-    const suggestion = parseSuggestion(response)
-    if (!suggestion) return null
+    const parsed = parseSuggestionPayload(response)
+    if (!parsed) return null
+    const updateTarget = parsed.updateIndex ? approvedSuggestions?.[parsed.updateIndex - 1] : null
 
     await supabase.from('offering_profile_suggestions').insert({
         organization_id: options.organizationId,
         source_type: options.sourceType,
         source_id: options.sourceId ?? null,
-        content: suggestion,
+        content: parsed.suggestion,
         status: 'pending',
-        locale
+        locale,
+        update_of: updateTarget?.id ?? null
     })
 
     if (completion.usage) {
@@ -108,7 +123,7 @@ async function createSuggestion(options: {
         })
     }
 
-    return suggestion
+    return parsed.suggestion
 }
 
 export async function appendOfferingProfileSuggestion(options: {

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { AiBotMode } from '@/types/database'
@@ -31,6 +31,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     const tNav = useTranslations('nav')
     const tCommon = useTranslations('common')
     const tSidebar = useTranslations('mainSidebar')
+    const currentLocale = useLocale()
 
     const [collapsed, setCollapsed] = useState(false)
     const [hasUnread, setHasUnread] = useState(false)
@@ -60,11 +61,15 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     }, [supabase])
 
     const refreshPendingSuggestions = useCallback(async (orgId: string) => {
-        const query = supabase
+        let query = supabase
             .from('offering_profile_suggestions')
             .select('id', { count: 'exact', head: true })
             .eq('organization_id', orgId)
             .or('status.eq.pending,status.is.null')
+
+        if (currentLocale?.trim()) {
+            query = query.eq('locale', currentLocale)
+        }
 
         const { count, error } = await query
 
@@ -74,7 +79,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         }
 
         setHasPendingSuggestions((count ?? 0) > 0)
-    }, [supabase])
+    }, [currentLocale, supabase])
 
     const fetchBotMode = useCallback(async (orgId: string) => {
         const { data, error } = await supabase
@@ -216,6 +221,13 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         window.addEventListener('ai-settings-updated', handler)
         return () => window.removeEventListener('ai-settings-updated', handler)
     }, [fetchBotMode, organizationId])
+
+    useEffect(() => {
+        if (!organizationId) return
+        const handler = () => refreshPendingSuggestions(organizationId)
+        window.addEventListener('pending-suggestions-updated', handler)
+        return () => window.removeEventListener('pending-suggestions-updated', handler)
+    }, [organizationId, refreshPendingSuggestions])
 
     const sections = useMemo(
         () => [

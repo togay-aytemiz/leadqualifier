@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
@@ -33,6 +34,7 @@ export default function OrganizationSettingsClient({
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
     const locale = useLocale()
+    const router = useRouter()
     const [baseline, setBaseline] = useState({
         name: initialName,
         profileSummary: offeringProfile?.summary ?? '',
@@ -153,6 +155,8 @@ export default function OrganizationSettingsClient({
                 ...item,
                 status: item.status ?? 'pending'
             })))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
+            router.refresh()
         } catch (error) {
             console.error(error)
         }
@@ -168,6 +172,8 @@ export default function OrganizationSettingsClient({
                 ...item,
                 status: item.status ?? 'pending'
             })))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
+            router.refresh()
             return generated
         } catch (error) {
             console.error(error)

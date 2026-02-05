@@ -149,7 +149,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Extraction runs asynchronously on every new customer message (conversation snapshot update).
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
-- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions start pending, require admin approval, and only approved suggestions are used for extraction (manual text is never overwritten). Generation always follows the active UI locale (no dual-language generation).
+- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + up to 5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Generation always follows the active UI locale (no dual-language generation).
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
@@ -291,10 +291,12 @@ MVP is successful when:
 - **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
 - **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and require admin approval before the service can be used in extraction.
-- **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; AI suggestions are generated from Skills/KB in org language, start pending, and only approved suggestions are used for extraction.
+- **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; AI suggestions are generated from Skills/KB in org language using a hybrid format (intro + up to 5 bullets), start pending, can propose updates to existing approved suggestions, and only approved suggestions are used for extraction.
+- **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
+- **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

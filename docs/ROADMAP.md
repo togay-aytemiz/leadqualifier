@@ -182,6 +182,10 @@
   - [x] AI suggestions default enabled while respecting opt-out (no generation when off)
   - [x] Suggestion generation follows active UI locale (single-language)
   - [x] AI suggestion status can be toggled between approved/rejected
+  - [x] Turkish UI terminology uses "Kişi" instead of "Lead"
+  - [x] Suggestion tabs can be viewed even when empty
+  - [x] Pending indicators refresh after review actions
+  - [x] Hybrid AI suggestions (intro + up to 5 bullets) with update proposals for conflicting content
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
   - [x] Admin approval workflow

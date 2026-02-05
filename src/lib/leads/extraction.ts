@@ -67,6 +67,7 @@ export async function runLeadExtraction(options: {
             .select('content')
             .eq('organization_id', options.organizationId)
             .eq('status', 'approved')
+            .is('update_of', null)
             .order('created_at', { ascending: false })
             .limit(5)
     ])

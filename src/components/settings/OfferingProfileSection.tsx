@@ -9,7 +9,7 @@ import { CheckCircle2, Clock, XCircle } from 'lucide-react'
 interface OfferingProfileSectionProps {
     summary: string
     aiSuggestionsEnabled: boolean
-    suggestions: Array<{ id: string; content: string; created_at: string; status?: 'pending' | 'approved' | 'rejected' }>
+    suggestions: Array<{ id: string; content: string; created_at: string; status?: 'pending' | 'approved' | 'rejected'; update_of?: string | null }>
     onSummaryChange: (value: string) => void
     onAiSuggestionsEnabledChange: (value: boolean) => void
     onReviewSuggestion: (suggestionId: string, status: 'approved' | 'rejected') => Promise<void> | void
@@ -59,26 +59,13 @@ export function OfferingProfileSection({
     const grouped = useMemo(() => {
         return {
             pending: normalizedSuggestions.filter(item => item.status === 'pending'),
-            approved: normalizedSuggestions.filter(item => item.status === 'approved'),
-            rejected: normalizedSuggestions.filter(item => item.status === 'rejected')
+            approved: normalizedSuggestions.filter(item => item.status === 'approved' && !item.update_of),
+            rejected: normalizedSuggestions.filter(item => item.status === 'rejected' && !item.update_of)
         }
     }, [normalizedSuggestions])
 
     useEffect(() => {
-        if (!hasSetInitialTab) {
-            if (grouped.pending.length > 0) {
-                setActiveTab('pending')
-            } else if (grouped.approved.length > 0) {
-                setActiveTab('approved')
-            } else if (grouped.rejected.length > 0) {
-                setActiveTab('rejected')
-            }
-            setHasSetInitialTab(true)
-            return
-        }
-
-        if (grouped[activeTab].length > 0) return
-
+        if (hasSetInitialTab) return
         if (grouped.pending.length > 0) {
             setActiveTab('pending')
         } else if (grouped.approved.length > 0) {
@@ -86,7 +73,8 @@ export function OfferingProfileSection({
         } else if (grouped.rejected.length > 0) {
             setActiveTab('rejected')
         }
-    }, [activeTab, grouped, hasSetInitialTab])
+        setHasSetInitialTab(true)
+    }, [grouped, hasSetInitialTab])
 
     const dateFormatter = useMemo(() => {
         return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
@@ -182,7 +170,7 @@ export function OfferingProfileSection({
                 <p className="text-xs text-gray-500">{t('offeringProfileAiToggleHelp')}</p>
 
                 {aiSuggestionsEnabled && (
-                    <div className="border-t border-gray-200/60 pt-4">
+                    <div className="border-t border-gray-200/40 pt-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-gray-900">{t('offeringProfileSuggestionsTitle')}</p>
@@ -243,7 +231,14 @@ export function OfferingProfileSection({
                             {visibleItems.map((item) => (
                                 <div key={item.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                                     <div className="flex items-start justify-between gap-3">
-                                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.content}</p>
+                                        <div className="space-y-2">
+                                            {item.update_of && (
+                                                <Badge variant="info">
+                                                    <span className="text-xs">{t('offeringProfileSuggestionUpdateBadge')}</span>
+                                                </Badge>
+                                            )}
+                                            <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.content}</p>
+                                        </div>
                                         {item.status === 'pending' && (
                                             <div className="flex gap-2 shrink-0">
                                                 <Button

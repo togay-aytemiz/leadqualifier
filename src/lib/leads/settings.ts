@@ -13,13 +13,17 @@ export async function getOfferingProfile(organizationId: string) {
     return data
 }
 
-export async function getOfferingProfileSuggestions(organizationId: string, _locale?: string) {
+export async function getOfferingProfileSuggestions(organizationId: string, locale?: string) {
     const supabase = await createClient()
     let query = supabase
         .from('offering_profile_suggestions')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
+
+    if (locale?.trim()) {
+        query = query.eq('locale', locale)
+    }
 
     const { data } = await query
     return data ?? []
@@ -87,24 +91,50 @@ export async function updateOfferingProfileSuggestionStatus(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
+    const { data: suggestion } = await supabase
+        .from('offering_profile_suggestions')
+        .select('id, content, update_of')
+        .eq('organization_id', organizationId)
+        .eq('id', suggestionId)
+        .maybeSingle()
+
+    const reviewedAt = new Date().toISOString()
+
+    if (status === 'approved' && suggestion?.update_of) {
+        await supabase
+            .from('offering_profile_suggestions')
+            .update({
+                content: suggestion.content,
+                status: 'approved',
+                reviewed_at: reviewedAt,
+                reviewed_by: user.id
+            })
+            .eq('organization_id', organizationId)
+            .eq('id', suggestion.update_of)
+    }
+
     await supabase
         .from('offering_profile_suggestions')
         .update({
             status,
-            reviewed_at: new Date().toISOString(),
+            reviewed_at: reviewedAt,
             reviewed_by: user.id
         })
         .eq('organization_id', organizationId)
         .eq('id', suggestionId)
 }
 
-export async function getPendingOfferingProfileSuggestionCount(organizationId: string, _locale?: string) {
+export async function getPendingOfferingProfileSuggestionCount(organizationId: string, locale?: string) {
     const supabase = await createClient()
-    const query = supabase
+    let query = supabase
         .from('offering_profile_suggestions')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .or('status.eq.pending,status.is.null')
+
+    if (locale?.trim()) {
+        query = query.eq('locale', locale)
+    }
 
     const { count } = await query
     return count ?? 0

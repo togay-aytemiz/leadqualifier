@@ -151,6 +151,7 @@ export interface OfferingProfileSuggestion {
     content: string
     status: ServiceCandidateStatus
     locale: string | null
+    update_of: string | null
     created_at: string
     reviewed_at: string | null
     reviewed_by: string | null

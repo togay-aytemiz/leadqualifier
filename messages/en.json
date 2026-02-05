@@ -427,6 +427,7 @@
         "offeringProfileSuggestionsGenerateEmpty": "No new suggestions generated. Check your Skills or Knowledge Base content.",
         "offeringProfileSuggestionApprove": "Approve",
         "offeringProfileSuggestionReject": "Reject",
+        "offeringProfileSuggestionUpdateBadge": "Update suggestion",
         "offeringProfileSuggestionsEmptyPendingTitle": "No pending suggestions",
         "offeringProfileSuggestionsEmptyPendingDesc": "New suggestions will appear here for review.",
         "offeringProfileSuggestionsEmptyApprovedTitle": "No approved suggestions",
