@@ -150,6 +150,7 @@ export interface OfferingProfileSuggestion {
     source_id: string | null
     content: string
     status: ServiceCandidateStatus
+    locale: string | null
     created_at: string
     reviewed_at: string | null
     reviewed_by: string | null

@@ -37,7 +37,7 @@ export default async function AiSettingsPage() {
 
     const [aiSettings, pendingCount] = await Promise.all([
         getOrgAiSettings(organizationId, { supabase }),
-        getPendingOfferingProfileSuggestionCount(organizationId)
+        getPendingOfferingProfileSuggestionCount(organizationId, locale)
     ])
 
     return (

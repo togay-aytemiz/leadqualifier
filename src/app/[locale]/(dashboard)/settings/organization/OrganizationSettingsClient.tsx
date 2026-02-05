@@ -7,7 +7,13 @@ import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
-import { getOfferingProfileSuggestions, updateOfferingProfileSummary, updateOfferingProfileSuggestionStatus } from '@/lib/leads/settings'
+import {
+    generateOfferingProfileSuggestions,
+    getOfferingProfileSuggestions,
+    updateOfferingProfileSummary,
+    updateOfferingProfileLocaleForUser,
+    updateOfferingProfileSuggestionStatus
+} from '@/lib/leads/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 
@@ -35,10 +41,15 @@ export default function OrganizationSettingsClient({
     const [name, setName] = useState(initialName)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
     const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
-    const [suggestions, setSuggestions] = useState(initialSuggestions)
+    const [suggestions, setSuggestions] = useState(() => initialSuggestions.map((item) => ({
+        ...item,
+        status: item.status ?? 'pending'
+    })))
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
+    const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
+    const [localeSynced, setLocaleSynced] = useState(false)
 
     const isDirty = useMemo(() => {
         return (
@@ -56,11 +67,37 @@ export default function OrganizationSettingsClient({
             profileSummary: offeringProfile?.summary ?? '',
             aiSuggestionsEnabled: offeringProfile?.ai_suggestions_enabled ?? false
         }))
+        setLocaleSynced(false)
     }, [offeringProfile])
 
     useEffect(() => {
-        setSuggestions(initialSuggestions)
+        setSuggestions(initialSuggestions.map((item) => ({
+            ...item,
+            status: item.status ?? 'pending'
+        })))
     }, [initialSuggestions])
+
+    useEffect(() => {
+        if (!offeringProfile || localeSynced) return
+        if (offeringProfile.ai_suggestions_locale === locale) {
+            setLocaleSynced(true)
+            return
+        }
+        updateOfferingProfileLocaleForUser(locale)
+            .then(async () => {
+                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+                setSuggestions(refreshedSuggestions.map((item) => ({
+                    ...item,
+                    status: item.status ?? 'pending'
+                })))
+            })
+            .catch((error) => {
+                console.error('Failed to sync offering profile locale', error)
+            })
+            .finally(() => {
+                setLocaleSynced(true)
+            })
+    }, [locale, localeSynced, offeringProfile, organizationId])
 
     useEffect(() => {
         if (isDirty) {
@@ -90,8 +127,11 @@ export default function OrganizationSettingsClient({
                 aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
             ) {
                 await updateOfferingProfileSummary(organizationId, profileSummary, aiSuggestionsEnabled, locale)
-                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId)
-                setSuggestions(refreshedSuggestions)
+                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+                setSuggestions(refreshedSuggestions.map((item) => ({
+                    ...item,
+                    status: item.status ?? 'pending'
+                })))
             }
             setBaseline({ name, profileSummary, aiSuggestionsEnabled })
             setSaved(true)
@@ -108,10 +148,32 @@ export default function OrganizationSettingsClient({
     const handleReviewSuggestion = async (suggestionId: string, status: 'approved' | 'rejected') => {
         try {
             await updateOfferingProfileSuggestionStatus(organizationId, suggestionId, status)
-            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId)
-            setSuggestions(refreshedSuggestions)
+            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+            setSuggestions(refreshedSuggestions.map((item) => ({
+                ...item,
+                status: item.status ?? 'pending'
+            })))
         } catch (error) {
             console.error(error)
+        }
+    }
+
+    const handleGenerateSuggestions = async () => {
+        if (isGeneratingSuggestions) return false
+        setIsGeneratingSuggestions(true)
+        try {
+            const generated = await generateOfferingProfileSuggestions(organizationId)
+            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+            setSuggestions(refreshedSuggestions.map((item) => ({
+                ...item,
+                status: item.status ?? 'pending'
+            })))
+            return generated
+        } catch (error) {
+            console.error(error)
+            return false
+        } finally {
+            setIsGeneratingSuggestions(false)
         }
     }
 
@@ -171,6 +233,8 @@ export default function OrganizationSettingsClient({
                         onSummaryChange={setProfileSummary}
                         onAiSuggestionsEnabledChange={setAiSuggestionsEnabled}
                         onReviewSuggestion={handleReviewSuggestion}
+                        onGenerateSuggestions={handleGenerateSuggestions}
+                        isGeneratingSuggestions={isGeneratingSuggestions}
                     />
                 </div>
             </div>

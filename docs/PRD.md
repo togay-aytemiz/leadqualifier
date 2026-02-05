@@ -149,7 +149,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Extraction runs asynchronously on every new customer message (conversation snapshot update).
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
-- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions start pending, require admin approval, and only approved suggestions are used for extraction (manual text is never overwritten).
+- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions start pending, require admin approval, and only approved suggestions are used for extraction (manual text is never overwritten). Generation always follows the active UI locale (no dual-language generation).
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---

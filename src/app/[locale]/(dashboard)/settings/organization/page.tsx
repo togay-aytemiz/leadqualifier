@@ -41,10 +41,10 @@ export default async function OrganizationSettingsPage() {
             .eq('id', organizationId)
             .single(),
         getOfferingProfile(organizationId),
-        getOfferingProfileSuggestions(organizationId)
+        getOfferingProfileSuggestions(organizationId, locale)
     ])
 
-    const pendingCount = offeringProfileSuggestions.filter((item) => item.status === 'pending').length
+    const pendingCount = offeringProfileSuggestions.filter((item) => (item.status ?? 'pending') === 'pending').length
 
     return (
         <>

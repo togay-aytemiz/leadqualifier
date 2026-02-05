@@ -34,6 +34,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
 
     const [collapsed, setCollapsed] = useState(false)
     const [hasUnread, setHasUnread] = useState(false)
+    const [hasPendingSuggestions, setHasPendingSuggestions] = useState(false)
     const [organizationId, setOrganizationId] = useState<string | null>(null)
     const [botMode, setBotMode] = useState<AiBotMode>('active')
 
@@ -56,6 +57,23 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         }
 
         setHasUnread((count ?? 0) > 0)
+    }, [supabase])
+
+    const refreshPendingSuggestions = useCallback(async (orgId: string) => {
+        const query = supabase
+            .from('offering_profile_suggestions')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', orgId)
+            .or('status.eq.pending,status.is.null')
+
+        const { count, error } = await query
+
+        if (error) {
+            console.error('Failed to load pending suggestion indicator', error)
+            return
+        }
+
+        setHasPendingSuggestions((count ?? 0) > 0)
     }, [supabase])
 
     const fetchBotMode = useCallback(async (orgId: string) => {
@@ -132,6 +150,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
             setOrganizationId(orgId)
             await refreshUnread(orgId)
             await fetchBotMode(orgId)
+            await refreshPendingSuggestions(orgId)
         }
 
         loadOrganization()
@@ -139,11 +158,12 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         return () => {
             isMounted = false
         }
-    }, [fetchBotMode, refreshUnread, supabase])
+    }, [fetchBotMode, refreshPendingSuggestions, refreshUnread, supabase])
 
     useEffect(() => {
         if (!organizationId) return
-        let channel: ReturnType<typeof supabase.channel> | null = null
+        let unreadChannel: ReturnType<typeof supabase.channel> | null = null
+        let suggestionChannel: ReturnType<typeof supabase.channel> | null = null
         let isMounted = true
 
         const setupRealtime = async () => {
@@ -154,7 +174,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                 supabase.realtime.setAuth(session.access_token)
             }
 
-            channel = supabase.channel(`sidebar_unread_${organizationId}`)
+            unreadChannel = supabase.channel(`sidebar_unread_${organizationId}`)
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
@@ -164,17 +184,31 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                     refreshUnread(organizationId)
                 })
                 .subscribe()
+
+            suggestionChannel = supabase.channel(`sidebar_suggestions_${organizationId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'offering_profile_suggestions',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    refreshPendingSuggestions(organizationId)
+                })
+                .subscribe()
         }
 
         setupRealtime()
 
         return () => {
             isMounted = false
-            if (channel) {
-                supabase.removeChannel(channel)
+            if (unreadChannel) {
+                supabase.removeChannel(unreadChannel)
+            }
+            if (suggestionChannel) {
+                supabase.removeChannel(suggestionChannel)
             }
         }
-    }, [organizationId, refreshUnread, supabase])
+    }, [organizationId, refreshPendingSuggestions, refreshUnread, supabase])
 
     useEffect(() => {
         if (!organizationId) return
@@ -389,6 +423,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                                 {section.items.map(item => {
                                     const isActive = pathWithoutLocale.startsWith('/settings')
                                     const Icon = item.icon
+                                    const showPending = item.id === 'settings' && hasPendingSuggestions
                                     return (
                                         <Link
                                             key={item.id}
@@ -406,13 +441,18 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                                                     : 'text-slate-600 hover:bg-white hover:text-slate-900'
                                             )}
                                         >
-                                            <Icon
-                                                size={18}
-                                                className={cn(
-                                                    'shrink-0',
-                                                    isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                            <span className="relative flex items-center">
+                                                <Icon
+                                                    size={18}
+                                                    className={cn(
+                                                        'shrink-0',
+                                                        isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                                    )}
+                                                />
+                                                {showPending && collapsed && (
+                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-slate-50" />
                                                 )}
-                                            />
+                                            </span>
                                             <span
                                                 className={cn(
                                                     'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
@@ -423,6 +463,14 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                                             >
                                                 {item.label}
                                             </span>
+                                            {showPending && !collapsed && (
+                                                <span
+                                                    className={cn(
+                                                        'ml-auto h-2 w-2 rounded-full ring-2',
+                                                        isActive ? 'bg-white ring-blue-200' : 'bg-blue-500 ring-white'
+                                                    )}
+                                                />
+                                            )}
                                         </Link>
                                     )
                                 })}

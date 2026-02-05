@@ -9,10 +9,12 @@ import { CheckCircle2, Clock, XCircle } from 'lucide-react'
 interface OfferingProfileSectionProps {
     summary: string
     aiSuggestionsEnabled: boolean
-    suggestions: Array<{ id: string; content: string; created_at: string; status: 'pending' | 'approved' | 'rejected' }>
+    suggestions: Array<{ id: string; content: string; created_at: string; status?: 'pending' | 'approved' | 'rejected' }>
     onSummaryChange: (value: string) => void
     onAiSuggestionsEnabledChange: (value: boolean) => void
     onReviewSuggestion: (suggestionId: string, status: 'approved' | 'rejected') => Promise<void> | void
+    onGenerateSuggestions?: () => Promise<boolean> | boolean
+    isGeneratingSuggestions?: boolean
 }
 
 export function OfferingProfileSection({
@@ -21,7 +23,9 @@ export function OfferingProfileSection({
     suggestions,
     onSummaryChange,
     onAiSuggestionsEnabledChange,
-    onReviewSuggestion
+    onReviewSuggestion,
+    onGenerateSuggestions,
+    isGeneratingSuggestions = false
 }: OfferingProfileSectionProps) {
     const t = useTranslations('organizationSettings')
     const locale = useLocale()
@@ -35,6 +39,7 @@ export function OfferingProfileSection({
         rejected: 3
     })
     const [reviewingId, setReviewingId] = useState<string | null>(null)
+    const [generationFeedback, setGenerationFeedback] = useState<string | null>(null)
 
     useEffect(() => {
         setSummary(initialSummary)
@@ -44,13 +49,20 @@ export function OfferingProfileSection({
         setAiSuggestionsEnabled(initialAiSuggestionsEnabled)
     }, [initialAiSuggestionsEnabled])
 
+    const normalizedSuggestions = useMemo(() => {
+        return suggestions.map((item) => ({
+            ...item,
+            status: item.status ?? 'pending'
+        }))
+    }, [suggestions])
+
     const grouped = useMemo(() => {
         return {
-            pending: suggestions.filter(item => item.status === 'pending'),
-            approved: suggestions.filter(item => item.status === 'approved'),
-            rejected: suggestions.filter(item => item.status === 'rejected')
+            pending: normalizedSuggestions.filter(item => item.status === 'pending'),
+            approved: normalizedSuggestions.filter(item => item.status === 'approved'),
+            rejected: normalizedSuggestions.filter(item => item.status === 'rejected')
         }
-    }, [suggestions])
+    }, [normalizedSuggestions])
 
     useEffect(() => {
         if (!hasSetInitialTab) {
@@ -90,6 +102,7 @@ export function OfferingProfileSection({
     const visibleCount = visibleCounts[activeTab]
     const visibleItems = activeItems.slice(0, visibleCount)
     const hasMore = activeItems.length > visibleCount
+    const totalSuggestions = grouped.pending.length + grouped.approved.length + grouped.rejected.length
 
     const handleShowMore = () => {
         setVisibleCounts(prev => ({
@@ -104,6 +117,19 @@ export function OfferingProfileSection({
             await onReviewSuggestion(id, status)
         } finally {
             setReviewingId(null)
+        }
+    }
+
+    const handleGenerate = async () => {
+        if (!onGenerateSuggestions) return
+        setGenerationFeedback(null)
+        try {
+            const result = await onGenerateSuggestions()
+            if (!result) {
+                setGenerationFeedback(t('offeringProfileSuggestionsGenerateEmpty'))
+            }
+        } catch {
+            setGenerationFeedback(t('offeringProfileSuggestionsGenerateEmpty'))
         }
     }
 
@@ -155,7 +181,8 @@ export function OfferingProfileSection({
                 </label>
                 <p className="text-xs text-gray-500">{t('offeringProfileAiToggleHelp')}</p>
 
-                <div className="border-t pt-4">
+                {aiSuggestionsEnabled && (
+                    <div className="border-t border-gray-200/60 pt-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-gray-900">{t('offeringProfileSuggestionsTitle')}</p>
@@ -194,6 +221,22 @@ export function OfferingProfileSection({
                             </div>
                             <h3 className="text-sm font-bold text-gray-900 mb-1">{emptyState.title}</h3>
                             <p className="text-gray-500 text-xs max-w-[260px]">{emptyState.description}</p>
+                            {totalSuggestions === 0 && onGenerateSuggestions && (
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="mt-4"
+                                    onClick={handleGenerate}
+                                    disabled={isGeneratingSuggestions}
+                                >
+                                    {isGeneratingSuggestions
+                                        ? t('offeringProfileSuggestionsGenerating')
+                                        : t('offeringProfileSuggestionsGenerate')}
+                                </Button>
+                            )}
+                            {generationFeedback && (
+                                <p className="mt-3 text-xs text-gray-500">{generationFeedback}</p>
+                            )}
                         </div>
                     ) : (
                         <div className="mt-4 space-y-3">
@@ -221,6 +264,30 @@ export function OfferingProfileSection({
                                                 </Button>
                                             </div>
                                         )}
+                                        {item.status === 'approved' && (
+                                            <div className="flex gap-2 shrink-0">
+                                                <Button
+                                                    size="sm"
+                                                    variant="danger"
+                                                    onClick={() => handleReview(item.id, 'rejected')}
+                                                    disabled={reviewingId === item.id}
+                                                >
+                                                    {t('offeringProfileSuggestionReject')}
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {item.status === 'rejected' && (
+                                            <div className="flex gap-2 shrink-0">
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={() => handleReview(item.id, 'approved')}
+                                                    disabled={reviewingId === item.id}
+                                                >
+                                                    {t('offeringProfileSuggestionApprove')}
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                     <p className="mt-2 text-xs text-gray-500">
                                         {dateFormatter.format(new Date(item.created_at))}
@@ -240,6 +307,7 @@ export function OfferingProfileSection({
                         </div>
                     )}
                 </div>
+                )}
             </div>
         </SettingsSection>
     )

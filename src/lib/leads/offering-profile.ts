@@ -51,7 +51,8 @@ async function createSuggestion(options: {
 
     if (!process.env.OPENAI_API_KEY) return null
 
-    const language = resolveSuggestionLanguage(profile?.ai_suggestions_locale)
+    const locale = profile?.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
+    const language = resolveSuggestionLanguage(locale)
     const systemPrompt = buildSuggestionSystemPrompt(language)
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -77,7 +78,8 @@ async function createSuggestion(options: {
         source_type: options.sourceType,
         source_id: options.sourceId ?? null,
         content: suggestion,
-        status: 'pending'
+        status: 'pending',
+        locale
     })
 
     if (completion.usage) {
@@ -127,24 +129,29 @@ export async function appendOfferingProfileSuggestion(options: {
 
 export async function generateInitialOfferingSuggestion(options: {
     organizationId: string
+    skipExistingCheck?: boolean
     supabase?: any
 }) {
     const supabase = options.supabase ?? await createClient()
     const { data: profile } = await supabase
         .from('offering_profiles')
-        .select('ai_suggestions_enabled')
+        .select('ai_suggestions_enabled, ai_suggestions_locale')
         .eq('organization_id', options.organizationId)
         .maybeSingle()
 
     if (!profile?.ai_suggestions_enabled) return null
 
-    const { data: existing } = await supabase
-        .from('offering_profile_suggestions')
-        .select('id')
-        .eq('organization_id', options.organizationId)
-        .limit(1)
+    if (!options.skipExistingCheck) {
+        const locale = profile?.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
+        const { data: existing } = await supabase
+            .from('offering_profile_suggestions')
+            .select('id')
+            .eq('organization_id', options.organizationId)
+            .eq('locale', locale)
+            .limit(1)
 
-    if (existing && existing.length > 0) return null
+        if (existing && existing.length > 0) return null
+    }
 
     const [skillsResult, docsResult] = await Promise.all([
         supabase

@@ -13,13 +13,15 @@ export async function getOfferingProfile(organizationId: string) {
     return data
 }
 
-export async function getOfferingProfileSuggestions(organizationId: string) {
+export async function getOfferingProfileSuggestions(organizationId: string, _locale?: string) {
     const supabase = await createClient()
-    const { data } = await supabase
+    let query = supabase
         .from('offering_profile_suggestions')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
+
+    const { data } = await query
     return data ?? []
 }
 
@@ -38,6 +40,20 @@ export async function updateOfferingProfileSummary(
     if (aiSuggestionsEnabled) {
         await generateInitialOfferingSuggestion({ organizationId, supabase })
     }
+}
+
+export async function generateOfferingProfileSuggestions(organizationId: string) {
+    const supabase = await createClient()
+    const { data: profile } = await supabase
+        .from('offering_profiles')
+        .select('ai_suggestions_enabled')
+        .eq('organization_id', organizationId)
+        .maybeSingle()
+
+    if (!profile?.ai_suggestions_enabled) return false
+
+    const suggestion = await generateInitialOfferingSuggestion({ organizationId, supabase, skipExistingCheck: true })
+    return Boolean(suggestion)
 }
 
 export async function updateOfferingProfileLocaleForUser(locale: string) {
@@ -82,14 +98,15 @@ export async function updateOfferingProfileSuggestionStatus(
         .eq('id', suggestionId)
 }
 
-export async function getPendingOfferingProfileSuggestionCount(organizationId: string) {
+export async function getPendingOfferingProfileSuggestionCount(organizationId: string, _locale?: string) {
     const supabase = await createClient()
-    const { count } = await supabase
+    const query = supabase
         .from('offering_profile_suggestions')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
-        .eq('status', 'pending')
+        .or('status.eq.pending,status.is.null')
 
+    const { count } = await query
     return count ?? 0
 }
 

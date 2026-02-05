@@ -38,7 +38,7 @@ export default async function BillingSettingsPage() {
 
     const [usage, pendingCount] = await Promise.all([
         getOrgAiUsageSummary(organizationId, { supabase }),
-        getPendingOfferingProfileSuggestionCount(organizationId)
+        getPendingOfferingProfileSuggestionCount(organizationId, locale)
     ])
     const formatNumber = new Intl.NumberFormat(locale)
     const [year, month] = usage.month.split('-').map(Number)

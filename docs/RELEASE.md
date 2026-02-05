@@ -8,8 +8,13 @@
 
 ### Added
 - Offering Profile AI suggestions review workflow (pending/approved/rejected tabs, accept/reject actions, empty states, and show-more).
+- Offering Profile AI suggestions manual generate action (shown when no suggestions exist).
 - Pending AI suggestion indicators in settings sidebar and organization profile section.
+- Main sidebar Settings indicator for pending AI suggestions.
 - Locale-aware AI suggestion generation and localized timestamps in settings.
+- Offering Profile AI suggestions now default to enabled for new orgs.
+- AI suggestion generation now follows the active UI locale (no dual-language generation).
+- AI suggestions can be moved between approved and rejected states.
 - Lead extraction schema (offering profile, service catalog, candidates, leads).
 - Lead extraction worker wired to Telegram webhook with token usage logging.
 - Offering Profile settings UI with pending profile updates and service candidate approvals.

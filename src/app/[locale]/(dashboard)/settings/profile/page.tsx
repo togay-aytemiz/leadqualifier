@@ -31,7 +31,7 @@ export default async function ProfileSettingsPage() {
     const initialName = profile?.full_name ?? ''
     const email = profile?.email ?? user.email ?? ''
     const pendingCount = membership?.organization_id
-        ? await getPendingOfferingProfileSuggestionCount(membership.organization_id)
+        ? await getPendingOfferingProfileSuggestionCount(membership.organization_id, locale)
         : 0
 
     return (

@@ -39,7 +39,7 @@ export default async function ChannelsPage() {
 
     const [channels, pendingCount] = await Promise.all([
         getChannels(organizationId),
-        getPendingOfferingProfileSuggestionCount(organizationId)
+        getPendingOfferingProfileSuggestionCount(organizationId, locale)
     ])
     const totalChannels = 2
     const connectedChannels = (channels || []).filter(channel => channel.status === 'active').length

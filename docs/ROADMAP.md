@@ -177,6 +177,11 @@
   - [x] Approved-only AI suggestions used in lead extraction
   - [x] Locale-aware AI suggestions + localized timestamps
   - [x] Pending suggestion indicators in settings (sidebar + section)
+  - [x] AI suggestions panel toggles with manual generate when empty
+  - [x] Main sidebar settings indicator reflects pending AI suggestions
+  - [x] AI suggestions default enabled while respecting opt-out (no generation when off)
+  - [x] Suggestion generation follows active UI locale (single-language)
+  - [x] AI suggestion status can be toggled between approved/rejected
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
   - [x] Admin approval workflow
