@@ -16,6 +16,9 @@ const SUGGESTION_LANGUAGE_BY_LOCALE: Record<string, string> = {
 
 const buildSuggestionSystemPrompt = (language: string) => `You generate a service offering profile suggestion for a business.
 Only use the provided content. Do not give business advice.
+Use the offering profile summary plus approved/rejected suggestions as context.
+Treat approved suggestions as confirmed scope.
+Avoid repeating rejected suggestions unless new content explicitly changes the scope.
 Write the suggestion in ${language}.
 Format:
 - One short intro sentence.
@@ -40,7 +43,7 @@ async function createSuggestion(options: {
     const supabase = options.supabase ?? await createClient()
     const { data: profile } = await supabase
         .from('offering_profiles')
-        .select('ai_suggestions_enabled, ai_suggestions_locale')
+        .select('summary, ai_suggestions_enabled, ai_suggestions_locale')
         .eq('organization_id', options.organizationId)
         .maybeSingle()
 
@@ -63,13 +66,33 @@ async function createSuggestion(options: {
         .order('created_at', { ascending: false })
         .limit(5)
 
+    const { data: rejectedSuggestions } = await supabase
+        .from('offering_profile_suggestions')
+        .select('content')
+        .eq('organization_id', options.organizationId)
+        .eq('status', 'rejected')
+        .eq('locale', locale)
+        .is('update_of', null)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
     const approvedList = (approvedSuggestions ?? [])
         .map((item: any, index: number) => `${index + 1}. ${item.content}`)
         .join('\n')
     const approvedBlock = approvedList
         ? `Existing approved suggestions (use these indices for update_index):\n${approvedList}`
         : 'Existing approved suggestions: none'
-    const userPrompt = `New content:\n${options.content}\n\n${approvedBlock}`
+    const rejectedList = (rejectedSuggestions ?? [])
+        .map((item: any) => `- ${item.content}`)
+        .join('\n')
+    const rejectedBlock = rejectedList
+        ? `Rejected suggestions (avoid repeating these unless the new content explicitly changes scope):\n${rejectedList}`
+        : 'Rejected suggestions: none'
+    const summaryText = (profile?.summary ?? '').trim()
+    const summaryBlock = summaryText
+        ? `Offering profile summary:\n${summaryText}`
+        : 'Offering profile summary: none'
+    const userPrompt = `New content:\n${options.content}\n\n${summaryBlock}\n\n${approvedBlock}\n\n${rejectedBlock}`
 
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',

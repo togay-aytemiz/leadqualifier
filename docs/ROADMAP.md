@@ -186,6 +186,7 @@
   - [x] Suggestion tabs can be viewed even when empty
   - [x] Pending indicators refresh after review actions
   - [x] Hybrid AI suggestions (intro + up to 5 bullets) with update proposals for conflicting content
+  - [x] Suggestion generation uses manual summary plus approved/rejected history for context
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
   - [x] Admin approval workflow

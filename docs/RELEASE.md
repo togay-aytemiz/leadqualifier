@@ -10,6 +10,7 @@
 - Offering Profile AI suggestions review workflow (pending/approved/rejected tabs, accept/reject actions, empty states, and show-more).
 - Offering Profile AI suggestions manual generate action (shown when no suggestions exist).
 - Offering Profile AI suggestions now use a hybrid format (intro + up to 5 bullets) and support update proposals for conflicting content.
+- Offering Profile AI suggestions now consider manual summary plus approved/rejected history for better alignment.
 - Pending AI suggestion indicators in settings sidebar and organization profile section.
 - Main sidebar Settings indicator for pending AI suggestions.
 - Locale-aware AI suggestion generation and localized timestamps in settings.
