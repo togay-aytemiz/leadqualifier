@@ -19,6 +19,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const [baseline, setBaseline] = useState(initialSettings)
     const [botName, setBotName] = useState(initialSettings.bot_name)
     const [botMode, setBotMode] = useState(initialSettings.bot_mode)
+    const [allowLeadExtractionDuringOperator, setAllowLeadExtractionDuringOperator] = useState(
+        initialSettings.allow_lead_extraction_during_operator
+    )
     const [matchThreshold, setMatchThreshold] = useState(initialSettings.match_threshold)
     const [prompt, setPrompt] = useState(initialSettings.prompt)
     const [isSaving, setIsSaving] = useState(false)
@@ -29,10 +32,11 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
         return (
             botName !== baseline.bot_name ||
             botMode !== baseline.bot_mode ||
+            allowLeadExtractionDuringOperator !== baseline.allow_lead_extraction_during_operator ||
             matchThreshold !== baseline.match_threshold ||
             prompt !== baseline.prompt
         )
-    }, [botName, botMode, matchThreshold, prompt, baseline])
+    }, [botName, botMode, allowLeadExtractionDuringOperator, matchThreshold, prompt, baseline])
 
     useEffect(() => {
         if (isDirty) {
@@ -57,12 +61,14 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                 mode: 'flexible',
                 bot_name: botName,
                 bot_mode: botMode,
+                allow_lead_extraction_during_operator: allowLeadExtractionDuringOperator,
                 match_threshold: matchThreshold,
                 prompt
             })
             setBaseline(savedSettings)
             setBotName(savedSettings.bot_name)
             setBotMode(savedSettings.bot_mode)
+            setAllowLeadExtractionDuringOperator(savedSettings.allow_lead_extraction_during_operator)
             setMatchThreshold(savedSettings.match_threshold)
             setPrompt(savedSettings.prompt)
             setSaved(true)
@@ -82,6 +88,7 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const handleDiscard = () => {
         setBotName(baseline.bot_name)
         setBotMode(baseline.bot_mode)
+        setAllowLeadExtractionDuringOperator(baseline.allow_lead_extraction_during_operator)
         setMatchThreshold(baseline.match_threshold)
         setPrompt(baseline.prompt)
         setSaved(false)
@@ -117,10 +124,12 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                 <AiSettingsForm
                     botName={botName}
                     botMode={botMode}
+                    allowLeadExtractionDuringOperator={allowLeadExtractionDuringOperator}
                     matchThreshold={matchThreshold}
                     prompt={prompt}
                     onBotNameChange={setBotName}
                     onBotModeChange={setBotMode}
+                    onAllowLeadExtractionDuringOperatorChange={setAllowLeadExtractionDuringOperator}
                     onMatchThresholdChange={setMatchThreshold}
                     onPromptChange={setPrompt}
                 />

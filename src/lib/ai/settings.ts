@@ -9,7 +9,8 @@ const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'cre
     bot_mode: 'active',
     match_threshold: 0.6,
     prompt: DEFAULT_FLEXIBLE_PROMPT,
-    bot_name: DEFAULT_BOT_NAME
+    bot_name: DEFAULT_BOT_NAME,
+    allow_lead_extraction_during_operator: false
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -48,7 +49,10 @@ function applyAiDefaults(
         bot_mode: normalizeBotMode(settings?.bot_mode ?? DEFAULT_AI_SETTINGS.bot_mode),
         match_threshold: clamp(Number(settings?.match_threshold ?? DEFAULT_AI_SETTINGS.match_threshold), 0, 1),
         prompt: resolvePrompt(settings?.prompt),
-        bot_name: normalizeBotName(settings?.bot_name)
+        bot_name: normalizeBotName(settings?.bot_name),
+        allow_lead_extraction_during_operator: Boolean(
+            settings?.allow_lead_extraction_during_operator ?? DEFAULT_AI_SETTINGS.allow_lead_extraction_during_operator
+        )
     }
 }
 

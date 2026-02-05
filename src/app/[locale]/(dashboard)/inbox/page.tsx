@@ -64,6 +64,7 @@ export default async function InboxPage() {
             organizationId={organizationId}
             botName={aiSettings.bot_name}
             botMode={aiSettings.bot_mode}
+            allowLeadExtractionDuringOperator={aiSettings.allow_lead_extraction_during_operator}
         />
     )
 }

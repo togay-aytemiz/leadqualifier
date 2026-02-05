@@ -169,6 +169,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - **Assignee Lock:** Operator is assigned (`assignee_id`), strictly blocking AI.
 - **AI Silence:** Bot ignores all incoming messages while operator is active.
 - **Resume:** Operator (or Admin) must explicitly "Leave Conversation" to resume Bot.
+- **Optional Extraction:** Lead extraction can remain active during operator takeover if enabled in AI Settings.
 
 ---
 
@@ -323,6 +324,7 @@ MVP is successful when:
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
+- **Operator Extraction Toggle:** Default to pausing lead extraction during operator takeover, with an AI Settings toggle to keep it running.
 - **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.
 - **Lead Scoring Transparency:** Weight decisive booking intent higher (+3), add keyword fallback for intent signals, and expose on-demand score reasoning grounded in extracted inputs.
 - **Lead Score UX:** Reasoning copy respects the active UI locale and uses localized status labels.

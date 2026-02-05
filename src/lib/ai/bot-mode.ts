@@ -9,3 +9,14 @@ export function resolveBotModeAction(botMode: AiBotMode) {
     }
     return { allowReplies: true, allowLeadExtraction: true }
 }
+
+export function resolveLeadExtractionAllowance(options: {
+    botMode: AiBotMode
+    operatorActive: boolean
+    allowDuringOperator: boolean
+}) {
+    const base = resolveBotModeAction(options.botMode).allowLeadExtraction
+    if (!base) return false
+    if (!options.operatorActive) return true
+    return options.allowDuringOperator
+}

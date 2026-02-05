@@ -22,12 +22,19 @@ interface InboxContainerProps {
     organizationId: string
     botName?: string
     botMode?: AiBotMode
+    allowLeadExtractionDuringOperator?: boolean
 }
 
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 
-export function InboxContainer({ initialConversations, organizationId, botName, botMode }: InboxContainerProps) {
+export function InboxContainer({
+    initialConversations,
+    organizationId,
+    botName,
+    botMode,
+    allowLeadExtractionDuringOperator
+}: InboxContainerProps) {
     const t = useTranslations('inbox')
     const locale = useLocale()
     const dateLocale = locale === 'tr' ? tr : undefined
@@ -693,9 +700,10 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
             : t('scoreReasonError')
     const resolvedBotMode = (botMode ?? 'active')
     const operatorActive = selectedConversation?.active_agent === 'operator' || Boolean(selectedConversation?.assignee_id)
-    const leadExtractionPaused = Boolean(selectedConversation) && (operatorActive || resolvedBotMode === 'off')
+    const allowDuringOperator = Boolean(allowLeadExtractionDuringOperator)
+    const leadExtractionPaused = Boolean(selectedConversation) && (resolvedBotMode === 'off' || (operatorActive && !allowDuringOperator))
     const pauseReasons: string[] = []
-    if (operatorActive) pauseReasons.push(t('leadPausedReasonOperator'))
+    if (operatorActive && !allowDuringOperator) pauseReasons.push(t('leadPausedReasonOperator'))
     if (resolvedBotMode === 'off') pauseReasons.push(t('leadPausedReasonAiOff'))
     const pauseReasonText = pauseReasons.join(t('leadPausedReasonSeparator'))
     const leadRefreshMessage = leadRefreshError === 'missing_api_key'

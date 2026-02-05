@@ -18,6 +18,7 @@ export interface OrganizationAiSettings {
     prompt: string
     bot_mode: AiBotMode
     bot_name: string
+    allow_lead_extraction_during_operator: boolean
     created_at: string
     updated_at: string
 }

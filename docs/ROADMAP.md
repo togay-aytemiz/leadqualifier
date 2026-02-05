@@ -246,6 +246,8 @@
   - [x] Read-only lead snapshot in conversation details
   - [x] Lead header shows "Updating" indicator during extraction
   - [x] Keep "Updated" timestamp visible while updating
+- [x] **Operator Takeover Control**
+  - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
 
 ---
 

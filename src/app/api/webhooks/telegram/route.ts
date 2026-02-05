@@ -7,7 +7,7 @@ import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
-import { resolveBotModeAction } from '@/lib/ai/bot-mode'
+import { resolveBotModeAction, resolveLeadExtractionAllowance } from '@/lib/ai/bot-mode'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { runLeadExtraction } from '@/lib/leads/extraction'
@@ -169,14 +169,17 @@ export async function POST(req: NextRequest) {
         assigneeId: conversation.assignee_id
     })
 
-    // Skip AI if Operator is explicitly active OR if an operator is assigned
-    if (conversation.active_agent === 'operator' || conversation.assignee_id) {
-        console.log('Telegram Webhook: Operator active or Assigned. SKIPPING AI REPLY.')
-        return NextResponse.json({ ok: true })
-    }
+    const operatorActive = conversation.active_agent === 'operator' || Boolean(conversation.assignee_id)
+    const botMode = aiSettings.bot_mode ?? 'active'
+    const { allowReplies } = resolveBotModeAction(botMode)
+    const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
+    const shouldRunLeadExtraction = resolveLeadExtractionAllowance({
+        botMode,
+        operatorActive,
+        allowDuringOperator
+    })
 
-    const { allowReplies, allowLeadExtraction } = resolveBotModeAction(aiSettings.bot_mode ?? 'active')
-    if (allowLeadExtraction) {
+    if (shouldRunLeadExtraction) {
         await runLeadExtraction({
             organizationId: orgId,
             conversationId: conversation.id,
@@ -185,7 +188,11 @@ export async function POST(req: NextRequest) {
             source: 'telegram'
         })
     }
-    if (!allowReplies) {
+
+    if (operatorActive || !allowReplies) {
+        if (operatorActive) {
+            console.log('Telegram Webhook: Operator active or Assigned. SKIPPING AI REPLY.')
+        }
         return NextResponse.json({ ok: true })
     }
 

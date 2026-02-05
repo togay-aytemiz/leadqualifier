@@ -7,10 +7,12 @@ import type { AiBotMode } from '@/types/database'
 interface AiSettingsFormProps {
     botName: string
     botMode: AiBotMode
+    allowLeadExtractionDuringOperator: boolean
     matchThreshold: number
     prompt: string
     onBotNameChange: (value: string) => void
     onBotModeChange: (value: AiBotMode) => void
+    onAllowLeadExtractionDuringOperatorChange: (value: boolean) => void
     onMatchThresholdChange: (value: number) => void
     onPromptChange: (value: string) => void
 }
@@ -18,10 +20,12 @@ interface AiSettingsFormProps {
 export default function AiSettingsForm({
     botName,
     botMode,
+    allowLeadExtractionDuringOperator,
     matchThreshold,
     prompt,
     onBotNameChange,
     onBotModeChange,
+    onAllowLeadExtractionDuringOperatorChange,
     onMatchThresholdChange,
     onPromptChange
 }: AiSettingsFormProps) {
@@ -66,6 +70,21 @@ export default function AiSettingsForm({
                         )
                     })}
                 </div>
+            </SettingsSection>
+
+            <SettingsSection
+                title={t('operatorLeadExtractionTitle')}
+                description={t('operatorLeadExtractionDescription')}
+            >
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                        type="checkbox"
+                        checked={allowLeadExtractionDuringOperator}
+                        onChange={(e) => onAllowLeadExtractionDuringOperatorChange(e.target.checked)}
+                    />
+                    {t('operatorLeadExtractionLabel')}
+                </label>
+                <p className="text-xs text-gray-500">{t('operatorLeadExtractionHelp')}</p>
             </SettingsSection>
 
             <SettingsSection

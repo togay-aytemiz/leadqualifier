@@ -36,6 +36,7 @@
 - Inbox lead header keeps the updated timestamp visible while updating.
 - Lead scoring helpers and extraction parsing utilities.
 - Lead extraction design spec (hybrid service catalog, offering profile, non-business skip, async per-message snapshot).
+- AI Settings toggle to keep lead extraction running during operator takeover.
 - Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
 - Auth password recovery flow (Forgot Password + Reset Password screens).
 - Profile settings password section with reset link CTA and cooldown.
