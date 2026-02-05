@@ -139,7 +139,10 @@ export interface OfferingProfile {
     summary: string
     catalog_enabled: boolean
     ai_suggestions_enabled: boolean
+    required_intake_fields_ai_enabled: boolean
     ai_suggestions_locale: string
+    required_intake_fields: string[]
+    required_intake_fields_ai: string[]
     created_at: string
     updated_at: string
 }

@@ -3,13 +3,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateInitialOfferingSuggestion } from '@/lib/leads/offering-profile'
 
+function ensureNoError(error: { message?: string } | null, context: string) {
+    if (!error) return
+    throw new Error(`${context}: ${error.message ?? 'Unknown Supabase error'}`)
+}
+
 export async function getOfferingProfile(organizationId: string) {
     const supabase = await createClient()
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from('offering_profiles')
         .select('*')
         .eq('organization_id', organizationId)
         .maybeSingle()
+    ensureNoError(error, 'Failed to load offering profile')
     return data
 }
 
@@ -33,7 +39,8 @@ export async function getOfferingProfileSuggestions(
         query = query.eq('locale', locale)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    ensureNoError(error, 'Failed to load offering profile suggestions')
     return data ?? []
 }
 
@@ -41,26 +48,113 @@ export async function updateOfferingProfileSummary(
     organizationId: string,
     summary: string,
     aiSuggestionsEnabled: boolean,
-    aiSuggestionsLocale: string
+    requiredIntakeFieldsAiEnabled: boolean,
+    aiSuggestionsLocale: string,
+    requiredIntakeFields: string[],
+    requiredIntakeFieldsAi: string[],
+    options?: { generateInitialSuggestion?: boolean }
 ) {
     const supabase = await createClient()
-    await supabase
-        .from('offering_profiles')
-        .update({ summary, ai_suggestions_enabled: aiSuggestionsEnabled, ai_suggestions_locale: aiSuggestionsLocale })
-        .eq('organization_id', organizationId)
 
-    if (aiSuggestionsEnabled) {
+    const runUpdate = async (payload: Record<string, unknown>) => {
+        return supabase
+            .from('offering_profiles')
+            .update(payload)
+            .eq('organization_id', organizationId)
+    }
+
+    const fullPayload = {
+        summary,
+        ai_suggestions_enabled: aiSuggestionsEnabled,
+        required_intake_fields_ai_enabled: requiredIntakeFieldsAiEnabled,
+        ai_suggestions_locale: aiSuggestionsLocale,
+        required_intake_fields: requiredIntakeFields,
+        required_intake_fields_ai: requiredIntakeFieldsAi
+    }
+
+    let { error } = await runUpdate(fullPayload)
+
+    // Backward-compatible fallback for partially migrated databases.
+    if (error?.message?.includes('required_intake_fields_ai_enabled')) {
+        ({ error } = await runUpdate({
+            summary,
+            ai_suggestions_enabled: aiSuggestionsEnabled,
+            ai_suggestions_locale: aiSuggestionsLocale,
+            required_intake_fields: requiredIntakeFields,
+            required_intake_fields_ai: requiredIntakeFieldsAi
+        }))
+    }
+
+    if (error?.message?.includes('required_intake_fields_ai')) {
+        ({ error } = await runUpdate({
+            summary,
+            ai_suggestions_enabled: aiSuggestionsEnabled,
+            ai_suggestions_locale: aiSuggestionsLocale,
+            required_intake_fields: requiredIntakeFields
+        }))
+    }
+
+    ensureNoError(error, 'Failed to update offering profile')
+
+    if (aiSuggestionsEnabled && options?.generateInitialSuggestion !== false) {
         await generateInitialOfferingSuggestion({ organizationId, supabase })
     }
 }
 
+export async function syncOfferingProfileSummary(
+    organizationId: string,
+    summary: string
+) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('offering_profiles')
+        .update({ summary })
+        .eq('organization_id', organizationId)
+    ensureNoError(error, 'Failed to sync offering profile summary')
+}
+
+export async function createManualApprovedOfferingProfileSuggestion(
+    organizationId: string,
+    content: string,
+    locale: string
+) {
+    const trimmedContent = content.trim()
+    if (!trimmedContent) return null
+
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    ensureNoError(authError, 'Failed to read auth user')
+    if (!user) throw new Error('Unauthorized')
+
+    const reviewedAt = new Date().toISOString()
+
+    const { error: insertError } = await supabase
+        .from('offering_profile_suggestions')
+        .insert({
+            organization_id: organizationId,
+            source_type: 'batch',
+            source_id: null,
+            content: trimmedContent,
+            status: 'approved',
+            locale,
+            reviewed_at: reviewedAt,
+            reviewed_by: user.id,
+            update_of: null,
+            archived_at: null
+        })
+    ensureNoError(insertError, 'Failed to create manual approved suggestion')
+
+    return trimmedContent
+}
+
 export async function generateOfferingProfileSuggestions(organizationId: string) {
     const supabase = await createClient()
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
         .from('offering_profiles')
         .select('ai_suggestions_enabled')
         .eq('organization_id', organizationId)
         .maybeSingle()
+    ensureNoError(error, 'Failed to read offering profile suggestion settings')
 
     if (!profile?.ai_suggestions_enabled) return false
 
@@ -70,7 +164,8 @@ export async function generateOfferingProfileSuggestions(organizationId: string)
 
 export async function updateOfferingProfileLocaleForUser(locale: string) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    ensureNoError(authError, 'Failed to read auth user')
     if (!user) throw new Error('Unauthorized')
 
     const { data: membership, error: membershipError } = await supabase
@@ -84,10 +179,11 @@ export async function updateOfferingProfileLocaleForUser(locale: string) {
         throw new Error('No organization found')
     }
 
-    await supabase
+    const { error: updateError } = await supabase
         .from('offering_profiles')
         .update({ ai_suggestions_locale: locale })
         .eq('organization_id', membership.organization_id)
+    ensureNoError(updateError, 'Failed to update offering profile locale')
 }
 
 export async function updateOfferingProfileSuggestionStatus(
@@ -96,20 +192,23 @@ export async function updateOfferingProfileSuggestionStatus(
     status: 'pending' | 'approved' | 'rejected'
 ) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    ensureNoError(authError, 'Failed to read auth user')
     if (!user) throw new Error('Unauthorized')
 
-    const { data: suggestion } = await supabase
+    const { data: suggestion, error: suggestionError } = await supabase
         .from('offering_profile_suggestions')
         .select('id, content, update_of')
         .eq('organization_id', organizationId)
         .eq('id', suggestionId)
         .maybeSingle()
+    ensureNoError(suggestionError, 'Failed to read offering profile suggestion')
+    if (!suggestion) throw new Error('Offering profile suggestion not found')
 
     const reviewedAt = new Date().toISOString()
 
     if (status === 'approved' && suggestion?.update_of) {
-        await supabase
+        const { error: updateBaseError } = await supabase
             .from('offering_profile_suggestions')
             .update({
                 content: suggestion.content,
@@ -119,9 +218,10 @@ export async function updateOfferingProfileSuggestionStatus(
             })
             .eq('organization_id', organizationId)
             .eq('id', suggestion.update_of)
+        ensureNoError(updateBaseError, 'Failed to apply update suggestion to base item')
     }
 
-    await supabase
+    const { error: reviewError } = await supabase
         .from('offering_profile_suggestions')
         .update({
             status,
@@ -130,6 +230,7 @@ export async function updateOfferingProfileSuggestionStatus(
         })
         .eq('organization_id', organizationId)
         .eq('id', suggestionId)
+    ensureNoError(reviewError, 'Failed to update offering profile suggestion status')
 }
 
 export async function archiveOfferingProfileSuggestion(
@@ -137,15 +238,17 @@ export async function archiveOfferingProfileSuggestion(
     suggestionId: string
 ) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    ensureNoError(authError, 'Failed to read auth user')
     if (!user) throw new Error('Unauthorized')
 
-    const { data: suggestion } = await supabase
+    const { data: suggestion, error: suggestionError } = await supabase
         .from('offering_profile_suggestions')
         .select('id, status, archived_at')
         .eq('organization_id', organizationId)
         .eq('id', suggestionId)
         .maybeSingle()
+    ensureNoError(suggestionError, 'Failed to read suggestion for archive')
 
     if (!suggestion) return false
     if (suggestion.archived_at) return true
@@ -153,11 +256,12 @@ export async function archiveOfferingProfileSuggestion(
 
     const archivedAt = new Date().toISOString()
 
-    await supabase
+    const { error: archiveError } = await supabase
         .from('offering_profile_suggestions')
         .update({ archived_at: archivedAt })
         .eq('organization_id', organizationId)
         .eq('id', suggestionId)
+    ensureNoError(archiveError, 'Failed to archive suggestion')
 
     return true
 }
@@ -171,17 +275,19 @@ export async function getPendingOfferingProfileSuggestionCount(organizationId: s
         .is('archived_at', null)
         .or('status.eq.pending,status.is.null')
 
-    const { count } = await query
+    const { count, error } = await query
+    ensureNoError(error, 'Failed to read pending suggestion count')
     return count ?? 0
 }
 
 export async function getServiceCandidates(organizationId: string) {
     const supabase = await createClient()
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from('service_candidates')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
+    ensureNoError(error, 'Failed to read service candidates')
     return data ?? []
 }

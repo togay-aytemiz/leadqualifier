@@ -157,6 +157,10 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Lead score and status are produced directly by the LLM using the latest 5 customer messages only (assistant messages excluded).
 - The most recent customer message is always injected into the extraction prompt to avoid replication delays.
 - Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation). Rejected suggestions can be archived for audit (excluded from AI context), and users can regenerate suggestions whenever there are no pending items.
+- Organization Settings now uses separate AI toggles per section:
+  - Offering Profile: AI off shows manual textarea, AI on shows suggestions workflow.
+  - Required Fields: AI toggle controls AI-tagged required-field suggestions independently.
+  - Approved suggestions tab supports one-off custom textarea entries for manual overrides.
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
@@ -211,6 +215,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Profile: name and email visibility (email is read-only)
 - Profile security: password recovery via email reset link (Forgot + Reset)
 - Organization: company name and future org-level defaults
+- Organization AI behavior is section-based:
+  - Offering Profile has its own AI toggle for manual vs suggestions workflow.
+  - Required Fields has its own AI toggle and keeps manual + AI chips together.
 
 ### 5.7 Usage & Billing (Implemented)
 - Track org-level AI token usage (monthly UTC + total)
@@ -335,6 +342,8 @@ MVP is successful when:
 - **Offering Profile Formatting:** Suggestions must include a short intro plus 3-5 labeled bullets; if output is too sparse, retry generation.
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
+- **Organization AI Control:** Use independent section-level AI toggles for Offering Profile and Required Fields UX modes.
+- **Manual Override Entry:** Allow one-off custom textarea additions in Approved suggestions to support manual scope overrides without reopening manual profile mode.
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 
@@ -353,3 +362,4 @@ MVP is successful when:
 | Onboarding | **Concierge (MVP)** | Manual WhatsApp setup for 5 pilots |
 | Inbox Updates | **Atomic send RPC + realtime fallback** | Prevents unassigned state and keeps bot/user messages visible |
 | Dev Workflow | **Always provide commit message** | Ensures consistent handoff across iterations |
+| Dev Workflow | Add subagent-driven-development skill | Standardizes subagent-based execution of implementation plans |

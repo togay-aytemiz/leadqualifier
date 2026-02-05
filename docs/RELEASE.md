@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- Subagent-driven-development skill added for subagent-based plan execution.
 - Offering Profile AI suggestions review workflow (pending/approved/rejected tabs, accept/reject actions, empty states, and show-more).
 - Offering Profile AI suggestions manual generate action (shown when no suggestions exist).
 - Offering Profile AI suggestions now use a hybrid format (intro + up to 5 bullets) and support update proposals for conflicting content.
@@ -37,6 +38,10 @@
 - Lead scoring helpers and extraction parsing utilities.
 - Lead extraction design spec (hybrid service catalog, offering profile, non-business skip, async per-message snapshot).
 - AI Settings toggle to keep lead extraction running during operator takeover.
+- Organization settings now use independent AI toggles for Offering Profile and Required Fields sections.
+- Required Fields section includes its own AI toggle, on-demand manual add, and subtle AI tags.
+- Approved AI suggestions tab now supports one-off custom textarea additions for manual overrides.
+- Manual approved additions are persisted as approved offering profile suggestions.
 - Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
 - Auth password recovery flow (Forgot Password + Reset Password screens).
 - Profile settings password section with reset link CTA and cooldown.
@@ -158,8 +163,11 @@
 - Knowledge Base save/update now return immediately with background processing and UI polling.
 - Lead scoring now uses LLM-provided score/status from the latest 5 customer messages (assistant messages excluded).
 - Lead extraction now injects the latest customer message into the LLM prompt to avoid missing fresh messages.
+- Offering Profile UI now switches by its own AI mode: manual textarea when AI is off, suggestions workflow when AI is on.
+- Offering Profile summary now syncs from approved suggestions after review/archive/manual-approved actions.
 
 ### Fixed
+- Required fields chip remove button now uses a centered icon with a larger hit area for better alignment and usability.
 - Knowledge Base sidebar file clicks now open the document details view.
 - Inbox platform badge alignment restored after adding the lead status dot.
 - Lead status dot now updates via realtime lead changes (no manual refresh needed).

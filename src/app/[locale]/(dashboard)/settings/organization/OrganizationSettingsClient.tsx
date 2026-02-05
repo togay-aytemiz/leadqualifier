@@ -8,14 +8,19 @@ import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
+import { RequiredIntakeFieldsSection } from '@/components/settings/RequiredIntakeFieldsSection'
 import {
+    archiveOfferingProfileSuggestion,
+    createManualApprovedOfferingProfileSuggestion,
     generateOfferingProfileSuggestions,
     getOfferingProfileSuggestions,
-    archiveOfferingProfileSuggestion,
-    updateOfferingProfileSummary,
+    syncOfferingProfileSummary,
     updateOfferingProfileLocaleForUser,
-    updateOfferingProfileSuggestionStatus
+    updateOfferingProfileSuggestionStatus,
+    updateOfferingProfileSummary
 } from '@/lib/leads/settings'
+import { mergeOfferingProfileItems, serializeOfferingProfileItems } from '@/lib/leads/offering-profile-content'
+import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 
@@ -36,39 +41,78 @@ export default function OrganizationSettingsClient({
     const tUnsaved = useTranslations('unsavedChanges')
     const locale = useLocale()
     const router = useRouter()
+
     const [baseline, setBaseline] = useState({
         name: initialName,
         profileSummary: offeringProfile?.summary ?? '',
-        aiSuggestionsEnabled: offeringProfile?.ai_suggestions_enabled ?? false
+        offeringProfileAiEnabled: offeringProfile?.ai_suggestions_enabled ?? false,
+        requiredIntakeFieldsAiEnabled: offeringProfile?.required_intake_fields_ai_enabled ?? true,
+        requiredIntakeFields: offeringProfile?.required_intake_fields ?? [],
+        requiredIntakeFieldsAi: offeringProfile?.required_intake_fields_ai ?? []
     })
+
     const [name, setName] = useState(initialName)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
-    const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
+    const [offeringProfileAiEnabled, setOfferingProfileAiEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
+    const [requiredIntakeFieldsAiEnabled, setRequiredIntakeFieldsAiEnabled] = useState(offeringProfile?.required_intake_fields_ai_enabled ?? true)
+    const [requiredIntakeFields, setRequiredIntakeFields] = useState(offeringProfile?.required_intake_fields ?? [])
+    const [requiredIntakeFieldsAi, setRequiredIntakeFieldsAi] = useState(offeringProfile?.required_intake_fields_ai ?? [])
     const [suggestions, setSuggestions] = useState(() => initialSuggestions.map((item) => ({
         ...item,
         status: item.status ?? 'pending'
     })))
+
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
     const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
     const [localeSynced, setLocaleSynced] = useState(false)
 
+    const normalizedRequiredIntakeFieldsAi = useMemo(() => {
+        const fieldSet = new Set(requiredIntakeFields.map((field) => field.trim().toLowerCase()))
+        return normalizeIntakeFields(
+            requiredIntakeFieldsAi.filter((field) => fieldSet.has(field.trim().toLowerCase()))
+        )
+    }, [requiredIntakeFields, requiredIntakeFieldsAi])
+
     const isDirty = useMemo(() => {
         return (
             name !== baseline.name ||
             profileSummary !== baseline.profileSummary ||
-            aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
+            offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
+            requiredIntakeFieldsAiEnabled !== baseline.requiredIntakeFieldsAiEnabled ||
+            requiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
+            normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|')
         )
-    }, [name, profileSummary, aiSuggestionsEnabled, baseline])
+    }, [
+        name,
+        profileSummary,
+        offeringProfileAiEnabled,
+        requiredIntakeFieldsAiEnabled,
+        requiredIntakeFields,
+        normalizedRequiredIntakeFieldsAi,
+        baseline
+    ])
 
     useEffect(() => {
-        setProfileSummary(offeringProfile?.summary ?? '')
-        setAiSuggestionsEnabled(offeringProfile?.ai_suggestions_enabled ?? false)
-        setBaseline(prev => ({
+        const nextSummary = offeringProfile?.summary ?? ''
+        const nextOfferingProfileAiEnabled = offeringProfile?.ai_suggestions_enabled ?? false
+        const nextRequiredIntakeFieldsAiEnabled = offeringProfile?.required_intake_fields_ai_enabled ?? true
+        const nextRequiredFields = offeringProfile?.required_intake_fields ?? []
+        const nextRequiredFieldsAi = offeringProfile?.required_intake_fields_ai ?? []
+
+        setProfileSummary(nextSummary)
+        setOfferingProfileAiEnabled(nextOfferingProfileAiEnabled)
+        setRequiredIntakeFieldsAiEnabled(nextRequiredIntakeFieldsAiEnabled)
+        setRequiredIntakeFields(nextRequiredFields)
+        setRequiredIntakeFieldsAi(nextRequiredFieldsAi)
+        setBaseline((prev) => ({
             ...prev,
-            profileSummary: offeringProfile?.summary ?? '',
-            aiSuggestionsEnabled: offeringProfile?.ai_suggestions_enabled ?? false
+            profileSummary: nextSummary,
+            offeringProfileAiEnabled: nextOfferingProfileAiEnabled,
+            requiredIntakeFieldsAiEnabled: nextRequiredIntakeFieldsAiEnabled,
+            requiredIntakeFields: nextRequiredFields,
+            requiredIntakeFieldsAi: nextRequiredFieldsAi
         }))
         setLocaleSynced(false)
     }, [offeringProfile])
@@ -86,6 +130,7 @@ export default function OrganizationSettingsClient({
             setLocaleSynced(true)
             return
         }
+
         updateOfferingProfileLocaleForUser(locale)
             .then(async () => {
                 const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
@@ -116,32 +161,82 @@ export default function OrganizationSettingsClient({
         return () => window.clearTimeout(timeout)
     }, [saved])
 
+    const deriveSummaryFromApprovedSuggestions = (allSuggestions: OfferingProfileSuggestion[]) => {
+        const approvedItems = allSuggestions
+            .filter((item) => item.status === 'approved' && !item.update_of && !item.archived_at)
+            .map((item) => item.content)
+        return serializeOfferingProfileItems(mergeOfferingProfileItems([], approvedItems))
+    }
+
+    const refreshSuggestions = async () => {
+        const refreshed = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
+        const normalized = refreshed.map((item) => ({ ...item, status: item.status ?? 'pending' }))
+        setSuggestions(normalized)
+        return normalized
+    }
+
+    const syncSummaryWithApprovedSuggestions = async (allSuggestions: OfferingProfileSuggestion[]) => {
+        if (!offeringProfileAiEnabled) return
+        const nextSummary = deriveSummaryFromApprovedSuggestions(allSuggestions)
+        setProfileSummary(nextSummary)
+        setBaseline((prev) => ({ ...prev, profileSummary: nextSummary }))
+        await syncOfferingProfileSummary(organizationId, nextSummary)
+    }
+
     const handleSave = async () => {
         if (!isDirty) return true
+
         setIsSaving(true)
         setSaveError(null)
         setSaved(false)
+
         try {
             if (name !== baseline.name) {
                 await updateOrganizationName(name)
             }
+
             if (
                 profileSummary !== baseline.profileSummary ||
-                aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
+                offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
+                requiredIntakeFieldsAiEnabled !== baseline.requiredIntakeFieldsAiEnabled ||
+                requiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
+                normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|')
             ) {
-                await updateOfferingProfileSummary(organizationId, profileSummary, aiSuggestionsEnabled, locale)
-                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
-                setSuggestions(refreshedSuggestions.map((item) => ({
-                    ...item,
-                    status: item.status ?? 'pending'
-                })))
+                await updateOfferingProfileSummary(
+                    organizationId,
+                    profileSummary,
+                    offeringProfileAiEnabled,
+                    requiredIntakeFieldsAiEnabled,
+                    locale,
+                    requiredIntakeFields,
+                    normalizedRequiredIntakeFieldsAi,
+                    { generateInitialSuggestion: offeringProfileAiEnabled && !baseline.offeringProfileAiEnabled }
+                )
+                await refreshSuggestions()
             }
-            setBaseline({ name, profileSummary, aiSuggestionsEnabled })
+
+            setBaseline({
+                name,
+                profileSummary,
+                offeringProfileAiEnabled,
+                requiredIntakeFieldsAiEnabled,
+                requiredIntakeFields,
+                requiredIntakeFieldsAi: normalizedRequiredIntakeFieldsAi
+            })
             setSaved(true)
             return true
         } catch (error) {
             console.error(error)
-            setSaveError(t('saveError'))
+            const message = error instanceof Error ? error.message : ''
+            if (
+                message.includes('required_intake_fields') ||
+                message.includes('ai_suggestions_enabled') ||
+                message.includes('offering_profiles')
+            ) {
+                setSaveError(t('saveErrorMigration'))
+            } else {
+                setSaveError(t('saveError'))
+            }
             return false
         } finally {
             setIsSaving(false)
@@ -151,11 +246,8 @@ export default function OrganizationSettingsClient({
     const handleReviewSuggestion = async (suggestionId: string, status: 'approved' | 'rejected') => {
         try {
             await updateOfferingProfileSuggestionStatus(organizationId, suggestionId, status)
-            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
-            setSuggestions(refreshedSuggestions.map((item) => ({
-                ...item,
-                status: item.status ?? 'pending'
-            })))
+            const refreshedSuggestions = await refreshSuggestions()
+            await syncSummaryWithApprovedSuggestions(refreshedSuggestions)
             window.dispatchEvent(new Event('pending-suggestions-updated'))
             router.refresh()
         } catch (error) {
@@ -166,11 +258,8 @@ export default function OrganizationSettingsClient({
     const handleArchiveSuggestion = async (suggestionId: string) => {
         try {
             await archiveOfferingProfileSuggestion(organizationId, suggestionId)
-            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
-            setSuggestions(refreshedSuggestions.map((item) => ({
-                ...item,
-                status: item.status ?? 'pending'
-            })))
+            const refreshedSuggestions = await refreshSuggestions()
+            await syncSummaryWithApprovedSuggestions(refreshedSuggestions)
             window.dispatchEvent(new Event('pending-suggestions-updated'))
             router.refresh()
         } catch (error) {
@@ -180,14 +269,11 @@ export default function OrganizationSettingsClient({
 
     const handleGenerateSuggestions = async () => {
         if (isGeneratingSuggestions) return false
+
         setIsGeneratingSuggestions(true)
         try {
             const generated = await generateOfferingProfileSuggestions(organizationId)
-            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
-            setSuggestions(refreshedSuggestions.map((item) => ({
-                ...item,
-                status: item.status ?? 'pending'
-            })))
+            await refreshSuggestions()
             window.dispatchEvent(new Event('pending-suggestions-updated'))
             router.refresh()
             return generated
@@ -199,10 +285,29 @@ export default function OrganizationSettingsClient({
         }
     }
 
+    const handleAddCustomApprovedSuggestion = async (content: string) => {
+        try {
+            const created = await createManualApprovedOfferingProfileSuggestion(organizationId, content, locale)
+            if (!created) return false
+
+            const refreshedSuggestions = await refreshSuggestions()
+            await syncSummaryWithApprovedSuggestions(refreshedSuggestions)
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
+            router.refresh()
+            return true
+        } catch (error) {
+            console.error(error)
+            return false
+        }
+    }
+
     const handleDiscard = () => {
         setName(baseline.name)
         setProfileSummary(baseline.profileSummary)
-        setAiSuggestionsEnabled(baseline.aiSuggestionsEnabled)
+        setOfferingProfileAiEnabled(baseline.offeringProfileAiEnabled)
+        setRequiredIntakeFieldsAiEnabled(baseline.requiredIntakeFieldsAiEnabled)
+        setRequiredIntakeFields(baseline.requiredIntakeFields)
+        setRequiredIntakeFieldsAi(baseline.requiredIntakeFieldsAi)
         setSaveError(null)
         setSaved(false)
     }
@@ -235,10 +340,7 @@ export default function OrganizationSettingsClient({
                 </div>
 
                 <div className="max-w-5xl">
-                    <SettingsSection
-                        title={t('nameTitle')}
-                        description={t('nameDescription')}
-                    >
+                    <SettingsSection title={t('nameTitle')} description={t('nameDescription')}>
                         <input
                             type="text"
                             value={name}
@@ -250,14 +352,24 @@ export default function OrganizationSettingsClient({
 
                     <OfferingProfileSection
                         summary={profileSummary}
-                        aiSuggestionsEnabled={aiSuggestionsEnabled}
+                        aiSuggestionsEnabled={offeringProfileAiEnabled}
                         suggestions={suggestions}
                         onSummaryChange={setProfileSummary}
-                        onAiSuggestionsEnabledChange={setAiSuggestionsEnabled}
+                        onAiSuggestionsEnabledChange={setOfferingProfileAiEnabled}
                         onReviewSuggestion={handleReviewSuggestion}
                         onArchiveSuggestion={handleArchiveSuggestion}
                         onGenerateSuggestions={handleGenerateSuggestions}
+                        onAddCustomApproved={handleAddCustomApprovedSuggestion}
                         isGeneratingSuggestions={isGeneratingSuggestions}
+                    />
+
+                    <RequiredIntakeFieldsSection
+                        fields={requiredIntakeFields}
+                        aiFields={normalizedRequiredIntakeFieldsAi}
+                        aiSuggestionsEnabled={requiredIntakeFieldsAiEnabled}
+                        onAiSuggestionsEnabledChange={setRequiredIntakeFieldsAiEnabled}
+                        onFieldsChange={setRequiredIntakeFields}
+                        onAiFieldsChange={setRequiredIntakeFieldsAi}
                     />
                 </div>
             </div>

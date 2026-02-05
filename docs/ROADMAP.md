@@ -13,6 +13,7 @@
 - [x] Configure database (Supabase client ready)
 - [x] Set up environment variables
 - [x] Codify agent workflow rules (always provide commit message)
+- [x] Add subagent-driven-development skill for plan execution workflow
 - [x] Use system fonts in app shell to avoid CI font-fetch issues
 
 ---
@@ -216,6 +217,11 @@
   - [x] Hybrid AI suggestions (intro + up to 5 bullets) with update proposals for conflicting content
   - [x] Suggestion generation uses manual summary plus approved/rejected history for context
   - [x] Knowledge Base banner surfaces pending AI suggestions with quick link to Organization settings
+  - [x] Organization settings now expose separate AI toggles for Offering Profile and Required Fields
+  - [x] Offering Profile AI disabled mode shows only manual textarea
+  - [x] Offering Profile AI enabled mode shows AI suggestions workflow
+  - [x] Required Fields has its own AI suggestions toggle and remains a dedicated section
+  - [x] Approved suggestions tab supports one-off custom textarea entries (manual override into approved list)
 - [x] AI suggestions enforce 3-5 bullet hybrid format with retry on sparse output
 - [x] AI suggestions archive (archived tab with archive action; regenerate when no pending)
   - [x] Knowledge Base banner copy updated to “Hizmet profili önerileri hazır” and spaced from header

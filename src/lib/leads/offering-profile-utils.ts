@@ -12,3 +12,17 @@ export function parseSuggestionPayload(raw: string) {
         return null
     }
 }
+
+export function normalizeIntakeFields(input: string[]) {
+    return Array.from(
+        new Set(
+            input
+                .map((item) => item.trim())
+                .filter(Boolean)
+        )
+    )
+}
+
+export function mergeIntakeFields(current: string[], proposed: string[]) {
+    return normalizeIntakeFields([...current, ...proposed])
+}
