@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
 import OrganizationSettingsClient from './OrganizationSettingsClient'
-import { getOfferingProfile, getOfferingProfileSuggestions } from '@/lib/leads/settings'
+import { getOfferingProfile, getOfferingProfileSuggestions, getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 
 export default async function OrganizationSettingsPage() {
     const supabase = await createClient()
@@ -34,17 +34,16 @@ export default async function OrganizationSettingsPage() {
         )
     }
 
-    const [{ data: organization }, offeringProfile, offeringProfileSuggestions] = await Promise.all([
+    const [{ data: organization }, offeringProfile, offeringProfileSuggestions, pendingCount] = await Promise.all([
         supabase
             .from('organizations')
             .select('name')
             .eq('id', organizationId)
             .single(),
         getOfferingProfile(organizationId),
-        getOfferingProfileSuggestions(organizationId, locale)
+        getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true }),
+        getPendingOfferingProfileSuggestionCount(organizationId, locale)
     ])
-
-    const pendingCount = offeringProfileSuggestions.filter((item) => (item.status ?? 'pending') === 'pending').length
 
     return (
         <>

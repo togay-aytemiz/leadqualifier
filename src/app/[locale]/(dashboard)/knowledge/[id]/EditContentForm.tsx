@@ -62,7 +62,7 @@ export function EditContentForm({
 
         setSaving(true)
         try {
-            const updated = await updateKnowledgeBaseEntry(id, {
+            const updatePromise = updateKnowledgeBaseEntry(id, {
                 title,
                 content,
                 collection_id: collectionId || null
@@ -71,6 +71,8 @@ export function EditContentForm({
             setSaving(false)
             window.dispatchEvent(new Event('knowledge-updated'))
             window.dispatchEvent(new Event('pending-suggestions-updated'))
+
+            const updated = await updatePromise
 
             if (updated?.id) {
                 void fetch('/api/knowledge/process', {
@@ -95,11 +97,12 @@ export function EditContentForm({
     async function handleDelete() {
         setSaving(true)
         try {
-            await deleteKnowledgeBaseEntry(id)
+            const deletePromise = deleteKnowledgeBaseEntry(id)
             router.push('/knowledge')
             window.dispatchEvent(new Event('knowledge-updated'))
             window.dispatchEvent(new Event('pending-suggestions-updated'))
             router.refresh()
+            await deletePromise
         } catch (error) {
             console.error(error)
             alert(t('failedToDelete'))

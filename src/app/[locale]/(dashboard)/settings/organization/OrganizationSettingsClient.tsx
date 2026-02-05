@@ -11,6 +11,7 @@ import { OfferingProfileSection } from '@/components/settings/OfferingProfileSec
 import {
     generateOfferingProfileSuggestions,
     getOfferingProfileSuggestions,
+    archiveOfferingProfileSuggestion,
     updateOfferingProfileSummary,
     updateOfferingProfileLocaleForUser,
     updateOfferingProfileSuggestionStatus
@@ -87,7 +88,7 @@ export default function OrganizationSettingsClient({
         }
         updateOfferingProfileLocaleForUser(locale)
             .then(async () => {
-                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
                 setSuggestions(refreshedSuggestions.map((item) => ({
                     ...item,
                     status: item.status ?? 'pending'
@@ -129,7 +130,7 @@ export default function OrganizationSettingsClient({
                 aiSuggestionsEnabled !== baseline.aiSuggestionsEnabled
             ) {
                 await updateOfferingProfileSummary(organizationId, profileSummary, aiSuggestionsEnabled, locale)
-                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+                const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
                 setSuggestions(refreshedSuggestions.map((item) => ({
                     ...item,
                     status: item.status ?? 'pending'
@@ -150,7 +151,22 @@ export default function OrganizationSettingsClient({
     const handleReviewSuggestion = async (suggestionId: string, status: 'approved' | 'rejected') => {
         try {
             await updateOfferingProfileSuggestionStatus(organizationId, suggestionId, status)
-            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
+            setSuggestions(refreshedSuggestions.map((item) => ({
+                ...item,
+                status: item.status ?? 'pending'
+            })))
+            window.dispatchEvent(new Event('pending-suggestions-updated'))
+            router.refresh()
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
+    const handleArchiveSuggestion = async (suggestionId: string) => {
+        try {
+            await archiveOfferingProfileSuggestion(organizationId, suggestionId)
+            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
             setSuggestions(refreshedSuggestions.map((item) => ({
                 ...item,
                 status: item.status ?? 'pending'
@@ -167,7 +183,7 @@ export default function OrganizationSettingsClient({
         setIsGeneratingSuggestions(true)
         try {
             const generated = await generateOfferingProfileSuggestions(organizationId)
-            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale)
+            const refreshedSuggestions = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
             setSuggestions(refreshedSuggestions.map((item) => ({
                 ...item,
                 status: item.status ?? 'pending'
@@ -239,6 +255,7 @@ export default function OrganizationSettingsClient({
                         onSummaryChange={setProfileSummary}
                         onAiSuggestionsEnabledChange={setAiSuggestionsEnabled}
                         onReviewSuggestion={handleReviewSuggestion}
+                        onArchiveSuggestion={handleArchiveSuggestion}
                         onGenerateSuggestions={handleGenerateSuggestions}
                         isGeneratingSuggestions={isGeneratingSuggestions}
                     />

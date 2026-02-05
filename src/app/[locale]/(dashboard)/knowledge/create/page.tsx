@@ -31,12 +31,18 @@ export default function CreateContentPage() {
 
         setLoading(true)
         try {
-            const created = await createKnowledgeBaseEntry({
+            const target = collectionId ? `/knowledge?collectionId=${collectionId}` : '/knowledge'
+            const createPromise = createKnowledgeBaseEntry({
                 title,
                 content,
                 type: 'article', // Default for now
                 collection_id: collectionId || null
             })
+
+            router.push(target)
+            router.refresh()
+
+            const created = await createPromise
 
             window.dispatchEvent(new Event('knowledge-updated'))
             window.dispatchEvent(new Event('pending-suggestions-updated'))
@@ -49,11 +55,6 @@ export default function CreateContentPage() {
                     keepalive: true
                 })
             }
-
-            // Redirect back to the collection or root
-            const target = collectionId ? `/knowledge?collectionId=${collectionId}` : '/knowledge'
-            router.push(target)
-            router.refresh()
         } catch (error) {
             console.error(error)
             alert(t('failedToSave'))

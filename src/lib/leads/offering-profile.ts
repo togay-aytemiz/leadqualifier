@@ -130,6 +130,7 @@ async function createSuggestion(options: {
         .eq('organization_id', options.organizationId)
         .eq('status', 'approved')
         .eq('locale', locale)
+        .is('archived_at', null)
         .is('update_of', null)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -140,6 +141,7 @@ async function createSuggestion(options: {
         .eq('organization_id', options.organizationId)
         .eq('status', 'rejected')
         .eq('locale', locale)
+        .is('archived_at', null)
         .is('update_of', null)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -266,6 +268,7 @@ export async function generateInitialOfferingSuggestion(options: {
             .select('id')
             .eq('organization_id', options.organizationId)
             .eq('locale', locale)
+            .is('archived_at', null)
             .limit(1)
 
         if (existing && existing.length > 0) return null

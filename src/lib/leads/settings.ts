@@ -13,13 +13,21 @@ export async function getOfferingProfile(organizationId: string) {
     return data
 }
 
-export async function getOfferingProfileSuggestions(organizationId: string, locale?: string) {
+export async function getOfferingProfileSuggestions(
+    organizationId: string,
+    locale?: string,
+    options?: { includeArchived?: boolean }
+) {
     const supabase = await createClient()
     let query = supabase
         .from('offering_profile_suggestions')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
+
+    if (!options?.includeArchived) {
+        query = query.is('archived_at', null)
+    }
 
     if (locale?.trim()) {
         query = query.eq('locale', locale)
@@ -124,12 +132,43 @@ export async function updateOfferingProfileSuggestionStatus(
         .eq('id', suggestionId)
 }
 
+export async function archiveOfferingProfileSuggestion(
+    organizationId: string,
+    suggestionId: string
+) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const { data: suggestion } = await supabase
+        .from('offering_profile_suggestions')
+        .select('id, status, archived_at')
+        .eq('organization_id', organizationId)
+        .eq('id', suggestionId)
+        .maybeSingle()
+
+    if (!suggestion) return false
+    if (suggestion.archived_at) return true
+    if (suggestion.status !== 'rejected') return false
+
+    const archivedAt = new Date().toISOString()
+
+    await supabase
+        .from('offering_profile_suggestions')
+        .update({ archived_at: archivedAt })
+        .eq('organization_id', organizationId)
+        .eq('id', suggestionId)
+
+    return true
+}
+
 export async function getPendingOfferingProfileSuggestionCount(organizationId: string, locale?: string) {
     const supabase = await createClient()
     const query = supabase
         .from('offering_profile_suggestions')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
+        .is('archived_at', null)
         .or('status.eq.pending,status.is.null')
 
     const { count } = await query

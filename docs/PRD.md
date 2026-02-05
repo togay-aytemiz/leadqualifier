@@ -149,7 +149,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Extraction runs asynchronously on every new customer message (conversation snapshot update).
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
-- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation).
+- Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation). Rejected suggestions can be archived for audit (excluded from AI context), and users can regenerate suggestions whenever there are no pending items.
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
@@ -275,6 +275,7 @@ MVP is successful when:
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **KB Sidebar Refresh:** Dispatch `knowledge-updated` on content create/update/delete and surface pending AI suggestions via a KB banner linked to Organization settings.
+- **KB Banner Styling:** Use an amber-toned banner for pending AI suggestion visibility in Knowledge Base.
 - **KB Sidebar Navigation:** Allow clicking files in the sidebar to open the document detail view.
 - **KB Sidebar Focus:** Highlight the active document and add spacing between the All Content and Uncategorized sections.
 - **KB Sidebar Realtime:** Subscribe to knowledge document/collection changes to refresh the sidebar immediately.
@@ -282,6 +283,7 @@ MVP is successful when:
 - **KB Realtime Publication:** Add knowledge tables to Supabase realtime publication so sidebar updates instantly on deletes.
 - **KB Realtime Deletes:** Set replica identity full on knowledge tables so delete events include `organization_id` for filtered subscriptions.
 - **Suggestions Realtime Publication:** Add offering profile suggestions to Supabase realtime publication so indicators/banners update instantly.
+- **KB Non-blocking UI:** Create/edit/delete navigates immediately while processing continues in the background.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.

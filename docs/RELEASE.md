@@ -17,6 +17,7 @@
 - Supabase realtime publication now includes knowledge tables for instant sidebar updates.
 - Knowledge Base realtime delete events now include full row data for filtered subscriptions.
 - Supabase realtime publication now includes offering profile suggestions for indicator updates.
+- Knowledge Base create/edit/delete now navigate immediately while processing continues in the background.
 - Pending AI suggestion indicators in settings sidebar and organization profile section.
 - Main sidebar Settings indicator for pending AI suggestions.
 - Locale-aware AI suggestion generation and localized timestamps in settings.
@@ -109,6 +110,8 @@
 
 ### Changed
 - Turkish UI copy now uses "Kişi" instead of "Lead".
+- Offering Profile suggestions now support archiving rejected items (audit-only) with an archived tab, and the generate button appears whenever there are no pending items.
+- Knowledge Base pending AI suggestions banner now uses an amber tone for better visibility.
 - Lead extraction now uses only approved Offering Profile AI suggestions.
 - Lead extraction ignores update proposals (only approved base suggestions are used).
 - New AI suggestions start in a pending state until reviewed.

@@ -73,6 +73,7 @@ export function KnowledgeContainer({
             .from('offering_profile_suggestions')
             .select('id', { count: 'exact', head: true })
             .eq('organization_id', organizationId)
+            .is('archived_at', null)
             .or('status.eq.pending,status.is.null')
 
         const { count, error } = await query
@@ -247,14 +248,14 @@ export function KnowledgeContainer({
 
             {aiSuggestionsEnabled && pendingSuggestions > 0 && (
                 <div className="px-8 mt-4">
-                    <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-900 flex items-center justify-between gap-4">
+                    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-100/80 px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-4">
                         <div>
                             <p className="font-semibold">{t('aiSuggestionsBannerTitle')}</p>
-                            <p className="text-xs text-blue-700">{t('aiSuggestionsBannerDescription', { count: pendingSuggestions })}</p>
+                            <p className="text-xs text-amber-800">{t('aiSuggestionsBannerDescription', { count: pendingSuggestions })}</p>
                         </div>
                         <Link
                             href="/settings/organization"
-                            className="text-xs font-semibold text-blue-700 hover:text-blue-800"
+                            className="text-xs font-semibold text-amber-800 hover:text-amber-900"
                         >
                             {t('aiSuggestionsBannerCta')}
                         </Link>

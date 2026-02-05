@@ -65,6 +65,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
             .from('offering_profile_suggestions')
             .select('id', { count: 'exact', head: true })
             .eq('organization_id', orgId)
+            .is('archived_at', null)
             .or('status.eq.pending,status.is.null')
 
         const { count, error } = await query

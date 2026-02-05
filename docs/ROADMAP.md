@@ -130,9 +130,11 @@
 - [x] **KB Realtime Publication:** Enable knowledge tables in Supabase realtime for instant sidebar updates
 - [x] **KB Realtime Deletes:** Enable replica identity full so delete events include org context
 - [x] **Suggestions Realtime Publication:** Add offering profile suggestions to Supabase realtime publication
+- [x] **KB Non-blocking UI:** Create/edit/delete return immediately while background jobs continue
 - [x] **KB Sidebar Uncategorized:** Show uncategorized items (max 10) with expand and correct all-content counts
 - [x] **KB Terminology:** Replace "collection" labels with "folder" in UI copy
 - [x] **KB Keyword Fallback:** Use keyword search when embedding lookup fails or returns no matches
+- [x] **KB Banner Styling:** Use an amber tone for pending AI suggestion banners
 
 ---
 
@@ -196,7 +198,8 @@
   - [x] Hybrid AI suggestions (intro + up to 5 bullets) with update proposals for conflicting content
   - [x] Suggestion generation uses manual summary plus approved/rejected history for context
   - [x] Knowledge Base banner surfaces pending AI suggestions with quick link to Organization settings
-  - [x] AI suggestions enforce 3-5 bullet hybrid format with retry on sparse output
+- [x] AI suggestions enforce 3-5 bullet hybrid format with retry on sparse output
+- [x] AI suggestions archive (archived tab with archive action; regenerate when no pending)
   - [x] Knowledge Base banner copy updated to “Hizmet profili önerileri hazır” and spaced from header
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
