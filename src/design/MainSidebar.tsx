@@ -7,16 +7,18 @@ import { useLocale, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { AiBotMode } from '@/types/database'
+import { AiFillExperiment, AiOutlineExperiment } from 'react-icons/ai'
+import { FaRegFolderOpen } from 'react-icons/fa'
+import {
+    HiMiniChatBubbleBottomCenterText,
+    HiOutlineChatBubbleBottomCenterText,
+} from 'react-icons/hi2'
+import { IoSettings, IoSettingsOutline, IoSparkles, IoSparklesOutline } from 'react-icons/io5'
 import {
     ArrowLeftFromLine,
     ArrowRightFromLine,
-    BookOpen,
     Bot,
-    Inbox,
     LogOut,
-    MessageSquare,
-    Settings,
-    Sparkles,
 } from 'lucide-react'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
@@ -232,16 +234,40 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                 id: 'workspace',
                 label: tSidebar('workspace'),
                 items: [
-                    { id: 'inbox', href: '/inbox', label: tNav('inbox'), icon: Inbox },
-                    { id: 'simulator', href: '/simulator', label: tNav('simulator'), icon: MessageSquare },
+                    {
+                        id: 'inbox',
+                        href: '/inbox',
+                        label: tNav('inbox'),
+                        icon: HiOutlineChatBubbleBottomCenterText,
+                        activeIcon: HiMiniChatBubbleBottomCenterText,
+                    },
+                    {
+                        id: 'simulator',
+                        href: '/simulator',
+                        label: tNav('simulator'),
+                        icon: AiOutlineExperiment,
+                        activeIcon: AiFillExperiment,
+                    },
                 ],
             },
             {
                 id: 'ai',
                 label: tSidebar('aiTools'),
                 items: [
-                    { id: 'skills', href: '/skills', label: tNav('skills'), icon: Sparkles },
-                    { id: 'knowledge', href: '/knowledge', label: tNav('knowledgeBase'), icon: BookOpen },
+                    {
+                        id: 'skills',
+                        href: '/skills',
+                        label: tNav('skills'),
+                        icon: IoSparklesOutline,
+                        activeIcon: IoSparkles,
+                    },
+                    {
+                        id: 'knowledge',
+                        href: '/knowledge',
+                        label: tNav('knowledgeBase'),
+                        icon: FaRegFolderOpen,
+                        activeIcon: FaRegFolderOpen,
+                    },
                 ],
             },
         ],
@@ -253,7 +279,15 @@ export function MainSidebar({ userName }: MainSidebarProps) {
             {
                 id: 'other',
                 label: tSidebar('other'),
-                items: [{ id: 'settings', href: '/settings/channels', label: tNav('settings'), icon: Settings }],
+                items: [
+                    {
+                        id: 'settings',
+                        href: '/settings/channels',
+                        label: tNav('settings'),
+                        icon: IoSettingsOutline,
+                        activeIcon: IoSettings,
+                    },
+                ],
             },
         ],
         [tNav, tSidebar]
@@ -358,7 +392,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                             <div className="space-y-1">
                                 {section.items.map(item => {
                                     const isActive = pathWithoutLocale.startsWith(item.href)
-                                    const Icon = item.icon
+                                    const Icon = isActive ? item.activeIcon : item.icon
                                     const showUnread = item.id === 'inbox' && hasUnread
                                     return (
                                         <Link
@@ -431,7 +465,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                             <div className="space-y-1">
                                 {section.items.map(item => {
                                     const isActive = pathWithoutLocale.startsWith('/settings')
-                                    const Icon = item.icon
+                                    const Icon = isActive ? item.activeIcon : item.icon
                                     const showPending = item.id === 'settings' && hasPendingSuggestions
                                     return (
                                         <Link

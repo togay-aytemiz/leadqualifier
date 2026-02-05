@@ -115,6 +115,10 @@
 
 ### Changed
 - Turkish UI copy now uses "Kişi" instead of "Lead".
+- Main sidebar navigation now swaps active/passive icons per item for selected states.
+- Knowledge Base routes now show skeleton loaders during navigation to avoid blank waits.
+- Inbox conversation list now shows a lead status dot beneath the platform badge.
+- Settings sidebar icons updated to the bubbles/circle user icon set.
 - Lead scoring now weights decisive booking intent higher and augments intent signals with keyword heuristics.
 - Inbox details now keep the contact header while grouping the lead snapshot under Key Information.
 - Lead score reasoning now respects the active UI language and uses localized status labels.
@@ -152,9 +156,12 @@
 - Knowledge Base banner copy now emphasizes service profile suggestions and adds spacing from the header.
 - Knowledge Base save/update now return immediately with background processing and UI polling.
 - Lead scoring now uses LLM-provided score/status from the latest 5 customer messages (assistant messages excluded).
+- Lead extraction now injects the latest customer message into the LLM prompt to avoid missing fresh messages.
 
 ### Fixed
 - Knowledge Base sidebar file clicks now open the document details view.
+- Inbox platform badge alignment restored after adding the lead status dot.
+- Lead status dot now updates via realtime lead changes (no manual refresh needed).
 - Knowledge Base sidebar now highlights the active document and adds spacing between All Content and Uncategorized sections.
 - Knowledge Base sidebar now refreshes immediately via realtime document/collection updates.
 - Removed legacy `knowledge_base` table in favor of documents/chunks.

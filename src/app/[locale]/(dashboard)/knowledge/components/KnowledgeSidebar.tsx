@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
-import { Sidebar, SidebarGroup, SidebarItem, Button } from '@/design'
+import { Sidebar, SidebarGroup, SidebarItem, Button, Skeleton } from '@/design'
 import { getSidebarData, type SidebarData, createCollection } from '@/lib/knowledge-base/actions'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -147,28 +147,54 @@ export function KnowledgeSidebar() {
         loadSidebar()
     }
 
+    const footer = (
+        <div className="p-3 space-y-2 border-t border-gray-200 bg-white">
+            <Button
+                variant="secondary"
+                className="w-full justify-start bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-700"
+                onClick={() => setShowFolderModal(true)}
+            >
+                <FolderPlus size={16} className="mr-2 text-gray-500" />
+                {useTranslations('folderModal')('create')}
+            </Button>
+            <NewContentButton
+                collectionId={currentCollectionId}
+                className="w-full justify-start"
+                align="start"
+                side="top"
+            />
+        </div>
+    )
+
+    if (!data) {
+        return (
+            <Sidebar title={t('title')} footer={footer}>
+                <SidebarGroup title={t('content')}>
+                    <div className="space-y-2 px-3 py-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-8 w-full rounded-md" />
+                        <Skeleton className="h-8 w-5/6 rounded-md" />
+                    </div>
+                </SidebarGroup>
+                <SidebarGroup title={t('collections')}>
+                    <div className="space-y-2 px-3 py-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-8 w-full rounded-md" />
+                        <Skeleton className="h-8 w-4/5 rounded-md" />
+                        <Skeleton className="h-8 w-11/12 rounded-md" />
+                    </div>
+                </SidebarGroup>
+                <FolderModal
+                    isOpen={showFolderModal}
+                    onClose={() => setShowFolderModal(false)}
+                    onSubmit={handleCreateFolder}
+                />
+            </Sidebar>
+        )
+    }
+
     return (
-        <Sidebar
-            title={t('title')}
-            footer={
-                <div className="p-3 space-y-2 border-t border-gray-200 bg-white">
-                    <Button
-                        variant="secondary"
-                        className="w-full justify-start bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-700"
-                        onClick={() => setShowFolderModal(true)}
-                    >
-                        <FolderPlus size={16} className="mr-2 text-gray-500" />
-                        {useTranslations('folderModal')('create')}
-                    </Button>
-                    <NewContentButton
-                        collectionId={currentCollectionId}
-                        className="w-full justify-start"
-                        align="start"
-                        side="top"
-                    />
-                </div>
-            }
-        >
+        <Sidebar title={t('title')} footer={footer}>
             <SidebarGroup title={t('content')}>
                 <SidebarItem
                     icon={<LayoutGrid size={18} />}

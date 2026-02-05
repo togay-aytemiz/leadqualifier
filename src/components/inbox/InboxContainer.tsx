@@ -393,7 +393,8 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
                                     return {
                                         ...c,
                                         ...newOrUpdatedConv,
-                                        assignee: nextAssignee
+                                        assignee: nextAssignee,
+                                        leads: c.leads
                                     }
                                 }
                                 return c
@@ -406,7 +407,7 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
                                 ? assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? null
                                 : null
 
-                            return [{ ...newOrUpdatedConv, assignee: nextAssignee }, ...prev]
+                            return [{ ...newOrUpdatedConv, assignee: nextAssignee, leads: [] }, ...prev]
                                 .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
                         }
                     })
@@ -424,6 +425,31 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
                         const lastMessageAt = messagesRef.current[messagesRef.current.length - 1]?.created_at
                         if (!lastMessageAt || new Date(newOrUpdatedConv.last_message_at).getTime() > new Date(lastMessageAt).getTime()) {
                             refreshMessages(newOrUpdatedConv.id)
+                        }
+                    }
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'leads',
+                    filter: `organization_id=eq.${organizationId}`
+                }, (payload) => {
+                    const leadRow = (payload.eventType === 'DELETE' ? payload.old : payload.new) as Lead | null
+                    if (!leadRow?.conversation_id) return
+
+                    setConversations(prev => prev.map(c => {
+                        if (c.id !== leadRow.conversation_id) return c
+                        if (payload.eventType === 'DELETE') {
+                            return { ...c, leads: [] }
+                        }
+                        return { ...c, leads: [{ status: leadRow.status }] }
+                    }))
+
+                    if (leadRow.conversation_id === selectedIdRef.current) {
+                        if (payload.eventType === 'DELETE') {
+                            setLead(null)
+                        } else {
+                            setLead(leadRow)
                         }
                     }
                 })
@@ -699,7 +725,12 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
                             <p className="text-xs text-gray-500 mt-1">{t('noMessagesDesc')}</p>
                         </div>
                     ) : (
-                        conversations.map(c => (
+                        conversations.map(c => {
+                            const leadStatus = Array.isArray(c.leads)
+                                ? c.leads[0]?.status
+                                : c.leads?.status
+
+                            return (
                             <div
                                 key={c.id}
                                 onClick={() => setSelectedId(c.id)}
@@ -709,15 +740,29 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
                                     <div className="flex items-center gap-2.5">
                                         <div className="relative">
                                             <Avatar name={c.contact_name} size="sm" />
-                                            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
-                                                {c.platform === 'telegram' ? (
-                                                    <FaTelegram className="text-[#229ED9]" size={18} />
-                                                ) : c.platform === 'whatsapp' ? (
-                                                    <IoLogoWhatsapp className="text-[#25D366]" size={18} />
-                                                ) : (
-                                                    <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
+                                            <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-2 flex flex-col items-center gap-1">
+                                                <span className="h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
+                                                    {c.platform === 'telegram' ? (
+                                                        <FaTelegram className="text-[#229ED9]" size={18} />
+                                                    ) : c.platform === 'whatsapp' ? (
+                                                        <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                                    ) : (
+                                                        <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
+                                                    )}
+                                                </span>
+                                                {leadStatus && (
+                                                    <span
+                                                        className={`h-2 w-2 rounded-full ${leadStatus === 'hot'
+                                                            ? 'bg-red-500'
+                                                            : leadStatus === 'warm'
+                                                                ? 'bg-amber-500'
+                                                                : leadStatus === 'ignored'
+                                                                    ? 'bg-blue-500'
+                                                                    : 'bg-gray-400'
+                                                        }`}
+                                                    />
                                                 )}
-                                            </span>
+                                            </div>
                                         </div>
                                         <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
                                     </div>
@@ -737,7 +782,8 @@ export function InboxContainer({ initialConversations, organizationId, botName, 
                                 </div>
                                 {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
                             </div>
-                        ))
+                            )
+                        })
                     )}
                     {loadingMore && (
                         <div className="p-4 flex justify-center">

@@ -155,6 +155,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
 - Service type inference prioritizes customer messages, ignores assistant-only suggestions, and respects explicit negations.
 - Lead score and status are produced directly by the LLM using the latest 5 customer messages only (assistant messages excluded).
+- The most recent customer message is always injected into the extraction prompt to avoid replication delays.
 - Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation). Rejected suggestions can be archived for audit (excluded from AI context), and users can regenerate suggestions whenever there are no pending items.
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
@@ -274,6 +275,7 @@ MVP is successful when:
 - **Sidebar UI Refinement:** Collapsed logo alignment is centered to match the navigation icon stack.
 - **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
 - **Sidebar Spacing:** Add top padding between the header block and first navigation section for visual separation.
+- **Sidebar Icons:** Use per-item active/passive icon variants (react-icons) to differentiate selected states.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
@@ -282,6 +284,7 @@ MVP is successful when:
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **KB Sidebar Refresh:** Dispatch `knowledge-updated` on content create/update/delete and surface pending AI suggestions via a KB banner linked to Organization settings.
 - **KB Banner Styling:** Use an amber-toned banner for pending AI suggestion visibility in Knowledge Base.
+- **KB Loading UX:** Show route-level skeletons so knowledge pages render instantly while server data loads.
 - **KB Sidebar Navigation:** Allow clicking files in the sidebar to open the document detail view.
 - **KB Sidebar Focus:** Highlight the active document and add spacing between the All Content and Uncategorized sections.
 - **KB Sidebar Realtime:** Subscribe to knowledge document/collection changes to refresh the sidebar immediately.
@@ -307,11 +310,14 @@ MVP is successful when:
 - **Inbox Badge Scale:** Increase badge/icon size slightly and reduce border weight for better legibility.
 - **Inbox Badge Offset:** Drop the badge a bit lower and further emphasize the brand icon.
 - **Inbox Badge Fine-Tuning:** Allow incremental offset and border tweaks for visual balance.
+- **Inbox Lead Status Dot:** Show a small status dot beneath the platform badge to surface AI lead status at a glance.
+- **Inbox Lead Realtime:** Include `leads` in realtime publication and subscribe to status changes so list indicators update without manual refresh.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
 - **Settings Save Feedback:** Show saved state via the save button (no inline “Saved” text) and clear dirty-state after persistence across settings pages.
+- **Settings Sidebar Icons:** Use the updated settings menu icon set (bubbles/circle user) for profile/org/general/AI/channels/billing entries.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.

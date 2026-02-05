@@ -1,7 +1,9 @@
 'use client'
 
 import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
-import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
+import { FaRegCreditCard } from 'react-icons/fa'
+import { ImBubbles4 } from 'react-icons/im'
+import { LuBriefcaseBusiness, LuCircleUser, LuReceipt, LuSettings2, LuWandSparkles } from 'react-icons/lu'
 import { useRouter, usePathname } from '@/i18n/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -125,19 +127,19 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
             <Sidebar title={tSidebar('settings')}>
                 <SidebarGroup title={tSidebar('preferences')}>
                     <SidebarItem
-                        icon={<User size={18} />}
+                        icon={<LuCircleUser size={18} />}
                         label={tSidebar('profile')}
                         href={currentLocale === 'tr' ? '/settings/profile' : `/${currentLocale}/settings/profile`}
                     />
                     <SidebarItem
-                        icon={<Building2 size={18} />}
+                        icon={<LuBriefcaseBusiness size={18} />}
                         label={tSidebar('organization')}
                         href={currentLocale === 'tr' ? '/settings/organization' : `/${currentLocale}/settings/organization`}
                         indicator={pendingCount > 0}
                     />
-                    <SidebarItem icon={<Settings size={18} />} label={tSidebar('general')} active />
+                    <SidebarItem icon={<LuSettings2 size={18} />} label={tSidebar('general')} active />
                     <SidebarItem
-                        icon={<Sparkles size={18} />}
+                        icon={<LuWandSparkles size={18} />}
                         label={tSidebar('ai')}
                         href={currentLocale === 'tr' ? '/settings/ai' : `/${currentLocale}/settings/ai`}
                     />
@@ -145,7 +147,7 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
 
                 <SidebarGroup title={tSidebar('integrations')}>
                     <SidebarItem
-                        icon={<Zap size={18} />}
+                        icon={<ImBubbles4 size={18} />}
                         label={tSidebar('channels')}
                         href={currentLocale === 'tr' ? '/settings/channels' : `/${currentLocale}/settings/channels`}
                     />
@@ -153,12 +155,12 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
 
                 <SidebarGroup title={tSidebar('billing')}>
                     <SidebarItem
-                        icon={<CreditCard size={18} />}
+                        icon={<FaRegCreditCard size={18} />}
                         label={tSidebar('plans')}
                         href="#"
                     />
                     <SidebarItem
-                        icon={<Receipt size={18} />}
+                        icon={<LuReceipt size={18} />}
                         label={tSidebar('receipts')}
                         href={currentLocale === 'tr' ? '/settings/billing' : `/${currentLocale}/settings/billing`}
                     />

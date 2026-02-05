@@ -32,11 +32,13 @@ export async function getConversations(organizationId: string, page: number = 0,
         .from('conversations')
         .select(`
             *,
-            *,
             active_agent,
             assignee:assignee_id(
                 full_name,
                 email
+            ),
+            leads (
+                status
             ),
             messages (
                 content,
@@ -48,6 +50,7 @@ export async function getConversations(organizationId: string, page: number = 0,
         .order('last_message_at', { ascending: false })
         .order('created_at', { foreignTable: 'messages', ascending: false })
         .limit(1, { foreignTable: 'messages' })
+        .limit(1, { foreignTable: 'leads' })
         .range(from, to)
 
     if (error) {

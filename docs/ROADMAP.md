@@ -94,6 +94,7 @@
   - [x] Inbox list platform badges adjusted for size and placement
   - [x] Inbox list platform badges lowered and icon size increased
   - [x] Inbox list platform badges lowered further with thinner borders
+  - [x] Inbox list lead status dot shown under platform badge
   - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)
@@ -106,10 +107,12 @@
   - [x] Centered collapsed logo alignment
   - [x] Eyebrow section labels for grouped navigation
   - [x] Increased spacing between header and first sidebar section
+  - [x] Sidebar nav icons use active/passive variants per item
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
   - [x] Realtime auth handshake for subscriptions
+  - [x] Realtime lead status updates for inbox list indicators
 - [x] **Internationalization**
   - [x] Remove hardcoded UI strings
   - [x] Enforce EN/TR parity with automated checks
@@ -121,6 +124,7 @@
   - [x] Create KB entry model
   - [x] Category support
   - [x] Admin UI for KB management
+  - [x] Knowledge base route loading skeletons for instant navigation
 - [x] **KB Status UI**
   - [x] Show indexing status per entry (Ready / Processing / Error)
 - [x] **RAG Pipeline**
@@ -174,6 +178,7 @@
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
 - [x] **Settings UX:** Align settings column widths and remove duplicate field labels for cleaner alignment
+- [x] **Settings UX:** Refresh settings sidebar icons with bubbles/circle-user icons
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details
 - [x] **Auth UX Refresh**
@@ -229,6 +234,7 @@
   - [x] Parse fenced or noisy JSON outputs safely
   - [x] Label customer vs assistant messages and respect customer negations
   - [x] Use last 5 customer messages and LLM-provided score/status
+  - [x] Ensure latest message is included even with async writes
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
   - [x] Auto-generate AI summary

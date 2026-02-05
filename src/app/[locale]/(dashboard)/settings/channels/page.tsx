@@ -3,7 +3,9 @@ import { getChannels } from '@/lib/channels/actions'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ChannelsList } from '@/components/channels/ChannelsList'
 import { Sidebar, SidebarGroup, SidebarItem, PageHeader, Button } from '@/design'
-import { Zap, CreditCard, Receipt, Settings, Sparkles, User, Building2 } from 'lucide-react'
+import { FaRegCreditCard } from 'react-icons/fa'
+import { ImBubbles4 } from 'react-icons/im'
+import { LuBriefcaseBusiness, LuCircleUser, LuReceipt, LuSettings2, LuWandSparkles } from 'react-icons/lu'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 
@@ -50,36 +52,36 @@ export default async function ChannelsPage() {
             <Sidebar title={tSidebar('settings')}>
                 <SidebarGroup title={tSidebar('preferences')}>
                     <SidebarItem
-                        icon={<User size={18} />}
+                        icon={<LuCircleUser size={18} />}
                         label={tSidebar('profile')}
                         href={locale === 'tr' ? '/settings/profile' : `/${locale}/settings/profile`}
                     />
                     <SidebarItem
-                        icon={<Building2 size={18} />}
+                        icon={<LuBriefcaseBusiness size={18} />}
                         label={tSidebar('organization')}
                         href={locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`}
                         indicator={pendingCount > 0}
                     />
                     <SidebarItem
-                        icon={<Settings size={18} />}
+                        icon={<LuSettings2 size={18} />}
                         label={tSidebar('general')}
                         href={locale === 'tr' ? '/settings/general' : `/${locale}/settings/general`}
                     />
                     <SidebarItem
-                        icon={<Sparkles size={18} />}
+                        icon={<LuWandSparkles size={18} />}
                         label={tSidebar('ai')}
                         href={locale === 'tr' ? '/settings/ai' : `/${locale}/settings/ai`}
                     />
                 </SidebarGroup>
 
                 <SidebarGroup title={tSidebar('integrations')}>
-                    <SidebarItem icon={<Zap size={18} />} label={tSidebar('channels')} active />
+                    <SidebarItem icon={<ImBubbles4 size={18} />} label={tSidebar('channels')} active />
                 </SidebarGroup>
 
                 <SidebarGroup title={tSidebar('billing')}>
-                    <SidebarItem icon={<CreditCard size={18} />} label={tSidebar('plans')} />
+                    <SidebarItem icon={<FaRegCreditCard size={18} />} label={tSidebar('plans')} />
                     <SidebarItem
-                        icon={<Receipt size={18} />}
+                        icon={<LuReceipt size={18} />}
                         label={tSidebar('receipts')}
                         href={locale === 'tr' ? '/settings/billing' : `/${locale}/settings/billing`}
                     />

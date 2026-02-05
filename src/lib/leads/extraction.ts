@@ -112,6 +112,11 @@ function extractFirstJsonObject(value: string) {
     return null
 }
 
+function hasJsonKey(value: string, key: string) {
+    const pattern = new RegExp(`"${key}"\\s*:`, 'i')
+    return pattern.test(value)
+}
+
 function normalizeExtractionPayload(payload: any) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return {
@@ -199,6 +204,13 @@ export async function runLeadExtraction(options: {
             return `customer: ${content}`
         })
         .filter(Boolean) as string[]
+    const latestMessage = (options.latestMessage ?? '').trim()
+    if (latestMessage && !contextMessages.some((entry) => entry === `customer: ${latestMessage}`)) {
+        contextMessages.push(`customer: ${latestMessage}`)
+    }
+    if (contextMessages.length > 5) {
+        contextMessages.splice(0, contextMessages.length - 5)
+    }
     const suggestionText = (suggestions ?? [])
         .map((item: any) => `- ${item.content}`)
         .reverse()
@@ -226,7 +238,42 @@ export async function runLeadExtraction(options: {
         ]
     })
 
-    const response = completion.choices[0]?.message?.content?.trim() ?? '{}'
+    let response = completion.choices[0]?.message?.content?.trim() ?? '{}'
+    let usageTotals = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+
+    const addUsage = (currentCompletion: typeof completion, prompt: string, output: string) => {
+        if (currentCompletion.usage) {
+            usageTotals = {
+                inputTokens: usageTotals.inputTokens + (currentCompletion.usage.prompt_tokens ?? 0),
+                outputTokens: usageTotals.outputTokens + (currentCompletion.usage.completion_tokens ?? 0),
+                totalTokens: usageTotals.totalTokens + (currentCompletion.usage.total_tokens ?? ((currentCompletion.usage.prompt_tokens ?? 0) + (currentCompletion.usage.completion_tokens ?? 0)))
+            }
+        } else {
+            const inputTokens = estimateTokenCount(EXTRACTION_SYSTEM_PROMPT) + estimateTokenCount(prompt)
+            const outputTokens = estimateTokenCount(output)
+            usageTotals = {
+                inputTokens: usageTotals.inputTokens + inputTokens,
+                outputTokens: usageTotals.outputTokens + outputTokens,
+                totalTokens: usageTotals.totalTokens + inputTokens + outputTokens
+            }
+        }
+    }
+
+    addUsage(completion, userPrompt, response)
+
+    if (!hasJsonKey(response, 'score') || !hasJsonKey(response, 'status')) {
+        const strictPrompt = `${userPrompt}\n\nReturn JSON with all required keys including score and status.`
+        const retry = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.2,
+            messages: [
+                { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
+                { role: 'user', content: strictPrompt }
+            ]
+        })
+        response = retry.choices[0]?.message?.content?.trim() ?? response
+        addUsage(retry, strictPrompt, response)
+    }
     const extracted = safeParseLeadExtraction(response)
     const normalizedExtracted = extracted
 
@@ -250,27 +297,14 @@ export async function runLeadExtraction(options: {
         last_message_at: new Date().toISOString()
     }, { onConflict: 'conversation_id' })
 
-    if (completion.usage) {
-        await recordAiUsage({
-            organizationId: options.organizationId,
-            category: 'lead_extraction',
-            model: 'gpt-4o-mini',
-            inputTokens: completion.usage.prompt_tokens ?? 0,
-            outputTokens: completion.usage.completion_tokens ?? 0,
-            totalTokens: completion.usage.total_tokens ?? 0,
-            metadata: { conversation_id: options.conversationId, source: options.source },
-            supabase
-        })
-    } else {
-        await recordAiUsage({
-            organizationId: options.organizationId,
-            category: 'lead_extraction',
-            model: 'gpt-4o-mini',
-            inputTokens: estimateTokenCount(EXTRACTION_SYSTEM_PROMPT) + estimateTokenCount(userPrompt),
-            outputTokens: estimateTokenCount(response),
-            totalTokens: estimateTokenCount(EXTRACTION_SYSTEM_PROMPT) + estimateTokenCount(userPrompt) + estimateTokenCount(response),
-            metadata: { conversation_id: options.conversationId, source: options.source },
-            supabase
-        })
-    }
+    await recordAiUsage({
+        organizationId: options.organizationId,
+        category: 'lead_extraction',
+        model: 'gpt-4o-mini',
+        inputTokens: usageTotals.inputTokens,
+        outputTokens: usageTotals.outputTokens,
+        totalTokens: usageTotals.totalTokens,
+        metadata: { conversation_id: options.conversationId, source: options.source },
+        supabase
+    })
 }
