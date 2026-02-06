@@ -125,6 +125,7 @@
 
 ### Changed
 - Inbox conversation list cards now use a 3-row text stack (name + right-aligned lead chip, one-line message preview, and time on the third row).
+- Inbox bot message bubbles now use a darker violet background with lighter text for stronger visual contrast.
 - Offering Profile AI Suggestions accordion header now shows only one pending indicator label and removes the redundant right-side count chip.
 - Telegram and Simulator KB/fallback replies now use required-fields + recent-customer-message context so LLM can naturally ask one smart follow-up question when needed.
 - Telegram and Simulator KB/fallback follow-up context now also includes the last 3 assistant replies to reduce repeated greetings in consecutive turns.

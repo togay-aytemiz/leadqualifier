@@ -2,6 +2,7 @@ import { Conversation, Message } from '@/types/database'
 import { format } from 'date-fns'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
+import { getInboxMessageBubbleClasses } from '@/components/inbox/chatWindowStyles'
 
 interface ChatWindowProps {
     conversation: Conversation
@@ -82,12 +83,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
                             </div>
 
                             <div className={`flex flex-col space-y-1 max-w-xl ${isMe || isBot ? 'items-end' : ''}`}>
-                                <div className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${isBot
-                                        ? 'bg-purple-100 text-purple-900 rounded-tr-none'
-                                        : isMe
-                                            ? 'bg-blue-100 text-blue-900 rounded-tr-none'
-                                            : 'bg-white text-gray-800 rounded-tl-none'
-                                    }`}>
+                                <div className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${getInboxMessageBubbleClasses(msg.sender_type)}`}>
                                     <p>{msg.content}</p>
                                 </div>
                                 <span className="text-[10px] text-gray-400">

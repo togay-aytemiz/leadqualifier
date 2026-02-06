@@ -317,6 +317,7 @@ MVP is successful when:
 - **KB Non-blocking UI:** Create/edit/delete navigates immediately while processing continues in the background.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
+- **Inbox Message Contrast:** Bot-authored inbox messages use a dark-violet bubble with light text to keep bot replies easy to scan against operator and contact messages.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.

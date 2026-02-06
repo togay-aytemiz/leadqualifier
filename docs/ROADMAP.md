@@ -97,6 +97,7 @@
   - [x] Inbox list platform badges lowered further with thinner borders
   - [x] Inbox list lead status shown as a right-aligned chip on the name row
   - [x] Inbox list time moved to a dedicated third row under message preview
+  - [x] Inbox bot message bubbles now use a darker background with light text for better contrast
   - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)

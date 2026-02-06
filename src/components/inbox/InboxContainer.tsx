@@ -6,7 +6,7 @@ import {
     Inbox, ChevronDown,
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw
 } from 'lucide-react'
-import { FaTelegram } from 'react-icons/fa'
+import { FaTelegram, FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { IoLogoWhatsapp } from 'react-icons/io5'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary, getConversationLead, getLeadScoreReasoning, refreshConversationLead } from '@/lib/inbox/actions'
@@ -608,9 +608,10 @@ export function InboxContainer({
                 active_agent: 'operator',
                 assignee_id: currentUserProfile?.id ?? c.assignee_id,
                 assignee: optimisticAssignee ?? c.assignee,
-                last_message_at: new Date().toISOString()
+                last_message_at: new Date().toISOString(),
+                messages: [{ content: input, created_at: new Date().toISOString(), sender_type: 'user' } as any]
             } : c
-        ))
+        ).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
 
         setInput('')
         setIsSending(true)
@@ -772,52 +773,57 @@ export function InboxContainer({
                                             : 'border-gray-200 bg-gray-100 text-gray-600'
 
                             return (
-                            <div
-                                key={c.id}
-                                onClick={() => setSelectedId(c.id)}
-                                className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""}`}
-                            >
-                                <div className="flex items-start gap-3">
-                                    <div className="relative shrink-0">
-                                        <Avatar name={c.contact_name} size="sm" />
-                                        <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-2">
-                                            <span className="h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
-                                                {c.platform === 'telegram' ? (
-                                                    <FaTelegram className="text-[#229ED9]" size={18} />
-                                                ) : c.platform === 'whatsapp' ? (
-                                                    <IoLogoWhatsapp className="text-[#25D366]" size={18} />
-                                                ) : (
-                                                    <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="min-w-0 flex-1 pr-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-sm font-semibold truncate ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
-                                                {c.contact_name}
-                                            </span>
-                                            {leadStatusLabel && (
-                                                <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
-                                                    {leadStatusLabel}
+                                <div
+                                    key={c.id}
+                                    onClick={() => setSelectedId(c.id)}
+                                    className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""}`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="relative shrink-0">
+                                            <Avatar name={c.contact_name} size="sm" />
+                                            <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-2">
+                                                <span className="h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
+                                                    {c.platform === 'telegram' ? (
+                                                        <FaTelegram className="text-[#229ED9]" size={18} />
+                                                    ) : c.platform === 'whatsapp' ? (
+                                                        <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                                    ) : (
+                                                        <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
+                                                    )}
                                                 </span>
-                                            )}
+                                            </div>
                                         </div>
-                                        <p className={`mt-0.5 text-sm truncate leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
-                                            {c.messages?.[0]?.content || t('noMessagesYet')}
-                                        </p>
-                                        <div className="mt-0.5 flex items-center justify-between">
-                                            <span className="text-xs text-gray-400">
-                                                {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
-                                            </span>
-                                            {c.unread_count > 0 && (
-                                                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                                            )}
+                                        <div className="min-w-0 flex-1 pr-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-sm font-semibold truncate ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
+                                                    {c.contact_name}
+                                                </span>
+                                                {leadStatusLabel && (
+                                                    <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
+                                                        {leadStatusLabel}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className={`mt-0.5 text-sm truncate leading-relaxed flex items-center gap-1.5 ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
+                                                {c.messages?.[0] && (
+                                                    c.messages[0].sender_type === 'contact'
+                                                        ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
+                                                        : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
+                                                )}
+                                                <span className="truncate">{c.messages?.[0]?.content || t('noMessagesYet')}</span>
+                                            </p>
+                                            <div className="mt-0.5 flex items-center justify-between">
+                                                <span className="text-xs text-gray-400">
+                                                    {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
+                                                </span>
+                                                {c.unread_count > 0 && (
+                                                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
+                                    {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
                                 </div>
-                                {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
-                            </div>
                             )
                         })
                     )}
@@ -886,7 +892,7 @@ export function InboxContainer({
                                 return (
                                     <div key={m.id} className="flex items-end gap-3 justify-end">
                                         <div className="flex flex-col gap-1 items-end max-w-[80%]">
-                                            <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-50 text-purple-900' : 'bg-blue-100 text-blue-900'}`}>
+                                            <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
                                                 {m.content}
                                             </div>
                                             <div className="flex items-center gap-1.5 mr-1">
