@@ -323,6 +323,8 @@ export function InboxContainer({
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null
+        let messagesChannel: ReturnType<typeof supabase.channel> | null = null
+        let conversationsChannel: ReturnType<typeof supabase.channel> | null = null
         let cleanupRealtimeAuth: (() => void) | null = null
         let isMounted = true
 
@@ -343,7 +345,8 @@ export function InboxContainer({
 
             console.log('Setting up Realtime subscription...')
 
-            channel = supabase.channel('inbox_global')
+            // Separate channels for messages and conversations
+            messagesChannel = supabase.channel('inbox_messages')
                 .on('postgres_changes', {
                     event: 'INSERT',
                     schema: 'public',
@@ -394,6 +397,11 @@ export function InboxContainer({
                         return c
                     }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
                 })
+                .subscribe((status, err) => {
+                    console.log('Messages Channel Status:', status, err ? { error: err } : '')
+                })
+
+            conversationsChannel = supabase.channel('inbox_conversations')
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
@@ -418,25 +426,20 @@ export function InboxContainer({
                                     return {
                                         ...c,
                                         ...newOrUpdatedConv,
-                                        assignee: nextAssignee,
-                                        leads: c.leads
+                                        leads: c.leads, // preserve relational data
+                                        messages: c.messages, // preserve relational data
+                                        assignee: nextAssignee
                                     }
                                 }
                                 return c
                             }).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
                         } else {
-                            // INSERT logic (New conversation)
-                            // Note: We won't have the 'assignee' object populated (it's null or just ID) until a fetch,
-                            // but for a new open conversation that's fine.
-                            const nextAssignee = newOrUpdatedConv.assignee_id
-                                ? assigneeCacheRef.current[newOrUpdatedConv.assignee_id] ?? null
-                                : null
-
-                            return [{ ...newOrUpdatedConv, assignee: nextAssignee, leads: [] }, ...prev]
-                                .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+                            // INSERT logic (new conversation)
+                            return [newOrUpdatedConv, ...prev]
                         }
                     })
 
+                    // Resolve assignee if needed
                     if (newOrUpdatedConv.assignee_id && !assigneeCacheRef.current[newOrUpdatedConv.assignee_id]) {
                         resolveAssignee(newOrUpdatedConv.assignee_id).then((assignee) => {
                             if (!assignee) return
@@ -485,10 +488,19 @@ export function InboxContainer({
 
         setupRealtime()
 
+
         return () => {
             isMounted = false
             if (cleanupRealtimeAuth) {
                 cleanupRealtimeAuth()
+            }
+            if (messagesChannel) {
+                console.log('Cleaning up Messages channel...')
+                supabase.removeChannel(messagesChannel)
+            }
+            if (conversationsChannel) {
+                console.log('Cleaning up Conversations channel...')
+                supabase.removeChannel(conversationsChannel)
             }
             if (channel) {
                 console.log('Cleaning up Realtime subscription...')
