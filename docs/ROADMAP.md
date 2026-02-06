@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-06  
+> **Last Updated:** 2026-02-06 (human escalation planning)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -173,6 +173,10 @@
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
 - [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
 - [x] **AI Settings:** Configurable bot name (org-level)
+- [ ] **Human Escalation (Planned)**
+  - [ ] AI Settings section: hot lead score, action, notice mode, handover message
+  - [ ] Skill-level `Requires Human Handover` toggle with read-only message preview
+  - [ ] Centralized escalation policy with precedence: skill override > hot lead score
 - [x] **Inbox UI:** Show configured bot name in chat labels
 - [x] **Usage & Billing:** Track monthly (UTC) + total AI token usage
 - [x] **Usage & Billing:** Breakdown by summary, messages, and lead extraction

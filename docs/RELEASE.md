@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- Human escalation policy design finalized (centralized policy, skill override precedence, hot lead actions, and assistant-promise UX with AI Settings deep link).
 - Offering Profile AI Suggestions accordion header now shows a compact pending badge (dot + count) while collapsed.
 - Knowledge Base “Review/İncele” CTA now deep-links to Organization settings and auto-expands the Offering Profile AI Suggestions accordion.
 - Offering Profile AI Suggestions now surface pending indicators inside the accordion content/tabs in addition to sidebar/header indicators.

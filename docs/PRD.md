@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-06  
+> **Last Updated:** 2026-02-06 (human escalation planning)  
 > **Status:** In Development
 
 ---
@@ -89,6 +89,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 | `trigger_examples` | Min 3, recommended 5 example phrases |
 | `response_text` | Template response |
 | `enabled` | Toggle on/off |
+| `requires_human_handover` | If true, always switch to operator after this skill response |
 
 **Routing Logic:**
 1. User message → embedding
@@ -191,6 +192,29 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ---
 
+### 4.6 Human Escalation Policy (Planned)
+
+**Triggers:**
+- Skill-level mandatory handover (`requires_human_handover = true`)
+- Lead-score handover (`lead.total_score >= hot_lead_score_threshold`)
+
+**Precedence:**
+- `skill override > hot lead score > no escalation`
+
+**Actions:**
+- `notify_only`: notify owner/team, keep AI active
+- `switch_to_operator`: lock conversation to operator (`active_agent='operator'`)
+
+**Customer Notice Modes:**
+- `assistant_promise`: append a handover message after AI response
+- `silent`: no customer-facing handover message
+
+**Skill Override Rule (validated):**
+- Skill-triggered handover always uses `switch_to_operator` + `assistant_promise`.
+- Promise text is configured in AI Settings and shown as read-only in skill form with a deep link to edit.
+
+---
+
 ## 5. Admin Panel
 
 ### 5.1 Lead List (Planned)
@@ -224,6 +248,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - TR copy labels Shadow mode as "Dinleyici" for clarity
 - TR copy for Active mode highlights background lead extraction
 - Sidebar status dots map to green/amber/red for Active/Dinleyici/Kapalı
+- Human Escalation section (planned): hot lead threshold, escalation action, customer notice mode, and editable handover message
 
 ### 5.6 Profile & Organization Settings
 - Profile: name and email visibility (email is read-only)
@@ -349,6 +374,7 @@ MVP is successful when:
 - **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
 - **Operator Extraction Toggle:** Default to pausing lead extraction during operator takeover, with an AI Settings toggle to keep it running.
+- **Human Escalation Policy:** Centralize escalation decisions in one policy layer with strict precedence `skill override > hot lead score`, where skill-triggered handover always sends the assistant promise and switches to operator.
 - **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.
 - **Lead Scoring Transparency:** Weight decisive booking intent higher (+3), add keyword fallback for intent signals, and expose on-demand score reasoning grounded in extracted inputs.
 - **Lead Score UX:** Reasoning copy respects the active UI locale and uses localized status labels.
