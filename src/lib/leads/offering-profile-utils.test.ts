@@ -47,6 +47,11 @@ describe('parseRequiredIntakeFieldsPayload', () => {
         expect(parseRequiredIntakeFieldsPayload('["Bütçe","Tarih"]')).toEqual(['Bütçe', 'Tarih'])
     })
 
+    it('parses fenced JSON payloads with surrounding text', () => {
+        const payload = 'Sonuc:\n```json\n{"required_fields":["Telefon","Adres"]}\n```'
+        expect(parseRequiredIntakeFieldsPayload(payload)).toEqual(['Telefon', 'Adres'])
+    })
+
     it('returns null for invalid payload', () => {
         expect(parseRequiredIntakeFieldsPayload('nope')).toBeNull()
     })

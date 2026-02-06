@@ -218,6 +218,8 @@
         "leadScore": "Skor",
         "leadService": "Hizmet",
         "leadSummary": "Özet",
+        "leadRequiredInfo": "Önemli bilgiler",
+        "leadRequiredInfoEmpty": "Henüz önemli bilgi toplanmadı.",
         "leadUpdated": "Güncellendi",
         "leadUnknown": "Bilinmiyor",
         "leadEmpty": "Henüz kişi çıkarımı yok.",

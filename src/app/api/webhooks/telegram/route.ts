@@ -10,6 +10,12 @@ import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { resolveBotModeAction, resolveLeadExtractionAllowance } from '@/lib/ai/bot-mode'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { buildRequiredIntakeFollowupGuidance, getRequiredIntakeFields } from '@/lib/ai/followup'
+import {
+    buildConversationContinuityGuidance,
+    stripRepeatedGreeting,
+    toOpenAiConversationMessages
+} from '@/lib/ai/conversation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -72,6 +78,7 @@ export async function POST(req: NextRequest) {
     const aiSettings = await getOrgAiSettings(orgId, { supabase })
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
+    const requiredIntakeFields = await getRequiredIntakeFields({ organizationId: orgId, supabase })
 
     // 3. Find or Create Conversation
     // 3. Find or Create Conversation
@@ -195,6 +202,13 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ ok: true })
     }
+    let customerHistoryForFollowup = [text.trim()].filter(Boolean)
+    let assistantHistoryForFollowup: string[] = []
+    let conversationHistoryForReply: ConversationTurn[] = []
+    let leadSnapshotForReply: {
+        service_type?: string | null
+        extracted_fields?: Record<string, unknown> | null
+    } | null = null
 
     // 6. Process AI Response (Skills)
     const matchedSkills = await matchSkills(text, orgId, matchThreshold, 5, supabase)
@@ -237,24 +251,41 @@ export async function POST(req: NextRequest) {
 
         try {
             const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions') // Dynamically import to avoid circular dep if any
-            const { data: recentMessages, error: historyError } = await supabase
-                .from('messages')
-                .select('sender_type, content, created_at')
-                .eq('conversation_id', conversation.id)
-                .order('created_at', { ascending: false })
-                .limit(4)
+            const [{ data: recentMessages, error: historyError }, { data: leadSnapshot, error: leadError }] = await Promise.all([
+                supabase
+                    .from('messages')
+                    .select('sender_type, content, created_at')
+                    .eq('conversation_id', conversation.id)
+                    .order('created_at', { ascending: false })
+                    .limit(12),
+                supabase
+                    .from('leads')
+                    .select('service_type, extracted_fields')
+                    .eq('conversation_id', conversation.id)
+                    .maybeSingle()
+            ])
 
             if (historyError) {
                 console.warn('Telegram Webhook: Failed to load history for KB routing', historyError)
             }
+            if (leadError) {
+                console.warn('Telegram Webhook: Failed to load lead snapshot for continuity', leadError)
+            }
+            leadSnapshotForReply = (leadSnapshot ?? null) as typeof leadSnapshotForReply
 
             const trimmedHistory = (recentMessages ?? []).filter((msg, index) => {
                 if (index !== 0) return true
                 return !(msg.sender_type === 'contact' && msg.content === text)
             })
+            assistantHistoryForFollowup = trimmedHistory
+                .filter((msg) => msg.sender_type === 'bot')
+                .map((msg) => (msg.content ?? '').toString().trim())
+                .filter(Boolean)
+                .slice(0, 3)
+                .reverse()
 
             const history: ConversationTurn[] = trimmedHistory
-                .slice(0, 6)
+                .slice(0, 10)
                 .reverse()
                 .filter((msg) => typeof msg.content === 'string' && msg.content.trim().length > 0)
                 .map((msg) => ({
@@ -262,6 +293,21 @@ export async function POST(req: NextRequest) {
                     content: msg.content as string,
                     timestamp: msg.created_at
                 }))
+            conversationHistoryForReply = history
+            customerHistoryForFollowup = history
+                .filter((turn) => turn.role === 'user')
+                .map((turn) => turn.content.trim())
+                .filter(Boolean)
+                .slice(-8)
+            const latestMessage = text.trim()
+            if (latestMessage && !customerHistoryForFollowup.some((item) => item === latestMessage)) {
+                customerHistoryForFollowup.push(latestMessage)
+            }
+            const requiredIntakeGuidance = buildRequiredIntakeFollowupGuidance(
+                requiredIntakeFields,
+                customerHistoryForFollowup,
+                assistantHistoryForFollowup
+            )
 
             const decision = await decideKnowledgeBaseRoute(text, history)
             if (decision.usage) {
@@ -301,25 +347,34 @@ export async function POST(req: NextRequest) {
                     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
                     const basePrompt = withBotNamePrompt(aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT, aiSettings.bot_name)
+                    const continuityGuidance = buildConversationContinuityGuidance({
+                        recentAssistantMessages: assistantHistoryForFollowup,
+                        leadSnapshot: leadSnapshotForReply
+                    })
                     const systemPrompt = `${basePrompt}
 
 Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Keep the answer concise and friendly (in Turkish or English depending on user).
+Continue naturally from recent conversation turns without restarting.
 
 Context:
-${context}`
+${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${continuityGuidance ? `\n\n${continuityGuidance}` : ''}`
+                    const historyMessages = toOpenAiConversationMessages(history, text, 10)
 
                     const completion = await openai.chat.completions.create({
                         model: 'gpt-4o-mini',
                         messages: [
                             { role: 'system', content: systemPrompt },
+                            ...historyMessages,
                             { role: 'user', content: text }
                         ],
                         temperature: 0.3
                     })
 
                     const ragResponse = completion.choices[0]?.message?.content?.trim()
+                    const polishedRagResponse = stripRepeatedGreeting(ragResponse ?? '', assistantHistoryForFollowup)
+                    const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                     const ragUsage = completion.usage
                         ? {
                             inputTokens: completion.usage.prompt_tokens ?? 0,
@@ -327,9 +382,9 @@ ${context}`
                             totalTokens: completion.usage.total_tokens ?? (completion.usage.prompt_tokens ?? 0) + (completion.usage.completion_tokens ?? 0)
                         }
                         : {
-                            inputTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(text),
-                            outputTokens: estimateTokenCount(ragResponse ?? ''),
-                            totalTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(text) + estimateTokenCount(ragResponse ?? '')
+                            inputTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text),
+                            outputTokens: estimateTokenCount(polishedRagResponse ?? ''),
+                            totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text) + estimateTokenCount(polishedRagResponse ?? '')
                         }
 
                     await recordAiUsage({
@@ -346,9 +401,9 @@ ${context}`
                         supabase
                     })
 
-                    if (ragResponse && !ragResponse.includes(noAnswerToken)) {
+                    if (polishedRagResponse && !polishedRagResponse.includes(noAnswerToken)) {
                         const client = new TelegramClient(channel.config.bot_token)
-                        await client.sendMessage(chatId, ragResponse)
+                        await client.sendMessage(chatId, polishedRagResponse)
 
                         // Save Bot Message (RAG)
                         await supabase.from('messages').insert({
@@ -356,8 +411,11 @@ ${context}`
                             conversation_id: conversation.id,
                             organization_id: orgId,
                             sender_type: 'bot',
-                            content: ragResponse,
-                            metadata: { is_rag: true, sources: chunks.map(r => r.document_id).filter(Boolean) }
+                            content: polishedRagResponse,
+                            metadata: {
+                                is_rag: true,
+                                sources: chunks.map(r => r.document_id).filter(Boolean)
+                            }
                         })
 
                         // Update conversation
@@ -381,6 +439,11 @@ ${context}`
         const fallbackText = await buildFallbackResponse({
             organizationId: orgId,
             message: text,
+            requiredIntakeFields,
+            recentCustomerMessages: customerHistoryForFollowup,
+            recentAssistantMessages: assistantHistoryForFollowup,
+            conversationHistory: conversationHistoryForReply,
+            leadSnapshot: leadSnapshotForReply,
             aiSettings,
             supabase,
             usageMetadata: {

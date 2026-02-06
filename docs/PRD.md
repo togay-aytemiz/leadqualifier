@@ -163,8 +163,18 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Required Fields: AI toggle controls AI-tagged required-field suggestions independently.
   - KB “Review/İncele” CTA deep-links into Organization Settings and auto-expands the Offering Profile AI Suggestions accordion.
   - Pending suggestion visibility is shown both on the accordion header and inside the accordion content/tabs.
+  - Even when the accordion is collapsed, the header keeps a clear pending indicator so users can find the review queue quickly.
   - Approved suggestions tab supports a persistent custom profile note (editable/removable) that is stored separately from suggestion cards.
 - Required Fields AI chips are regenerated when Skill/KB content updates, with normalization and dedupe against existing manual/AI chips (LLM receives current fields and proposes only missing ones).
+- KB/fallback replies include one smart follow-up question when required intake fields are still missing from recent customer messages.
+- Skill replies remain deterministic; required-fields follow-up prompting currently applies to KB/fallback in Telegram and Simulator.
+- KB/fallback prompting also includes the last 3 assistant replies to reduce repeated greetings/openings in consecutive bot turns.
+- Final KB/RAG/fallback generation now receives recent multi-turn user+assistant history and known lead snapshot facts (when available) so replies continue naturally, avoid repetitive greetings, and reduce repeated question loops.
+- Lead extraction now stores collected required-intake values as `extracted_fields.required_intake_collected` when customer messages clearly provide them.
+- Lead extraction applies merge-on-update persistence: if later turns omit previously extracted business details, existing `service_type`, summary, and collected required fields are preserved unless explicitly updated.
+- Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
+- Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
+- Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
@@ -225,8 +235,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ### 5.7 Usage & Billing (Implemented)
 - Track org-level AI token usage (monthly UTC + total)
-- Includes production AI paths: router, RAG, fallback, and summaries
-- Report usage breakdown by summary, messages (router/RAG/fallback), and lead extraction
+- Includes production AI paths: router, RAG, fallback, summaries, lead extraction, and lead reasoning
+- Report usage breakdown by summary, messages (router/RAG/fallback), and lead extraction (including lead reasoning)
 - Monthly usage card surfaces the UTC month label (e.g., February 2026)
 - Usage details link appears under the UTC note in the Usage & Billing section
 - Every new token-consuming feature must log usage events
@@ -322,8 +332,10 @@ MVP is successful when:
 - **Inbox Badge Scale:** Increase badge/icon size slightly and reduce border weight for better legibility.
 - **Inbox Badge Offset:** Drop the badge a bit lower and further emphasize the brand icon.
 - **Inbox Badge Fine-Tuning:** Allow incremental offset and border tweaks for visual balance.
-- **Inbox Lead Status Dot:** Show a small status dot beneath the platform badge to surface AI lead status at a glance.
+- **Inbox Lead Status Chip:** Show lead status as a text chip on the conversation name row (far right) for faster scanability.
+- **Inbox List Time Row:** Keep relative last-message time on a dedicated third line under the one-line preview.
 - **Inbox Lead Realtime:** Include `leads` in realtime publication and subscribe to status changes so list indicators update without manual refresh.
+- **Inbox Realtime Auth Sync:** Bootstrap realtime auth from session, fall back to `refreshSession()` when missing, and re-apply tokens on auth state changes to avoid stale subscriptions.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
@@ -347,8 +359,12 @@ MVP is successful when:
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 - **Organization AI Control:** Use independent section-level AI toggles for Offering Profile and Required Fields UX modes.
+- **AI Suggestions Header:** Keep a single pending indicator label in the accordion header and avoid duplicate right-side count chips.
 - **Manual Profile Note:** Keep a persistent custom textarea in Approved suggestions for manual scope notes; store it separately in `offering_profiles` and do not convert it into suggestion cards.
 - **Required Fields Sync:** On Skill/KB updates, ask AI for only missing required fields by sending existing fields in prompt context; normalize/dedupe before persisting so manual and AI chips do not duplicate.
+- **Required Fields Parsing:** Accept fenced/noisy JSON responses when extracting required fields so KB/Skill-triggered chip generation remains resilient.
+- **Required Fields Follow-Up:** For KB/fallback response generation, include required fields, recent customer messages, and the last 3 assistant replies in prompt context so LLM can naturally ask one concise follow-up question when needed and avoid repetitive openings.
+- **Conversation Continuity:** Use recent multi-turn conversation history in final KB/RAG/fallback generation and apply repeated-greeting suppression when assistant already greeted recently.
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 

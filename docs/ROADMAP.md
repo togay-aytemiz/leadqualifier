@@ -95,7 +95,8 @@
   - [x] Inbox list platform badges adjusted for size and placement
   - [x] Inbox list platform badges lowered and icon size increased
   - [x] Inbox list platform badges lowered further with thinner borders
-  - [x] Inbox list lead status dot shown under platform badge
+  - [x] Inbox list lead status shown as a right-aligned chip on the name row
+  - [x] Inbox list time moved to a dedicated third row under message preview
   - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)
@@ -113,6 +114,7 @@
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
   - [x] Realtime auth handshake for subscriptions
+  - [x] Realtime auth token sync now refreshes missing tokens and listens to auth state changes to prevent stale inbox streams
   - [x] Realtime lead status updates for inbox list indicators
 - [x] **Internationalization**
   - [x] Remove hardcoded UI strings
@@ -173,6 +175,7 @@
 - [x] **Inbox UI:** Show configured bot name in chat labels
 - [x] **Usage & Billing:** Track monthly (UTC) + total AI token usage
 - [x] **Usage & Billing:** Breakdown by summary, messages, and lead extraction
+- [x] **Usage & Billing:** Include lead reasoning tokens under lead extraction totals in detailed breakdown
 - [x] **Usage & Billing UI:** Show the UTC month label in the monthly card header
 - [x] **Usage & Billing UI:** Place “Detayları gör” link under the UTC note
 - [x] **Settings UX:** Save buttons show a transient success state and clear dirty-state across settings pages
@@ -206,6 +209,8 @@
   - [x] Approved-only AI suggestions used in lead extraction
   - [x] Locale-aware AI suggestions + localized timestamps
   - [x] Pending suggestion indicators in settings (sidebar + section)
+  - [x] AI Suggestions accordion header keeps a visible pending indicator even when collapsed
+  - [x] AI Suggestions accordion header removes redundant right-side pending count chip
   - [x] AI suggestions panel toggles with manual generate when empty
   - [x] Main sidebar settings indicator reflects pending AI suggestions
   - [x] AI suggestions default enabled while respecting opt-out (no generation when off)
@@ -224,6 +229,8 @@
   - [x] AI Suggestions accordion shows pending indicators both on the header and inside the accordion tabs/content
   - [x] Required Fields has its own AI suggestions toggle and remains a dedicated section
   - [x] Skill/KB updates auto-generate Required Fields AI chips and dedupe against existing manual/AI fields
+  - [x] KB/fallback replies include a smart required-fields follow-up question (Telegram + Simulator) when key intake details are missing (skill replies stay unchanged) and use the last 3 assistant replies to avoid repeated greetings
+  - [x] Telegram + Simulator final KB/RAG/fallback replies now use recent multi-turn history and known lead snapshot facts for smoother continuity (less repeated greetings and repeated question loops)
   - [x] Approved suggestions tab supports a persistent custom profile-note textarea (editable/removable, not converted into suggestion cards)
 - [x] AI suggestions enforce 3-5 bullet hybrid format with retry on sparse output
 - [x] AI suggestions archive (archived tab with archive action; regenerate when no pending)
@@ -241,10 +248,12 @@
   - [x] Risk signal detection
 - [x] **Extraction Reliability**
   - [x] Parse fenced or noisy JSON outputs safely
+  - [x] Required Fields parser now accepts fenced/noisy JSON responses from AI
   - [x] Label customer vs assistant messages and respect customer negations
   - [x] Use last 5 customer messages and LLM-provided score/status
   - [x] Ensure latest message is included even with async writes
   - [x] Include manual profile note with approved AI suggestions in extraction context
+  - [x] Preserve previously extracted lead details when later turns omit fields (merge-on-update instead of destructive overwrite)
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
   - [x] Auto-generate AI summary
@@ -256,6 +265,10 @@
   - [x] Read-only lead snapshot in conversation details
   - [x] Lead header shows "Updating" indicator during extraction
   - [x] Keep "Updated" timestamp visible while updating
+  - [x] Show collected "Required Fields" values in lead details using Organization > Required Fields definitions
+  - [x] Present collected required fields in an "Important info" card section with plain label-value rows inside
+  - [x] Required-info resolver supports manual override precedence for future lead-edit workflows
+  - [ ] Manual overwrite UI for "Important info" values in Inbox (per field edit + save source tracking)
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
 

@@ -218,6 +218,8 @@
         "leadScore": "Score",
         "leadService": "Service",
         "leadSummary": "Summary",
+        "leadRequiredInfo": "Important info",
+        "leadRequiredInfoEmpty": "No important info collected yet.",
         "leadUpdated": "Updated",
         "leadUnknown": "Unknown",
         "leadEmpty": "No lead extracted yet.",

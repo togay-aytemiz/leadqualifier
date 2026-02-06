@@ -36,8 +36,14 @@ export function UsageBreakdownDetails({ usage }: UsageBreakdownDetailsProps) {
     ])
     const monthlySummaryTotals = usage.monthlyByCategory.summary ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
     const totalSummaryTotals = usage.totalByCategory.summary ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
-    const monthlyLeadTotals = usage.monthlyByCategory.lead_extraction ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
-    const totalLeadTotals = usage.totalByCategory.lead_extraction ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+    const monthlyLeadTotals = sumTotals([
+        usage.monthlyByCategory.lead_extraction ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        usage.monthlyByCategory.lead_reasoning ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+    ])
+    const totalLeadTotals = sumTotals([
+        usage.totalByCategory.lead_extraction ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        usage.totalByCategory.lead_reasoning ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+    ])
 
     const monthlyRouter = usage.monthlyByCategory.router ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
     const totalRouter = usage.totalByCategory.router ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 }

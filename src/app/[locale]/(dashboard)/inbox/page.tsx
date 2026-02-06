@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getConversations } from '@/lib/inbox/actions'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getRequiredIntakeFields } from '@/lib/ai/followup'
 import { InboxContainer } from '@/components/inbox/InboxContainer'
 import { redirect } from 'next/navigation'
 import { Building2 } from 'lucide-react'
@@ -53,9 +54,10 @@ export default async function InboxPage() {
         )
     }
 
-    const [conversations, aiSettings] = await Promise.all([
+    const [conversations, aiSettings, requiredIntakeFields] = await Promise.all([
         getConversations(organizationId),
-        getOrgAiSettings(organizationId, { supabase })
+        getOrgAiSettings(organizationId, { supabase }),
+        getRequiredIntakeFields({ organizationId, supabase })
     ])
 
     return (
@@ -65,6 +67,7 @@ export default async function InboxPage() {
             botName={aiSettings.bot_name}
             botMode={aiSettings.bot_mode}
             allowLeadExtractionDuringOperator={aiSettings.allow_lead_extraction_during_operator}
+            requiredIntakeFields={requiredIntakeFields}
         />
     )
 }

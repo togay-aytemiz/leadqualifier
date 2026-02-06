@@ -7,6 +7,12 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
+import { buildRequiredIntakeFollowupGuidance, getRequiredIntakeFields } from '@/lib/ai/followup'
+import {
+    buildConversationContinuityGuidance,
+    stripRepeatedGreeting,
+    toOpenAiConversationMessages
+} from '@/lib/ai/conversation'
 
 export interface ChatMessage {
     id: string
@@ -61,6 +67,26 @@ export async function simulateChat(
     const aiSettings = await getOrgAiSettings(organizationId)
     const matchThreshold = typeof threshold === 'number' ? threshold : aiSettings.match_threshold
     const kbThreshold = matchThreshold
+    const requiredIntakeFields = await getRequiredIntakeFields({ organizationId })
+    const customerHistory = history
+        .filter((turn) => turn.role === 'user')
+        .map((turn) => turn.content.trim())
+        .filter(Boolean)
+        .slice(-8)
+    const assistantHistory = history
+        .filter((turn) => turn.role === 'assistant')
+        .map((turn) => turn.content.trim())
+        .filter(Boolean)
+        .slice(-3)
+    const latestMessage = message.trim()
+    if (latestMessage && !customerHistory.some((item) => item === latestMessage)) {
+        customerHistory.push(latestMessage)
+    }
+    const requiredIntakeGuidance = buildRequiredIntakeFollowupGuidance(
+        requiredIntakeFields,
+        customerHistory,
+        assistantHistory
+    )
 
     // 1. Match skills with ZERO threshold to get ANY match for debugging
     console.log(`Simulating chat for: "${message}" in org: ${organizationId} with threshold: ${threshold}`)
@@ -110,6 +136,10 @@ export async function simulateChat(
             const fallbackResponse = await buildFallbackResponse({
                 organizationId,
                 message,
+                requiredIntakeFields,
+                recentCustomerMessages: customerHistory,
+                recentAssistantMessages: assistantHistory,
+                conversationHistory: history,
                 aiSettings,
                 trackUsage: false
             })
@@ -159,19 +189,25 @@ export async function simulateChat(
 
             const noAnswerToken = 'NO_ANSWER'
             const basePrompt = withBotNamePrompt(aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT, aiSettings.bot_name)
+            const continuityGuidance = buildConversationContinuityGuidance({
+                recentAssistantMessages: assistantHistory
+            })
             const systemPrompt = `${basePrompt}
 
 Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Keep the answer concise and friendly.
+Continue naturally from recent conversation turns without restarting.
 
 Context:
-${context}`
+${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${continuityGuidance ? `\n\n${continuityGuidance}` : ''}`
+            const historyMessages = toOpenAiConversationMessages(history, message, 10)
 
             const completion = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: systemPrompt },
+                    ...historyMessages,
                     { role: 'user', content: message }
                 ],
                 temperature: 0.3
@@ -179,20 +215,22 @@ ${context}`
 
             const ragResponse = completion.choices[0]?.message?.content
             const normalizedResponse = ragResponse?.trim() ?? ''
+            const polishedResponse = stripRepeatedGreeting(normalizedResponse, assistantHistory)
+            const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
 
             if (completion.usage) {
                 ragInputTokens += completion.usage.prompt_tokens ?? 0
                 ragOutputTokens += completion.usage.completion_tokens ?? 0
             } else {
-                ragInputTokens += estimateTokenCount(systemPrompt) + estimateTokenCount(message)
-                ragOutputTokens += estimateTokenCount(normalizedResponse)
+                ragInputTokens += estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message)
+                ragOutputTokens += estimateTokenCount(polishedResponse)
             }
-            if (normalizedResponse && !normalizedResponse.includes(noAnswerToken)) {
+            if (polishedResponse && !polishedResponse.includes(noAnswerToken)) {
                 const topResult = kbResults[0]
                 totalInputTokens += routerInputTokens + ragInputTokens
                 totalOutputTokens += routerOutputTokens + ragOutputTokens
                 return {
-                    response: normalizedResponse,
+                    response: polishedResponse,
                     matchedSkill: {
                         id: 'rag-knowledge-base',
                         title: '📚 Knowledge Base',
@@ -224,6 +262,10 @@ ${context}`
     const fallbackResponse = await buildFallbackResponse({
         organizationId,
         message,
+        requiredIntakeFields,
+        recentCustomerMessages: customerHistory,
+        recentAssistantMessages: assistantHistory,
+        conversationHistory: history,
         aiSettings,
         trackUsage: false
     })

@@ -23,6 +23,7 @@ export interface KnowledgeRouteDecision {
 const MAX_HISTORY_ITEMS = 6
 const MAX_CHARS_PER_MESSAGE = 400
 const MAX_USER_TURNS = 5
+const MAX_ASSISTANT_TURNS = 3
 const KNOWLEDGE_HINTS = [
     'nedir',
     'ne demek',
@@ -63,6 +64,7 @@ function formatHistory(history: ConversationTurn[]) {
 
     const filtered: ConversationTurn[] = []
     let userCount = 0
+    let assistantCount = 0
 
     for (let i = history.length - 1; i >= 0; i -= 1) {
         const turn = history[i]
@@ -74,10 +76,9 @@ function formatHistory(history: ConversationTurn[]) {
             continue
         }
         if (turn.role === 'assistant') {
-            const lastAssistant = filtered.find((item) => item.role === 'assistant')
-            if (!lastAssistant) {
-                filtered.push(turn)
-            }
+            if (assistantCount >= MAX_ASSISTANT_TURNS) continue
+            assistantCount += 1
+            filtered.push(turn)
         }
     }
 

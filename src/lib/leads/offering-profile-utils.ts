@@ -57,27 +57,96 @@ export function mergeIntakeFields(current: string[], proposed: string[]) {
     return normalizeIntakeFields([...current, ...proposed])
 }
 
-export function parseRequiredIntakeFieldsPayload(raw: string) {
+function stripJsonFence(value: string) {
+    const fenced = value.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+    return fenced?.[1]?.trim() ?? value
+}
+
+function extractFencedBlocks(value: string) {
+    const blocks: string[] = []
+    const pattern = /```(?:json)?\s*([\s\S]*?)\s*```/gi
+    let match: RegExpExecArray | null = pattern.exec(value)
+    while (match) {
+        const captured = match[1]?.trim()
+        if (captured) blocks.push(captured)
+        match = pattern.exec(value)
+    }
+    return blocks
+}
+
+function extractFirstBalanced(value: string, open: '{' | '[', close: '}' | ']') {
+    const text = value.trim()
+    if (!text) return null
+    if (text.startsWith(open) && text.endsWith(close)) return text
+
+    let startIndex = -1
+    let depth = 0
+
+    for (let i = 0; i < text.length; i += 1) {
+        const char = text[i]
+        if (char === open) {
+            if (depth === 0) startIndex = i
+            depth += 1
+            continue
+        }
+        if (char === close && depth > 0) {
+            depth -= 1
+            if (depth === 0 && startIndex !== -1) {
+                return text.slice(startIndex, i + 1)
+            }
+        }
+    }
+
+    return null
+}
+
+function parseJsonCandidate(input: string) {
     try {
-        const parsed = JSON.parse(raw)
+        return JSON.parse(input)
+    } catch {
+        return null
+    }
+}
+
+export function parseRequiredIntakeFieldsPayload(raw: string) {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+
+    const stripped = stripJsonFence(trimmed)
+    const candidates = [
+        trimmed,
+        stripped,
+        ...extractFencedBlocks(trimmed),
+        extractFirstBalanced(stripped, '{', '}'),
+        extractFirstBalanced(stripped, '[', ']')
+    ].filter((item): item is string => Boolean(item))
+
+    const seen = new Set<string>()
+
+    for (const candidate of candidates) {
+        if (seen.has(candidate)) continue
+        seen.add(candidate)
+
+        const parsed = parseJsonCandidate(candidate)
+        if (!parsed) continue
 
         if (Array.isArray(parsed)) {
             return normalizeIntakeFields(parsed.filter((item): item is string => typeof item === 'string'))
         }
 
-        if (!parsed || typeof parsed !== 'object') return null
+        if (typeof parsed !== 'object') continue
 
-        const candidates = (parsed as any).required_fields ?? (parsed as any).requiredFields
-        if (Array.isArray(candidates)) {
-            return normalizeIntakeFields(candidates.filter((item): item is string => typeof item === 'string'))
+        const parsedObject = parsed as any
+        const fields = parsedObject.required_fields ?? parsedObject.requiredFields
+
+        if (Array.isArray(fields)) {
+            return normalizeIntakeFields(fields.filter((item): item is string => typeof item === 'string'))
         }
 
-        if (typeof candidates === 'string') {
-            return normalizeIntakeFields([candidates])
+        if (typeof fields === 'string') {
+            return normalizeIntakeFields([fields])
         }
-
-        return null
-    } catch {
-        return null
     }
+
+    return null
 }

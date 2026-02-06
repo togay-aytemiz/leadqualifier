@@ -119,7 +119,7 @@ export async function getOrgAiUsageSummary(organizationId: string, options?: { s
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
     const monthKey = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`
-    const categories: string[] = ['router', 'rag', 'fallback', 'summary', 'lead_extraction']
+    const categories: string[] = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning']
 
     const [monthlyResult, totalResult] = await Promise.all([
         supabase

@@ -2,10 +2,11 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 
 const EXTRACTION_SYSTEM_PROMPT = `Extract lead signals as JSON.
 Return ONLY valid JSON (no code fences, no extra text).
-Return keys: service_type, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status.
+Return keys: service_type, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
 intent_signals can include: decisive (explicit booking/appointment intent), urgent (ASAP/today/tomorrow), indecisive (unsure), far_future (months later/next season).
 Customer messages are labeled "customer:" and represent the latest 5 customer messages.
 Prioritize customer intent and the most recent customer messages.
@@ -15,6 +16,10 @@ Score must be an integer from 0 to 10.
 Status must be one of: hot, warm, cold, ignored.
 If non_business is true, set score to 0 and status to ignored.
 Use catalog names when possible for service_type; if catalog is empty, infer service_type from the offering profile summary/suggestions when possible.
+When required intake fields are provided, fill required_intake_collected as an object that maps clearly collected field names to concise values.
+Only include fields clearly provided by the customer; otherwise omit them from the object.
+If none are collected, return required_intake_collected as {}.
+Messages indicating cancellation/decline (e.g., "vazgeçtim", "istemiyorum") are still business-context messages, not personal/social chat.
 Use nulls if unknown. Use non_business=true only for personal/social conversations.`
 
 function normalizeStringArray(value: unknown) {
@@ -26,6 +31,27 @@ function normalizeStringArray(value: unknown) {
         return [value.trim()]
     }
     return []
+}
+
+function normalizeCollectedFieldValues(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {} as Record<string, string>
+    }
+
+    const collected: Record<string, string> = {}
+    for (const [rawKey, rawValue] of Object.entries(value as Record<string, unknown>)) {
+        const key = rawKey.trim()
+        if (!key) continue
+        const normalizedValue = normalizeStringArray(rawValue)[0] ?? (
+            typeof rawValue === 'number' || typeof rawValue === 'boolean'
+                ? String(rawValue)
+                : null
+        )
+        if (!normalizedValue) continue
+        collected[key] = normalizedValue.trim()
+    }
+
+    return collected
 }
 
 function normalizeBoolean(value: unknown) {
@@ -117,7 +143,21 @@ function hasJsonKey(value: string, key: string) {
     return pattern.test(value)
 }
 
-function normalizeExtractionPayload(payload: any) {
+export interface NormalizedLeadExtraction {
+    service_type: string | null
+    desired_date: string | null
+    location: string | null
+    budget_signals: string[]
+    intent_signals: string[]
+    risk_signals: string[]
+    required_intake_collected: Record<string, string>
+    non_business: boolean
+    summary: string | null
+    score: number
+    status: 'hot' | 'warm' | 'cold' | 'ignored'
+}
+
+function normalizeExtractionPayload(payload: any): NormalizedLeadExtraction {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return {
             service_type: null,
@@ -126,6 +166,7 @@ function normalizeExtractionPayload(payload: any) {
             budget_signals: [],
             intent_signals: [],
             risk_signals: [],
+            required_intake_collected: {},
             non_business: false,
             summary: null,
             score: 0,
@@ -144,6 +185,7 @@ function normalizeExtractionPayload(payload: any) {
         budget_signals: normalizeStringArray(payload.budget_signals),
         intent_signals: normalizeStringArray(payload.intent_signals),
         risk_signals: normalizeStringArray(payload.risk_signals),
+        required_intake_collected: normalizeCollectedFieldValues(payload.required_intake_collected ?? payload.requiredIntakeCollected),
         non_business: nonBusiness,
         summary: typeof payload.summary === 'string' ? payload.summary.trim() || null : null,
         score,
@@ -162,6 +204,55 @@ export function safeParseLeadExtraction(input: string) {
     }
 }
 
+function normalizeOptionalString(value: unknown) {
+    if (typeof value !== 'string') return null
+    const normalized = value.trim()
+    return normalized.length > 0 ? normalized : null
+}
+
+function normalizeExistingExtractedFields(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {} as Record<string, unknown>
+    }
+    return value as Record<string, unknown>
+}
+
+export function mergeExtractionWithExisting(
+    incoming: NormalizedLeadExtraction,
+    existingLead?: {
+        service_type?: string | null
+        summary?: string | null
+        extracted_fields?: unknown
+    } | null
+): NormalizedLeadExtraction {
+    const existingExtracted = normalizeExistingExtractedFields(existingLead?.extracted_fields)
+    const existingCollected = normalizeCollectedFieldValues(existingExtracted.required_intake_collected)
+    const incomingCollected = normalizeCollectedFieldValues(incoming.required_intake_collected)
+
+    return {
+        service_type: incoming.service_type ?? normalizeOptionalString(existingLead?.service_type) ?? null,
+        desired_date: incoming.desired_date ?? normalizeOptionalString(existingExtracted.desired_date) ?? null,
+        location: incoming.location ?? normalizeOptionalString(existingExtracted.location) ?? null,
+        budget_signals: incoming.budget_signals.length > 0
+            ? incoming.budget_signals
+            : normalizeStringArray(existingExtracted.budget_signals),
+        intent_signals: incoming.intent_signals.length > 0
+            ? incoming.intent_signals
+            : normalizeStringArray(existingExtracted.intent_signals),
+        risk_signals: incoming.risk_signals.length > 0
+            ? incoming.risk_signals
+            : normalizeStringArray(existingExtracted.risk_signals),
+        required_intake_collected: {
+            ...existingCollected,
+            ...incomingCollected
+        },
+        non_business: incoming.non_business,
+        summary: incoming.summary ?? normalizeOptionalString(existingLead?.summary) ?? null,
+        score: incoming.score,
+        status: incoming.status
+    }
+}
+
 export async function runLeadExtraction(options: {
     organizationId: string
     conversationId: string
@@ -171,10 +262,10 @@ export async function runLeadExtraction(options: {
 }) {
     const supabase = options.supabase ?? await createClient()
 
-    const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }] = await Promise.all([
+    const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }, { data: existingLead }] = await Promise.all([
         supabase
             .from('offering_profiles')
-            .select('summary, manual_profile_note, catalog_enabled, ai_suggestions_enabled')
+            .select('summary, manual_profile_note, catalog_enabled, ai_suggestions_enabled, required_intake_fields')
             .eq('organization_id', options.organizationId)
             .maybeSingle(),
         supabase.from('service_catalog').select('name, aliases, active').eq('organization_id', options.organizationId).eq('active', true),
@@ -193,7 +284,12 @@ export async function runLeadExtraction(options: {
             .is('archived_at', null)
             .is('update_of', null)
             .order('created_at', { ascending: false })
-            .limit(5)
+            .limit(5),
+        supabase
+            .from('leads')
+            .select('service_type, summary, extracted_fields')
+            .eq('conversation_id', options.conversationId)
+            .maybeSingle()
     ])
 
     if (!process.env.OPENAI_API_KEY) return
@@ -227,10 +323,15 @@ export async function runLeadExtraction(options: {
     ]
         .filter(Boolean)
         .join('\n\n')
+    const requiredIntakeFields = normalizeIntakeFields(profile?.required_intake_fields ?? [])
+    const requiredIntakeBlock = requiredIntakeFields.length > 0
+        ? requiredIntakeFields.map((field) => `- ${field}`).join('\n')
+        : 'none'
 
     const userPrompt = [
         `Offering profile:\n${profileText}`,
         `Catalog:${catalogList}`,
+        `Required intake fields:\n${requiredIntakeBlock}`,
         'Customer messages (latest 5, oldest to newest):',
         contextMessages.join('\n')
     ].join('\n\n')
@@ -281,7 +382,7 @@ export async function runLeadExtraction(options: {
         addUsage(retry, strictPrompt, response)
     }
     const extracted = safeParseLeadExtraction(response)
-    const normalizedExtracted = extracted
+    const normalizedExtracted = mergeExtractionWithExisting(extracted, existingLead)
 
     await supabase.from('leads').upsert({
         organization_id: options.organizationId,
@@ -292,13 +393,14 @@ export async function runLeadExtraction(options: {
         total_score: normalizedExtracted.score,
         status: normalizedExtracted.status,
         non_business: normalizedExtracted.non_business,
-        summary: normalizedExtracted.non_business ? null : normalizedExtracted.summary,
+        summary: normalizedExtracted.summary,
         extracted_fields: {
             desired_date: normalizedExtracted.desired_date,
             location: normalizedExtracted.location,
             budget_signals: normalizedExtracted.budget_signals,
             intent_signals: normalizedExtracted.intent_signals,
-            risk_signals: normalizedExtracted.risk_signals
+            risk_signals: normalizedExtracted.risk_signals,
+            required_intake_collected: normalizedExtracted.required_intake_collected
         },
         last_message_at: new Date().toISOString()
     }, { onConflict: 'conversation_id' })

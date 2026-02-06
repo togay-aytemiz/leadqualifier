@@ -11,8 +11,10 @@ import { IoLogoWhatsapp } from 'react-icons/io5'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary, getConversationLead, getLeadScoreReasoning, refreshConversationLead } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
+import { setupRealtimeAuth } from '@/lib/supabase/realtime-auth'
 import { formatDistanceToNow, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
+import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -23,6 +25,7 @@ interface InboxContainerProps {
     botName?: string
     botMode?: AiBotMode
     allowLeadExtractionDuringOperator?: boolean
+    requiredIntakeFields?: string[]
 }
 
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
@@ -33,7 +36,8 @@ export function InboxContainer({
     organizationId,
     botName,
     botMode,
-    allowLeadExtractionDuringOperator
+    allowLeadExtractionDuringOperator,
+    requiredIntakeFields = []
 }: InboxContainerProps) {
     const t = useTranslations('inbox')
     const locale = useLocale()
@@ -83,6 +87,14 @@ export function InboxContainer({
         cold: t('leadStatusCold'),
         ignored: t('leadStatusIgnored')
     }
+    const leadExtractedFields = lead?.extracted_fields && typeof lead.extracted_fields === 'object' && !Array.isArray(lead.extracted_fields)
+        ? lead.extracted_fields as Record<string, unknown>
+        : {}
+    const collectedRequiredIntake = resolveCollectedRequiredIntake({
+        requiredFields: requiredIntakeFields,
+        extractedFields: leadExtractedFields,
+        serviceType: lead?.service_type
+    })
 
     useEffect(() => {
         selectedIdRef.current = selectedId
@@ -311,16 +323,22 @@ export function InboxContainer({
 
     useEffect(() => {
         let channel: ReturnType<typeof supabase.channel> | null = null
+        let cleanupRealtimeAuth: (() => void) | null = null
         let isMounted = true
 
         const setupRealtime = async () => {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (!isMounted) return
-
-            if (session?.access_token) {
-                supabase.realtime.setAuth(session.access_token)
-            } else {
-                console.warn('Realtime: missing session, subscribing as anon')
+            cleanupRealtimeAuth = await setupRealtimeAuth(supabase, {
+                onMissingToken: () => {
+                    console.warn('Realtime: missing session token, subscribing without auth token')
+                },
+                onError: (error) => {
+                    console.error('Realtime auth bootstrap failed', error)
+                }
+            })
+            if (!isMounted) {
+                cleanupRealtimeAuth()
+                cleanupRealtimeAuth = null
+                return
             }
 
             console.log('Setting up Realtime subscription...')
@@ -469,6 +487,9 @@ export function InboxContainer({
 
         return () => {
             isMounted = false
+            if (cleanupRealtimeAuth) {
+                cleanupRealtimeAuth()
+            }
             if (channel) {
                 console.log('Cleaning up Realtime subscription...')
                 supabase.removeChannel(channel)
@@ -737,6 +758,18 @@ export function InboxContainer({
                             const leadStatus = Array.isArray(c.leads)
                                 ? c.leads[0]?.status
                                 : c.leads?.status
+                            const leadStatusLabel = leadStatus
+                                ? (leadStatusLabels[leadStatus] ?? leadStatus)
+                                : null
+                            const leadChipClassName = leadStatus === 'hot'
+                                ? 'border-red-100 bg-red-50 text-red-700'
+                                : leadStatus === 'warm'
+                                    ? 'border-amber-100 bg-amber-50 text-amber-700'
+                                    : leadStatus === 'cold'
+                                        ? 'border-slate-200 bg-slate-100 text-slate-600'
+                                        : leadStatus === 'ignored'
+                                            ? 'border-blue-100 bg-blue-50 text-blue-700'
+                                            : 'border-gray-200 bg-gray-100 text-gray-600'
 
                             return (
                             <div
@@ -744,49 +777,44 @@ export function InboxContainer({
                                 onClick={() => setSelectedId(c.id)}
                                 className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""}`}
                             >
-                                <div className="flex justify-between items-start mb-1.5">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="relative">
-                                            <Avatar name={c.contact_name} size="sm" />
-                                            <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-2 flex flex-col items-center gap-1">
-                                                <span className="h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
-                                                    {c.platform === 'telegram' ? (
-                                                        <FaTelegram className="text-[#229ED9]" size={18} />
-                                                    ) : c.platform === 'whatsapp' ? (
-                                                        <IoLogoWhatsapp className="text-[#25D366]" size={18} />
-                                                    ) : (
-                                                        <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
-                                                    )}
-                                                </span>
-                                                {leadStatus && (
-                                                    <span
-                                                        className={`h-2 w-2 rounded-full ${leadStatus === 'hot'
-                                                            ? 'bg-red-500'
-                                                            : leadStatus === 'warm'
-                                                                ? 'bg-amber-500'
-                                                                : leadStatus === 'ignored'
-                                                                    ? 'bg-blue-500'
-                                                                    : 'bg-gray-400'
-                                                        }`}
-                                                    />
+                                <div className="flex items-start gap-3">
+                                    <div className="relative shrink-0">
+                                        <Avatar name={c.contact_name} size="sm" />
+                                        <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-2">
+                                            <span className="h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
+                                                {c.platform === 'telegram' ? (
+                                                    <FaTelegram className="text-[#229ED9]" size={18} />
+                                                ) : c.platform === 'whatsapp' ? (
+                                                    <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                                ) : (
+                                                    <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
                                                 )}
-                                            </div>
+                                            </span>
                                         </div>
-                                        <span className={`text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>{c.contact_name}</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">
-                                            {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
-                                        </span>
-                                        {c.unread_count > 0 && (
-                                            <span className="h-2 w-2 rounded-full bg-blue-500" />
-                                        )}
+                                    <div className="min-w-0 flex-1 pr-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-sm font-semibold truncate ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
+                                                {c.contact_name}
+                                            </span>
+                                            {leadStatusLabel && (
+                                                <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
+                                                    {leadStatusLabel}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className={`mt-0.5 text-sm truncate leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
+                                            {c.messages?.[0]?.content || t('noMessagesYet')}
+                                        </p>
+                                        <div className="mt-0.5 flex items-center justify-between">
+                                            <span className="text-xs text-gray-400">
+                                                {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
+                                            </span>
+                                            {c.unread_count > 0 && (
+                                                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="pl-[42px] pr-2">
-                                    <p className="text-sm text-gray-500 truncate leading-relaxed">
-                                        {c.messages?.[0]?.content || t('noMessagesYet')}
-                                    </p>
                                 </div>
                                 {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
                             </div>
@@ -1165,6 +1193,25 @@ export function InboxContainer({
                                                 <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
                                                     <span className="text-sm text-gray-500">{t('leadSummary')}</span>
                                                     <span className="text-sm text-gray-900 whitespace-pre-wrap">{lead.summary}</span>
+                                                </div>
+                                            )}
+                                            {requiredIntakeFields.length > 0 && (
+                                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                                    <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">
+                                                        {t('leadRequiredInfo')}
+                                                    </p>
+                                                    {collectedRequiredIntake.length > 0 ? (
+                                                        <div className="mt-2 space-y-2">
+                                                            {collectedRequiredIntake.map((item) => (
+                                                                <div key={item.field} className="grid grid-cols-[130px_1fr] gap-3 items-start">
+                                                                    <span className="text-sm text-gray-500">{item.field}:</span>
+                                                                    <span className="text-sm text-gray-900 break-words">{item.value}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
+                                                    )}
                                                 </div>
                                             )}
                                             {lead.updated_at && (

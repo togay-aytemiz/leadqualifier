@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- Offering Profile AI Suggestions accordion header now shows a compact pending badge (dot + count) while collapsed.
 - Knowledge Base “Review/İncele” CTA now deep-links to Organization settings and auto-expands the Offering Profile AI Suggestions accordion.
 - Offering Profile AI Suggestions now surface pending indicators inside the accordion content/tabs in addition to sidebar/header indicators.
 - Skill/KB updates now trigger AI Required Fields chip generation by requesting only missing fields from current context.
@@ -123,6 +124,18 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Inbox conversation list cards now use a 3-row text stack (name + right-aligned lead chip, one-line message preview, and time on the third row).
+- Offering Profile AI Suggestions accordion header now shows only one pending indicator label and removes the redundant right-side count chip.
+- Telegram and Simulator KB/fallback replies now use required-fields + recent-customer-message context so LLM can naturally ask one smart follow-up question when needed.
+- Telegram and Simulator KB/fallback follow-up context now also includes the last 3 assistant replies to reduce repeated greetings in consecutive turns.
+- Telegram and Simulator final KB/RAG/fallback generation now includes recent multi-turn user+assistant history (not only routing), improving conversational continuity.
+- Telegram KB/fallback generation now also receives current lead snapshot facts (`service_type` + extracted fields) to avoid re-asking already captured details.
+- KB router now keeps multiple recent assistant turns (instead of only one) for better follow-up routing and query rewrites.
+- Lead extraction now asks for and persists `required_intake_collected` values in `leads.extracted_fields` when required fields are clearly provided by the customer.
+- Lead extraction now uses merge-on-update persistence so previously extracted service/summary/required-info values are not wiped when later turns omit those fields.
+- Inbox lead details now show collected values in an "Important info" card section with plain label-value rows inside, sourced from Organization > Required Fields.
+- Required-info resolution now supports manual override precedence (`required_intake_overrides`) for future lead-edit flows.
+- Docs: Roadmap/PRD now explicitly track deferred Inbox manual overwrite UI for "Important info" (per-field edit + source tracking).
 - Required Fields normalization is now case-insensitive so manual and AI chips avoid duplicates (including previously suggested values).
 - Turkish UI copy now uses "Kişi" instead of "Lead".
 - Main sidebar navigation now swaps active/passive icons per item for selected states.
@@ -172,7 +185,11 @@
 - Offering Profile summary now syncs from approved suggestions after review/archive/manual-approved actions.
 
 ### Fixed
+- Inbox realtime subscriptions now recover auth tokens via session refresh and keep realtime auth synced on auth state changes, preventing stale live message streams that required manual page refresh.
+- Usage & Billing detail breakdown now includes `lead_reasoning` tokens in the Lead Extraction bucket so detail totals align with monthly/all-time totals.
+- Reduced repeated "Merhaba"/opening loops by applying repeated-greeting suppression when recent assistant turns already greeted.
 - Manual custom profile text in Approved tab no longer gets inserted as a suggestion card or toggles AI mode unexpectedly.
+- Required Fields auto-generation now parses fenced/noisy JSON outputs from AI responses, so KB-triggered chips are persisted reliably.
 - Required fields chip remove button now uses a centered icon with a larger hit area for better alignment and usability.
 - Knowledge Base sidebar file clicks now open the document details view.
 - Inbox platform badge alignment restored after adding the lead status dot.

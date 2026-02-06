@@ -6,6 +6,13 @@ import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { buildRequiredIntakeFollowupGuidance } from '@/lib/ai/followup'
+import {
+    buildConversationContinuityGuidance,
+    type ConversationHistoryTurn,
+    stripRepeatedGreeting,
+    toOpenAiConversationMessages
+} from '@/lib/ai/conversation'
 import type { OrganizationAiSettings } from '@/types/database'
 
 const FALLBACK_TOPICS_TR = ['fiyatlar', 'randevu', 'iptal/iade', 'hizmetler']
@@ -86,11 +93,18 @@ async function renderFlexibleFallback(
     topics: string[],
     message: string,
     botName: string,
+    followupGuidance: string | null,
     options: {
         organizationId: string
         supabase?: any
         trackUsage?: boolean
         usageMetadata?: Record<string, any>
+        conversationHistory?: ConversationHistoryTurn[]
+        recentAssistantMessages?: string[]
+        leadSnapshot?: {
+            service_type?: string | null
+            extracted_fields?: Record<string, unknown> | null
+        } | null
     }
 ): Promise<string> {
     if (!process.env.OPENAI_API_KEY) {
@@ -102,9 +116,17 @@ async function renderFlexibleFallback(
         ? formatTopicList(topics)
         : formatTopicList(isLikelyTurkish(message) ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
 
-    const systemPrompt = withBotNamePrompt(prompt || DEFAULT_FLEXIBLE_PROMPT, botName)
-
-    const userPrompt = `Available topics: ${topicsList}\n\nUser message: ${message}`
+    const basePrompt = withBotNamePrompt(prompt || DEFAULT_FLEXIBLE_PROMPT, botName)
+    const continuityGuidance = buildConversationContinuityGuidance({
+        recentAssistantMessages: options.recentAssistantMessages ?? [],
+        leadSnapshot: options.leadSnapshot
+    })
+    const topicGuidance = `When you need to guide the user, stay within these available business topics: ${topicsList}.
+If the request is outside scope, politely redirect to the most relevant available topics.`
+    const systemPrompt = followupGuidance
+        ? `${basePrompt}\n\n${topicGuidance}\n\n${continuityGuidance}\n\n${followupGuidance}`
+        : `${basePrompt}\n\n${topicGuidance}\n\n${continuityGuidance}`
+    const historyMessages = toOpenAiConversationMessages(options.conversationHistory ?? [], message, 10)
 
     try {
         const completion = await openai.chat.completions.create({
@@ -112,11 +134,19 @@ async function renderFlexibleFallback(
             temperature: 0.3,
             messages: [
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
+                ...historyMessages,
+                { role: 'user', content: message }
             ]
         })
 
         const response = completion.choices[0]?.message?.content?.trim()
+        const polishedResponse = response
+            ? stripRepeatedGreeting(response, options.recentAssistantMessages ?? [])
+            : ''
+        const historyTokenCount = historyMessages.reduce(
+            (total, item) => total + estimateTokenCount(item.content),
+            0
+        )
         const usage = completion.usage
             ? {
                 inputTokens: completion.usage.prompt_tokens ?? 0,
@@ -124,9 +154,9 @@ async function renderFlexibleFallback(
                 totalTokens: completion.usage.total_tokens ?? (completion.usage.prompt_tokens ?? 0) + (completion.usage.completion_tokens ?? 0)
             }
             : {
-                inputTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt),
-                outputTokens: estimateTokenCount(response ?? ''),
-                totalTokens: estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt) + estimateTokenCount(response ?? '')
+                inputTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message),
+                outputTokens: estimateTokenCount(polishedResponse ?? ''),
+                totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message) + estimateTokenCount(polishedResponse ?? '')
             }
 
         if (options.trackUsage !== false) {
@@ -141,7 +171,7 @@ async function renderFlexibleFallback(
                 supabase: options.supabase
             })
         }
-        if (response) return response
+        if (polishedResponse) return polishedResponse
     } catch (error) {
         console.error('Flexible fallback failed:', error)
     }
@@ -152,6 +182,14 @@ async function renderFlexibleFallback(
 export async function buildFallbackResponse(options: {
     organizationId: string
     message: string
+    requiredIntakeFields?: string[]
+    recentCustomerMessages?: string[]
+    recentAssistantMessages?: string[]
+    conversationHistory?: ConversationHistoryTurn[]
+    leadSnapshot?: {
+        service_type?: string | null
+        extracted_fields?: Record<string, unknown> | null
+    } | null
     aiSettings?: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'>
     supabase?: any
     trackUsage?: boolean
@@ -160,17 +198,26 @@ export async function buildFallbackResponse(options: {
     const supabase = options.supabase ?? await createClient()
     const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, { supabase })
     const topics = await getFallbackTopics(supabase, options.organizationId, FALLBACK_TOPIC_LIMIT)
+    const followupGuidance = buildRequiredIntakeFollowupGuidance(
+        options.requiredIntakeFields ?? [],
+        options.recentCustomerMessages ?? [],
+        options.recentAssistantMessages ?? []
+    )
 
     return renderFlexibleFallback(
         aiSettings.prompt,
         topics,
         options.message,
         aiSettings.bot_name,
+        followupGuidance,
         {
             organizationId: options.organizationId,
             supabase,
             trackUsage: options.trackUsage,
-            usageMetadata: options.usageMetadata
+            usageMetadata: options.usageMetadata,
+            conversationHistory: options.conversationHistory,
+            recentAssistantMessages: options.recentAssistantMessages,
+            leadSnapshot: options.leadSnapshot
         }
     )
 }
