@@ -7,13 +7,20 @@ import { useLocale, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { AiBotMode } from '@/types/database'
-import { AiFillExperiment, AiOutlineExperiment } from 'react-icons/ai'
-import { FaRegFolderOpen } from 'react-icons/fa'
 import {
     HiMiniChatBubbleBottomCenterText,
     HiOutlineChatBubbleBottomCenterText,
+    HiMiniUser,
+    HiOutlineUser,
+    HiMiniPuzzlePiece,
+    HiOutlinePuzzlePiece,
+    HiMiniSparkles,
+    HiOutlineSparkles,
+    HiMiniSquare3Stack3D,
+    HiOutlineSquare3Stack3D,
+    HiMiniCog6Tooth,
+    HiOutlineCog6Tooth,
 } from 'react-icons/hi2'
-import { IoSettings, IoSettingsOutline, IoSparkles, IoSparklesOutline } from 'react-icons/io5'
 import {
     ArrowLeftFromLine,
     ArrowRightFromLine,
@@ -242,11 +249,18 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                         activeIcon: HiMiniChatBubbleBottomCenterText,
                     },
                     {
+                        id: 'leads',
+                        href: '/leads',
+                        label: tNav('leads'),
+                        icon: HiOutlineUser,
+                        activeIcon: HiMiniUser,
+                    },
+                    {
                         id: 'simulator',
                         href: '/simulator',
                         label: tNav('simulator'),
-                        icon: AiOutlineExperiment,
-                        activeIcon: AiFillExperiment,
+                        icon: HiOutlinePuzzlePiece,
+                        activeIcon: HiMiniPuzzlePiece,
                     },
                 ],
             },
@@ -258,15 +272,15 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                         id: 'skills',
                         href: '/skills',
                         label: tNav('skills'),
-                        icon: IoSparklesOutline,
-                        activeIcon: IoSparkles,
+                        icon: HiOutlineSparkles,
+                        activeIcon: HiMiniSparkles,
                     },
                     {
                         id: 'knowledge',
                         href: '/knowledge',
                         label: tNav('knowledgeBase'),
-                        icon: FaRegFolderOpen,
-                        activeIcon: FaRegFolderOpen,
+                        icon: HiOutlineSquare3Stack3D,
+                        activeIcon: HiMiniSquare3Stack3D,
                     },
                 ],
             },
@@ -284,8 +298,8 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                         id: 'settings',
                         href: '/settings/channels',
                         label: tNav('settings'),
-                        icon: IoSettingsOutline,
-                        activeIcon: IoSettings,
+                        icon: HiOutlineCog6Tooth,
+                        activeIcon: HiMiniCog6Tooth,
                     },
                 ],
             },

@@ -6,7 +6,8 @@ import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
 import { ConfirmDialog, Badge } from '@/design/primitives'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
-import { Plus, Trash2, Sparkles, TriangleAlert } from 'lucide-react'
+import { Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { IoSparklesOutline } from 'react-icons/io5'
 
 import { useTranslations } from 'next-intl'
 
@@ -297,7 +298,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                         /* Core Skills - Empty */
                         <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
                             <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center mb-3">
-                                <Sparkles size={24} />
+                                <IoSparklesOutline size={24} />
                             </div>
                             <h3 className="text-sm font-bold text-gray-900 mb-1">{t('core.emptyTitle')}</h3>
                             <p className="text-gray-500 text-xs max-w-[200px]">
@@ -461,7 +462,7 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
                                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                    <Sparkles className="text-gray-400" size={32} />
+                                    <IoSparklesOutline className="text-gray-400" size={32} />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-900 mb-2">{t('noSelection')}</h3>
                                 <p className="text-gray-500 text-sm max-w-xs mb-6">

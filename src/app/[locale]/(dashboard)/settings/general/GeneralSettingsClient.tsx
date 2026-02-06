@@ -1,9 +1,15 @@
 'use client'
 
 import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
-import { FaRegCreditCard } from 'react-icons/fa'
-import { ImBubbles4 } from 'react-icons/im'
-import { LuBriefcaseBusiness, LuCircleUser, LuReceipt, LuSettings2, LuWandSparkles } from 'react-icons/lu'
+import {
+    HiOutlineUserCircle,
+    HiOutlineBriefcase,
+    HiOutlineAdjustmentsHorizontal,
+    HiOutlineSparkles,
+    HiOutlineChatBubbleLeftRight,
+    HiOutlineCreditCard,
+    HiOutlineBanknotes
+} from 'react-icons/hi2'
 import { useRouter, usePathname } from '@/i18n/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -127,19 +133,19 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
             <Sidebar title={tSidebar('settings')}>
                 <SidebarGroup title={tSidebar('preferences')}>
                     <SidebarItem
-                        icon={<LuCircleUser size={18} />}
+                        icon={<HiOutlineUserCircle size={18} />}
                         label={tSidebar('profile')}
                         href={currentLocale === 'tr' ? '/settings/profile' : `/${currentLocale}/settings/profile`}
                     />
                     <SidebarItem
-                        icon={<LuBriefcaseBusiness size={18} />}
+                        icon={<HiOutlineBriefcase size={18} />}
                         label={tSidebar('organization')}
                         href={currentLocale === 'tr' ? '/settings/organization' : `/${currentLocale}/settings/organization`}
                         indicator={pendingCount > 0}
                     />
-                    <SidebarItem icon={<LuSettings2 size={18} />} label={tSidebar('general')} active />
+                    <SidebarItem icon={<HiOutlineAdjustmentsHorizontal size={18} />} label={tSidebar('general')} active />
                     <SidebarItem
-                        icon={<LuWandSparkles size={18} />}
+                        icon={<HiOutlineSparkles size={18} />}
                         label={tSidebar('ai')}
                         href={currentLocale === 'tr' ? '/settings/ai' : `/${currentLocale}/settings/ai`}
                     />
@@ -147,7 +153,7 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
 
                 <SidebarGroup title={tSidebar('integrations')}>
                     <SidebarItem
-                        icon={<ImBubbles4 size={18} />}
+                        icon={<HiOutlineChatBubbleLeftRight size={18} />}
                         label={tSidebar('channels')}
                         href={currentLocale === 'tr' ? '/settings/channels' : `/${currentLocale}/settings/channels`}
                     />
@@ -155,12 +161,12 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
 
                 <SidebarGroup title={tSidebar('billing')}>
                     <SidebarItem
-                        icon={<FaRegCreditCard size={18} />}
+                        icon={<HiOutlineCreditCard size={18} />}
                         label={tSidebar('plans')}
                         href="#"
                     />
                     <SidebarItem
-                        icon={<LuReceipt size={18} />}
+                        icon={<HiOutlineBanknotes size={18} />}
                         label={tSidebar('receipts')}
                         href={currentLocale === 'tr' ? '/settings/billing' : `/${currentLocale}/settings/billing`}
                     />
@@ -171,15 +177,15 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
                 <PageHeader
                     title={tGeneral('title')}
                     actions={
-                    <Button
-                        onClick={handleSave}
-                        disabled={!isDirty || isSaving}
-                        className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
-                    >
-                        {saved ? tGeneral('saved') : isSaving ? tGeneral('saving') : tGeneral('save')}
-                    </Button>
-                }
-            />
+                        <Button
+                            onClick={handleSave}
+                            disabled={!isDirty || isSaving}
+                            className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
+                        >
+                            {saved ? tGeneral('saved') : isSaving ? tGeneral('saving') : tGeneral('save')}
+                        </Button>
+                    }
+                />
 
                 <div className="flex-1 overflow-auto p-8">
                     <div className="max-w-5xl">

@@ -3,7 +3,21 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Inbox, MessageSquare, Sparkles, Settings, Bot, LogOut, BookOpen } from 'lucide-react'
+import { Bot, LogOut } from 'lucide-react'
+import {
+    HiOutlineChatBubbleBottomCenterText,
+    HiMiniChatBubbleBottomCenterText,
+    HiOutlineUser,
+    HiMiniUser,
+    HiOutlinePuzzlePiece,
+    HiPuzzlePiece,
+    HiOutlineCog6Tooth,
+    HiMiniCog6Tooth,
+    HiOutlineSparkles,
+    HiSparkles,
+    HiOutlineSquare3Stack3D,
+    HiSquare3Stack3D
+} from 'react-icons/hi2'
 
 import { useTranslations } from 'next-intl'
 
@@ -18,11 +32,45 @@ export function GlobalRail({ userName }: GlobalRailProps) {
     const tc = useTranslations('common')
 
     const navItems = [
-        { id: 'inbox', href: '/inbox', label: t('inbox'), icon: Inbox },
-        { id: 'simulator', href: '/simulator', label: t('simulator'), icon: MessageSquare },
-        { id: 'skills', href: '/skills', label: t('skills'), icon: Sparkles },
-        { id: 'knowledge', href: '/knowledge', label: t('knowledgeBase'), icon: BookOpen },
+        {
+            id: 'inbox',
+            href: '/inbox',
+            label: t('inbox'),
+            icon: HiOutlineChatBubbleBottomCenterText,
+            activeIcon: HiMiniChatBubbleBottomCenterText
+        },
+        {
+            id: 'leads',
+            href: '/leads',
+            label: t('leads'),
+            icon: HiOutlineUser,
+            activeIcon: HiMiniUser
+        },
+        {
+            id: 'simulator',
+            href: '/simulator',
+            label: t('simulator'),
+            icon: HiOutlinePuzzlePiece,
+            activeIcon: HiPuzzlePiece
+        },
+        {
+            id: 'skills',
+            href: '/skills',
+            label: t('skills'),
+            icon: HiOutlineSparkles,
+            activeIcon: HiSparkles
+        },
+        {
+            id: 'knowledge',
+            href: '/knowledge',
+            label: t('knowledgeBase'),
+            icon: HiOutlineSquare3Stack3D,
+            activeIcon: HiSquare3Stack3D
+        },
     ]
+
+    const isSettingsActive = pathWithoutLocale.startsWith('/settings')
+    const SettingsIcon = isSettingsActive ? HiMiniCog6Tooth : HiOutlineCog6Tooth
 
     return (
         <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 gap-6 shrink-0 h-screen">
@@ -35,7 +83,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
             <div className="flex flex-col gap-2 w-full px-2">
                 {navItems.map(item => {
                     const isActive = pathWithoutLocale.startsWith(item.href)
-                    const Icon = item.icon
+                    const Icon = isActive ? item.activeIcon : item.icon
                     return (
                         <Link
                             key={item.id}
@@ -61,13 +109,13 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                     href="/settings/channels"
                     className={cn(
                         "h-10 w-full rounded-lg flex items-center justify-center cursor-pointer transition-colors",
-                        pathWithoutLocale.startsWith('/settings')
+                        isSettingsActive
                             ? "bg-blue-50 text-blue-600"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                     )}
                     title={t('settings')}
                 >
-                    <Settings size={20} />
+                    <SettingsIcon size={20} />
                 </Link>
 
                 <div className="relative group">
