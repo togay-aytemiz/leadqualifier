@@ -325,6 +325,7 @@ export function InboxContainer({
         let channel: ReturnType<typeof supabase.channel> | null = null
         let messagesChannel: ReturnType<typeof supabase.channel> | null = null
         let conversationsChannel: ReturnType<typeof supabase.channel> | null = null
+        let leadsChannel: ReturnType<typeof supabase.channel> | null = null
         let cleanupRealtimeAuth: (() => void) | null = null
         let isMounted = true
 
@@ -456,6 +457,12 @@ export function InboxContainer({
                         }
                     }
                 })
+                .subscribe((status, err) => {
+                    console.log('Conversations Channel Status:', status, err ? { error: err } : '')
+                })
+
+            // Separate channel for leads
+            leadsChannel = supabase.channel('inbox_leads')
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
@@ -463,6 +470,7 @@ export function InboxContainer({
                     filter: `organization_id=eq.${organizationId}`
                 }, (payload) => {
                     const leadRow = (payload.eventType === 'DELETE' ? payload.old : payload.new) as Lead | null
+                    console.log('Realtime Lead event:', payload.eventType, leadRow)
                     if (!leadRow?.conversation_id) return
 
                     setConversations(prev => prev.map(c => {
@@ -481,8 +489,8 @@ export function InboxContainer({
                         }
                     }
                 })
-                .subscribe((status) => {
-                    console.log('Realtime Subscription Status:', status)
+                .subscribe((status, err) => {
+                    console.log('Leads Channel Status:', status, err ? { error: err } : '')
                 })
         }
 
@@ -501,6 +509,10 @@ export function InboxContainer({
             if (conversationsChannel) {
                 console.log('Cleaning up Conversations channel...')
                 supabase.removeChannel(conversationsChannel)
+            }
+            if (leadsChannel) {
+                console.log('Cleaning up Leads channel...')
+                supabase.removeChannel(leadsChannel)
             }
             if (channel) {
                 console.log('Cleaning up Realtime subscription...')
