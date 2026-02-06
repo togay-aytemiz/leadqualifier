@@ -127,8 +127,6 @@ export function RequiredIntakeFieldsSection({
                         className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
                     />
                 )}
-
-                <p className="text-xs text-gray-500">{t('requiredFieldsHelp')}</p>
             </div>
         </SettingsSection>
     )

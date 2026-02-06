@@ -8,6 +8,8 @@ import { Archive, CheckCircle2, ChevronDown, ChevronUp, Clock, XCircle } from 'l
 
 interface OfferingProfileSectionProps {
     summary: string
+    manualProfileNote: string
+    onManualProfileNoteChange: (value: string) => void
     aiSuggestionsEnabled: boolean
     onAiSuggestionsEnabledChange: (value: boolean) => void
     suggestions: Array<{
@@ -23,12 +25,14 @@ interface OfferingProfileSectionProps {
     onReviewSuggestion: (suggestionId: string, status: 'approved' | 'rejected') => Promise<void> | void
     onArchiveSuggestion?: (suggestionId: string) => Promise<void> | void
     onGenerateSuggestions?: () => Promise<boolean> | boolean
-    onAddCustomApproved?: (content: string) => Promise<boolean> | boolean
     isGeneratingSuggestions?: boolean
+    autoOpenSuggestions?: boolean
 }
 
 export function OfferingProfileSection({
     summary,
+    manualProfileNote,
+    onManualProfileNoteChange,
     aiSuggestionsEnabled,
     onAiSuggestionsEnabledChange,
     suggestions,
@@ -36,8 +40,8 @@ export function OfferingProfileSection({
     onReviewSuggestion,
     onArchiveSuggestion,
     onGenerateSuggestions,
-    onAddCustomApproved,
-    isGeneratingSuggestions = false
+    isGeneratingSuggestions = false,
+    autoOpenSuggestions = false
 }: OfferingProfileSectionProps) {
     const t = useTranslations('organizationSettings')
     const locale = useLocale()
@@ -47,9 +51,9 @@ export function OfferingProfileSection({
     const [reviewingId, setReviewingId] = useState<string | null>(null)
     const [generationFeedback, setGenerationFeedback] = useState<string | null>(null)
     const [suggestionsOpen, setSuggestionsOpen] = useState(false)
-    const [manualOpen, setManualOpen] = useState(false)
-    const [manualText, setManualText] = useState('')
-    const [manualSaving, setManualSaving] = useState(false)
+    const [hasAutoOpenedSuggestions, setHasAutoOpenedSuggestions] = useState(false)
+    const [manualOpen, setManualOpen] = useState(Boolean(manualProfileNote.trim()))
+    const [manualText, setManualText] = useState(manualProfileNote)
 
     const normalizedSuggestions = useMemo(() => {
         return suggestions.map((item) => ({
@@ -88,6 +92,22 @@ export function OfferingProfileSection({
             setSuggestionsOpen(true)
         }
     }, [grouped.pending.length])
+
+    useEffect(() => {
+        if (!autoOpenSuggestions || hasAutoOpenedSuggestions) return
+        setSuggestionsOpen(true)
+        if (grouped.pending.length > 0) {
+            setActiveTab('pending')
+        }
+        setHasAutoOpenedSuggestions(true)
+    }, [autoOpenSuggestions, grouped.pending.length, hasAutoOpenedSuggestions])
+
+    useEffect(() => {
+        setManualText(manualProfileNote)
+        if (manualProfileNote.trim()) {
+            setManualOpen(true)
+        }
+    }, [manualProfileNote])
 
     const dateFormatter = useMemo(() => {
         return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
@@ -145,19 +165,15 @@ export function OfferingProfileSection({
         }
     }
 
-    const handleManualSave = async () => {
-        const trimmed = manualText.trim()
-        if (!trimmed || !onAddCustomApproved) return
-        setManualSaving(true)
-        try {
-            const saved = await onAddCustomApproved(trimmed)
-            if (saved) {
-                setManualText('')
-                setManualOpen(false)
-            }
-        } finally {
-            setManualSaving(false)
-        }
+    const handleManualSave = () => {
+        onManualProfileNoteChange(manualText.trim())
+        setManualOpen(true)
+    }
+
+    const handleManualClear = () => {
+        setManualText('')
+        onManualProfileNoteChange('')
+        setManualOpen(false)
     }
 
     const emptyState = {
@@ -278,7 +294,12 @@ export function OfferingProfileSection({
                                                 <span className="sr-only">{tab.label}</span>
                                             </>
                                         ) : (
-                                            <span>{tab.label}</span>
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <span>{tab.label}</span>
+                                                {tab.key === 'pending' && tab.count > 0 && (
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                                )}
+                                            </span>
                                         )}
                                         <Badge variant={activeTab === tab.key ? 'info' : 'neutral'}>
                                             {tab.count}
@@ -287,9 +308,16 @@ export function OfferingProfileSection({
                                 ))}
                             </div>
 
+                            {grouped.pending.length > 0 && (
+                                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs text-blue-700">
+                                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                    {t('offeringProfileSuggestionsPendingNotice', { count: grouped.pending.length })}
+                                </div>
+                            )}
+
                             {activeTab === 'approved' && (
                                 <div className="mt-4 space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                    {!manualOpen ? (
+                                    {!manualOpen && !manualProfileNote.trim() ? (
                                         <Button size="sm" variant="secondary" onClick={() => setManualOpen(true)}>
                                             {t('offeringProfileManualAdd')}
                                         </Button>
@@ -308,20 +336,16 @@ export function OfferingProfileSection({
                                                     size="sm"
                                                     variant="secondary"
                                                     onClick={handleManualSave}
-                                                    disabled={manualSaving || !manualText.trim()}
+                                                    disabled={manualText.trim() === manualProfileNote.trim()}
                                                 >
                                                     {t('offeringProfileManualAddSave')}
                                                 </Button>
                                                 <Button
                                                     size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => {
-                                                        setManualText('')
-                                                        setManualOpen(false)
-                                                    }}
-                                                    disabled={manualSaving}
+                                                    variant="danger"
+                                                    onClick={handleManualClear}
                                                 >
-                                                    {t('offeringProfileManualAddCancel')}
+                                                    {t('offeringProfileManualAddClear')}
                                                 </Button>
                                             </div>
                                         </div>

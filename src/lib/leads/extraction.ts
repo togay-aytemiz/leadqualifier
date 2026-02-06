@@ -172,7 +172,11 @@ export async function runLeadExtraction(options: {
     const supabase = options.supabase ?? await createClient()
 
     const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }] = await Promise.all([
-        supabase.from('offering_profiles').select('summary, catalog_enabled, ai_suggestions_enabled').eq('organization_id', options.organizationId).maybeSingle(),
+        supabase
+            .from('offering_profiles')
+            .select('summary, manual_profile_note, catalog_enabled, ai_suggestions_enabled')
+            .eq('organization_id', options.organizationId)
+            .maybeSingle(),
         supabase.from('service_catalog').select('name, aliases, active').eq('organization_id', options.organizationId).eq('active', true),
         supabase
             .from('messages')
@@ -215,8 +219,10 @@ export async function runLeadExtraction(options: {
         .map((item: any) => `- ${item.content}`)
         .reverse()
         .join('\n')
+    const manualProfileNoteText = (profile?.manual_profile_note ?? '').trim()
     const profileText = [
         (profile?.summary ?? '').trim(),
+        manualProfileNoteText ? `Manual profile note:\n${manualProfileNoteText}` : '',
         suggestionText ? `AI suggestions:\n${suggestionText}` : ''
     ]
         .filter(Boolean)

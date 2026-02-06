@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-05  
+> **Last Updated:** 2026-02-06  
 > Mark items with `[x]` when completed.
 
 ---
@@ -217,11 +217,14 @@
   - [x] Hybrid AI suggestions (intro + up to 5 bullets) with update proposals for conflicting content
   - [x] Suggestion generation uses manual summary plus approved/rejected history for context
   - [x] Knowledge Base banner surfaces pending AI suggestions with quick link to Organization settings
+  - [x] Knowledge Base “Review/İncele” link deep-links to Organization settings and auto-expands the AI Suggestions accordion
   - [x] Organization settings now expose separate AI toggles for Offering Profile and Required Fields
   - [x] Offering Profile AI disabled mode shows only manual textarea
   - [x] Offering Profile AI enabled mode shows AI suggestions workflow
+  - [x] AI Suggestions accordion shows pending indicators both on the header and inside the accordion tabs/content
   - [x] Required Fields has its own AI suggestions toggle and remains a dedicated section
-  - [x] Approved suggestions tab supports one-off custom textarea entries (manual override into approved list)
+  - [x] Skill/KB updates auto-generate Required Fields AI chips and dedupe against existing manual/AI fields
+  - [x] Approved suggestions tab supports a persistent custom profile-note textarea (editable/removable, not converted into suggestion cards)
 - [x] AI suggestions enforce 3-5 bullet hybrid format with retry on sparse output
 - [x] AI suggestions archive (archived tab with archive action; regenerate when no pending)
   - [x] Knowledge Base banner copy updated to “Hizmet profili önerileri hazır” and spaced from header
@@ -241,6 +244,7 @@
   - [x] Label customer vs assistant messages and respect customer negations
   - [x] Use last 5 customer messages and LLM-provided score/status
   - [x] Ensure latest message is included even with async writes
+  - [x] Include manual profile note with approved AI suggestions in extraction context
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
   - [x] Auto-generate AI summary

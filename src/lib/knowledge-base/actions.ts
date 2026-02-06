@@ -3,7 +3,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { chunkText } from '@/lib/knowledge-base/chunking'
-import { appendOfferingProfileSuggestion, proposeServiceCandidate } from '@/lib/leads/offering-profile'
+import {
+    appendOfferingProfileSuggestion,
+    appendRequiredIntakeFields,
+    proposeServiceCandidate
+} from '@/lib/leads/offering-profile'
 import { revalidatePath } from 'next/cache'
 
 export interface KnowledgeCollection {
@@ -176,6 +180,8 @@ export async function processKnowledgeDocument(documentId: string, supabaseOverr
 
         const finalDoc = (readyDoc ?? data) as KnowledgeBaseEntry
 
+        const profileContent = `${finalDoc.title}\n${finalDoc.content}`
+
         try {
             await proposeServiceCandidate({
                 organizationId: finalDoc.organization_id,
@@ -184,15 +190,31 @@ export async function processKnowledgeDocument(documentId: string, supabaseOverr
                 name: finalDoc.title,
                 supabase
             })
+        } catch (error) {
+            console.error('Failed to propose knowledge-based services:', error)
+        }
+
+        try {
             await appendOfferingProfileSuggestion({
                 organizationId: finalDoc.organization_id,
                 sourceType: 'knowledge',
                 sourceId: finalDoc.id,
-                content: `${finalDoc.title}\n${finalDoc.content}`,
+                content: profileContent,
                 supabase
             })
         } catch (error) {
-            console.error('Failed to propose knowledge-based offerings:', error)
+            console.error('Failed to propose knowledge-based offering profile suggestion:', error)
+        }
+
+        try {
+            await appendRequiredIntakeFields({
+                organizationId: finalDoc.organization_id,
+                sourceType: 'knowledge',
+                content: profileContent,
+                supabase
+            })
+        } catch (error) {
+            console.error('Failed to propose knowledge-based required intake fields:', error)
         }
 
         revalidatePath('/knowledge')

@@ -3,7 +3,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
-import { appendOfferingProfileSuggestion, proposeServiceCandidate } from '@/lib/leads/offering-profile'
+import {
+    appendOfferingProfileSuggestion,
+    appendRequiredIntakeFields,
+    proposeServiceCandidate
+} from '@/lib/leads/offering-profile'
 
 /**
  * Get all skills for an organization
@@ -67,6 +71,8 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
     // Generate and store embeddings for trigger examples
     await generateAndStoreEmbeddings(data.id, skill.trigger_examples)
 
+    const profileContent = `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`
+
     try {
         await proposeServiceCandidate({
             organizationId: data.organization_id,
@@ -75,15 +81,31 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
             name: data.title,
             supabase
         })
+    } catch (error) {
+        console.error('Failed to propose skill-based services:', error)
+    }
+
+    try {
         await appendOfferingProfileSuggestion({
             organizationId: data.organization_id,
             sourceType: 'skill',
             sourceId: data.id,
-            content: `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`,
+            content: profileContent,
             supabase
         })
     } catch (error) {
-        console.error('Failed to propose skill-based offerings:', error)
+        console.error('Failed to propose skill-based offering profile suggestion:', error)
+    }
+
+    try {
+        await appendRequiredIntakeFields({
+            organizationId: data.organization_id,
+            sourceType: 'skill',
+            content: profileContent,
+            supabase
+        })
+    } catch (error) {
+        console.error('Failed to propose skill-based required intake fields:', error)
     }
 
     return data
@@ -115,6 +137,8 @@ export async function updateSkill(
 
     const shouldPropose = Boolean(updates.title || updates.response_text || updates.trigger_examples)
     if (shouldPropose) {
+        const profileContent = `${data.title}\n${(updates.trigger_examples ?? currentTriggers ?? []).join('\n')}\n${data.response_text}`
+
         try {
             await proposeServiceCandidate({
                 organizationId: data.organization_id,
@@ -123,15 +147,31 @@ export async function updateSkill(
                 name: data.title,
                 supabase
             })
+        } catch (error) {
+            console.error('Failed to propose skill-based services:', error)
+        }
+
+        try {
             await appendOfferingProfileSuggestion({
                 organizationId: data.organization_id,
                 sourceType: 'skill',
                 sourceId: data.id,
-                content: `${data.title}\n${(updates.trigger_examples ?? currentTriggers ?? []).join('\n')}\n${data.response_text}`,
+                content: profileContent,
                 supabase
             })
         } catch (error) {
-            console.error('Failed to propose skill-based offerings:', error)
+            console.error('Failed to propose skill-based offering profile suggestion:', error)
+        }
+
+        try {
+            await appendRequiredIntakeFields({
+                organizationId: data.organization_id,
+                sourceType: 'skill',
+                content: profileContent,
+                supabase
+            })
+        } catch (error) {
+            console.error('Failed to propose skill-based required intake fields:', error)
         }
     }
 

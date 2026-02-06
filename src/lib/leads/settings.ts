@@ -47,6 +47,7 @@ export async function getOfferingProfileSuggestions(
 export async function updateOfferingProfileSummary(
     organizationId: string,
     summary: string,
+    manualProfileNote: string,
     aiSuggestionsEnabled: boolean,
     requiredIntakeFieldsAiEnabled: boolean,
     aiSuggestionsLocale: string,
@@ -65,6 +66,7 @@ export async function updateOfferingProfileSummary(
 
     const fullPayload = {
         summary,
+        manual_profile_note: manualProfileNote,
         ai_suggestions_enabled: aiSuggestionsEnabled,
         required_intake_fields_ai_enabled: requiredIntakeFieldsAiEnabled,
         ai_suggestions_locale: aiSuggestionsLocale,
@@ -78,6 +80,7 @@ export async function updateOfferingProfileSummary(
     if (error?.message?.includes('required_intake_fields_ai_enabled')) {
         ({ error } = await runUpdate({
             summary,
+            manual_profile_note: manualProfileNote,
             ai_suggestions_enabled: aiSuggestionsEnabled,
             ai_suggestions_locale: aiSuggestionsLocale,
             required_intake_fields: requiredIntakeFields,
@@ -86,6 +89,16 @@ export async function updateOfferingProfileSummary(
     }
 
     if (error?.message?.includes('required_intake_fields_ai')) {
+        ({ error } = await runUpdate({
+            summary,
+            manual_profile_note: manualProfileNote,
+            ai_suggestions_enabled: aiSuggestionsEnabled,
+            ai_suggestions_locale: aiSuggestionsLocale,
+            required_intake_fields: requiredIntakeFields
+        }))
+    }
+
+    if (error?.message?.includes('manual_profile_note')) {
         ({ error } = await runUpdate({
             summary,
             ai_suggestions_enabled: aiSuggestionsEnabled,
@@ -111,40 +124,6 @@ export async function syncOfferingProfileSummary(
         .update({ summary })
         .eq('organization_id', organizationId)
     ensureNoError(error, 'Failed to sync offering profile summary')
-}
-
-export async function createManualApprovedOfferingProfileSuggestion(
-    organizationId: string,
-    content: string,
-    locale: string
-) {
-    const trimmedContent = content.trim()
-    if (!trimmedContent) return null
-
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    ensureNoError(authError, 'Failed to read auth user')
-    if (!user) throw new Error('Unauthorized')
-
-    const reviewedAt = new Date().toISOString()
-
-    const { error: insertError } = await supabase
-        .from('offering_profile_suggestions')
-        .insert({
-            organization_id: organizationId,
-            source_type: 'batch',
-            source_id: null,
-            content: trimmedContent,
-            status: 'approved',
-            locale,
-            reviewed_at: reviewedAt,
-            reviewed_by: user.id,
-            update_of: null,
-            archived_at: null
-        })
-    ensureNoError(insertError, 'Failed to create manual approved suggestion')
-
-    return trimmedContent
 }
 
 export async function generateOfferingProfileSuggestions(organizationId: string) {

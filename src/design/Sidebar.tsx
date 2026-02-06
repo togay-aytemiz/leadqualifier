@@ -17,7 +17,7 @@ export function Sidebar({ title, children, actions, footer }: SidebarProps) {
     return (
         <div className="w-64 bg-gray-50/50 flex flex-col h-full border-r border-gray-200 shrink-0 font-sans">
             {/* Header */}
-            <div className="h-14 flex items-center justify-between px-6 border-b border-gray-200 bg-white shrink-0">
+            <div className="h-14 flex items-center justify-between px-6 border-b border-gray-200 bg-gray-50/50 shrink-0">
                 <div className="flex items-center gap-3">
                     <h2 className="text-xl font-bold text-gray-900">{title}</h2>
                 </div>

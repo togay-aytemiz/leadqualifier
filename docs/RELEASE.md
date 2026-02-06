@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Added
+- Knowledge Base “Review/İncele” CTA now deep-links to Organization settings and auto-expands the Offering Profile AI Suggestions accordion.
+- Offering Profile AI Suggestions now surface pending indicators inside the accordion content/tabs in addition to sidebar/header indicators.
+- Skill/KB updates now trigger AI Required Fields chip generation by requesting only missing fields from current context.
 - Subagent-driven-development skill added for subagent-based plan execution.
 - Offering Profile AI suggestions review workflow (pending/approved/rejected tabs, accept/reject actions, empty states, and show-more).
 - Offering Profile AI suggestions manual generate action (shown when no suggestions exist).
@@ -40,7 +43,7 @@
 - AI Settings toggle to keep lead extraction running during operator takeover.
 - Organization settings now use independent AI toggles for Offering Profile and Required Fields sections.
 - Required Fields section includes its own AI toggle, on-demand manual add, and subtle AI tags.
-- Approved AI suggestions tab now supports one-off custom textarea additions for manual overrides.
+- Approved AI suggestions tab now includes a persistent custom profile-note textarea (editable/removable) that is stored separately from suggestion cards.
 - Manual approved additions are persisted as approved offering profile suggestions.
 - Org-level bot mode (Active/Shadow/Off) with AI Settings selector, sidebar status indicator, and Telegram reply gating (Simulator unaffected).
 - Auth password recovery flow (Forgot Password + Reset Password screens).
@@ -120,6 +123,7 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Required Fields normalization is now case-insensitive so manual and AI chips avoid duplicates (including previously suggested values).
 - Turkish UI copy now uses "Kişi" instead of "Lead".
 - Main sidebar navigation now swaps active/passive icons per item for selected states.
 - Knowledge Base routes now show skeleton loaders during navigation to avoid blank waits.
@@ -163,10 +167,12 @@
 - Knowledge Base save/update now return immediately with background processing and UI polling.
 - Lead scoring now uses LLM-provided score/status from the latest 5 customer messages (assistant messages excluded).
 - Lead extraction now injects the latest customer message into the LLM prompt to avoid missing fresh messages.
+- Lead extraction now includes persistent manual profile notes together with approved AI suggestions in its profile context.
 - Offering Profile UI now switches by its own AI mode: manual textarea when AI is off, suggestions workflow when AI is on.
 - Offering Profile summary now syncs from approved suggestions after review/archive/manual-approved actions.
 
 ### Fixed
+- Manual custom profile text in Approved tab no longer gets inserted as a suggestion card or toggles AI mode unexpectedly.
 - Required fields chip remove button now uses a centered icon with a larger hit area for better alignment and usability.
 - Knowledge Base sidebar file clicks now open the document details view.
 - Inbox platform badge alignment restored after adding the lead status dot.

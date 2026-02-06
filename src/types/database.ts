@@ -137,6 +137,7 @@ export type ServiceCandidateStatus = 'pending' | 'approved' | 'rejected'
 export interface OfferingProfile {
     organization_id: string
     summary: string
+    manual_profile_note: string
     catalog_enabled: boolean
     ai_suggestions_enabled: boolean
     required_intake_fields_ai_enabled: boolean

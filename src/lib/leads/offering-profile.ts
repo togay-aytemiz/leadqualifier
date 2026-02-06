@@ -5,7 +5,13 @@ import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { normalizeServiceName, isNewCandidate } from '@/lib/leads/catalog'
-import { parseSuggestionPayload } from '@/lib/leads/offering-profile-utils'
+import {
+    filterMissingIntakeFields,
+    mergeIntakeFields,
+    normalizeIntakeFields,
+    parseRequiredIntakeFieldsPayload,
+    parseSuggestionPayload
+} from '@/lib/leads/offering-profile-utils'
 
 const DEFAULT_SUGGESTION_LOCALE = 'tr'
 
@@ -62,6 +68,14 @@ Format:
 Use labels in the same language. Allowed labels: ${labels}.
 Return JSON: { suggestion: string, update_index: number | null } only.`
 
+const buildRequiredIntakeFieldsPrompt = (language: string) => `You propose missing intake fields for lead qualification.
+Write field names in ${language}.
+Use only information from the provided content and profile context.
+Do not repeat existing fields.
+Keep each field short (1 to 4 words), customer-facing, and specific.
+Avoid generic fields like "other details".
+Return ONLY JSON in this format: { "required_fields": string[] }`
+
 async function recordSuggestionUsage(options: {
     organizationId: string
     supabase: any
@@ -94,6 +108,43 @@ async function recordSuggestionUsage(options: {
             outputTokens,
             totalTokens: promptTokens + outputTokens,
             metadata: { source: 'offering_profile_suggestion', source_type: sourceType },
+            supabase
+        })
+    }
+}
+
+async function recordRequiredFieldsUsage(options: {
+    organizationId: string
+    supabase: any
+    systemPrompt: string
+    userPrompt: string
+    response: string
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null
+    sourceType: 'skill' | 'knowledge'
+}) {
+    const { organizationId, supabase, systemPrompt, userPrompt, response, usage, sourceType } = options
+    if (usage) {
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_extraction',
+            model: 'gpt-4o-mini',
+            inputTokens: usage.prompt_tokens ?? 0,
+            outputTokens: usage.completion_tokens ?? 0,
+            totalTokens: usage.total_tokens ?? 0,
+            metadata: { source: 'required_intake_fields', source_type: sourceType },
+            supabase
+        })
+    } else {
+        const promptTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt)
+        const outputTokens = estimateTokenCount(response)
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_extraction',
+            model: 'gpt-4o-mini',
+            inputTokens: promptTokens,
+            outputTokens,
+            totalTokens: promptTokens + outputTokens,
+            metadata: { source: 'required_intake_fields', source_type: sourceType },
             supabase
         })
     }
@@ -245,6 +296,99 @@ export async function appendOfferingProfileSuggestion(options: {
         content: options.content,
         supabase: options.supabase
     })
+}
+
+export async function appendRequiredIntakeFields(options: {
+    organizationId: string
+    sourceType: 'skill' | 'knowledge'
+    content: string
+    supabase?: any
+}) {
+    const supabase = options.supabase ?? await createClient()
+
+    const { data: profile } = await supabase
+        .from('offering_profiles')
+        .select('*')
+        .eq('organization_id', options.organizationId)
+        .maybeSingle()
+
+    if (!profile) return []
+    if (profile.required_intake_fields_ai_enabled === false) return []
+    if (!process.env.OPENAI_API_KEY) return []
+
+    const existingFields = normalizeIntakeFields(profile.required_intake_fields ?? [])
+    const existingAiFields = normalizeIntakeFields(profile.required_intake_fields_ai ?? [])
+    const locale = profile.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
+    const language = resolveSuggestionLanguage(locale)
+    const systemPrompt = buildRequiredIntakeFieldsPrompt(language)
+    const existingBlock = existingFields.length > 0
+        ? existingFields.map((field) => `- ${field}`).join('\n')
+        : 'none'
+    const profileContext = [
+        (profile.summary ?? '').trim(),
+        (profile.manual_profile_note ?? '').trim()
+    ].filter(Boolean).join('\n\n')
+    const profileContextBlock = profileContext || 'none'
+
+    const userPrompt = `New content:\n${options.content}\n\nExisting required intake fields:\n${existingBlock}\n\nOffering profile context:\n${profileContextBlock}`
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 180,
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ]
+    })
+
+    const response = completion.choices[0]?.message?.content?.trim()
+    if (!response) return []
+
+    await recordRequiredFieldsUsage({
+        organizationId: options.organizationId,
+        supabase,
+        systemPrompt,
+        userPrompt,
+        response,
+        usage: completion.usage,
+        sourceType: options.sourceType
+    })
+
+    const parsedFields = parseRequiredIntakeFieldsPayload(response)
+    if (!parsedFields || parsedFields.length === 0) return []
+
+    const missingFields = filterMissingIntakeFields(existingFields, parsedFields)
+    if (missingFields.length === 0) return []
+
+    const nextRequiredFields = mergeIntakeFields(existingFields, missingFields)
+    const nextAiFields = normalizeIntakeFields(
+        mergeIntakeFields(existingAiFields, missingFields)
+            .filter((field) => filterMissingIntakeFields(nextRequiredFields, [field]).length === 0)
+    )
+
+    let { error } = await supabase
+        .from('offering_profiles')
+        .update({
+            required_intake_fields: nextRequiredFields,
+            required_intake_fields_ai: nextAiFields
+        })
+        .eq('organization_id', options.organizationId)
+
+    // Backward-compatible fallback for partially migrated databases.
+    if (error?.message?.includes('required_intake_fields_ai')) {
+        ({ error } = await supabase
+            .from('offering_profiles')
+            .update({ required_intake_fields: nextRequiredFields })
+            .eq('organization_id', options.organizationId))
+    }
+
+    if (error) {
+        throw new Error(`Failed to update required intake fields: ${error.message}`)
+    }
+
+    return missingFields
 }
 
 export async function generateInitialOfferingSuggestion(options: {

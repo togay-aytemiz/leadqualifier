@@ -240,7 +240,7 @@ export async function getLeadScoreReasoning(
             .maybeSingle(),
         supabase
             .from('offering_profiles')
-            .select('summary, catalog_enabled')
+            .select('summary, manual_profile_note, catalog_enabled')
             .eq('organization_id', organizationId)
             .maybeSingle(),
         supabase
@@ -270,7 +270,7 @@ export async function getLeadScoreReasoning(
 
     const catalogEnabled = profile?.catalog_enabled ?? true
     const hasCatalogMatch = catalogEnabled && matchesCatalog(lead.service_type, catalog ?? [])
-    const hasProfileContent = Boolean((profile?.summary ?? '').trim() || suggestionText)
+    const hasProfileContent = Boolean((profile?.summary ?? '').trim() || (profile?.manual_profile_note ?? '').trim() || suggestionText)
 
     const extractedFields = (lead.extracted_fields ?? {}) as {
         desired_date?: string | null

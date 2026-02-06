@@ -254,7 +254,7 @@ export function KnowledgeContainer({
                             <p className="text-xs text-amber-800">{t('aiSuggestionsBannerDescription', { count: pendingSuggestions })}</p>
                         </div>
                         <Link
-                            href="/settings/organization"
+                            href="/settings/organization?focus=offering-suggestions"
                             className="text-xs font-semibold text-amber-800 hover:text-amber-900"
                         >
                             {t('aiSuggestionsBannerCta')}

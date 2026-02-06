@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-05  
+> **Last Updated:** 2026-02-06  
 > **Status:** In Development
 
 ---
@@ -157,10 +157,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Lead score and status are produced directly by the LLM using the latest 5 customer messages only (assistant messages excluded).
 - The most recent customer message is always injected into the extraction prompt to avoid replication delays.
 - Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation). Rejected suggestions can be archived for audit (excluded from AI context), and users can regenerate suggestions whenever there are no pending items.
+- Lead extraction context includes both approved AI suggestions and the persistent manual profile note from Organization Settings.
 - Organization Settings now uses separate AI toggles per section:
   - Offering Profile: AI off shows manual textarea, AI on shows suggestions workflow.
   - Required Fields: AI toggle controls AI-tagged required-field suggestions independently.
-  - Approved suggestions tab supports one-off custom textarea entries for manual overrides.
+  - KB “Review/İncele” CTA deep-links into Organization Settings and auto-expands the Offering Profile AI Suggestions accordion.
+  - Pending suggestion visibility is shown both on the accordion header and inside the accordion content/tabs.
+  - Approved suggestions tab supports a persistent custom profile note (editable/removable) that is stored separately from suggestion cards.
+- Required Fields AI chips are regenerated when Skill/KB content updates, with normalization and dedupe against existing manual/AI chips (LLM receives current fields and proposes only missing ones).
 - Non-business conversations are excluded from lead scoring and marked as ignored.
 
 ---
@@ -343,7 +347,8 @@ MVP is successful when:
 - **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 - **Organization AI Control:** Use independent section-level AI toggles for Offering Profile and Required Fields UX modes.
-- **Manual Override Entry:** Allow one-off custom textarea additions in Approved suggestions to support manual scope overrides without reopening manual profile mode.
+- **Manual Profile Note:** Keep a persistent custom textarea in Approved suggestions for manual scope notes; store it separately in `offering_profiles` and do not convert it into suggestion cards.
+- **Required Fields Sync:** On Skill/KB updates, ask AI for only missing required fields by sending existing fields in prompt context; normalize/dedupe before persisting so manual and AI chips do not duplicate.
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { updateOrganizationName } from '@/lib/organizations/actions'
@@ -11,7 +11,6 @@ import { OfferingProfileSection } from '@/components/settings/OfferingProfileSec
 import { RequiredIntakeFieldsSection } from '@/components/settings/RequiredIntakeFieldsSection'
 import {
     archiveOfferingProfileSuggestion,
-    createManualApprovedOfferingProfileSuggestion,
     generateOfferingProfileSuggestions,
     getOfferingProfileSuggestions,
     syncOfferingProfileSummary,
@@ -41,22 +40,28 @@ export default function OrganizationSettingsClient({
     const tUnsaved = useTranslations('unsavedChanges')
     const locale = useLocale()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const autoOpenOfferingSuggestions = searchParams.get('focus') === 'offering-suggestions'
+    const initialRequiredFields = normalizeIntakeFields(offeringProfile?.required_intake_fields ?? [])
+    const initialRequiredFieldsAi = normalizeIntakeFields(offeringProfile?.required_intake_fields_ai ?? [])
 
     const [baseline, setBaseline] = useState({
         name: initialName,
         profileSummary: offeringProfile?.summary ?? '',
+        manualProfileNote: offeringProfile?.manual_profile_note ?? '',
         offeringProfileAiEnabled: offeringProfile?.ai_suggestions_enabled ?? false,
         requiredIntakeFieldsAiEnabled: offeringProfile?.required_intake_fields_ai_enabled ?? true,
-        requiredIntakeFields: offeringProfile?.required_intake_fields ?? [],
-        requiredIntakeFieldsAi: offeringProfile?.required_intake_fields_ai ?? []
+        requiredIntakeFields: initialRequiredFields,
+        requiredIntakeFieldsAi: initialRequiredFieldsAi
     })
 
     const [name, setName] = useState(initialName)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
+    const [manualProfileNote, setManualProfileNote] = useState(offeringProfile?.manual_profile_note ?? '')
     const [offeringProfileAiEnabled, setOfferingProfileAiEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
     const [requiredIntakeFieldsAiEnabled, setRequiredIntakeFieldsAiEnabled] = useState(offeringProfile?.required_intake_fields_ai_enabled ?? true)
-    const [requiredIntakeFields, setRequiredIntakeFields] = useState(offeringProfile?.required_intake_fields ?? [])
-    const [requiredIntakeFieldsAi, setRequiredIntakeFieldsAi] = useState(offeringProfile?.required_intake_fields_ai ?? [])
+    const [requiredIntakeFields, setRequiredIntakeFields] = useState(initialRequiredFields)
+    const [requiredIntakeFieldsAi, setRequiredIntakeFieldsAi] = useState(initialRequiredFieldsAi)
     const [suggestions, setSuggestions] = useState(() => initialSuggestions.map((item) => ({
         ...item,
         status: item.status ?? 'pending'
@@ -68,40 +73,48 @@ export default function OrganizationSettingsClient({
     const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
     const [localeSynced, setLocaleSynced] = useState(false)
 
+    const normalizedRequiredIntakeFields = useMemo(() => {
+        return normalizeIntakeFields(requiredIntakeFields)
+    }, [requiredIntakeFields])
+
     const normalizedRequiredIntakeFieldsAi = useMemo(() => {
-        const fieldSet = new Set(requiredIntakeFields.map((field) => field.trim().toLowerCase()))
+        const fieldSet = new Set(normalizedRequiredIntakeFields.map((field) => field.trim().toLowerCase()))
         return normalizeIntakeFields(
             requiredIntakeFieldsAi.filter((field) => fieldSet.has(field.trim().toLowerCase()))
         )
-    }, [requiredIntakeFields, requiredIntakeFieldsAi])
+    }, [normalizedRequiredIntakeFields, requiredIntakeFieldsAi])
 
     const isDirty = useMemo(() => {
         return (
             name !== baseline.name ||
             profileSummary !== baseline.profileSummary ||
+            manualProfileNote !== baseline.manualProfileNote ||
             offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
             requiredIntakeFieldsAiEnabled !== baseline.requiredIntakeFieldsAiEnabled ||
-            requiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
+            normalizedRequiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
             normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|')
         )
     }, [
         name,
         profileSummary,
+        manualProfileNote,
         offeringProfileAiEnabled,
         requiredIntakeFieldsAiEnabled,
-        requiredIntakeFields,
+        normalizedRequiredIntakeFields,
         normalizedRequiredIntakeFieldsAi,
         baseline
     ])
 
     useEffect(() => {
         const nextSummary = offeringProfile?.summary ?? ''
+        const nextManualProfileNote = offeringProfile?.manual_profile_note ?? ''
         const nextOfferingProfileAiEnabled = offeringProfile?.ai_suggestions_enabled ?? false
         const nextRequiredIntakeFieldsAiEnabled = offeringProfile?.required_intake_fields_ai_enabled ?? true
-        const nextRequiredFields = offeringProfile?.required_intake_fields ?? []
-        const nextRequiredFieldsAi = offeringProfile?.required_intake_fields_ai ?? []
+        const nextRequiredFields = normalizeIntakeFields(offeringProfile?.required_intake_fields ?? [])
+        const nextRequiredFieldsAi = normalizeIntakeFields(offeringProfile?.required_intake_fields_ai ?? [])
 
         setProfileSummary(nextSummary)
+        setManualProfileNote(nextManualProfileNote)
         setOfferingProfileAiEnabled(nextOfferingProfileAiEnabled)
         setRequiredIntakeFieldsAiEnabled(nextRequiredIntakeFieldsAiEnabled)
         setRequiredIntakeFields(nextRequiredFields)
@@ -109,6 +122,7 @@ export default function OrganizationSettingsClient({
         setBaseline((prev) => ({
             ...prev,
             profileSummary: nextSummary,
+            manualProfileNote: nextManualProfileNote,
             offeringProfileAiEnabled: nextOfferingProfileAiEnabled,
             requiredIntakeFieldsAiEnabled: nextRequiredIntakeFieldsAiEnabled,
             requiredIntakeFields: nextRequiredFields,
@@ -161,11 +175,15 @@ export default function OrganizationSettingsClient({
         return () => window.clearTimeout(timeout)
     }, [saved])
 
-    const deriveSummaryFromApprovedSuggestions = (allSuggestions: OfferingProfileSuggestion[]) => {
+    const deriveSummaryFromApprovedSuggestions = (allSuggestions: OfferingProfileSuggestion[], customNote: string) => {
         const approvedItems = allSuggestions
             .filter((item) => item.status === 'approved' && !item.update_of && !item.archived_at)
             .map((item) => item.content)
-        return serializeOfferingProfileItems(mergeOfferingProfileItems([], approvedItems))
+        const approvedSummary = serializeOfferingProfileItems(mergeOfferingProfileItems([], approvedItems))
+        const trimmedCustomNote = customNote.trim()
+        if (!trimmedCustomNote) return approvedSummary
+        if (!approvedSummary) return trimmedCustomNote
+        return `${approvedSummary}\n\n${trimmedCustomNote}`
     }
 
     const refreshSuggestions = async () => {
@@ -177,7 +195,7 @@ export default function OrganizationSettingsClient({
 
     const syncSummaryWithApprovedSuggestions = async (allSuggestions: OfferingProfileSuggestion[]) => {
         if (!offeringProfileAiEnabled) return
-        const nextSummary = deriveSummaryFromApprovedSuggestions(allSuggestions)
+        const nextSummary = deriveSummaryFromApprovedSuggestions(allSuggestions, baseline.manualProfileNote)
         setProfileSummary(nextSummary)
         setBaseline((prev) => ({ ...prev, profileSummary: nextSummary }))
         await syncOfferingProfileSummary(organizationId, nextSummary)
@@ -195,32 +213,41 @@ export default function OrganizationSettingsClient({
                 await updateOrganizationName(name)
             }
 
+            const effectiveSummary = offeringProfileAiEnabled
+                ? deriveSummaryFromApprovedSuggestions(suggestions, manualProfileNote)
+                : profileSummary
+
             if (
-                profileSummary !== baseline.profileSummary ||
+                effectiveSummary !== baseline.profileSummary ||
+                manualProfileNote !== baseline.manualProfileNote ||
                 offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
                 requiredIntakeFieldsAiEnabled !== baseline.requiredIntakeFieldsAiEnabled ||
-                requiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
+                normalizedRequiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
                 normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|')
             ) {
                 await updateOfferingProfileSummary(
                     organizationId,
-                    profileSummary,
+                    effectiveSummary,
+                    manualProfileNote,
                     offeringProfileAiEnabled,
                     requiredIntakeFieldsAiEnabled,
                     locale,
-                    requiredIntakeFields,
+                    normalizedRequiredIntakeFields,
                     normalizedRequiredIntakeFieldsAi,
                     { generateInitialSuggestion: offeringProfileAiEnabled && !baseline.offeringProfileAiEnabled }
                 )
                 await refreshSuggestions()
             }
 
+            setProfileSummary(effectiveSummary)
+
             setBaseline({
                 name,
-                profileSummary,
+                profileSummary: effectiveSummary,
+                manualProfileNote,
                 offeringProfileAiEnabled,
                 requiredIntakeFieldsAiEnabled,
-                requiredIntakeFields,
+                requiredIntakeFields: normalizedRequiredIntakeFields,
                 requiredIntakeFieldsAi: normalizedRequiredIntakeFieldsAi
             })
             setSaved(true)
@@ -285,25 +312,17 @@ export default function OrganizationSettingsClient({
         }
     }
 
-    const handleAddCustomApprovedSuggestion = async (content: string) => {
-        try {
-            const created = await createManualApprovedOfferingProfileSuggestion(organizationId, content, locale)
-            if (!created) return false
-
-            const refreshedSuggestions = await refreshSuggestions()
-            await syncSummaryWithApprovedSuggestions(refreshedSuggestions)
-            window.dispatchEvent(new Event('pending-suggestions-updated'))
-            router.refresh()
-            return true
-        } catch (error) {
-            console.error(error)
-            return false
-        }
+    const handleManualProfileNoteChange = (value: string) => {
+        setManualProfileNote(value)
+        if (!offeringProfileAiEnabled) return
+        const nextSummary = deriveSummaryFromApprovedSuggestions(suggestions, value)
+        setProfileSummary(nextSummary)
     }
 
     const handleDiscard = () => {
         setName(baseline.name)
         setProfileSummary(baseline.profileSummary)
+        setManualProfileNote(baseline.manualProfileNote)
         setOfferingProfileAiEnabled(baseline.offeringProfileAiEnabled)
         setRequiredIntakeFieldsAiEnabled(baseline.requiredIntakeFieldsAiEnabled)
         setRequiredIntakeFields(baseline.requiredIntakeFields)
@@ -354,12 +373,14 @@ export default function OrganizationSettingsClient({
                         summary={profileSummary}
                         aiSuggestionsEnabled={offeringProfileAiEnabled}
                         suggestions={suggestions}
+                        autoOpenSuggestions={autoOpenOfferingSuggestions}
                         onSummaryChange={setProfileSummary}
+                        manualProfileNote={manualProfileNote}
+                        onManualProfileNoteChange={handleManualProfileNoteChange}
                         onAiSuggestionsEnabledChange={setOfferingProfileAiEnabled}
                         onReviewSuggestion={handleReviewSuggestion}
                         onArchiveSuggestion={handleArchiveSuggestion}
                         onGenerateSuggestions={handleGenerateSuggestions}
-                        onAddCustomApproved={handleAddCustomApprovedSuggestion}
                         isGeneratingSuggestions={isGeneratingSuggestions}
                     />
 
@@ -368,7 +389,7 @@ export default function OrganizationSettingsClient({
                         aiFields={normalizedRequiredIntakeFieldsAi}
                         aiSuggestionsEnabled={requiredIntakeFieldsAiEnabled}
                         onAiSuggestionsEnabledChange={setRequiredIntakeFieldsAiEnabled}
-                        onFieldsChange={setRequiredIntakeFields}
+                        onFieldsChange={(fields) => setRequiredIntakeFields(normalizeIntakeFields(fields))}
                         onAiFieldsChange={setRequiredIntakeFieldsAi}
                     />
                 </div>
