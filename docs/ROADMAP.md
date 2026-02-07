@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-07 (skills icon parity update)  
+> **Last Updated:** 2026-02-07 (platform admin org switcher + tenant impersonation planning)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -53,6 +53,7 @@
   - [x] Enable/disable toggle
 - [x] **Skill Matching Engine**
   - [x] Embedding generation for triggers
+  - [x] Embedding generation now includes skill titles in addition to triggers
   - [x] Similarity search (top-5)
   - [x] LLM re-ranking
   - [x] Confidence threshold logic
@@ -201,6 +202,7 @@
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
 - [x] **Settings UX:** Align settings column widths and remove duplicate field labels for cleaner alignment
 - [x] **Settings UX:** Refresh settings sidebar icons with bubbles/circle-user icons
+- [x] **Settings UX:** Settings page headers now match sidebar item labels (AI + General)
 - [x] **AI Settings UI:** Compact bot mode/escalation selection cards (smaller title, radio, and padding)
 - [x] **AI Settings UI:** Downsize selection card title text to section-title scale and reduce description font one step
 - [x] **AI Settings UI:** Align sensitivity slider with hot lead threshold styling (blue `>=` right-side highlight)
@@ -325,8 +327,22 @@
 ## Phase 8: Platform Admin Features
 - [x] System admin dashboard + organizations/users lists
 - [ ] Organization switcher
+  - [ ] Searchable org switcher in main sidebar (system admin)
+  - [ ] Persist active organization context via server-side cookie
+  - [ ] Apply switched org context across Inbox/Leads/Skills/Knowledge/Simulator/Settings
+  - [ ] Show clear "viewing as organization" state and reset action
 - [ ] Cross-org debugging tools
+  - [ ] Admin-only org details page (`/admin/organizations/[id]`)
+  - [ ] Read org-level snapshots: usage, channels, skills, knowledge stats
+  - [ ] Audit trail for admin-driven plan/quota updates
 - [ ] Usage analytics per org
+  - [ ] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
+  - [ ] Add premium/trial status visibility and plan cycle/status visibility
+  - [ ] Add search + pagination for organization/admin list
+- [ ] Billing/Quota Controls (Admin)
+  - [ ] Extend premium duration
+  - [ ] Extend trial duration
+  - [ ] Edit token/message quota limits per organization
 
 ---
 

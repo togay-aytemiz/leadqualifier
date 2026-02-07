@@ -7,10 +7,13 @@
 ## [Unreleased]
 
 ### Added
+- Added platform admin planning docs for searchable organization switcher + tenant impersonation flow and admin organization details controls (`docs/plans/2026-02-07-platform-admin-org-switcher-implementation-plan.md`).
+- Updated PRD and Roadmap to include planned platform admin scope: cross-org switcher, organization-level analytics columns, and premium/trial/quota management modules.
 - Documented minimal day-1 default guardrail system skills (human support request, complaint, urgent, privacy) with dedicated localized handover messages and explicit decision to skip low-confidence/no-safe-answer auto-handover for MVP.
 - Added implementation plan and product-spec updates for unified single-list Skills management (no Core/Custom split).
 - Skills now auto-seed localized minimal guardrail defaults (human support, complaint, urgent, privacy) when an organization has no skills yet.
 - Added automatic skill-embedding backfill on Skills load for orgs with SQL-seeded skills that are missing vectors.
+- Skill embeddings now include both skill title and trigger phrases; embeddings regenerate when title/trigger fields change.
 - Usage & Billing now includes message usage cards for monthly UTC and all-time totals (AI-generated, operator-sent, customer inbound).
 - Usage & Billing now includes storage usage cards with total estimated size and Skills vs Knowledge Base breakdown.
 - Added `src/lib/billing/usage.ts` plus unit tests for message and storage usage calculations.
@@ -143,6 +146,8 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Settings page headers now reuse settings sidebar labels for title parity (AI and General pages).
+- Skill matching context now uses title-aware embeddings instead of trigger-only embeddings.
 - Skills empty-state icon now uses the same icon family/glyph as the sidebar Skills navigation item for visual consistency.
 - Skills page now uses a single unified list; Core/Custom tabs were removed and default/user-added skills are managed from the same list.
 - Usage & Billing page now renders three usage sections in one flow: AI token usage, message usage, and storage usage.

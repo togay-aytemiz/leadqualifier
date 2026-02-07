@@ -17,6 +17,7 @@ interface AiSettingsClientProps {
 export default function AiSettingsClient({ initialSettings }: AiSettingsClientProps) {
     const locale = useLocale()
     const t = useTranslations('aiSettings')
+    const tSidebar = useTranslations('Sidebar')
     const tUnsaved = useTranslations('unsavedChanges')
     const searchParams = useSearchParams()
     const [baseline, setBaseline] = useState(initialSettings)
@@ -166,7 +167,7 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     return (
         <>
             <PageHeader
-                title={t('pageTitle')}
+                title={tSidebar('ai')}
                 actions={
                     <Button
                         onClick={handleSave}

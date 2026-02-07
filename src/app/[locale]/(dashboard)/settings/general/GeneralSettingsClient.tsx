@@ -175,7 +175,7 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
 
             <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
                 <PageHeader
-                    title={tGeneral('title')}
+                    title={tSidebar('general')}
                     actions={
                         <Button
                             onClick={handleSave}

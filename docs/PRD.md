@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-07 (skills UI icon parity update)  
+> **Last Updated:** 2026-02-07 (platform admin org switcher + tenant impersonation planning)  
 > **Status:** In Development
 
 ---
@@ -96,6 +96,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 2. Compare with skill embeddings (top-5 similarity)
 3. LLM re-rank → `skill_id` + `confidence` (0-1)
 4. If `confidence < threshold` → fallback to KB or topic-guided fallback response
+
+**Embedding Source:**
+- Skill embeddings are generated from both `title` and `trigger_examples` (not triggers only).
 
 ---
 
@@ -307,6 +310,28 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Add storage usage cards showing total estimated content size and a Skills/Knowledge Base split
 - Every new token-consuming feature must log usage events
 
+### 5.8 Platform Admin Workspace (Planned)
+- **Searchable Organization Switcher (System Admin):**
+  - System admin can switch active org from a searchable switcher.
+  - Switch affects tenant-scoped modules (Inbox, Leads, Skills, Knowledge Base, Settings, Simulator).
+  - UI shows a clear "viewing as organization" state to prevent mistakes.
+- **Admin Organization List:**
+  - Table-level visibility for:
+    - organization identity
+    - total usage
+    - total token usage
+    - total skills count
+    - knowledge base count
+    - premium status
+    - plan status/cycle (monthly/yearly/trial/free)
+- **Organization Details (Admin):**
+  - Dedicated details page per organization.
+  - Control modules for:
+    - extending premium period
+    - extending trial period
+    - updating token/message quota limits
+  - All admin changes are audit-logged.
+
 ---
 
 ## 6. Multi-Tenant Architecture
@@ -315,7 +340,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 |---------|----------------|
 | Organization | 1 customer = 1 org |
 | Data Isolation | All tables have `organization_id` |
-| Platform Admin | System admin dashboard + org/user lists (org switcher not yet implemented) |
+| Platform Admin | System admin dashboard + org/user lists implemented; searchable org switcher + cross-org tenant impersonation and billing/quota controls are planned in Phase 8 |
 
 ---
 
@@ -416,10 +441,12 @@ MVP is successful when:
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
 - **Settings Save Feedback:** Show saved state via the save button (no inline “Saved” text) and clear dirty-state after persistence across settings pages.
 - **Settings Sidebar Icons:** Use the updated settings menu icon set (bubbles/circle user) for profile/org/general/AI/channels/billing entries.
+- **Settings Title Parity:** Settings page headers should use the same labels as the corresponding settings sidebar items.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.
+- **Skills Embedding Source:** Generate skill embeddings from both skill title and trigger examples; regenerate on title/trigger changes.
 - **Skills Icon Consistency:** Reuse the sidebar Skills icon in the Skills empty-state panel for visual consistency.
 - **Skills Embedding Backfill:** When skills exist without embeddings (e.g., manual SQL inserts), regenerate missing skill embeddings on skills load to restore semantic matching.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
