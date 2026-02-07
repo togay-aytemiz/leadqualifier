@@ -1,7 +1,9 @@
 import { getSkills } from '@/lib/skills/actions'
+import { getOrgAiSettings } from '@/lib/ai/settings'
+import { DEFAULT_HANDOVER_MESSAGE_EN, DEFAULT_HANDOVER_MESSAGE_TR } from '@/lib/ai/escalation'
 import { createClient } from '@/lib/supabase/server'
 import { SkillsContainer } from '@/components/skills/SkillsContainer'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +13,7 @@ interface SkillsPageProps {
 
 export default async function SkillsPage({ searchParams }: SkillsPageProps) {
     const supabase = await createClient()
+    const locale = await getLocale()
     const t = await getTranslations('skills')
     const { q } = await searchParams
     const query = q || ''
@@ -34,11 +37,20 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
 
 
     let skills: Awaited<ReturnType<typeof getSkills>> = []
+    let handoverMessage = locale === 'tr' ? DEFAULT_HANDOVER_MESSAGE_TR : DEFAULT_HANDOVER_MESSAGE_EN
     if (organizationId) {
         try {
-            skills = await getSkills(organizationId, query)
+            const [skillsResult, aiSettings] = await Promise.all([
+                getSkills(organizationId, query),
+                getOrgAiSettings(organizationId, { supabase })
+            ])
+            skills = skillsResult
+            handoverMessage = locale === 'tr'
+                ? aiSettings.hot_lead_handover_message_tr
+                : aiSettings.hot_lead_handover_message_en
         } catch {
             skills = []
+            handoverMessage = locale === 'tr' ? DEFAULT_HANDOVER_MESSAGE_TR : DEFAULT_HANDOVER_MESSAGE_EN
         }
     }
 
@@ -58,6 +70,7 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
             <SkillsContainer
                 initialSkills={skills}
                 organizationId={organizationId}
+                handoverMessage={handoverMessage}
             />
         </div>
     )

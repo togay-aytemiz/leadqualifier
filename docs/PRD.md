@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-06 (human escalation planning)  
+> **Last Updated:** 2026-02-07 (human escalation bot message terminology update)  
 > **Status:** In Development
 
 ---
@@ -192,7 +192,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ---
 
-### 4.6 Human Escalation Policy (Planned)
+### 4.6 Human Escalation Policy (Implemented for Telegram)
 
 **Triggers:**
 - Skill-level mandatory handover (`requires_human_handover = true`)
@@ -205,13 +205,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 - `notify_only`: notify owner/team, keep AI active
 - `switch_to_operator`: lock conversation to operator (`active_agent='operator'`)
 
-**Customer Notice Modes:**
-- `assistant_promise`: append a handover message after AI response
-- `silent`: no customer-facing handover message
+**Bot Message (Handover):**
+- Escalation appends a handover message after AI response.
+- Handover message is locale-aware (TR/EN in AI Settings; UI locale selects which message is edited/shown).
+- Legacy/default mismatch repair ensures TR UI does not show EN default handover text.
 
 **Skill Override Rule (validated):**
 - Skill-triggered handover always uses `switch_to_operator` + `assistant_promise`.
-- Promise text is configured in AI Settings and shown as read-only in skill form with a deep link to edit.
+- Bot message text is configured in AI Settings and shown as read-only in skill form with a deep link to edit.
 
 ---
 
@@ -225,6 +226,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 5.2 Skills Management (Implemented; Playground Planned)
 - CRUD operations
 - Enable/disable toggle
+- `Requires Human Handover` toggle with read-only bot message preview and AI Settings deep-link
 - No per-skill playground yet (use Simulator for end-to-end testing)
 
 ### 5.3 Knowledge Base (Implemented)
@@ -248,7 +250,13 @@ Customer Message → Skill Match? → Yes → Skill Response
 - TR copy labels Shadow mode as "Dinleyici" for clarity
 - TR copy for Active mode highlights background lead extraction
 - Sidebar status dots map to green/amber/red for Active/Dinleyici/Kapalı
-- Human Escalation section (planned): hot lead threshold, escalation action, customer notice mode, and editable handover message
+- Bot mode and escalation action cards use compact visual density (reduced title size, radio size, and card padding)
+- Bot mode and escalation card titles align to section-title scale, with one-step smaller description text for tighter visual hierarchy
+- Human Escalation section: two-step flow (automatic escalation + skill handover), hot lead threshold slider, escalation action cards, and locale-aware editable handover message
+- Handover notice terminology in UI uses "Bot message" / "Bot mesajı" (replaces "Assistant's Promise" / "Asistan Sözü")
+- Sensitivity slider now mirrors threshold semantics visually with right-side (`>=`) highlight and blue styling aligned to the hot lead score control
+- Skill and KB matching threshold checks use inclusive comparison (`similarity >= threshold`) to align runtime behavior with UI semantics
+- Prompt textarea defaults are locale-aware (TR UI shows Turkish default prompt when stored value is legacy/default English prompt text, including older long EN default variants)
 
 ### 5.6 Profile & Organization Settings
 - Profile: name and email visibility (email is read-only)
@@ -264,6 +272,12 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Report usage breakdown by summary, messages (router/RAG/fallback), and lead extraction (including lead reasoning)
 - Monthly usage card surfaces the UTC month label (e.g., February 2026)
 - Usage details link appears under the UTC note in the Usage & Billing section
+- Add monthly UTC + all-time message volume cards for:
+  - AI-generated messages (`sender_type='bot'`)
+  - Operator-sent messages (`sender_type='user'`)
+  - Customer inbound messages (`sender_type='contact'`)
+  - Display each metric on its own row inside the monthly/total cards for readability
+- Add storage usage cards showing total estimated content size and a Skills/Knowledge Base split
 - Every new token-consuming feature must log usage events
 
 ---
@@ -344,6 +358,9 @@ MVP is successful when:
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Inbox Message Contrast:** Bot-authored inbox messages use a dark-violet bubble with light text to keep bot replies easy to scan against operator and contact messages.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
+- **Billing Message Metrics:** Message usage in Usage & Billing is computed from `messages.sender_type` with UTC monthly boundaries (`bot`, `user`, `contact`) and excludes `system` rows.
+- **Billing Storage Metrics:** Storage usage in Usage & Billing is an approximate UTF-8 text size based on Skills (`title`, `response_text`, `trigger_examples`) and Knowledge Documents (`title`, `content`).
+- **Billing Message Layout:** Present AI/operator/customer message counts on separate rows inside each message usage card to improve scanability.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
 - **Inbox Details:** Use consistent contact initials between list avatars and details panel.
@@ -365,6 +382,10 @@ MVP is successful when:
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
+- **AI Settings Card Density:** Keep bot-mode and escalation selection cards compact to avoid oversized visual weight in settings pages.
+- **AI Settings Card Typography:** Keep selection card titles at section-title scale (`text-sm`) and descriptions one step smaller (`text-xs`) for consistent hierarchy.
+- **AI Settings Threshold Semantics UI:** Render sensitivity threshold with a blue right-side (`>=`) highlight to match hot lead score semantics and reduce ambiguity.
+- **AI Settings Threshold Semantics Runtime:** Apply inclusive threshold checks (`>=`) in skill and KB similarity matching so backend behavior matches UI wording.
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
 - **Settings Save Feedback:** Show saved state via the save button (no inline “Saved” text) and clear dirty-state after persistence across settings pages.
 - **Settings Sidebar Icons:** Use the updated settings menu icon set (bubbles/circle user) for profile/org/general/AI/channels/billing entries.
@@ -374,7 +395,9 @@ MVP is successful when:
 - **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
 - **Operator Extraction Toggle:** Default to pausing lead extraction during operator takeover, with an AI Settings toggle to keep it running.
-- **Human Escalation Policy:** Centralize escalation decisions in one policy layer with strict precedence `skill override > hot lead score`, where skill-triggered handover always sends the assistant promise and switches to operator.
+- **Human Escalation Policy:** Centralize escalation decisions in one policy layer with strict precedence `skill override > hot lead score`, where skill-triggered handover always sends the bot handover message and switches to operator.
+- **Handover Locale Repair:** When legacy/default values create EN text in both localized fields, normalize to TR default for `hot_lead_handover_message_tr` and EN default for `hot_lead_handover_message_en`.
+- **Prompt Locale Repair:** When stored prompt is a known default family (EN/TR), including legacy long EN default variants and legacy strict fallback text, normalize to the active UI locale default prompt in settings.
 - **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.
 - **Lead Scoring Transparency:** Weight decisive booking intent higher (+3), add keyword fallback for intent signals, and expose on-demand score reasoning grounded in extracted inputs.
 - **Lead Score UX:** Reasoning copy respects the active UI locale and uses localized status labels.

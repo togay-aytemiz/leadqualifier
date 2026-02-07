@@ -16,8 +16,16 @@ import {
     stripRepeatedGreeting,
     toOpenAiConversationMessages
 } from '@/lib/ai/conversation'
+import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { v4 as uuidv4 } from 'uuid'
+
+function isLikelyTurkishMessage(value: string) {
+    const text = (value ?? '').trim()
+    if (!text) return true
+    if (/[ığüşöçİĞÜŞÖÇ]/.test(text)) return true
+    return /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet)\b/i.test(text)
+}
 
 export async function POST(req: NextRequest) {
     const headerSecret = req.headers.get('x-telegram-bot-api-secret-token')
@@ -185,6 +193,7 @@ export async function POST(req: NextRequest) {
         operatorActive,
         allowDuringOperator
     })
+    let leadScoreForEscalation: number | null = null
 
     if (shouldRunLeadExtraction) {
         await runLeadExtraction({
@@ -194,6 +203,18 @@ export async function POST(req: NextRequest) {
             supabase,
             source: 'telegram'
         })
+
+        const { data: leadForEscalation, error: leadForEscalationError } = await supabase
+            .from('leads')
+            .select('total_score')
+            .eq('conversation_id', conversation.id)
+            .maybeSingle()
+
+        if (leadForEscalationError) {
+            console.warn('Telegram Webhook: Failed to load lead score for escalation', leadForEscalationError)
+        } else if (typeof leadForEscalation?.total_score === 'number') {
+            leadScoreForEscalation = leadForEscalation.total_score
+        }
     }
 
     if (operatorActive || !allowReplies) {
@@ -202,6 +223,73 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ ok: true })
     }
+    const client = new TelegramClient(channel.config.bot_token)
+
+    const persistBotMessage = async (content: string, metadata: Record<string, unknown>) => {
+        await supabase.from('messages').insert({
+            id: uuidv4(),
+            conversation_id: conversation.id,
+            organization_id: orgId,
+            sender_type: 'bot',
+            content,
+            metadata
+        })
+
+        await supabase.from('conversations')
+            .update({
+                last_message_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id)
+    }
+
+    const applyEscalationAfterReply = async (options: { skillRequiresHumanHandover: boolean }) => {
+        const handoverMessage = isLikelyTurkishMessage(text)
+            ? aiSettings.hot_lead_handover_message_tr
+            : aiSettings.hot_lead_handover_message_en
+        const escalation = decideHumanEscalation({
+            skillRequiresHumanHandover: options.skillRequiresHumanHandover,
+            leadScore: leadScoreForEscalation,
+            hotLeadThreshold: aiSettings.hot_lead_score_threshold,
+            hotLeadAction: aiSettings.hot_lead_action,
+            handoverMessage
+        })
+
+        if (!escalation.shouldEscalate) return
+
+        if (
+            escalation.noticeMode === 'assistant_promise' &&
+            escalation.noticeMessage &&
+            conversation.active_agent !== 'operator'
+        ) {
+            await client.sendMessage(chatId, escalation.noticeMessage)
+            await persistBotMessage(escalation.noticeMessage, {
+                is_handover_notice: true,
+                escalation_reason: escalation.reason,
+                escalation_action: escalation.action
+            })
+        }
+
+        if (escalation.action === 'switch_to_operator' && conversation.active_agent !== 'operator') {
+            const { error: switchError } = await supabase
+                .from('conversations')
+                .update({
+                    active_agent: 'operator',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', conversation.id)
+
+            if (switchError) {
+                console.error('Telegram Webhook: Failed to switch conversation to operator', switchError)
+            } else {
+                conversation = {
+                    ...conversation,
+                    active_agent: 'operator'
+                }
+            }
+        }
+    }
+
     let customerHistoryForFollowup = [text.trim()].filter(Boolean)
     let assistantHistoryForFollowup: string[] = []
     let conversationHistoryForReply: ConversationTurn[] = []
@@ -221,28 +309,24 @@ export async function POST(req: NextRequest) {
     })
 
     if (bestMatch) {
-        // Send Response via Telegram
-        const client = new TelegramClient(channel.config.bot_token)
         await client.sendMessage(chatId, bestMatch.response_text)
 
-        // Save Bot Message
-        await supabase.from('messages').insert({
-            id: uuidv4(),
-            conversation_id: conversation.id,
-            organization_id: orgId,
-            sender_type: 'bot',
-            content: bestMatch.response_text,
-            metadata: { skill_id: bestMatch.skill_id }
-        })
+        await persistBotMessage(bestMatch.response_text, { skill_id: bestMatch.skill_id })
         console.log('Telegram Webhook: Sent matched response')
 
-        // Update conversation timestamp (No unread increment for bot replies)
-        await supabase.from('conversations')
-            .update({
-                last_message_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', conversation.id)
+        const { data: matchedSkillDetails, error: matchedSkillError } = await supabase
+            .from('skills')
+            .select('requires_human_handover')
+            .eq('id', bestMatch.skill_id)
+            .maybeSingle()
+
+        if (matchedSkillError) {
+            console.warn('Telegram Webhook: Failed to load matched skill handover flag', matchedSkillError)
+        }
+
+        await applyEscalationAfterReply({
+            skillRequiresHumanHandover: Boolean(matchedSkillDetails?.requires_human_handover)
+        })
 
         return NextResponse.json({ ok: true })
     } else {
@@ -402,26 +486,14 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     })
 
                     if (polishedRagResponse && !polishedRagResponse.includes(noAnswerToken)) {
-                        const client = new TelegramClient(channel.config.bot_token)
                         await client.sendMessage(chatId, polishedRagResponse)
 
-                        // Save Bot Message (RAG)
-                        await supabase.from('messages').insert({
-                            id: uuidv4(),
-                            conversation_id: conversation.id,
-                            organization_id: orgId,
-                            sender_type: 'bot',
-                            content: polishedRagResponse,
-                            metadata: {
-                                is_rag: true,
-                                sources: chunks.map(r => r.document_id).filter(Boolean)
-                            }
+                        await persistBotMessage(polishedRagResponse, {
+                            is_rag: true,
+                            sources: chunks.map(r => r.document_id).filter(Boolean)
                         })
 
-                        // Update conversation
-                        await supabase.from('conversations')
-                            .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-                            .eq('id', conversation.id)
+                        await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 
                         return NextResponse.json({ ok: true })
                     }
@@ -435,7 +507,6 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
 
         // 8. Final Fallback (No Skill, No Knowledge)
         console.log('Telegram Webhook: No knowledge match, sending fallback')
-        const client = new TelegramClient(channel.config.bot_token)
         const fallbackText = await buildFallbackResponse({
             organizationId: orgId,
             message: text,
@@ -454,19 +525,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
 
         await client.sendMessage(chatId, fallbackText)
 
-        // Save final fallback
-        await supabase.from('messages').insert({
-            id: uuidv4(),
-            conversation_id: conversation.id,
-            organization_id: orgId,
-            sender_type: 'bot',
-            content: fallbackText,
-            metadata: { is_fallback: true }
-        })
-
-        await supabase.from('conversations')
-            .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-            .eq('id', conversation.id)
+        await persistBotMessage(fallbackText, { is_fallback: true })
+        await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 
         return NextResponse.json({ ok: true })
     }

@@ -10,6 +10,7 @@ export interface Organization {
 
 export type AiMode = 'strict' | 'flexible'
 export type AiBotMode = 'active' | 'shadow' | 'off'
+export type HumanEscalationAction = 'notify_only' | 'switch_to_operator'
 
 export interface OrganizationAiSettings {
     organization_id: string
@@ -19,6 +20,10 @@ export interface OrganizationAiSettings {
     bot_mode: AiBotMode
     bot_name: string
     allow_lead_extraction_during_operator: boolean
+    hot_lead_score_threshold: number
+    hot_lead_action: HumanEscalationAction
+    hot_lead_handover_message_tr: string
+    hot_lead_handover_message_en: string
     created_at: string
     updated_at: string
 }
@@ -70,6 +75,7 @@ export interface Skill {
     trigger_examples: string[]
     response_text: string
     enabled: boolean
+    requires_human_handover: boolean
     created_at: string
     updated_at: string
 }

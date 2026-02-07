@@ -20,6 +20,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
     const [title, setTitle] = useState(skill?.title || '')
     const [triggers, setTriggers] = useState<string[]>(skill?.trigger_examples || ['', '', ''])
     const [responseText, setResponseText] = useState(skill?.response_text || '')
+    const [requiresHumanHandover, setRequiresHumanHandover] = useState(skill?.requires_human_handover ?? false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +56,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
                     title,
                     trigger_examples: validTriggers,
                     response_text: responseText,
+                    requires_human_handover: requiresHumanHandover
                 }, skill.trigger_examples)
             } else {
                 const data: SkillInsert = {
@@ -63,6 +65,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
                     trigger_examples: validTriggers,
                     response_text: responseText,
                     enabled: true,
+                    requires_human_handover: requiresHumanHandover
                 }
                 await createSkill(data)
             }
@@ -135,6 +138,15 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
                 placeholder={t('responseTextPlaceholder')}
                 required
             />
+
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                    type="checkbox"
+                    checked={requiresHumanHandover}
+                    onChange={(event) => setRequiresHumanHandover(event.target.checked)}
+                />
+                {t('requiresHumanHandover')}
+            </label>
 
             <div className="flex gap-4">
                 <Button

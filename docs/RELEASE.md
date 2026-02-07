@@ -7,7 +7,21 @@
 ## [Unreleased]
 
 ### Added
-- Human escalation policy design finalized (centralized policy, skill override precedence, hot lead actions, and assistant-promise UX with AI Settings deep link).
+- Usage & Billing now includes message usage cards for monthly UTC and all-time totals (AI-generated, operator-sent, customer inbound).
+- Usage & Billing now includes storage usage cards with total estimated size and Skills vs Knowledge Base breakdown.
+- Added `src/lib/billing/usage.ts` plus unit tests for message and storage usage calculations.
+- Human escalation policy implementation (Telegram): centralized precedence (`skill override > hot lead score`), AI Settings two-step controls (automatic escalation + skill handover), and runtime operator switch + bot message execution.
+- Skills now support `Requires Human Handover` with read-only bot message preview and deep-link to AI Settings (`Human Escalation` section + handover message focus).
+- AI Settings form now shows a dedicated divider above the Bot Name section for clearer section separation.
+- Human escalation copy polish: TR label now uses `Kişi çıkarım skoru`, step title uses `Yetenek tabanlı devir`, and the locale helper text under bot message is removed.
+- AI Settings sensitivity slider now uses the same blue right-side (`>=`) threshold highlight style as the human escalation score slider for consistent semantics.
+- Skill and KB similarity matching now use inclusive threshold checks (`>=`) to match the sensitivity slider semantics.
+- Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
+
+### Fixed
+- Supabase migration version collision: renamed `00020_send_operator_message_rpc.sql` to `00052_send_operator_message_rpc.sql` so `schema_migrations.version` is unique.
+
+### Added
 - Offering Profile AI Suggestions accordion header now shows a compact pending badge (dot + count) while collapsed.
 - Knowledge Base “Review/İncele” CTA now deep-links to Organization settings and auto-expands the Offering Profile AI Suggestions accordion.
 - Offering Profile AI Suggestions now surface pending indicators inside the accordion content/tabs in addition to sidebar/header indicators.
@@ -125,6 +139,10 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Usage & Billing page now renders three usage sections in one flow: AI token usage, message usage, and storage usage.
+- Usage & Billing message usage cards now render AI/operator/customer counts on separate rows instead of a single inline sentence.
+- AI Settings bot mode and escalation action selection cards now use a more compact size (smaller title/radio/padding).
+- AI Settings selection card titles are now section-title sized, and description text is reduced one step for tighter layout.
 - Inbox conversation list cards now use a 3-row text stack (name + right-aligned lead chip, one-line message preview, and time on the third row).
 - Inbox bot message bubbles now use a darker violet background with lighter text for stronger visual contrast.
 - Offering Profile AI Suggestions accordion header now shows only one pending indicator label and removes the redundant right-side count chip.
@@ -187,6 +205,8 @@
 - Offering Profile summary now syncs from approved suggestions after review/archive/manual-approved actions.
 
 ### Fixed
+- AI Settings now repairs localized handover message defaults so Turkish UI shows the Turkish bot handover message instead of the English default when legacy/default data is mismatched.
+- AI Settings prompt textarea now applies locale-aware default repair so Turkish UI shows Turkish prompt instructions instead of English default text, including legacy long EN default prompt variants.
 - Inbox realtime subscriptions now recover auth tokens via session refresh and keep realtime auth synced on auth state changes, preventing stale live message streams that required manual page refresh.
 - Usage & Billing detail breakdown now includes `lead_reasoning` tokens in the Lead Extraction bucket so detail totals align with monthly/all-time totals.
 - Reduced repeated "Merhaba"/opening loops by applying repeated-greeting suppression when recent assistant turns already greeted.

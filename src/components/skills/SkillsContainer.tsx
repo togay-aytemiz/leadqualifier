@@ -10,15 +10,18 @@ import { Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { IoSparklesOutline } from 'react-icons/io5'
 
 import { useTranslations } from 'next-intl'
+import { useLocale } from 'next-intl'
 
 interface SkillsContainerProps {
     initialSkills: Skill[]
     organizationId: string
+    handoverMessage: string
 }
 
-export function SkillsContainer({ initialSkills, organizationId }: SkillsContainerProps) {
+export function SkillsContainer({ initialSkills, organizationId, handoverMessage }: SkillsContainerProps) {
     const t = useTranslations('skills')
     const tc = useTranslations('common')
+    const locale = useLocale()
     const router = useRouter()
     const [skills, setSkills] = useState<Skill[]>(initialSkills)
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
@@ -31,14 +34,16 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     const [formData, setFormData] = useState({
         title: '',
         response_text: '',
-        triggers: [''] // Start with one empty trigger
+        triggers: [''], // Start with one empty trigger
+        requires_human_handover: false
     })
 
     // To track dirty state
     const [initialFormState, setInitialFormState] = useState({
         title: '',
         response_text: '',
-        triggers: ['']
+        triggers: [''],
+        requires_human_handover: false
     })
 
     // Sync skills when initialSkills changes (e.g. after search)
@@ -55,7 +60,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                     title: skill.title,
                     response_text: skill.response_text,
                     // Ensure at least 3 triggers for editing consistency if backend data is sparse
-                    triggers: ensureMinTriggers(skill.trigger_examples, 3)
+                    triggers: ensureMinTriggers(skill.trigger_examples, 3),
+                    requires_human_handover: skill.requires_human_handover ?? false
                 }
                 setFormData(initialData)
                 setInitialFormState(initialData)
@@ -66,7 +72,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
             const initialData = {
                 title: '',
                 response_text: '',
-                triggers: ['', '', ''] // 3 empty triggers for new skill
+                triggers: ['', '', ''], // 3 empty triggers for new skill
+                requires_human_handover: false
             }
             setFormData(initialData)
             setInitialFormState(initialData)
@@ -183,7 +190,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                     title: formData.title,
                     response_text: formData.response_text,
                     trigger_examples: cleanTriggers,
-                    enabled: true
+                    enabled: true,
+                    requires_human_handover: formData.requires_human_handover
                 })
 
                 // Refresh and select the new skill
@@ -202,7 +210,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                 await updateSkill(selectedSkillId, {
                     title: formData.title,
                     response_text: formData.response_text,
-                    trigger_examples: cleanTriggers
+                    trigger_examples: cleanTriggers,
+                    requires_human_handover: formData.requires_human_handover
                 })
                 router.refresh()
 
@@ -212,7 +221,8 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                         ...s,
                         title: formData.title,
                         response_text: formData.response_text,
-                        trigger_examples: cleanTriggers
+                        trigger_examples: cleanTriggers,
+                        requires_human_handover: formData.requires_human_handover
                     } : s
                 ))
                 setInitialFormState(formData)
@@ -246,6 +256,9 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
     const showForm = isCreating || selectedSkill
 
     const [activeTab, setActiveTab] = useState<'core' | 'custom'>('custom')
+    const aiSettingsDeepLink = locale === 'tr'
+        ? '/settings/ai?focus=human-escalation&field=handover-message#human-escalation'
+        : `/${locale}/settings/ai?focus=human-escalation&field=handover-message#human-escalation`
 
     return (
         <div className="flex h-full bg-white border-t border-gray-200">
@@ -454,6 +467,38 @@ export function SkillsContainer({ initialSkills, organizationId }: SkillsContain
                                             placeholder={t('responsePlaceholder')}
                                             className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
                                         />
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.requires_human_handover}
+                                                onChange={(event) => setFormData(prev => ({
+                                                    ...prev,
+                                                    requires_human_handover: event.target.checked
+                                                }))}
+                                            />
+                                            {t('requiresHumanHandover')}
+                                        </label>
+
+                                        {formData.requires_human_handover && (
+                                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                                                <p className="text-xs font-semibold text-amber-800 tracking-wider">
+                                                    {t('customerNoticeReadonlyLabel')}
+                                                </p>
+                                                <p className="text-sm text-amber-900">
+                                                    {handoverMessage}
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => router.push(aiSettingsDeepLink)}
+                                                    className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
+                                                >
+                                                    {t('editHandoverMessageInAiSettings')}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

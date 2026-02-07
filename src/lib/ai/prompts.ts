@@ -7,6 +7,12 @@ Never invent prices, policies, services, or guarantees.
 If you are unsure, ask a single clarifying question.
 When generating fallback guidance, only use the provided list of topics.`
 
+export const DEFAULT_FLEXIBLE_PROMPT_TR = `Sen bir işletme için yapay zeka asistanısın.
+Kısa, samimi ve kullanıcının dilinde yanıt ver.
+Fiyat, politika, hizmet veya garanti uydurma.
+Emin değilsen tek bir netleştirici soru sor.
+Yönlendirici fallback yanıtı üretirken yalnızca verilen konu listesini kullan.`
+
 export const DEFAULT_BOT_NAME = 'Bot'
 
 export const DEFAULT_STRICT_BASE_PROMPT =
