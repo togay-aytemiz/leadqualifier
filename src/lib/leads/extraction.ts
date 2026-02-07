@@ -4,7 +4,59 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 
-const EXTRACTION_SYSTEM_PROMPT = `Extract lead signals as JSON.
+const TURKISH_CHAR_PATTERN = /[ığüşöçİĞÜŞÖÇ]/
+const TURKISH_WORD_PATTERN = /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet|çekim|cekim|vazgeçtim|vazgectim)\b/i
+const ENGLISH_WORD_PATTERN = /\b(hello|hi|price|appointment|thank(s| you)|please|tomorrow|today|available|campaign|service|book|booking|schedule)\b/i
+
+function isLikelyTurkishText(value: string) {
+    const text = (value ?? '').trim()
+    if (!text) return false
+    if (TURKISH_CHAR_PATTERN.test(text)) return true
+    return TURKISH_WORD_PATTERN.test(text)
+}
+
+function isLikelyEnglishText(value: string) {
+    const text = (value ?? '').trim()
+    if (!text) return false
+    if (TURKISH_CHAR_PATTERN.test(text)) return false
+    return ENGLISH_WORD_PATTERN.test(text)
+}
+
+export function resolveLeadExtractionLocale(options?: {
+    preferredLocale?: string | null
+    customerMessages?: string[]
+    latestMessage?: string | null
+}) {
+    const preferredLocale = (options?.preferredLocale ?? '').toString().trim().toLowerCase()
+    if (preferredLocale.startsWith('tr')) return 'tr' as const
+    if (preferredLocale.startsWith('en')) return 'en' as const
+
+    const samples = [
+        ...(options?.customerMessages ?? []),
+        options?.latestMessage ?? ''
+    ]
+        .map((item) => item.trim())
+        .filter(Boolean)
+
+    if (samples.length === 0) {
+        return 'tr' as const
+    }
+
+    let turkishScore = 0
+    let englishScore = 0
+
+    for (const sample of samples) {
+        if (isLikelyTurkishText(sample)) turkishScore += 1
+        if (isLikelyEnglishText(sample)) englishScore += 1
+    }
+
+    if (turkishScore > englishScore) return 'tr' as const
+    if (englishScore > turkishScore) return 'en' as const
+    return turkishScore > 0 ? 'tr' as const : 'en' as const
+}
+
+function buildExtractionSystemPrompt(responseLanguage: 'Turkish' | 'English') {
+    return `Extract lead signals as JSON.
 Return ONLY valid JSON (no code fences, no extra text).
 Return keys: service_type, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
 intent_signals can include: decisive (explicit booking/appointment intent), urgent (ASAP/today/tomorrow), indecisive (unsure), far_future (months later/next season).
@@ -16,11 +68,15 @@ Score must be an integer from 0 to 10.
 Status must be one of: hot, warm, cold, ignored.
 If non_business is true, set score to 0 and status to ignored.
 Use catalog names when possible for service_type; if catalog is empty, infer service_type from the offering profile summary/suggestions when possible.
+If service_type matches a provided catalog name, keep that catalog name exactly as-is.
+If no catalog match exists, write inferred service_type in ${responseLanguage}.
 When required intake fields are provided, fill required_intake_collected as an object that maps clearly collected field names to concise values.
 Only include fields clearly provided by the customer; otherwise omit them from the object.
 If none are collected, return required_intake_collected as {}.
 Messages indicating cancellation/decline (e.g., "vazgeçtim", "istemiyorum") are still business-context messages, not personal/social chat.
-Use nulls if unknown. Use non_business=true only for personal/social conversations.`
+Use nulls if unknown. Use non_business=true only for personal/social conversations.
+Write summary, desired_date, location, and required_intake_collected values in ${responseLanguage}.`
+}
 
 function normalizeStringArray(value: unknown) {
     if (Array.isArray(value)) {
@@ -257,6 +313,7 @@ export async function runLeadExtraction(options: {
     organizationId: string
     conversationId: string
     latestMessage?: string
+    preferredLocale?: string | null
     supabase?: any
     source?: 'telegram' | 'whatsapp'
 }) {
@@ -296,20 +353,25 @@ export async function runLeadExtraction(options: {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const catalogList = (catalog ?? []).map((row: any) => row.name).join(', ')
-    const contextMessages = (messages ?? [])
+    const customerMessages = (messages ?? [])
         .reverse()
         .map((msg: any) => {
             const content = (msg.content ?? '').trim()
             if (!content) return null
-            return `customer: ${content}`
+            return content
         })
         .filter(Boolean) as string[]
+    const contextMessages = customerMessages.map((content) => `customer: ${content}`)
     const latestMessage = (options.latestMessage ?? '').trim()
     if (latestMessage && !contextMessages.some((entry) => entry === `customer: ${latestMessage}`)) {
         contextMessages.push(`customer: ${latestMessage}`)
+        customerMessages.push(latestMessage)
     }
     if (contextMessages.length > 5) {
         contextMessages.splice(0, contextMessages.length - 5)
+    }
+    if (customerMessages.length > 5) {
+        customerMessages.splice(0, customerMessages.length - 5)
     }
     const suggestionText = (suggestions ?? [])
         .map((item: any) => `- ${item.content}`)
@@ -327,8 +389,16 @@ export async function runLeadExtraction(options: {
     const requiredIntakeBlock = requiredIntakeFields.length > 0
         ? requiredIntakeFields.map((field) => `- ${field}`).join('\n')
         : 'none'
+    const extractionLocale = resolveLeadExtractionLocale({
+        preferredLocale: options.preferredLocale,
+        customerMessages,
+        latestMessage
+    })
+    const responseLanguage = extractionLocale === 'tr' ? 'Turkish' : 'English'
+    const extractionSystemPrompt = buildExtractionSystemPrompt(responseLanguage)
 
     const userPrompt = [
+        `Preferred response language: ${responseLanguage}`,
         `Offering profile:\n${profileText}`,
         `Catalog:${catalogList}`,
         `Required intake fields:\n${requiredIntakeBlock}`,
@@ -340,7 +410,7 @@ export async function runLeadExtraction(options: {
         model: 'gpt-4o-mini',
         temperature: 0.2,
         messages: [
-            { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
+            { role: 'system', content: extractionSystemPrompt },
             { role: 'user', content: userPrompt }
         ]
     })
@@ -356,7 +426,7 @@ export async function runLeadExtraction(options: {
                 totalTokens: usageTotals.totalTokens + (currentCompletion.usage.total_tokens ?? ((currentCompletion.usage.prompt_tokens ?? 0) + (currentCompletion.usage.completion_tokens ?? 0)))
             }
         } else {
-            const inputTokens = estimateTokenCount(EXTRACTION_SYSTEM_PROMPT) + estimateTokenCount(prompt)
+            const inputTokens = estimateTokenCount(extractionSystemPrompt) + estimateTokenCount(prompt)
             const outputTokens = estimateTokenCount(output)
             usageTotals = {
                 inputTokens: usageTotals.inputTokens + inputTokens,
@@ -374,7 +444,7 @@ export async function runLeadExtraction(options: {
             model: 'gpt-4o-mini',
             temperature: 0.2,
             messages: [
-                { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
+                { role: 'system', content: extractionSystemPrompt },
                 { role: 'user', content: strictPrompt }
             ]
         })

@@ -12,6 +12,7 @@ import {
 } from 'react-icons/hi2'
 import OrganizationSettingsClient from './OrganizationSettingsClient'
 import { getOfferingProfile, getOfferingProfileSuggestions, getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function OrganizationSettingsPage() {
     const supabase = await createClient()
@@ -22,14 +23,8 @@ export default async function OrganizationSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
-
-    const organizationId = membership?.organization_id
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
         return (

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getLocale } from 'next-intl/server'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import GeneralSettingsClient from './GeneralSettingsClient'
 
 export default async function GeneralSettingsPage() {
@@ -10,15 +11,10 @@ export default async function GeneralSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
+    const orgContext = await resolveActiveOrganizationContext(supabase)
 
-    const pendingCount = membership?.organization_id
-        ? await getPendingOfferingProfileSuggestionCount(membership.organization_id, locale)
+    const pendingCount = orgContext?.activeOrganizationId
+        ? await getPendingOfferingProfileSuggestionCount(orgContext.activeOrganizationId, locale)
         : 0
 
     return <GeneralSettingsClient pendingCount={pendingCount} />

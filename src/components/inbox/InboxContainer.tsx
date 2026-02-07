@@ -15,6 +15,7 @@ import { setupRealtimeAuth } from '@/lib/supabase/realtime-auth'
 import { formatDistanceToNow, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
+import { isOperatorActive } from '@/lib/inbox/operator-state'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -26,10 +27,12 @@ interface InboxContainerProps {
     botMode?: AiBotMode
     allowLeadExtractionDuringOperator?: boolean
     requiredIntakeFields?: string[]
+    isReadOnly?: boolean
 }
 
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
+const SUMMARY_PANEL_ID = 'conversation-summary-panel'
 
 export function InboxContainer({
     initialConversations,
@@ -37,7 +40,8 @@ export function InboxContainer({
     botName,
     botMode,
     allowLeadExtractionDuringOperator,
-    requiredIntakeFields = []
+    requiredIntakeFields = [],
+    isReadOnly = false
 }: InboxContainerProps) {
     const t = useTranslations('inbox')
     const locale = useLocale()
@@ -526,7 +530,7 @@ export function InboxContainer({
         setSummaryStatus('loading')
         setSummaryText('')
         try {
-            const result = await getConversationSummary(selectedId, organizationId)
+            const result = await getConversationSummary(selectedId, organizationId, locale)
             if (result.ok) {
                 setSummaryText(result.summary)
                 setSummaryStatus('success')
@@ -610,6 +614,7 @@ export function InboxContainer({
     }
 
     const handleSendMessage = async () => {
+        if (isReadOnly) return
         if (!selectedId || !input.trim() || isSending) return
         const tempMsg: Message = {
             id: 'temp-' + Date.now(),
@@ -662,11 +667,13 @@ export function InboxContainer({
     }
 
     const handleDeleteConversation = () => {
+        if (isReadOnly) return
         if (!selectedId) return
         setDeleteDialog({ isOpen: true, isLoading: false })
     }
 
     const handleConfirmDelete = async () => {
+        if (isReadOnly) return
         if (!selectedId) return
 
         setDeleteDialog(prev => ({ ...prev, isLoading: true }))
@@ -682,6 +689,7 @@ export function InboxContainer({
     }
 
     const handleLeaveConversation = async () => {
+        if (isReadOnly) return
         if (!selectedId || isLeaving) return
 
         setIsLeaving(true)
@@ -732,7 +740,7 @@ export function InboxContainer({
     // Fallback to 'ai' (bot) if undefined (e.g. old data or optimistic new conv)
     const activeAgent = selectedConversation?.active_agent === 'operator' ? 'operator' : 'ai'
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
-    const canSend = !!input.trim() && !isSending
+    const canSend = !!input.trim() && !isSending && !isReadOnly
     const contactMessageCount = messages.filter(m => m.sender_type === 'contact').length
     const hasBotMessage = messages.some(m => m.sender_type === 'bot')
     const canSummarize = contactMessageCount >= 5 && hasBotMessage
@@ -745,7 +753,7 @@ export function InboxContainer({
             ? t('scoreReasonNoLead')
             : t('scoreReasonError')
     const resolvedBotMode = (botMode ?? 'active')
-    const operatorActive = selectedConversation?.active_agent === 'operator' || Boolean(selectedConversation?.assignee_id)
+    const operatorActive = isOperatorActive(selectedConversation)
     const allowDuringOperator = Boolean(allowLeadExtractionDuringOperator)
     const leadExtractionPaused = Boolean(selectedConversation) && (resolvedBotMode === 'off' || (operatorActive && !allowDuringOperator))
     const pauseReasons: string[] = []
@@ -812,7 +820,7 @@ export function InboxContainer({
                                                     ) : c.platform === 'whatsapp' ? (
                                                         <IoLogoWhatsapp className="text-[#25D366]" size={18} />
                                                     ) : (
-                                                        <span className="text-[9px] font-semibold text-gray-400 uppercase">S</span>
+                                                        <span className="text-[9px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
                                                     )}
                                                 </span>
                                             </div>
@@ -943,7 +951,7 @@ export function InboxContainer({
                                             onClick={handleToggleSummary}
                                             disabled={summaryHeaderDisabled}
                                             aria-expanded={isSummaryOpen}
-                                            aria-controls="conversation-summary-panel"
+                                            aria-controls={SUMMARY_PANEL_ID}
                                             className="flex items-center gap-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed"
                                         >
                                             <ChevronDown className={`transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`} size={16} />
@@ -969,7 +977,7 @@ export function InboxContainer({
                                 </div>
 
                                 <div
-                                    id="conversation-summary-panel"
+                                    id={SUMMARY_PANEL_ID}
                                     aria-hidden={!isSummaryOpen}
                                     className={`mt-3 overflow-hidden transition-all duration-300 ease-out ${isSummaryOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}
                                 >
@@ -1012,6 +1020,11 @@ export function InboxContainer({
                                     </div>
                                 </div>
                             )}
+                            {isReadOnly && (
+                                <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                    {t('readOnlyMode')}
+                                </div>
+                            )}
 
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2 flex-1 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
@@ -1021,6 +1034,7 @@ export function InboxContainer({
                                     <textarea
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
+                                        disabled={isReadOnly}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault()
@@ -1053,13 +1067,14 @@ export function InboxContainer({
                             <h3 className="font-semibold text-gray-900">{t('details')}</h3>
                             <div className="relative">
                                 <button
+                                    disabled={isReadOnly}
                                     onClick={() => setIsDetailsMenuOpen(!isDetailsMenuOpen)}
                                     className="p-1 hover:bg-gray-100 rounded text-gray-500"
                                 >
                                     <MoreHorizontal size={20} />
                                 </button>
 
-                                {isDetailsMenuOpen && (
+                                {isDetailsMenuOpen && !isReadOnly && (
                                     <>
                                         <div
                                             className="fixed inset-0 z-10"
@@ -1134,7 +1149,7 @@ export function InboxContainer({
                                                 ) : selectedConversation.platform === 'whatsapp' ? (
                                                     <IoLogoWhatsapp className="text-[#25D366]" size={16} />
                                                 ) : (
-                                                    <span className="text-[10px] font-semibold text-gray-400 uppercase">S</span>
+                                                    <span className="text-[10px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
                                                 )}
                                             </span>
                                             <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
@@ -1263,7 +1278,7 @@ export function InboxContainer({
                                 {activeAgent === 'operator' && (
                                     <button
                                         onClick={handleLeaveConversation}
-                                        disabled={isLeaving}
+                                        disabled={isLeaving || isReadOnly}
                                         className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <LogOut size={18} />

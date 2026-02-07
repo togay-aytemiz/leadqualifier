@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Let system admins switch organizations with search, view tenant modules in that organization context (Inbox/Leads/Skills/Knowledge/Settings), and manage subscription/trial/quota controls from a dedicated admin area.
+**Goal:** Let system admins switch organizations with search, view tenant modules in that organization context (Inbox/Leads/Skills/Knowledge/Settings) in read-only mode, and monitor subscription/trial/quota data from a dedicated admin area.
 
-**Architecture:** Introduce a single server-side active-organization resolver backed by a signed cookie (`active_org_id`) instead of scattered “first membership” lookups. Use that resolver in all dashboard pages/actions so the selected organization is applied consistently. Expand platform admin pages with organization-level analytics + billing/control modules, and persist admin changes with audit logs.
+**Architecture:** Introduce a single server-side active-organization resolver backed by a signed cookie (`active_org_id`) instead of scattered “first membership” lookups. Use that resolver in all dashboard pages/actions so the selected organization is applied consistently. Expand platform admin pages with organization-level analytics + billing visibility modules, and structure details to include both organization and profile-level data (multi-profile-ready).
 
 **Tech Stack:** Next.js 14 App Router, React, TypeScript, next-intl (TR/EN), Supabase Postgres + RLS + migrations.
 
@@ -31,11 +31,13 @@
 - In scope:
   - Searchable org switcher for system admin.
   - Active-org impersonation context across Inbox, Leads, Skills, Knowledge, Simulator, Settings.
+  - Impersonation is read-only in tenant modules for system admin.
   - Dedicated admin section with organization list + requested metrics.
-  - Organization detail page with trial/premium/quota controls.
+  - Organization detail page showing trial/premium/quota state and organization + profiles overview.
 - Out of scope:
   - Automated billing provider integration.
   - Payment collection and invoicing workflows.
+  - Quota/premium/trial mutation controls in MVP.
 
 ---
 
@@ -124,10 +126,14 @@
 **Step 2: Remove duplicated org selection logic**
 - Ensure consistent fallback behavior for missing org.
 
-**Step 3: Verify regression paths**
+**Step 3: Enforce read-only impersonation policy**
+- In impersonation mode, hide/disable tenant mutations for system admin (create/update/delete/send).
+- Show clear "read-only impersonation" warning in UI.
+
+**Step 4: Verify regression paths**
 - Inbox, Leads, Skills, Knowledge, Settings all reflect switched org data.
 
-### Task 5: Refactor Server Actions to Accept Explicit Organization Context
+### Task 5: Refactor Server Actions for Explicit Organization Context + Read-Only Guard
 
 **Files:**
 - Modify: `/Users/togay/Desktop/leadqualifier/src/lib/leads/list-actions.ts`
@@ -139,10 +145,14 @@
 - Keep safe defaults for non-admin users.
 - Validate write permissions (owner/admin for tenant settings).
 
-**Step 2: Preserve RLS-first guardrails**
+**Step 2: Add impersonation read-only guardrails**
+- Block system-admin writes when acting through switched-org impersonation context.
+- Keep read paths enabled.
+
+**Step 3: Preserve RLS-first guardrails**
 - Never bypass org access checks.
 
-**Step 3: Add/adjust tests**
+**Step 4: Add/adjust tests**
 - Verify explicit org context works for system admin without breaking member flows.
 
 ### Task 6: Expand Admin Organization List with Requested Metrics
@@ -169,7 +179,7 @@
 **Step 3: Add “Details” entry action**
 - Route to `/admin/organizations/[organizationId]`.
 
-### Task 7: Add Billing/Quota Data Model (Admin-Controlled)
+### Task 7: Add Billing/Quota Data Model (Admin Visibility)
 
 **Files:**
 - Create: `/Users/togay/Desktop/leadqualifier/supabase/migrations/00054_admin_org_billing_controls.sql`
@@ -202,14 +212,14 @@
 - Org summary.
 - current billing/plan state.
 - usage snapshots.
+- profile roster and profile-level summary cards (multi-profile-ready).
 
-**Step 2: Mutating admin actions**
-- Extend trial.
-- Extend premium expiry.
-- Update token/message quota limits.
+**Step 2: Visibility-only modules for MVP**
+- Show trial/premium/quota values.
+- Show clear "editable later" placeholders for future controls.
 
-**Step 3: Add change audit trail**
-- write immutable row per admin change.
+**Step 3: Add audit-ready schema hooks**
+- Prepare immutable audit table shape for future mutation rollout (no mutation endpoints yet).
 
 ### Task 9: Add Admin Navigation Section
 
@@ -252,9 +262,8 @@
 
 ---
 
-## Open Decisions Before Implementation
+## Confirmed Decisions
 
-1. Should impersonation allow mutating tenant data in regular modules (Inbox/Skills/KB), or remain read-only outside dedicated Admin pages?
-2. Should quota enforcement be hard-blocking immediately in MVP, or visibility-only with soft alerts first?
-3. Should “user details” be modeled by `organization` (customer account) or by individual `profile`?  
-   Recommendation: model by `organization` for billing/quota controls; keep `users` page for identity/roles.
+1. Impersonation mode will be **read-only** in tenant modules.
+2. Quotas will be **visibility-only** in MVP (no enforcement controls yet).
+3. Details model will include **both organization and profiles**, designed for **multiple profiles per organization**.

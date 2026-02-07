@@ -8,6 +8,7 @@ import {
 } from '@/lib/knowledge-base/actions'
 import { KnowledgeContainer } from './components/KnowledgeContainer'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,11 +20,13 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
     const locale = await getLocale()
     const supabase = await createClient()
     const { collectionId } = await searchParams
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
     // Fetch data in parallel
     const [entries, allCollections] = await Promise.all([
-        getKnowledgeBaseEntries(collectionId),
-        getCollections()
+        getKnowledgeBaseEntries(collectionId, organizationId),
+        getCollections(organizationId)
     ])
 
     // Filter logic currently in action but good to double check or prepare collections
@@ -40,31 +43,18 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
         displayCollections = allCollections
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    let organizationId: string | null = null
     let aiSuggestionsEnabled = false
     let pendingSuggestions = 0
 
-    if (user) {
-        const { data: membership } = await supabase
-            .from('organization_members')
-            .select('organization_id')
-            .eq('user_id', user.id)
-            .limit(1)
-            .single()
+    if (organizationId) {
+        const { data: profile } = await supabase
+            .from('offering_profiles')
+            .select('ai_suggestions_enabled')
+            .eq('organization_id', organizationId)
+            .maybeSingle()
 
-        organizationId = membership?.organization_id ?? null
-
-        if (organizationId) {
-            const { data: profile } = await supabase
-                .from('offering_profiles')
-                .select('ai_suggestions_enabled')
-                .eq('organization_id', organizationId)
-                .maybeSingle()
-
-            aiSuggestionsEnabled = profile?.ai_suggestions_enabled ?? false
-            pendingSuggestions = await getPendingOfferingProfileSuggestionCount(organizationId, locale)
-        }
+        aiSuggestionsEnabled = profile?.ai_suggestions_enabled ?? false
+        pendingSuggestions = await getPendingOfferingProfileSuggestionCount(organizationId, locale)
     }
 
     return (
@@ -76,6 +66,7 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
             organizationId={organizationId}
             aiSuggestionsEnabled={aiSuggestionsEnabled}
             initialPendingSuggestions={pendingSuggestions}
+            isReadOnly={orgContext?.readOnlyTenantMode ?? false}
         />
     )
 }

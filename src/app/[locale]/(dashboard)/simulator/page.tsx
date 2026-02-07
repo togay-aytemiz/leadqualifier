@@ -4,6 +4,7 @@ import ChatSimulator from '@/components/chat/ChatSimulator'
 import { PageHeader } from '@/design'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getOrgAiSettings } from '@/lib/ai/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 interface SimulatorPageProps {
     params: Promise<{ locale: string }>
@@ -24,14 +25,9 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
         redirect('/login')
     }
 
-    const { data: memberships } = await supabase
-        .from('organization_members')
-        .select('organization_id, organizations(name)')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
+    const orgContext = await resolveActiveOrganizationContext(supabase)
 
-    if (!memberships || !memberships.organizations) {
+    if (!orgContext?.activeOrganization) {
         return (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
                 <div className="text-center">
@@ -42,8 +38,7 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
         )
     }
 
-    const org = memberships.organizations as unknown as { name: string }
-    const aiSettings = await getOrgAiSettings(memberships.organization_id, { supabase })
+    const aiSettings = await getOrgAiSettings(orgContext.activeOrganization.id, { supabase })
 
     return (
         <>
@@ -56,8 +51,8 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
                         <p className="text-gray-500 mb-4 shrink-0 px-1">{t('description')}</p>
                         <div className="flex-1 min-h-0">
                             <ChatSimulator
-                                organizationId={memberships.organization_id}
-                                organizationName={org.name}
+                                organizationId={orgContext.activeOrganization.id}
+                                organizationName={orgContext.activeOrganization.name}
                                 defaultMatchThreshold={aiSettings.match_threshold}
                             />
                         </div>

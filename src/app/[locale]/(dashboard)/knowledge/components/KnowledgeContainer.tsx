@@ -29,6 +29,7 @@ interface KnowledgeContainerProps {
     organizationId?: string | null
     aiSuggestionsEnabled?: boolean
     initialPendingSuggestions?: number
+    isReadOnly?: boolean
 }
 
 export function KnowledgeContainer({
@@ -38,7 +39,8 @@ export function KnowledgeContainer({
     collectionId,
     organizationId,
     aiSuggestionsEnabled = false,
-    initialPendingSuggestions = 0
+    initialPendingSuggestions = 0,
+    isReadOnly = false
 }: KnowledgeContainerProps) {
     const t = useTranslations('knowledge')
     const tSidebar = useTranslations('sidebar')
@@ -155,6 +157,7 @@ export function KnowledgeContainer({
     }
 
     async function handleConfirmAction() {
+        if (isReadOnly) return
         if (!deleteDialog.id) return
 
         setDeleteDialog(prev => ({ ...prev, isLoading: true }))
@@ -174,6 +177,7 @@ export function KnowledgeContainer({
     }
 
     async function handleSubmitFolder(name: string) {
+        if (isReadOnly) return
         await createCollection(name)
         window.dispatchEvent(new Event('knowledge-updated'))
         // Refresh server data
@@ -222,14 +226,14 @@ export function KnowledgeContainer({
                 actions={
                     <div className="flex gap-2">
                         {/* Only show "New Folder" at root */}
-                        {!collectionId && (
+                        {!collectionId && !isReadOnly && (
                             <Button variant="secondary" onClick={() => setShowFolderModal(true)}>
                                 <FolderPlus size={16} className="mr-2" />
                                 {t('newFolder')}
                             </Button>
                         )}
                         {/* Folder Actions (Delete/Rename) */}
-                        {collectionId && currentCollection && (
+                        {collectionId && currentCollection && !isReadOnly && (
                             <FolderActions
                                 collection={{ ...currentCollection, count: entries.length }}
                                 redirectOnDelete
@@ -241,7 +245,7 @@ export function KnowledgeContainer({
                                 onUpdate={handleRefresh}
                             />
                         )}
-                        <NewContentButton collectionId={collectionId} />
+                        {!isReadOnly && <NewContentButton collectionId={collectionId} />}
                     </div>
                 }
             />
@@ -281,13 +285,13 @@ export function KnowledgeContainer({
                         </p>
 
                         <div className="flex gap-2 mt-2 justify-center">
-                            {!collectionId && (
+                            {!collectionId && !isReadOnly && (
                                 <Button variant="secondary" onClick={() => setShowFolderModal(true)} className="bg-white border border-gray-200 shadow-sm hover:bg-gray-50">
                                     <FolderPlus size={16} className="mr-2 text-gray-500" />
                                     {t('newFolder')}
                                 </Button>
                             )}
-                            <NewContentButton collectionId={collectionId} />
+                            {!isReadOnly && <NewContentButton collectionId={collectionId} />}
                         </div>
                     </div>
                 ) : (
@@ -304,6 +308,7 @@ export function KnowledgeContainer({
                                             name={col.name}
                                             count={col.count || 0}
                                             onRefresh={handleRefresh}
+                                            isReadOnly={isReadOnly}
                                         />
                                     ))}
                                 </div>
@@ -314,7 +319,7 @@ export function KnowledgeContainer({
                         {entries.length > 0 && (
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-500 mb-3 px-1">{t('files')}</h3>
-                                <KnowledgeTable entries={entries} onDelete={handleDelete} />
+                                <KnowledgeTable entries={entries} onDelete={isReadOnly ? undefined : handleDelete} />
                             </div>
                         )}
                     </div>
@@ -322,11 +327,13 @@ export function KnowledgeContainer({
             </div>
 
             {/* Modals */}
-            <FolderModal
-                isOpen={showFolderModal}
-                onClose={() => setShowFolderModal(false)}
-                onSubmit={handleSubmitFolder}
-            />
+            {!isReadOnly && (
+                <FolderModal
+                    isOpen={showFolderModal}
+                    onClose={() => setShowFolderModal(false)}
+                    onSubmit={handleSubmitFolder}
+                />
+            )}
 
             <ConfirmDialog
                 isOpen={deleteDialog.isOpen}

@@ -15,6 +15,7 @@ import { getOrgAiUsageSummary } from '@/lib/ai/usage'
 import { UsageBreakdownDetails } from './UsageBreakdownDetails'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 import { formatStorageSize, getOrgMessageUsageSummary, getOrgStorageUsageSummary } from '@/lib/billing/usage'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function BillingSettingsPage() {
     const supabase = await createClient()
@@ -25,14 +26,8 @@ export default async function BillingSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id, role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
-
-    const organizationId = membership?.organization_id
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
         return (

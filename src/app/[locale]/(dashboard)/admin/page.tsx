@@ -1,46 +1,26 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { StatCard, PageHeader } from '@/design'
 import { Link } from '@/i18n/navigation'
-import { Building2, Users, Sparkles } from 'lucide-react'
+import { Activity, Building2, Database, Sparkles, Users } from 'lucide-react'
+import { requireSystemAdmin } from '@/lib/admin/access'
+import { getAdminOrganizationSummaries, getAdminUserCount } from '@/lib/admin/read-models'
 
 export default async function AdminPage() {
-    const supabase = await createClient()
     const locale = await getLocale()
     const t = await getTranslations('admin')
+    const { supabase } = await requireSystemAdmin(locale)
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const [organizationSummaries, userCount] = await Promise.all([
+        getAdminOrganizationSummaries(supabase),
+        getAdminUserCount(supabase)
+    ])
 
-    if (!user) {
-        redirect(`/${locale}/login`)
-    }
-
-    // Check if user is system admin
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_system_admin')
-        .eq('id', user.id)
-        .single()
-
-    if (!profile?.is_system_admin) {
-        redirect(`/${locale}/dashboard`)
-    }
-
-    // Get stats
-    const { count: orgCount } = await supabase
-        .from('organizations')
-        .select('*', { count: 'exact', head: true })
-
-    const { count: userCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-
-    const { count: skillCount } = await supabase
-        .from('skills')
-        .select('*', { count: 'exact', head: true })
+    const orgCount = organizationSummaries.length
+    const skillCount = organizationSummaries.reduce((total, organization) => total + organization.skillCount, 0)
+    const knowledgeCount = organizationSummaries.reduce((total, organization) => total + organization.knowledgeDocumentCount, 0)
+    const messageCount = organizationSummaries.reduce((total, organization) => total + organization.totalMessageCount, 0)
+    const totalTokens = organizationSummaries.reduce((total, organization) => total + organization.totalTokenCount, 0)
+    const formatter = new Intl.NumberFormat(locale)
 
     return (
         <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
@@ -49,25 +29,46 @@ export default async function AdminPage() {
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-6xl mx-auto space-y-8">
                     <p className="text-gray-500">{t('overview')}</p>
+                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                        {t('readOnlyBanner')}
+                    </p>
 
-                    <div className="grid gap-6 md:grid-cols-3">
+                    <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
                         <StatCard
                             icon={Building2}
                             iconColor="purple"
                             title={t('stats.organizations')}
-                            value={orgCount || 0}
+                            value={formatter.format(orgCount)}
                         />
                         <StatCard
                             icon={Users}
                             iconColor="blue"
                             title={t('stats.users')}
-                            value={userCount || 0}
+                            value={formatter.format(userCount)}
                         />
                         <StatCard
                             icon={Sparkles}
                             iconColor="green"
                             title={t('stats.skills')}
-                            value={skillCount || 0}
+                            value={formatter.format(skillCount)}
+                        />
+                        <StatCard
+                            icon={Database}
+                            iconColor="orange"
+                            title={t('stats.knowledge')}
+                            value={formatter.format(knowledgeCount)}
+                        />
+                        <StatCard
+                            icon={Activity}
+                            iconColor="red"
+                            title={t('stats.messages')}
+                            value={formatter.format(messageCount)}
+                        />
+                        <StatCard
+                            icon={Sparkles}
+                            iconColor="purple"
+                            title={t('stats.tokens')}
+                            value={formatter.format(totalTokens)}
                         />
                     </div>
 

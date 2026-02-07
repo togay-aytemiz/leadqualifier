@@ -14,6 +14,7 @@ import {
 } from 'react-icons/hi2'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function ChannelsPage() {
     const supabase = await createClient()
@@ -24,15 +25,8 @@ export default async function ChannelsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    // Get organization from user's membership (accessible to all org members)
-    const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id, role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
-
-    const organizationId = membership?.organization_id
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
         return (
@@ -113,7 +107,12 @@ export default async function ChannelsPage() {
                             summary={tChannels('summary', { connected: connectedChannels, total: totalChannels })}
                             layout="wide"
                         >
-                            <ChannelsList channels={channels || []} organizationId={organizationId} showDescription={false} />
+                            <ChannelsList
+                                channels={channels || []}
+                                organizationId={organizationId}
+                                showDescription={false}
+                                isReadOnly={orgContext?.readOnlyTenantMode ?? false}
+                            />
                         </SettingsSection>
                     </div>
                 </div>

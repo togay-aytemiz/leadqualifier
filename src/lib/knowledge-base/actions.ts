@@ -8,6 +8,7 @@ import {
     appendRequiredIntakeFields,
     proposeServiceCandidate
 } from '@/lib/leads/offering-profile'
+import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
 
 export interface KnowledgeCollection {
@@ -60,26 +61,46 @@ async function getUserOrganization(supabase: any) {
     return member.organization_id
 }
 
+async function getScopedOrganizationId(
+    supabase: any,
+    organizationId?: string | null
+) {
+    if (organizationId) return organizationId
+    const context = await resolveActiveOrganizationContext(supabase)
+    return context?.activeOrganizationId ?? null
+}
+
 /**
  * --- COLLECTIONS ---
  */
 
-export async function getCollections() {
+export async function getCollections(organizationId?: string | null) {
     const supabase = await createClient()
+    const scopedOrganizationId = await getScopedOrganizationId(supabase, organizationId)
 
     // Get collections
-    const { data: collections, error } = await supabase
+    let collectionsQuery = supabase
         .from('knowledge_collections')
         .select('*')
         .order('name')
+    if (scopedOrganizationId) {
+        collectionsQuery = collectionsQuery.eq('organization_id', scopedOrganizationId)
+    }
+
+    const { data: collections, error } = await collectionsQuery
 
     if (error) throw new Error(error.message)
 
     // Get counts for each collection
     // This could be optimized with a join/count query but for now this is simple and robust with RLS
-    const { data: counts, error: countError } = await supabase
+    let countsQuery = supabase
         .from('knowledge_documents')
         .select('collection_id')
+    if (scopedOrganizationId) {
+        countsQuery = countsQuery.eq('organization_id', scopedOrganizationId)
+    }
+
+    const { data: counts, error: countError } = await countsQuery
 
     if (countError) throw new Error(countError.message)
 
@@ -99,6 +120,7 @@ export async function getCollections() {
 
 export async function createCollection(name: string, description?: string, icon: string = 'folder') {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const organizationId = await getUserOrganization(supabase)
 
     const { data, error } = await supabase
@@ -123,6 +145,7 @@ export async function createCollection(name: string, description?: string, icon:
 
 export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const organizationId = await getUserOrganization(supabase)
 
     // 1. Insert document in processing state
@@ -151,6 +174,7 @@ export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
 
 export async function deleteKnowledgeBaseEntry(id: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { error } = await supabase.from('knowledge_documents').delete().eq('id', id)
     if (error) throw new Error(error.message)
     revalidatePath('/knowledge')
@@ -158,6 +182,7 @@ export async function deleteKnowledgeBaseEntry(id: string) {
 
 export async function processKnowledgeDocument(documentId: string, supabaseOverride?: any) {
     const supabase = supabaseOverride ?? await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data, error } = await supabase
         .from('knowledge_documents')
         .select('id, organization_id, title, content')
@@ -226,16 +251,23 @@ export async function processKnowledgeDocument(documentId: string, supabaseOverr
     }
 }
 
-export async function getKnowledgeBaseEntry(id: string) {
+export async function getKnowledgeBaseEntry(id: string, organizationId?: string | null) {
     const supabase = await createClient()
-    const { data, error } = await supabase
+    const scopedOrganizationId = await getScopedOrganizationId(supabase, organizationId)
+
+    let query = supabase
         .from('knowledge_documents')
         .select(`
             id, organization_id, content, title, type, collection_id, status, created_at, updated_at,
             collection:knowledge_collections(*)
         `)
         .eq('id', id)
-        .single()
+
+    if (scopedOrganizationId) {
+        query = query.eq('organization_id', scopedOrganizationId)
+    }
+
+    const { data, error } = await query.single()
 
     if (error) throw new Error(error.message)
 
@@ -247,6 +279,7 @@ export async function getKnowledgeBaseEntry(id: string) {
 
 export async function updateKnowledgeBaseEntry(id: string, entry: Partial<KnowledgeBaseInsert>) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     const contentChanged = typeof entry.content === 'string'
     const titleChanged = typeof entry.title === 'string'
@@ -270,8 +303,9 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
     return data as KnowledgeBaseEntry
 }
 
-export async function getKnowledgeBaseEntries(collectionId?: string | null) {
+export async function getKnowledgeBaseEntries(collectionId?: string | null, organizationId?: string | null) {
     const supabase = await createClient()
+    const scopedOrganizationId = await getScopedOrganizationId(supabase, organizationId)
     // Explicitly filtering by org is safer even with RLS, but for read-only RLS is sufficient usually.
     // However, knowing the org context is good. 
     // For now, reliance on RLS for SELECT is standard in Supabase apps unless we need optimization.
@@ -283,6 +317,10 @@ export async function getKnowledgeBaseEntries(collectionId?: string | null) {
             collection:knowledge_collections(*)
         `)
         .order('created_at', { ascending: false })
+
+    if (scopedOrganizationId) {
+        query = query.eq('organization_id', scopedOrganizationId)
+    }
 
     if (collectionId) {
         query = query.eq('collection_id', collectionId)
@@ -375,22 +413,33 @@ export interface SidebarData {
     totalCount: number
 }
 
-export async function getSidebarData() {
+export async function getSidebarData(organizationId?: string | null) {
     const supabase = await createClient()
+    const scopedOrganizationId = await getScopedOrganizationId(supabase, organizationId)
 
     // 1. Get Collections
-    const { data: collections, error: colsError } = await supabase
+    let collectionsQuery = supabase
         .from('knowledge_collections')
         .select('*')
         .order('name')
+    if (scopedOrganizationId) {
+        collectionsQuery = collectionsQuery.eq('organization_id', scopedOrganizationId)
+    }
+
+    const { data: collections, error: colsError } = await collectionsQuery
 
     if (colsError) throw new Error(colsError.message)
 
     // 2. Get Files (only needed fields)
-    const { data: files, error: filesError } = await supabase
+    let filesQuery = supabase
         .from('knowledge_documents')
         .select('id, title, type, collection_id')
         .order('title')
+    if (scopedOrganizationId) {
+        filesQuery = filesQuery.eq('organization_id', scopedOrganizationId)
+    }
+
+    const { data: files, error: filesError } = await filesQuery
 
     if (filesError) throw new Error(filesError.message)
 
@@ -562,6 +611,7 @@ async function buildAndStoreChunks(
 
 export async function deleteCollection(id: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // Explicitly delete all knowledge entries in this collection first
     const { error: filesError } = await supabase
@@ -579,6 +629,7 @@ export async function deleteCollection(id: string) {
 
 export async function updateCollection(id: string, name: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data, error } = await supabase
         .from('knowledge_collections')
         .update({ name })

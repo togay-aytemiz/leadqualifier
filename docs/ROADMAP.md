@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-07 (platform admin org switcher + tenant impersonation planning)  
+> **Last Updated:** 2026-02-07 (locale-aware lead extraction outputs + active_agent-based AI reply gating fix)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -109,6 +109,7 @@
   - [x] Crisp-inspired main sidebar with collapse toggle and persisted state
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
   - [x] Centered collapsed logo alignment
+  - [x] Sidebar header branding uses `logo-black.svg` when expanded and `icon-black.svg` when collapsed
   - [x] Eyebrow section labels for grouped navigation
   - [x] Increased spacing between header and first sidebar section
   - [x] Sidebar nav icons use active/passive variants per item
@@ -179,6 +180,7 @@
   - [x] Skill-level `Requires Human Handover` toggle with read-only message preview
   - [x] Centralized escalation policy with precedence: skill override > hot lead score
   - [x] Locale-aware handover message repair so TR UI no longer displays EN default text
+  - [x] `notify_only` hot-lead behavior now keeps AI replies active based on `active_agent` state (stale assignee no longer blocks bot replies)
 - [x] **Default System Guardrail Skills (MVP)**
   - [x] Human support request skill (`requires_human_handover=true`)
   - [x] Complaint / dissatisfaction skill (`requires_human_handover=true`)
@@ -277,6 +279,7 @@
   - [x] Label customer vs assistant messages and respect customer negations
   - [x] Use last 5 customer messages and LLM-provided score/status
   - [x] Ensure latest message is included even with async writes
+  - [x] Enforce locale-aware output language (TR/EN) for lead summary and extracted detail fields
   - [x] Include manual profile note with approved AI suggestions in extraction context
   - [x] Preserve previously extracted lead details when later turns omit fields (merge-on-update instead of destructive overwrite)
 - [x] **Lead Scoring**
@@ -326,23 +329,30 @@
 
 ## Phase 8: Platform Admin Features
 - [x] System admin dashboard + organizations/users lists
-- [ ] Organization switcher
-  - [ ] Searchable org switcher in main sidebar (system admin)
-  - [ ] Persist active organization context via server-side cookie
-  - [ ] Apply switched org context across Inbox/Leads/Skills/Knowledge/Simulator/Settings
-  - [ ] Show clear "viewing as organization" state and reset action
+- [x] Organization switcher
+  - [x] Searchable org switcher in main sidebar (system admin)
+  - [x] Persist active organization context via server-side cookie
+  - [x] Apply switched org context across Inbox/Leads/Skills/Knowledge/Simulator/Settings
+  - [x] Enforce read-only impersonation mode across tenant modules
+  - [x] Show clear "viewing as organization" state and reset action
 - [ ] Cross-org debugging tools
-  - [ ] Admin-only org details page (`/admin/organizations/[id]`)
-  - [ ] Read org-level snapshots: usage, channels, skills, knowledge stats
+  - [x] Admin-only org details page (`/admin/organizations/[id]`)
+  - [x] Read org-level snapshots: usage, token usage, skills, knowledge stats (read-only table)
+  - [x] Include profile-level details via user details view (multi-profile-ready membership listing)
   - [ ] Audit trail for admin-driven plan/quota updates
 - [ ] Usage analytics per org
-  - [ ] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
-  - [ ] Add premium/trial status visibility and plan cycle/status visibility
-  - [ ] Add search + pagination for organization/admin list
-- [ ] Billing/Quota Controls (Admin)
-  - [ ] Extend premium duration
-  - [ ] Extend trial duration
-  - [ ] Edit token/message quota limits per organization
+  - [x] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
+  - [x] Add premium/trial status visibility and plan cycle/status visibility (placeholder: not integrated)
+  - [x] Add search + pagination for admin organization and user lists
+  - [x] Move organization list search/pagination to DB-level count + range queries (no in-memory full-list slicing)
+  - [x] Batch organization metric aggregation to avoid per-organization N+1 read fan-out
+  - [x] Load organization detail profile layer with targeted org/member/profile queries (no full-table scans)
+  - [x] Avoid heavy org-summary aggregation when building admin user lists (use lightweight organization lookup only)
+  - [x] Load admin user detail via targeted profile + memberships + related-org snapshots (no full user/org scan)
+- [x] Billing/Quota Visibility (Admin)
+  - [x] Show premium/trial periods (read-only placeholders until billing integration)
+  - [x] Show token/message usage values (read-only)
+  - [x] Defer edit controls until billing policy is finalized
 
 ---
 

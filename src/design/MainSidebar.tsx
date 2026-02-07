@@ -1,9 +1,10 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { AiBotMode } from '@/types/database'
@@ -24,35 +25,72 @@ import {
 import {
     ArrowLeftFromLine,
     ArrowRightFromLine,
-    Bot,
+    Building2,
+    LayoutDashboard,
     LogOut,
+    RotateCcw,
+    Users,
 } from 'lucide-react'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
-interface MainSidebarProps {
-    userName?: string
+interface ActiveOrganizationSummary {
+    id: string
+    name: string
+    slug: string
 }
 
-export function MainSidebar({ userName }: MainSidebarProps) {
+interface MainSidebarProps {
+    userName?: string
+    isSystemAdmin?: boolean
+    organizations?: ActiveOrganizationSummary[]
+    activeOrganizationId?: string | null
+    readOnlyTenantMode?: boolean
+}
+
+export function MainSidebar({
+    userName,
+    isSystemAdmin = false,
+    organizations = [],
+    activeOrganizationId = null,
+    readOnlyTenantMode = false
+}: MainSidebarProps) {
     const pathname = usePathname()
+    const router = useRouter()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
     const tNav = useTranslations('nav')
     const tCommon = useTranslations('common')
     const tSidebar = useTranslations('mainSidebar')
-    const currentLocale = useLocale()
 
     const [collapsed, setCollapsed] = useState(false)
     const [hasUnread, setHasUnread] = useState(false)
     const [hasPendingSuggestions, setHasPendingSuggestions] = useState(false)
-    const [organizationId, setOrganizationId] = useState<string | null>(null)
+    const [organizationId, setOrganizationId] = useState<string | null>(activeOrganizationId)
     const [botMode, setBotMode] = useState<AiBotMode>('active')
+    const [orgSearch, setOrgSearch] = useState('')
+    const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
         supabaseRef.current = createClient()
     }
     const supabase = supabaseRef.current
+
+    const currentOrganization = useMemo(
+        () => organizations.find((organization) => organization.id === organizationId) ?? null,
+        [organizationId, organizations]
+    )
+
+    const filteredOrganizations = useMemo(() => {
+        const query = orgSearch.trim().toLowerCase()
+        if (!query) return organizations
+        return organizations.filter((organization) => {
+            return (
+                organization.name.toLowerCase().includes(query) ||
+                organization.slug.toLowerCase().includes(query)
+            )
+        })
+    }, [orgSearch, organizations])
 
     const refreshUnread = useCallback(async (orgId: string) => {
         const { count, error } = await supabase
@@ -70,14 +108,12 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     }, [supabase])
 
     const refreshPendingSuggestions = useCallback(async (orgId: string) => {
-        let query = supabase
+        const { count, error } = await supabase
             .from('offering_profile_suggestions')
             .select('id', { count: 'exact', head: true })
             .eq('organization_id', orgId)
             .is('archived_at', null)
             .or('status.eq.pending,status.is.null')
-
-        const { count, error } = await query
 
         if (error) {
             console.error('Failed to load pending suggestion indicator', error)
@@ -85,7 +121,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         }
 
         setHasPendingSuggestions((count ?? 0) > 0)
-    }, [currentLocale, supabase])
+    }, [supabase])
 
     const fetchBotMode = useCallback(async (orgId: string) => {
         const { data, error } = await supabase
@@ -107,6 +143,57 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         }
     }, [supabase])
 
+    const handleOrganizationSwitch = useCallback(async (nextOrganizationId: string) => {
+        if (!isSystemAdmin || isSwitchingOrg || !nextOrganizationId || nextOrganizationId === organizationId) {
+            return
+        }
+
+        setIsSwitchingOrg(true)
+        try {
+            const response = await fetch('/api/organizations/active', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({ organizationId: nextOrganizationId })
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to switch organization context')
+            }
+
+            setOrganizationId(nextOrganizationId)
+            router.refresh()
+        } catch (error) {
+            console.error(error)
+        } finally {
+            setIsSwitchingOrg(false)
+        }
+    }, [isSystemAdmin, isSwitchingOrg, organizationId, router])
+
+    const handleOrganizationReset = useCallback(async () => {
+        if (!isSystemAdmin || isSwitchingOrg) return
+
+        setIsSwitchingOrg(true)
+        try {
+            const response = await fetch('/api/organizations/active', {
+                method: 'DELETE'
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to reset organization context')
+            }
+
+            setOrganizationId(organizations[0]?.id ?? null)
+            setOrgSearch('')
+            router.refresh()
+        } catch (error) {
+            console.error(error)
+        } finally {
+            setIsSwitchingOrg(false)
+        }
+    }, [isSwitchingOrg, isSystemAdmin, organizations, router])
+
     useEffect(() => {
         try {
             const stored = localStorage.getItem(STORAGE_KEY)
@@ -125,51 +212,21 @@ export function MainSidebar({ userName }: MainSidebarProps) {
     }, [collapsed])
 
     useEffect(() => {
-        let isMounted = true
+        setOrganizationId(activeOrganizationId)
+    }, [activeOrganizationId])
 
-        const loadOrganization = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('is_system_admin')
-                .eq('id', user.id)
-                .single()
-
-            let orgId: string | null = null
-
-            if (profile?.is_system_admin) {
-                const { data: org } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .limit(1)
-                    .single()
-                orgId = org?.id ?? null
-            } else {
-                const { data: membership } = await supabase
-                    .from('organization_members')
-                    .select('organization_id')
-                    .eq('user_id', user.id)
-                    .limit(1)
-                    .single()
-                orgId = membership?.organization_id ?? null
-            }
-
-            if (!isMounted || !orgId) return
-
-            setOrganizationId(orgId)
-            await refreshUnread(orgId)
-            await fetchBotMode(orgId)
-            await refreshPendingSuggestions(orgId)
+    useEffect(() => {
+        if (!organizationId) {
+            setHasUnread(false)
+            setHasPendingSuggestions(false)
+            setBotMode('active')
+            return
         }
 
-        loadOrganization()
-
-        return () => {
-            isMounted = false
-        }
-    }, [fetchBotMode, refreshPendingSuggestions, refreshUnread, supabase])
+        refreshUnread(organizationId)
+        fetchBotMode(organizationId)
+        refreshPendingSuggestions(organizationId)
+    }, [fetchBotMode, organizationId, refreshPendingSuggestions, refreshUnread])
 
     useEffect(() => {
         if (!organizationId) return
@@ -288,6 +345,40 @@ export function MainSidebar({ userName }: MainSidebarProps) {
         [tNav, tSidebar]
     )
 
+    const adminSections = useMemo(() => {
+        if (!isSystemAdmin) return []
+
+        return [
+            {
+                id: 'admin',
+                label: tSidebar('adminSection'),
+                items: [
+                    {
+                        id: 'admin-dashboard',
+                        href: '/admin',
+                        label: tSidebar('adminDashboard'),
+                        icon: LayoutDashboard,
+                        activeIcon: LayoutDashboard,
+                    },
+                    {
+                        id: 'admin-organizations',
+                        href: '/admin/organizations',
+                        label: tSidebar('adminOrganizations'),
+                        icon: Building2,
+                        activeIcon: Building2,
+                    },
+                    {
+                        id: 'admin-users',
+                        href: '/admin/users',
+                        label: tSidebar('adminUsers'),
+                        icon: Users,
+                        activeIcon: Users,
+                    },
+                ],
+            }
+        ]
+    }, [isSystemAdmin, tSidebar])
+
     const footerSections = useMemo(
         () => [
             {
@@ -340,16 +431,20 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                             collapsed ? 'w-full justify-center gap-0' : 'gap-3'
                         )}
                     >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-900 shadow-sm ring-1 ring-slate-200">
-                            <Bot size={20} />
-                        </div>
                         <div
                             className={cn(
-                                'flex flex-col transition-all duration-200 motion-reduce:transition-none',
-                                collapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'opacity-100'
+                                'transition-all duration-200 motion-reduce:transition-none',
+                                collapsed ? 'w-[27px] opacity-100' : 'w-[85px] opacity-100'
                             )}
                         >
-                            <span className="text-sm font-semibold tracking-tight">{tCommon('appName')}</span>
+                            <Image
+                                src={collapsed ? '/icon-black.svg' : '/logo-black.svg'}
+                                alt={tCommon('appName')}
+                                width={collapsed ? 27 : 85}
+                                height={27}
+                                priority
+                                className="h-auto w-full"
+                            />
                         </div>
                     </div>
                     <button
@@ -367,6 +462,69 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                     </button>
                 </div>
             </div>
+
+            {isSystemAdmin && !collapsed && (
+                <div className="px-3 pb-2 space-y-2">
+                    <div className="rounded-xl border border-slate-200 bg-white p-2">
+                        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            {tSidebar('organizationSwitcherTitle')}
+                        </p>
+                        <input
+                            value={orgSearch}
+                            onChange={(event) => setOrgSearch(event.target.value)}
+                            placeholder={tSidebar('organizationSwitcherSearch')}
+                            className="mt-2 h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 outline-none ring-blue-200 transition focus:bg-white focus:ring-2"
+                        />
+                        <div className="mt-2 max-h-32 space-y-1 overflow-auto pr-1">
+                            {filteredOrganizations.map((organization) => {
+                                const isActive = organization.id === organizationId
+                                return (
+                                    <button
+                                        key={organization.id}
+                                        type="button"
+                                        disabled={isSwitchingOrg || isActive}
+                                        onClick={() => handleOrganizationSwitch(organization.id)}
+                                        className={cn(
+                                            'w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors',
+                                            isActive
+                                                ? 'bg-blue-50 text-blue-700'
+                                                : 'text-slate-700 hover:bg-slate-100',
+                                            (isSwitchingOrg || isActive) && 'cursor-not-allowed opacity-80'
+                                        )}
+                                    >
+                                        <p className="truncate font-medium">{organization.name}</p>
+                                        <p className="truncate text-[11px] text-slate-400">{organization.slug}</p>
+                                    </button>
+                                )
+                            })}
+                            {filteredOrganizations.length === 0 && (
+                                <p className="px-2 py-1 text-xs text-slate-400">
+                                    {tSidebar('organizationSwitcherEmpty')}
+                                </p>
+                            )}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 px-1">
+                            <p className="truncate text-[11px] text-slate-500">
+                                {currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
+                            </p>
+                            <button
+                                type="button"
+                                disabled={isSwitchingOrg}
+                                onClick={handleOrganizationReset}
+                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <RotateCcw size={12} />
+                                {tSidebar('organizationSwitcherReset')}
+                            </button>
+                        </div>
+                    </div>
+                    {readOnlyTenantMode && (
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-800">
+                            {tSidebar('readOnlyTenantMode')}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="px-3 pb-2">
                 <Link
@@ -393,7 +551,7 @@ export function MainSidebar({ userName }: MainSidebarProps) {
 
             <nav className="flex-1 px-3 pt-3">
                 <div className="space-y-4">
-                    {sections.map(section => (
+                    {[...sections, ...adminSections].map(section => (
                         <div key={section.id} className="space-y-2">
                             <p
                                 className={cn(
@@ -405,7 +563,13 @@ export function MainSidebar({ userName }: MainSidebarProps) {
                             </p>
                             <div className="space-y-1">
                                 {section.items.map(item => {
-                                    const isActive = pathWithoutLocale.startsWith(item.href)
+                                    const isSettingsItem = item.id === 'settings'
+                                    const isAdminRoot = item.id === 'admin-dashboard'
+                                    const isActive = isSettingsItem
+                                        ? pathWithoutLocale.startsWith('/settings')
+                                        : isAdminRoot
+                                            ? pathWithoutLocale === '/admin'
+                                            : pathWithoutLocale.startsWith(item.href)
                                     const Icon = isActive ? item.activeIcon : item.icon
                                     const showUnread = item.id === 'inbox' && hasUnread
                                     return (

@@ -5,6 +5,7 @@ import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddi
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
 import { buildDefaultSystemSkills } from '@/lib/skills/default-system-skills'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
+import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import {
     appendOfferingProfileSuggestion,
     appendRequiredIntakeFields,
@@ -68,6 +69,7 @@ export async function getSkill(skillId: string): Promise<Skill | null> {
  */
 export async function createSkill(skill: SkillInsert): Promise<Skill> {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // Create the skill
     const { data, error } = await supabase.from('skills').insert(skill).select().single()
@@ -127,6 +129,7 @@ export async function updateSkill(
     currentTriggers?: string[]
 ): Promise<Skill> {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     const { data, error } = await supabase.from('skills').update(updates).eq('id', skillId).select().single()
 
@@ -192,6 +195,7 @@ export async function updateSkill(
  */
 export async function deleteSkill(skillId: string): Promise<void> {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     const { error } = await supabase.from('skills').delete().eq('id', skillId)
 

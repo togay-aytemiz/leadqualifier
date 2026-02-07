@@ -1,4 +1,6 @@
 import { getKnowledgeBaseEntry, getCollections } from '@/lib/knowledge-base/actions'
+import { createClient } from '@/lib/supabase/server'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { EditContentForm } from './EditContentForm'
 
 interface EditPageProps {
@@ -7,11 +9,14 @@ interface EditPageProps {
 
 export default async function EditContentPage({ params }: EditPageProps) {
     const { id } = await params
+    const supabase = await createClient()
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
     // Fetch data on the server
     const [entry, collections] = await Promise.all([
-        getKnowledgeBaseEntry(id),
-        getCollections()
+        getKnowledgeBaseEntry(id, organizationId),
+        getCollections(organizationId)
     ])
 
     return (

@@ -12,9 +12,10 @@ interface ChannelsListProps {
     channels: Channel[]
     organizationId: string
     showDescription?: boolean
+    isReadOnly?: boolean
 }
 
-export function ChannelsList({ channels, organizationId, showDescription = true }: ChannelsListProps) {
+export function ChannelsList({ channels, organizationId, showDescription = true, isReadOnly = false }: ChannelsListProps) {
     const t = useTranslations('Channels')
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
     const router = useRouter()
@@ -23,6 +24,7 @@ export function ChannelsList({ channels, organizationId, showDescription = true 
     const whatsappChannel = channels.find(c => c.type === 'whatsapp')
 
     const handleConnectTelegram = async (token: string) => {
+        if (isReadOnly) return
         const result = await connectTelegramChannel(organizationId, token)
         if (result.error) {
             throw new Error(result.error)
@@ -31,6 +33,7 @@ export function ChannelsList({ channels, organizationId, showDescription = true 
     }
 
     const handleConnectWhatsApp = () => {
+        if (isReadOnly) return
         alert(t('whatsappComingSoon'))
     }
 
@@ -43,20 +46,24 @@ export function ChannelsList({ channels, organizationId, showDescription = true 
                     type="telegram"
                     channel={telegramChannel}
                     onConnect={() => setIsTelegramModalOpen(true)}
+                    isReadOnly={isReadOnly}
                 />
 
                 <ChannelCard
                     type="whatsapp"
                     channel={whatsappChannel}
                     onConnect={handleConnectWhatsApp}
+                    isReadOnly={isReadOnly}
                 />
             </div>
 
-            <ConnectTelegramModal
-                isOpen={isTelegramModalOpen}
-                onClose={() => setIsTelegramModalOpen(false)}
-                onConnect={handleConnectTelegram}
-            />
+            {!isReadOnly && (
+                <ConnectTelegramModal
+                    isOpen={isTelegramModalOpen}
+                    onClose={() => setIsTelegramModalOpen(false)}
+                    onConnect={handleConnectTelegram}
+                />
+            )}
         </div>
     )
 }

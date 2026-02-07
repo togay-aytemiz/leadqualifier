@@ -13,6 +13,7 @@ import {
 import AiSettingsClient from './AiSettingsClient'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function AiSettingsPage() {
     const supabase = await createClient()
@@ -23,14 +24,8 @@ export default async function AiSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id, role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
-
-    const organizationId = membership?.organization_id
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
         return (

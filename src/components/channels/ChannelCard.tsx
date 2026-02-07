@@ -14,9 +14,10 @@ interface ChannelCardProps {
     channel?: Channel
     type: 'telegram' | 'whatsapp'
     onConnect: () => void
+    isReadOnly?: boolean
 }
 
-export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
+export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: ChannelCardProps) {
     const t = useTranslations('Channels')
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
@@ -32,6 +33,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
     }
 
     const handleDisconnect = async () => {
+        if (isReadOnly) return
         if (!channel) return
 
         setIsDisconnecting(true)
@@ -51,7 +53,12 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
         <>
             <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center relative overflow-hidden group shadow-sm hover:shadow-md transition-shadow">
                 {isConnected && (
-                    <button onClick={handleDebug} className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 p-1" title={t('debug.tooltip')}>
+                    <button
+                        onClick={handleDebug}
+                        disabled={isReadOnly}
+                        className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={t('debug.tooltip')}
+                    >
                         <Bug size={16} />
                     </button>
                 )}
@@ -77,7 +84,7 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
                             <div className="mt-4 w-full">
                                 <Button
                                     onClick={() => setShowConfirm(true)}
-                                    disabled={isDisconnecting}
+                                    disabled={isDisconnecting || isReadOnly}
                                     variant="danger"
                                     className="w-full"
                                 >
@@ -89,24 +96,26 @@ export function ChannelCard({ channel, type, onConnect }: ChannelCardProps) {
                 ) : (
                     <>
                         <p className="text-gray-400 text-sm mb-6">{t('status.notConnected')}</p>
-                        <Button onClick={onConnect} variant="secondary" className="mt-auto w-full">
+                        <Button onClick={onConnect} disabled={isReadOnly} variant="secondary" className="mt-auto w-full">
                             {t('actions.connect')}
                         </Button>
                     </>
                 )}
             </div>
 
-            <ConfirmDialog
-                isOpen={showConfirm}
-                title={t('confirmDisconnectTitle')}
-                description={t('confirmDisconnectDesc')}
-                confirmText={t('actions.disconnect')}
-                cancelText={t('actions.cancel')}
-                isDestructive
-                isLoading={isDisconnecting}
-                onConfirm={handleDisconnect}
-                onCancel={() => setShowConfirm(false)}
-            />
+            {!isReadOnly && (
+                <ConfirmDialog
+                    isOpen={showConfirm}
+                    title={t('confirmDisconnectTitle')}
+                    description={t('confirmDisconnectDesc')}
+                    confirmText={t('actions.disconnect')}
+                    cancelText={t('actions.cancel')}
+                    isDestructive
+                    isLoading={isDisconnecting}
+                    onConfirm={handleDisconnect}
+                    onCancel={() => setShowConfirm(false)}
+                />
+            )}
         </>
     )
 }

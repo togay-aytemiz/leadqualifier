@@ -16,9 +16,10 @@ interface SkillsContainerProps {
     initialSkills: Skill[]
     organizationId: string
     handoverMessage: string
+    isReadOnly?: boolean
 }
 
-export function SkillsContainer({ initialSkills, organizationId, handoverMessage }: SkillsContainerProps) {
+export function SkillsContainer({ initialSkills, organizationId, handoverMessage, isReadOnly = false }: SkillsContainerProps) {
     const t = useTranslations('skills')
     const tc = useTranslations('common')
     const locale = useLocale()
@@ -94,6 +95,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     }, [formData, initialFormState])
 
     const handleCreateNew = () => {
+        if (isReadOnly) return
         setSelectedSkillId(null)
         setIsCreating(true)
     }
@@ -109,6 +111,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     }
 
     const handleArchiveToggle = async () => {
+        if (isReadOnly) return
         if (!selectedSkillId) return
         const skill = skills.find(s => s.id === selectedSkillId)
         if (!skill) return
@@ -132,11 +135,13 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     }
 
     const handleAddTrigger = () => {
+        if (isReadOnly) return
         if (formData.triggers.length >= 10) return
         setFormData(prev => ({ ...prev, triggers: [...prev.triggers, ''] }))
     }
 
     const handleRemoveTrigger = (index: number) => {
+        if (isReadOnly) return
         // Prevent removing if it's one of the first 3
         if (index < 3) return
 
@@ -146,6 +151,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     }
 
     const handleSave = async () => {
+        if (isReadOnly) return
         setValidationError(null)
         // Validate
         if (!formData.title.trim()) {
@@ -222,6 +228,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     }
 
     const handleDelete = async () => {
+        if (isReadOnly) return
         if (!selectedSkillId) return
 
         setIsSaving(true)
@@ -258,6 +265,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     </div>
                     <button
                         onClick={handleCreateNew}
+                        disabled={isReadOnly}
                         className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
                     >
                         <Plus size={18} />
@@ -266,6 +274,11 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                 </div>
 
                 <div className="px-6 py-3 border-b border-gray-100 bg-white shrink-0">
+                    {isReadOnly && (
+                        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                            {t('readOnlyMode')}
+                        </p>
+                    )}
                     <ClientSearchInput placeholder={t('searchPlaceholder')} />
                 </div>
 
@@ -313,12 +326,14 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     <>
                                         <button
                                             onClick={handleArchiveToggle}
+                                            disabled={isReadOnly}
                                             className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
                                         >
                                             {selectedSkill?.enabled ? t('archive') : t('activate')}
                                         </button>
                                         <button
                                             onClick={() => setShowDeleteConfirm(true)}
+                                            disabled={isReadOnly}
                                             className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
                                         >
                                             {t('delete')}
@@ -327,7 +342,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                 )}
                                 <button
                                     onClick={handleSave}
-                                    disabled={!isDirty || isSaving}
+                                    disabled={isReadOnly || !isDirty || isSaving}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
                                 >
                                     {t('saveChanges')}
@@ -351,6 +366,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     value={formData.title}
                                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                                     placeholder={t('namePlaceholder')}
+                                    disabled={isReadOnly}
                                     className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
                                 />
                             </div>
@@ -370,12 +386,14 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                                 value={trigger}
                                                 onChange={(e) => handleTriggerChange(idx, e.target.value)}
                                                 placeholder={idx < 3 ? t('triggerPlaceholderMandatory') : t('triggerPlaceholderOptional')}
+                                                disabled={isReadOnly}
                                                 className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
                                                     }`}
                                             />
                                             {idx >= 3 && (
                                                 <button
                                                     onClick={() => handleRemoveTrigger(idx)}
+                                                    disabled={isReadOnly}
                                                     className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                     title={t('removeTrigger')}
                                                 >
@@ -405,6 +423,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     value={formData.response_text}
                                     onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
                                     placeholder={t('responsePlaceholder')}
+                                    disabled={isReadOnly}
                                     className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
                                 />
                             </div>
@@ -414,6 +433,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     <input
                                         type="checkbox"
                                         checked={formData.requires_human_handover}
+                                        disabled={isReadOnly}
                                         onChange={(event) => setFormData(prev => ({
                                             ...prev,
                                             requires_human_handover: event.target.checked
@@ -433,6 +453,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                         <button
                                             type="button"
                                             onClick={() => router.push(aiSettingsDeepLink)}
+                                            disabled={isReadOnly}
                                             className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
                                         >
                                             {t('editHandoverMessageInAiSettings')}

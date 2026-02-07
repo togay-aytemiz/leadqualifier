@@ -12,7 +12,12 @@ import { FolderModal } from './FolderModal'
 import { NewContentButton } from './NewContentButton'
 import { FolderActions } from './FolderActions'
 
-export function KnowledgeSidebar() {
+interface KnowledgeSidebarProps {
+    organizationId: string | null
+    isReadOnly?: boolean
+}
+
+export function KnowledgeSidebar({ organizationId, isReadOnly = false }: KnowledgeSidebarProps) {
     const t = useTranslations('sidebar')
     const [data, setData] = useState<SidebarData | null>(null)
     const router = useRouter()
@@ -24,7 +29,6 @@ export function KnowledgeSidebar() {
     const [showFolderModal, setShowFolderModal] = useState(false)
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
     const [showAllUncategorized, setShowAllUncategorized] = useState(false)
-    const [organizationId, setOrganizationId] = useState<string | null>(null)
 
     const collections = data?.collections ?? []
     const uncategorized = data?.uncategorized ?? []
@@ -50,7 +54,7 @@ export function KnowledgeSidebar() {
 
     const loadSidebar = useCallback(async () => {
         try {
-            const sidebarData = await getSidebarData()
+            const sidebarData = await getSidebarData(organizationId)
             setData(sidebarData)
             const initialExpanded: Record<string, boolean> = {}
             sidebarData.collections.forEach(c => initialExpanded[c.id] = true)
@@ -59,7 +63,7 @@ export function KnowledgeSidebar() {
         } catch (error) {
             console.error(error)
         }
-    }, [])
+    }, [organizationId])
 
     useEffect(() => {
         loadSidebar()
@@ -68,31 +72,6 @@ export function KnowledgeSidebar() {
         window.addEventListener('knowledge-updated', handleUpdate)
         return () => window.removeEventListener('knowledge-updated', handleUpdate)
     }, [loadSidebar])
-
-    useEffect(() => {
-        let isMounted = true
-
-        const loadOrganization = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-
-            const { data: membership } = await supabase
-                .from('organization_members')
-                .select('organization_id')
-                .eq('user_id', user.id)
-                .limit(1)
-                .single()
-
-            if (!isMounted) return
-            setOrganizationId(membership?.organization_id ?? null)
-        }
-
-        loadOrganization()
-
-        return () => {
-            isMounted = false
-        }
-    }, [supabase])
 
     useEffect(() => {
         if (!organizationId) return
@@ -147,7 +126,7 @@ export function KnowledgeSidebar() {
         loadSidebar()
     }
 
-    const footer = (
+    const footer = isReadOnly ? null : (
         <div className="p-3 space-y-2 border-t border-gray-200 bg-white">
             <Button
                 variant="secondary"
@@ -266,14 +245,16 @@ export function KnowledgeSidebar() {
                                     <span className="truncate">{col.name}</span>
                                     <span className="text-xs text-gray-400 ml-1">({col.count})</span>
                                 </div>
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <FolderActions
-                                        collection={col}
-                                        redirectOnDelete={currentCollectionId === col.id}
-                                        onDeleteSuccess={loadSidebar} // Reload sidebar after delete
-                                        onUpdate={loadSidebar} // Reload sidebar after rename
-                                    />
-                                </div>
+                                {!isReadOnly && (
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <FolderActions
+                                            collection={col}
+                                            redirectOnDelete={currentCollectionId === col.id}
+                                            onDeleteSuccess={loadSidebar} // Reload sidebar after delete
+                                            onUpdate={loadSidebar} // Reload sidebar after rename
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Files List (Nested) */}

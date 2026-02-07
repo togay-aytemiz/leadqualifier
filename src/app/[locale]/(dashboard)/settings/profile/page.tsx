@@ -12,6 +12,7 @@ import {
 } from 'react-icons/hi2'
 import ProfileSettingsClient from './ProfileSettingsClient'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function ProfileSettingsPage() {
     const supabase = await createClient()
@@ -22,24 +23,19 @@ export default async function ProfileSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    const [{ data: profile }, { data: membership }] = await Promise.all([
+    const [{ data: profile }, orgContext] = await Promise.all([
         supabase
             .from('profiles')
             .select('full_name, email')
             .eq('id', user.id)
             .single(),
-        supabase
-            .from('organization_members')
-            .select('organization_id')
-            .eq('user_id', user.id)
-            .limit(1)
-            .single()
+        resolveActiveOrganizationContext(supabase)
     ])
 
     const initialName = profile?.full_name ?? ''
     const email = profile?.email ?? user.email ?? ''
-    const pendingCount = membership?.organization_id
-        ? await getPendingOfferingProfileSuggestionCount(membership.organization_id, locale)
+    const pendingCount = orgContext?.activeOrganizationId
+        ? await getPendingOfferingProfileSuggestionCount(orgContext.activeOrganizationId, locale)
         : 0
 
     return (

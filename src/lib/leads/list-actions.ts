@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { Lead, ConversationPlatform, LeadStatus } from '@/types/database'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export interface LeadWithConversation extends Lead {
     conversation: {
@@ -26,22 +27,17 @@ export interface GetLeadsResult {
     totalPages: number
 }
 
-async function getUserOrganization() {
+async function getUserOrganization(organizationIdOverride?: string | null) {
+    if (organizationIdOverride) {
+        return organizationIdOverride
+    }
+
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const { data: member } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
-
-    return member?.organization_id ?? null
+    const context = await resolveActiveOrganizationContext(supabase)
+    return context?.activeOrganizationId ?? null
 }
 
-export async function getLeads(params: GetLeadsParams = {}): Promise<GetLeadsResult> {
+export async function getLeads(params: GetLeadsParams = {}, organizationIdOverride?: string | null): Promise<GetLeadsResult> {
     const {
         page = 1,
         pageSize = 20,
@@ -50,7 +46,7 @@ export async function getLeads(params: GetLeadsParams = {}): Promise<GetLeadsRes
         search
     } = params
 
-    const organizationId = await getUserOrganization()
+    const organizationId = await getUserOrganization(organizationIdOverride)
     if (!organizationId) {
         return { leads: [], total: 0, page: 1, pageSize, totalPages: 0 }
     }
@@ -132,8 +128,8 @@ export async function getLeads(params: GetLeadsParams = {}): Promise<GetLeadsRes
     }
 }
 
-export async function getRequiredFields(): Promise<string[]> {
-    const organizationId = await getUserOrganization()
+export async function getRequiredFields(organizationIdOverride?: string | null): Promise<string[]> {
+    const organizationId = await getUserOrganization(organizationIdOverride)
     if (!organizationId) return []
 
     const supabase = await createClient()

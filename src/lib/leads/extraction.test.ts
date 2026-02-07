@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeExtractionWithExisting, safeParseLeadExtraction } from '@/lib/leads/extraction'
+import { mergeExtractionWithExisting, resolveLeadExtractionLocale, safeParseLeadExtraction } from '@/lib/leads/extraction'
 
 describe('safeParseLeadExtraction', () => {
     it('fills defaults on invalid payloads', () => {
@@ -139,5 +139,36 @@ describe('mergeExtractionWithExisting', () => {
             Telefon: '05551112233',
             'Doğum Tarihi': '1 Mart'
         })
+    })
+})
+
+describe('resolveLeadExtractionLocale', () => {
+    it('respects explicit locale override', () => {
+        const locale = resolveLeadExtractionLocale({
+            preferredLocale: 'tr',
+            customerMessages: ['hello']
+        })
+        expect(locale).toBe('tr')
+    })
+
+    it('detects Turkish in mixed conversation history', () => {
+        const locale = resolveLeadExtractionLocale({
+            customerMessages: ['selam canım', 'randevu almak istiyorum', 'vazgeçtim', 'hello'],
+            latestMessage: 'fiyat'
+        })
+        expect(locale).toBe('tr')
+    })
+
+    it('detects English when conversation is English only', () => {
+        const locale = resolveLeadExtractionLocale({
+            customerMessages: ['hello', 'i want to book an appointment'],
+            latestMessage: 'price'
+        })
+        expect(locale).toBe('en')
+    })
+
+    it('defaults to Turkish when no signal is provided', () => {
+        const locale = resolveLeadExtractionLocale()
+        expect(locale).toBe('tr')
     })
 })

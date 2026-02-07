@@ -8,9 +8,10 @@ interface FolderCardProps {
     name: string
     count?: number
     onRefresh?: () => void
+    isReadOnly?: boolean
 }
 
-export function FolderCard({ id, name, count = 0, onRefresh }: FolderCardProps) {
+export function FolderCard({ id, name, count = 0, onRefresh, isReadOnly = false }: FolderCardProps) {
     const t = useTranslations('knowledge')
     const router = useRouter()
 
@@ -28,18 +29,20 @@ export function FolderCard({ id, name, count = 0, onRefresh }: FolderCardProps) 
                 <div className="bg-blue-50 text-blue-500 p-2 rounded-lg">
                     <Folder size={24} fill="currentColor" className="opacity-20" />
                 </div>
-                <div onClick={(e) => e.stopPropagation()}>
-                    <FolderActions
-                        collection={{ id, name, count }}
-                        trigger={
-                            <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                                <MoreVertical size={16} />
-                            </button>
-                        }
-                        onDeleteSuccess={handleRefresh}
-                        onUpdate={handleRefresh}
-                    />
-                </div>
+                {!isReadOnly && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <FolderActions
+                            collection={{ id, name, count }}
+                            trigger={
+                                <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                    <MoreVertical size={16} />
+                                </button>
+                            }
+                            onDeleteSuccess={handleRefresh}
+                            onUpdate={handleRefresh}
+                        />
+                    </div>
+                )}
             </div>
             <h3 className="font-semibold text-gray-900 truncate" title={name}>{name}</h3>
             <p className="text-xs text-gray-500 mt-1">{t('itemsCount', { count })}</p>

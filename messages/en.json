@@ -134,6 +134,7 @@
             "saveFailed": "Failed to save changes. Please try again.",
             "genericError": "Something went wrong. Please try again."
         },
+        "readOnlyMode": "Read-only mode: admin impersonation can review skills but cannot modify them.",
         "noOrganization": "No Organization Found",
         "noOrganizationDesc": "You need to be part of an organization to manage skills."
     },
@@ -150,7 +151,17 @@
     "mainSidebar": {
         "workspace": "Workspace",
         "aiTools": "AI Tools",
+        "adminSection": "Admin",
+        "adminDashboard": "Admin Dashboard",
+        "adminOrganizations": "Organizations",
+        "adminUsers": "Users",
         "other": "Other",
+        "organizationSwitcherTitle": "Organization",
+        "organizationSwitcherSearch": "Search organizations...",
+        "organizationSwitcherEmpty": "No organization found",
+        "organizationSwitcherNoSelection": "No organization selected",
+        "organizationSwitcherReset": "Reset",
+        "readOnlyTenantMode": "Read-only impersonation mode",
         "botStatusLabel": "Bot",
         "botStatusActive": "Active",
         "botStatusShadow": "Shadow",
@@ -172,6 +183,7 @@
         "takeOverPlaceholder": "Take over the conversation...",
         "botActiveTitle": "AI assistant is active.",
         "botActiveBody": "Take over to send messages manually.",
+        "readOnlyMode": "Read-only mode: admin impersonation cannot send or modify conversation data.",
         "sendShortcut": "⌘ Enter to send",
         "sendButton": "Send Reply",
         "summary": {
@@ -188,6 +200,7 @@
         "id": "ID",
         "keyInfo": "Key Information",
         "platform": "Platform",
+        "platformSimulatorShort": "S",
         "status": "Status",
         "received": "Created",
         "created": "Created",
@@ -627,46 +640,142 @@
     },
     "admin": {
         "dashboardTitle": "Admin Dashboard",
-        "overview": "System-wide overview and settings",
+        "overview": "System-wide overview and read-only monitoring.",
+        "readOnlyBanner": "This area is read-only for now. Premium, trial, and quota updates are not yet integrated.",
         "stats": {
             "organizations": "Total Organizations",
             "users": "Total Users",
-            "skills": "Total Skills"
+            "skills": "Total Skills",
+            "knowledge": "Total Knowledge Docs",
+            "messages": "Total Usage",
+            "tokens": "Total Tokens"
         },
         "quickActions": "Quick Actions",
-        "manageOrganizations": "Manage Organizations",
-        "manageOrganizationsDesc": "Create, edit, delete organizations",
-        "manageUsers": "Manage Users",
-        "manageUsersDesc": "View and manage all users",
+        "manageOrganizations": "Organization Overview",
+        "manageOrganizationsDesc": "Review organization-level usage, tokens, and content counts",
+        "manageUsers": "User Overview",
+        "manageUsersDesc": "Review all profiles and organization memberships",
+        "status": {
+            "notIntegrated": "Not integrated"
+        },
         "organizations": {
             "title": "Organizations",
-            "description": "Manage all organizations in the system",
+            "description": "Read-only organization summary for system admins.",
             "emptyTitle": "No organizations found",
             "emptyDesc": "There are no organizations in the system yet.",
+            "emptySearchTitle": "No organizations match your search",
+            "emptySearchDesc": "Try a different name or slug.",
+            "searchPlaceholder": "Search by organization name or slug...",
+            "searchAction": "Search",
+            "clearSearch": "Clear",
+            "viewDetails": "View details",
+            "showing": "Showing {from}-{to} of {total}",
+            "page": "Page {current} of {total}",
+            "pagination": {
+                "prev": "Previous",
+                "next": "Next"
+            },
             "columns": {
-                "name": "Name",
+                "name": "Organization",
                 "slug": "Slug",
-                "members": "Members",
-                "created": "Created"
+                "profiles": "Profiles",
+                "usage": "Total Usage",
+                "tokens": "Total Tokens",
+                "skills": "Skills",
+                "knowledge": "Knowledge Base",
+                "premium": "Premium",
+                "plan": "Plan",
+                "trial": "Trial",
+                "created": "Created",
+                "details": "Details"
             }
         },
         "users": {
             "title": "Users",
-            "description": "Manage all users in the system",
+            "description": "Read-only profile list with organization memberships.",
+            "searchPlaceholder": "Search by name or email",
+            "searchAction": "Search",
+            "clearSearch": "Clear",
             "emptyTitle": "No users found",
             "emptyDesc": "There are no users in the system yet.",
+            "emptySearchTitle": "No users match this search",
+            "emptySearchDesc": "Try a different name or email query.",
+            "noOrganization": "No organization membership",
+            "organizationCount": "{count, plural, one {# organization} other {# organizations}}",
+            "showing": "Showing {from}-{to} of {total} users",
+            "page": "Page {current} / {total}",
+            "pagination": {
+                "prev": "Previous",
+                "next": "Next"
+            },
             "columns": {
                 "name": "Name",
                 "email": "Email",
                 "role": "Role",
-                "created": "Created"
+                "organizations": "Organizations",
+                "created": "Created",
+                "details": "Details"
             },
             "roles": {
                 "systemAdmin": "System Admin",
                 "user": "User"
             },
             "actions": {
-                "makeAdmin": "Make Admin"
+                "viewDetails": "View details"
+            }
+        },
+        "userDetail": {
+            "title": "User Details",
+            "description": "Read-only user profile and organization snapshots.",
+            "emptyTitle": "No organizations for this user",
+            "emptyDesc": "This user is not connected to any organization yet.",
+            "profile": {
+                "name": "Name",
+                "email": "Email",
+                "role": "Role",
+                "created": "Created"
+            },
+            "columns": {
+                "organization": "Organization",
+                "role": "Role",
+                "usage": "Total Usage",
+                "tokens": "Total Tokens",
+                "skills": "Skills",
+                "knowledge": "Knowledge Base",
+                "premium": "Premium",
+                "plan": "Plan",
+                "trial": "Trial"
+            }
+        },
+        "organizationDetail": {
+            "title": "Organization Details",
+            "description": "Read-only organization snapshot with profile memberships.",
+            "summary": {
+                "name": "Organization",
+                "slug": "Slug",
+                "created": "Created",
+                "profiles": "Profiles",
+                "usage": "Total Usage",
+                "tokens": "Total Tokens",
+                "skills": "Skills",
+                "knowledge": "Knowledge Base"
+            },
+            "billing": {
+                "premium": "Premium",
+                "plan": "Plan",
+                "trial": "Trial"
+            },
+            "profiles": {
+                "emptyTitle": "No profiles in this organization",
+                "emptyDesc": "There are no linked profiles yet.",
+                "columns": {
+                    "name": "Name",
+                    "email": "Email",
+                    "role": "Role",
+                    "systemAdmin": "System Admin",
+                    "organizations": "Organizations",
+                    "joined": "Joined"
+                }
             }
         }
     },
@@ -687,6 +796,7 @@
             "lastActivity": "Last Activity",
             "summary": "Summary"
         },
+        "platformSimulatorShort": "S",
         "pagination": {
             "prev": "Previous",
             "next": "Next",

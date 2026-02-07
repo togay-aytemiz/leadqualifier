@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
 
 export async function getChannels(organizationId: string) {
@@ -23,6 +24,9 @@ import { TelegramClient } from '@/lib/telegram/client'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
     // 1. Validate Token with Telegram API
     try {
         const client = new TelegramClient(botToken)
@@ -52,7 +56,6 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
         }
 
         // 3. Save to DB
-        const supabase = await createClient()
         const { error } = await supabase.from('channels').insert({
             organization_id: organizationId,
             type: 'telegram',
@@ -77,6 +80,7 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
 
 export async function disconnectChannel(channelId: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // Fetch channel first to get token
     const { data: channel } = await supabase

@@ -18,6 +18,7 @@ import {
 } from '@/lib/ai/conversation'
 import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
+import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { v4 as uuidv4 } from 'uuid'
 
 function isLikelyTurkishMessage(value: string) {
@@ -184,7 +185,7 @@ export async function POST(req: NextRequest) {
         assigneeId: conversation.assignee_id
     })
 
-    const operatorActive = conversation.active_agent === 'operator' || Boolean(conversation.assignee_id)
+    const operatorActive = isOperatorActive(conversation)
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)
     const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
@@ -200,6 +201,7 @@ export async function POST(req: NextRequest) {
             organizationId: orgId,
             conversationId: conversation.id,
             latestMessage: text,
+            preferredLocale: isLikelyTurkishMessage(text) ? 'tr' : 'en',
             supabase,
             source: 'telegram'
         })

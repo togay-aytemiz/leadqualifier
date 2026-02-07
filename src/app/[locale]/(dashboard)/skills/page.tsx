@@ -3,6 +3,7 @@ import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_HANDOVER_MESSAGE_EN, DEFAULT_HANDOVER_MESSAGE_TR } from '@/lib/ai/escalation'
 import { createClient } from '@/lib/supabase/server'
 import { SkillsContainer } from '@/components/skills/SkillsContainer'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getLocale, getTranslations } from 'next-intl/server'
 
 export const dynamic = 'force-dynamic'
@@ -27,13 +28,8 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
 
     if (!user) return null
 
-    const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .single()
-
-    const organizationId = membership?.organization_id
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
 
     let skills: Awaited<ReturnType<typeof getSkills>> = []
@@ -71,6 +67,7 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
                 initialSkills={skills}
                 organizationId={organizationId}
                 handoverMessage={handoverMessage}
+                isReadOnly={orgContext?.readOnlyTenantMode ?? false}
             />
         </div>
     )

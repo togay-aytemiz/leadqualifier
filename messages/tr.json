@@ -134,6 +134,7 @@
             "saveFailed": "Değişiklikler kaydedilemedi. Lütfen tekrar deneyin.",
             "genericError": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
         },
+        "readOnlyMode": "Salt okunur mod: admin impersonation yetenekleri görüntüler, değiştiremez.",
         "noOrganization": "Organizasyon Bulunamadı",
         "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyonun parçası olmalısınız."
     },
@@ -150,7 +151,17 @@
     "mainSidebar": {
         "workspace": "Çalışma Alanı",
         "aiTools": "Yapay Zeka Araçları",
+        "adminSection": "Yönetim",
+        "adminDashboard": "Yönetici Paneli",
+        "adminOrganizations": "Organizasyonlar",
+        "adminUsers": "Kullanıcılar",
         "other": "Diğer",
+        "organizationSwitcherTitle": "Organizasyon",
+        "organizationSwitcherSearch": "Organizasyon ara...",
+        "organizationSwitcherEmpty": "Organizasyon bulunamadı",
+        "organizationSwitcherNoSelection": "Organizasyon seçilmedi",
+        "organizationSwitcherReset": "Sıfırla",
+        "readOnlyTenantMode": "Salt okunur impersonation modu",
         "botStatusLabel": "Bot",
         "botStatusActive": "Aktif",
         "botStatusShadow": "Dinleyici",
@@ -172,6 +183,7 @@
         "takeOverPlaceholder": "Sohbeti devralın...",
         "botActiveTitle": "Yapay zeka asistanı devrede.",
         "botActiveBody": "Manuel mesaj göndermek için devralın.",
+        "readOnlyMode": "Salt okunur mod: admin impersonation konuşma üzerinde gönderim/değişiklik yapamaz.",
         "sendShortcut": "Göndermek için ⌘ Enter",
         "sendButton": "Yanıtı Gönder",
         "summary": {
@@ -188,6 +200,7 @@
         "id": "ID",
         "keyInfo": "Önemli Bilgiler",
         "platform": "Platform",
+        "platformSimulatorShort": "S",
         "status": "Durum",
         "received": "Oluşturuldu",
         "created": "Oluşturulma",
@@ -627,46 +640,142 @@
     },
     "admin": {
         "dashboardTitle": "Yönetici Paneli",
-        "overview": "Sistem genel görünümü ve ayarlar",
+        "overview": "Sistem genel görünümü ve salt okunur izleme.",
+        "readOnlyBanner": "Bu alan şimdilik salt okunur. Premium, trial ve kota güncellemeleri henüz entegre edilmedi.",
         "stats": {
             "organizations": "Toplam Organizasyonlar",
             "users": "Toplam Kullanıcılar",
-            "skills": "Toplam Yetenekler"
+            "skills": "Toplam Yetenekler",
+            "knowledge": "Toplam Bilgi Dokümanı",
+            "messages": "Toplam Kullanım",
+            "tokens": "Toplam Token"
         },
         "quickActions": "Hızlı İşlemler",
-        "manageOrganizations": "Organizasyonları Yönet",
-        "manageOrganizationsDesc": "Organizasyonları oluşturun, düzenleyin, silin",
-        "manageUsers": "Kullanıcıları Yönet",
-        "manageUsersDesc": "Tüm kullanıcıları görüntüleyin ve yönetin",
+        "manageOrganizations": "Organizasyon Özeti",
+        "manageOrganizationsDesc": "Organizasyon bazlı kullanım, token ve içerik sayılarını inceleyin",
+        "manageUsers": "Kullanıcı Özeti",
+        "manageUsersDesc": "Tüm profilleri ve organizasyon üyeliklerini inceleyin",
+        "status": {
+            "notIntegrated": "Henüz entegre değil"
+        },
         "organizations": {
             "title": "Organizasyonlar",
-            "description": "Sistemdeki tüm organizasyonları yönetin",
+            "description": "Sistem yöneticileri için salt okunur organizasyon özeti.",
             "emptyTitle": "Organizasyon bulunamadı",
             "emptyDesc": "Sistemde henüz organizasyon yok.",
+            "emptySearchTitle": "Aramaya uyan organizasyon bulunamadı",
+            "emptySearchDesc": "Farklı bir isim veya kısa ad deneyin.",
+            "searchPlaceholder": "Organizasyon adı veya kısa ad ile ara...",
+            "searchAction": "Ara",
+            "clearSearch": "Temizle",
+            "viewDetails": "Detayı görüntüle",
+            "showing": "{from}-{to} / {total} gösteriliyor",
+            "page": "Sayfa {current} / {total}",
+            "pagination": {
+                "prev": "Önceki",
+                "next": "Sonraki"
+            },
             "columns": {
-                "name": "Ad",
+                "name": "Organizasyon",
                 "slug": "Kısa Ad",
-                "members": "Üyeler",
-                "created": "Oluşturulma"
+                "profiles": "Profiller",
+                "usage": "Toplam Kullanım",
+                "tokens": "Toplam Token",
+                "skills": "Yetenekler",
+                "knowledge": "Bilgi Bankası",
+                "premium": "Premium",
+                "plan": "Plan",
+                "trial": "Trial",
+                "created": "Oluşturulma",
+                "details": "Detay"
             }
         },
         "users": {
             "title": "Kullanıcılar",
-            "description": "Sistemdeki tüm kullanıcıları yönetin",
+            "description": "Organizasyon üyelikleriyle birlikte salt okunur profil listesi.",
+            "searchPlaceholder": "Ad veya e-posta ile ara",
+            "searchAction": "Ara",
+            "clearSearch": "Temizle",
             "emptyTitle": "Kullanıcı bulunamadı",
             "emptyDesc": "Sistemde henüz kullanıcı yok.",
+            "emptySearchTitle": "Aramaya uygun kullanıcı bulunamadı",
+            "emptySearchDesc": "Farklı bir ad veya e-posta sorgusu deneyin.",
+            "noOrganization": "Organizasyon üyeliği yok",
+            "organizationCount": "{count, plural, one {# organizasyon} other {# organizasyon}}",
+            "showing": "{total} kullanıcıdan {from}-{to} gösteriliyor",
+            "page": "Sayfa {current} / {total}",
+            "pagination": {
+                "prev": "Önceki",
+                "next": "Sonraki"
+            },
             "columns": {
                 "name": "Ad",
                 "email": "E-posta",
                 "role": "Rol",
-                "created": "Oluşturulma"
+                "organizations": "Organizasyonlar",
+                "created": "Oluşturulma",
+                "details": "Detay"
             },
             "roles": {
                 "systemAdmin": "Sistem Yöneticisi",
                 "user": "Kullanıcı"
             },
             "actions": {
-                "makeAdmin": "Yönetici Yap"
+                "viewDetails": "Detayı görüntüle"
+            }
+        },
+        "userDetail": {
+            "title": "Kullanıcı Detayı",
+            "description": "Salt okunur kullanıcı profili ve organizasyon snapshot bilgileri.",
+            "emptyTitle": "Bu kullanıcı için organizasyon yok",
+            "emptyDesc": "Bu kullanıcı henüz herhangi bir organizasyona bağlı değil.",
+            "profile": {
+                "name": "Ad",
+                "email": "E-posta",
+                "role": "Rol",
+                "created": "Oluşturulma"
+            },
+            "columns": {
+                "organization": "Organizasyon",
+                "role": "Rol",
+                "usage": "Toplam Kullanım",
+                "tokens": "Toplam Token",
+                "skills": "Yetenekler",
+                "knowledge": "Bilgi Bankası",
+                "premium": "Premium",
+                "plan": "Plan",
+                "trial": "Trial"
+            }
+        },
+        "organizationDetail": {
+            "title": "Organizasyon Detayı",
+            "description": "Profil üyelikleriyle birlikte salt okunur organizasyon snapshot görünümü.",
+            "summary": {
+                "name": "Organizasyon",
+                "slug": "Kısa Ad",
+                "created": "Oluşturulma",
+                "profiles": "Profiller",
+                "usage": "Toplam Kullanım",
+                "tokens": "Toplam Token",
+                "skills": "Yetenekler",
+                "knowledge": "Bilgi Bankası"
+            },
+            "billing": {
+                "premium": "Premium",
+                "plan": "Plan",
+                "trial": "Trial"
+            },
+            "profiles": {
+                "emptyTitle": "Bu organizasyonda profil yok",
+                "emptyDesc": "Henüz bağlı profil bulunmuyor.",
+                "columns": {
+                    "name": "Ad",
+                    "email": "E-posta",
+                    "role": "Rol",
+                    "systemAdmin": "Sistem Yöneticisi",
+                    "organizations": "Organizasyonlar",
+                    "joined": "Katılım"
+                }
             }
         }
     },
@@ -687,6 +796,7 @@
             "lastActivity": "Son Aktivite",
             "summary": "Özet"
         },
+        "platformSimulatorShort": "S",
         "pagination": {
             "prev": "Önceki",
             "next": "Sonraki",

@@ -1,9 +1,11 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 
 export async function updateOrganizationName(name: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { generateInitialOfferingSuggestion } from '@/lib/leads/offering-profile'
+import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 
 function ensureNoError(error: { message?: string } | null, context: string) {
     if (!error) return
@@ -56,6 +57,7 @@ export async function updateOfferingProfileSummary(
     options?: { generateInitialSuggestion?: boolean }
 ) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     const runUpdate = async (payload: Record<string, unknown>) => {
         return supabase
@@ -119,6 +121,7 @@ export async function syncOfferingProfileSummary(
     summary: string
 ) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { error } = await supabase
         .from('offering_profiles')
         .update({ summary })
@@ -128,6 +131,7 @@ export async function syncOfferingProfileSummary(
 
 export async function generateOfferingProfileSuggestions(organizationId: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data: profile, error } = await supabase
         .from('offering_profiles')
         .select('ai_suggestions_enabled')
@@ -143,6 +147,7 @@ export async function generateOfferingProfileSuggestions(organizationId: string)
 
 export async function updateOfferingProfileLocaleForUser(locale: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     ensureNoError(authError, 'Failed to read auth user')
     if (!user) throw new Error('Unauthorized')
@@ -171,6 +176,7 @@ export async function updateOfferingProfileSuggestionStatus(
     status: 'pending' | 'approved' | 'rejected'
 ) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     ensureNoError(authError, 'Failed to read auth user')
     if (!user) throw new Error('Unauthorized')
@@ -217,6 +223,7 @@ export async function archiveOfferingProfileSuggestion(
     suggestionId: string
 ) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     ensureNoError(authError, 'Failed to read auth user')
     if (!user) throw new Error('Unauthorized')

@@ -156,7 +156,7 @@ export function LeadsTable({
         if (platform === 'whatsapp') {
             return <IoLogoWhatsapp className="text-[#25D366]" size={18} />
         }
-        return <span className="text-xs text-gray-400">S</span>
+        return <span className="text-xs text-gray-400">{t('platformSimulatorShort')}</span>
     }
 
     const getExtractedFieldValue = (lead: LeadWithConversation, fieldName: string): string => {

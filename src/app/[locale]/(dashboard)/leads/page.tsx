@@ -6,6 +6,7 @@ import { getLeads, getRequiredFields } from '@/lib/leads/list-actions'
 import { LeadsTable } from '@/components/leads/LeadsTable'
 import { LeadSearch } from '@/components/leads/LeadSearch'
 import { LeadsEmptyState } from '@/components/leads/LeadsEmptyState'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 interface PageProps {
     searchParams: Promise<{ page?: string; sortBy?: string; sortOrder?: string; search?: string }>
@@ -19,15 +20,10 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) redirect(`/${locale}/login`)
 
-    // Get organization
-    const { data: member } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const organizationId = orgContext?.activeOrganizationId ?? null
 
-    if (!member) {
+    if (!organizationId) {
         return (
             <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
                 <PageHeader title={t('title')} />
@@ -50,8 +46,8 @@ export default async function LeadsPage({ searchParams }: PageProps) {
 
     // Fetch data
     const [leadsResult, requiredFields] = await Promise.all([
-        getLeads({ page, pageSize: 20, sortBy, sortOrder, search }),
-        getRequiredFields()
+        getLeads({ page, pageSize: 20, sortBy, sortOrder, search }, organizationId),
+        getRequiredFields(organizationId)
     ])
 
     return (

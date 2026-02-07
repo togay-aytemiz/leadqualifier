@@ -7,8 +7,22 @@
 ## [Unreleased]
 
 ### Added
+- Lead extraction now enforces locale-aware output language (TR/EN) for user-facing extracted fields, including lead summary and important-info values.
+- Inbox on-demand conversation summary now accepts active UI locale (TR/EN) and generates locale-matched output.
+- Admin organization list now supports search + pagination for large tenant sets.
+- Admin user list now supports search + pagination for large profile sets.
+- Added `/admin/organizations/[id]` read-only details page with organization snapshot cards and profile/member layer.
+- Platform admin organization switcher (searchable, cookie-persisted active org context) in main sidebar for system admins.
+- Main sidebar header now uses `/public/logo-black.svg` in expanded mode and `/public/icon-black.svg` in collapsed mode.
+- Cross-tenant read-only impersonation mode across Inbox, Leads, Skills, Knowledge Base, Simulator, and Settings.
+- Read-only admin analytics views:
+  - `/admin/organizations` now shows org-level usage, token usage, skills, knowledge counts, and premium/plan/trial placeholders.
+  - `/admin/users` now shows all profiles with organization memberships.
+  - `/admin/users/[id]` added for read-only user detail snapshots by organization.
+- New admin read-model layer (`src/lib/admin/access.ts`, `src/lib/admin/read-models.ts`) for centralized system-admin access checks and summary aggregation.
 - Added platform admin planning docs for searchable organization switcher + tenant impersonation flow and admin organization details controls (`docs/plans/2026-02-07-platform-admin-org-switcher-implementation-plan.md`).
 - Updated PRD and Roadmap to include planned platform admin scope: cross-org switcher, organization-level analytics columns, and premium/trial/quota management modules.
+- Confirmed platform admin decisions: switched-org impersonation is read-only in tenant modules, quotas are visibility-only for now, and admin details will include both organization + profile layers (multi-profile-ready).
 - Documented minimal day-1 default guardrail system skills (human support request, complaint, urgent, privacy) with dedicated localized handover messages and explicit decision to skip low-confidence/no-safe-answer auto-handover for MVP.
 - Added implementation plan and product-spec updates for unified single-list Skills management (no Core/Custom split).
 - Skills now auto-seed localized minimal guardrail defaults (human support, complaint, urgent, privacy) when an organization has no skills yet.
@@ -26,7 +40,15 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Fixed
+- Telegram webhook AI gating no longer gets blocked by stale `assignee_id` when `active_agent` is already bot; runtime operator-active checks now honor `active_agent` as source of truth.
+- Hot-lead `notify_only` escalation now preserves ongoing AI replies as intended (only `switch_to_operator` silences AI).
 - Supabase migration version collision: renamed `00020_send_operator_message_rpc.sql` to `00052_send_operator_message_rpc.sql` so `schema_migrations.version` is unique.
+- i18n hardcoded-string violations for simulator platform fallback labels in Inbox/Leads and static summary panel id attribute usage.
+- Platform admin organization list now avoids in-memory full-list filtering/pagination by using DB-backed count + ranged queries.
+- Platform admin organization aggregates now use batched reads instead of per-organization N+1 fan-out, and organization detail now loads targeted org/member/profile slices.
+- Platform admin user list no longer triggers heavy organization summary aggregation; it now uses lightweight org identity lookups.
+- Platform admin user detail now loads targeted profile/membership/organization slices instead of scanning full user+org read models.
+- Removed unused `NavIconComponent` type in `MainSidebar` to keep admin-related lint checks clean.
 
 ### Added
 - Offering Profile AI Suggestions accordion header now shows a compact pending badge (dot + count) while collapsed.

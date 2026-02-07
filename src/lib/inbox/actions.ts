@@ -8,6 +8,7 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { matchesCatalog } from '@/lib/leads/catalog'
 import { runLeadExtraction } from '@/lib/leads/extraction'
+import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { Conversation, Lead, Message } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -106,9 +107,10 @@ function truncateSummaryText(text: string, maxChars: number) {
     return `${normalized.slice(0, Math.max(0, maxChars - 3))}...`
 }
 
-function formatSummaryMessages(messages: SummaryMessage[], botName: string) {
+function formatSummaryMessages(messages: SummaryMessage[], botName: string, locale: string) {
+    const customerLabel = locale === 'tr' ? 'Müşteri' : 'Customer'
     return messages.map((message, index) => {
-        const roleLabel = message.sender_type === 'bot' ? botName : 'User'
+        const roleLabel = message.sender_type === 'bot' ? botName : customerLabel
         const timestamp = new Date(message.created_at).toISOString()
         const content = truncateSummaryText(message.content ?? '', SUMMARY_MAX_CHARS)
         return `${index + 1}. [${timestamp}] ${roleLabel}: ${content}`
@@ -117,7 +119,8 @@ function formatSummaryMessages(messages: SummaryMessage[], botName: string) {
 
 export async function getConversationSummary(
     conversationId: string,
-    organizationId: string
+    organizationId: string,
+    locale: string = 'tr'
 ): Promise<ConversationSummaryResult> {
     if (!process.env.OPENAI_API_KEY) {
         return { ok: false, reason: 'missing_api_key' }
@@ -160,7 +163,8 @@ export async function getConversationSummary(
     const combined = [...contactMessages, botMessage]
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
-    const formattedMessages = formatSummaryMessages(combined, aiSettings.bot_name)
+    const formattedMessages = formatSummaryMessages(combined, aiSettings.bot_name, locale)
+    const responseLanguage = locale === 'tr' ? 'Turkish' : 'English'
 
     try {
         const { default: OpenAI } = await import('openai')
@@ -168,7 +172,7 @@ export async function getConversationSummary(
         const basePrompt = [
             'You summarize only from the provided messages.',
             'Do not add facts or assumptions.',
-            'Respond with a single paragraph in Turkish, 2-3 sentences.'
+            `Respond with a single paragraph in ${responseLanguage}, 2-3 sentences.`
         ].join(' ')
         const systemPrompt = withBotNamePrompt(basePrompt, aiSettings.bot_name)
         const userPrompt = `Summarize the conversation using only the messages below:\n${formattedMessages}`
@@ -371,6 +375,11 @@ export async function refreshConversationLead(
     }
 
     const supabase = await createClient()
+    try {
+        await assertTenantWriteAllowed(supabase)
+    } catch {
+        return { ok: false, reason: 'request_failed' }
+    }
 
     const { data: conversation, error } = await supabase
         .from('conversations')
@@ -418,6 +427,7 @@ export async function sendMessage(
     content: string
 ): Promise<{ message: Message; conversation: Conversation }> {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // 1. Get conversation details to know platform and recipient
     const { data: conversation } = await supabase
@@ -467,6 +477,7 @@ export async function sendMessage(
 
 export async function setConversationAgent(conversationId: string, agent: 'bot' | 'operator') {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // If switching to bot, we MUST clear the assignee_id to release the lock in webhook
     const updates: any = { active_agent: agent }
@@ -485,6 +496,7 @@ export async function setConversationAgent(conversationId: string, agent: 'bot' 
 
 export async function sendSystemMessage(conversationId: string, content: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // 1. Get conversation details (need org ID)
     const { data: conversation, error: convError } = await supabase
@@ -519,6 +531,7 @@ export async function sendSystemMessage(conversationId: string, content: string)
 
 export async function deleteConversation(conversationId: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // 1. Delete messages first (if not cascading, but good practice to be explicit or if we want soft delete later)
     const { error: msgError } = await supabase
@@ -547,6 +560,7 @@ export async function deleteConversation(conversationId: string) {
 
 export async function createMockConversation(organizationId: string) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
 
     // Create conversation
     const { data: conv, error: convError } = await supabase

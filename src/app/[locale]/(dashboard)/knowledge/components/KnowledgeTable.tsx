@@ -11,7 +11,7 @@ import { useTranslations, useLocale } from 'next-intl'
 
 interface KnowledgeTableProps {
     entries: KnowledgeBaseEntry[]
-    onDelete: (id: string) => void
+    onDelete?: (id: string) => void
 }
 
 export function KnowledgeTable({ entries, onDelete }: KnowledgeTableProps) {

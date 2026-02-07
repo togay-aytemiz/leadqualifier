@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-07 (platform admin org switcher + tenant impersonation planning)  
+> **Last Updated:** 2026-02-07 (locale-aware extraction outputs + active_agent-based AI reply gating fix)  
 > **Status:** In Development
 
 ---
@@ -176,6 +176,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Final KB/RAG/fallback generation now receives recent multi-turn user+assistant history and known lead snapshot facts (when available) so replies continue naturally, avoid repetitive greetings, and reduce repeated question loops.
 - Lead extraction now stores collected required-intake values as `extracted_fields.required_intake_collected` when customer messages clearly provide them.
 - Lead extraction applies merge-on-update persistence: if later turns omit previously extracted business details, existing `service_type`, summary, and collected required fields are preserved unless explicitly updated.
+- Lead extraction output language is locale-aware (TR/EN): summary and extracted detail values follow customer/locale signal instead of defaulting to English.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
 - Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
@@ -188,7 +189,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Trigger:** Business owner sends ANY message from their WhatsApp OR claims via Inbox.
  **Behavior:**
 - **Explicit State:** `active_agent` switches to 'operator'.
-- **Assignee Lock:** Operator is assigned (`assignee_id`), strictly blocking AI.
+- **Assignee Ownership:** Operator is assigned (`assignee_id`) for ownership/visibility and claim tracking.
+- **Source of Truth:** AI reply gating uses `active_agent` as the runtime source of truth; `assignee_id` is ownership metadata and legacy fallback only.
 - **AI Silence:** Bot ignores all incoming messages while operator is active.
 - **Resume:** Operator (or Admin) must explicitly "Leave Conversation" to resume Bot.
 - **Optional Extraction:** Lead extraction can remain active during operator takeover if enabled in AI Settings.
@@ -212,6 +214,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Escalation appends a handover message after AI response.
 - Handover message is locale-aware (TR/EN in AI Settings; UI locale selects which message is edited/shown).
 - Legacy/default mismatch repair ensures TR UI does not show EN default handover text.
+- `notify_only` does not suppress subsequent AI replies; only `switch_to_operator` toggles runtime AI silence via `active_agent`.
 
 **Skill Override Rule (validated):**
 - Skill-triggered handover always uses `switch_to_operator` + `assistant_promise`.
@@ -310,27 +313,38 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Add storage usage cards showing total estimated content size and a Skills/Knowledge Base split
 - Every new token-consuming feature must log usage events
 
-### 5.8 Platform Admin Workspace (Planned)
+### 5.8 Platform Admin Workspace (Implemented v1, Read-Only)
 - **Searchable Organization Switcher (System Admin):**
-  - System admin can switch active org from a searchable switcher.
-  - Switch affects tenant-scoped modules (Inbox, Leads, Skills, Knowledge Base, Settings, Simulator).
-  - UI shows a clear "viewing as organization" state to prevent mistakes.
-- **Admin Organization List:**
-  - Table-level visibility for:
+  - System admin can switch active org from a searchable switcher in the main sidebar.
+  - Active org context is persisted via server cookie and applied across tenant modules (Inbox, Leads, Skills, Knowledge Base, Settings, Simulator).
+  - Switched-org impersonation is read-only in tenant modules for MVP.
+  - UI shows a clear "read-only impersonation" state and supports reset to default org context.
+- **Admin Organization List (Read-Only):**
+  - Organization table includes:
     - organization identity
-    - total usage
+    - total usage (messages)
     - total token usage
     - total skills count
     - knowledge base count
-    - premium status
-    - plan status/cycle (monthly/yearly/trial/free)
-- **Organization Details (Admin):**
-  - Dedicated details page per organization.
-  - Control modules for:
-    - extending premium period
-    - extending trial period
-    - updating token/message quota limits
-  - All admin changes are audit-logged.
+    - premium status (placeholder)
+    - plan status/cycle (placeholder)
+    - trial status (placeholder)
+  - Organization list supports search and pagination for large tenant sets.
+  - Query strategy uses DB-level count/range pagination and batched aggregate reads (no in-memory full-list slicing).
+- **Admin Organization Details (Read-Only):**
+  - `/admin/organizations/[id]` shows organization-level snapshot cards (usage, tokens, skills, knowledge, profile count).
+  - Includes profile/member layer with role, system-admin flag, joined date, and cross-org membership visibility.
+  - Detail read-model loads targeted org/member/profile slices only (avoids full-table organization/profile/membership scans).
+- **Admin User List + User Details (Read-Only):**
+  - User list shows all profiles and organization memberships (multi-profile-ready per organization).
+  - User list supports search + pagination for large profile sets.
+  - User details page shows per-organization snapshots (usage/tokens/skills/knowledge + plan/premium/trial placeholders).
+  - User list read-model uses lightweight organization identity lookup (no org metric fan-out).
+  - User details read-model loads only requested profile + memberships + related organizations, then computes snapshots for those organizations.
+- **Deferred (Post-v1):**
+  - Editable premium/trial/quota controls
+  - Audit trail for platform-admin billing/plan actions
+  - Advanced filters/sorting for admin tables
 
 ---
 
@@ -340,7 +354,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 |---------|----------------|
 | Organization | 1 customer = 1 org |
 | Data Isolation | All tables have `organization_id` |
-| Platform Admin | System admin dashboard + org/user lists implemented; searchable org switcher + cross-org tenant impersonation and billing/quota controls are planned in Phase 8 |
+| Platform Admin | System admin dashboard, org/user lists, searchable org switcher, and read-only cross-org impersonation implemented; billing/quota edits and audit tooling are deferred |
 
 ---
 
@@ -386,6 +400,7 @@ MVP is successful when:
 - **Font Update:** Adopt Plus Jakarta Sans via CSS `@import` for the main sidebar’s crisp visual language. This supersedes the system-font-only decision since we are not using Next.js font fetching in CI and accept the lightweight web font load.
 - **Sidebar UI Refinement:** Collapsed-state icon pills are centered and the expand/collapse toggle sits alongside the app name, using arrow-from-line icons for clarity.
 - **Sidebar UI Refinement:** Collapsed logo alignment is centered to match the navigation icon stack.
+- **Sidebar Branding:** Use `/public/logo-black.svg` for expanded sidebar header state and `/public/icon-black.svg` for collapsed sidebar header state.
 - **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
 - **Sidebar Spacing:** Add top padding between the header block and first navigation section for visual separation.
 - **Sidebar Icons:** Use per-item active/passive icon variants (react-icons) to differentiate selected states.
@@ -394,6 +409,10 @@ MVP is successful when:
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
 - **Chunk Overlap Alignment:** Overlap prefers paragraph/sentence boundaries and drops overlap when it would exceed max tokens.
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
+- **Platform Admin Context:** Persist active admin-selected tenant context via `active_org_id` server cookie so tenant pages resolve a single active organization consistently.
+- **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
+- **Billing Status Visibility Strategy:** Show premium/plan/trial as read-only placeholders (`not integrated`) until billing schema and policy are finalized.
+- **Platform Admin Read Models:** Use DB-backed pagination/search and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **KB Sidebar Refresh:** Dispatch `knowledge-updated` on content create/update/delete and surface pending AI suggestions via a KB banner linked to Organization settings.
 - **KB Banner Styling:** Use an amber-toned banner for pending AI suggestion visibility in Knowledge Base.
@@ -452,6 +471,8 @@ MVP is successful when:
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
 - **Operator Extraction Toggle:** Default to pausing lead extraction during operator takeover, with an AI Settings toggle to keep it running.
 - **Human Escalation Policy:** Centralize escalation decisions in one policy layer with strict precedence `skill override > hot lead score`, where skill-triggered handover always sends the bot handover message and switches to operator.
+- **Operator Activity Resolution:** Use `active_agent` as the primary runtime switch for AI reply gating; treat `assignee_id` as ownership metadata (legacy fallback only when `active_agent` is missing).
+- **Extraction Language Resolution:** Lead extraction writes user-facing extracted outputs (summary + key detail values) in locale/customer language (TR/EN) instead of relying on English default prompts.
 - **Default Guardrail Scope (MVP):** Ship universal explicit-intent guardrail skills (human support, complaint, urgent, privacy) and keep low-confidence/no-safe-answer auto-handover out of scope.
 - **Default Guardrail Provisioning:** Seed localized default guardrail skills for organizations that have no skills on first Skills load; manage them in the same list as user-created skills.
 - **Handover Locale Repair:** When legacy/default values create EN text in both localized fields, normalize to TR default for `hot_lead_handover_message_tr` and EN default for `hot_lead_handover_message_en`.

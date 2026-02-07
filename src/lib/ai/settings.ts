@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import type {
     OrganizationAiSettings,
     AiMode,
@@ -208,6 +209,7 @@ async function getOrganizationIdForUser(supabase: any) {
 
 export async function updateOrgAiSettings(updates: Partial<OrganizationAiSettings>) {
     const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
     const member = await getOrganizationIdForUser(supabase)
 
     if (member.role !== 'owner' && member.role !== 'admin') {
