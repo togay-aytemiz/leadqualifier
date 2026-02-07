@@ -266,7 +266,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     <button
                         onClick={handleCreateNew}
                         disabled={isReadOnly}
-                        className="h-10 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
+                        className="h-10 bg-[#242A40] hover:bg-[#1B2033] text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
                     >
                         <Plus size={18} />
                         {t('create')}
@@ -343,7 +343,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                 <button
                                     onClick={handleSave}
                                     disabled={isReadOnly || !isDirty || isSaving}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 bg-[#242A40] text-white rounded-lg text-sm font-medium hover:bg-[#1B2033] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
                                 >
                                     {t('saveChanges')}
                                 </button>
@@ -476,7 +476,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                         </p>
                         <button
                             onClick={handleCreateNew}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
+                            className="bg-[#242A40] hover:bg-[#1B2033] text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
                         >
                             <Plus size={20} />
                             {t('createButton')}

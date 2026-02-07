@@ -80,7 +80,11 @@ export default function CreateContentPage() {
                         <Button variant="ghost" onClick={() => router.back()}>
                             {t('form.cancel')}
                         </Button>
-                        <Button onClick={handleSubmit} disabled={loading || !title.trim() || !content.trim()}>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={loading || !title.trim() || !content.trim()}
+                            className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
+                        >
                             {loading ? (
                                 t('form.saving')
                             ) : (

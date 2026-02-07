@@ -133,7 +133,11 @@ export function EditContentForm({
                             <Trash2 size={16} className="mr-2" />
                             {t('delete')}
                         </Button>
-                        <Button onClick={handleSubmit} disabled={saving || !isDirty || !title.trim() || !content.trim()}>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={saving || !isDirty || !title.trim() || !content.trim()}
+                            className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
+                        >
                             {saving ? (
                                 t('form.saving')
                             ) : (

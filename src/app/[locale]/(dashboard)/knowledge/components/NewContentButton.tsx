@@ -65,7 +65,7 @@ export function NewContentButton({ collectionId, className }: NewContentButtonPr
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
             <Popover.Trigger asChild>
-                <Button className={className}>
+                <Button className={cn('bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white', className)}>
                     <Plus size={16} className="mr-2" />
                     {t('newContent')}
                     <ChevronDown size={14} className="ml-1 opacity-70" />

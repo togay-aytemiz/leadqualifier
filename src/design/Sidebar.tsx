@@ -93,7 +93,7 @@ export function SidebarItem({ icon, iconColor, label, active, count, indicator, 
                 <span>{label}</span>
             </div>
             {indicator ? (
-                <span className="h-2 w-2 rounded-full bg-blue-500" aria-hidden />
+                <span className="h-2 w-2 rounded-full bg-[#242A40]" aria-hidden />
             ) : count !== undefined ? (
                 <span className="text-xs text-gray-400">{count}</span>
             ) : null}

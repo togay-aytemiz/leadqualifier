@@ -41,7 +41,11 @@ export function CreateFolderModal({ isOpen, onClose, onSubmit }: CreateFolderMod
                 />
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={onClose}>{t('cancel')}</Button>
-                    <Button onClick={handleSubmit} disabled={loading || !name.trim()}>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={loading || !name.trim()}
+                        className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
+                    >
                         {loading ? t('creating') : t('create')}
                     </Button>
                 </div>

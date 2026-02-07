@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-07 (locale-aware extraction outputs + active_agent-based AI reply gating fix)  
+> **Last Updated:** 2026-02-07 (sidebar + Skills/Knowledge CTA accent refresh; platform admin dashboard totals RPC optimization)  
 > **Status:** In Development
 
 ---
@@ -341,6 +341,9 @@ Customer Message → Skill Match? → Yes → Skill Response
   - User details page shows per-organization snapshots (usage/tokens/skills/knowledge + plan/premium/trial placeholders).
   - User list read-model uses lightweight organization identity lookup (no org metric fan-out).
   - User details read-model loads only requested profile + memberships + related organizations, then computes snapshots for those organizations.
+- **Admin Dashboard Totals (Read-Only):**
+  - Top stat cards (organizations/users/skills/knowledge/messages/tokens) are fetched via a single DB aggregate RPC.
+  - Dashboard avoids loading full organization summaries just to compute global totals.
 - **Deferred (Post-v1):**
   - Editable premium/trial/quota controls
   - Audit trail for platform-admin billing/plan actions
@@ -404,6 +407,8 @@ MVP is successful when:
 - **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
 - **Sidebar Spacing:** Add top padding between the header block and first navigation section for visual separation.
 - **Sidebar Icons:** Use per-item active/passive icon variants (react-icons) to differentiate selected states.
+- **Sidebar Accent Color:** Replace blue navigation accents with ink `#242A40` for sidebar active, indicator, and focus states.
+- **Skills/Knowledge CTA Accent:** Use ink `#242A40` for primary CTA buttons in Skills and Knowledge Base (create, save, and primary modal actions).
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
@@ -412,7 +417,7 @@ MVP is successful when:
 - **Platform Admin Context:** Persist active admin-selected tenant context via `active_org_id` server cookie so tenant pages resolve a single active organization consistently.
 - **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
 - **Billing Status Visibility Strategy:** Show premium/plan/trial as read-only placeholders (`not integrated`) until billing schema and policy are finalized.
-- **Platform Admin Read Models:** Use DB-backed pagination/search and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
+- **Platform Admin Read Models:** Use DB-backed pagination/search, aggregate RPC totals, and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **KB Sidebar Refresh:** Dispatch `knowledge-updated` on content create/update/delete and surface pending AI suggestions via a KB banner linked to Organization settings.
 - **KB Banner Styling:** Use an amber-toned banner for pending AI suggestion visibility in Knowledge Base.

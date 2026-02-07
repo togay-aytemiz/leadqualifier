@@ -74,6 +74,15 @@ export interface AdminUserListResult {
     totalPages: number
 }
 
+export interface AdminDashboardSummary {
+    organizationCount: number
+    userCount: number
+    skillCount: number
+    knowledgeDocumentCount: number
+    messageCount: number
+    totalTokenCount: number
+}
+
 function buildOrganizationMembershipLookup(organizations: OrganizationRow[]) {
     return new Map<string, OrganizationRow>(
         organizations.map((organization) => [organization.id, organization])
@@ -143,6 +152,12 @@ interface TokenUsageRow {
 }
 
 const EMPTY_COUNT_MAP = new Map<string, number>()
+
+function toNonNegativeInteger(value: unknown): number {
+    const normalized = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value)
+    if (!Number.isFinite(normalized)) return 0
+    return Math.max(0, Math.floor(normalized))
+}
 
 function chunkValues<T>(values: T[], chunkSize: number): T[][] {
     if (values.length === 0) return []
@@ -239,6 +254,51 @@ async function getProfiles(supabase: SupabaseClient): Promise<ProfileRow[]> {
     }
 
     return (data ?? []) as ProfileRow[]
+}
+
+async function getTableCount(
+    supabase: SupabaseClient,
+    tableName: 'organizations' | 'profiles' | 'skills' | 'knowledge_documents' | 'messages'
+): Promise<number> {
+    const { count, error } = await supabase
+        .from(tableName)
+        .select('id', { count: 'exact', head: true })
+
+    if (error) {
+        console.error(`Failed to count ${tableName} for admin read model:`, error)
+        return 0
+    }
+
+    return count ?? 0
+}
+
+async function getGlobalTokenTotalFallback(supabase: SupabaseClient): Promise<number> {
+    const pageSize = 1000
+    let offset = 0
+    let total = 0
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('organization_ai_usage')
+            .select('total_tokens')
+            .order('created_at', { ascending: true })
+            .range(offset, offset + pageSize - 1)
+
+        if (error) {
+            console.error('Failed to load token totals for dashboard fallback:', error)
+            return total
+        }
+
+        const rows = (data ?? []) as Array<{ total_tokens: number | null }>
+        for (const row of rows) {
+            total += row.total_tokens ?? 0
+        }
+
+        if (rows.length < pageSize) break
+        offset += pageSize
+    }
+
+    return total
 }
 
 async function getOrganizationsByIds(
@@ -546,6 +606,63 @@ async function buildUserSummariesFromProfiles(
             organizations: userOrganizations
         }
     })
+}
+
+async function getAdminDashboardSummaryFallback(
+    supabase: SupabaseClient
+): Promise<AdminDashboardSummary> {
+    const [organizationCount, userCount, skillCount, knowledgeDocumentCount, messageCount, totalTokenCount] = await Promise.all([
+        getTableCount(supabase, 'organizations'),
+        getTableCount(supabase, 'profiles'),
+        getTableCount(supabase, 'skills'),
+        getTableCount(supabase, 'knowledge_documents'),
+        getTableCount(supabase, 'messages'),
+        getGlobalTokenTotalFallback(supabase)
+    ])
+
+    return {
+        organizationCount,
+        userCount,
+        skillCount,
+        knowledgeDocumentCount,
+        messageCount,
+        totalTokenCount
+    }
+}
+
+export async function getAdminDashboardSummary(
+    supabaseOverride?: SupabaseClient
+): Promise<AdminDashboardSummary> {
+    const supabase = supabaseOverride ?? await createClient()
+
+    const { data, error } = await supabase
+        .rpc('get_admin_dashboard_totals')
+        .maybeSingle()
+
+    if (error || !data) {
+        if (error) {
+            console.error('Failed to load admin dashboard totals via RPC, using fallback:', error)
+        }
+        return getAdminDashboardSummaryFallback(supabase)
+    }
+
+    const row = data as {
+        organization_count?: unknown
+        user_count?: unknown
+        skill_count?: unknown
+        knowledge_document_count?: unknown
+        message_count?: unknown
+        total_token_count?: unknown
+    }
+
+    return {
+        organizationCount: toNonNegativeInteger(row.organization_count),
+        userCount: toNonNegativeInteger(row.user_count),
+        skillCount: toNonNegativeInteger(row.skill_count),
+        knowledgeDocumentCount: toNonNegativeInteger(row.knowledge_document_count),
+        messageCount: toNonNegativeInteger(row.message_count),
+        totalTokenCount: toNonNegativeInteger(row.total_token_count)
+    }
 }
 
 export async function getAdminOrganizationSummaries(

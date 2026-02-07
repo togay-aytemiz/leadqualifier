@@ -20,12 +20,12 @@
 - `--color-gray-800`: #1F2937
 - `--color-gray-900`: #111827
 
-### Primary (Blue)
-- `--color-primary-50`: #EFF6FF
-- `--color-primary-100`: #DBEAFE
-- `--color-primary-500`: #3B82F6
-- `--color-primary-600`: #2563EB
-- `--color-primary-700`: #1D4ED8
+### Primary (Ink)
+- `--color-primary-50`: #EEF0F5
+- `--color-primary-100`: #D7DBE6
+- `--color-primary-500`: #242A40
+- `--color-primary-600`: #1E2336
+- `--color-primary-700`: #171C2B
 
 ### Status
 - Success: Green-500 (#22C55E)
@@ -56,7 +56,7 @@
 - Width: 264px (expanded) / 76px (collapsed)
 - Background: slate-50/70
 - Border-right: 1px slate-200/80
-- Items: Icon + label; active uses primary blue pill
+- Items: Icon + label; active uses primary ink pill
 - Toggle: Netlify-style chip below the logo
 
 ### Sidebar
@@ -72,7 +72,7 @@
 - Border-bottom
 
 ### Button Variants
-- primary: bg-blue-500, text-white
+- primary: bg-primary-500, text-white
 - secondary: bg-white, border, text-gray-700
 - ghost: transparent, text-gray-600
 - outline: transparent, border, text-gray-700

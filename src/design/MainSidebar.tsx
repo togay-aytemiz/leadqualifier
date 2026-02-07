@@ -451,7 +451,7 @@ export function MainSidebar({
                         type="button"
                         onClick={() => setCollapsed(prev => !prev)}
                         className={cn(
-                            'inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200',
+                            'inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/20',
                             'motion-reduce:transition-none'
                         )}
                         aria-label={toggleLabel}
@@ -473,7 +473,7 @@ export function MainSidebar({
                             value={orgSearch}
                             onChange={(event) => setOrgSearch(event.target.value)}
                             placeholder={tSidebar('organizationSwitcherSearch')}
-                            className="mt-2 h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 outline-none ring-blue-200 transition focus:bg-white focus:ring-2"
+                            className="mt-2 h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 outline-none ring-[#242A40]/20 transition focus:bg-white focus:ring-2"
                         />
                         <div className="mt-2 max-h-32 space-y-1 overflow-auto pr-1">
                             {filteredOrganizations.map((organization) => {
@@ -487,7 +487,7 @@ export function MainSidebar({
                                         className={cn(
                                             'w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors',
                                             isActive
-                                                ? 'bg-blue-50 text-blue-700'
+                                                ? 'bg-[#242A40]/10 text-[#242A40]'
                                                 : 'text-slate-700 hover:bg-slate-100',
                                             (isSwitchingOrg || isActive) && 'cursor-not-allowed opacity-80'
                                         )}
@@ -585,7 +585,7 @@ export function MainSidebar({
                                                     ? 'mx-auto h-11 w-11 justify-center gap-0'
                                                     : 'w-full gap-3 px-3 py-2',
                                                 isActive
-                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    ? 'bg-[#242A40] text-white shadow-sm'
                                                     : 'text-slate-600 hover:bg-white hover:text-slate-900'
                                             )}
                                         >
@@ -598,7 +598,7 @@ export function MainSidebar({
                                                     )}
                                                 />
                                                 {showUnread && collapsed && (
-                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-slate-50" />
+                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
                                                 )}
                                             </span>
                                             <span
@@ -615,7 +615,7 @@ export function MainSidebar({
                                                 <span
                                                     className={cn(
                                                         'ml-auto h-2 w-2 rounded-full ring-2',
-                                                        isActive ? 'bg-white ring-blue-200' : 'bg-blue-500 ring-white'
+                                                        isActive ? 'bg-white ring-[#242A40]/25' : 'bg-[#242A40] ring-white'
                                                     )}
                                                 />
                                             )}
@@ -658,7 +658,7 @@ export function MainSidebar({
                                                     ? 'mx-auto h-11 w-11 justify-center gap-0'
                                                     : 'w-full gap-3 px-3 py-2',
                                                 isActive
-                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    ? 'bg-[#242A40] text-white shadow-sm'
                                                     : 'text-slate-600 hover:bg-white hover:text-slate-900'
                                             )}
                                         >
@@ -671,7 +671,7 @@ export function MainSidebar({
                                                     )}
                                                 />
                                                 {showPending && collapsed && (
-                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-slate-50" />
+                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
                                                 )}
                                             </span>
                                             <span
@@ -688,7 +688,7 @@ export function MainSidebar({
                                                 <span
                                                     className={cn(
                                                         'ml-auto h-2 w-2 rounded-full ring-2',
-                                                        isActive ? 'bg-white ring-blue-200' : 'bg-blue-500 ring-white'
+                                                        isActive ? 'bg-white ring-[#242A40]/25' : 'bg-[#242A40] ring-white'
                                                     )}
                                                 />
                                             )}

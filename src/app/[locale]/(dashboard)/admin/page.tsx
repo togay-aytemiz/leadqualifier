@@ -3,23 +3,14 @@ import { StatCard, PageHeader } from '@/design'
 import { Link } from '@/i18n/navigation'
 import { Activity, Building2, Database, Sparkles, Users } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
-import { getAdminOrganizationSummaries, getAdminUserCount } from '@/lib/admin/read-models'
+import { getAdminDashboardSummary } from '@/lib/admin/read-models'
 
 export default async function AdminPage() {
     const locale = await getLocale()
     const t = await getTranslations('admin')
     const { supabase } = await requireSystemAdmin(locale)
+    const summary = await getAdminDashboardSummary(supabase)
 
-    const [organizationSummaries, userCount] = await Promise.all([
-        getAdminOrganizationSummaries(supabase),
-        getAdminUserCount(supabase)
-    ])
-
-    const orgCount = organizationSummaries.length
-    const skillCount = organizationSummaries.reduce((total, organization) => total + organization.skillCount, 0)
-    const knowledgeCount = organizationSummaries.reduce((total, organization) => total + organization.knowledgeDocumentCount, 0)
-    const messageCount = organizationSummaries.reduce((total, organization) => total + organization.totalMessageCount, 0)
-    const totalTokens = organizationSummaries.reduce((total, organization) => total + organization.totalTokenCount, 0)
     const formatter = new Intl.NumberFormat(locale)
 
     return (
@@ -38,37 +29,37 @@ export default async function AdminPage() {
                             icon={Building2}
                             iconColor="purple"
                             title={t('stats.organizations')}
-                            value={formatter.format(orgCount)}
+                            value={formatter.format(summary.organizationCount)}
                         />
                         <StatCard
                             icon={Users}
                             iconColor="blue"
                             title={t('stats.users')}
-                            value={formatter.format(userCount)}
+                            value={formatter.format(summary.userCount)}
                         />
                         <StatCard
                             icon={Sparkles}
                             iconColor="green"
                             title={t('stats.skills')}
-                            value={formatter.format(skillCount)}
+                            value={formatter.format(summary.skillCount)}
                         />
                         <StatCard
                             icon={Database}
                             iconColor="orange"
                             title={t('stats.knowledge')}
-                            value={formatter.format(knowledgeCount)}
+                            value={formatter.format(summary.knowledgeDocumentCount)}
                         />
                         <StatCard
                             icon={Activity}
                             iconColor="red"
                             title={t('stats.messages')}
-                            value={formatter.format(messageCount)}
+                            value={formatter.format(summary.messageCount)}
                         />
                         <StatCard
                             icon={Sparkles}
                             iconColor="purple"
                             title={t('stats.tokens')}
-                            value={formatter.format(totalTokens)}
+                            value={formatter.format(summary.totalTokenCount)}
                         />
                     </div>
 

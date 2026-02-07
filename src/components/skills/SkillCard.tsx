@@ -78,6 +78,7 @@ export function SkillCard({ skill }: SkillCardProps) {
                         disabled={isPending}
                         variant={skill.enabled ? 'secondary' : 'primary'}
                         size="sm"
+                        className={!skill.enabled ? 'bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white' : undefined}
                     >
                         {skill.enabled ? tc('disable') : tc('enable')}
                     </Button>

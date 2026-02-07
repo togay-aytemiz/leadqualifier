@@ -195,7 +195,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                                     className={cn(
                                         "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md cursor-pointer truncate",
                                         file.id === currentFileId
-                                            ? "bg-blue-50/70 text-blue-700"
+                                            ? "bg-[#242A40]/10 text-[#242A40]"
                                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
                                     )}
                                     onClick={() => router.push(`/knowledge/${file.id}`)}
@@ -209,7 +209,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                             <button
                                 type="button"
                                 onClick={() => setShowAllUncategorized((prev) => !prev)}
-                                className="mt-1 ml-3 text-xs text-blue-600 hover:text-blue-700"
+                                className="mt-1 ml-3 text-xs text-[#242A40] hover:text-[#1B2033]"
                             >
                                 {showAllUncategorized
                                     ? t('showLess')
@@ -229,7 +229,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                                 className={cn(
                                     "group flex items-center justify-between px-3 py-2 rounded-md text-sm cursor-pointer transition-colors",
                                     currentCollectionId === col.id
-                                        ? "bg-blue-50/50 text-blue-700 font-medium"
+                                        ? "bg-[#242A40]/10 text-[#242A40] font-medium"
                                         : "text-gray-700 hover:bg-gray-100"
                                 )}
                                 onClick={() => router.push(`/knowledge?collectionId=${col.id}`)}
@@ -241,7 +241,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                                     >
                                         {expanded[col.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                     </div>
-                                    <Folder size={16} className={cn("shrink-0", currentCollectionId === col.id ? "text-blue-500" : "text-yellow-500")} />
+                                    <Folder size={16} className={cn("shrink-0", currentCollectionId === col.id ? "text-[#242A40]" : "text-yellow-500")} />
                                     <span className="truncate">{col.name}</span>
                                     <span className="text-xs text-gray-400 ml-1">({col.count})</span>
                                 </div>
@@ -266,7 +266,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                                             className={cn(
                                                 "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer truncate",
                                                 file.id === currentFileId
-                                                    ? "bg-blue-50/70 text-blue-700"
+                                                    ? "bg-[#242A40]/10 text-[#242A40]"
                                                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                                             )}
                                             onClick={() => router.push(`/knowledge/${file.id}`)}

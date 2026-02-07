@@ -50,7 +50,11 @@ export function CreateContentModal({ isOpen, onClose, onSubmit }: CreateContentM
                 />
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={onClose}>{t('form.cancel')}</Button>
-                    <Button onClick={handleSubmit} disabled={loading || !title.trim() || !content.trim()}>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={loading || !title.trim() || !content.trim()}
+                        className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
+                    >
                         {loading ? t('form.saving') : t('form.save')}
                     </Button>
                 </div>

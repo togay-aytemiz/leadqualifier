@@ -152,6 +152,7 @@ export function SkillForm({ organizationId, skill }: SkillFormProps) {
                 <Button
                     type="submit"
                     disabled={isSubmitting}
+                    className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
                 >
                     {isSubmitting ? tc('loading') : tc('save')}
                 </Button>

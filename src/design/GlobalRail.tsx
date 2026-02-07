@@ -92,7 +92,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                             className={cn(
                                 "h-10 w-full rounded-lg flex items-center justify-center cursor-pointer transition-colors",
                                 isActive
-                                    ? "bg-blue-50 text-blue-600"
+                                    ? "bg-[#242A40] text-white"
                                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                             )}
                             title={item.label}
@@ -110,7 +110,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                     className={cn(
                         "h-10 w-full rounded-lg flex items-center justify-center cursor-pointer transition-colors",
                         isSettingsActive
-                            ? "bg-blue-50 text-blue-600"
+                            ? "bg-[#242A40] text-white"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                     )}
                     title={t('settings')}
@@ -120,7 +120,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
 
                 <div className="relative group">
                     <button
-                        className="h-8 w-8 rounded-full bg-gray-200 mx-auto flex items-center justify-center text-xs font-medium text-gray-600 hover:ring-2 hover:ring-blue-100 transition-all outline-none"
+                        className="h-8 w-8 rounded-full bg-gray-200 mx-auto flex items-center justify-center text-xs font-medium text-gray-600 hover:ring-2 hover:ring-[#242A40]/15 transition-all outline-none"
                         title={userName}
                     >
                         {(userName?.[0] || tc('defaultUserInitial')).toUpperCase()}

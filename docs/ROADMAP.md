@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-07 (locale-aware lead extraction outputs + active_agent-based AI reply gating fix)  
+> **Last Updated:** 2026-02-07 (sidebar + Skills/Knowledge CTA accent refresh to #242A40; admin dashboard totals RPC optimization)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -105,6 +105,7 @@
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
+  - [x] Skills and Knowledge Base primary CTA buttons now use `#242A40` accent styling
 - [x] **Navigation Shell**
   - [x] Crisp-inspired main sidebar with collapse toggle and persisted state
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
@@ -113,6 +114,7 @@
   - [x] Eyebrow section labels for grouped navigation
   - [x] Increased spacing between header and first sidebar section
   - [x] Sidebar nav icons use active/passive variants per item
+  - [x] Sidebar accent and active-state color updated from blue to `#242A40`
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
@@ -344,6 +346,7 @@
   - [x] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
   - [x] Add premium/trial status visibility and plan cycle/status visibility (placeholder: not integrated)
   - [x] Add search + pagination for admin organization and user lists
+  - [x] Compute admin dashboard stat cards via DB-side aggregate RPC (avoid full org summary scan on dashboard load)
   - [x] Move organization list search/pagination to DB-level count + range queries (no in-memory full-list slicing)
   - [x] Batch organization metric aggregation to avoid per-organization N+1 read fan-out
   - [x] Load organization detail profile layer with targeted org/member/profile queries (no full-table scans)

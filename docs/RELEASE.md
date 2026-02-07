@@ -44,6 +44,7 @@
 - Hot-lead `notify_only` escalation now preserves ongoing AI replies as intended (only `switch_to_operator` silences AI).
 - Supabase migration version collision: renamed `00020_send_operator_message_rpc.sql` to `00052_send_operator_message_rpc.sql` so `schema_migrations.version` is unique.
 - i18n hardcoded-string violations for simulator platform fallback labels in Inbox/Leads and static summary panel id attribute usage.
+- Platform admin dashboard stat cards now use a single DB aggregate RPC instead of loading full organization summaries for global totals.
 - Platform admin organization list now avoids in-memory full-list filtering/pagination by using DB-backed count + ranged queries.
 - Platform admin organization aggregates now use batched reads instead of per-organization N+1 fan-out, and organization detail now loads targeted org/member/profile slices.
 - Platform admin user list no longer triggers heavy organization summary aggregation; it now uses lightweight org identity lookups.
@@ -168,6 +169,8 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Sidebar navigation accent palette now uses ink `#242A40` (replacing blue) for active pills, indicators, and focus rings in `MainSidebar`, `GlobalRail`, and `KnowledgeSidebar`.
+- Skills and Knowledge Base primary CTA buttons now use ink `#242A40` (replacing blue) across create/save actions, including modal and empty-state CTAs.
 - Settings page headers now reuse settings sidebar labels for title parity (AI and General pages).
 - Skill matching context now uses title-aware embeddings instead of trigger-only embeddings.
 - Skills empty-state icon now uses the same icon family/glyph as the sidebar Skills navigation item for visual consistency.
