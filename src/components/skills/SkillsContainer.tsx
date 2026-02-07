@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
-import { ConfirmDialog, Badge } from '@/design/primitives'
+import { Badge, ConfirmDialog } from '@/design/primitives'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
-import { Plus, Trash2, TriangleAlert } from 'lucide-react'
-import { IoSparklesOutline } from 'react-icons/io5'
+import { Plus, Trash2 } from 'lucide-react'
+import { HiOutlineSparkles } from 'react-icons/hi2'
 
 import { useTranslations } from 'next-intl'
 import { useLocale } from 'next-intl'
@@ -106,20 +106,6 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         // User asked for specific "Save" behavior, so switching discards changes naturally in this pattern
         setSelectedSkillId(id)
         setIsCreating(false)
-    }
-
-    const handleToggleSkill = async (e: React.MouseEvent, skill: Skill) => {
-        e.stopPropagation()
-        try {
-            await toggleSkill(skill.id, !skill.enabled)
-            router.refresh()
-            // Optimistic update
-            setSkills(prev => prev.map(s =>
-                s.id === skill.id ? { ...s, enabled: !s.enabled } : s
-            ))
-        } catch (error) {
-            console.error('Failed to toggle skill', error)
-        }
     }
 
     const handleArchiveToggle = async () => {
@@ -255,7 +241,6 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     const selectedSkill = skills.find(s => s.id === selectedSkillId)
     const showForm = isCreating || selectedSkill
 
-    const [activeTab, setActiveTab] = useState<'core' | 'custom'>('custom')
     const aiSettingsDeepLink = locale === 'tr'
         ? '/settings/ai?focus=human-escalation&field=handover-message#human-escalation'
         : `/${locale}/settings/ai?focus=human-escalation&field=handover-message#human-escalation`
@@ -284,245 +269,198 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     <ClientSearchInput placeholder={t('searchPlaceholder')} />
                 </div>
 
-                {/* Tabs inside Left Panel */}
-                <div className="flex px-6 border-b border-gray-100 bg-white sticky top-0 z-10 shrink-0">
-                    <button
-                        onClick={() => setActiveTab('core')}
-                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors text-center ${activeTab === 'core'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-                            }`}
-                    >
-                        {t('tabs.core')}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('custom')}
-                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors text-center ${activeTab === 'custom'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-                            }`}
-                    >
-                        {t('tabs.custom')}
-                    </button>
-                </div>
-
                 <div className="flex-1 overflow-y-auto">
-                    {activeTab === 'core' ? (
-                        /* Core Skills - Empty */
-                        <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
-                            <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center mb-3">
-                                <IoSparklesOutline size={24} />
-                            </div>
-                            <h3 className="text-sm font-bold text-gray-900 mb-1">{t('core.emptyTitle')}</h3>
-                            <p className="text-gray-500 text-xs max-w-[200px]">
-                                {t('core.emptyDesc')}
-                            </p>
+                    {skills.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 text-sm">
+                            {t('noSkills')}
                         </div>
                     ) : (
-                        /* Custom Skills List */
-                        <>
-                            {skills.length === 0 ? (
-                                <div className="p-8 text-center text-gray-500 text-sm">
-                                    {t('noSkills')}
+                        <div>
+                            {skills.map(skill => (
+                                <div
+                                    key={skill.id}
+                                    onClick={() => handleSelectSkill(skill.id)}
+                                    className={`px-6 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedSkillId === skill.id ? "bg-blue-50/40" : ""
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-base font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
+                                            {skill.title}
+                                        </span>
+                                        <Badge variant={skill.enabled ? 'success' : 'neutral'}>
+                                            {skill.enabled ? tc('enabled') : tc('disabled')}
+                                        </Badge>
+                                    </div>
+                                    {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
                                 </div>
-                            ) : (
-                                <div>
-                                    {skills.map(skill => (
-                                        <div
-                                            key={skill.id}
-                                            onClick={() => handleSelectSkill(skill.id)}
-                                            className={`px-6 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedSkillId === skill.id ? "bg-blue-50/40" : ""
-                                                }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className={`text-base font-medium ${selectedSkillId === skill.id ? "text-blue-700" : "text-gray-900"}`}>
-                                                    {skill.title}
-                                                </span>
-                                                <Badge variant={skill.enabled ? 'success' : 'neutral'}>
-                                                    {skill.enabled ? tc('enabled') : tc('disabled')}
-                                                </Badge>
-                                            </div>
-                                            {selectedSkillId === skill.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </>
+                            ))}
+                        </div>
                     )}
                 </div>
             </div>
 
             {/* Right Panel - Detail/Form (66%) */}
             <div className="flex-1 flex flex-col bg-white overflow-hidden relative border-l border-gray-200 -ml-px">
-                {activeTab === 'core' ? (
-                    /* Empty Right Panel for Core */
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/30">
-                        <p className="text-gray-400 text-sm">{t('core.selectPrompt')}</p>
-                    </div>
-                ) : (
-                    <>
-                        {showForm ? (
-                            <div className="flex flex-col h-full bg-white">
-                                {/* Header */}
-                                <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
-                                    <h3 className="font-bold text-gray-900 text-xl">
-                                        {isCreating ? t('newSkill') : t('editSkill')}
-                                    </h3>
-                                    <div className="flex gap-3">
-                                        {!isCreating && (
-                                            <>
-                                                <button
-                                                    onClick={handleArchiveToggle}
-                                                    className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
-                                                >
-                                                    {selectedSkill?.enabled ? t('archive') : t('activate')}
-                                                </button>
-                                                <button
-                                                    onClick={() => setShowDeleteConfirm(true)}
-                                                    className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
-                                                >
-                                                    {t('delete')}
-                                                </button>
-                                            </>
-                                        )}
+                {showForm ? (
+                    <div className="flex flex-col h-full bg-white">
+                        {/* Header */}
+                        <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
+                            <h3 className="font-bold text-gray-900 text-xl">
+                                {isCreating ? t('newSkill') : t('editSkill')}
+                            </h3>
+                            <div className="flex gap-3">
+                                {!isCreating && (
+                                    <>
                                         <button
-                                            onClick={handleSave}
-                                            disabled={!isDirty || isSaving}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
+                                            onClick={handleArchiveToggle}
+                                            className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
                                         >
-                                            {t('saveChanges')}
+                                            {selectedSkill?.enabled ? t('archive') : t('activate')}
                                         </button>
-                                    </div>
-                                </div>
-
-                                {/* Form Content */}
-                                <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                                    {validationError && (
-                                        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
-                                            {validationError}
-                                        </div>
-                                    )}
-                                    {/* Skill Name */}
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                            {t('nameLabel')}
-                                        </label>
-                                        <input
-                                            value={formData.title}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                            placeholder={t('namePlaceholder')}
-                                            className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                                        />
-                                    </div>
-
-                                    {/* Triggers */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                                {t('triggersLabel')} {formData.triggers.length}/10
-                                            </label>
-                                            <span className="text-xs text-gray-400">{t('triggersHint')}</span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {formData.triggers.map((trigger, idx) => (
-                                                <div key={idx} className="flex gap-2 items-center">
-                                                    <input
-                                                        value={trigger}
-                                                        onChange={(e) => handleTriggerChange(idx, e.target.value)}
-                                                        placeholder={idx < 3 ? t('triggerPlaceholderMandatory') : t('triggerPlaceholderOptional')}
-                                                        className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
-                                                            }`}
-                                                    />
-                                                    {idx >= 3 && (
-                                                        <button
-                                                            onClick={() => handleRemoveTrigger(idx)}
-                                                            className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title={t('removeTrigger')}
-                                                        >
-                                                            <Trash2 size={20} className="font-light" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {formData.triggers.length < 10 && (
-                                            <button
-                                                onClick={handleAddTrigger}
-                                                className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
-                                            >
-                                                <Plus size={16} />
-                                                {t('addTrigger')}
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* Response Text */}
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                            {t('responseLabel')}
-                                        </label>
-                                        <textarea
-                                            value={formData.response_text}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
-                                            placeholder={t('responsePlaceholder')}
-                                            className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.requires_human_handover}
-                                                onChange={(event) => setFormData(prev => ({
-                                                    ...prev,
-                                                    requires_human_handover: event.target.checked
-                                                }))}
-                                            />
-                                            {t('requiresHumanHandover')}
-                                        </label>
-
-                                        {formData.requires_human_handover && (
-                                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-                                                <p className="text-xs font-semibold text-amber-800 tracking-wider">
-                                                    {t('customerNoticeReadonlyLabel')}
-                                                </p>
-                                                <p className="text-sm text-amber-900">
-                                                    {handoverMessage}
-                                                </p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => router.push(aiSettingsDeepLink)}
-                                                    className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
-                                                >
-                                                    {t('editHandoverMessageInAiSettings')}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Delete Confirmation: Replaced by global ConfirmDialog below */}
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
-                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                    <IoSparklesOutline className="text-gray-400" size={32} />
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-2">{t('noSelection')}</h3>
-                                <p className="text-gray-500 text-sm max-w-xs mb-6">
-                                    {t('noSelectionDesc')}
-                                </p>
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(true)}
+                                            className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            {t('delete')}
+                                        </button>
+                                    </>
+                                )}
                                 <button
-                                    onClick={handleCreateNew}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
+                                    onClick={handleSave}
+                                    disabled={!isDirty || isSaving}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
                                 >
-                                    <Plus size={20} />
-                                    {t('createButton')}
+                                    {t('saveChanges')}
                                 </button>
                             </div>
-                        )}
-                    </>
+                        </div>
+
+                        {/* Form Content */}
+                        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                            {validationError && (
+                                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
+                                    {validationError}
+                                </div>
+                            )}
+                            {/* Skill Name */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                    {t('nameLabel')}
+                                </label>
+                                <input
+                                    value={formData.title}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                                    placeholder={t('namePlaceholder')}
+                                    className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                                />
+                            </div>
+
+                            {/* Triggers */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                        {t('triggersLabel')} {formData.triggers.length}/10
+                                    </label>
+                                    <span className="text-xs text-gray-400">{t('triggersHint')}</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {formData.triggers.map((trigger, idx) => (
+                                        <div key={idx} className="flex gap-2 items-center">
+                                            <input
+                                                value={trigger}
+                                                onChange={(e) => handleTriggerChange(idx, e.target.value)}
+                                                placeholder={idx < 3 ? t('triggerPlaceholderMandatory') : t('triggerPlaceholderOptional')}
+                                                className={`flex-1 h-[42px] px-4 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm ${idx < 3 && !trigger && isDirty ? 'border-red-300 bg-red-50/10' : 'border-gray-300'
+                                                    }`}
+                                            />
+                                            {idx >= 3 && (
+                                                <button
+                                                    onClick={() => handleRemoveTrigger(idx)}
+                                                    className="h-[42px] w-[42px] flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title={t('removeTrigger')}
+                                                >
+                                                    <Trash2 size={20} className="font-light" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                {formData.triggers.length < 10 && (
+                                    <button
+                                        onClick={handleAddTrigger}
+                                        className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1 mt-2"
+                                    >
+                                        <Plus size={16} />
+                                        {t('addTrigger')}
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Response Text */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                    {t('responseLabel')}
+                                </label>
+                                <textarea
+                                    value={formData.response_text}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, response_text: e.target.value }))}
+                                    placeholder={t('responsePlaceholder')}
+                                    className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-sm text-gray-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.requires_human_handover}
+                                        onChange={(event) => setFormData(prev => ({
+                                            ...prev,
+                                            requires_human_handover: event.target.checked
+                                        }))}
+                                    />
+                                    {t('requiresHumanHandover')}
+                                </label>
+
+                                {formData.requires_human_handover && (
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                                        <p className="text-xs font-semibold text-amber-800 tracking-wider">
+                                            {t('customerNoticeReadonlyLabel')}
+                                        </p>
+                                        <p className="text-sm text-amber-900">
+                                            {handoverMessage}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => router.push(aiSettingsDeepLink)}
+                                            className="text-sm font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2"
+                                        >
+                                            {t('editHandoverMessageInAiSettings')}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Delete Confirmation: Replaced by global ConfirmDialog below */}
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                            <HiOutlineSparkles className="text-gray-400" size={32} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{t('noSelection')}</h3>
+                        <p className="text-gray-500 text-sm max-w-xs mb-6">
+                            {t('noSelectionDesc')}
+                        </p>
+                        <button
+                            onClick={handleCreateNew}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-colors shadow-sm"
+                        >
+                            <Plus size={20} />
+                            {t('createButton')}
+                        </button>
+                    </div>
                 )}
             </div>
 

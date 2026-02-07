@@ -135,16 +135,7 @@
             "genericError": "Something went wrong. Please try again."
         },
         "noOrganization": "No Organization Found",
-        "noOrganizationDesc": "You need to be part of an organization to manage skills.",
-        "tabs": {
-            "core": "Core Skills",
-            "custom": "Custom Skills"
-        },
-        "core": {
-            "emptyTitle": "Core Skills Coming Soon",
-            "emptyDesc": "Pre-built skills for your business will appear here.",
-            "selectPrompt": "Select a core skill to view details"
-        }
+        "noOrganizationDesc": "You need to be part of an organization to manage skills."
     },
     "nav": {
         "dashboard": "Dashboard",

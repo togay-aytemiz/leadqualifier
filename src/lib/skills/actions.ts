@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
+import { buildDefaultSystemSkills } from '@/lib/skills/default-system-skills'
 import {
     appendOfferingProfileSuggestion,
     appendRequiredIntakeFields,
@@ -12,10 +13,15 @@ import {
 /**
  * Get all skills for an organization
  */
-export async function getSkills(organizationId: string, search?: string): Promise<Skill[]> {
+export async function getSkills(organizationId: string, search?: string, locale?: string): Promise<Skill[]> {
     const supabase = await createClient()
 
     console.log(`getSkills called for org ${organizationId} with search: "${search}"`)
+
+    if (!search?.trim()) {
+        await ensureDefaultSystemSkills(supabase, organizationId, locale)
+        await ensureSkillEmbeddingsForOrg(supabase, organizationId)
+    }
 
     let query = supabase
         .from('skills')
@@ -194,6 +200,93 @@ export async function deleteSkill(skillId: string): Promise<void> {
  */
 export async function toggleSkill(skillId: string, enabled: boolean): Promise<Skill> {
     return updateSkill(skillId, { enabled })
+}
+
+type SkillsClient = Awaited<ReturnType<typeof createClient>>
+
+async function ensureDefaultSystemSkills(
+    supabase: SkillsClient,
+    organizationId: string,
+    locale?: string
+): Promise<void> {
+    const { count, error: countError } = await supabase
+        .from('skills')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+
+    if (countError) {
+        console.error('Failed to check skill count for default seeding:', countError)
+        return
+    }
+
+    if ((count ?? 0) > 0) return
+
+    const defaultSkills = buildDefaultSystemSkills(organizationId, locale)
+    const { data, error: insertError } = await supabase
+        .from('skills')
+        .insert(defaultSkills)
+        .select('id, trigger_examples')
+
+    if (insertError) {
+        console.error('Failed to seed default system skills:', insertError)
+        return
+    }
+
+    await Promise.all(
+        (data ?? []).map((skill) =>
+            generateAndStoreEmbeddings(skill.id, skill.trigger_examples ?? [])
+        )
+    )
+}
+
+async function ensureSkillEmbeddingsForOrg(
+    supabase: SkillsClient,
+    organizationId: string
+): Promise<void> {
+    const { data: skills, error: skillsError } = await supabase
+        .from('skills')
+        .select('id, trigger_examples')
+        .eq('organization_id', organizationId)
+
+    if (skillsError) {
+        console.error('Failed to load skills for embedding backfill:', skillsError)
+        return
+    }
+
+    const rows = skills ?? []
+    if (rows.length === 0) return
+
+    const skillIds = rows.map((skill) => skill.id)
+
+    const { data: embeddings, error: embeddingsError } = await supabase
+        .from('skill_embeddings')
+        .select('skill_id')
+        .in('skill_id', skillIds)
+
+    if (embeddingsError) {
+        console.error('Failed to load skill embeddings for backfill:', embeddingsError)
+        return
+    }
+
+    const counts = new Map<string, number>()
+    for (const row of embeddings ?? []) {
+        counts.set(row.skill_id, (counts.get(row.skill_id) ?? 0) + 1)
+    }
+
+    const missing = rows.filter((skill) => {
+        const triggerCount = skill.trigger_examples?.length ?? 0
+        const embeddingCount = counts.get(skill.id) ?? 0
+        return triggerCount > 0 && embeddingCount < triggerCount
+    })
+
+    for (const skill of missing) {
+        const { error } = await supabase.from('skill_embeddings').delete().eq('skill_id', skill.id)
+        if (error) {
+            console.error('Failed to clear stale skill embeddings before backfill:', error)
+            continue
+        }
+        await generateAndStoreEmbeddings(skill.id, skill.trigger_examples ?? [])
+    }
 }
 
 /**

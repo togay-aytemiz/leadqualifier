@@ -135,16 +135,7 @@
             "genericError": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
         },
         "noOrganization": "Organizasyon Bulunamadı",
-        "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyonun parçası olmalısınız.",
-        "tabs": {
-            "core": "Temel Yetenekler",
-            "custom": "Özel Yetenekler"
-        },
-        "core": {
-            "emptyTitle": "Temel Yetenekler Çok Yakında",
-            "emptyDesc": "İşletmeniz için hazır yetenekler burada görünecektir.",
-            "selectPrompt": "Detayları görmek için bir temel yetenek seçin"
-        }
+        "noOrganizationDesc": "Yetenekleri yönetmek için bir organizasyonun parçası olmalısınız."
     },
     "nav": {
         "dashboard": "Panel",

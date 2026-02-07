@@ -41,7 +41,7 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
     if (organizationId) {
         try {
             const [skillsResult, aiSettings] = await Promise.all([
-                getSkills(organizationId, query),
+                getSkills(organizationId, query, locale),
                 getOrgAiSettings(organizationId, { supabase })
             ])
             skills = skillsResult

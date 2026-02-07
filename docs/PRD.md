@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-07 (human escalation bot message terminology update)  
+> **Last Updated:** 2026-02-07 (skills UI icon parity update)  
 > **Status:** In Development
 
 ---
@@ -216,6 +216,31 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ---
 
+### 4.7 Default System Guardrail Skills (Implemented)
+
+**Goal:** provide safe day-1 behavior for every organization without requiring setup.
+
+**Default skills (enabled for all orgs):**
+- Human support request (`requires_human_handover = true`)
+- Complaint / dissatisfaction (`requires_human_handover = true`)
+- Urgent / critical request (`requires_human_handover = true`)
+- Privacy / consent / deletion request (`requires_human_handover = true`)
+
+**Provisioning behavior:**
+- Default guardrail skills are seeded automatically when an organization first loads Skills and has no skills yet.
+- Skills appear in the same unified list as user-created skills (no Core/Custom split).
+
+**Message behavior:**
+- Each guardrail skill uses a dedicated localized bot message (TR/EN).
+- Guardrail skills escalate via existing skill handover policy (`switch_to_operator`).
+
+**Important scope decision (MVP):**
+- Do not apply low-confidence automatic handover.
+- Do not apply "no safe KB answer" automatic handover.
+- Ambiguous/general requests continue to route through existing `Skill -> KB -> fallback`.
+
+---
+
 ## 5. Admin Panel
 
 ### 5.1 Lead List (Planned)
@@ -227,6 +252,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - CRUD operations
 - Enable/disable toggle
 - `Requires Human Handover` toggle with read-only bot message preview and AI Settings deep-link
+- Skills screen uses a single unified list (no Core/Custom tab split); default and user-added skills are managed together
 - No per-skill playground yet (use Simulator for end-to-end testing)
 
 ### 5.3 Knowledge Base (Implemented)
@@ -254,6 +280,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Bot mode and escalation card titles align to section-title scale, with one-step smaller description text for tighter visual hierarchy
 - Human Escalation section: two-step flow (automatic escalation + skill handover), hot lead threshold slider, escalation action cards, and locale-aware editable handover message
 - Handover notice terminology in UI uses "Bot message" / "Bot mesajı" (replaces "Assistant's Promise" / "Asistan Sözü")
+- Low-confidence automatic handover is intentionally disabled in MVP; explicit guardrail skills and existing KB/fallback flow are used instead
 - Sensitivity slider now mirrors threshold semantics visually with right-side (`>=`) highlight and blue styling aligned to the hot lead score control
 - Skill and KB matching threshold checks use inclusive comparison (`similarity >= threshold`) to align runtime behavior with UI semantics
 - Prompt textarea defaults are locale-aware (TR UI shows Turkish default prompt when stored value is legacy/default English prompt text, including older long EN default variants)
@@ -392,10 +419,14 @@ MVP is successful when:
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
-- **Skills UI Layout:** Place skills search above tabs and keep the add CTA visible in the list header.
+- **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.
+- **Skills Icon Consistency:** Reuse the sidebar Skills icon in the Skills empty-state panel for visual consistency.
+- **Skills Embedding Backfill:** When skills exist without embeddings (e.g., manual SQL inserts), regenerate missing skill embeddings on skills load to restore semantic matching.
 - **Lead Extraction Trigger:** Run extraction asynchronously on every new customer message to keep the lead snapshot current.
 - **Operator Extraction Toggle:** Default to pausing lead extraction during operator takeover, with an AI Settings toggle to keep it running.
 - **Human Escalation Policy:** Centralize escalation decisions in one policy layer with strict precedence `skill override > hot lead score`, where skill-triggered handover always sends the bot handover message and switches to operator.
+- **Default Guardrail Scope (MVP):** Ship universal explicit-intent guardrail skills (human support, complaint, urgent, privacy) and keep low-confidence/no-safe-answer auto-handover out of scope.
+- **Default Guardrail Provisioning:** Seed localized default guardrail skills for organizations that have no skills on first Skills load; manage them in the same list as user-created skills.
 - **Handover Locale Repair:** When legacy/default values create EN text in both localized fields, normalize to TR default for `hot_lead_handover_message_tr` and EN default for `hot_lead_handover_message_en`.
 - **Prompt Locale Repair:** When stored prompt is a known default family (EN/TR), including legacy long EN default variants and legacy strict fallback text, normalize to the active UI locale default prompt in settings.
 - **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.

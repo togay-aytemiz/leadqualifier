@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-07 (human escalation bot message terminology update)  
+> **Last Updated:** 2026-02-07 (skills icon parity update)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -178,6 +178,13 @@
   - [x] Skill-level `Requires Human Handover` toggle with read-only message preview
   - [x] Centralized escalation policy with precedence: skill override > hot lead score
   - [x] Locale-aware handover message repair so TR UI no longer displays EN default text
+- [x] **Default System Guardrail Skills (MVP)**
+  - [x] Human support request skill (`requires_human_handover=true`)
+  - [x] Complaint / dissatisfaction skill (`requires_human_handover=true`)
+  - [x] Urgent / critical request skill (`requires_human_handover=true`)
+  - [x] Privacy / consent / deletion request skill (`requires_human_handover=true`)
+  - [x] Dedicated localized bot messages (TR/EN) per guardrail skill
+  - [x] Keep low-confidence/no-safe-answer automatic handover out of scope (KB/fallback continues)
 - [x] **AI Settings Prompt:** Locale-aware prompt default repair so TR UI shows Turkish prompt instructions
 - [x] **AI Settings Prompt:** Legacy EN default prompt variants also normalize to TR default in TR UI
 - [x] **Inbox UI:** Show configured bot name in chat labels
@@ -300,7 +307,10 @@
   - [ ] "Open in WhatsApp" button
 - [x] **Skills Management**
   - [x] CRUD UI
-  - [x] Search positioned above tabs with always-visible add CTA
+  - [x] Search positioned above the unified skills list with always-visible add CTA
+  - [x] Removed Core/Custom tab split; skills are managed in one list
+  - [x] Skills empty-state icon now matches the sidebar Skills icon
+  - [x] Backfill missing skill embeddings automatically when seeded skills exist without vectors
   - [ ] Test playground
 - [x] **Knowledge Base UI**
   - [x] CRUD with categories

@@ -7,6 +7,10 @@
 ## [Unreleased]
 
 ### Added
+- Documented minimal day-1 default guardrail system skills (human support request, complaint, urgent, privacy) with dedicated localized handover messages and explicit decision to skip low-confidence/no-safe-answer auto-handover for MVP.
+- Added implementation plan and product-spec updates for unified single-list Skills management (no Core/Custom split).
+- Skills now auto-seed localized minimal guardrail defaults (human support, complaint, urgent, privacy) when an organization has no skills yet.
+- Added automatic skill-embedding backfill on Skills load for orgs with SQL-seeded skills that are missing vectors.
 - Usage & Billing now includes message usage cards for monthly UTC and all-time totals (AI-generated, operator-sent, customer inbound).
 - Usage & Billing now includes storage usage cards with total estimated size and Skills vs Knowledge Base breakdown.
 - Added `src/lib/billing/usage.ts` plus unit tests for message and storage usage calculations.
@@ -139,6 +143,8 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Skills empty-state icon now uses the same icon family/glyph as the sidebar Skills navigation item for visual consistency.
+- Skills page now uses a single unified list; Core/Custom tabs were removed and default/user-added skills are managed from the same list.
 - Usage & Billing page now renders three usage sections in one flow: AI token usage, message usage, and storage usage.
 - Usage & Billing message usage cards now render AI/operator/customer counts on separate rows instead of a single inline sentence.
 - AI Settings bot mode and escalation action selection cards now use a more compact size (smaller title/radio/padding).
