@@ -23,6 +23,15 @@ export async function getChannels(organizationId: string) {
 import { TelegramClient } from '@/lib/telegram/client'
 import { v4 as uuidv4 } from 'uuid'
 
+export type TelegramDebugResult =
+    | { success: true; info: unknown }
+    | { success: false; error: string }
+
+function getErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error && error.message) return error.message
+    return fallback
+}
+
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
@@ -72,9 +81,9 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
 
         revalidatePath('/settings/channels')
         return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Telegram connection error:', error)
-        return { error: error.message || 'Failed to connect Telegram bot' }
+        return { error: getErrorMessage(error, 'Failed to connect Telegram bot') }
     }
 }
 
@@ -112,7 +121,7 @@ export async function disconnectChannel(channelId: string) {
     revalidatePath('/settings/channels')
 }
 
-export async function debugTelegramChannel(channelId: string) {
+export async function debugTelegramChannel(channelId: string): Promise<TelegramDebugResult> {
     const supabase = await createClient()
 
     const { data: channel } = await supabase
@@ -126,8 +135,8 @@ export async function debugTelegramChannel(channelId: string) {
             const client = new TelegramClient(channel.config.bot_token)
             const info = await client.getWebhookInfo()
             return { success: true, info }
-        } catch (e: any) {
-            return { success: false, error: e.message }
+        } catch (e: unknown) {
+            return { success: false, error: getErrorMessage(e, 'Failed to read Telegram webhook info') }
         }
     }
     return { success: false, error: 'Channel not found or not telegram' }

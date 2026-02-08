@@ -21,6 +21,8 @@ export interface AiUsageSummary {
     totalCount: number
 }
 
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+
 interface RecordAiUsageInput {
     organizationId: string
     category: AiUsageCategory
@@ -28,8 +30,8 @@ interface RecordAiUsageInput {
     inputTokens?: number
     outputTokens?: number
     totalTokens?: number
-    metadata?: Record<string, any>
-    supabase?: any
+    metadata?: Record<string, unknown>
+    supabase?: SupabaseClientLike
 }
 
 function clampTokens(value?: number) {
@@ -112,7 +114,10 @@ function sumUsageByCategory(
     return totals
 }
 
-export async function getOrgAiUsageSummary(organizationId: string, options?: { supabase?: any }): Promise<AiUsageSummary> {
+export async function getOrgAiUsageSummary(
+    organizationId: string,
+    options?: { supabase?: SupabaseClientLike }
+): Promise<AiUsageSummary> {
     const supabase = options?.supabase ?? await createClient()
 
     const now = new Date()

@@ -13,6 +13,8 @@ import {
     parseSuggestionPayload
 } from '@/lib/leads/offering-profile-utils'
 
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+
 const DEFAULT_SUGGESTION_LOCALE = 'tr'
 
 const SUGGESTION_LANGUAGE_BY_LOCALE: Record<string, string> = {
@@ -78,7 +80,7 @@ Return ONLY JSON in this format: { "required_fields": string[] }`
 
 async function recordSuggestionUsage(options: {
     organizationId: string
-    supabase: any
+    supabase: SupabaseClientLike
     systemPrompt: string
     userPrompt: string
     response: string
@@ -115,7 +117,7 @@ async function recordSuggestionUsage(options: {
 
 async function recordRequiredFieldsUsage(options: {
     organizationId: string
-    supabase: any
+    supabase: SupabaseClientLike
     systemPrompt: string
     userPrompt: string
     response: string
@@ -155,7 +157,7 @@ async function createSuggestion(options: {
     sourceType: 'skill' | 'knowledge' | 'batch'
     sourceId?: string | null
     content: string
-    supabase?: any
+    supabase?: SupabaseClientLike
 }) {
     const supabase = options.supabase ?? await createClient()
     const { data: profile } = await supabase
@@ -198,13 +200,13 @@ async function createSuggestion(options: {
         .limit(5)
 
     const approvedList = (approvedSuggestions ?? [])
-        .map((item: any, index: number) => `${index + 1}. ${item.content}`)
+        .map((item: { content?: string | null }, index: number) => `${index + 1}. ${item.content}`)
         .join('\n')
     const approvedBlock = approvedList
         ? `Existing approved suggestions (use these indices for update_index):\n${approvedList}`
         : 'Existing approved suggestions: none'
     const rejectedList = (rejectedSuggestions ?? [])
-        .map((item: any) => `- ${item.content}`)
+        .map((item: { content?: string | null }) => `- ${item.content}`)
         .join('\n')
     const rejectedBlock = rejectedList
         ? `Rejected suggestions (avoid repeating these unless the new content explicitly changes scope):\n${rejectedList}`
@@ -287,7 +289,7 @@ export async function appendOfferingProfileSuggestion(options: {
     sourceType: 'skill' | 'knowledge'
     sourceId?: string | null
     content: string
-    supabase?: any
+    supabase?: SupabaseClientLike
 }) {
     return createSuggestion({
         organizationId: options.organizationId,
@@ -302,7 +304,7 @@ export async function appendRequiredIntakeFields(options: {
     organizationId: string
     sourceType: 'skill' | 'knowledge'
     content: string
-    supabase?: any
+    supabase?: SupabaseClientLike
 }) {
     const supabase = options.supabase ?? await createClient()
 
@@ -394,7 +396,7 @@ export async function appendRequiredIntakeFields(options: {
 export async function generateInitialOfferingSuggestion(options: {
     organizationId: string
     skipExistingCheck?: boolean
-    supabase?: any
+    supabase?: SupabaseClientLike
 }) {
     const supabase = options.supabase ?? await createClient()
     const { data: profile } = await supabase
@@ -440,8 +442,8 @@ export async function generateInitialOfferingSuggestion(options: {
 
     if (skills.length === 0 && docs.length === 0) return null
 
-    const skillLines = skills.map((skill: any) => `- ${skill.title}`).join('\n')
-    const docLines = docs.map((doc: any) => `- ${doc.title}`).join('\n')
+    const skillLines = skills.map((skill: { title?: string | null }) => `- ${skill.title}`).join('\n')
+    const docLines = docs.map((doc: { title?: string | null }) => `- ${doc.title}`).join('\n')
 
     const content = `Skills:\n${skillLines}\n\nKnowledge Base:\n${docLines}`
 
@@ -458,7 +460,7 @@ export async function proposeServiceCandidate(options: {
     sourceType: 'skill' | 'knowledge'
     sourceId?: string | null
     name: string
-    supabase?: any
+    supabase?: SupabaseClientLike
 }) {
     const supabase = options.supabase ?? await createClient()
     const normalized = normalizeServiceName(options.name)
@@ -484,8 +486,8 @@ export async function proposeServiceCandidate(options: {
         .eq('status', 'pending')
 
     const existing = [
-        ...(existingCatalog ?? []).map((row: any) => row.name),
-        ...(existingCandidates ?? []).map((row: any) => row.proposed_name)
+        ...(existingCatalog ?? []).map((row: { name?: string | null }) => row.name ?? ''),
+        ...(existingCandidates ?? []).map((row: { proposed_name?: string | null }) => row.proposed_name ?? '')
     ]
 
     if (!isNewCandidate(options.name, existing)) return

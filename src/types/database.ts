@@ -1,4 +1,5 @@
 export type UserRole = 'owner' | 'admin' | 'member'
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export interface Organization {
     id: string
@@ -36,7 +37,7 @@ export interface OrganizationAiUsage {
     input_tokens: number
     output_tokens: number
     total_tokens: number
-    metadata: any
+    metadata: Json
     created_at: string
 }
 
@@ -122,7 +123,7 @@ export interface Message {
     conversation_id: string
     sender_type: MessageSenderType
     content: string
-    metadata: any
+    metadata: Json
     created_at: string
 }
 
@@ -131,7 +132,7 @@ export interface Channel {
     organization_id: string
     type: 'telegram' | 'whatsapp'
     name: string
-    config: any
+    config: Json
     status: 'active' | 'disconnected' | 'error'
     created_at: string
     updated_at: string
@@ -213,7 +214,7 @@ export interface Lead {
     total_score: number
     status: LeadStatus
     summary: string | null
-    extracted_fields: any
+    extracted_fields: Json
     non_business: boolean
     last_message_at: string | null
     created_at: string

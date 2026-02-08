@@ -23,7 +23,21 @@ export type LeadRefreshResult =
     | { ok: true }
     | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'request_failed' }
 
-export async function getConversations(organizationId: string, page: number = 0, pageSize: number = 20) {
+type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
+type ConversationLeadPreview = { status?: string | null }
+type ConversationAssigneePreview = { full_name?: string | null; email?: string | null }
+
+export interface ConversationListItem extends Conversation {
+    assignee?: ConversationAssigneePreview | null
+    leads?: ConversationLeadPreview[]
+    messages?: ConversationPreviewMessage[]
+}
+
+export async function getConversations(
+    organizationId: string,
+    page: number = 0,
+    pageSize: number = 20
+): Promise<ConversationListItem[]> {
     const supabase = await createClient()
 
     const from = page * pageSize
@@ -59,7 +73,7 @@ export async function getConversations(organizationId: string, page: number = 0,
         return []
     }
 
-    return data as any[]
+    return data as ConversationListItem[]
 }
 
 export async function getMessages(conversationId: string) {
@@ -268,7 +282,7 @@ export async function getLeadScoreReasoning(
     }
 
     const suggestionText = (suggestions ?? [])
-        .map((item: any) => `- ${item.content}`)
+        .map((item: { content?: string | null }) => `- ${item.content}`)
         .reverse()
         .join('\n')
 
@@ -480,7 +494,7 @@ export async function setConversationAgent(conversationId: string, agent: 'bot' 
     await assertTenantWriteAllowed(supabase)
 
     // If switching to bot, we MUST clear the assignee_id to release the lock in webhook
-    const updates: any = { active_agent: agent }
+    const updates: Partial<Pick<Conversation, 'active_agent' | 'assignee_id'>> = { active_agent: agent }
     if (agent === 'bot') {
         updates.assignee_id = null
     }

@@ -9,7 +9,6 @@ import type {
     HumanEscalationAction
 } from '@/types/database'
 import {
-    DEFAULT_HANDOVER_MESSAGE,
     DEFAULT_HANDOVER_MESSAGE_EN,
     DEFAULT_HANDOVER_MESSAGE_TR
 } from '@/lib/ai/escalation'
@@ -20,6 +19,13 @@ import {
     DEFAULT_STRICT_FALLBACK_TEXT,
     normalizeBotName
 } from '@/lib/ai/prompts'
+
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+type AiSettingsLegacyRow = Partial<OrganizationAiSettings> & {
+    hot_lead_handover_message?: string | null
+    hot_lead_handover_message_tr?: string | null
+    hot_lead_handover_message_en?: string | null
+}
 
 const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'> = {
     mode: 'flexible',
@@ -78,13 +84,14 @@ function resolveHandoverMessage(message: string | null | undefined, fallback: st
 }
 
 function resolveLocalizedHandoverMessages(settings: Partial<OrganizationAiSettings> | null) {
-    const legacyRaw = (settings as any)?.hot_lead_handover_message
+    const legacySettings = (settings ?? {}) as AiSettingsLegacyRow
+    const legacyRaw = legacySettings.hot_lead_handover_message
     const legacyMessage = (legacyRaw ?? '').toString().trim()
     const hasLegacyMessage = legacyMessage.length > 0
     const legacyLooksTurkish = /[çğıöşüÇĞİÖŞÜ]/.test(legacyMessage)
 
-    const trRaw = ((settings as any)?.hot_lead_handover_message_tr ?? '').toString().trim()
-    const enRaw = ((settings as any)?.hot_lead_handover_message_en ?? '').toString().trim()
+    const trRaw = (legacySettings.hot_lead_handover_message_tr ?? '').toString().trim()
+    const enRaw = (legacySettings.hot_lead_handover_message_en ?? '').toString().trim()
 
     const trFallback = hasLegacyMessage && legacyLooksTurkish
         ? legacyMessage
@@ -172,7 +179,7 @@ function applyAiDefaults(
 
 export async function getOrgAiSettings(
     organizationId: string,
-    options?: { supabase?: any; locale?: string | null }
+    options?: { supabase?: SupabaseClientLike; locale?: string | null }
 ) {
     const supabase = options?.supabase ?? await createClient()
 
@@ -192,7 +199,7 @@ export async function getOrgAiSettings(
     return applyAiDefaults(data as Partial<OrganizationAiSettings>, options?.locale)
 }
 
-async function getOrganizationIdForUser(supabase: any) {
+async function getOrganizationIdForUser(supabase: SupabaseClientLike) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 

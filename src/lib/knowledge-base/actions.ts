@@ -37,6 +37,29 @@ export interface KnowledgeBaseEntry {
 }
 
 export type KnowledgeBaseInsert = Pick<KnowledgeBaseEntry, 'content' | 'title' | 'type' | 'collection_id'>
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+type KnowledgeCountRow = { collection_id: string | null }
+type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { collection_id: string | null }
+
+interface KnowledgeSearchResult {
+    chunk_id: string
+    document_id: string
+    document_title: string
+    document_type: string
+    content: string
+    similarity: number
+}
+
+interface KeywordSearchRow {
+    id: string
+    document_id: string
+    content: string
+    knowledge_documents?: {
+        title?: string | null
+        type?: string | null
+        status?: string | null
+    } | null
+}
 
 /**
  * --- COLLECTIONS ---
@@ -45,7 +68,7 @@ export type KnowledgeBaseInsert = Pick<KnowledgeBaseEntry, 'content' | 'title' |
 /**
  * --- HELPERS ---
  */
-async function getUserOrganization(supabase: any) {
+async function getUserOrganization(supabase: SupabaseClientLike) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
@@ -62,7 +85,7 @@ async function getUserOrganization(supabase: any) {
 }
 
 async function getScopedOrganizationId(
-    supabase: any,
+    supabase: SupabaseClientLike,
     organizationId?: string | null
 ) {
     if (organizationId) return organizationId
@@ -106,13 +129,13 @@ export async function getCollections(organizationId?: string | null) {
 
     // Map counts
     const countMap = new Map<string, number>()
-    counts.forEach((item: any) => {
+    ;(counts ?? []).forEach((item: KnowledgeCountRow) => {
         if (item.collection_id) {
             countMap.set(item.collection_id, (countMap.get(item.collection_id) || 0) + 1)
         }
     })
 
-    return collections.map(col => ({
+    return (collections ?? []).map(col => ({
         ...col,
         count: countMap.get(col.id) || 0
     })) as KnowledgeCollection[]
@@ -180,7 +203,10 @@ export async function deleteKnowledgeBaseEntry(id: string) {
     revalidatePath('/knowledge')
 }
 
-export async function processKnowledgeDocument(documentId: string, supabaseOverride?: any) {
+export async function processKnowledgeDocument(
+    documentId: string,
+    supabaseOverride?: SupabaseClientLike
+) {
     const supabase = supabaseOverride ?? await createClient()
     await assertTenantWriteAllowed(supabase)
     const { data, error } = await supabase
@@ -285,7 +311,7 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
     const titleChanged = typeof entry.title === 'string'
 
     // If content or title changed, mark as processing so retrieval skips it
-    let updates: any = { ...entry }
+    const updates: Partial<KnowledgeBaseInsert> & { status?: 'processing' } = { ...entry }
     if (contentChanged || titleChanged) {
         updates.status = 'processing'
     }
@@ -335,7 +361,7 @@ export async function getKnowledgeBaseEntries(collectionId?: string | null, orga
 
     if (error) throw new Error(error.message)
 
-    return data.map(item => ({
+    return (data ?? []).map(item => ({
         ...item,
         collection: Array.isArray(item.collection) ? item.collection[0] : item.collection
     })) as KnowledgeBaseEntry[]
@@ -350,11 +376,11 @@ export async function searchKnowledgeBase(
         collectionId?: string | null
         type?: string | null
         language?: string | null
-        supabase?: any
+        supabase?: SupabaseClientLike
     }
 ) {
     const supabase = options?.supabase || await createClient()
-    let data: any[] | null = null
+    let data: KnowledgeSearchResult[] | null = null
 
     try {
         const embedding = await generateEmbedding(query)
@@ -371,7 +397,7 @@ export async function searchKnowledgeBase(
         if (error) {
             console.error('RAG Search failed:', error)
         } else {
-            data = result
+            data = (result ?? null) as KnowledgeSearchResult[] | null
         }
     } catch (error) {
         console.error('Embedding generation failed:', error)
@@ -391,14 +417,7 @@ export async function searchKnowledgeBase(
 
     if (!data) return []
 
-    return data as {
-        chunk_id: string
-        document_id: string
-        document_title: string
-        document_type: string
-        content: string
-        similarity: number
-    }[]
+    return data
 }
 export interface SidebarCollection extends KnowledgeCollection {
     files: Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>[]
@@ -444,10 +463,12 @@ export async function getSidebarData(organizationId?: string | null) {
     if (filesError) throw new Error(filesError.message)
 
     // 3. Merge data
-    const sidebarData: SidebarCollection[] = listToTree(collections, files)
-    const uncategorized = files
+    const typedCollections = (collections ?? []) as KnowledgeCollection[]
+    const typedFiles = (files ?? []) as KnowledgeFileRow[]
+    const sidebarData: SidebarCollection[] = listToTree(typedCollections, typedFiles)
+    const uncategorized = typedFiles
         .filter(f => !f.collection_id)
-        .map((file: any) => ({
+        .map((file) => ({
             id: file.id,
             title: file.title,
             type: file.type
@@ -456,11 +477,11 @@ export async function getSidebarData(organizationId?: string | null) {
     return {
         collections: sidebarData,
         uncategorized,
-        totalCount: files.length
+        totalCount: typedFiles.length
     } as SidebarData
 }
 
-function listToTree(collections: any[], files: any[]): SidebarCollection[] {
+function listToTree(collections: KnowledgeCollection[], files: KnowledgeFileRow[]): SidebarCollection[] {
     return collections.map(col => {
         const colFiles = files.filter(f => f.collection_id === col.id)
         return {
@@ -536,7 +557,7 @@ async function searchKnowledgeBaseByKeyword(
         collectionId?: string | null
         type?: string | null
         language?: string | null
-        supabase?: any
+        supabase?: SupabaseClientLike
     }
 ) {
     const supabase = options?.supabase || await createClient()
@@ -570,7 +591,7 @@ async function searchKnowledgeBaseByKeyword(
         return []
     }
 
-    return (data as any[])
+    return (data as KeywordSearchRow[])
         .filter((row) => row.knowledge_documents?.status === 'ready')
         .map((row) => ({
             chunk_id: row.id as string,
@@ -583,7 +604,7 @@ async function searchKnowledgeBaseByKeyword(
 }
 
 async function buildAndStoreChunks(
-    supabase: any,
+    supabase: SupabaseClientLike,
     organizationId: string,
     documentId: string,
     content: string

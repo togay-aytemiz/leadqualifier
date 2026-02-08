@@ -13,8 +13,6 @@ interface OrgSwitcherProps {
 export function OrgSwitcher({ organizations, currentOrgId, onSwitch, isSystemAdmin }: OrgSwitcherProps) {
     const t = useTranslations('common')
 
-    const currentOrg = organizations.find(o => o.id === currentOrgId)
-
     if (organizations.length <= 1 && !isSystemAdmin) {
         return null
     }

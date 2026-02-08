@@ -18,6 +18,7 @@ import type { OrganizationAiSettings } from '@/types/database'
 const FALLBACK_TOPICS_TR = ['fiyatlar', 'randevu', 'iptal/iade', 'hizmetler']
 const FALLBACK_TOPICS_EN = ['pricing', 'appointments', 'cancellations/refunds', 'services']
 const FALLBACK_TOPIC_LIMIT = 6
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
 const TURKISH_HINTS = ['nedir', 'ne', 'nasıl', 'fiyat', 'randevu', 'iptal', 'iade', 'kampanya', 'paket', 'yardımcı']
 
@@ -32,7 +33,7 @@ function formatTopicList(topics: string[]) {
 }
 
 async function getFallbackTopics(
-    supabase: any,
+    supabase: SupabaseClientLike,
     organizationId: string,
     limit: number
 ): Promise<string[]> {
@@ -54,8 +55,8 @@ async function getFallbackTopics(
     ])
 
     const topicPool = [
-        ...(skillsResult.data ?? []).map((item: any) => item.title),
-        ...(docsResult.data ?? []).map((item: any) => item.title)
+        ...(skillsResult.data ?? []).map((item: { title?: string | null }) => item.title),
+        ...(docsResult.data ?? []).map((item: { title?: string | null }) => item.title)
     ]
 
     const seen = new Set<string>()
@@ -96,9 +97,9 @@ async function renderFlexibleFallback(
     followupGuidance: string | null,
     options: {
         organizationId: string
-        supabase?: any
+        supabase?: SupabaseClientLike
         trackUsage?: boolean
-        usageMetadata?: Record<string, any>
+        usageMetadata?: Record<string, unknown>
         conversationHistory?: ConversationHistoryTurn[]
         recentAssistantMessages?: string[]
         leadSnapshot?: {
@@ -191,9 +192,9 @@ export async function buildFallbackResponse(options: {
         extracted_fields?: Record<string, unknown> | null
     } | null
     aiSettings?: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'>
-    supabase?: any
+    supabase?: SupabaseClientLike
     trackUsage?: boolean
-    usageMetadata?: Record<string, any>
+    usageMetadata?: Record<string, unknown>
 }) {
     const supabase = options.supabase ?? await createClient()
     const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, { supabase })

@@ -1,10 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { getLocale } from 'next-intl/server'
 import {
     getKnowledgeBaseEntries,
     getCollections,
-    KnowledgeCollection,
-    KnowledgeBaseEntry
+    KnowledgeCollection
 } from '@/lib/knowledge-base/actions'
 import { KnowledgeContainer } from './components/KnowledgeContainer'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
@@ -17,7 +15,6 @@ interface KnowledgePageProps {
 }
 
 export default async function KnowledgeBasePage({ searchParams }: KnowledgePageProps) {
-    const locale = await getLocale()
     const supabase = await createClient()
     const { collectionId } = await searchParams
     const orgContext = await resolveActiveOrganizationContext(supabase)
@@ -54,7 +51,7 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
             .maybeSingle()
 
         aiSuggestionsEnabled = profile?.ai_suggestions_enabled ?? false
-        pendingSuggestions = await getPendingOfferingProfileSuggestionCount(organizationId, locale)
+        pendingSuggestions = await getPendingOfferingProfileSuggestionCount(organizationId)
     }
 
     return (

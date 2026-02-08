@@ -1,6 +1,13 @@
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot'
 
+export interface TelegramBotInfo {
+    id: number
+    is_bot: boolean
+    first_name: string
+    username?: string
+}
+
 export class TelegramClient {
     private token: string
 
@@ -8,7 +15,7 @@ export class TelegramClient {
         this.token = token
     }
 
-    private async request(method: string, body?: any) {
+    private async request<T>(method: string, body?: Record<string, unknown>): Promise<T> {
         const response = await fetch(`${TELEGRAM_API_BASE}${this.token}/${method}`, {
             method: 'POST',
             headers: {
@@ -17,14 +24,14 @@ export class TelegramClient {
             body: body ? JSON.stringify(body) : undefined,
         })
 
-        const data = await response.json()
+        const data = await response.json() as { ok?: boolean; description?: string; result?: unknown }
         if (!data.ok) {
             throw new Error(data.description || 'Telegram API error')
         }
-        return data.result
+        return data.result as T
     }
 
-    async getMe() {
+    async getMe(): Promise<TelegramBotInfo> {
         return this.request('getMe')
     }
 
@@ -45,7 +52,7 @@ export class TelegramClient {
             text,
         })
     }
-    async getWebhookInfo() {
+    async getWebhookInfo(): Promise<Record<string, unknown>> {
         return this.request('getWebhookInfo')
     }
 }

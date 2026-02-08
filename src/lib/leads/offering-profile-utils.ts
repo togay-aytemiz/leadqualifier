@@ -136,7 +136,7 @@ export function parseRequiredIntakeFieldsPayload(raw: string) {
 
         if (typeof parsed !== 'object') continue
 
-        const parsedObject = parsed as any
+        const parsedObject = parsed as Record<string, unknown>
         const fields = parsedObject.required_fields ?? parsedObject.requiredFields
 
         if (Array.isArray(fields)) {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { ChatMessage, simulateChat } from '@/lib/chat/actions'
+import { ChatMessage, simulateChat, type SimulationResponse } from '@/lib/chat/actions'
 import type { ConversationTurn } from '@/lib/knowledge-base/router'
 import { ChatBubble } from './ChatBubble'
 import { Send, Bug, MessageSquare } from 'lucide-react'
@@ -21,7 +21,7 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
     const [input, setInput] = useState('')
     const [isTyping, setIsTyping] = useState(false)
     const [threshold, setThreshold] = useState(defaultMatchThreshold ?? 0.6)
-    const [debugInfo, setDebugInfo] = useState<any>(null)
+    const [debugInfo, setDebugInfo] = useState<SimulationResponse['matchedSkill'] | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const conversationTotals = useMemo(() => {

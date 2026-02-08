@@ -9,3 +9,7 @@ export function getInboxMessageBubbleClasses(senderType: MessageSenderType) {
     if (senderType === 'user') return USER_MESSAGE_BUBBLE_CLASSES
     return CONTACT_MESSAGE_BUBBLE_CLASSES
 }
+
+export function getInboxOutgoingBubbleClasses(senderType: MessageSenderType) {
+    return getInboxMessageBubbleClasses(senderType)
+}

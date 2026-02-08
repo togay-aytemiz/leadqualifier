@@ -9,7 +9,20 @@ import {
 import { FaTelegram, FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { IoLogoWhatsapp } from 'react-icons/io5'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
-import { getMessages, sendMessage, getConversations, deleteConversation, sendSystemMessage, setConversationAgent, markConversationRead, getConversationSummary, getConversationLead, getLeadScoreReasoning, refreshConversationLead } from '@/lib/inbox/actions'
+import {
+    getMessages,
+    sendMessage,
+    getConversations,
+    deleteConversation,
+    sendSystemMessage,
+    setConversationAgent,
+    markConversationRead,
+    getConversationSummary,
+    getConversationLead,
+    getLeadScoreReasoning,
+    refreshConversationLead,
+    type ConversationListItem
+} from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { setupRealtimeAuth } from '@/lib/supabase/realtime-auth'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -31,7 +44,7 @@ import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
 
 interface InboxContainerProps {
-    initialConversations: Conversation[]
+    initialConversations: ConversationListItem[]
     organizationId: string
     botName?: string
     botMode?: AiBotMode
@@ -56,7 +69,7 @@ export function InboxContainer({
     const t = useTranslations('inbox')
     const locale = useLocale()
     const dateLocale = locale === 'tr' ? tr : undefined
-    const [conversations, setConversations] = useState<any[]>(initialConversations)
+    const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
     const [lead, setLead] = useState<Lead | null>(null)
@@ -371,7 +384,6 @@ export function InboxContainer({
     // ... re-insert realtime subscriptions ...
 
     useEffect(() => {
-        let channel: ReturnType<typeof supabase.channel> | null = null
         let messagesChannel: ReturnType<typeof supabase.channel> | null = null
         let conversationsChannel: ReturnType<typeof supabase.channel> | null = null
         let leadsChannel: ReturnType<typeof supabase.channel> | null = null
@@ -433,6 +445,11 @@ export function InboxContainer({
                     setConversations(prev => prev.map(c => {
                         if (c.id === newMsg.conversation_id) {
                             const shouldIncrementUnread = newMsg.sender_type === 'contact'
+                            const previewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type'> = {
+                                content: newMsg.content,
+                                created_at: newMsg.created_at,
+                                sender_type: newMsg.sender_type
+                            }
                             return {
                                 ...c,
                                 last_message_at: newMsg.created_at,
@@ -441,7 +458,7 @@ export function InboxContainer({
                                     ? (shouldIncrementUnread ? c.unread_count + 1 : c.unread_count)
                                     : 0,
                                 // If we have messages snippet in list, update it too
-                                messages: [{ content: newMsg.content, created_at: newMsg.created_at, sender_type: newMsg.sender_type } as any]
+                                messages: [previewMessage]
                             }
                         }
                         return c
@@ -563,10 +580,6 @@ export function InboxContainer({
                 console.log('Cleaning up Leads channel...')
                 supabase.removeChannel(leadsChannel)
             }
-            if (channel) {
-                console.log('Cleaning up Realtime subscription...')
-                supabase.removeChannel(channel)
-            }
         }
     }, [organizationId, refreshMessages, resolveAssignee, scheduleLeadAutoRefresh, supabase])
 
@@ -683,15 +696,20 @@ export function InboxContainer({
         const optimisticAssignee: Assignee | null = currentUserProfile
             ? { full_name: currentUserProfile.full_name, email: currentUserProfile.email }
             : null
+        const optimisticPreviewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type'> = {
+            content: input,
+            created_at: new Date().toISOString(),
+            sender_type: 'user'
+        }
 
         setConversations(prev => prev.map(c =>
             c.id === selectedId ? {
                 ...c,
-                active_agent: 'operator',
+                active_agent: 'operator' as const,
                 assignee_id: currentUserProfile?.id ?? c.assignee_id,
                 assignee: optimisticAssignee ?? c.assignee,
                 last_message_at: new Date().toISOString(),
-                messages: [{ content: input, created_at: new Date().toISOString(), sender_type: 'user' } as any]
+                messages: [optimisticPreviewMessage]
             } : c
         ).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
 
@@ -799,9 +817,7 @@ export function InboxContainer({
                 </div>
             ) : (
                 conversations.map(c => {
-                    const leadStatus = Array.isArray(c.leads)
-                        ? c.leads[0]?.status
-                        : c.leads?.status
+                    const leadStatus = c.leads?.[0]?.status
                     const leadStatusLabel = leadStatus
                         ? (leadStatusLabels[leadStatus] ?? leadStatus)
                         : null
@@ -879,16 +895,6 @@ export function InboxContainer({
     )
 
     const selectedConversation = conversations.find(c => c.id === selectedId)
-
-    // Calculate active agent based on last outgoing message
-    const lastOutgoingMessage = messages
-        .slice()
-        .reverse()
-        .find(m => m.sender_type === 'user' || m.sender_type === 'bot' || m.sender_type === 'system')
-
-    // Default to AI if no history, otherwise check who sent last
-    // If system sent last (e.g. "Operator left"), it defaults to AI (operator only if 'user')
-    // const activeAgent = lastOutgoingMessage?.sender_type === 'user' ? 'operator' : 'ai'
 
     const resolvedBotMode = (botMode ?? 'active')
     // NEW: Use explicit state from conversation

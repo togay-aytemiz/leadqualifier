@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { Lead, ConversationPlatform, LeadStatus } from '@/types/database'
+import { Lead, ConversationPlatform } from '@/types/database'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export interface LeadWithConversation extends Lead {

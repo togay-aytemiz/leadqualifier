@@ -4,6 +4,8 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+
 const TURKISH_CHAR_PATTERN = /[ığüşöçİĞÜŞÖÇ]/
 const TURKISH_WORD_PATTERN = /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet|çekim|cekim|vazgeçtim|vazgectim)\b/i
 const ENGLISH_WORD_PATTERN = /\b(hello|hi|price|appointment|thank(s| you)|please|tomorrow|today|available|campaign|service|book|booking|schedule)\b/i
@@ -213,7 +215,7 @@ export interface NormalizedLeadExtraction {
     status: 'hot' | 'warm' | 'cold' | 'ignored'
 }
 
-function normalizeExtractionPayload(payload: any): NormalizedLeadExtraction {
+function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return {
             service_type: null,
@@ -230,20 +232,25 @@ function normalizeExtractionPayload(payload: any): NormalizedLeadExtraction {
         }
     }
 
-    const nonBusiness = normalizeBoolean(payload.non_business)
-    const score = nonBusiness ? 0 : normalizeScore(payload.score)
-    const status = nonBusiness ? 'ignored' : normalizeStatus(payload.status)
+    const payloadRecord = payload as Record<string, unknown>
+    const nonBusiness = normalizeBoolean(payloadRecord.non_business)
+    const score = nonBusiness ? 0 : normalizeScore(payloadRecord.score)
+    const status = nonBusiness ? 'ignored' : normalizeStatus(payloadRecord.status)
 
     return {
-        service_type: typeof payload.service_type === 'string' ? payload.service_type.trim() || null : null,
-        desired_date: typeof payload.desired_date === 'string' ? payload.desired_date.trim() || null : null,
-        location: typeof payload.location === 'string' ? payload.location.trim() || null : null,
-        budget_signals: normalizeStringArray(payload.budget_signals),
-        intent_signals: normalizeStringArray(payload.intent_signals),
-        risk_signals: normalizeStringArray(payload.risk_signals),
-        required_intake_collected: normalizeCollectedFieldValues(payload.required_intake_collected ?? payload.requiredIntakeCollected),
+        service_type:
+            typeof payloadRecord.service_type === 'string' ? payloadRecord.service_type.trim() || null : null,
+        desired_date:
+            typeof payloadRecord.desired_date === 'string' ? payloadRecord.desired_date.trim() || null : null,
+        location: typeof payloadRecord.location === 'string' ? payloadRecord.location.trim() || null : null,
+        budget_signals: normalizeStringArray(payloadRecord.budget_signals),
+        intent_signals: normalizeStringArray(payloadRecord.intent_signals),
+        risk_signals: normalizeStringArray(payloadRecord.risk_signals),
+        required_intake_collected: normalizeCollectedFieldValues(
+            payloadRecord.required_intake_collected ?? payloadRecord.requiredIntakeCollected
+        ),
         non_business: nonBusiness,
-        summary: typeof payload.summary === 'string' ? payload.summary.trim() || null : null,
+        summary: typeof payloadRecord.summary === 'string' ? payloadRecord.summary.trim() || null : null,
         score,
         status
     }
@@ -314,7 +321,7 @@ export async function runLeadExtraction(options: {
     conversationId: string
     latestMessage?: string
     preferredLocale?: string | null
-    supabase?: any
+    supabase?: SupabaseClientLike
     source?: 'telegram' | 'whatsapp'
 }) {
     const supabase = options.supabase ?? await createClient()
@@ -352,10 +359,10 @@ export async function runLeadExtraction(options: {
     if (!process.env.OPENAI_API_KEY) return
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const catalogList = (catalog ?? []).map((row: any) => row.name).join(', ')
+    const catalogList = (catalog ?? []).map((row: { name?: string | null }) => row.name ?? '').join(', ')
     const customerMessages = (messages ?? [])
         .reverse()
-        .map((msg: any) => {
+        .map((msg: { content?: string | null }) => {
             const content = (msg.content ?? '').trim()
             if (!content) return null
             return content
@@ -374,7 +381,7 @@ export async function runLeadExtraction(options: {
         customerMessages.splice(0, customerMessages.length - 5)
     }
     const suggestionText = (suggestions ?? [])
-        .map((item: any) => `- ${item.content}`)
+        .map((item: { content?: string | null }) => `- ${item.content}`)
         .reverse()
         .join('\n')
     const manualProfileNoteText = (profile?.manual_profile_note ?? '').trim()

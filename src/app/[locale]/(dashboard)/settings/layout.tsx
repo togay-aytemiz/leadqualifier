@@ -2,7 +2,6 @@ import { SettingsResponsiveShell } from '@/components/settings/SettingsResponsiv
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { createClient } from '@/lib/supabase/server'
-import { getLocale } from 'next-intl/server'
 
 export default async function SettingsLayout({
     children
@@ -10,7 +9,6 @@ export default async function SettingsLayout({
     children: React.ReactNode
 }) {
     const supabase = await createClient()
-    const locale = await getLocale()
 
     const {
         data: { user }
@@ -20,7 +18,7 @@ export default async function SettingsLayout({
 
     const orgContext = await resolveActiveOrganizationContext(supabase)
     const pendingCount = orgContext?.activeOrganizationId
-        ? await getPendingOfferingProfileSuggestionCount(orgContext.activeOrganizationId, locale)
+        ? await getPendingOfferingProfileSuggestionCount(orgContext.activeOrganizationId)
         : 0
 
     return (

@@ -1,6 +1,6 @@
-const fs = require('fs')
-const path = require('path')
-const ts = require('typescript')
+import fs from 'node:fs'
+import path from 'node:path'
+import ts from 'typescript'
 
 const projectRoot = process.cwd()
 const srcRoot = path.join(projectRoot, 'src')

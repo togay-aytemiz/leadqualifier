@@ -4,6 +4,8 @@ import { recordAiUsage } from '@/lib/ai/usage'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+
 interface RequiredIntakeFollowupPayload {
     missingFields: string[]
     followupQuestion: string | null
@@ -11,7 +13,7 @@ interface RequiredIntakeFollowupPayload {
 
 export async function getRequiredIntakeFields(options: {
     organizationId: string
-    supabase?: any
+    supabase?: SupabaseClientLike
 }) {
     const supabase = options.supabase ?? await createClient()
     const { data: profile } = await supabase
@@ -155,7 +157,7 @@ export function parseRequiredIntakeFollowupPayload(raw: string): RequiredIntakeF
         const parsed = parseJsonCandidate(candidate)
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
 
-        const parsedObject = parsed as any
+        const parsedObject = parsed as Record<string, unknown>
         const rawMissing = parsedObject.missing_fields ?? parsedObject.missingFields
         const rawFollowup = parsedObject.followup_question ?? parsedObject.followupQuestion
         const missingFields = Array.isArray(rawMissing)
@@ -184,7 +186,7 @@ export async function generateRequiredIntakeFollowup(options: {
     latestUserMessage?: string
     source?: 'telegram' | 'simulator' | 'whatsapp' | 'unknown'
     trackUsage?: boolean
-    supabase?: any
+    supabase?: SupabaseClientLike
     maxMessages?: number
 }): Promise<RequiredIntakeFollowupPayload> {
     const supabase = options.supabase ?? await createClient()

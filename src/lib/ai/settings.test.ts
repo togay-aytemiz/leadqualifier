@@ -3,7 +3,9 @@ import { getOrgAiSettings } from './settings'
 import { DEFAULT_HANDOVER_MESSAGE_EN, DEFAULT_HANDOVER_MESSAGE_TR } from './escalation'
 import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_FLEXIBLE_PROMPT_TR } from './prompts'
 
-function createSupabaseMock(data: any, error: any = null) {
+type GetOrgAiSettingsSupabase = NonNullable<Parameters<typeof getOrgAiSettings>[1]>['supabase']
+
+function createSupabaseMock(data: Record<string, unknown>, error: unknown = null) {
     const maybeSingle = vi.fn().mockResolvedValue({ data, error })
     const eq = vi.fn().mockReturnValue({ maybeSingle })
     const select = vi.fn().mockReturnValue({ eq })
@@ -26,7 +28,9 @@ describe('getOrgAiSettings handover message localization', () => {
             hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
         })
 
-        const settings = await getOrgAiSettings('org-1', { supabase: supabase as any })
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase
+        })
 
         expect(settings.hot_lead_handover_message_tr).toBe(DEFAULT_HANDOVER_MESSAGE_TR)
         expect(settings.hot_lead_handover_message_en).toBe(DEFAULT_HANDOVER_MESSAGE_EN)
@@ -46,7 +50,9 @@ describe('getOrgAiSettings handover message localization', () => {
             hot_lead_handover_message_en: ''
         })
 
-        const settings = await getOrgAiSettings('org-1', { supabase: supabase as any })
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase
+        })
 
         expect(settings.hot_lead_handover_message_tr).toBe(DEFAULT_HANDOVER_MESSAGE_TR)
         expect(settings.hot_lead_handover_message_en).toBe(DEFAULT_HANDOVER_MESSAGE_EN)
@@ -65,7 +71,10 @@ describe('getOrgAiSettings handover message localization', () => {
             hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
         })
 
-        const settings = await getOrgAiSettings('org-1', { supabase: supabase as any, locale: 'tr' })
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            locale: 'tr'
+        })
 
         expect(settings.prompt).toBe(DEFAULT_FLEXIBLE_PROMPT_TR)
     })
@@ -90,7 +99,10 @@ If the user's message is a greeting or small talk, respond briefly and friendly,
             hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
         })
 
-        const settings = await getOrgAiSettings('org-1', { supabase: supabase as any, locale: 'tr' })
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            locale: 'tr'
+        })
 
         expect(settings.prompt).toBe(DEFAULT_FLEXIBLE_PROMPT_TR)
     })

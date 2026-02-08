@@ -12,6 +12,8 @@ import {
     proposeServiceCandidate
 } from '@/lib/leads/offering-profile'
 
+type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+
 /**
  * Get all skills for an organization
  */
@@ -332,7 +334,7 @@ export async function matchSkills(
     organizationId: string,
     threshold: number = 0.5,
     limit: number = 5,
-    customSupabase?: any
+    customSupabase?: SupabaseClientLike
 ): Promise<SkillMatch[]> {
     const supabase = customSupabase || await createClient()
 

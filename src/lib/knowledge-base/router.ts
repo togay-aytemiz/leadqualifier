@@ -98,17 +98,32 @@ function formatHistory(history: ConversationTurn[]) {
         .join('\n')
 }
 
-function normalizeDecision(latestMessage: string, parsed: any): KnowledgeRouteDecision {
-    const routeToKb = Boolean(parsed?.route_to_kb)
-    const reason = typeof parsed?.reason === 'string' ? parsed.reason.trim() : ''
-    const rewrittenQueryRaw = typeof parsed?.rewritten_query === 'string' ? parsed.rewritten_query.trim() : ''
+function normalizeUsage(value: unknown): KnowledgeRouteDecision['usage'] {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+    const usage = value as Record<string, unknown>
+    const input = typeof usage.inputTokens === 'number' ? usage.inputTokens : 0
+    const output = typeof usage.outputTokens === 'number' ? usage.outputTokens : 0
+    const total = typeof usage.totalTokens === 'number' ? usage.totalTokens : input + output
+    return { inputTokens: input, outputTokens: output, totalTokens: total }
+}
+
+function normalizeDecision(latestMessage: string, parsed: unknown): KnowledgeRouteDecision {
+    const parsedObject =
+        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {}
+    const routeToKb = Boolean(parsedObject.route_to_kb)
+    const reason = typeof parsedObject.reason === 'string' ? parsedObject.reason.trim() : ''
+    const rewrittenQueryRaw =
+        typeof parsedObject.rewritten_query === 'string' ? parsedObject.rewritten_query.trim() : ''
+    const usage = normalizeUsage(parsedObject.usage)
 
     if (!routeToKb) {
         return {
             route_to_kb: false,
             rewritten_query: '',
             reason,
-            usage: parsed?.usage
+            usage
         }
     }
 
@@ -116,7 +131,7 @@ function normalizeDecision(latestMessage: string, parsed: any): KnowledgeRouteDe
         route_to_kb: true,
         rewritten_query: rewrittenQueryRaw || latestMessage,
         reason,
-        usage: parsed?.usage
+        usage
     }
 }
 

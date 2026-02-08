@@ -3,7 +3,7 @@
 import { User } from '@supabase/supabase-js'
 import type { Profile, Organization } from '@/types/database'
 import { useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
 interface DashboardHeaderProps {
@@ -17,7 +17,6 @@ export function DashboardHeader({ user, profile, organizations, isSystemAdmin }:
     const tCommon = useTranslations('common')
     const tNav = useTranslations('nav')
     const router = useRouter()
-    const pathname = usePathname()
 
     // Get current org from URL or localStorage
     const [currentOrgId, setCurrentOrgId] = useState<string | null>(() => {
@@ -34,8 +33,6 @@ export function DashboardHeader({ user, profile, organizations, isSystemAdmin }:
         }
         router.refresh()
     }
-
-    const currentOrg = organizations.find((o) => o.id === currentOrgId) || organizations[0]
 
     return (
         <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-50">

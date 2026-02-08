@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Added
+- Added a troubleshooting-driven quality pass covering tests, hooks, lint debt, and TypeScript strictness across AI/Inbox/Knowledge/Leads modules.
+- Added explicit typed models for inbox conversation list rows (`ConversationListItem`) and Telegram debug responses to prevent unsafe UI assumptions.
+- Added an ESM-based i18n validation runner (`scripts/i18n/check-i18n.mjs`) and updated npm script wiring.
 - Inbox composer banner now reflects bot mode state: Active keeps the assistant-active message, while Shadow/Off show an explicit “AI assistant is not active” notice.
 - Mobile dashboard shell now includes an app-style bottom navbar on small screens with 5 items: Inbox, Kişiler, Yetenekler, Bilgi Bankası, and Diğer.
 - Mobile “Diğer” menu now exposes quick actions for Simülatör, Ayarlar, and Signout.
@@ -54,6 +57,8 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Replaced broad `any` usage with concrete/unknown-safe typing patterns in core runtime paths (fallback, follow-up, AI settings, usage, inbox actions, knowledge actions, extraction, offering profile, telegram client).
+- Updated `scripts/tests/main-sidebar.test.js` into a proper Vitest suite and aligned chat style exports with existing tests.
 - Leads desktop table now keeps `Durum` chips on a single line and truncates long contact names to one line for cleaner row height consistency.
 - Settings route composition now uses a shared `settings/layout.tsx` shell so desktop navigation keeps the inner settings sidebar mounted while only detail content updates.
 - Lead extraction summary persistence now stays aligned with the current extraction window (latest 5 customer messages) instead of carrying over stale summaries when the latest extraction omits summary.
@@ -68,6 +73,10 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed failing inbox style tests by restoring `getInboxOutgoingBubbleClasses` export.
+- Fixed Vitest failure caused by a non-suite test file (`scripts/tests/main-sidebar.test.js`) by converting it into an executable test suite.
+- Fixed React hook rule violations (`rules-of-hooks`, `set-state-in-effect`) in Knowledge, Settings, and Auth flows.
+- Fixed build-time type regressions introduced by strict typing updates (channel debug result narrowing, inbox optimistic message typing, dropdown clone typing).
 - Desktop Settings sub-page navigation no longer flashes/replaces the whole settings shell with skeletons; sidebar remains stable while detail pane loads.
 - Mobile Settings detail→list back navigation no longer behaves like a full refresh; it now returns via client-side transition for a stable mobile flow.
 - Inbox conversation list header no longer shows a dropdown chevron next to the “Gelen Kutusu / Inbox” title.

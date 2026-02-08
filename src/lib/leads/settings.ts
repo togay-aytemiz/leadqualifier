@@ -252,7 +252,7 @@ export async function archiveOfferingProfileSuggestion(
     return true
 }
 
-export async function getPendingOfferingProfileSuggestionCount(organizationId: string, locale?: string) {
+export async function getPendingOfferingProfileSuggestionCount(organizationId: string) {
     const supabase = await createClient()
     const query = supabase
         .from('offering_profile_suggestions')

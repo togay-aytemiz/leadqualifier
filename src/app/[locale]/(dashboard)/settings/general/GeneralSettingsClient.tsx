@@ -14,7 +14,7 @@ export default function GeneralSettingsClient() {
     const pathname = usePathname()
     const router = useRouter()
     const currentLocale = useLocale()
-    const [isPending, startTransition] = useTransition()
+    const [, startTransition] = useTransition()
     const tGeneral = useTranslations('General')
     const tSidebar = useTranslations('Sidebar')
     const tUnsaved = useTranslations('unsavedChanges')
@@ -22,19 +22,20 @@ export default function GeneralSettingsClient() {
     const [baselineLocale, setBaselineLocale] = useState(currentLocale)
     const [isSaving, setIsSaving] = useState(false)
     const [saved, setSaved] = useState(false)
-    const [saveRequested, setSaveRequested] = useState(false)
 
     const isDirty = useMemo(() => selectedLocale !== baselineLocale, [selectedLocale, baselineLocale])
 
     const handleLanguageChange = (newLang: string) => {
         const nextLocale = newLang as 'en' | 'tr'
         setSelectedLocale(nextLocale)
+        if (saved) {
+            setSaved(false)
+        }
     }
 
     const handleSave = async () => {
         if (!isDirty) return true
         setIsSaving(true)
-        setSaveRequested(true)
         const nextLocale = selectedLocale as 'en' | 'tr'
         setBaselineLocale(nextLocale)
         setSaved(false)
@@ -48,24 +49,10 @@ export default function GeneralSettingsClient() {
         startTransition(() => {
             router.replace(pathname, { locale: nextLocale })
         })
+        setIsSaving(false)
+        setSaved(true)
         return true
     }
-
-    useEffect(() => {
-        if (!isPending) {
-            if (saveRequested) {
-                setSaved(true)
-                setSaveRequested(false)
-            }
-            setIsSaving(false)
-        }
-    }, [isPending])
-
-    useEffect(() => {
-        if (isDirty) {
-            setSaved(false)
-        }
-    }, [isDirty])
 
     useEffect(() => {
         if (!saved) return
@@ -75,15 +62,9 @@ export default function GeneralSettingsClient() {
         return () => window.clearTimeout(timeout)
     }, [saved])
 
-    useEffect(() => {
-        setSelectedLocale(currentLocale)
-        setBaselineLocale(currentLocale)
-        setSaveRequested(false)
-        setSaved(false)
-    }, [currentLocale])
-
     const handleDiscard = () => {
         setSelectedLocale(currentLocale)
+        setSaved(false)
     }
 
     const transformPendingHref = (href: string) => {

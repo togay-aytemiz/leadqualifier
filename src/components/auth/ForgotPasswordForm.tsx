@@ -19,9 +19,9 @@ export default function ForgotPasswordForm() {
     )
 
     useEffect(() => {
-        if (state?.success) {
-            setCooldown(120)
-        }
+        if (!state?.success) return
+        const timer = window.setTimeout(() => setCooldown(120), 0)
+        return () => window.clearTimeout(timer)
     }, [state?.success])
 
     useEffect(() => {

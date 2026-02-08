@@ -118,8 +118,10 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
 
     useEffect(() => {
         if (!hasDetail) {
-            setIsMobileDetailOpen(false)
-            return
+            const frame = window.requestAnimationFrame(() => {
+                setIsMobileDetailOpen(false)
+            })
+            return () => window.cancelAnimationFrame(frame)
         }
 
         const frame = window.requestAnimationFrame(() => {

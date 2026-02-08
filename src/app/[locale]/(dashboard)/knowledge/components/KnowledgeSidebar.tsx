@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
 import { Sidebar, SidebarGroup, SidebarItem, Button, Skeleton } from '@/design'
 import { getSidebarData, type SidebarData, createCollection } from '@/lib/knowledge-base/actions'
@@ -19,6 +19,7 @@ interface KnowledgeSidebarProps {
 
 export function KnowledgeSidebar({ organizationId, isReadOnly = false }: KnowledgeSidebarProps) {
     const t = useTranslations('sidebar')
+    const tFolderModal = useTranslations('folderModal')
     const [data, setData] = useState<SidebarData | null>(null)
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -46,11 +47,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
         return parts.length >= 2 ? parts[1] : null
     }, [pathname])
 
-    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-    if (!supabaseRef.current) {
-        supabaseRef.current = createClient()
-    }
-    const supabase = supabaseRef.current
+    const supabase = useMemo(() => createClient(), [])
 
     const loadSidebar = useCallback(async () => {
         try {
@@ -66,11 +63,15 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
     }, [organizationId])
 
     useEffect(() => {
-        loadSidebar()
-
-        const handleUpdate = () => loadSidebar()
+        const handleUpdate = () => {
+            void loadSidebar()
+        }
+        const frame = window.requestAnimationFrame(handleUpdate)
         window.addEventListener('knowledge-updated', handleUpdate)
-        return () => window.removeEventListener('knowledge-updated', handleUpdate)
+        return () => {
+            window.cancelAnimationFrame(frame)
+            window.removeEventListener('knowledge-updated', handleUpdate)
+        }
     }, [loadSidebar])
 
     useEffect(() => {
@@ -134,7 +135,7 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                 onClick={() => setShowFolderModal(true)}
             >
                 <FolderPlus size={16} className="mr-2 text-gray-500" />
-                {useTranslations('folderModal')('create')}
+                {tFolderModal('create')}
             </Button>
             <NewContentButton
                 collectionId={currentCollectionId}

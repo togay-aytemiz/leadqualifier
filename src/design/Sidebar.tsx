@@ -3,7 +3,6 @@
 import { cn } from '@/lib/utils'
 import { ReactNode } from 'react'
 import Link from 'next/link'
-import { Plus, Search } from 'lucide-react'
 
 // --- Sidebar Container ---
 interface SidebarProps {

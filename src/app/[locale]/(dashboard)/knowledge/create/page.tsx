@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
 import { Button, PageHeader, Input, TextArea } from '@/design'
@@ -18,8 +18,6 @@ export default function CreateContentPage() {
     const [collectionId, setCollectionId] = useState<string>(initialCollectionId || '')
     const [collections, setCollections] = useState<KnowledgeCollection[]>([])
 
-    // Status
-    const [isPending, startTransition] = useTransition()
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
