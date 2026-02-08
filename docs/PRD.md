@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-07 (sidebar + Skills/Knowledge CTA accent refresh; platform admin dashboard totals RPC optimization)  
+> **Last Updated:** 2026-02-08 (mobile leads list compact-card layout on small screens; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > **Status:** In Development
 
 ---
@@ -46,7 +46,7 @@ Automate WhatsApp message handling:
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary** | Implemented |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, mobile list→conversation flow with details toggle** | Implemented |
 
 ### ❌ Out of Scope (Intentional)
 - Calendar integration
@@ -71,6 +71,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
+- Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
+- Shadow inactive banner copy is compact by default (single-line title + one short explanatory sentence).
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
  - If no skill/KB match, bot suggests available topics using existing skills/KB titles
@@ -175,7 +177,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - KB/fallback prompting also includes the last 3 assistant replies to reduce repeated greetings/openings in consecutive bot turns.
 - Final KB/RAG/fallback generation now receives recent multi-turn user+assistant history and known lead snapshot facts (when available) so replies continue naturally, avoid repetitive greetings, and reduce repeated question loops.
 - Lead extraction now stores collected required-intake values as `extracted_fields.required_intake_collected` when customer messages clearly provide them.
-- Lead extraction applies merge-on-update persistence: if later turns omit previously extracted business details, existing `service_type`, summary, and collected required fields are preserved unless explicitly updated.
+- Lead extraction applies merge-on-update persistence for `service_type` and collected required fields, while `summary` is always tied to the current extraction window (latest 5 customer messages) to prevent stale status-summary mismatch.
 - Lead extraction output language is locale-aware (TR/EN): summary and extracted detail values follow customer/locale signal instead of defaulting to English.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
@@ -253,6 +255,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Name, phone, status (Hot/Warm/Cold)
 - Score, AI Summary, last message time
 - "Open in WhatsApp" button
+- Mobile layout uses compact, tappable card rows with reduced spacing; desktop keeps the full sortable table layout.
 
 ### 5.2 Skills Management (Implemented; Playground Planned)
 - CRUD operations
@@ -404,6 +407,7 @@ MVP is successful when:
 - **Sidebar UI Refinement:** Collapsed-state icon pills are centered and the expand/collapse toggle sits alongside the app name, using arrow-from-line icons for clarity.
 - **Sidebar UI Refinement:** Collapsed logo alignment is centered to match the navigation icon stack.
 - **Sidebar Branding:** Use `/public/logo-black.svg` for expanded sidebar header state and `/public/icon-black.svg` for collapsed sidebar header state.
+- **Sidebar Branding Scale:** In collapsed mode, render `/public/icon-black.svg` at active-tab footprint size (`44px`) to keep header branding visually balanced with nav pills.
 - **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
 - **Sidebar Spacing:** Add top padding between the header block and first navigation section for visual separation.
 - **Sidebar Icons:** Use per-item active/passive icon variants (react-icons) to differentiate selected states.
@@ -438,6 +442,8 @@ MVP is successful when:
 - **Billing Storage Metrics:** Storage usage in Usage & Billing is an approximate UTF-8 text size based on Skills (`title`, `response_text`, `trigger_examples`) and Knowledge Documents (`title`, `content`).
 - **Billing Message Layout:** Present AI/operator/customer message counts on separate rows inside each message usage card to improve scanability.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
+- **Inbox Assistant-State Banner:** Composer banner copy reflects org `bot_mode` (`active` vs `shadow`/`off`) so runtime reply availability is explicit.
+- **Skill Matching Fail-Open:** If semantic skill matching fails at runtime, continue via KB/fallback path instead of terminating the webhook flow.
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
 - **Inbox Details:** Use consistent contact initials between list avatars and details panel.
 - **Inbox Avatars:** Use the shared Avatar component across list, chat, and details to keep initials/colors consistent.
@@ -456,6 +462,17 @@ MVP is successful when:
 - **Inbox Lead Realtime:** Include `leads` in realtime publication and subscribe to status changes so list indicators update without manual refresh.
 - **Inbox Realtime Auth Sync:** Bootstrap realtime auth from session, fall back to `refreshSession()` when missing, and re-apply tokens on auth state changes to avoid stale subscriptions.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
+- **Inbox Summary Reopen Behavior:** Closing and re-opening the summary panel should trigger a fresh summary generation (without requiring manual refresh).
+- **Inbox Scroll-to-Latest CTA:** Show an animated jump-to-latest button only when chat is away from bottom; anchor it on the composer divider with subtle gray styling.
+- **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
+- **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
+- **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
+- **Mobile Inbox Details Payload:** Mobile details must prioritize lead context by showing `service_type`, `summary`, and collected required-intake fields.
+- **Mobile Operator Exit Visibility:** When conversation control is on operator, keep a visible “Leave Conversation” action in mobile chat view (not buried in desktop-only details column).
+- **Mobile Inbox Transition Motion:** Use horizontal slide transitions for list→conversation and conversation→list navigation to preserve app-like continuity.
+- **Mobile Details Overlay:** Opening mobile details should dim the chat background with a dark tappable overlay to emphasize focus and make close intent obvious.
+- **Mobile Details Micro-Animation:** Mobile details open/close should use short fade + vertical translate transitions to avoid abrupt layout jumps.
+- **Mobile Leads List Density:** On small screens, use compact card rows with tighter spacing and tap-first scanning; keep desktop lead table structure unchanged.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
 - **AI Settings Card Density:** Keep bot-mode and escalation selection cards compact to avoid oversized visual weight in settings pages.

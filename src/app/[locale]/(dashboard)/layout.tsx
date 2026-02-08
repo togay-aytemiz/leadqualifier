@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { MainSidebar } from '@/design'
+import { MobileBottomNav } from '@/design/MobileBottomNav'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function DashboardLayout({
@@ -22,16 +23,21 @@ export default async function DashboardLayout({
     const userName = profile?.full_name || profile?.email || 'User'
 
     return (
-        <div className="flex h-screen w-full bg-gray-50 overflow-hidden">
-            <MainSidebar
-                userName={userName}
-                isSystemAdmin={orgContext?.isSystemAdmin ?? false}
-                organizations={orgContext?.accessibleOrganizations ?? []}
-                activeOrganizationId={orgContext?.activeOrganizationId ?? null}
-                readOnlyTenantMode={orgContext?.readOnlyTenantMode ?? false}
-            />
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                {children}
+        <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+            <div className="hidden lg:flex">
+                <MainSidebar
+                    userName={userName}
+                    isSystemAdmin={orgContext?.isSystemAdmin ?? false}
+                    organizations={orgContext?.accessibleOrganizations ?? []}
+                    activeOrganizationId={orgContext?.activeOrganizationId ?? null}
+                    readOnlyTenantMode={orgContext?.readOnlyTenantMode ?? false}
+                />
+            </div>
+            <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="flex min-h-0 flex-1 overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+                    {children}
+                </div>
+                <MobileBottomNav />
             </div>
         </div>
     )

@@ -7,6 +7,17 @@
 ## [Unreleased]
 
 ### Added
+- Inbox composer banner now reflects bot mode state: Active keeps the assistant-active message, while Shadow/Off show an explicit “AI assistant is not active” notice.
+- Mobile dashboard shell now includes an app-style bottom navbar on small screens with 5 items: Inbox, Kişiler, Yetenekler, Bilgi Bankası, and Diğer.
+- Mobile “Diğer” menu now exposes quick actions for Simülatör, Ayarlar, and Signout.
+- Inbox now supports mobile single-pane flow: conversation list opens a dedicated chat detail view with back navigation.
+- Mobile chat header now includes a Details toggle that expands/collapses compact contact and lead snapshot cards.
+- Mobile details cards now include lead summary, service type, and collected required-intake info.
+- Mobile operator takeover view now shows a clearly visible Leave Conversation action in chat.
+- Mobile inbox transitions now animate as horizontal slide-in/slide-out between list and conversation detail views.
+- Mobile details panel now adds a dark background overlay and supports tap-outside close behavior.
+- Mobile details panel open/close now uses smooth transition (fade + slight slide).
+- Leads page now renders a compact mobile-first card list (reduced spacing/margins) while preserving the existing desktop sortable table layout.
 - Lead extraction now enforces locale-aware output language (TR/EN) for user-facing extracted fields, including lead summary and important-info values.
 - Inbox on-demand conversation summary now accepts active UI locale (TR/EN) and generates locale-matched output.
 - Admin organization list now supports search + pagination for large tenant sets.
@@ -39,7 +50,17 @@
 - Skill and KB similarity matching now use inclusive threshold checks (`>=`) to match the sensitivity slider semantics.
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
+### Changed
+- Lead extraction summary persistence now stays aligned with the current extraction window (latest 5 customer messages) instead of carrying over stale summaries when the latest extraction omits summary.
+- Lead extraction strict-retry validation now requires `summary` together with `score` and `status` keys.
+- Shadow-mode inbox inactive banner copy is now compact (`Yapay zeka asistanı devrede değil.` + `Dinleyici modunda yanıt gönderilmez.`) with reduced card footprint.
+- Inbox scroll-to-latest CTA is now anchored on the composer divider and restyled with a subtle gray tone for clearer but less distracting visibility.
+- Inbox composer spacing between the summary row and assistant banner is now tighter.
+
 ### Fixed
+- Inbox conversation list header no longer shows a dropdown chevron next to the “Gelen Kutusu / Inbox” title.
+- Inbox summary panel now regenerates summary on every reopen; manual refresh is no longer required after close/reopen.
+- Telegram webhook skill-matching failures now fail open to KB/fallback processing, preventing silent no-reply drops when embedding/match calls error.
 - Telegram webhook AI gating no longer gets blocked by stale `assignee_id` when `active_agent` is already bot; runtime operator-active checks now honor `active_agent` as source of truth.
 - Hot-lead `notify_only` escalation now preserves ongoing AI replies as intended (only `switch_to_operator` silences AI).
 - Supabase migration version collision: renamed `00020_send_operator_message_rpc.sql` to `00052_send_operator_message_rpc.sql` so `schema_migrations.version` is unique.
@@ -169,6 +190,7 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+- Collapsed sidebar header brand icon (`/public/icon-black.svg`) now renders at `44px` so it visually matches the active navigation pill footprint.
 - Sidebar navigation accent palette now uses ink `#242A40` (replacing blue) for active pills, indicators, and focus rings in `MainSidebar`, `GlobalRail`, and `KnowledgeSidebar`.
 - Skills and Knowledge Base primary CTA buttons now use ink `#242A40` (replacing blue) across create/save actions, including modal and empty-state CTAs.
 - Settings page headers now reuse settings sidebar labels for title parity (AI and General pages).

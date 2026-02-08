@@ -303,7 +303,7 @@ export function mergeExtractionWithExisting(
             ...incomingCollected
         },
         non_business: incoming.non_business,
-        summary: incoming.summary ?? normalizeOptionalString(existingLead?.summary) ?? null,
+        summary: incoming.summary,
         score: incoming.score,
         status: incoming.status
     }
@@ -438,8 +438,8 @@ export async function runLeadExtraction(options: {
 
     addUsage(completion, userPrompt, response)
 
-    if (!hasJsonKey(response, 'score') || !hasJsonKey(response, 'status')) {
-        const strictPrompt = `${userPrompt}\n\nReturn JSON with all required keys including score and status.`
+    if (!hasJsonKey(response, 'score') || !hasJsonKey(response, 'status') || !hasJsonKey(response, 'summary')) {
+        const strictPrompt = `${userPrompt}\n\nReturn JSON with all required keys including summary, score, and status.`
         const retry = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.2,

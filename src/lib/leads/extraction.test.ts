@@ -57,7 +57,7 @@ describe('safeParseLeadExtraction', () => {
 })
 
 describe('mergeExtractionWithExisting', () => {
-    it('preserves previously collected lead fields when incoming extraction omits them', () => {
+    it('keeps summary aligned with current extraction window when incoming summary is omitted', () => {
         const merged = mergeExtractionWithExisting(
             {
                 service_type: null,
@@ -89,7 +89,7 @@ describe('mergeExtractionWithExisting', () => {
         )
 
         expect(merged.service_type).toBe('Yenidoğan çekimi')
-        expect(merged.summary).toBe('Müşteri randevu istiyor.')
+        expect(merged.summary).toBeNull()
         expect(merged.desired_date).toBe('1 Mart')
         expect(merged.location).toBe('Kadıköy')
         expect(merged.budget_signals).toEqual(['15.000 TL'])

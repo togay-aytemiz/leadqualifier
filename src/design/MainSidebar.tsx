@@ -434,14 +434,14 @@ export function MainSidebar({
                         <div
                             className={cn(
                                 'transition-all duration-200 motion-reduce:transition-none',
-                                collapsed ? 'w-[27px] opacity-100' : 'w-[85px] opacity-100'
+                                collapsed ? 'w-11 opacity-100' : 'w-[85px] opacity-100'
                             )}
                         >
                             <Image
                                 src={collapsed ? '/icon-black.svg' : '/logo-black.svg'}
                                 alt={tCommon('appName')}
-                                width={collapsed ? 27 : 85}
-                                height={27}
+                                width={collapsed ? 44 : 85}
+                                height={collapsed ? 44 : 27}
                                 priority
                                 className="h-auto w-full"
                             />

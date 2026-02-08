@@ -19,6 +19,7 @@ import {
 import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
+import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { v4 as uuidv4 } from 'uuid'
 
 function isLikelyTurkishMessage(value: string) {
@@ -301,7 +302,14 @@ export async function POST(req: NextRequest) {
     } | null = null
 
     // 6. Process AI Response (Skills)
-    const matchedSkills = await matchSkills(text, orgId, matchThreshold, 5, supabase)
+    const matchedSkills = await matchSkillsSafely({
+        matcher: () => matchSkills(text, orgId, matchThreshold, 5, supabase),
+        context: {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            source: 'telegram'
+        }
+    })
     const bestMatch = matchedSkills?.[0]
 
     console.log('Telegram Webhook: Skill match result', {

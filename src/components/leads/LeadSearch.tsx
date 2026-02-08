@@ -35,13 +35,13 @@ export function LeadSearch() {
     }, [value, router, searchParams])
 
     return (
-        <div className="relative">
+        <div className="relative w-44 sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder={t('searchPlaceholder')}
-                className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 bg-white shadow-sm hover:border-gray-300 transition-colors"
+                className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm transition-colors hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
         </div>
     )

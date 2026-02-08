@@ -56,7 +56,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                 title={t('title')}
                 actions={<LeadSearch />}
             />
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-3 md:p-6">
                 {leadsResult.total === 0 ? (
                     <div className="flex items-center justify-center h-full">
                         <LeadsEmptyState

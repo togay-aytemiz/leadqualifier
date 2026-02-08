@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal } from '@/design'
 import {
     Inbox, ChevronDown,
-    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown
 } from 'lucide-react'
 import { FaTelegram, FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { IoLogoWhatsapp } from 'react-icons/io5'
@@ -16,6 +16,16 @@ import { formatDistanceToNow, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
+import { resolveAssistantBanner } from '@/lib/inbox/assistant-banner'
+import {
+    getMobileConversationPaneClasses,
+    getMobileDetailsOverlayClasses,
+    getMobileDetailsPanelClasses,
+    getMobileListPaneClasses
+} from '@/components/inbox/mobilePaneState'
+import { resolveSummaryToggle } from '@/components/inbox/summaryPanelState'
+import { cn } from '@/lib/utils'
+import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -69,6 +79,9 @@ export function InboxContainer({
     const [isLeaving, setIsLeaving] = useState(false)
     const [currentUserProfile, setCurrentUserProfile] = useState<ProfileLite | null>(null)
     const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, isLoading: false })
+    const [isMobileConversationOpen, setIsMobileConversationOpen] = useState(false)
+    const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false)
+    const [showScrollToLatest, setShowScrollToLatest] = useState(false)
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -77,6 +90,7 @@ export function InboxContainer({
     const supabase = supabaseRef.current
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const messagesContainerRef = useRef<HTMLDivElement>(null)
     const messagesRef = useRef<Message[]>([])
     const leadRef = useRef<Lead | null>(null)
     const refreshInFlightRef = useRef(false)
@@ -115,6 +129,7 @@ export function InboxContainer({
         setLeadRefreshStatus('idle')
         setLeadRefreshError(null)
         setLeadAutoRefreshStatus('idle')
+        setIsMobileDetailsOpen(false)
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
             leadRefreshTimeoutRef.current = null
@@ -122,6 +137,12 @@ export function InboxContainer({
         if (leadAutoRefreshTimeoutRef.current) {
             clearTimeout(leadAutoRefreshTimeoutRef.current)
             leadAutoRefreshTimeoutRef.current = null
+        }
+    }, [selectedId])
+
+    useEffect(() => {
+        if (!selectedId) {
+            setIsMobileConversationOpen(false)
         }
     }, [selectedId])
 
@@ -297,8 +318,25 @@ export function InboxContainer({
         // Use setTimeout to ensure DOM is fully rendered/layout updated
         setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' })
+            setTimeout(() => setShowScrollToLatest(false), behavior === 'smooth' ? 250 : 0)
         }, 100)
     }
+
+    const syncScrollToLatestVisibility = useCallback(() => {
+        const container = messagesContainerRef.current
+        if (!container) {
+            setShowScrollToLatest(false)
+            return
+        }
+        const distanceFromBottom = getDistanceFromBottom(container)
+        setShowScrollToLatest(
+            shouldShowScrollToLatestButton(distanceFromBottom, DEFAULT_SCROLL_TO_LATEST_THRESHOLD)
+        )
+    }, [])
+
+    const handleMessagesScroll = useCallback(() => {
+        syncScrollToLatestVisibility()
+    }, [syncScrollToLatestVisibility])
 
     // Effect for conversation switch (Instant scroll)
     useEffect(() => {
@@ -316,6 +354,13 @@ export function InboxContainer({
         }
         prevMessagesLength.current = messages.length
     }, [messages])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            syncScrollToLatestVisibility()
+        }, 120)
+        return () => clearTimeout(timer)
+    }, [messages, selectedId, syncScrollToLatestVisibility])
 
     // Also force scroll on mount/updates just in case
     // useEffect(() => { scrollToBottom() }, [])
@@ -545,9 +590,17 @@ export function InboxContainer({
 
     const handleToggleSummary = async () => {
         if (summaryHeaderDisabled) return
-        const nextOpen = !isSummaryOpen
+        const next = resolveSummaryToggle(isSummaryOpen)
+        const nextOpen = next.nextOpen
         setIsSummaryOpen(nextOpen)
-        if (nextOpen && summaryStatus === 'idle' && !summaryText) {
+
+        if (next.resetCachedSummary) {
+            setSummaryStatus('idle')
+            setSummaryText('')
+            return
+        }
+
+        if (next.shouldFetch) {
             await handleFetchSummary()
         }
     }
@@ -724,6 +777,107 @@ export function InboxContainer({
         }
     }
 
+    const handleSelectConversation = (conversationId: string) => {
+        setSelectedId(conversationId)
+        setIsMobileConversationOpen(true)
+    }
+
+    const handleBackToConversationList = () => {
+        setIsMobileConversationOpen(false)
+        setIsMobileDetailsOpen(false)
+    }
+
+    const renderConversationListContent = () => (
+        <>
+            {conversations.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-start p-6 pt-20 text-center">
+                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                        <Inbox className="text-gray-400" size={24} />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900">{t('noMessages')}</h3>
+                    <p className="mt-1 text-xs text-gray-500">{t('noMessagesDesc')}</p>
+                </div>
+            ) : (
+                conversations.map(c => {
+                    const leadStatus = Array.isArray(c.leads)
+                        ? c.leads[0]?.status
+                        : c.leads?.status
+                    const leadStatusLabel = leadStatus
+                        ? (leadStatusLabels[leadStatus] ?? leadStatus)
+                        : null
+                    const leadChipClassName = leadStatus === 'hot'
+                        ? 'border-red-100 bg-red-50 text-red-700'
+                        : leadStatus === 'warm'
+                            ? 'border-amber-100 bg-amber-50 text-amber-700'
+                            : leadStatus === 'cold'
+                                ? 'border-slate-200 bg-slate-100 text-slate-600'
+                                : leadStatus === 'ignored'
+                                    ? 'border-blue-100 bg-blue-50 text-blue-700'
+                                    : 'border-gray-200 bg-gray-100 text-gray-600'
+
+                    return (
+                        <div
+                            key={c.id}
+                            onClick={() => handleSelectConversation(c.id)}
+                            className={`relative cursor-pointer border-b border-gray-100 bg-white px-4 py-4 transition-colors hover:bg-gray-50 group ${selectedId === c.id ? "bg-blue-50/30" : ""}`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="relative shrink-0">
+                                    <Avatar name={c.contact_name} size="sm" />
+                                    <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
+                                        <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
+                                            {c.platform === 'telegram' ? (
+                                                <FaTelegram className="text-[#229ED9]" size={18} />
+                                            ) : c.platform === 'whatsapp' ? (
+                                                <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                            ) : (
+                                                <span className="text-[9px] font-semibold uppercase text-gray-400">{t('platformSimulatorShort')}</span>
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="min-w-0 flex-1 pr-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`truncate text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
+                                            {c.contact_name}
+                                        </span>
+                                        {leadStatusLabel && (
+                                            <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
+                                                {leadStatusLabel}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
+                                        {c.messages?.[0] && (
+                                            c.messages[0].sender_type === 'contact'
+                                                ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
+                                                : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
+                                        )}
+                                        <span className="truncate">{c.messages?.[0]?.content || t('noMessagesYet')}</span>
+                                    </p>
+                                    <div className="mt-0.5 flex items-center justify-between">
+                                        <span className="text-xs text-gray-400">
+                                            {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
+                                        </span>
+                                        {c.unread_count > 0 && (
+                                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            {selectedId === c.id && <div className="absolute bottom-0 left-0 top-0 w-0.5 bg-blue-500"></div>}
+                        </div>
+                    )
+                })
+            )}
+            {loadingMore && (
+                <div className="flex justify-center p-4">
+                    <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-blue-500"></div>
+                </div>
+            )}
+        </>
+    )
+
     const selectedConversation = conversations.find(c => c.id === selectedId)
 
     // Calculate active agent based on last outgoing message
@@ -736,9 +890,14 @@ export function InboxContainer({
     // If system sent last (e.g. "Operator left"), it defaults to AI (operator only if 'user')
     // const activeAgent = lastOutgoingMessage?.sender_type === 'user' ? 'operator' : 'ai'
 
+    const resolvedBotMode = (botMode ?? 'active')
     // NEW: Use explicit state from conversation
     // Fallback to 'ai' (bot) if undefined (e.g. old data or optimistic new conv)
     const activeAgent = selectedConversation?.active_agent === 'operator' ? 'operator' : 'ai'
+    const assistantBanner = resolveAssistantBanner({
+        activeAgent,
+        botMode: resolvedBotMode
+    })
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
     const canSend = !!input.trim() && !isSending && !isReadOnly
     const contactMessageCount = messages.filter(m => m.sender_type === 'contact').length
@@ -752,7 +911,6 @@ export function InboxContainer({
         : scoreReasonError === 'missing_lead'
             ? t('scoreReasonNoLead')
             : t('scoreReasonError')
-    const resolvedBotMode = (botMode ?? 'active')
     const operatorActive = isOperatorActive(selectedConversation)
     const allowDuringOperator = Boolean(allowLeadExtractionDuringOperator)
     const leadExtractionPaused = Boolean(selectedConversation) && (resolvedBotMode === 'off' || (operatorActive && !allowDuringOperator))
@@ -766,117 +924,61 @@ export function InboxContainer({
             ? t('leadRefreshMissingConversation')
             : t('leadRefreshError')
     const isLeadUpdating = leadRefreshStatus === 'loading' || leadAutoRefreshStatus === 'loading'
+    const mobileListPaneClasses = getMobileListPaneClasses(isMobileConversationOpen)
+    const mobileConversationPaneClasses = getMobileConversationPaneClasses(isMobileConversationOpen)
+    const mobileDetailsOverlayClasses = getMobileDetailsOverlayClasses(isMobileDetailsOpen)
+    const mobileDetailsPanelClasses = getMobileDetailsPanelClasses(isMobileDetailsOpen)
 
     return (
         <>
+            <div className="relative flex min-h-0 flex-1 overflow-hidden">
             {/* Conversation List */}
-            <div className="w-[320px] border-r border-gray-200 flex flex-col h-full bg-gray-50/30">
+            <div
+                className={cn(
+                    'absolute inset-0 z-20 flex h-full w-full flex-col border-r border-gray-200 bg-gray-50/30 transition-transform duration-300 ease-out lg:static lg:z-auto lg:w-[320px] lg:translate-x-0 lg:pointer-events-auto lg:transition-none',
+                    mobileListPaneClasses
+                )}
+            >
                 <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-white">
-                    <div className="flex items-center gap-1 cursor-pointer group">
+                    <div className="flex items-center">
                         <span className="text-lg font-bold text-gray-900">{t('title')}</span>
-                        <ChevronDown className="text-gray-500 group-hover:text-gray-900" size={20} />
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
-                    {conversations.length === 0 ? (
-                        <div className="flex flex-col items-center justify-start h-full p-6 pt-20 text-center">
-                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                                <Inbox className="text-gray-400" size={24} />
-                            </div>
-                            <h3 className="text-sm font-medium text-gray-900">{t('noMessages')}</h3>
-                            <p className="text-xs text-gray-500 mt-1">{t('noMessagesDesc')}</p>
-                        </div>
-                    ) : (
-                        conversations.map(c => {
-                            const leadStatus = Array.isArray(c.leads)
-                                ? c.leads[0]?.status
-                                : c.leads?.status
-                            const leadStatusLabel = leadStatus
-                                ? (leadStatusLabels[leadStatus] ?? leadStatus)
-                                : null
-                            const leadChipClassName = leadStatus === 'hot'
-                                ? 'border-red-100 bg-red-50 text-red-700'
-                                : leadStatus === 'warm'
-                                    ? 'border-amber-100 bg-amber-50 text-amber-700'
-                                    : leadStatus === 'cold'
-                                        ? 'border-slate-200 bg-slate-100 text-slate-600'
-                                        : leadStatus === 'ignored'
-                                            ? 'border-blue-100 bg-blue-50 text-blue-700'
-                                            : 'border-gray-200 bg-gray-100 text-gray-600'
-
-                            return (
-                                <div
-                                    key={c.id}
-                                    onClick={() => setSelectedId(c.id)}
-                                    className={`px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative group bg-white ${selectedId === c.id ? "bg-blue-50/30" : ""}`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div className="relative shrink-0">
-                                            <Avatar name={c.contact_name} size="sm" />
-                                            <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-2">
-                                                <span className="h-6 w-6 rounded-full border-[0.5px] border-white/50 bg-white shadow-sm flex items-center justify-center">
-                                                    {c.platform === 'telegram' ? (
-                                                        <FaTelegram className="text-[#229ED9]" size={18} />
-                                                    ) : c.platform === 'whatsapp' ? (
-                                                        <IoLogoWhatsapp className="text-[#25D366]" size={18} />
-                                                    ) : (
-                                                        <span className="text-[9px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="min-w-0 flex-1 pr-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-sm font-semibold truncate ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
-                                                    {c.contact_name}
-                                                </span>
-                                                {leadStatusLabel && (
-                                                    <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
-                                                        {leadStatusLabel}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className={`mt-0.5 text-sm truncate leading-relaxed flex items-center gap-1.5 ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
-                                                {c.messages?.[0] && (
-                                                    c.messages[0].sender_type === 'contact'
-                                                        ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
-                                                        : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
-                                                )}
-                                                <span className="truncate">{c.messages?.[0]?.content || t('noMessagesYet')}</span>
-                                            </p>
-                                            <div className="mt-0.5 flex items-center justify-between">
-                                                <span className="text-xs text-gray-400">
-                                                    {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
-                                                </span>
-                                                {c.unread_count > 0 && (
-                                                    <span className="h-2 w-2 rounded-full bg-blue-500" />
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {selectedId === c.id && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>}
-                                </div>
-                            )
-                        })
-                    )}
-                    {loadingMore && (
-                        <div className="p-4 flex justify-center">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                        </div>
-                    )}
+                    {renderConversationListContent()}
                 </div>
             </div >
 
             {/* Main Chat */}
             {selectedConversation ? (
                 <>
-                    <div className="flex-1 flex flex-col bg-white min-w-0">
-                        <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 shrink-0 bg-white">
-                            <div className="flex items-center gap-3">
+                    <div
+                        className={cn(
+                            'relative absolute inset-0 z-30 flex min-w-0 flex-1 flex-col bg-white transition-transform duration-300 ease-out lg:static lg:z-auto lg:flex lg:translate-x-0 lg:pointer-events-auto lg:transition-none',
+                            mobileConversationPaneClasses
+                        )}
+                    >
+                        <div className="h-14 shrink-0 border-b border-gray-200 bg-white px-4 lg:px-6 flex items-center justify-between">
+                            <div className="flex items-center gap-2 lg:gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleBackToConversationList}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden"
+                                    aria-label={t('backToInbox')}
+                                >
+                                    <ArrowLeft size={18} />
+                                </button>
                                 <h2 className="font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition-colors ${activeAgent === 'ai'
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileDetailsOpen(prev => !prev)}
+                                    className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 lg:hidden"
+                                >
+                                    {isMobileDetailsOpen ? t('hideDetails') : t('details')}
+                                </button>
+                                <span className={`hidden md:flex text-xs px-3 py-1.5 rounded-full border items-center gap-1.5 transition-colors ${activeAgent === 'ai'
                                     ? 'bg-purple-50 text-purple-700 border-purple-100'
                                     : 'bg-blue-50 text-blue-700 border-blue-100'
                                     }`}>
@@ -888,7 +990,79 @@ export function InboxContainer({
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gray-50/30">
+                        <button
+                            type="button"
+                            aria-hidden={!isMobileDetailsOpen}
+                            onClick={() => setIsMobileDetailsOpen(false)}
+                            className={cn(
+                                'absolute inset-0 top-14 z-20 bg-gray-950/30 transition-opacity duration-300 ease-out lg:hidden',
+                                mobileDetailsOverlayClasses
+                            )}
+                        />
+                        <div
+                            aria-hidden={!isMobileDetailsOpen}
+                            className={cn(
+                                'absolute inset-x-0 top-14 z-30 px-4 pt-3 transition-all duration-300 ease-out lg:hidden',
+                                mobileDetailsPanelClasses
+                            )}
+                        >
+                            <div className="max-h-[54vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white px-3 py-3 shadow-lg">
+                                <div className="mb-3 flex items-center gap-3">
+                                    <Avatar name={selectedConversation.contact_name} size="sm" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900">{selectedConversation.contact_name}</p>
+                                        <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                        <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadService')}</p>
+                                        <p className="mt-1 text-sm font-medium text-gray-900">{lead?.service_type || t('leadUnknown')}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                        <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
+                                        <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
+                                    <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">{lead?.summary || t('leadEmpty')}</p>
+                                </div>
+                                <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadRequiredInfo')}</p>
+                                    {collectedRequiredIntake.length > 0 ? (
+                                        <div className="mt-2 space-y-2">
+                                            {collectedRequiredIntake.map((item) => (
+                                                <div key={item.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
+                                                    <span className="text-xs text-gray-500">{item.field}</span>
+                                                    <span className="break-words text-sm text-gray-900">{item.value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {activeAgent === 'operator' && (
+                            <div className="border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
+                                <button
+                                    onClick={handleLeaveConversation}
+                                    disabled={isLeaving || isReadOnly}
+                                    className="w-full rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isLeaving ? t('leaving') : t('leaveConversation')}
+                                </button>
+                            </div>
+                        )}
+
+                        <div
+                            ref={messagesContainerRef}
+                            onScroll={handleMessagesScroll}
+                            className="flex-1 overflow-y-auto bg-gray-50/30 p-4 lg:p-8 space-y-6 lg:space-y-8"
+                        >
                             <div className="flex justify-center">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">{t('today')}</span>
                             </div>
@@ -939,8 +1113,30 @@ export function InboxContainer({
                             <div ref={messagesEndRef} />
                         </div>
 
-                        <div className="p-6 border-t border-gray-200 bg-white">
-                            <div className="mb-2">
+                        <div className="relative border-t border-gray-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:p-6">
+                            <div
+                                className="pointer-events-none absolute right-4 top-0 z-20 -translate-y-1/2 lg:right-6"
+                                aria-hidden={!showScrollToLatest}
+                            >
+                                <div
+                                    className={`transition-all duration-300 ease-out ${
+                                        showScrollToLatest
+                                            ? 'translate-y-0 opacity-100'
+                                            : 'translate-y-2 opacity-0'
+                                    }`}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => scrollToBottom('smooth')}
+                                        title={t('scrollToLatest')}
+                                        aria-label={t('scrollToLatest')}
+                                        className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-200"
+                                    >
+                                        <ArrowDown size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mb-1">
                                 <div
                                     className="relative inline-flex group"
                                     title={!canSummarize ? t('summary.tooltip.insufficient') : undefined}
@@ -979,7 +1175,7 @@ export function InboxContainer({
                                 <div
                                     id={SUMMARY_PANEL_ID}
                                     aria-hidden={!isSummaryOpen}
-                                    className={`mt-3 overflow-hidden transition-all duration-300 ease-out ${isSummaryOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}
+                                    className={`mt-2 overflow-hidden transition-all duration-300 ease-out ${isSummaryOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}
                                 >
                                     <div className={`w-full transition-all duration-300 ease-out ${summaryStatus === 'success' ? 'max-w-full' : 'max-w-[520px]'}`}>
                                         <div className={`rounded-2xl border px-4 py-3 shadow-sm transition-all duration-300 ${summaryStatus === 'loading'
@@ -1009,14 +1205,39 @@ export function InboxContainer({
                                 </div>
                             </div>
 
-                            {activeAgent === 'ai' && (
-                                <div className="mb-4 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 flex items-center gap-3">
-                                    <div className="h-9 w-9 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center text-yellow-700 shrink-0">
-                                        <Bot size={18} />
+                            {assistantBanner && (
+                                <div
+                                    className={`mb-3 rounded-xl flex items-center ${
+                                        assistantBanner.tone === 'inactive'
+                                            ? 'gap-2 border border-slate-200 bg-slate-50 px-3 py-2'
+                                            : 'gap-3 border border-yellow-200 bg-yellow-50 px-4 py-3'
+                                    }`}
+                                >
+                                    <div
+                                        className={`${assistantBanner.tone === 'inactive' ? 'h-8 w-8' : 'h-9 w-9'} rounded-full border flex items-center justify-center shrink-0 ${
+                                            assistantBanner.tone === 'inactive'
+                                                ? 'bg-slate-100 border-slate-200 text-slate-600'
+                                                : 'bg-yellow-100 border-yellow-200 text-yellow-700'
+                                        }`}
+                                    >
+                                        <Bot size={assistantBanner.tone === 'inactive' ? 16 : 18} />
                                     </div>
-                                    <div className="text-sm text-yellow-900 leading-relaxed">
-                                        <span className="font-semibold">{t('botActiveTitle')}</span>
-                                        <span className="ml-1 text-yellow-800">{t('botActiveBody')}</span>
+                                    <div
+                                        className={`min-w-0 ${
+                                            assistantBanner.tone === 'inactive' ? 'text-slate-800' : 'text-yellow-900'
+                                        }`}
+                                    >
+                                        {assistantBanner.tone === 'inactive' ? (
+                                            <>
+                                                <p className="text-base font-semibold leading-5 whitespace-nowrap">{t(assistantBanner.titleKey)}</p>
+                                                <p className="text-xs leading-4 text-slate-700">{t(assistantBanner.bodyKey)}</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="font-semibold">{t(assistantBanner.titleKey)}</span>
+                                                <span className="ml-1 text-yellow-800">{t(assistantBanner.bodyKey)}</span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1026,7 +1247,7 @@ export function InboxContainer({
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 lg:gap-3">
                                 <div className="flex items-center gap-2 flex-1 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
                                     <IconButton icon={Paperclip} size="sm" />
                                     <IconButton icon={Image} size="sm" />
@@ -1055,7 +1276,7 @@ export function InboxContainer({
                                         }`}
                                 >
                                     <Send size={18} />
-                                    {t('sendButton')}
+                                    <span className="hidden sm:inline">{t('sendButton')}</span>
                                 </button>
                             </div>
                         </div>
@@ -1290,7 +1511,7 @@ export function InboxContainer({
                     </div >
                 </>
             ) : (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="hidden flex-1 items-center justify-center lg:flex">
                     <EmptyState
                         icon={Inbox}
                         title={t('noSelection')}
@@ -1298,6 +1519,7 @@ export function InboxContainer({
                     />
                 </div>
             )}
+            </div>
 
             <ConfirmDialog
                 isOpen={deleteDialog.isOpen}

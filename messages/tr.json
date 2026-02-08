@@ -146,7 +146,9 @@
         "settings": "Ayarlar",
         "inbox": "Gelen Kutusu",
         "simulator": "Simülatör",
-        "signout": "Çıkış Yap"
+        "other": "Diğer",
+        "signout": "Çıkış Yap",
+        "closeOtherMenu": "Diğer menüsünü kapat"
     },
     "mainSidebar": {
         "workspace": "Çalışma Alanı",
@@ -183,6 +185,10 @@
         "takeOverPlaceholder": "Sohbeti devralın...",
         "botActiveTitle": "Yapay zeka asistanı devrede.",
         "botActiveBody": "Manuel mesaj göndermek için devralın.",
+        "botInactiveShadowTitle": "Yapay zeka asistanı devrede değil.",
+        "botInactiveShadowBody": "Dinleyici modunda yanıt gönderilmez.",
+        "botInactiveOffTitle": "Yapay zeka asistanı devrede değil.",
+        "botInactiveOffBody": "Asistan kapalı. Mesaj göndermek için devralın.",
         "readOnlyMode": "Salt okunur mod: admin impersonation konuşma üzerinde gönderim/değişiklik yapamaz.",
         "sendShortcut": "Göndermek için ⌘ Enter",
         "sendButton": "Yanıtı Gönder",
@@ -196,6 +202,8 @@
             }
         },
         "details": "Detaylar",
+        "hideDetails": "Detayları gizle",
+        "backToInbox": "Gelen kutusuna dön",
         "conversationAttributes": "Konuşma Özellikleri",
         "id": "ID",
         "keyInfo": "Önemli Bilgiler",
@@ -250,7 +258,8 @@
         "scoreReasonTitle": "Skor gerekçesi",
         "scoreReasonError": "Skor açıklaması alınamadı. Tekrar deneyin.",
         "scoreReasonMissing": "Skor açıklaması için yapay zeka anahtarı eksik.",
-        "scoreReasonNoLead": "Bu konuşma için lead verisi bulunamadı."
+        "scoreReasonNoLead": "Bu konuşma için lead verisi bulunamadı.",
+        "scrollToLatest": "Son mesaja git"
     },
     "simulator": {
         "title": "Mesajlaşma Simülatörü",

@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-07 (sidebar + Skills/Knowledge CTA accent refresh to #242A40; admin dashboard totals RPC optimization)  
+> **Last Updated:** 2026-02-08 (mobile leads list compact-card layout + tighter mobile spacing; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -39,6 +39,7 @@
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
   - [x] Outgoing message API
+  - [x] Skill-match failures fail open to KB/fallback instead of dropping reply flow
 - [x] **Message Handling Core**
   - [x] Store incoming messages
   - [x] Store outgoing messages
@@ -102,6 +103,18 @@
   - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)
+  - [x] Closing and reopening summary panel now regenerates summary without requiring manual refresh
+  - [x] Mobile inbox app flow with list-to-conversation transition and back navigation
+  - [x] Mobile chat header details toggle with compact contact/lead snapshot
+  - [x] Mobile details payload now includes lead summary, service type, and collected required info
+  - [x] Mobile operator takeover view shows a visible Leave Conversation action
+  - [x] Mobile list/detail navigation uses slide transitions (forward/back)
+  - [x] Mobile details panel now dims background with a dark overlay and closes on outside tap
+  - [x] Mobile details panel open/close now uses smooth transition (fade + slight slide)
+  - [x] Inbox list header no longer shows the dropdown chevron next to the title
+  - [x] Chat view now shows an animated "scroll to latest" button only when not at bottom, positioned on the composer divider
+  - [x] Reduced vertical gap between the "Konuşma Özeti" row and the assistant banner in composer area
+  - [x] Shadow/Off bot modes now show compact inactive-state banner copy (single-line title + short body) in composer area
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
@@ -111,10 +124,13 @@
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
   - [x] Centered collapsed logo alignment
   - [x] Sidebar header branding uses `logo-black.svg` when expanded and `icon-black.svg` when collapsed
+  - [x] Collapsed sidebar brand icon scaled up to match active navigation item size
   - [x] Eyebrow section labels for grouped navigation
   - [x] Increased spacing between header and first sidebar section
   - [x] Sidebar nav icons use active/passive variants per item
   - [x] Sidebar accent and active-state color updated from blue to `#242A40`
+  - [x] Mobile bottom navbar with 5 items (Inbox, Kişiler, Yetenekler, Bilgi Bankası, Diğer)
+  - [x] Mobile “Diğer” quick menu with Simülatör, Ayarlar, and Signout
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
@@ -284,6 +300,7 @@
   - [x] Enforce locale-aware output language (TR/EN) for lead summary and extracted detail fields
   - [x] Include manual profile note with approved AI suggestions in extraction context
   - [x] Preserve previously extracted lead details when later turns omit fields (merge-on-update instead of destructive overwrite)
+  - [x] Keep lead summary aligned to the current extraction window (avoid stale summary carry-over when omitted)
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
   - [x] Auto-generate AI summary
@@ -299,6 +316,8 @@
   - [x] Present collected required fields in an "Important info" card section with plain label-value rows inside
   - [x] Required-info resolver supports manual override precedence for future lead-edit workflows
   - [ ] Manual overwrite UI for "Important info" values in Inbox (per field edit + save source tracking)
+- [x] **Lead List UX**
+  - [x] Mobile leads list now uses compact card rows with reduced spacing while preserving the existing desktop table layout
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
 

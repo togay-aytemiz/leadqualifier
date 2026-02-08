@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { DataTable, TableBody, TableRow, TableCell, Badge } from '@/design'
+import { DataTable, TableBody, TableRow, TableCell, Badge, Button } from '@/design'
 import { LeadWithConversation } from '@/lib/leads/list-actions'
 import { FaTelegram } from 'react-icons/fa6'
 import { IoLogoWhatsapp } from 'react-icons/io5'
@@ -12,7 +12,7 @@ import { tr, enUS } from 'date-fns/locale'
 import { useLocale } from 'next-intl'
 import * as Popover from '@radix-ui/react-popover'
 import { useState } from 'react'
-import { Button } from '@/design' // Ensure Button is imported if used, previously it was imported
+import { getMobileRequiredFieldHints, truncateForMobileSummary } from '@/components/leads/mobile-table'
 
 interface LeadsTableProps {
     leads: LeadWithConversation[]
@@ -169,8 +169,76 @@ export function LeadsTable({
     const to = Math.min(page * pageSize, total)
 
     return (
-        <div className="space-y-4">
-            <DataTable>
+        <div className="space-y-3 md:space-y-4">
+            <div className="space-y-2 md:hidden">
+                {leads.map(lead => {
+                    const mobileHints = getMobileRequiredFieldHints(lead, requiredFields)
+
+                    return (
+                        <button
+                            key={lead.id}
+                            type="button"
+                            onClick={() => handleRowClick(lead.conversation_id)}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-left shadow-sm transition-colors hover:border-gray-300 active:scale-[0.99]"
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="shrink-0">
+                                            {getPlatformIcon(lead.conversation.platform)}
+                                        </span>
+                                        <span className="truncate text-sm font-semibold text-gray-900">
+                                            {lead.conversation.contact_name}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-gray-500">
+                                        {formatDistanceToNow(new Date(lead.updated_at), {
+                                            addSuffix: true,
+                                            locale: dateLocale
+                                        })}
+                                    </p>
+                                </div>
+                                <div className="shrink-0 rounded-lg bg-gray-100 px-2 py-1 text-right">
+                                    <p className="text-[10px] uppercase tracking-wide text-gray-500">
+                                        {t('columns.score')}
+                                    </p>
+                                    <p className="text-sm font-semibold text-gray-900">{lead.total_score}</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge variant={statusVariants[lead.status] || 'neutral'}>
+                                    {statusLabels[lead.status] || lead.status}
+                                </Badge>
+                                {lead.service_type ? (
+                                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                                        {lead.service_type}
+                                    </span>
+                                ) : null}
+                            </div>
+
+                            {mobileHints.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {mobileHints.map((hint) => (
+                                        <span
+                                            key={hint.field}
+                                            className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600"
+                                        >
+                                            {hint.field}: {hint.value}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
+
+                            <p className="mt-2 truncate text-xs text-gray-500">
+                                {truncateForMobileSummary(lead.summary)}
+                            </p>
+                        </button>
+                    )
+                })}
+            </div>
+
+            <DataTable className="hidden md:block">
                 {/* Custom header with sorting */}
                 <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold border-b border-gray-200">
                     <tr>
@@ -258,8 +326,8 @@ export function LeadsTable({
             </DataTable>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-2">
-                <span className="text-sm text-gray-500">
+            <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between md:px-2">
+                <span className="text-xs text-gray-500 sm:text-sm">
                     {t('pagination.showing', { from, to, total })}
                 </span>
                 <div className="flex gap-2">
@@ -268,6 +336,7 @@ export function LeadsTable({
                         size="sm"
                         onClick={() => handlePageChange(page - 1)}
                         disabled={page <= 1}
+                        className="flex-1 sm:flex-none"
                     >
                         {t('pagination.prev')}
                     </Button>
@@ -276,6 +345,7 @@ export function LeadsTable({
                         size="sm"
                         onClick={() => handlePageChange(page + 1)}
                         disabled={page >= totalPages}
+                        className="flex-1 sm:flex-none"
                     >
                         {t('pagination.next')}
                     </Button>

@@ -146,7 +146,9 @@
         "settings": "Settings",
         "inbox": "Inbox",
         "simulator": "Simulator",
-        "signout": "Sign out"
+        "other": "Other",
+        "signout": "Sign out",
+        "closeOtherMenu": "Close other menu"
     },
     "mainSidebar": {
         "workspace": "Workspace",
@@ -183,6 +185,10 @@
         "takeOverPlaceholder": "Take over the conversation...",
         "botActiveTitle": "AI assistant is active.",
         "botActiveBody": "Take over to send messages manually.",
+        "botInactiveShadowTitle": "AI assistant is not active.",
+        "botInactiveShadowBody": "Shadow mode does not send replies.",
+        "botInactiveOffTitle": "AI assistant is not active.",
+        "botInactiveOffBody": "Assistant is off. Take over to send messages manually.",
         "readOnlyMode": "Read-only mode: admin impersonation cannot send or modify conversation data.",
         "sendShortcut": "⌘ Enter to send",
         "sendButton": "Send Reply",
@@ -196,6 +202,8 @@
             }
         },
         "details": "Details",
+        "hideDetails": "Hide details",
+        "backToInbox": "Back to inbox",
         "conversationAttributes": "Conversation Attributes",
         "id": "ID",
         "keyInfo": "Key Information",
@@ -250,7 +258,8 @@
         "scoreReasonTitle": "Score reasoning",
         "scoreReasonError": "Score explanation unavailable. Try again.",
         "scoreReasonMissing": "Score explanation unavailable because the AI key is missing.",
-        "scoreReasonNoLead": "No lead data available for this conversation."
+        "scoreReasonNoLead": "No lead data available for this conversation.",
+        "scrollToLatest": "Jump to latest message"
     },
     "simulator": {
         "title": "Simulator",

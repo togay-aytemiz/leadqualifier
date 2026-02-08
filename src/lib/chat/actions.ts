@@ -13,6 +13,7 @@ import {
     stripRepeatedGreeting,
     toOpenAiConversationMessages
 } from '@/lib/ai/conversation'
+import { matchSkillsSafely } from '@/lib/skills/match-safe'
 
 export interface ChatMessage {
     id: string
@@ -90,7 +91,13 @@ export async function simulateChat(
 
     // 1. Match skills with ZERO threshold to get ANY match for debugging
     console.log(`Simulating chat for: "${message}" in org: ${organizationId} with threshold: ${threshold}`)
-    const matches = await matchSkills(message, organizationId, 0.0)
+    const matches = await matchSkillsSafely({
+        matcher: () => matchSkills(message, organizationId, 0.0),
+        context: {
+            organization_id: organizationId,
+            source: 'simulator'
+        }
+    })
     console.log('Matches found:', JSON.stringify(matches, null, 2))
     // Only count tokens actually sent to LLM endpoints. Skill-only paths should be zero.
 
