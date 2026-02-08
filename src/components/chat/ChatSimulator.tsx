@@ -7,7 +7,14 @@ import type { ConversationTurn } from '@/lib/knowledge-base/router'
 import { ChatBubble } from './ChatBubble'
 import { Send, Bug, MessageSquare } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-
+import {
+    getSimulatorHeaderClasses,
+    getSimulatorInputBarClasses,
+    getSimulatorInputClasses,
+    getSimulatorMessagesPaneClasses,
+    getSimulatorSendButtonClasses,
+    getSimulatorShellClasses
+} from '@/components/chat/simulatorStyles'
 
 interface ChatSimulatorProps {
     organizationId: string
@@ -68,13 +75,6 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
         setIsTyping(true)
         setDebugInfo(null)
 
-        // Update status to read after short delay
-        setTimeout(() => {
-            setMessages((prev) =>
-                prev.map((m) => (m.id === userMsg.id ? { ...m, status: 'read' } : m))
-            )
-        }, 1000)
-
         try {
             // Simulate network delay + typing
             const startTime = Date.now()
@@ -133,24 +133,24 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full min-h-0">
             {/* Chat Window */}
-            <div className="lg:col-span-2 flex flex-col rounded-xl overflow-hidden border border-gray-200 bg-[#efeae2] shadow-sm">
+            <div className={getSimulatorShellClasses()}>
                 {/* Header */}
-                <div className="bg-[#00a884] px-4 py-3 flex items-center gap-3 shadow-sm z-10">
-                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold backdrop-blur-sm">
+                <div className={getSimulatorHeaderClasses()}>
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold">
                         {organizationName.charAt(0).toUpperCase()}
                     </div>
                     <div>
                         <h3 className="text-white font-medium text-base">{organizationName}</h3>
-                        <p className="text-white/80 text-xs">{t('businessAccount')}</p>
+                        <p className="text-white/70 text-xs">{t('assistantLabel')}</p>
                     </div>
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d936cd035c.png")', backgroundRepeat: 'repeat' }}>
+                <div className={getSimulatorMessagesPaneClasses()}>
                     {messages.length === 0 && (
                         <div className="flex justify-center mt-10">
-                            <span className="bg-[#fff5c4] text-gray-800 text-xs px-3 py-1.5 rounded-lg shadow-sm text-center border border-[#ffeeba]">
-                                {t('encryptionNotice')}
+                            <span className="max-w-md rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs text-slate-600 shadow-sm">
+                                {t('emptyChatNotice')}
                             </span>
                         </div>
                     )}
@@ -161,7 +161,7 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
 
                     {isTyping && (
                         <div className="flex w-full justify-start animate-fade-in">
-                            <div className="bg-white rounded-lg rounded-tl-none px-4 py-3 shadow-sm">
+                            <div className="rounded-2xl rounded-bl-md border border-zinc-200 bg-white px-4 py-3 shadow-sm">
                                 <div className="flex gap-1">
                                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -174,19 +174,19 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
                 </div>
 
                 {/* Input */}
-                <div className="bg-[#f0f2f5] px-4 py-3 border-t border-gray-200">
+                <div className={getSimulatorInputBarClasses()}>
                     <form onSubmit={handleSend} className="flex gap-2">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder={t('typeMessage')}
-                            className="flex-1 bg-white text-gray-900 rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 border border-gray-200 focus:border-[#00a884] transition-colors"
+                            className={getSimulatorInputClasses()}
                         />
                         <button
                             type="submit"
                             disabled={!input.trim() || isTyping}
-                            className="bg-[#00a884] text-white p-2 rounded-lg hover:bg-[#008f6f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                            className={getSimulatorSendButtonClasses()}
                         >
                             <Send size={24} />
                         </button>
@@ -213,7 +213,7 @@ export default function ChatSimulator({ organizationId, organizationName, defaul
                         step="0.05"
                         value={threshold}
                         onChange={(e) => setThreshold(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#00a884]"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                     />
                     <p className="text-[10px] text-gray-500 mt-2 whitespace-pre-line">
                         {t('sensitivityHint')}

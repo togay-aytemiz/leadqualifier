@@ -10,13 +10,9 @@ export default async function SettingsLayout({
 }) {
     const supabase = await createClient()
 
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-
-    if (!user) return null
-
     const orgContext = await resolveActiveOrganizationContext(supabase)
+    if (!orgContext) return null
+
     const pendingCount = orgContext?.activeOrganizationId
         ? await getPendingOfferingProfileSuggestionCount(orgContext.activeOrganizationId)
         : 0

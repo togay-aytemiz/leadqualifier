@@ -7,6 +7,11 @@
 ## [Unreleased]
 
 ### Added
+- Added desktop settings route warmup by prefetching settings destinations in `MainSidebar` and `SettingsResponsiveShell`.
+- Added WhatsApp Meta Cloud MVP implementation: manual channel connect modal, channel debug support, `POST/GET /api/webhooks/whatsapp`, and text-only reactive outbound sending from inbox.
+- Added WhatsApp integration helpers with unit tests (`src/lib/whatsapp/client.ts`, `src/lib/whatsapp/webhook.ts`, `src/lib/whatsapp/client.test.ts`, `src/lib/whatsapp/webhook.test.ts`).
+- Added simulator style helper tests (`src/components/chat/simulatorStyles.test.ts`) to lock neutral chatbot theming and prevent WhatsApp-style regressions.
+- Added WhatsApp Meta Cloud MVP design blueprint at `docs/plans/2026-02-08-whatsapp-meta-cloud-mvp-design.md` with validated scope: manual channel setup, inbound text-only processing, and reactive replies only.
 - Added prompt-budget guardrail for Knowledge→Offering Profile/Required Intake pipelines by truncating oversized document content before LLM suggestion prompts.
 - Added explicit `max_tokens` caps for router, fallback, RAG, summary, lead reasoning, and extraction calls to keep response size/cost predictable.
 - Added structured-output hardening for JSON-producing LLM calls by enabling `response_format: { type: "json_object" }` in lead extraction, required-intake follow-up, and offering-profile suggestion pipelines.
@@ -61,6 +66,8 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed main sidebar Settings entry target from `/settings/channels` to `/settings` to reduce first-load weight and keep navigation app-like.
+- Simulator chat UI now uses a neutral chatbot surface (channel-agnostic header, message pane, and bubble styles) instead of WhatsApp-like wallpaper/green header/read ticks.
 - Changed Next.js locale interception file convention from `src/middleware.ts` to `src/proxy.ts` to align with Next.js 16.
 - Changed locale layout to remove the unused Material Symbols webfont `<link>` and keep shell font loading warning-free.
 - Changed Knowledge document post-processing to pass bounded context into suggestion generators instead of full raw document bodies.
@@ -80,6 +87,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed slow-feeling settings transitions by removing a redundant auth read in settings layout and warming settings routes in advance.
 - Fixed stale-closure risk in unsaved-changes save flow by including `transformPendingHref` in `useUnsavedChangesGuard` callback dependencies.
 - Fixed failing inbox style tests by restoring `getInboxOutgoingBubbleClasses` export.
 - Fixed Vitest failure caused by a non-suite test file (`scripts/tests/main-sidebar.test.js`) by converting it into an executable test suite.

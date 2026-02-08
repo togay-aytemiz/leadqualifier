@@ -264,8 +264,8 @@
     "simulator": {
         "title": "Simulator",
         "description": "Test your bot in a realistic environment. Messages here are not saved.",
-        "businessAccount": "Business Account",
-        "encryptionNotice": "Messages are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.",
+        "assistantLabel": "AI Assistant",
+        "emptyChatNotice": "Start a new conversation to test how your assistant responds.",
         "typeMessage": "Type a message",
         "debug": "Simulator Debug",
         "sensitivity": "Sensitivity",
@@ -334,8 +334,27 @@
         "botTokenLabel": "Bot Token",
         "botTokenPlaceholder": "123456789:ABCDEF...",
         "connectTelegramError": "Failed to connect",
+        "connectWhatsAppError": "Failed to connect WhatsApp channel",
         "validating": "Validating...",
-        "connectBot": "Connect Bot"
+        "connectBot": "Connect Bot",
+        "connectWhatsApp": "Connect WhatsApp",
+        "connectWhatsAppTitle": "Connect WhatsApp Business",
+        "connectWhatsAppHelpTitle": "Meta Cloud API setup checklist:",
+        "connectWhatsAppSteps": {
+            "step1": "Create a WhatsApp app in Meta Developers and copy the Phone Number ID + Business Account ID.",
+            "step2": "Generate a permanent access token with WhatsApp messaging permissions.",
+            "step3": "Set an app secret and verify token. Use the same verify token in the webhook configuration."
+        },
+        "whatsappPhoneNumberIdLabel": "Phone Number ID",
+        "whatsappPhoneNumberIdPlaceholder": "e.g. 123456789012345",
+        "whatsappBusinessAccountIdLabel": "Business Account ID",
+        "whatsappBusinessAccountIdPlaceholder": "e.g. 123456789012345",
+        "whatsappPermanentTokenLabel": "Permanent Access Token",
+        "whatsappPermanentTokenPlaceholder": "EAAG...",
+        "whatsappAppSecretLabel": "App Secret",
+        "whatsappAppSecretPlaceholder": "Meta app secret",
+        "whatsappVerifyTokenLabel": "Verify Token",
+        "whatsappVerifyTokenPlaceholder": "Choose a custom verify token"
     },
     "Sidebar": {
         "settings": "Settings",

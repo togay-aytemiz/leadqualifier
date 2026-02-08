@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes guard callback dependencies fixed, Knowledge New Content PDF option now clearly marked `Coming Soon`, Next.js middleware convention migrated to `src/proxy.ts`, structured-output JSON mode added for extraction/follow-up/offering profile LLM calls, LLM output token caps applied to router/fallback/RAG/summary/reasoning/extraction paths, and KB content now truncates before profile/intake suggestion prompts to control prompt growth; lint/test/build pipelines re-verified; repo-wide troubleshooting sweep completed: test suite stabilized, hook rule violations fixed, `no-unused-vars` cleaned, `no-explicit-any` removed across inbox/AI/knowledge/leads modules, and lint/test/build pipelines verified; desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; desktop leads table now keeps status chips on one line and truncates long contact names to one line; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes guard callback dependencies fixed, Knowledge New Content PDF option now clearly marked `Coming Soon`, Next.js middleware convention migrated to `src/proxy.ts`, structured-output JSON mode added for extraction/follow-up/offering profile LLM calls, LLM output token caps applied to router/fallback/RAG/summary/reasoning/extraction paths, and KB content now truncates before profile/intake suggestion prompts to control prompt growth; lint/test/build pipelines re-verified; repo-wide troubleshooting sweep completed: test suite stabilized, hook rule violations fixed, `no-unused-vars` cleaned, `no-explicit-any` removed across inbox/AI/knowledge/leads modules, and lint/test/build pipelines verified; desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; desktop leads table now keeps status chips on one line and truncates long contact names to one line; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening; WhatsApp Meta Cloud MVP design completed with validated scope decisions; WhatsApp Meta Cloud MVP implementation now includes manual channel connect/debug, inbound webhook, and outbound message API; settings route transitions accelerated via desktop/sidebar prefetch warmup and leaner settings layout auth flow; simulator visual theme shifted from WhatsApp mimic to neutral chatbot UI)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -30,11 +30,13 @@
 
 ---
 
-## Phase 2: Messaging Channels (WhatsApp Pending)
-- [ ] **WhatsApp (Meta Cloud API)**
-  - [ ] Choose provider (Twilio / 360dialog / Meta Cloud API)
-  - [ ] Webhook endpoint for incoming messages
-  - [ ] Outgoing message API
+## Phase 2: Messaging Channels
+- [x] **WhatsApp (Meta Cloud API)**
+  - [x] Choose provider (Meta Cloud API selected for MVP)
+  - [x] Finalize MVP scope (manual channel setup, inbound text-only, reactive replies only)
+  - [x] Write WhatsApp integration design document (`docs/plans/2026-02-08-whatsapp-meta-cloud-mvp-design.md`)
+  - [x] Webhook endpoint for incoming messages
+  - [x] Outgoing message API
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
@@ -61,9 +63,9 @@
 - [ ] **Skill Testing**
   - [ ] Per-skill playground in admin (use Simulator for now)
 
-## Phase 3.5: Chat Simulator (WhatsApp-Style UI) ✅
+## Phase 3.5: Chat Simulator (Neutral Chatbot UI) ✅
 - [x] **Chat Interface**
-  - [x] WhatsApp-like UI (bubbles, ticks, input)
+  - [x] Neutral chatbot UI (channel-agnostic bubbles, header, and input)
   - [x] Org-specific simulator URL
 - [x] **Simulation Logic**
   - [x] Connect to Skill Matching Engine
@@ -143,6 +145,8 @@
   - [x] Mobile Knowledge Base now uses a single-pane flow (sidebar hidden on mobile and files rendered as responsive cards)
   - [x] Mobile Knowledge edit header now uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance
   - [x] Mobile bottom navbar now prefetches primary routes for faster tab transitions
+  - [x] Desktop main sidebar and settings shell now prefetch settings routes to reduce transition latency
+  - [x] Main sidebar Settings entry now opens `/settings` root (lighter first load than direct `/settings/channels`)
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates

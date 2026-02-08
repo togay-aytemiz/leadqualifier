@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes navigation guard dependency fixed, Next.js request interceptor migrated to `src/proxy.ts`, Knowledge New Content PDF source now explicitly marked `Coming Soon`, structured-output JSON mode enforced for extraction/follow-up/offering profile LLM calls, max output token caps added on fallback/RAG/summary/reasoning/extraction paths, and oversized KB content truncated before profile/intake suggestion prompts; repo-wide troubleshooting sweep completed: hook/lint regressions resolved, `no-explicit-any` removed from core modules, and lint/test/build pipelines re-verified; desktop settings now keeps the inner settings sidebar mounted while only detail content transitions/loading updates; mobile settings detail→list back flow now uses client-side navigation to avoid refresh-like behavior; mobile knowledge edit header now uses icon-only back + short `Düzenle/Kaydet`; skills detail action buttons now follow standardized icon usage for delete/save; mobile navbar prefetch warmup to reduce tab lag; mobile skills header labels simplified; mobile skills list→detail single-pane flow; mobile settings list→detail single-pane flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout on small screens; desktop leads table now keeps status chips and contact names single-line (name truncates on overflow); summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes navigation guard dependency fixed, Next.js request interceptor migrated to `src/proxy.ts`, Knowledge New Content PDF source now explicitly marked `Coming Soon`, structured-output JSON mode enforced for extraction/follow-up/offering profile LLM calls, max output token caps added on fallback/RAG/summary/reasoning/extraction paths, and oversized KB content truncated before profile/intake suggestion prompts; repo-wide troubleshooting sweep completed: hook/lint regressions resolved, `no-explicit-any` removed from core modules, and lint/test/build pipelines re-verified; desktop settings now keeps the inner settings sidebar mounted while only detail content transitions/loading updates; mobile settings detail→list back flow now uses client-side navigation to avoid refresh-like behavior; mobile knowledge edit header now uses icon-only back + short `Düzenle/Kaydet`; skills detail action buttons now follow standardized icon usage for delete/save; mobile navbar prefetch warmup to reduce tab lag; mobile skills header labels simplified; mobile skills list→detail single-pane flow; mobile settings list→detail single-pane flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout on small screens; desktop leads table now keeps status chips and contact names single-line (name truncates on overflow); summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening; WhatsApp Meta Cloud MVP decisions validated with a dedicated design blueprint; WhatsApp Meta Cloud MVP implementation delivered (manual channel connect/debug, webhook verification + inbound text processing, reactive outbound API); desktop settings navigation now prefetches settings routes and opens from `/settings` root for faster perceived transitions; simulator UI moved from WhatsApp mimic to neutral chatbot styling)  
 > **Status:** In Development
 
 ---
@@ -38,7 +38,7 @@ Automate WhatsApp message handling:
 ### ✅ In Scope (Target MVP)
 | Feature | Description | Status (2026-02-04) |
 |---------|-------------|--------------------|
-| WhatsApp Integration | Single number per org | Planned (WhatsApp UI placeholder only; Telegram sandbox channel implemented) |
+| WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: manual channel setup, webhook verification, inbound text-only processing, and reactive outbound replies) |
 | AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + Simulator |
 | User-Generated Skills | Custom intent → response mappings | Implemented |
 | Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
@@ -58,7 +58,7 @@ Automate WhatsApp message handling:
 
 ## 4. Core Features
 
-### 4.1 Messaging Auto-Reply Engine (Telegram now, WhatsApp planned)
+### 4.1 Messaging Auto-Reply Engine (Telegram + WhatsApp MVP)
 
 **Flow:**
 ```
@@ -70,11 +70,13 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Rules:**
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
+- WhatsApp MVP supports text messages only and sends replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
 - Shadow inactive banner copy is compact by default (single-line title + one short explanatory sentence).
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
+ - Simulator chat visuals are channel-agnostic (no WhatsApp-specific brand mimicry)
  - If no skill/KB match, bot suggests available topics using existing skills/KB titles
  - Org-level AI settings control strict/flexible modes, a single sensitivity threshold, and prompt-driven fallback behavior
 
@@ -447,6 +449,7 @@ MVP is successful when:
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Inbox Message Contrast:** Bot-authored inbox messages use a dark-violet bubble with light text to keep bot replies easy to scan against operator and contact messages.
+- **Simulator UI Direction:** Keep the simulator channel-agnostic with a neutral chatbot look (no WhatsApp wallpaper/green header/read ticks) while preserving the same matching/debug behavior.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
 - **Billing Message Metrics:** Message usage in Usage & Billing is computed from `messages.sender_type` with UTC monthly boundaries (`bot`, `user`, `contact`) and excludes `system` rows.
 - **Billing Storage Metrics:** Storage usage in Usage & Billing is an approximate UTF-8 text size based on Skills (`title`, `response_text`, `trigger_examples`) and Knowledge Documents (`title`, `content`).
@@ -478,6 +481,7 @@ MVP is successful when:
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
 - **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
 - **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) on mount to reduce transition latency.
+- **Desktop Settings Navigation Performance:** Prefetch settings destinations from main sidebar/settings shell and route the main Settings entry to `/settings` root to reduce first-click latency.
 - **Mobile Inbox Details Payload:** Mobile details must prioritize lead context by showing `service_type`, `summary`, and collected required-intake fields.
 - **Mobile Operator Exit Visibility:** When conversation control is on operator, keep a visible “Leave Conversation” action in mobile chat view (not buried in desktop-only details column).
 - **Mobile Inbox Transition Motion:** Use horizontal slide transitions for list→conversation and conversation→list navigation to preserve app-like continuity.
@@ -500,6 +504,7 @@ MVP is successful when:
 - **Settings Title Parity:** Settings page headers should use the same labels as the corresponding settings sidebar items.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
+- **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with manual channel setup (`phone_number_id`, `business_account_id`, token, secrets), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.
 - **Skills Embedding Source:** Generate skill embeddings from both skill title and trigger examples; regenerate on title/trigger changes.

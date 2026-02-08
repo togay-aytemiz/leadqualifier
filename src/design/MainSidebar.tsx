@@ -69,6 +69,10 @@ export function MainSidebar({
     const [botMode, setBotMode] = useState<AiBotMode>('active')
     const [orgSearch, setOrgSearch] = useState('')
     const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
+    const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
+    const localePrefix = localePrefixMatch && localePrefixMatch[1] !== 'tr'
+        ? `/${localePrefixMatch[1]}`
+        : ''
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -292,6 +296,22 @@ export function MainSidebar({
         return () => window.removeEventListener('pending-suggestions-updated', handler)
     }, [organizationId, refreshPendingSuggestions])
 
+    useEffect(() => {
+        const routesToPrefetch = [
+            '/settings',
+            '/settings/profile',
+            '/settings/organization',
+            '/settings/general',
+            '/settings/ai',
+            '/settings/channels',
+            '/settings/billing'
+        ]
+
+        routesToPrefetch.forEach((route) => {
+            router.prefetch(`${localePrefix}${route}`)
+        })
+    }, [localePrefix, router])
+
     const sections = useMemo(
         () => [
             {
@@ -387,7 +407,7 @@ export function MainSidebar({
                 items: [
                     {
                         id: 'settings',
-                        href: '/settings/channels',
+                        href: '/settings',
                         label: tNav('settings'),
                         icon: HiOutlineCog6Tooth,
                         activeIcon: HiMiniCog6Tooth,
@@ -529,7 +549,6 @@ export function MainSidebar({
             <div className="px-3 pb-2">
                 <Link
                     href="/settings/ai"
-                    prefetch={false}
                     title={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                     aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                     className={cn(
@@ -576,7 +595,6 @@ export function MainSidebar({
                                         <Link
                                             key={item.id}
                                             href={item.href}
-                                            prefetch={false}
                                             title={item.label}
                                             aria-label={item.label}
                                             className={cn(
@@ -649,7 +667,6 @@ export function MainSidebar({
                                         <Link
                                             key={item.id}
                                             href={item.href}
-                                            prefetch={false}
                                             title={item.label}
                                             aria-label={item.label}
                                             className={cn(

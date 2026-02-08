@@ -4,7 +4,8 @@ import { Channel } from '@/types/database'
 import { useState } from 'react'
 import { ChannelCard } from '@/components/channels/ChannelCard'
 import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal'
-import { connectTelegramChannel } from '@/lib/channels/actions'
+import { ConnectWhatsAppModal, type ConnectWhatsAppFormValues } from '@/components/channels/ConnectWhatsAppModal'
+import { connectTelegramChannel, connectWhatsAppChannel } from '@/lib/channels/actions'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
@@ -18,6 +19,7 @@ interface ChannelsListProps {
 export function ChannelsList({ channels, organizationId, showDescription = true, isReadOnly = false }: ChannelsListProps) {
     const t = useTranslations('Channels')
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
+    const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false)
     const router = useRouter()
 
     const telegramChannel = channels.find(c => c.type === 'telegram')
@@ -32,9 +34,13 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
         router.refresh()
     }
 
-    const handleConnectWhatsApp = () => {
+    const handleConnectWhatsApp = async (values: ConnectWhatsAppFormValues) => {
         if (isReadOnly) return
-        alert(t('whatsappComingSoon'))
+        const result = await connectWhatsAppChannel(organizationId, values)
+        if (result.error) {
+            throw new Error(result.error)
+        }
+        router.refresh()
     }
 
     return (
@@ -52,17 +58,24 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
                 <ChannelCard
                     type="whatsapp"
                     channel={whatsappChannel}
-                    onConnect={handleConnectWhatsApp}
+                    onConnect={() => setIsWhatsAppModalOpen(true)}
                     isReadOnly={isReadOnly}
                 />
             </div>
 
             {!isReadOnly && (
-                <ConnectTelegramModal
-                    isOpen={isTelegramModalOpen}
-                    onClose={() => setIsTelegramModalOpen(false)}
-                    onConnect={handleConnectTelegram}
-                />
+                <>
+                    <ConnectTelegramModal
+                        isOpen={isTelegramModalOpen}
+                        onClose={() => setIsTelegramModalOpen(false)}
+                        onConnect={handleConnectTelegram}
+                    />
+                    <ConnectWhatsAppModal
+                        isOpen={isWhatsAppModalOpen}
+                        onClose={() => setIsWhatsAppModalOpen(false)}
+                        onConnect={handleConnectWhatsApp}
+                    />
+                </>
             )}
         </div>
     )

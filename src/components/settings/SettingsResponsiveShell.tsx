@@ -3,7 +3,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import {
@@ -49,6 +49,7 @@ function getLocalizedHref(locale: string, href: string): string {
 export function SettingsResponsiveShell({ pendingCount, children }: SettingsResponsiveShellProps) {
     const locale = useLocale()
     const pathname = usePathname()
+    const router = useRouter()
     const activeItem = getSettingsNavItemFromPath(pathname)
     const tSidebar = useTranslations('Sidebar')
     const hasDetail = Boolean(activeItem && children)
@@ -170,6 +171,16 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
         window.addEventListener(SETTINGS_MOBILE_BACK_EVENT, handleBack)
         return () => window.removeEventListener(SETTINGS_MOBILE_BACK_EVENT, handleBack)
     }, [navigateBackToSettings])
+
+    useEffect(() => {
+        const routes = navItems
+            .map((item) => item.href)
+            .filter((href): href is string => Boolean(href))
+
+        routes.forEach((href) => {
+            router.prefetch(href)
+        })
+    }, [navItems, router])
 
     const mobileListPaneClasses = getSettingsMobileListPaneClasses(isMobileDetailOpen)
     const mobileDetailPaneClasses = getSettingsMobileDetailPaneClasses(isMobileDetailOpen)

@@ -3,7 +3,7 @@
 import { Channel } from '@/types/database'
 import { useState } from 'react'
 import { Bug } from 'lucide-react'
-import { debugTelegramChannel, disconnectChannel } from '@/lib/channels/actions'
+import { debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { useTranslations } from 'next-intl'
@@ -24,7 +24,9 @@ export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: Ch
 
     const handleDebug = async () => {
         if (!channel) return
-        const result = await debugTelegramChannel(channel.id)
+        const result = type === 'telegram'
+            ? await debugTelegramChannel(channel.id)
+            : await debugWhatsAppChannel(channel.id)
         if (result.success) {
             alert(t('debug.webhookInfo', { info: JSON.stringify(result.info, null, 2) }))
         } else {

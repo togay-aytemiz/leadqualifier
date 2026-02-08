@@ -264,8 +264,8 @@
     "simulator": {
         "title": "Mesajlaşma Simülatörü",
         "description": "Botunuzu gerçekçi bir ortamda test edin. Buradaki mesajlar kaydedilmez.",
-        "businessAccount": "İşletme Hesabı",
-        "encryptionNotice": "Mesajlar uçtan uca şifrelenmiştir. Bu sohbetin dışındaki hiç kimse, Messenger bile, bunları okuyamaz veya dinleyemez.",
+        "assistantLabel": "Yapay Zeka Asistanı",
+        "emptyChatNotice": "Asistanın nasıl yanıt verdiğini görmek için yeni bir konuşma başlatın.",
         "typeMessage": "Bir mesaj yazın",
         "debug": "Simülatör Hata Ayıklama",
         "sensitivity": "Hassasiyet",
@@ -334,8 +334,27 @@
         "botTokenLabel": "Bot Token",
         "botTokenPlaceholder": "123456789:ABCDEF...",
         "connectTelegramError": "Bağlantı kurulamadı",
+        "connectWhatsAppError": "WhatsApp kanalı bağlanamadı",
         "validating": "Doğrulanıyor...",
-        "connectBot": "Botu Bağla"
+        "connectBot": "Botu Bağla",
+        "connectWhatsApp": "WhatsApp Bağla",
+        "connectWhatsAppTitle": "WhatsApp Business Bağla",
+        "connectWhatsAppHelpTitle": "Meta Cloud API kurulum kontrol listesi:",
+        "connectWhatsAppSteps": {
+            "step1": "Meta Developers içinde bir WhatsApp uygulaması oluşturun ve Phone Number ID ile Business Account ID değerlerini alın.",
+            "step2": "WhatsApp mesajlaşma izinlerine sahip kalıcı bir access token üretin.",
+            "step3": "App secret ve verify token belirleyin. Aynı verify token değerini webhook ayarında kullanın."
+        },
+        "whatsappPhoneNumberIdLabel": "Phone Number ID",
+        "whatsappPhoneNumberIdPlaceholder": "örn. 123456789012345",
+        "whatsappBusinessAccountIdLabel": "Business Account ID",
+        "whatsappBusinessAccountIdPlaceholder": "örn. 123456789012345",
+        "whatsappPermanentTokenLabel": "Kalıcı Access Token",
+        "whatsappPermanentTokenPlaceholder": "EAAG...",
+        "whatsappAppSecretLabel": "App Secret",
+        "whatsappAppSecretPlaceholder": "Meta app secret",
+        "whatsappVerifyTokenLabel": "Verify Token",
+        "whatsappVerifyTokenPlaceholder": "Özel bir verify token seçin"
     },
     "Sidebar": {
         "settings": "Ayarlar",

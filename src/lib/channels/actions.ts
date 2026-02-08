@@ -3,6 +3,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
+import { TelegramClient } from '@/lib/telegram/client'
+import { WhatsAppClient } from '@/lib/whatsapp/client'
+import { v4 as uuidv4 } from 'uuid'
+import type { Json } from '@/types/database'
 
 export async function getChannels(organizationId: string) {
     const supabase = await createClient()
@@ -20,16 +24,37 @@ export async function getChannels(organizationId: string) {
     return data
 }
 
-import { TelegramClient } from '@/lib/telegram/client'
-import { v4 as uuidv4 } from 'uuid'
-
 export type TelegramDebugResult =
     | { success: true; info: unknown }
     | { success: false; error: string }
 
+export type WhatsAppDebugResult =
+    | { success: true; info: unknown }
+    | { success: false; error: string }
+
+export interface ConnectWhatsAppChannelInput {
+    phoneNumberId: string
+    businessAccountId: string
+    permanentAccessToken: string
+    appSecret: string
+    verifyToken: string
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
     return fallback
+}
+
+function asConfigRecord(value: Json): Record<string, Json | undefined> {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+    return value as Record<string, Json | undefined>
+}
+
+function readConfigString(config: Json, key: string): string | null {
+    const value = asConfigRecord(config)[key]
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
 }
 
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
@@ -87,6 +112,59 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
     }
 }
 
+export async function connectWhatsAppChannel(organizationId: string, input: ConnectWhatsAppChannelInput) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const phoneNumberId = input.phoneNumberId.trim()
+    const businessAccountId = input.businessAccountId.trim()
+    const permanentAccessToken = input.permanentAccessToken.trim()
+    const appSecret = input.appSecret.trim()
+    const verifyToken = input.verifyToken.trim()
+
+    if (!phoneNumberId || !businessAccountId || !permanentAccessToken || !appSecret || !verifyToken) {
+        return { error: 'Missing required WhatsApp channel fields.' }
+    }
+
+    try {
+        const client = new WhatsAppClient(permanentAccessToken)
+        const phoneDetails = await client.getPhoneNumber(phoneNumberId)
+
+        const displayPhoneNumber = (phoneDetails.display_phone_number ?? '').trim()
+        const channelName = displayPhoneNumber
+            ? `WhatsApp (${displayPhoneNumber})`
+            : `WhatsApp (${phoneNumberId})`
+
+        const { error } = await supabase
+            .from('channels')
+            .upsert({
+                organization_id: organizationId,
+                type: 'whatsapp',
+                name: channelName,
+                status: 'active',
+                config: {
+                    phone_number_id: phoneNumberId,
+                    business_account_id: businessAccountId,
+                    permanent_access_token: permanentAccessToken,
+                    app_secret: appSecret,
+                    verify_token: verifyToken,
+                    display_phone_number: displayPhoneNumber,
+                    webhook_verified_at: null
+                }
+            }, {
+                onConflict: 'organization_id,type'
+            })
+
+        if (error) throw error
+
+        revalidatePath('/settings/channels')
+        return { success: true }
+    } catch (error: unknown) {
+        console.error('WhatsApp connection error:', error)
+        return { error: getErrorMessage(error, 'Failed to connect WhatsApp channel') }
+    }
+}
+
 export async function disconnectChannel(channelId: string) {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
@@ -98,9 +176,13 @@ export async function disconnectChannel(channelId: string) {
         .eq('id', channelId)
         .single()
 
-    if (channel && channel.type === 'telegram' && channel.config.bot_token) {
+    const telegramToken = channel && channel.type === 'telegram'
+        ? readConfigString(channel.config, 'bot_token')
+        : null
+
+    if (channel && channel.type === 'telegram' && telegramToken) {
         try {
-            const client = new TelegramClient(channel.config.bot_token)
+            const client = new TelegramClient(telegramToken)
             await client.deleteWebhook()
         } catch (e) {
             console.error('Failed to delete Telegram webhook', e)
@@ -130,9 +212,13 @@ export async function debugTelegramChannel(channelId: string): Promise<TelegramD
         .eq('id', channelId)
         .single()
 
-    if (channel && channel.type === 'telegram' && channel.config.bot_token) {
+    const telegramToken = channel && channel.type === 'telegram'
+        ? readConfigString(channel.config, 'bot_token')
+        : null
+
+    if (channel && channel.type === 'telegram' && telegramToken) {
         try {
-            const client = new TelegramClient(channel.config.bot_token)
+            const client = new TelegramClient(telegramToken)
             const info = await client.getWebhookInfo()
             return { success: true, info }
         } catch (e: unknown) {
@@ -140,4 +226,45 @@ export async function debugTelegramChannel(channelId: string): Promise<TelegramD
         }
     }
     return { success: false, error: 'Channel not found or not telegram' }
+}
+
+export async function debugWhatsAppChannel(channelId: string): Promise<WhatsAppDebugResult> {
+    const supabase = await createClient()
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('id', channelId)
+        .single()
+
+    const accessToken = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'permanent_access_token')
+        : null
+    const phoneNumberId = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'phone_number_id')
+        : null
+    const verifyToken = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'verify_token')
+        : null
+
+    if (!channel || channel.type !== 'whatsapp' || !accessToken || !phoneNumberId) {
+        return { success: false, error: 'Channel not found or not whatsapp' }
+    }
+
+    try {
+        const client = new WhatsAppClient(accessToken)
+        const phoneDetails = await client.getPhoneNumber(phoneNumberId)
+        return {
+            success: true,
+            info: {
+                phone_number_id: phoneNumberId,
+                verify_token_set: Boolean(verifyToken),
+                display_phone_number: phoneDetails.display_phone_number ?? null,
+                verified_name: phoneDetails.verified_name ?? null,
+                quality_rating: phoneDetails.quality_rating ?? null
+            }
+        }
+    } catch (error: unknown) {
+        return { success: false, error: getErrorMessage(error, 'Failed to read WhatsApp channel info') }
+    }
 }

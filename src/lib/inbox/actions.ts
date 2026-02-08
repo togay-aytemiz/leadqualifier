@@ -9,7 +9,7 @@ import { recordAiUsage } from '@/lib/ai/usage'
 import { matchesCatalog } from '@/lib/leads/catalog'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
-import { Conversation, Lead, Message } from '@/types/database'
+import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
     | { ok: true; summary: string }
@@ -455,6 +455,19 @@ export async function sendMessage(
         .single()
 
     if (!conversation) throw new Error('Conversation not found')
+    if (!conversation.contact_phone) throw new Error('Conversation contact is missing')
+
+    const asConfigRecord = (value: Json): Record<string, Json | undefined> => {
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+        return value as Record<string, Json | undefined>
+    }
+
+    const readConfigString = (config: Json, key: string): string | null => {
+        const value = asConfigRecord(config)[key]
+        if (typeof value !== 'string') return null
+        const trimmed = value.trim()
+        return trimmed.length > 0 ? trimmed : null
+    }
 
     // 2. If Telegram, send via API
     if (conversation.platform === 'telegram') {
@@ -467,10 +480,11 @@ export async function sendMessage(
             .eq('status', 'active')
             .single()
 
-        if (channel && channel.config?.bot_token) {
+        const botToken = channel ? readConfigString(channel.config as Json, 'bot_token') : null
+        if (botToken) {
             try {
                 const { TelegramClient } = await import('@/lib/telegram/client')
-                const client = new TelegramClient(channel.config.bot_token)
+                const client = new TelegramClient(botToken)
                 await client.sendMessage(conversation.contact_phone, content)
             } catch (error) {
                 console.error('Failed to send Telegram message:', error)
@@ -478,6 +492,36 @@ export async function sendMessage(
             }
         } else {
             console.warn('No active Telegram channel found for this organization')
+        }
+    }
+
+    if (conversation.platform === 'whatsapp') {
+        const { data: channel } = await supabase
+            .from('channels')
+            .select('config')
+            .eq('organization_id', conversation.organization_id)
+            .eq('type', 'whatsapp')
+            .eq('status', 'active')
+            .single()
+
+        const accessToken = channel ? readConfigString(channel.config as Json, 'permanent_access_token') : null
+        const phoneNumberId = channel ? readConfigString(channel.config as Json, 'phone_number_id') : null
+
+        if (accessToken && phoneNumberId) {
+            try {
+                const { WhatsAppClient } = await import('@/lib/whatsapp/client')
+                const client = new WhatsAppClient(accessToken)
+                await client.sendText({
+                    phoneNumberId,
+                    to: conversation.contact_phone,
+                    text: content
+                })
+            } catch (error) {
+                console.error('Failed to send WhatsApp message:', error)
+                throw new Error('Failed to send message to WhatsApp API')
+            }
+        } else {
+            console.warn('No active WhatsApp channel found for this organization')
         }
     }
 
