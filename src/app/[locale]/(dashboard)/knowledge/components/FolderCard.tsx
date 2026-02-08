@@ -34,7 +34,7 @@ export function FolderCard({ id, name, count = 0, onRefresh, isReadOnly = false 
                         <FolderActions
                             collection={{ id, name, count }}
                             trigger={
-                                <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                <button className="p-1 text-gray-400 opacity-100 transition-opacity hover:text-gray-600 lg:opacity-0 lg:group-hover:opacity-100">
                                     <MoreVertical size={16} />
                                 </button>
                             }

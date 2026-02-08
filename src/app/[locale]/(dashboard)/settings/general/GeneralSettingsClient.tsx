@@ -1,15 +1,6 @@
 'use client'
 
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
-import {
-    HiOutlineUserCircle,
-    HiOutlineBriefcase,
-    HiOutlineAdjustmentsHorizontal,
-    HiOutlineSparkles,
-    HiOutlineChatBubbleLeftRight,
-    HiOutlineCreditCard,
-    HiOutlineBanknotes
-} from 'react-icons/hi2'
+import { PageHeader } from '@/design'
 import { useRouter, usePathname } from '@/i18n/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -19,11 +10,7 @@ import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 import { updateOfferingProfileLocaleForUser } from '@/lib/leads/settings'
 
-interface GeneralSettingsClientProps {
-    pendingCount: number
-}
-
-export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsClientProps) {
+export default function GeneralSettingsClient() {
     const pathname = usePathname()
     const router = useRouter()
     const currentLocale = useLocale()
@@ -130,100 +117,55 @@ export default function GeneralSettingsClient({ pendingCount }: GeneralSettingsC
 
     return (
         <>
-            <Sidebar title={tSidebar('settings')}>
-                <SidebarGroup title={tSidebar('preferences')}>
-                    <SidebarItem
-                        icon={<HiOutlineUserCircle size={18} />}
-                        label={tSidebar('profile')}
-                        href={currentLocale === 'tr' ? '/settings/profile' : `/${currentLocale}/settings/profile`}
-                    />
-                    <SidebarItem
-                        icon={<HiOutlineBriefcase size={18} />}
-                        label={tSidebar('organization')}
-                        href={currentLocale === 'tr' ? '/settings/organization' : `/${currentLocale}/settings/organization`}
-                        indicator={pendingCount > 0}
-                    />
-                    <SidebarItem icon={<HiOutlineAdjustmentsHorizontal size={18} />} label={tSidebar('general')} active />
-                    <SidebarItem
-                        icon={<HiOutlineSparkles size={18} />}
-                        label={tSidebar('ai')}
-                        href={currentLocale === 'tr' ? '/settings/ai' : `/${currentLocale}/settings/ai`}
-                    />
-                </SidebarGroup>
+            <PageHeader
+                title={tSidebar('general')}
+                actions={
+                    <Button
+                        onClick={handleSave}
+                        disabled={!isDirty || isSaving}
+                        className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
+                    >
+                        {saved ? tGeneral('saved') : isSaving ? tGeneral('saving') : tGeneral('save')}
+                    </Button>
+                }
+            />
 
-                <SidebarGroup title={tSidebar('integrations')}>
-                    <SidebarItem
-                        icon={<HiOutlineChatBubbleLeftRight size={18} />}
-                        label={tSidebar('channels')}
-                        href={currentLocale === 'tr' ? '/settings/channels' : `/${currentLocale}/settings/channels`}
-                    />
-                </SidebarGroup>
-
-                <SidebarGroup title={tSidebar('billing')}>
-                    <SidebarItem
-                        icon={<HiOutlineCreditCard size={18} />}
-                        label={tSidebar('plans')}
-                        href="#"
-                    />
-                    <SidebarItem
-                        icon={<HiOutlineBanknotes size={18} />}
-                        label={tSidebar('receipts')}
-                        href={currentLocale === 'tr' ? '/settings/billing' : `/${currentLocale}/settings/billing`}
-                    />
-                </SidebarGroup>
-            </Sidebar>
-
-            <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-                <PageHeader
-                    title={tSidebar('general')}
-                    actions={
-                        <Button
-                            onClick={handleSave}
-                            disabled={!isDirty || isSaving}
-                            className={saved ? 'bg-green-500 hover:bg-green-500 text-white' : undefined}
-                        >
-                            {saved ? tGeneral('saved') : isSaving ? tGeneral('saving') : tGeneral('save')}
-                        </Button>
-                    }
-                />
-
-                <div className="flex-1 overflow-auto p-8">
-                    <div className="max-w-5xl">
-                        <SettingsSection
-                            title={tGeneral('language')}
-                            description={tGeneral('languageDescription')}
-                        >
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div
-                                    onClick={() => handleLanguageChange('en')}
-                                    className={`cursor-pointer rounded-lg border p-4 flex items-center gap-3 transition-colors ${selectedLocale === 'en'
-                                        ? 'border-blue-500 bg-blue-50/50'
-                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
-                                        }`}>
-                                        {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{tGeneral('languageEnglish')}</span>
+            <div className="flex-1 overflow-auto p-8">
+                <div className="max-w-5xl">
+                    <SettingsSection
+                        title={tGeneral('language')}
+                        description={tGeneral('languageDescription')}
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div
+                                onClick={() => handleLanguageChange('en')}
+                                className={`cursor-pointer rounded-lg border p-4 flex items-center gap-3 transition-colors ${selectedLocale === 'en'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
+                                    }`}>
+                                    {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                                 </div>
-
-                                <div
-                                    onClick={() => handleLanguageChange('tr')}
-                                    className={`cursor-pointer rounded-lg border p-4 flex items-center gap-3 transition-colors ${selectedLocale === 'tr'
-                                        ? 'border-blue-500 bg-blue-50/50'
-                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
-                                        }`}>
-                                        {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{tGeneral('languageTurkish')}</span>
-                                </div>
+                                <span className="text-sm font-medium text-gray-900">{tGeneral('languageEnglish')}</span>
                             </div>
-                        </SettingsSection>
-                    </div>
+
+                            <div
+                                onClick={() => handleLanguageChange('tr')}
+                                className={`cursor-pointer rounded-lg border p-4 flex items-center gap-3 transition-colors ${selectedLocale === 'tr'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
+                                    }`}>
+                                    {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">{tGeneral('languageTurkish')}</span>
+                            </div>
+                        </div>
+                    </SettingsSection>
                 </div>
             </div>
 

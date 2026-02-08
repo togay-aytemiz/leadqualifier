@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-08 (mobile leads list compact-card layout on small screens; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (desktop settings now keeps the inner settings sidebar mounted while only detail content transitions/loading updates; mobile settings detail→list back flow now uses client-side navigation to avoid refresh-like behavior; mobile knowledge edit header now uses icon-only back + short `Düzenle/Kaydet`; skills detail action buttons now follow standardized icon usage for delete/save; mobile navbar prefetch warmup to reduce tab lag; mobile skills header labels simplified; mobile skills list→detail single-pane flow; mobile settings list→detail single-pane flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout on small screens; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > **Status:** In Development
 
 ---
@@ -262,6 +262,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Enable/disable toggle
 - `Requires Human Handover` toggle with read-only bot message preview and AI Settings deep-link
 - Skills screen uses a single unified list (no Core/Custom tab split); default and user-added skills are managed together
+- Mobile UX follows app-style single-pane navigation: full list page first, then detail/edit page after selection with a back action.
+- Mobile detail header uses compact action labels on small screens (e.g., `Düzenle`, `Kaydet`) while desktop keeps full labels.
+- Skills detail action buttons (delete/save) use a shared icon + label pattern for consistent desktop/mobile affordance.
 - No per-skill playground yet (use Simulator for end-to-end testing)
 
 ### 5.3 Knowledge Base (Implemented)
@@ -269,6 +272,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Rich text editor
  - Show indexing status (Ready / Processing / Error)
  - Sidebar shows uncategorized items (max 10 with expand) and accurate all-content counts
+- Mobile UX uses a single-pane flow (Knowledge sidebar hidden on mobile; content/files shown as responsive cards)
+- Mobile edit-content header uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance to prevent header wrap on small screens.
 
 ### 5.4 Channels (Telegram Implemented, WhatsApp Planned)
 - Telegram bot connection + status
@@ -298,6 +303,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Profile: name and email visibility (email is read-only)
 - Profile security: password recovery via email reset link (Forgot + Reset)
 - Organization: company name and future org-level defaults
+- Mobile Settings navigation now opens with a dedicated settings list page first, then transitions to selected detail pages with an explicit back action.
+- Mobile Settings back action uses client-side route transition (not full-page refresh) to keep mobile flow stable.
+- Desktop Settings keeps the inner settings sidebar persistent across sub-route navigation; only the detail pane content swaps and shows loading states.
 - Organization AI behavior is section-based:
   - Offering Profile has its own AI toggle for manual vs suggestions workflow.
   - Required Fields has its own AI toggle and keeps manual + AI chips together.
@@ -434,6 +442,7 @@ MVP is successful when:
 - **KB Realtime Deletes:** Set replica identity full on knowledge tables so delete events include `organization_id` for filtered subscriptions.
 - **Suggestions Realtime Publication:** Add offering profile suggestions to Supabase realtime publication so indicators/banners update instantly.
 - **KB Non-blocking UI:** Create/edit/delete navigates immediately while processing continues in the background.
+- **Mobile Knowledge Flow:** Keep Knowledge Base single-pane on small screens by hiding the sidebar and rendering file lists as touch-friendly cards, while preserving desktop split layout.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Inbox Message Contrast:** Bot-authored inbox messages use a dark-violet bubble with light text to keep bot replies easy to scan against operator and contact messages.
@@ -467,12 +476,16 @@ MVP is successful when:
 - **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
 - **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
+- **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) on mount to reduce transition latency.
 - **Mobile Inbox Details Payload:** Mobile details must prioritize lead context by showing `service_type`, `summary`, and collected required-intake fields.
 - **Mobile Operator Exit Visibility:** When conversation control is on operator, keep a visible “Leave Conversation” action in mobile chat view (not buried in desktop-only details column).
 - **Mobile Inbox Transition Motion:** Use horizontal slide transitions for list→conversation and conversation→list navigation to preserve app-like continuity.
 - **Mobile Details Overlay:** Opening mobile details should dim the chat background with a dark tappable overlay to emphasize focus and make close intent obvious.
 - **Mobile Details Micro-Animation:** Mobile details open/close should use short fade + vertical translate transitions to avoid abrupt layout jumps.
 - **Mobile Leads List Density:** On small screens, use compact card rows with tighter spacing and tap-first scanning; keep desktop lead table structure unchanged.
+- **Mobile Skills Flow:** On small screens, keep Skills as single-pane list→detail navigation with horizontal slide transitions and explicit back action; keep desktop split-pane layout unchanged.
+- **Mobile Settings Flow:** On small screens, keep Settings as single-pane list→detail navigation with horizontal slide transitions and explicit back action; keep desktop settings layout unchanged.
+- **Mobile Skills Header Density:** On small screens, use shorter detail-header action labels for readability; keep desktop wording unchanged.
 - **Settings UX:** Use two-column sections with header save actions, dirty-state enablement, and unsaved-change confirmation on navigation.
 - **Settings Clarity:** Remove redundant "current value" summaries above form inputs and selection controls.
 - **AI Settings Card Density:** Keep bot-mode and escalation selection cards compact to avoid oversized visual weight in settings pages.

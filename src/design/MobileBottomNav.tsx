@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useMemo, useState, type ComponentType } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
 import {
     HiMiniChatBubbleBottomCenterText,
@@ -29,6 +29,7 @@ interface NavItem {
 
 export function MobileBottomNav() {
     const pathname = usePathname()
+    const router = useRouter()
     const tNav = useTranslations('nav')
     const [isOtherOpen, setIsOtherOpen] = useState(false)
 
@@ -68,6 +69,11 @@ export function MobileBottomNav() {
         [tNav]
     )
 
+    useEffect(() => {
+        const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings']
+        hotRoutes.forEach((href) => router.prefetch(href))
+    }, [router])
+
     return (
         <>
             {isOtherOpen && (
@@ -88,7 +94,7 @@ export function MobileBottomNav() {
                             {tNav('simulator')}
                         </Link>
                         <Link
-                            href="/settings/channels"
+                            href="/settings"
                             onClick={() => setIsOtherOpen(false)}
                             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                         >
@@ -117,7 +123,6 @@ export function MobileBottomNav() {
                             <Link
                                 key={item.id}
                                 href={item.href}
-                                prefetch={false}
                                 className={cn(
                                     'flex flex-col items-center justify-center rounded-xl py-1.5 text-[11px] font-medium transition-colors',
                                     isActive ? 'text-[#242A40]' : 'text-slate-500 hover:text-slate-900'

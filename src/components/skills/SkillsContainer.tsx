@@ -6,8 +6,13 @@ import { Skill } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
 import { Badge, ConfirmDialog } from '@/design/primitives'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react'
 import { HiOutlineSparkles } from 'react-icons/hi2'
+import { cn } from '@/lib/utils'
+import {
+    getSkillsMobileDetailPaneClasses,
+    getSkillsMobileListPaneClasses
+} from '@/components/skills/mobilePaneState'
 
 import { useTranslations } from 'next-intl'
 import { useLocale } from 'next-intl'
@@ -30,6 +35,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     const [isSaving, setIsSaving] = useState(false)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
+    const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
 
     // Form state
     const [formData, setFormData] = useState({
@@ -98,16 +104,22 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         if (isReadOnly) return
         setSelectedSkillId(null)
         setIsCreating(true)
+        setIsMobileDetailOpen(true)
     }
 
     const handleSelectSkill = (id: string) => {
-        // If clicking same skill, do nothing
-        if (selectedSkillId === id) return
+        if (selectedSkillId === id) {
+            setIsMobileDetailOpen(true)
+            return
+        }
 
-        // If dirty, maybe warn? For now assume direct switch is okay, losing changes
-        // User asked for specific "Save" behavior, so switching discards changes naturally in this pattern
         setSelectedSkillId(id)
         setIsCreating(false)
+        setIsMobileDetailOpen(true)
+    }
+
+    const handleBackToSkillList = () => {
+        setIsMobileDetailOpen(false)
     }
 
     const handleArchiveToggle = async () => {
@@ -235,6 +247,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         try {
             await deleteSkill(selectedSkillId)
             setSelectedSkillId(null)
+            setIsCreating(false)
+            setIsMobileDetailOpen(false)
             setShowDeleteConfirm(false)
             router.refresh()
             setSkills(prev => prev.filter(s => s.id !== selectedSkillId))
@@ -247,16 +261,23 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
 
     const selectedSkill = skills.find(s => s.id === selectedSkillId)
     const showForm = isCreating || selectedSkill
+    const mobileListPaneClasses = getSkillsMobileListPaneClasses(isMobileDetailOpen)
+    const mobileDetailPaneClasses = getSkillsMobileDetailPaneClasses(isMobileDetailOpen)
 
     const aiSettingsDeepLink = locale === 'tr'
         ? '/settings/ai?focus=human-escalation&field=handover-message#human-escalation'
         : `/${locale}/settings/ai?focus=human-escalation&field=handover-message#human-escalation`
 
     return (
-        <div className="flex h-full bg-white border-t border-gray-200">
+        <div className="relative flex h-full bg-white border-t border-gray-200 overflow-hidden">
             {/* Left Panel - List (33%) */}
-            <div className="w-1/3 flex flex-col border-r border-gray-200 bg-white">
-                <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-between shrink-0 bg-white">
+            <div
+                className={cn(
+                    'absolute inset-0 z-20 flex h-full w-full flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-out lg:static lg:z-auto lg:w-1/3 lg:translate-x-0 lg:pointer-events-auto lg:transition-none',
+                    mobileListPaneClasses
+                )}
+            >
+                <div className="h-14 border-b border-gray-200 px-4 lg:px-6 flex items-center justify-between shrink-0 bg-white">
                     <div className="flex items-center gap-3">
                         <h2 className="text-xl font-bold text-gray-900">{t('title')}</h2>
                         <span className="text-gray-500 font-medium text-sm bg-gray-100 px-2 py-0.5 rounded-full">
@@ -273,7 +294,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     </button>
                 </div>
 
-                <div className="px-6 py-3 border-b border-gray-100 bg-white shrink-0">
+                <div className="px-4 lg:px-6 py-3 border-b border-gray-100 bg-white shrink-0">
                     {isReadOnly && (
                         <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
                             {t('readOnlyMode')}
@@ -313,29 +334,52 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
             </div>
 
             {/* Right Panel - Detail/Form (66%) */}
-            <div className="flex-1 flex flex-col bg-white overflow-hidden relative border-l border-gray-200 -ml-px">
+            <div
+                className={cn(
+                    'absolute inset-0 z-30 flex min-w-0 flex-1 flex-col overflow-hidden bg-white transition-transform duration-300 ease-out lg:static lg:z-auto lg:translate-x-0 lg:pointer-events-auto lg:transition-none lg:border-l lg:border-gray-200 lg:-ml-px',
+                    mobileDetailPaneClasses
+                )}
+            >
                 {showForm ? (
                     <div className="flex flex-col h-full bg-white">
                         {/* Header */}
-                        <div className="h-14 border-b border-gray-200 px-8 flex items-center justify-between shrink-0 bg-white">
-                            <h3 className="font-bold text-gray-900 text-xl">
-                                {isCreating ? t('newSkill') : t('editSkill')}
-                            </h3>
-                            <div className="flex gap-3">
+                        <div className="h-14 border-b border-gray-200 px-4 lg:px-8 flex items-center justify-between shrink-0 bg-white">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleBackToSkillList}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden"
+                                    aria-label={tc('back')}
+                                >
+                                    <ArrowLeft size={18} />
+                                </button>
+                                <h3 className="font-bold text-gray-900 text-lg lg:text-xl">
+                                    {isCreating ? (
+                                        t('newSkill')
+                                    ) : (
+                                        <>
+                                            <span className="lg:hidden">{tc('edit')}</span>
+                                            <span className="hidden lg:inline">{t('editSkill')}</span>
+                                        </>
+                                    )}
+                                </h3>
+                            </div>
+                            <div className="flex gap-2 lg:gap-3">
                                 {!isCreating && (
                                     <>
                                         <button
                                             onClick={handleArchiveToggle}
                                             disabled={isReadOnly}
-                                            className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
+                                            className="px-2.5 lg:px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
                                         >
                                             {selectedSkill?.enabled ? t('archive') : t('activate')}
                                         </button>
                                         <button
                                             onClick={() => setShowDeleteConfirm(true)}
                                             disabled={isReadOnly}
-                                            className="px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                            className="px-2.5 lg:px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-1.5"
                                         >
+                                            <Trash2 size={16} className="shrink-0" />
                                             {t('delete')}
                                         </button>
                                     </>
@@ -343,15 +387,17 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                 <button
                                     onClick={handleSave}
                                     disabled={isReadOnly || !isDirty || isSaving}
-                                    className="px-4 py-2 bg-[#242A40] text-white rounded-lg text-sm font-medium hover:bg-[#1B2033] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
+                                    className="px-3 lg:px-4 py-2 bg-[#242A40] text-white rounded-lg text-sm font-medium hover:bg-[#1B2033] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
                                 >
-                                    {t('saveChanges')}
+                                    <Save size={16} className="shrink-0" />
+                                    <span className="lg:hidden">{tc('save')}</span>
+                                    <span className="hidden lg:inline">{t('saveChanges')}</span>
                                 </button>
                             </div>
                         </div>
 
                         {/* Form Content */}
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 lg:space-y-8">
                             {validationError && (
                                 <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
                                     {validationError}

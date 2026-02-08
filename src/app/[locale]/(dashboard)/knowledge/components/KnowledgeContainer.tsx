@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Plus, FolderPlus, Home, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { FolderPlus, Home, ChevronRight, MoreHorizontal, ArrowLeft } from 'lucide-react'
 import { Button, PageHeader, ConfirmDialog } from '@/design'
 import { KnowledgeTable } from './KnowledgeTable'
 import { FolderCard } from './FolderCard'
@@ -14,8 +14,6 @@ import {
     createCollection,
     KnowledgeBaseEntry,
     KnowledgeCollection,
-    getCollections,
-    getKnowledgeBaseEntries
 } from '@/lib/knowledge-base/actions'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -147,15 +145,6 @@ export function KnowledgeContainer({
     })
 
     // Actions
-    function handleDelete(id: string) {
-        setDeleteDialog({
-            isOpen: true,
-            id,
-            message: t('deleteConfirm'),
-            isLoading: false
-        })
-    }
-
     async function handleConfirmAction() {
         if (isReadOnly) return
         if (!deleteDialog.id) return
@@ -205,53 +194,100 @@ export function KnowledgeContainer({
         return () => window.clearInterval(intervalId)
     }, [entries, router])
 
+    const pageTitle = currentCollection ? currentCollection.name : tSidebar('allContent')
+    const totalVisibleItems = entries.length + collections.length
+
     return (
         <div className="flex flex-col h-full bg-white">
-            <PageHeader
-                title={currentCollection ? currentCollection.name : tSidebar('allContent')}
-                breadcrumb={
-                    currentCollection ? (
-                        <div className="flex items-center text-sm text-gray-500 mr-2">
-                            <span
-                                className="hover:text-gray-900 cursor-pointer flex items-center"
+            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white lg:hidden">
+                <div className="flex h-14 items-center justify-between px-4">
+                    <div className="flex min-w-0 items-center gap-2">
+                        {currentCollection && (
+                            <button
+                                type="button"
                                 onClick={() => router.push('/knowledge')}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100"
+                                aria-label={t('home')}
                             >
-                                <Home size={14} className="mr-1" />
-                                {tSidebar('allContent')}
-                            </span>
-                            <ChevronRight size={14} className="mx-1" />
-                        </div>
-                    ) : undefined
-                }
-                actions={
-                    <div className="flex gap-2">
-                        {/* Only show "New Folder" at root */}
-                        {!collectionId && !isReadOnly && (
-                            <Button variant="secondary" onClick={() => setShowFolderModal(true)}>
+                                <ArrowLeft size={18} />
+                            </button>
+                        )}
+                        <h2 className="truncate text-base font-bold text-gray-900">{pageTitle}</h2>
+                    </div>
+                    {collectionId && currentCollection && !isReadOnly && (
+                        <FolderActions
+                            collection={{ ...currentCollection, count: entries.length }}
+                            redirectOnDelete
+                            trigger={
+                                <Button variant="secondary" size="icon">
+                                    <MoreHorizontal size={16} />
+                                </Button>
+                            }
+                            onUpdate={handleRefresh}
+                        />
+                    )}
+                </div>
+
+                {!isReadOnly && (
+                    <div className="flex gap-2 px-4 pb-3">
+                        {!collectionId && (
+                            <Button variant="secondary" onClick={() => setShowFolderModal(true)} className="flex-1 justify-center">
                                 <FolderPlus size={16} className="mr-2" />
                                 {t('newFolder')}
                             </Button>
                         )}
-                        {/* Folder Actions (Delete/Rename) */}
-                        {collectionId && currentCollection && !isReadOnly && (
-                            <FolderActions
-                                collection={{ ...currentCollection, count: entries.length }}
-                                redirectOnDelete
-                                trigger={
-                                    <Button variant="secondary" size="icon">
-                                        <MoreHorizontal size={16} />
-                                    </Button>
-                                }
-                                onUpdate={handleRefresh}
-                            />
-                        )}
-                        {!isReadOnly && <NewContentButton collectionId={collectionId} />}
+                        <NewContentButton collectionId={collectionId} className="flex-1 justify-center" />
                     </div>
-                }
-            />
+                )}
+            </div>
+
+            <div className="hidden lg:block">
+                <PageHeader
+                    title={pageTitle}
+                    breadcrumb={
+                        currentCollection ? (
+                            <div className="flex items-center text-sm text-gray-500 mr-2">
+                                <span
+                                    className="hover:text-gray-900 cursor-pointer flex items-center"
+                                    onClick={() => router.push('/knowledge')}
+                                >
+                                    <Home size={14} className="mr-1" />
+                                    {tSidebar('allContent')}
+                                </span>
+                                <ChevronRight size={14} className="mx-1" />
+                            </div>
+                        ) : undefined
+                    }
+                    actions={
+                        <div className="flex gap-2">
+                            {/* Only show "New Folder" at root */}
+                            {!collectionId && !isReadOnly && (
+                                <Button variant="secondary" onClick={() => setShowFolderModal(true)}>
+                                    <FolderPlus size={16} className="mr-2" />
+                                    {t('newFolder')}
+                                </Button>
+                            )}
+                            {/* Folder Actions (Delete/Rename) */}
+                            {collectionId && currentCollection && !isReadOnly && (
+                                <FolderActions
+                                    collection={{ ...currentCollection, count: entries.length }}
+                                    redirectOnDelete
+                                    trigger={
+                                        <Button variant="secondary" size="icon">
+                                            <MoreHorizontal size={16} />
+                                        </Button>
+                                    }
+                                    onUpdate={handleRefresh}
+                                />
+                            )}
+                            {!isReadOnly && <NewContentButton collectionId={collectionId} />}
+                        </div>
+                    }
+                />
+            </div>
 
             {aiSuggestionsEnabled && pendingSuggestions > 0 && (
-                <div className="px-8 mt-4">
+                <div className="mt-3 px-4 lg:mt-4 lg:px-8">
                     <div className="mb-4 rounded-xl border border-amber-300 bg-amber-100/80 px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-4">
                         <div>
                             <p className="font-semibold">{t('aiSuggestionsBannerTitle')}</p>
@@ -267,11 +303,11 @@ export function KnowledgeContainer({
                 </div>
             )}
 
-            <div className="p-6 space-y-6 flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto p-4 space-y-4 lg:p-6 lg:space-y-6">
                 {/* Filters Bar */}
-                <div className="flex justify-end items-center bg-white p-1">
+                <div className="flex items-center justify-end bg-white p-1">
                     <div className="text-sm text-gray-500 font-medium">
-                        {t('itemsCount', { count: entries.length + collections.length })}
+                        {t('itemsCount', { count: totalVisibleItems })}
                     </div>
                 </div>
 
@@ -295,7 +331,7 @@ export function KnowledgeContainer({
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-8">
+                    <div className="space-y-6 lg:space-y-8">
                         {/* Folders Section (Only at Root) */}
                         {collections.length > 0 && (
                             <div>
@@ -319,7 +355,7 @@ export function KnowledgeContainer({
                         {entries.length > 0 && (
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-500 mb-3 px-1">{t('files')}</h3>
-                                <KnowledgeTable entries={entries} onDelete={isReadOnly ? undefined : handleDelete} />
+                                <KnowledgeTable entries={entries} />
                             </div>
                         )}
                     </div>

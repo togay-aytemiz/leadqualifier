@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-08 (mobile leads list compact-card layout + tighter mobile spacing; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -119,6 +119,7 @@
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
   - [x] Skills and Knowledge Base primary CTA buttons now use `#242A40` accent styling
+  - [x] Skills detail header delete/save actions now use standardized icon + label pattern (desktop/mobile compatible)
 - [x] **Navigation Shell**
   - [x] Crisp-inspired main sidebar with collapse toggle and persisted state
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
@@ -131,6 +132,15 @@
   - [x] Sidebar accent and active-state color updated from blue to `#242A40`
   - [x] Mobile bottom navbar with 5 items (Inbox, Kişiler, Yetenekler, Bilgi Bankası, Diğer)
   - [x] Mobile “Diğer” quick menu with Simülatör, Ayarlar, and Signout
+  - [x] Mobile Skills page now uses app-style single-pane navigation (list page → detail page with back action)
+  - [x] Mobile Skills detail header uses shorter labels (`Düzenle`, `Kaydet`) to reduce top-bar clutter
+  - [x] Mobile Settings now uses app-style single-pane navigation (settings list page → detail page with back action)
+  - [x] Mobile Settings detail pages now use animated back transition to the settings list (Inbox-style slide-out)
+  - [x] Mobile Settings back action now performs client-side navigation (no full refresh feel on detail→list return)
+  - [x] Desktop Settings now keeps the inner settings sidebar persistent while only detail content switches/loading states
+  - [x] Mobile Knowledge Base now uses a single-pane flow (sidebar hidden on mobile and files rendered as responsive cards)
+  - [x] Mobile Knowledge edit header now uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance
+  - [x] Mobile bottom navbar now prefetches primary routes for faster tab transitions
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates

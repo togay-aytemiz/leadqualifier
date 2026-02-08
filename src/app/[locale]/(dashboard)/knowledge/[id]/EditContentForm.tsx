@@ -25,6 +25,7 @@ export function EditContentForm({
     collections
 }: EditContentFormProps) {
     const t = useTranslations('knowledge')
+    const tc = useTranslations('common')
     const router = useRouter()
 
     // Form State
@@ -113,14 +114,19 @@ export function EditContentForm({
     return (
         <div className="flex flex-col h-full bg-white">
             <PageHeader
-                title={t('editTitle')}
+                title={
+                    <>
+                        <span className="sm:hidden">{tc('edit')}</span>
+                        <span className="hidden sm:inline">{t('editTitle')}</span>
+                    </>
+                }
                 breadcrumb={
                     <button
                         onClick={() => router.back()}
                         className="flex items-center text-sm text-gray-500 hover:text-gray-900 mr-4"
                     >
-                        <ArrowLeft size={16} className="mr-1" />
-                        {t('form.back')}
+                        <ArrowLeft size={16} className="sm:mr-1" />
+                        <span className="hidden sm:inline">{t('form.back')}</span>
                     </button>
                 }
                 actions={
@@ -143,7 +149,8 @@ export function EditContentForm({
                             ) : (
                                 <>
                                     <Save size={16} className="mr-2" />
-                                    {t('form.save')}
+                                    <span className="sm:hidden">{tc('save')}</span>
+                                    <span className="hidden sm:inline">{t('form.save')}</span>
                                 </>
                             )}
                         </Button>

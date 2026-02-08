@@ -17,6 +17,9 @@
 - Mobile inbox transitions now animate as horizontal slide-in/slide-out between list and conversation detail views.
 - Mobile details panel now adds a dark background overlay and supports tap-outside close behavior.
 - Mobile details panel open/close now uses smooth transition (fade + slight slide).
+- Skills page now supports mobile single-pane flow: the skill list is a standalone page, and tapping a skill opens a dedicated detail/edit pane with back navigation.
+- Settings page now supports mobile single-pane flow: tapping Ayarlar opens a dedicated `/settings` list first, then selected settings open as animated detail pages with mobile back navigation.
+- Knowledge Base now supports mobile single-pane flow: the left knowledge sidebar is hidden on mobile and files render as touch-friendly cards.
 - Leads page now renders a compact mobile-first card list (reduced spacing/margins) while preserving the existing desktop sortable table layout.
 - Lead extraction now enforces locale-aware output language (TR/EN) for user-facing extracted fields, including lead summary and important-info values.
 - Inbox on-demand conversation summary now accepts active UI locale (TR/EN) and generates locale-matched output.
@@ -51,13 +54,21 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Settings route composition now uses a shared `settings/layout.tsx` shell so desktop navigation keeps the inner settings sidebar mounted while only detail content updates.
 - Lead extraction summary persistence now stays aligned with the current extraction window (latest 5 customer messages) instead of carrying over stale summaries when the latest extraction omits summary.
 - Lead extraction strict-retry validation now requires `summary` together with `score` and `status` keys.
 - Shadow-mode inbox inactive banner copy is now compact (`Yapay zeka asistanı devrede değil.` + `Dinleyici modunda yanıt gönderilmez.`) with reduced card footprint.
 - Inbox scroll-to-latest CTA is now anchored on the composer divider and restyled with a subtle gray tone for clearer but less distracting visibility.
 - Inbox composer spacing between the summary row and assistant banner is now tighter.
+- Knowledge Base mobile edit header now uses compact copy (`Düzenle`, `Kaydet`) and hides back text (icon-only) to match Skills-style density.
+- Skills detail header action buttons now use standardized delete/save icon + label patterns (desktop/mobile compatible).
+- Mobile Skills detail header now uses shorter labels (`Düzenle`, `Kaydet`) to reduce top-bar crowding; desktop labels are unchanged.
+- Mobile bottom navbar now prefetches main destinations on mount, reducing perceived delay when switching tabs.
+- Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Desktop Settings sub-page navigation no longer flashes/replaces the whole settings shell with skeletons; sidebar remains stable while detail pane loads.
+- Mobile Settings detail→list back navigation no longer behaves like a full refresh; it now returns via client-side transition for a stable mobile flow.
 - Inbox conversation list header no longer shows a dropdown chevron next to the “Gelen Kutusu / Inbox” title.
 - Inbox summary panel now regenerates summary on every reopen; manual refresh is no longer required after close/reopen.
 - Telegram webhook skill-matching failures now fail open to KB/fallback processing, preventing silent no-reply drops when embedding/match calls error.

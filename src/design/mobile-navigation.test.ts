@@ -19,6 +19,7 @@ describe('resolveMobileNavActiveItem', () => {
 
     it('marks simulator and settings routes under other tab', () => {
         expect(resolveMobileNavActiveItem('/simulator')).toBe('other')
+        expect(resolveMobileNavActiveItem('/settings')).toBe('other')
         expect(resolveMobileNavActiveItem('/settings/channels')).toBe('other')
     })
 

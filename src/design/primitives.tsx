@@ -1,7 +1,9 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Search, X, ArrowUpRight, TriangleAlert } from 'lucide-react'
+import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { isSettingsDetailPath, SETTINGS_MOBILE_BACK_EVENT } from '@/components/settings/mobilePaneState'
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -96,15 +98,34 @@ export function Avatar({ name, size = 'md', className }: AvatarProps) {
 
 // --- PageHeader ---
 interface PageHeaderProps {
-    title: string
+    title: React.ReactNode
     actions?: React.ReactNode
     breadcrumb?: React.ReactNode
 }
 
 export function PageHeader({ title, actions, breadcrumb }: PageHeaderProps) {
+    const pathname = usePathname()
+    const isMobileSettingsDetail = isSettingsDetailPath(pathname)
+    const mobileBackLabel = typeof title === 'string' ? title : 'Back'
+
+    const handleMobileSettingsBack = () => {
+        if (typeof window === 'undefined') return
+        window.dispatchEvent(new Event(SETTINGS_MOBILE_BACK_EVENT))
+    }
+
     return (
         <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 bg-white shrink-0 sticky top-0 z-10">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+                {isMobileSettingsDetail && (
+                    <button
+                        type="button"
+                        onClick={handleMobileSettingsBack}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden shrink-0"
+                        aria-label={mobileBackLabel}
+                    >
+                        <ArrowLeft size={18} />
+                    </button>
+                )}
                 {breadcrumb}
                 <h2 className="font-bold text-gray-900 text-lg">{title}</h2>
             </div>

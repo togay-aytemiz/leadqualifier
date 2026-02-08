@@ -1,26 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { getLocale, getTranslations } from 'next-intl/server'
-import { Sidebar, SidebarGroup, SidebarItem, PageHeader } from '@/design'
-import {
-    HiOutlineUserCircle,
-    HiOutlineBriefcase,
-    HiOutlineAdjustmentsHorizontal,
-    HiOutlineSparkles,
-    HiOutlineChatBubbleLeftRight,
-    HiOutlineCreditCard,
-    HiOutlineBanknotes
-} from 'react-icons/hi2'
+import { PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { getOrgAiUsageSummary } from '@/lib/ai/usage'
 import { UsageBreakdownDetails } from './UsageBreakdownDetails'
-import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 import { formatStorageSize, getOrgMessageUsageSummary, getOrgStorageUsageSummary } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function BillingSettingsPage() {
     const supabase = await createClient()
     const locale = await getLocale()
-    const tSidebar = await getTranslations('Sidebar')
     const tBilling = await getTranslations('billingUsage')
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -40,11 +29,10 @@ export default async function BillingSettingsPage() {
         )
     }
 
-    const [usage, messageUsage, storageUsage, pendingCount] = await Promise.all([
+    const [usage, messageUsage, storageUsage] = await Promise.all([
         getOrgAiUsageSummary(organizationId, { supabase }),
         getOrgMessageUsageSummary(organizationId, { supabase }),
-        getOrgStorageUsageSummary(organizationId, { supabase }),
-        getPendingOfferingProfileSuggestionCount(organizationId, locale)
+        getOrgStorageUsageSummary(organizationId, { supabase })
     ])
     const formatNumber = new Intl.NumberFormat(locale)
     const [year, month] = usage.month.split('-').map(Number)
@@ -67,174 +55,124 @@ export default async function BillingSettingsPage() {
 
     return (
         <>
-            <Sidebar title={tSidebar('settings')}>
-                <SidebarGroup title={tSidebar('preferences')}>
-                    <SidebarItem
-                        icon={<HiOutlineUserCircle size={18} />}
-                        label={tSidebar('profile')}
-                        href={locale === 'tr' ? '/settings/profile' : `/${locale}/settings/profile`}
-                    />
-                    <SidebarItem
-                        icon={<HiOutlineBriefcase size={18} />}
-                        label={tSidebar('organization')}
-                        href={locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`}
-                        indicator={pendingCount > 0}
-                    />
-                    <SidebarItem
-                        icon={<HiOutlineAdjustmentsHorizontal size={18} />}
-                        label={tSidebar('general')}
-                        href={locale === 'tr' ? '/settings/general' : `/${locale}/settings/general`}
-                    />
-                    <SidebarItem
-                        icon={<HiOutlineSparkles size={18} />}
-                        label={tSidebar('ai')}
-                        href={locale === 'tr' ? '/settings/ai' : `/${locale}/settings/ai`}
-                    />
-                </SidebarGroup>
+            <PageHeader title={tBilling('pageTitle')} />
 
-                <SidebarGroup title={tSidebar('integrations')}>
-                    <SidebarItem
-                        icon={<HiOutlineChatBubbleLeftRight size={18} />}
-                        label={tSidebar('channels')}
-                        href={locale === 'tr' ? '/settings/channels' : `/${locale}/settings/channels`}
-                    />
-                </SidebarGroup>
+            <div className="flex-1 overflow-auto p-8">
+                <div className="max-w-5xl space-y-6">
+                    <p className="text-sm text-gray-500">{tBilling('description')}</p>
 
-                <SidebarGroup title={tSidebar('billing')}>
-                    <SidebarItem
-                        icon={<HiOutlineCreditCard size={18} />}
-                        label={tSidebar('plans')}
-                        href="#"
-                    />
-                    <SidebarItem
-                        icon={<HiOutlineBanknotes size={18} />}
-                        label={tSidebar('receipts')}
-                        active
-                        href={locale === 'tr' ? '/settings/billing' : `/${locale}/settings/billing`}
-                    />
-                </SidebarGroup>
-            </Sidebar>
-
-            <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-                <PageHeader title={tBilling('pageTitle')} />
-
-                <div className="flex-1 overflow-auto p-8">
-                    <div className="max-w-5xl space-y-6">
-                        <p className="text-sm text-gray-500">{tBilling('description')}</p>
-
-                        <SettingsSection
-                            title={tBilling('title')}
-                            description={tBilling('utcNote')}
-                            descriptionAddon={<UsageBreakdownDetails usage={usage} />}
-                        >
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
-                                        <span className="uppercase">{tBilling('monthLabel')}</span>
-                                        <span className="text-[11px]">•</span>
-                                        <span className="normal-case font-medium">{monthLabel}</span>
-                                    </div>
-                                    <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                        {formatNumber.format(monthlyTotal)}
-                                        <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
-                                    </p>
-                                    <p className="mt-2 text-xs text-gray-500">
-                                        {tBilling('inputLabel')}: {formatNumber.format(usage.monthly.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.monthly.outputTokens)}
-                                    </p>
+                    <SettingsSection
+                        title={tBilling('title')}
+                        description={tBilling('utcNote')}
+                        descriptionAddon={<UsageBreakdownDetails usage={usage} />}
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
+                                    <span className="uppercase">{tBilling('monthLabel')}</span>
+                                    <span className="text-[11px]">•</span>
+                                    <span className="normal-case font-medium">{monthLabel}</span>
                                 </div>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                                    {formatNumber.format(monthlyTotal)}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
+                                </p>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    {tBilling('inputLabel')}: {formatNumber.format(usage.monthly.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.monthly.outputTokens)}
+                                </p>
+                            </div>
 
-                                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
-                                    <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                        {formatNumber.format(totalTotal)}
-                                        <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
-                                    </p>
-                                    <p className="mt-2 text-xs text-gray-500">
-                                        {tBilling('inputLabel')}: {formatNumber.format(usage.total.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.total.outputTokens)}
-                                    </p>
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                                    {formatNumber.format(totalTotal)}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
+                                </p>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    {tBilling('inputLabel')}: {formatNumber.format(usage.total.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.total.outputTokens)}
+                                </p>
+                            </div>
+                        </div>
+
+                        {totalTotal === 0 && (
+                            <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>
+                        )}
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={tBilling('messageUsageTitle')}
+                        description={tBilling('messageUsageDescription')}
+                    >
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
+                                    <span className="uppercase">{tBilling('monthLabel')}</span>
+                                    <span className="text-[11px]">•</span>
+                                    <span className="normal-case font-medium">{monthLabel}</span>
+                                </div>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                                    {formatNumber.format(monthlyMessagesTotal)}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('messagesUnit')}</span>
+                                </p>
+                                <div className="mt-2 space-y-1 text-xs text-gray-500">
+                                    <p>{tBilling('messageAiLabel')}: {formatNumber.format(messageUsage.monthly.aiGenerated)}</p>
+                                    <p>{tBilling('messageOperatorLabel')}: {formatNumber.format(messageUsage.monthly.operatorSent)}</p>
+                                    <p>{tBilling('messageIncomingLabel')}: {formatNumber.format(messageUsage.monthly.incoming)}</p>
                                 </div>
                             </div>
 
-                            {totalTotal === 0 && (
-                                <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>
-                            )}
-                        </SettingsSection>
-
-                        <SettingsSection
-                            title={tBilling('messageUsageTitle')}
-                            description={tBilling('messageUsageDescription')}
-                        >
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
-                                        <span className="uppercase">{tBilling('monthLabel')}</span>
-                                        <span className="text-[11px]">•</span>
-                                        <span className="normal-case font-medium">{monthLabel}</span>
-                                    </div>
-                                    <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                        {formatNumber.format(monthlyMessagesTotal)}
-                                        <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('messagesUnit')}</span>
-                                    </p>
-                                    <div className="mt-2 space-y-1 text-xs text-gray-500">
-                                        <p>{tBilling('messageAiLabel')}: {formatNumber.format(messageUsage.monthly.aiGenerated)}</p>
-                                        <p>{tBilling('messageOperatorLabel')}: {formatNumber.format(messageUsage.monthly.operatorSent)}</p>
-                                        <p>{tBilling('messageIncomingLabel')}: {formatNumber.format(messageUsage.monthly.incoming)}</p>
-                                    </div>
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                                    {formatNumber.format(totalMessagesTotal)}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('messagesUnit')}</span>
+                                </p>
+                                <div className="mt-2 space-y-1 text-xs text-gray-500">
+                                    <p>{tBilling('messageAiLabel')}: {formatNumber.format(messageUsage.total.aiGenerated)}</p>
+                                    <p>{tBilling('messageOperatorLabel')}: {formatNumber.format(messageUsage.total.operatorSent)}</p>
+                                    <p>{tBilling('messageIncomingLabel')}: {formatNumber.format(messageUsage.total.incoming)}</p>
                                 </div>
+                            </div>
+                        </div>
 
-                                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
-                                    <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                        {formatNumber.format(totalMessagesTotal)}
-                                        <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('messagesUnit')}</span>
-                                    </p>
-                                    <div className="mt-2 space-y-1 text-xs text-gray-500">
-                                        <p>{tBilling('messageAiLabel')}: {formatNumber.format(messageUsage.total.aiGenerated)}</p>
-                                        <p>{tBilling('messageOperatorLabel')}: {formatNumber.format(messageUsage.total.operatorSent)}</p>
-                                        <p>{tBilling('messageIncomingLabel')}: {formatNumber.format(messageUsage.total.incoming)}</p>
+                        {totalMessagesTotal === 0 && (
+                            <p className="mt-4 text-sm text-gray-500">{tBilling('messageUsageEmptyState')}</p>
+                        )}
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={tBilling('storageUsageTitle')}
+                        description={tBilling('storageUsageDescription')}
+                    >
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                                    {storageTotalSize.value}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{storageTotalSize.unit}</span>
+                                </p>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    {tBilling('storageSkillsCountLabel', { count: formatNumber.format(storageUsage.skillCount) })} · {tBilling('storageKnowledgeCountLabel', { count: formatNumber.format(storageUsage.knowledgeDocumentCount) })}
+                                </p>
+                            </div>
+
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('storageBreakdownLabel')}</p>
+                                <div className="mt-3 space-y-3 text-sm text-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">{tBilling('storageSkillsLabel')}</span>
+                                        <span>{storageSkillsSize.value} {storageSkillsSize.unit}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">{tBilling('storageKnowledgeLabel')}</span>
+                                        <span>{storageKnowledgeSize.value} {storageKnowledgeSize.unit}</span>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {totalMessagesTotal === 0 && (
-                                <p className="mt-4 text-sm text-gray-500">{tBilling('messageUsageEmptyState')}</p>
-                            )}
-                        </SettingsSection>
-
-                        <SettingsSection
-                            title={tBilling('storageUsageTitle')}
-                            description={tBilling('storageUsageDescription')}
-                        >
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
-                                    <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                        {storageTotalSize.value}
-                                        <span className="ml-1 text-sm font-medium text-gray-400">{storageTotalSize.unit}</span>
-                                    </p>
-                                    <p className="mt-2 text-xs text-gray-500">
-                                        {tBilling('storageSkillsCountLabel', { count: formatNumber.format(storageUsage.skillCount) })} · {tBilling('storageKnowledgeCountLabel', { count: formatNumber.format(storageUsage.knowledgeDocumentCount) })}
-                                    </p>
-                                </div>
-
-                                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('storageBreakdownLabel')}</p>
-                                    <div className="mt-3 space-y-3 text-sm text-gray-700">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium">{tBilling('storageSkillsLabel')}</span>
-                                            <span>{storageSkillsSize.value} {storageSkillsSize.unit}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium">{tBilling('storageKnowledgeLabel')}</span>
-                                            <span>{storageKnowledgeSize.value} {storageKnowledgeSize.unit}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <p className="mt-4 text-xs text-gray-500">{tBilling('storageUsageApproxNote')}</p>
-                        </SettingsSection>
-                    </div>
+                        <p className="mt-4 text-xs text-gray-500">{tBilling('storageUsageApproxNote')}</p>
+                    </SettingsSection>
                 </div>
             </div>
         </>
