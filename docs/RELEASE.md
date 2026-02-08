@@ -54,6 +54,7 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Leads desktop table now keeps `Durum` chips on a single line and truncates long contact names to one line for cleaner row height consistency.
 - Settings route composition now uses a shared `settings/layout.tsx` shell so desktop navigation keeps the inner settings sidebar mounted while only detail content updates.
 - Lead extraction summary persistence now stays aligned with the current extraction window (latest 5 customer messages) instead of carrying over stale summaries when the latest extraction omits summary.
 - Lead extraction strict-retry validation now requires `summary` together with `score` and `status` keys.

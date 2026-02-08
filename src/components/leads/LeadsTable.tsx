@@ -207,9 +207,11 @@ export function LeadsTable({
                             </div>
 
                             <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <Badge variant={statusVariants[lead.status] || 'neutral'}>
-                                    {statusLabels[lead.status] || lead.status}
-                                </Badge>
+                                <span className="inline-block whitespace-nowrap">
+                                    <Badge variant={statusVariants[lead.status] || 'neutral'}>
+                                        {statusLabels[lead.status] || lead.status}
+                                    </Badge>
+                                </span>
                                 {lead.service_type ? (
                                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
                                         {lead.service_type}
@@ -264,21 +266,23 @@ export function LeadsTable({
                         >
                             {/* Name & Platform merged */}
                             <TableCell>
-                                <div className="flex items-center gap-3">
+                                <div className="flex min-w-0 items-center gap-3">
                                     <div className="shrink-0">
                                         {getPlatformIcon(lead.conversation.platform)}
                                     </div>
-                                    <span className="font-medium text-gray-900">
+                                    <span className="max-w-[240px] truncate whitespace-nowrap font-medium text-gray-900">
                                         {lead.conversation.contact_name}
                                     </span>
                                 </div>
                             </TableCell>
 
                             {/* Status */}
-                            <TableCell className="w-24">
-                                <Badge variant={statusVariants[lead.status] || 'neutral'}>
-                                    {statusLabels[lead.status] || lead.status}
-                                </Badge>
+                            <TableCell className="w-28">
+                                <span className="inline-block whitespace-nowrap">
+                                    <Badge variant={statusVariants[lead.status] || 'neutral'}>
+                                        {statusLabels[lead.status] || lead.status}
+                                    </Badge>
+                                </span>
                             </TableCell>
 
                             {/* Score */}

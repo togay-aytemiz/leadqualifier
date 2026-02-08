@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-08 (desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; desktop leads table now keeps status chips on one line and truncates long contact names to one line; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -328,6 +328,7 @@
   - [ ] Manual overwrite UI for "Important info" values in Inbox (per field edit + save source tracking)
 - [x] **Lead List UX**
   - [x] Mobile leads list now uses compact card rows with reduced spacing while preserving the existing desktop table layout
+  - [x] Desktop leads table keeps status chips on a single line and truncates long contact names to a single line
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
 

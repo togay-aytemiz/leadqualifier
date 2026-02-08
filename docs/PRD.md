@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-08 (desktop settings now keeps the inner settings sidebar mounted while only detail content transitions/loading updates; mobile settings detail→list back flow now uses client-side navigation to avoid refresh-like behavior; mobile knowledge edit header now uses icon-only back + short `Düzenle/Kaydet`; skills detail action buttons now follow standardized icon usage for delete/save; mobile navbar prefetch warmup to reduce tab lag; mobile skills header labels simplified; mobile skills list→detail single-pane flow; mobile settings list→detail single-pane flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout on small screens; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (desktop settings now keeps the inner settings sidebar mounted while only detail content transitions/loading updates; mobile settings detail→list back flow now uses client-side navigation to avoid refresh-like behavior; mobile knowledge edit header now uses icon-only back + short `Düzenle/Kaydet`; skills detail action buttons now follow standardized icon usage for delete/save; mobile navbar prefetch warmup to reduce tab lag; mobile skills header labels simplified; mobile skills list→detail single-pane flow; mobile settings list→detail single-pane flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout on small screens; desktop leads table now keeps status chips and contact names single-line (name truncates on overflow); summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > **Status:** In Development
 
 ---
@@ -256,6 +256,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Score, AI Summary, last message time
 - "Open in WhatsApp" button
 - Mobile layout uses compact, tappable card rows with reduced spacing; desktop keeps the full sortable table layout.
+- Desktop table keeps status chips on one line and keeps contact name on one line with truncation when needed.
 
 ### 5.2 Skills Management (Implemented; Playground Planned)
 - CRUD operations
@@ -483,6 +484,7 @@ MVP is successful when:
 - **Mobile Details Overlay:** Opening mobile details should dim the chat background with a dark tappable overlay to emphasize focus and make close intent obvious.
 - **Mobile Details Micro-Animation:** Mobile details open/close should use short fade + vertical translate transitions to avoid abrupt layout jumps.
 - **Mobile Leads List Density:** On small screens, use compact card rows with tighter spacing and tap-first scanning; keep desktop lead table structure unchanged.
+- **Desktop Leads Row Readability:** Keep lead status chips and contact names on one line in the desktop table; truncate long names instead of wrapping.
 - **Mobile Skills Flow:** On small screens, keep Skills as single-pane list→detail navigation with horizontal slide transitions and explicit back action; keep desktop split-pane layout unchanged.
 - **Mobile Settings Flow:** On small screens, keep Settings as single-pane list→detail navigation with horizontal slide transitions and explicit back action; keep desktop settings layout unchanged.
 - **Mobile Skills Header Density:** On small screens, use shorter detail-header action labels for readability; keep desktop wording unchanged.
