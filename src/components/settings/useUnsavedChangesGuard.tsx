@@ -118,7 +118,7 @@ export function useUnsavedChangesGuard({ isDirty, onSave, onDiscard, transformPe
         } finally {
             setIsSaving(false)
         }
-    }, [closeDialog, onSave, router])
+    }, [closeDialog, onSave, router, transformPendingHref])
 
     return {
         isDialogOpen,

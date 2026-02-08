@@ -24,6 +24,7 @@ const MAX_HISTORY_ITEMS = 6
 const MAX_CHARS_PER_MESSAGE = 400
 const MAX_USER_TURNS = 5
 const MAX_ASSISTANT_TURNS = 3
+const ROUTER_MAX_OUTPUT_TOKENS = 120
 const KNOWLEDGE_HINTS = [
     'nedir',
     'ne demek',
@@ -187,6 +188,7 @@ If you are unsure, set route_to_kb to true.`
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.1,
+            max_tokens: ROUTER_MAX_OUTPUT_TOKENS,
             response_format: { type: 'json_object' },
             messages: [
                 { role: 'system', content: systemPrompt },

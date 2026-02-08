@@ -221,6 +221,7 @@ async function createSuggestion(options: {
         model: 'gpt-4o-mini',
         temperature: 0.2,
         max_tokens: 260,
+        response_format: { type: 'json_object' },
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -249,6 +250,7 @@ async function createSuggestion(options: {
             model: 'gpt-4o-mini',
             temperature: 0.2,
             max_tokens: 260,
+            response_format: { type: 'json_object' },
             messages: [
                 { role: 'system', content: repairSystemPrompt },
                 { role: 'user', content: repairUserPrompt }
@@ -339,6 +341,7 @@ export async function appendRequiredIntakeFields(options: {
         model: 'gpt-4o-mini',
         temperature: 0.2,
         max_tokens: 180,
+        response_format: { type: 'json_object' },
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }

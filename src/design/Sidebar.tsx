@@ -84,6 +84,7 @@ export function SidebarItem({ icon, iconColor, label, active, count, indicator, 
             <div className="flex items-center gap-2.5">
                 {avatar ? (
                     <div className="h-5 w-5 rounded-full bg-gray-200 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img alt={label} className="h-full w-full object-cover" src={avatar} />
                     </div>
                 ) : icon ? (

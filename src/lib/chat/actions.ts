@@ -15,6 +15,8 @@ import {
 } from '@/lib/ai/conversation'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 
+const RAG_MAX_OUTPUT_TOKENS = 320
+
 export interface ChatMessage {
     id: string
     role: 'user' | 'system'
@@ -212,6 +214,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
 
             const completion = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
+                max_tokens: RAG_MAX_OUTPUT_TOKENS,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     ...historyMessages,

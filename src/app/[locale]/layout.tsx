@@ -26,12 +26,6 @@ export default async function LocaleLayout({ children, params }: Props) {
 
     return (
         <html lang={locale}>
-            <head>
-                <link
-                    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-                    rel="stylesheet"
-                />
-            </head>
             <body className="font-sans antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>
                 <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
             </body>

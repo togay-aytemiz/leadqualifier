@@ -40,7 +40,7 @@ export function NewContentButton({ collectionId, className }: NewContentButtonPr
             icon: <Upload size={16} className="text-red-500" />,
             label: tBtn('pdf'),
             onClick: () => { }, // TODO: Implement
-            badge: null
+            badge: tBtn('comingSoon')
         },
         {
             icon: <Github size={16} className="text-gray-700" />,

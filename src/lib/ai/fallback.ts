@@ -18,6 +18,7 @@ import type { OrganizationAiSettings } from '@/types/database'
 const FALLBACK_TOPICS_TR = ['fiyatlar', 'randevu', 'iptal/iade', 'hizmetler']
 const FALLBACK_TOPICS_EN = ['pricing', 'appointments', 'cancellations/refunds', 'services']
 const FALLBACK_TOPIC_LIMIT = 6
+const FALLBACK_MAX_OUTPUT_TOKENS = 320
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
 const TURKISH_HINTS = ['nedir', 'ne', 'nasıl', 'fiyat', 'randevu', 'iptal', 'iade', 'kampanya', 'paket', 'yardımcı']
@@ -133,6 +134,7 @@ If the request is outside scope, politely redirect to the most relevant availabl
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.3,
+            max_tokens: FALLBACK_MAX_OUTPUT_TOKENS,
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...historyMessages,

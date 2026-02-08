@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-08 (repo-wide troubleshooting sweep completed: test suite stabilized, hook rule violations fixed, `no-unused-vars` cleaned, `no-explicit-any` removed across inbox/AI/knowledge/leads modules, and lint/test/build pipelines verified; desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; desktop leads table now keeps status chips on one line and truncates long contact names to one line; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
+> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes guard callback dependencies fixed, Knowledge New Content PDF option now clearly marked `Coming Soon`, Next.js middleware convention migrated to `src/proxy.ts`, structured-output JSON mode added for extraction/follow-up/offering profile LLM calls, LLM output token caps applied to router/fallback/RAG/summary/reasoning/extraction paths, and KB content now truncates before profile/intake suggestion prompts to control prompt growth; lint/test/build pipelines re-verified; repo-wide troubleshooting sweep completed: test suite stabilized, hook rule violations fixed, `no-unused-vars` cleaned, `no-explicit-any` removed across inbox/AI/knowledge/leads modules, and lint/test/build pipelines verified; desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; desktop leads table now keeps status chips on one line and truncates long contact names to one line; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -120,6 +120,8 @@
   - [x] Primitive component cleanup
   - [x] Skills and Knowledge Base primary CTA buttons now use `#242A40` accent styling
   - [x] Skills detail header delete/save actions now use standardized icon + label pattern (desktop/mobile compatible)
+  - [x] Unsaved changes guard save callback now tracks pending-link transform dependency to avoid stale navigation targets
+  - [x] Next.js locale interceptor moved from `src/middleware.ts` to `src/proxy.ts` (Next 16 convention)
 - [x] **Navigation Shell**
   - [x] Crisp-inspired main sidebar with collapse toggle and persisted state
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
@@ -159,13 +161,15 @@
   - [x] Category support
   - [x] Admin UI for KB management
   - [x] Knowledge base route loading skeletons for instant navigation
+  - [x] New Content source menu keeps placeholder providers visible and marks PDF as `Coming Soon` for transparency
 - [x] **KB Status UI**
   - [x] Show indexing status per entry (Ready / Processing / Error)
-- [x] **RAG Pipeline**
+  - [x] **RAG Pipeline**
 - [x] Document chunking
 - [x] Embedding storage
 - [x] Retrieval logic
 - [x] Response generation from KB
+- [x] KB profile/intake suggestion context now truncates oversized document content before LLM handoff
 - [x] **Enterprise RAG Hardening:** Documents + chunks schema, token-budgeted context, and consistent fallback handling
 - [x] **Legacy Cleanup:** Remove `knowledge_base` in favor of documents/chunks
 - [x] **Contextual KB Routing:** LLM decides KB usage and rewrites follow-up queries
@@ -194,6 +198,8 @@
   - [x] Skill → KB → Topic-guided fallback response
   - [x] Response formatting
   - [x] Error handling
+  - [x] Router responses now enforce a max output token cap for predictable cost
+  - [x] Fallback/RAG responses now enforce max output token caps for predictable cost
 - [x] **Bot Mode (Org-Level)**
   - [x] Active / Shadow / Off (Simulator excluded)
   - [x] AI Settings selector + sidebar status indicator
@@ -304,6 +310,8 @@
 - [x] **Extraction Reliability**
   - [x] Parse fenced or noisy JSON outputs safely
   - [x] Required Fields parser now accepts fenced/noisy JSON responses from AI
+  - [x] Enforce JSON response mode (`response_format: json_object`) for extraction/follow-up/offering-profile structured outputs
+  - [x] Extraction and lead-reasoning/summary helpers now enforce max output token caps
   - [x] Label customer vs assistant messages and respect customer negations
   - [x] Use last 5 customer messages and LLM-provided score/status
   - [x] Ensure latest message is included even with async writes

@@ -26,6 +26,8 @@ export type LeadRefreshResult =
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
 type ConversationLeadPreview = { status?: string | null }
 type ConversationAssigneePreview = { full_name?: string | null; email?: string | null }
+const SUMMARY_MAX_OUTPUT_TOKENS = 180
+const LEAD_REASONING_MAX_OUTPUT_TOKENS = 220
 
 export interface ConversationListItem extends Conversation {
     assignee?: ConversationAssigneePreview | null
@@ -194,6 +196,7 @@ export async function getConversationSummary(
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.2,
+            max_tokens: SUMMARY_MAX_OUTPUT_TOKENS,
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
@@ -337,6 +340,7 @@ export async function getLeadScoreReasoning(
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.2,
+            max_tokens: LEAD_REASONING_MAX_OUTPUT_TOKENS,
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }

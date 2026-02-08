@@ -40,6 +40,7 @@ export type KnowledgeBaseInsert = Pick<KnowledgeBaseEntry, 'content' | 'title' |
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 type KnowledgeCountRow = { collection_id: string | null }
 type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { collection_id: string | null }
+const MAX_PROFILE_CONTEXT_CHARS = 6000
 
 interface KnowledgeSearchResult {
     chunk_id: string
@@ -91,6 +92,23 @@ async function getScopedOrganizationId(
     if (organizationId) return organizationId
     const context = await resolveActiveOrganizationContext(supabase)
     return context?.activeOrganizationId ?? null
+}
+
+function buildProfileContextContent(title: string, content: string) {
+    const normalizedTitle = (title ?? '').trim()
+    const normalizedContent = (content ?? '').trim()
+    if (!normalizedContent) return normalizedTitle
+
+    if (normalizedContent.length <= MAX_PROFILE_CONTEXT_CHARS) {
+        return normalizedTitle
+            ? `${normalizedTitle}\n${normalizedContent}`
+            : normalizedContent
+    }
+
+    const truncatedContent = normalizedContent.slice(0, MAX_PROFILE_CONTEXT_CHARS).trimEnd()
+    return normalizedTitle
+        ? `${normalizedTitle}\n${truncatedContent}\n\n[TRUNCATED_FOR_PROFILE_CONTEXT]`
+        : `${truncatedContent}\n\n[TRUNCATED_FOR_PROFILE_CONTEXT]`
 }
 
 /**
@@ -230,8 +248,7 @@ export async function processKnowledgeDocument(
             .single()
 
         const finalDoc = (readyDoc ?? data) as KnowledgeBaseEntry
-
-        const profileContent = `${finalDoc.title}\n${finalDoc.content}`
+        const profileContent = buildProfileContextContent(finalDoc.title, finalDoc.content)
 
         try {
             await proposeServiceCandidate({

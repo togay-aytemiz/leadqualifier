@@ -9,6 +9,7 @@ type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 const TURKISH_CHAR_PATTERN = /[ığüşöçİĞÜŞÖÇ]/
 const TURKISH_WORD_PATTERN = /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet|çekim|cekim|vazgeçtim|vazgectim)\b/i
 const ENGLISH_WORD_PATTERN = /\b(hello|hi|price|appointment|thank(s| you)|please|tomorrow|today|available|campaign|service|book|booking|schedule)\b/i
+const LEAD_EXTRACTION_MAX_OUTPUT_TOKENS = 320
 
 function isLikelyTurkishText(value: string) {
     const text = (value ?? '').trim()
@@ -416,6 +417,8 @@ export async function runLeadExtraction(options: {
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0.2,
+        max_tokens: LEAD_EXTRACTION_MAX_OUTPUT_TOKENS,
+        response_format: { type: 'json_object' },
         messages: [
             { role: 'system', content: extractionSystemPrompt },
             { role: 'user', content: userPrompt }
@@ -450,6 +453,8 @@ export async function runLeadExtraction(options: {
         const retry = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.2,
+            max_tokens: LEAD_EXTRACTION_MAX_OUTPUT_TOKENS,
+            response_format: { type: 'json_object' },
             messages: [
                 { role: 'system', content: extractionSystemPrompt },
                 { role: 'user', content: strictPrompt }

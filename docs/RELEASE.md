@@ -7,6 +7,10 @@
 ## [Unreleased]
 
 ### Added
+- Added prompt-budget guardrail for Knowledge→Offering Profile/Required Intake pipelines by truncating oversized document content before LLM suggestion prompts.
+- Added explicit `max_tokens` caps for router, fallback, RAG, summary, lead reasoning, and extraction calls to keep response size/cost predictable.
+- Added structured-output hardening for JSON-producing LLM calls by enabling `response_format: { type: "json_object" }` in lead extraction, required-intake follow-up, and offering-profile suggestion pipelines.
+- Added explicit `Coming Soon` badge to Knowledge Base New Content `PDF Upload` source while keeping placeholder handlers unchanged for non-MVP providers.
 - Added a troubleshooting-driven quality pass covering tests, hooks, lint debt, and TypeScript strictness across AI/Inbox/Knowledge/Leads modules.
 - Added explicit typed models for inbox conversation list rows (`ConversationListItem`) and Telegram debug responses to prevent unsafe UI assumptions.
 - Added an ESM-based i18n validation runner (`scripts/i18n/check-i18n.mjs`) and updated npm script wiring.
@@ -57,6 +61,9 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Next.js locale interception file convention from `src/middleware.ts` to `src/proxy.ts` to align with Next.js 16.
+- Changed locale layout to remove the unused Material Symbols webfont `<link>` and keep shell font loading warning-free.
+- Changed Knowledge document post-processing to pass bounded context into suggestion generators instead of full raw document bodies.
 - Replaced broad `any` usage with concrete/unknown-safe typing patterns in core runtime paths (fallback, follow-up, AI settings, usage, inbox actions, knowledge actions, extraction, offering profile, telegram client).
 - Updated `scripts/tests/main-sidebar.test.js` into a proper Vitest suite and aligned chat style exports with existing tests.
 - Leads desktop table now keeps `Durum` chips on a single line and truncates long contact names to one line for cleaner row height consistency.
@@ -73,6 +80,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed stale-closure risk in unsaved-changes save flow by including `transformPendingHref` in `useUnsavedChangesGuard` callback dependencies.
 - Fixed failing inbox style tests by restoring `getInboxOutgoingBubbleClasses` export.
 - Fixed Vitest failure caused by a non-suite test file (`scripts/tests/main-sidebar.test.js`) by converting it into an executable test suite.
 - Fixed React hook rule violations (`rules-of-hooks`, `set-state-in-effect`) in Knowledge, Settings, and Auth flows.

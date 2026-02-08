@@ -245,6 +245,7 @@ export async function generateRequiredIntakeFollowup(options: {
         model: 'gpt-4o-mini',
         temperature: 0.1,
         max_tokens: 220,
+        response_format: { type: 'json_object' },
         messages: [
             { role: 'system', content: REQUIRED_INTAKE_FOLLOWUP_SYSTEM_PROMPT },
             { role: 'user', content: userPrompt }

@@ -22,6 +22,8 @@ import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { v4 as uuidv4 } from 'uuid'
 
+const RAG_MAX_OUTPUT_TOKENS = 320
+
 function isLikelyTurkishMessage(value: string) {
     const text = (value ?? '').trim()
     if (!text) return true
@@ -458,6 +460,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
 
                     const completion = await openai.chat.completions.create({
                         model: 'gpt-4o-mini',
+                        max_tokens: RAG_MAX_OUTPUT_TOKENS,
                         messages: [
                             { role: 'system', content: systemPrompt },
                             ...historyMessages,
