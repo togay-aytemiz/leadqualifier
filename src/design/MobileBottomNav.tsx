@@ -71,7 +71,13 @@ export function MobileBottomNav() {
 
     useEffect(() => {
         const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings']
-        hotRoutes.forEach((href) => router.prefetch(href))
+
+        const prefetchRoutes = () => {
+            hotRoutes.forEach((href) => router.prefetch(href))
+        }
+
+        const timeoutId = setTimeout(prefetchRoutes, 250)
+        return () => clearTimeout(timeoutId)
     }, [router])
 
     return (

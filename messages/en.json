@@ -371,7 +371,8 @@
         "whatsappComingSoon": "WhatsApp integration coming soon! Contact support for early access.",
         "types": {
             "telegram": "Telegram",
-            "whatsapp": "WhatsApp"
+            "whatsapp": "WhatsApp",
+            "instagram": "Instagram"
         },
         "status": {
             "active": "Active",
@@ -400,15 +401,24 @@
         "botTokenPlaceholder": "123456789:ABCDEF...",
         "connectTelegramError": "Failed to connect",
         "connectWhatsAppError": "Failed to connect WhatsApp channel",
+        "connectInstagramError": "Failed to connect Instagram channel",
         "validating": "Validating...",
         "connectBot": "Connect Bot",
         "connectWhatsApp": "Connect WhatsApp",
+        "connectInstagram": "Connect Instagram",
         "connectWhatsAppTitle": "Connect WhatsApp Business",
         "connectWhatsAppHelpTitle": "Meta Cloud API setup checklist:",
         "connectWhatsAppSteps": {
             "step1": "Create a WhatsApp app in Meta Developers and copy the Phone Number ID + Business Account ID.",
             "step2": "Generate a permanent access token with WhatsApp messaging permissions.",
             "step3": "Set an app secret and verify token. Use the same verify token in the webhook configuration."
+        },
+        "connectInstagramTitle": "Connect Instagram Business",
+        "connectInstagramHelpTitle": "Meta Instagram Messaging setup checklist:",
+        "connectInstagramSteps": {
+            "step1": "Connect your Instagram professional account to a Facebook Page and enable Instagram Messaging API access in Meta App settings.",
+            "step2": "Copy the Page ID and Instagram Business Account ID, then generate a Page Access Token with messaging permissions.",
+            "step3": "Set an app secret and verify token. Use the same verify token in Meta webhook configuration."
         },
         "whatsappPhoneNumberIdLabel": "Phone Number ID",
         "whatsappPhoneNumberIdPlaceholder": "e.g. 123456789012345",
@@ -419,7 +429,17 @@
         "whatsappAppSecretLabel": "App Secret",
         "whatsappAppSecretPlaceholder": "Meta app secret",
         "whatsappVerifyTokenLabel": "Verify Token",
-        "whatsappVerifyTokenPlaceholder": "Choose a custom verify token"
+        "whatsappVerifyTokenPlaceholder": "Choose a custom verify token",
+        "instagramPageIdLabel": "Page ID",
+        "instagramPageIdPlaceholder": "e.g. 123456789012345",
+        "instagramBusinessAccountIdLabel": "Instagram Business Account ID",
+        "instagramBusinessAccountIdPlaceholder": "e.g. 17841400000000000",
+        "instagramPageAccessTokenLabel": "Page Access Token",
+        "instagramPageAccessTokenPlaceholder": "EAAG...",
+        "instagramAppSecretLabel": "App Secret",
+        "instagramAppSecretPlaceholder": "Meta app secret",
+        "instagramVerifyTokenLabel": "Verify Token",
+        "instagramVerifyTokenPlaceholder": "Choose a custom verify token"
     },
     "Sidebar": {
         "settings": "Settings",
@@ -479,7 +499,7 @@
         "title": "AI Settings",
         "description": "Tune how the bot responds when it can’t find a Skill or Knowledge Base match.",
         "botModeTitle": "Bot mode",
-        "botModeDescription": "Applies to Telegram/WhatsApp. Simulator is unaffected.",
+        "botModeDescription": "Applies to Telegram/WhatsApp/Instagram. Simulator is unaffected.",
         "botModeActive": "Active",
         "botModeActiveDescription": "Bot replies to messages (Skills → KB → fallback).",
         "botModeShadow": "Shadow",

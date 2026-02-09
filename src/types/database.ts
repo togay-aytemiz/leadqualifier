@@ -98,7 +98,7 @@ export interface SkillMatch {
 }
 
 // Inbox Types
-export type ConversationPlatform = 'whatsapp' | 'telegram' | 'simulator'
+export type ConversationPlatform = 'whatsapp' | 'telegram' | 'instagram' | 'simulator'
 export type ConversationStatus = 'open' | 'closed' | 'snoozed'
 export type MessageSenderType = 'user' | 'contact' | 'system' | 'bot'
 
@@ -130,7 +130,7 @@ export interface Message {
 export interface Channel {
     id: string
     organization_id: string
-    type: 'telegram' | 'whatsapp'
+    type: 'telegram' | 'whatsapp' | 'instagram'
     name: string
     config: Json
     status: 'active' | 'disconnected' | 'error'

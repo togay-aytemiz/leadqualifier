@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
-import { WhatsAppClient } from '@/lib/whatsapp/client'
-import { extractWhatsAppTextMessages, isValidMetaSignature } from '@/lib/whatsapp/webhook'
+import { InstagramClient } from '@/lib/instagram/client'
+import { extractInstagramTextMessages, isValidMetaSignature } from '@/lib/instagram/webhook'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 
 export const runtime = 'nodejs'
 
-interface WhatsAppChannelRecord {
+interface InstagramChannelRecord {
     id: string
     organization_id: string
     config: Json
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     const { data: channel } = await supabase
         .from('channels')
         .select('id, config')
-        .eq('type', 'whatsapp')
+        .eq('type', 'instagram')
         .eq('status', 'active')
         .eq('config->>verify_token', token)
         .maybeSingle()
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    const events = extractWhatsAppTextMessages(payload)
+    const events = extractInstagramTextMessages(payload)
     if (events.length === 0) {
         return NextResponse.json({ ok: true })
     }
@@ -85,44 +85,44 @@ export async function POST(req: NextRequest) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const channelCache = new Map<string, WhatsAppChannelRecord>()
-    const clientCache = new Map<string, WhatsAppClient>()
+    const channelCache = new Map<string, InstagramChannelRecord>()
+    const clientCache = new Map<string, InstagramClient>()
 
     for (const event of events) {
-        let channel = channelCache.get(event.phoneNumberId)
-        let client = clientCache.get(event.phoneNumberId)
+        let channel = channelCache.get(event.instagramBusinessAccountId)
+        let client = clientCache.get(event.instagramBusinessAccountId)
 
         if (!channel) {
             const { data } = await supabase
                 .from('channels')
                 .select('id, organization_id, config')
-                .eq('type', 'whatsapp')
+                .eq('type', 'instagram')
                 .eq('status', 'active')
-                .eq('config->>phone_number_id', event.phoneNumberId)
+                .eq('config->>instagram_business_account_id', event.instagramBusinessAccountId)
                 .maybeSingle()
 
             if (!data) {
-                console.warn('WhatsApp Webhook: Channel not found for phone number id', event.phoneNumberId)
+                console.warn('Instagram Webhook: Channel not found for business account id', event.instagramBusinessAccountId)
                 continue
             }
 
-            channel = data as WhatsAppChannelRecord
+            channel = data as InstagramChannelRecord
             const appSecret = readConfigString(channel.config, 'app_secret')
             const isValid = isValidMetaSignature(signatureHeader, rawBody, appSecret)
             if (!isValid) {
-                console.warn('WhatsApp Webhook: Invalid signature')
+                console.warn('Instagram Webhook: Invalid signature')
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
             }
 
-            const accessToken = readConfigString(channel.config, 'permanent_access_token')
-            if (!accessToken) {
-                console.warn('WhatsApp Webhook: Missing permanent access token')
+            const pageAccessToken = readConfigString(channel.config, 'page_access_token')
+            if (!pageAccessToken) {
+                console.warn('Instagram Webhook: Missing page access token')
                 continue
             }
 
-            client = new WhatsAppClient(accessToken)
-            channelCache.set(event.phoneNumberId, channel)
-            clientCache.set(event.phoneNumberId, client)
+            client = new InstagramClient(pageAccessToken)
+            channelCache.set(event.instagramBusinessAccountId, channel)
+            clientCache.set(event.instagramBusinessAccountId, client)
         }
 
         if (!channel || !client) continue
@@ -130,26 +130,26 @@ export async function POST(req: NextRequest) {
         await processInboundAiPipeline({
             supabase,
             organizationId: channel.organization_id,
-            platform: 'whatsapp',
-            source: 'whatsapp',
-            contactId: event.contactPhone,
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: event.contactId,
             contactName: event.contactName,
             text: event.text,
             inboundMessageId: event.messageId,
-            inboundMessageIdMetadataKey: 'whatsapp_message_id',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
             inboundMessageMetadata: {
-                whatsapp_message_id: event.messageId,
-                whatsapp_timestamp: event.timestamp,
-                phone_number_id: event.phoneNumberId
+                instagram_message_id: event.messageId,
+                instagram_timestamp: event.timestamp,
+                instagram_business_account_id: event.instagramBusinessAccountId
             },
             sendOutbound: async (content: string) => {
                 await client.sendText({
-                    phoneNumberId: event.phoneNumberId,
-                    to: event.contactPhone,
+                    instagramBusinessAccountId: event.instagramBusinessAccountId,
+                    to: event.contactId,
                     text: content
                 })
             },
-            logPrefix: 'WhatsApp Webhook'
+            logPrefix: 'Instagram Webhook'
         })
     }
 

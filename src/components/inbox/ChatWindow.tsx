@@ -39,7 +39,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
             <header className="h-16 flex-shrink-0 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
                 <div className="flex items-center gap-3">
                     <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${conversation.platform === 'whatsapp' ? 'bg-green-500' :
-                            conversation.platform === 'telegram' ? 'bg-blue-400' : 'bg-purple-500'
+                            conversation.platform === 'telegram' ? 'bg-blue-400' : conversation.platform === 'instagram' ? 'bg-pink-500' : 'bg-purple-500'
                         }`}>
                         {conversation.contact_name.charAt(0).toUpperCase()}
                     </div>

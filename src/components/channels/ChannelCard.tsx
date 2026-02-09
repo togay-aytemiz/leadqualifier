@@ -3,16 +3,17 @@
 import { Channel } from '@/types/database'
 import { useState } from 'react'
 import { Bug } from 'lucide-react'
-import { debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
+import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { useTranslations } from 'next-intl'
 import { FaTelegram } from 'react-icons/fa'
 import { IoLogoWhatsapp } from 'react-icons/io5'
+import { FaInstagram } from 'react-icons/fa6'
 
 interface ChannelCardProps {
     channel?: Channel
-    type: 'telegram' | 'whatsapp'
+    type: 'telegram' | 'whatsapp' | 'instagram'
     onConnect: () => void
     isReadOnly?: boolean
 }
@@ -26,7 +27,9 @@ export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: Ch
         if (!channel) return
         const result = type === 'telegram'
             ? await debugTelegramChannel(channel.id)
-            : await debugWhatsAppChannel(channel.id)
+            : type === 'whatsapp'
+                ? await debugWhatsAppChannel(channel.id)
+                : await debugInstagramChannel(channel.id)
         if (result.success) {
             alert(t('debug.webhookInfo', { info: JSON.stringify(result.info, null, 2) }))
         } else {
@@ -64,12 +67,14 @@ export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: Ch
                         <Bug size={16} />
                     </button>
                 )}
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${type === 'telegram' ? 'bg-blue-50' : 'bg-green-50'
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${type === 'telegram' ? 'bg-blue-50' : type === 'whatsapp' ? 'bg-green-50' : 'bg-pink-50'
                     }`}>
                     {type === 'telegram' ? (
                         <FaTelegram className="text-[#229ED9]" size={28} />
-                    ) : (
+                    ) : type === 'whatsapp' ? (
                         <IoLogoWhatsapp className="text-[#25D366]" size={28} />
+                    ) : (
+                        <FaInstagram className="text-[#E1306C]" size={28} />
                     )}
                 </div>
 

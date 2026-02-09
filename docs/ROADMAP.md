@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-09 (auth canvas refined with clearly distinct scenarios, compact scoring chip placement, duplicate under-composer score card removed, and pre-message scoring now shown as waiting placeholder state; support-forwarded copy simplified; build re-verified)  
+> **Last Updated:** 2026-02-09 (Instagram added as independent channel with separate webhook route and shared inbound AI pipeline for Meta channels; channel settings + inbox/leads platform badges updated; build re-verified)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -42,6 +42,14 @@
   - [x] Incoming message webhook
   - [x] Outgoing message API
   - [x] Skill-match failures fail open to KB/fallback instead of dropping reply flow
+- [x] **Instagram (Meta Messaging)**
+  - [x] Channel connect + webhook verification
+  - [x] Incoming message webhook
+  - [x] Outgoing message API (reactive replies only)
+  - [x] First bot reply starts only after inbound customer message
+- [x] **Shared Inbound AI Pipeline**
+  - [x] Keep Telegram/WhatsApp/Instagram webhook routes separate
+  - [x] Move inbound AI flow to shared pipeline function and reuse in WhatsApp + Instagram
 - [x] **Message Handling Core**
   - [x] Store incoming messages
   - [x] Store outgoing messages
@@ -148,7 +156,9 @@
   - [x] Mobile bottom navbar now prefetches primary routes for faster tab transitions
   - [x] Desktop main sidebar and settings shell now prefetch settings routes to reduce transition latency
   - [x] Desktop main sidebar now prefetches core workspace/AI/admin routes for faster route transitions
-  - [x] Main sidebar Settings entry now opens `/settings` root (lighter first load than direct `/settings/channels`)
+  - [x] Main sidebar Settings entry routing optimized for lighter first-load behavior vs legacy `/settings/channels`
+  - [x] Desktop main sidebar Settings entry now opens `/settings/ai`, while mobile quick action keeps `/settings` list-first flow
+  - [x] Route prefetch warmups now run with a short delayed schedule (main sidebar, settings shell, mobile nav) to reduce active-interaction jank
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates

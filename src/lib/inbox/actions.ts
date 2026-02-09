@@ -641,6 +641,50 @@ export async function sendMessage(
         }
     }
 
+    if (conversation.platform === 'instagram') {
+        const { count: inboundCount, error: inboundCountError } = await supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('conversation_id', conversationId)
+            .eq('sender_type', 'contact')
+
+        if (inboundCountError) {
+            console.error('Failed to validate Instagram inbound-first rule:', inboundCountError)
+            throw new Error('Failed to validate Instagram conversation state')
+        }
+        if ((inboundCount ?? 0) < 1) {
+            throw new Error('Instagram messages can only be sent after the customer starts the conversation')
+        }
+
+        const { data: channel } = await supabase
+            .from('channels')
+            .select('config')
+            .eq('organization_id', conversation.organization_id)
+            .eq('type', 'instagram')
+            .eq('status', 'active')
+            .single()
+
+        const pageAccessToken = channel ? readConfigString(channel.config as Json, 'page_access_token') : null
+        const instagramBusinessAccountId = channel ? readConfigString(channel.config as Json, 'instagram_business_account_id') : null
+
+        if (pageAccessToken && instagramBusinessAccountId) {
+            try {
+                const { InstagramClient } = await import('@/lib/instagram/client')
+                const client = new InstagramClient(pageAccessToken)
+                await client.sendText({
+                    instagramBusinessAccountId,
+                    to: conversation.contact_phone,
+                    text: content
+                })
+            } catch (error) {
+                console.error('Failed to send Instagram message:', error)
+                throw new Error('Failed to send message to Instagram API')
+            }
+        } else {
+            console.warn('No active Instagram channel found for this organization')
+        }
+    }
+
     // 3. Save to DB + assign operator atomically
     const { data, error } = await supabase.rpc('send_operator_message', {
         p_conversation_id: conversationId,

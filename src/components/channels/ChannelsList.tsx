@@ -5,7 +5,8 @@ import { useState } from 'react'
 import { ChannelCard } from '@/components/channels/ChannelCard'
 import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal'
 import { ConnectWhatsAppModal, type ConnectWhatsAppFormValues } from '@/components/channels/ConnectWhatsAppModal'
-import { connectTelegramChannel, connectWhatsAppChannel } from '@/lib/channels/actions'
+import { ConnectInstagramModal, type ConnectInstagramFormValues } from '@/components/channels/ConnectInstagramModal'
+import { connectInstagramChannel, connectTelegramChannel, connectWhatsAppChannel } from '@/lib/channels/actions'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
@@ -20,10 +21,12 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
     const t = useTranslations('Channels')
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false)
+    const [isInstagramModalOpen, setIsInstagramModalOpen] = useState(false)
     const router = useRouter()
 
     const telegramChannel = channels.find(c => c.type === 'telegram')
     const whatsappChannel = channels.find(c => c.type === 'whatsapp')
+    const instagramChannel = channels.find(c => c.type === 'instagram')
 
     const handleConnectTelegram = async (token: string) => {
         if (isReadOnly) return
@@ -43,11 +46,20 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
         router.refresh()
     }
 
+    const handleConnectInstagram = async (values: ConnectInstagramFormValues) => {
+        if (isReadOnly) return
+        const result = await connectInstagramChannel(organizationId, values)
+        if (result.error) {
+            throw new Error(result.error)
+        }
+        router.refresh()
+    }
+
     return (
         <div>
             {showDescription && <p className="text-gray-500 mb-8">{t('description')}</p>}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ChannelCard
                     type="telegram"
                     channel={telegramChannel}
@@ -59,6 +71,13 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
                     type="whatsapp"
                     channel={whatsappChannel}
                     onConnect={() => setIsWhatsAppModalOpen(true)}
+                    isReadOnly={isReadOnly}
+                />
+
+                <ChannelCard
+                    type="instagram"
+                    channel={instagramChannel}
+                    onConnect={() => setIsInstagramModalOpen(true)}
                     isReadOnly={isReadOnly}
                 />
             </div>
@@ -74,6 +93,11 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
                         isOpen={isWhatsAppModalOpen}
                         onClose={() => setIsWhatsAppModalOpen(false)}
                         onConnect={handleConnectWhatsApp}
+                    />
+                    <ConnectInstagramModal
+                        isOpen={isInstagramModalOpen}
+                        onClose={() => setIsInstagramModalOpen(false)}
+                        onConnect={handleConnectInstagram}
                     />
                 </>
             )}

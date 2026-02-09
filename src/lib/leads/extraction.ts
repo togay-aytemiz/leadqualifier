@@ -323,7 +323,7 @@ export async function runLeadExtraction(options: {
     latestMessage?: string
     preferredLocale?: string | null
     supabase?: SupabaseClientLike
-    source?: 'telegram' | 'whatsapp'
+    source?: 'telegram' | 'whatsapp' | 'instagram'
 }) {
     const supabase = options.supabase ?? await createClient()
 

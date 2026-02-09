@@ -177,9 +177,14 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
             .map((item) => item.href)
             .filter((href): href is string => Boolean(href))
 
-        routes.forEach((href) => {
-            router.prefetch(href)
-        })
+        const prefetchRoutes = () => {
+            routes.forEach((href) => {
+                router.prefetch(href)
+            })
+        }
+
+        const timeoutId = setTimeout(prefetchRoutes, 250)
+        return () => clearTimeout(timeoutId)
     }, [navItems, router])
 
     const mobileListPaneClasses = getSettingsMobileListPaneClasses(isMobileDetailOpen)

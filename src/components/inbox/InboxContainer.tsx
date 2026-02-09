@@ -6,7 +6,7 @@ import {
     Inbox, ChevronDown,
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown
 } from 'lucide-react'
-import { FaTelegram, FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
+import { FaTelegram, FaArrowTurnDown, FaArrowTurnUp, FaInstagram } from 'react-icons/fa6'
 import { IoLogoWhatsapp } from 'react-icons/io5'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
@@ -846,6 +846,8 @@ export function InboxContainer({
                                                 <FaTelegram className="text-[#229ED9]" size={18} />
                                             ) : c.platform === 'whatsapp' ? (
                                                 <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                            ) : c.platform === 'instagram' ? (
+                                                <FaInstagram className="text-[#E1306C]" size={18} />
                                             ) : (
                                                 <span className="text-[9px] font-semibold uppercase text-gray-400">{t('platformSimulatorShort')}</span>
                                             )}
@@ -1375,6 +1377,8 @@ export function InboxContainer({
                                                     <FaTelegram className="text-[#229ED9]" size={16} />
                                                 ) : selectedConversation.platform === 'whatsapp' ? (
                                                     <IoLogoWhatsapp className="text-[#25D366]" size={16} />
+                                                ) : selectedConversation.platform === 'instagram' ? (
+                                                    <FaInstagram className="text-[#E1306C]" size={16} />
                                                 ) : (
                                                     <span className="text-[10px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
                                                 )}

@@ -404,9 +404,15 @@ export function MainSidebar({
             routesToPrefetch.push('/admin', '/admin/organizations', '/admin/leads', '/admin/users')
         }
 
-        Array.from(new Set(routesToPrefetch)).forEach((route) => {
-            router.prefetch(`${localePrefix}${route}`)
-        })
+        const uniqueRoutes = Array.from(new Set(routesToPrefetch))
+        const prefetchRoutes = () => {
+            uniqueRoutes.forEach((route) => {
+                router.prefetch(`${localePrefix}${route}`)
+            })
+        }
+
+        const timeoutId = setTimeout(prefetchRoutes, 250)
+        return () => clearTimeout(timeoutId)
     }, [isSystemAdmin, localePrefix, router])
 
     const sections = useMemo(
@@ -511,7 +517,7 @@ export function MainSidebar({
                 items: [
                     {
                         id: 'settings',
-                        href: '/settings',
+                        href: '/settings/ai',
                         label: tNav('settings'),
                         icon: HiOutlineCog6Tooth,
                         activeIcon: HiMiniCog6Tooth,

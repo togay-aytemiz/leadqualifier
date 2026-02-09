@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { DataTable, TableBody, TableRow, TableCell, Badge, Button } from '@/design'
 import { LeadWithConversation } from '@/lib/leads/list-actions'
-import { FaTelegram } from 'react-icons/fa6'
+import { FaTelegram, FaInstagram } from 'react-icons/fa6'
 import { IoLogoWhatsapp } from 'react-icons/io5'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -155,6 +155,9 @@ export function LeadsTable({
         }
         if (platform === 'whatsapp') {
             return <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+        }
+        if (platform === 'instagram') {
+            return <FaInstagram className="text-[#E1306C]" size={18} />
         }
         return <span className="text-xs text-gray-400">{t('platformSimulatorShort')}</span>
     }

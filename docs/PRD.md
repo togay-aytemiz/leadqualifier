@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-09 (auth canvas now uses clearly distinct two-turn scenarios, surfaces a compact scoring chip under top-left auth canvas text with progress bar, and uses a waiting placeholder before first customer message; duplicate under-composer scoring removed; support-forwarded copy simplified; build re-verified)  
+> **Last Updated:** 2026-02-09 (Instagram added as an independent channel with separate webhook route and shared inbound AI pipeline reuse for Meta channels; bot-mode/reactive reply behavior aligned across Telegram/WhatsApp/Instagram; build re-verified)  
 > **Status:** In Development
 
 ---
@@ -39,10 +39,11 @@ Automate WhatsApp message handling:
 | Feature | Description | Status (2026-02-04) |
 |---------|-------------|--------------------|
 | WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: manual channel setup, webhook verification, inbound text-only processing, and reactive outbound replies) |
-| AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + Simulator |
+| Instagram Integration | Single business account per org | Implemented (manual channel setup, webhook verification, inbound text-only processing, reactive outbound replies; separate channel from WhatsApp) |
+| AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + WhatsApp + Instagram + Simulator |
 | User-Generated Skills | Custom intent → response mappings | Implemented |
 | Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
-| Lead Extraction | AI summary + score (0-10) | Implemented (Telegram only; Lead UI pending) |
+| Lead Extraction | AI summary + score (0-10) | Implemented (Telegram + WhatsApp + Instagram; Lead UI pending) |
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
@@ -58,7 +59,7 @@ Automate WhatsApp message handling:
 
 ## 4. Core Features
 
-### 4.1 Messaging Auto-Reply Engine (Telegram + WhatsApp MVP)
+### 4.1 Messaging Auto-Reply Engine (Telegram + WhatsApp + Instagram MVP)
 
 **Flow:**
 ```
@@ -70,7 +71,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Rules:**
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
-- WhatsApp MVP supports text messages only and sends replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
+- WhatsApp and Instagram MVP support text messages only and send replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
+- Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
 - Shadow inactive banner copy is compact by default (single-line title + one short explanatory sentence).
@@ -278,10 +280,11 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Mobile UX uses a single-pane flow (Knowledge sidebar hidden on mobile; content/files shown as responsive cards)
 - Mobile edit-content header uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance to prevent header wrap on small screens.
 
-### 5.4 Channels (Telegram Implemented, WhatsApp Planned)
-- Telegram bot connection + status
-- WhatsApp placeholder in UI (no provider integration yet)
-- Debug webhook info for Telegram
+### 5.4 Channels (Telegram, WhatsApp, Instagram Implemented)
+- Telegram bot connection + webhook status/debug
+- WhatsApp Meta Cloud connection + webhook status/debug
+- Instagram Messaging connection + webhook status/debug
+- Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
 ### 5.5 AI Settings (Implemented)
 - Always-on Flexible mode (no mode selection)
@@ -537,8 +540,8 @@ MVP is successful when:
 - **Inbox List Header Surface:** Keep the Inbox conversation-list header on the same surface tone as the list column (non-white) for consistent sidebar visuals across dashboard modules.
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
 - **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
-- **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) on mount to reduce transition latency.
-- **Desktop Settings Navigation Performance:** Prefetch settings destinations from main sidebar/settings shell and route the main Settings entry to `/settings` root to reduce first-click latency.
+- **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) with short delayed scheduling to reduce transition latency without adding click-time jank.
+- **Desktop Settings Navigation Performance:** Prefetch settings destinations from main sidebar/settings shell with short delayed scheduling, and route the desktop main Settings entry to `/settings/ai` while preserving mobile quick action target `/settings`.
 - **Mobile Inbox Details Payload:** Mobile details must prioritize lead context by showing `service_type`, `summary`, and collected required-intake fields.
 - **Mobile Operator Exit Visibility:** When conversation control is on operator, keep a visible “Leave Conversation” action in mobile chat view (not buried in desktop-only details column).
 - **Mobile Inbox Transition Motion:** Use horizontal slide transitions for list→conversation and conversation→list navigation to preserve app-like continuity.
@@ -560,8 +563,10 @@ MVP is successful when:
 - **Settings Sidebar Icons:** Use the updated settings menu icon set (bubbles/circle user) for profile/org/general/AI/channels/billing entries.
 - **Settings Title Parity:** Settings page headers should use the same labels as the corresponding settings sidebar items.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
-- **Telegram Sandbox Channel:** Use Telegram (bot + webhook) as the live channel while WhatsApp integration is pending; channels table supports both `telegram` and `whatsapp`.
+- **Channel Topology (MVP):** Treat `telegram`, `whatsapp`, and `instagram` as independent channels (`channels.type`) and store conversations with explicit per-channel platform values (`conversations.platform`).
+- **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with manual channel setup (`phone_number_id`, `business_account_id`, token, secrets), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
+- **Instagram MVP Channel Strategy:** Implemented via Meta Instagram Messaging API with manual channel setup (`page_id`, `instagram_business_account_id`, `page_access_token`, secrets), text-only inbound handling, webhook signature verification, and reactive replies only (first turn must come from customer inbound message).
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.
 - **Skills Embedding Source:** Generate skill embeddings from both skill title and trigger examples; regenerate on title/trigger changes.

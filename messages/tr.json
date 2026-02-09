@@ -371,7 +371,8 @@
         "whatsappComingSoon": "WhatsApp entegrasyonu yakında! Erken erişim için destekle iletişime geçin.",
         "types": {
             "telegram": "Telegram",
-            "whatsapp": "WhatsApp"
+            "whatsapp": "WhatsApp",
+            "instagram": "Instagram"
         },
         "status": {
             "active": "Aktif",
@@ -400,15 +401,24 @@
         "botTokenPlaceholder": "123456789:ABCDEF...",
         "connectTelegramError": "Bağlantı kurulamadı",
         "connectWhatsAppError": "WhatsApp kanalı bağlanamadı",
+        "connectInstagramError": "Instagram kanalı bağlanamadı",
         "validating": "Doğrulanıyor...",
         "connectBot": "Botu Bağla",
         "connectWhatsApp": "WhatsApp Bağla",
+        "connectInstagram": "Instagram Bağla",
         "connectWhatsAppTitle": "WhatsApp Business Bağla",
         "connectWhatsAppHelpTitle": "Meta Cloud API kurulum kontrol listesi:",
         "connectWhatsAppSteps": {
             "step1": "Meta Developers içinde bir WhatsApp uygulaması oluşturun ve Phone Number ID ile Business Account ID değerlerini alın.",
             "step2": "WhatsApp mesajlaşma izinlerine sahip kalıcı bir access token üretin.",
             "step3": "App secret ve verify token belirleyin. Aynı verify token değerini webhook ayarında kullanın."
+        },
+        "connectInstagramTitle": "Instagram Business Bağla",
+        "connectInstagramHelpTitle": "Meta Instagram Messaging kurulum kontrol listesi:",
+        "connectInstagramSteps": {
+            "step1": "Instagram profesyonel hesabınızı bir Facebook Sayfasına bağlayın ve Meta uygulama ayarlarında Instagram Messaging API erişimini açın.",
+            "step2": "Page ID ve Instagram Business Account ID değerlerini alın, ardından mesajlaşma izinli bir Page Access Token üretin.",
+            "step3": "App secret ve verify token belirleyin. Aynı verify token değerini Meta webhook ayarında kullanın."
         },
         "whatsappPhoneNumberIdLabel": "Phone Number ID",
         "whatsappPhoneNumberIdPlaceholder": "örn. 123456789012345",
@@ -419,7 +429,17 @@
         "whatsappAppSecretLabel": "App Secret",
         "whatsappAppSecretPlaceholder": "Meta app secret",
         "whatsappVerifyTokenLabel": "Verify Token",
-        "whatsappVerifyTokenPlaceholder": "Özel bir verify token seçin"
+        "whatsappVerifyTokenPlaceholder": "Özel bir verify token seçin",
+        "instagramPageIdLabel": "Page ID",
+        "instagramPageIdPlaceholder": "örn. 123456789012345",
+        "instagramBusinessAccountIdLabel": "Instagram Business Account ID",
+        "instagramBusinessAccountIdPlaceholder": "örn. 17841400000000000",
+        "instagramPageAccessTokenLabel": "Page Access Token",
+        "instagramPageAccessTokenPlaceholder": "EAAG...",
+        "instagramAppSecretLabel": "App Secret",
+        "instagramAppSecretPlaceholder": "Meta app secret",
+        "instagramVerifyTokenLabel": "Verify Token",
+        "instagramVerifyTokenPlaceholder": "Özel bir verify token seçin"
     },
     "Sidebar": {
         "settings": "Ayarlar",
@@ -479,7 +499,7 @@
         "title": "AI Ayarları",
         "description": "Yetenek veya Bilgi Bankası eşleşmesi bulunamazsa botun nasıl yanıt vereceğini ayarlayın.",
         "botModeTitle": "Bot durumu",
-        "botModeDescription": "Telegram/WhatsApp için geçerlidir. Simülatör etkilenmez.",
+        "botModeDescription": "Telegram/WhatsApp/Instagram için geçerlidir. Simülatör etkilenmez.",
         "botModeActive": "Aktif",
         "botModeActiveDescription": "Bot yanıt verir; arka planda kişi çıkarımı çalışır.",
         "botModeShadow": "Dinleyici",

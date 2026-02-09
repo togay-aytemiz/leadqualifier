@@ -41,7 +41,7 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                         <div className="flex justify-between items-start mb-1">
                             <div className="flex items-center space-x-2">
                                 <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${conv.platform === 'whatsapp' ? 'bg-green-500' :
-                                        conv.platform === 'telegram' ? 'bg-blue-400' : 'bg-purple-500'
+                                        conv.platform === 'telegram' ? 'bg-blue-400' : conv.platform === 'instagram' ? 'bg-pink-500' : 'bg-purple-500'
                                     }`}>
                                     {conv.contact_name.charAt(0).toUpperCase()}
                                 </div>
