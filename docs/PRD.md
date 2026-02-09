@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-08 (system-admin route latency reduced with slim active-org context resolution; full organization list now lazy-loads only when org-picker opens; admin routes now use explicit icon-animated loading skeletons; main sidebar prefetch extended to workspace/AI/admin paths; lint/test/build re-verified)  
+> **Last Updated:** 2026-02-09 (auth canvas now uses clearly distinct two-turn scenarios, surfaces a compact scoring chip under top-left auth canvas text with progress bar, and uses a waiting placeholder before first customer message; duplicate under-composer scoring removed; support-forwarded copy simplified; build re-verified)  
 > **Status:** In Development
 
 ---
@@ -305,6 +305,22 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 5.6 Profile & Organization Settings
 - Profile: name and email visibility (email is read-only)
 - Profile security: password recovery via email reset link (Forgot + Reset)
+- Public auth pages now include a top logo header and inline EN/TR language switcher.
+- Sign Up form fields for MVP are `full_name`, `email`, `password`, and required consent confirmation.
+- Sign In and Sign Up password inputs include show/hide toggle controls.
+- Sign In and Sign Up are route-level separated (`/login`, `/register`) and no longer use an in-form segmented switcher.
+- Public auth desktop shell includes an animated messenger-style preview panel with conversion-focused typed user/assistant example flows.
+- Messenger preview interaction follows a send lifecycle (`type -> sent -> input reset -> assistant reply`) to better reflect real chat behavior.
+- Composer resets to a placeholder-style empty state after send and before assistant reply to mirror real messenger input reset behavior.
+- During the sending phase, typed user text remains visible in the composer until dispatch completes, then transitions to placeholder-style empty input.
+- Auth preview composer uses a compact single-line style with subtle size transitions and the chat preview cluster is vertically centered in the right panel.
+- Auth preview scenarios are intentionally distinct by intent category and use two-turn dialog pairs (`user -> agent -> user -> agent`) before switching.
+- Auth preview shows a waiting placeholder before the first customer message (no pre-message score prediction shown).
+- Auth preview includes a compact internal scoring chip under the top-left canvas text block (score, status, progress bar, latest signal), updated after each message, with scenario mix covering 2 hot and 1 cold flow.
+- Auth preview does not render a secondary scoring card under the composer; analysis stays in the top-left internal chip only.
+- Support-only scenario agent closing copy is concise and handoff-oriented (“request forwarded to support team”).
+- Sign Up consent row keeps a compact single-line presentation on desktop and may wrap on smaller viewports.
+- Customer bubbles are explicitly labeled (`Müşteri` / `Customer`) to clarify that shown messages are incoming customer text in the simulation.
 - Organization: company name and future org-level defaults
 - Mobile Settings navigation now opens with a dedicated settings list page first, then transitions to selected detail pages with an explicit back action.
 - Mobile Settings back action uses client-side route transition (not full-page refresh) to keep mobile flow stable.
@@ -444,6 +460,20 @@ MVP is successful when:
 - **Sidebar Icons:** Use per-item active/passive icon variants (react-icons) to differentiate selected states.
 - **Sidebar Accent Color:** Replace blue navigation accents with ink `#242A40` for sidebar active, indicator, and focus states.
 - **Skills/Knowledge CTA Accent:** Use ink `#242A40` for primary CTA buttons in Skills and Knowledge Base (create, save, and primary modal actions).
+- **Auth CTA Accent:** Use ink `#242A40` for Sign In/Sign Up primary CTA and auth switch-link actions to keep public auth surfaces aligned with the product accent system.
+- **Auth Shell Layout:** Use a dedicated public auth shell with top branding, locale switcher, and a desktop visual panel to keep login/register focused and app-consistent.
+- **Auth Top Bar Density:** Keep auth header branding compact; prefer smaller logo scale to reduce visual weight above forms.
+- **Auth Right-Panel Motion:** Use lightweight typed/deleted message loops (customer + Qualy) plus gradient composer accents to communicate conversion value without external dependencies.
+- **Auth Preview Interaction Order:** Simulate realistic messenger timing where user message is sent before assistant typing begins, and composer resets immediately after send.
+- **Auth Sending Feedback:** Keep typed text visible during send and include a short sending delay state for clearer dispatch feedback before the sent bubble appears.
+- **Auth Composer Send Behavior:** Keep typed text visible while sending, then reset to a placeholder-style empty state once send is confirmed.
+- **Auth Composer Density:** Prefer compact, single-line composer sizing with smooth transitions over oversized multi-line presentation.
+- **Auth Disabled Composer State:** Keep disabled/sending composer content single-line; only temporarily increase vertical density while `Sending...` feedback is shown.
+- **Auth Scenario Variety:** Avoid semantically chained scenario rotations; each scenario should represent a separate use-case category.
+- **Auth Scoring Visibility:** Do not show scoring before first customer input; start scoring only after initial message signal exists.
+- **Auth Scoring Placement:** Keep scoring UI detached from customer input area to avoid implying end-user visibility; prefer compact analyst-style top placement.
+- **Auth Input Scope (MVP):** Keep Sign Up minimal (`full_name`, `email`, `password`, required consent) and postpone SSO/Google to post-MVP.
+- **Auth Password UX:** Provide explicit password show/hide controls on Sign In and Sign Up for entry confidence on desktop/mobile.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.

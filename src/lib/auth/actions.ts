@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
+import { normalizeRegisterFormData } from '@/lib/auth/register-data'
 import { redirect } from 'next/navigation'
 
 export async function login(formData: FormData) {
@@ -24,10 +25,7 @@ export async function login(formData: FormData) {
 export async function register(formData: FormData) {
     const supabase = await createClient()
 
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-    const fullName = formData.get('fullName') as string
-    const companyName = formData.get('companyName') as string
+    const { email, password, fullName, companyName } = normalizeRegisterFormData(formData)
 
     const { error } = await supabase.auth.signUp({
         email,

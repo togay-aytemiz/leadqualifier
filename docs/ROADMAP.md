@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-08 (system-admin navigation latency reduced by resolving active org in slim mode by default; full org list now lazy-loads only when org picker opens; main sidebar prefetch now warms workspace/AI/admin routes; admin organizations/users/detail routes now have icon-animated loading skeletons; lint/test/build re-verified)  
+> **Last Updated:** 2026-02-09 (auth canvas refined with clearly distinct scenarios, compact scoring chip placement, duplicate under-composer score card removed, and pre-message scoring now shown as waiting placeholder state; support-forwarded copy simplified; build re-verified)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -256,6 +256,26 @@
 - [x] **Auth UX Refresh**
   - [x] Sign In redesign (settings-aligned UI)
   - [x] Sign Up redesign (settings-aligned UI)
+  - [x] Sign In/Sign Up primary CTA + auth switch links now use ink accent `#242A40` (blue removed)
+  - [x] Auth shell now includes logo header, EN/TR language switcher, and desktop visual canvas panel
+  - [x] Auth right panel now uses animated messenger preview (user + Qualy typed/deleted message loop)
+  - [x] Auth messenger flow now simulates send lifecycle (type -> sent -> input reset -> Qualy reply)
+  - [x] Auth composer now shows empty-field caret state after typed send and includes short sending delay animation before user bubble appears
+  - [x] Auth sending state now keeps typed text visible until dispatch completes, then resets to placeholder-style empty input
+  - [x] Auth composer reduced to compact single-line style with animated size transition, and right-panel chat block is vertically centered
+  - [x] Auth canvas now runs 3 distinct conversation scenarios (2 turns each) and keeps 4 bubbles visible before switching scenario
+  - [x] Auth canvas now includes dynamic lead scoring block near canvas header text, updated after each message (2 hot scenarios, 1 cold scenario)
+  - [x] Auth composer stays single-line while disabled and briefly expands during sending state (`Gönderiliyor...`)
+  - [x] Lead scoring pre-message state now shows a waiting placeholder (no pre-message prediction shown)
+  - [x] Lead scoring UI moved to compact internal-analysis chip under top-left canvas text with animated 0-100 progress bar and stronger hot-state emphasis
+  - [x] Removed duplicate lead scoring panel under the composer (single scoring surface kept in top-left analysis chip)
+  - [x] Support-only scenario closes with concise handoff copy (“Talebin destek ekibine iletildi.”)
+  - [x] Auth bubbles now explicitly label customer messages as `Müşteri` for role clarity in the preview
+  - [x] Sign Up consent sentence now stays single-line on desktop and wraps only on smaller screens
+  - [x] Removed in-form Sign In/Sign Up segmented switcher (route-level pages + footer link navigation only)
+  - [x] Reduced auth header logo size for a lighter top bar visual balance
+  - [x] Sign Up form simplified to Full Name + Email + Password + required consent
+  - [x] Sign In and Sign Up forms now support password show/hide toggle
   - [x] Password Recovery flow (forgot + reset)
   - [x] Profile security: password reset CTA + email immutable note
 - [x] **Human Takeover**

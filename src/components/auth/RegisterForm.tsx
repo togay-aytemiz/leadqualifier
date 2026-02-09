@@ -1,14 +1,20 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { register } from '@/lib/auth/actions'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/design'
+import {
+    getRegisterConsentLabelClasses,
+    getRegisterConsentTextClasses,
+} from '@/components/auth/registerConsentStyles'
+import { Eye, EyeOff } from 'lucide-react'
 
 export function RegisterForm() {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
+    const [showPassword, setShowPassword] = useState(false)
     const [state, formAction, pending] = useActionState(
         async (_prevState: { error?: string } | null, formData: FormData) => {
             return await register(formData)
@@ -17,9 +23,9 @@ export function RegisterForm() {
     )
 
     return (
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-            <div className="mb-8 text-center">
-                <h1 className="text-2xl font-bold text-gray-900">{t('registerTitle')}</h1>
+        <div>
+            <div className="mb-7">
+                <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{t('registerTitle')}</h1>
                 <p className="mt-2 text-sm text-gray-500">{t('registerSubtitle')}</p>
             </div>
 
@@ -40,22 +46,8 @@ export function RegisterForm() {
                         type="text"
                         required
                         autoComplete="name"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10"
                         placeholder={t('fullNamePlaceholder')}
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                        {t('companyName')}
-                    </label>
-                    <input
-                        id="companyName"
-                        name="companyName"
-                        type="text"
-                        autoComplete="organization"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        placeholder={t('companyNamePlaceholder')}
                     />
                 </div>
 
@@ -69,7 +61,7 @@ export function RegisterForm() {
                         type="email"
                         required
                         autoComplete="email"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10"
                         placeholder={t('emailPlaceholder')}
                     />
                 </div>
@@ -78,22 +70,48 @@ export function RegisterForm() {
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                         {t('password')}
                     </label>
-                    <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        required
-                        minLength={6}
-                        autoComplete="new-password"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        placeholder={t('passwordPlaceholder')}
-                    />
+                    <div className="relative mt-2">
+                        <input
+                            id="password"
+                            name="password"
+                            type={showPassword ? 'text' : 'password'}
+                            required
+                            minLength={6}
+                            autoComplete="new-password"
+                            className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10"
+                            placeholder={t('passwordPlaceholder')}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((value) => !value)}
+                            aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                            title={showPassword ? t('hidePassword') : t('showPassword')}
+                            className="absolute inset-y-0 right-2 inline-flex items-center text-gray-500 hover:text-gray-700"
+                        >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                    </div>
+                </div>
+
+                <input type="hidden" name="companyName" value="" />
+
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                    <label htmlFor="consent" className={getRegisterConsentLabelClasses()}>
+                        <input
+                            id="consent"
+                            name="consent"
+                            type="checkbox"
+                            required
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#242A40] focus:ring-[#242A40]/20"
+                        />
+                        <span className={getRegisterConsentTextClasses()}>{t('consentLabel')}</span>
+                    </label>
                 </div>
 
                 <Button
                     type="submit"
                     disabled={pending}
-                    className="w-full h-10"
+                    className="h-10 w-full border-transparent bg-[#242A40] text-white hover:bg-[#1B2033]"
                 >
                     {pending ? tc('loading') : t('register')}
                 </Button>
@@ -101,7 +119,7 @@ export function RegisterForm() {
 
             <p className="mt-6 text-center text-sm text-gray-500">
                 {t('hasAccount')}{' '}
-                <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+                <Link href="/login" className="font-medium text-[#242A40] hover:text-[#1B2033]">
                     {t('login')}
                 </Link>
             </p>

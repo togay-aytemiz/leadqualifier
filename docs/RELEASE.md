@@ -7,6 +7,13 @@
 ## [Unreleased]
 
 ### Added
+- Added auth preview sending-state microcopy (`Sending...`/`Gönderiliyor...`) for short dispatch feedback before sent confirmation.
+- Added auth preview sent-state microcopy (`Sent`/`Gönderildi`) to emphasize message dispatch before assistant response.
+- Added animated messenger-style auth right-panel preview (`AuthMessengerPreview`) with typed/deleted customer and Qualy message loops.
+- Added conversion-focused auth preview copy keys in EN/TR for rotating user and assistant messages, typing label, and idle composer prompt.
+- Added a redesigned public auth shell with top branding (`/logo-black.svg`), inline EN/TR language switcher, and a desktop right-side visual canvas panel.
+- Added password visibility toggles (show/hide) to both Sign In and Sign Up forms.
+- Added a required consent checkbox to Sign Up and localized copy keys for consent/password-visibility/language/auth-canvas labels in both EN/TR message catalogs.
 - Added system-admin org-context regression tests in `src/lib/organizations/active-context.test.ts` to lock slim-mode navigation behavior vs full-list mode.
 - Added `GET /api/organizations/active` for on-demand system-admin organization option loading in the sidebar picker.
 - Added shared admin loading surface (`src/components/common/AdminRouteLoading.tsx`) using subtle animated `/icon-black.svg` branding.
@@ -76,6 +83,28 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed auth forms to remove the in-form Sign In/Sign Up segmented switcher and rely on route-level pages plus footer links.
+- Changed auth header branding scale by reducing `/logo-black.svg` size for a lighter top bar.
+- Changed auth canvas flow to 3 clearly distinct two-turn scenarios instead of semantically chained conversations.
+- Changed auth preview conversation lifecycle to keep 4 bubbles visible per scenario (`user, agent, user, agent`) before scenario switch.
+- Changed auth composer disabled state to remain single-line and only expand vertically during `Sending...` feedback.
+- Changed auth scoring predictions to start only after the first customer message (no pre-message score prediction shown).
+- Changed auth top-left scoring chip to render an initial waiting placeholder state before first customer message (`Waiting/Bekleniyor`, pending score/signal).
+- Changed auth scoring UI from below-composer panel to a compact internal-analysis chip under the top-left canvas text block with score/status/progress/signal.
+- Changed auth preview to remove the duplicate scoring card under the composer and keep a single scoring surface in the top-left analysis chip.
+- Changed auth score bar to an explicit 0-100 progress visualization with stronger hot-status emphasis.
+- Changed auth customer bubbles to include explicit role labels (`Customer` / `Müşteri`) for simulation clarity.
+- Changed auth canvas to include dynamic score/signal updates after each message (2 hot scenarios, 1 cold scenario).
+- Changed support-only cold scenario closing message to concise handoff copy (“request forwarded to support”).
+- Changed Sign Up consent row spacing/typography to keep the legal-acceptance sentence on one line on desktop while preserving mobile wrapping.
+- Changed auth sending behavior so composer text remains visible during `Sending...`, then resets to placeholder-style empty input after send confirmation.
+- Changed auth messenger preview with a short send-delay animation before promoting typed text into the sent user bubble.
+- Changed auth composer sizing to a compact single-line presentation with subtle animated density transition.
+- Changed auth right-panel preview alignment so the chat interaction block sits closer to vertical center.
+- Changed auth messenger preview sequence to send-first timing: customer composes message, message is sent, composer resets, and then Qualy response types in.
+- Changed auth right-panel visual from static prompt card to a dynamic messenger preview with top/bottom gradient composer accents and staged message transitions.
+- Changed Sign Up input scope to the MVP set (`full_name`, `email`, `password`, consent) and removed the visible company-name input from the form.
+- Changed auth page structure to explicitly separate Sign In and Sign Up routes (`/login`, `/register`) and cross-link via footer actions.
 - Changed system-admin active organization resolution to default slim mode (active org only) during route transitions; full org list now loads lazily when the sidebar picker opens.
 - Changed desktop `MainSidebar` prefetch warmup to include core workspace/AI/admin routes in addition to settings destinations.
 - Changed admin organization switcher UX from always-open inline list to compact summary + modal picker to reduce sidebar noise.
@@ -103,6 +132,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed Sign In and Sign Up page CTA styling so primary submit buttons and auth switch links now use the ink accent `#242A40` instead of blue.
 - Fixed slow-feeling system-admin navigation caused by full organization-list reads on each route transition in dashboard context resolution.
 - Fixed admin sub-route blank-wait transitions by adding explicit loading skeletons (organizations/users/detail pages) with immediate visual feedback.
 - Fixed Next.js server/client serialization errors on admin dashboard (`Only plain objects can be passed to Client Components`) by rendering stat cards server-side instead of passing icon components through `StatCard` props from a server route.
