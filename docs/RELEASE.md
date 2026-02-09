@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Added
+- Added route-aware browser tab title sync component (`src/components/common/TabTitleSync.tsx`) with dashboard/auth layout wiring so tabs render `Page | Qualy`.
+- Added tab-title utility + tests (`src/lib/tab-title.ts`, `src/lib/tab-title.test.ts`) for locale-safe route resolution and title formatting.
+- Added branding regression coverage in `src/app/[locale]/layout.metadata.test.ts` to lock `Qualy` tab metadata/icon settings and prevent legacy name reintroduction in EN/TR common labels.
 - Added auth preview sending-state microcopy (`Sending...`/`Gönderiliyor...`) for short dispatch feedback before sent confirmation.
 - Added auth preview sent-state microcopy (`Sent`/`Gönderildi`) to emphasize message dispatch before assistant response.
 - Added animated messenger-style auth right-panel preview (`AuthMessengerPreview`) with typed/deleted customer and Qualy message loops.
@@ -91,6 +94,9 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Inbox tab indicator behavior to show `(●)` when unread exists instead of unread count in tab title.
+- Changed runtime branding text from the legacy product name to `Qualy` in document metadata and shared EN/TR common app labels.
+- Changed app favicon pipeline to use `icon-black.svg` via locale metadata icons and app-level `src/app/icon.svg`; removed legacy `src/app/favicon.ico`.
 - Changed Telegram/WhatsApp/Instagram brand icons to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) for consistent channel visuals across Channels, Inbox, and Leads.
 - Changed desktop main sidebar `Settings` target from `/settings` to `/settings/ai` so desktop opens AI settings directly while mobile quick menu keeps `/settings` list-first flow.
 - Changed route prefetch warmups in `MainSidebar`, `SettingsResponsiveShell`, and `MobileBottomNav` to run with a short delayed schedule instead of immediate mount bursts.

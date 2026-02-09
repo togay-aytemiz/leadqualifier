@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { MainSidebar } from '@/design'
 import { MobileBottomNav } from '@/design/MobileBottomNav'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { TabTitleSync } from '@/components/common/TabTitleSync'
 
 export default async function DashboardLayout({
     children,
@@ -24,6 +25,7 @@ export default async function DashboardLayout({
 
     return (
         <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+            <TabTitleSync organizationId={orgContext?.activeOrganizationId ?? null} />
             <div className="hidden lg:flex">
                 <MainSidebar
                     userName={userName}

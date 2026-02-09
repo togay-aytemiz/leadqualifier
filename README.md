@@ -1,6 +1,6 @@
-# Lead Qualifier
+# Qualy
 
-WhatsApp AI Lead Qualifier for Turkish SMBs.
+WhatsApp AI Qualy for Turkish SMBs.
 
 ## Tech Stack
 

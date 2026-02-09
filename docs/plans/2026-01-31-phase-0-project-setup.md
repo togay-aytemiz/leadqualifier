@@ -319,7 +319,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
 // messages/en.json
 {
   "common": {
-    "welcome": "Welcome to Lead Qualifier",
+    "welcome": "Welcome to Qualy",
     "loading": "Loading..."
   }
 }
@@ -329,7 +329,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
 // messages/tr.json
 {
   "common": {
-    "welcome": "Lead Qualifier'a Hoş Geldiniz",
+    "welcome": "Qualy'ye Hoş Geldiniz",
     "loading": "Yükleniyor..."
   }
 }

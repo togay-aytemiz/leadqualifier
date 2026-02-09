@@ -1,6 +1,6 @@
-# WhatsApp AI Lead Qualifier — PRD (MVP)
+# WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels route via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels + Inbox + Leads; auth preview thread now keeps fixed/clamped-height behavior with hidden-scroll + top fade and bottom-anchored bubbles above composer to avoid short-viewport push glitches, plus smooth incoming bubble motion and protected composer spacing; forgot/reset password forms now share sign in/sign up styling (no nested card wrapper); build re-verified)  
+> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels route via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels + Inbox + Leads; auth preview thread now keeps fixed/clamped-height behavior with hidden-scroll + top fade and bottom-anchored bubbles above composer to avoid short-viewport push glitches, plus smooth incoming bubble motion and protected composer spacing; forgot/reset password forms now share sign in/sign up styling (no nested card wrapper); app branding switched to `Qualy` with tab metadata updates and `/icon-black.svg` favicon usage; browser tab title now follows active route (`Page | Qualy`) and Inbox uses unread dot indicator `(●)` in title; build re-verified)  
 > **Status:** In Development
 
 ---
@@ -465,6 +465,9 @@ MVP is successful when:
 - **Sidebar UI Refinement:** Collapsed logo alignment is centered to match the navigation icon stack.
 - **Sidebar Branding:** Use `/public/logo-black.svg` for expanded sidebar header state and `/public/icon-black.svg` for collapsed sidebar header state.
 - **Sidebar Branding Scale:** In collapsed mode, render `/public/icon-black.svg` at active-tab footprint size (`44px`) to keep header branding visually balanced with nav pills.
+- **Global Brand Name:** User-facing app brand copy and tab metadata use `Qualy` (legacy naming removed from runtime UI text).
+- **Tab Icon Source:** Browser tab icon metadata points to `/icon-black.svg`, and app-level icon file is `src/app/icon.svg` for consistent favicon output.
+- **Tab Title Strategy:** Browser tab title follows active route using `<Page> | Qualy`; Inbox title adds `(●)` when unread conversations exist, without numeric unread count in the title.
 - **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
 - **Sidebar Spacing:** Add top padding between the header block and first navigation section for visual separation.
 - **Sidebar Icons:** Use per-item active/passive icon variants (react-icons) to differentiate selected states.

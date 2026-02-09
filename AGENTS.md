@@ -1,4 +1,4 @@
-# AI Agent Guidelines — WhatsApp Lead Qualifier
+# AI Agent Guidelines — WhatsApp Qualy
 
 > **Purpose:** Instructions for AI coding assistants working on this project.
 
@@ -6,7 +6,7 @@
 
 ## 🎯 Project Overview
 
-This is a **WhatsApp AI Lead Qualifier** SaaS for Turkish SMBs. The system:
+This is a **WhatsApp AI Qualy** SaaS for Turkish SMBs. The system:
 - Auto-responds to WhatsApp messages using Skills & Knowledge Base
 - Qualifies leads with AI-powered extraction & scoring
 - Surfaces only serious leads for human follow-up

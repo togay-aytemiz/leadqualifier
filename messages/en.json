@@ -1,6 +1,6 @@
 {
     "common": {
-        "welcome": "Welcome to Lead Qualifier",
+        "welcome": "Welcome to Qualy",
         "loading": "Loading...",
         "submit": "Submit",
         "cancel": "Cancel",
@@ -18,7 +18,7 @@
         "success": "Success",
         "error": "Error",
         "search": "Search...",
-        "appName": "Lead Qualifier",
+        "appName": "Qualy",
         "adminBadge": "Admin",
         "loggedInAs": "Logged in as",
         "defaultUserName": "User",

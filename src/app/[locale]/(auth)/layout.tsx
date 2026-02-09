@@ -2,12 +2,14 @@ import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import { AuthLanguageSwitcher } from '@/components/auth/AuthLanguageSwitcher'
 import { AuthMessengerPreview } from '@/components/auth/AuthMessengerPreview'
+import { TabTitleSync } from '@/components/common/TabTitleSync'
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
     const tc = await getTranslations('common')
 
     return (
         <div className="min-h-screen bg-[#f3f4f6] px-4 py-5 sm:px-6 lg:px-8">
+            <TabTitleSync />
             <div className="mx-auto flex w-full max-w-7xl flex-col">
                 <header className="mb-5 flex items-center justify-between">
                     <div className="inline-flex items-center">

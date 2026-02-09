@@ -6,8 +6,13 @@ import { routing } from '@/i18n/routing'
 import '../globals.css'
 
 export const metadata: Metadata = {
-    title: 'Lead Qualifier',
-    description: 'WhatsApp AI Lead Qualifier for Turkish SMBs',
+    title: 'Qualy',
+    description: 'Qualy WhatsApp AI assistant for Turkish SMBs',
+    icons: {
+        icon: '/icon-black.svg',
+        shortcut: '/icon-black.svg',
+        apple: '/icon-black.svg',
+    },
 }
 
 type Props = {

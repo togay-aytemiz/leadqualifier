@@ -1,6 +1,6 @@
-# WhatsApp AI Lead Qualifier — Roadmap
+# WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels page via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels/Inbox/Leads; auth preview chat thread now stays capped with internal scroll, hidden scrollbar, top gradient fade, and bottom-anchored bubbles above composer to prevent page growth and small-height bubble-push glitches; incoming bot bubbles now animate smoothly with typing-height reservation and extra composer gap to avoid overlap; forgot/reset password forms now match sign in/sign up visual system without legacy inner card wrapper; build re-verified)  
+> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels page via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels/Inbox/Leads; auth preview chat thread now stays capped with internal scroll, hidden scrollbar, top gradient fade, and bottom-anchored bubbles above composer to prevent page growth and small-height bubble-push glitches; incoming bot bubbles now animate smoothly with typing-height reservation and extra composer gap to avoid overlap; forgot/reset password forms now match sign in/sign up visual system without legacy inner card wrapper; app branding switched to `Qualy` with tab metadata updates and `/icon-black.svg` favicon usage; browser tab title now follows active route (`Page | Qualy`) and Inbox shows unread dot indicator `(●)` instead of unread count in title; build re-verified)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -143,6 +143,8 @@
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
   - [x] Centered collapsed logo alignment
   - [x] Sidebar header branding uses `logo-black.svg` when expanded and `icon-black.svg` when collapsed
+  - [x] Browser tab branding now uses `Qualy` title metadata and `/icon-black.svg` favicon/icons
+  - [x] Browser tab title is route-aware (`Page | Qualy`) and Inbox title uses a dot indicator `(●)` for unread instead of numeric count
   - [x] Collapsed sidebar brand icon scaled up to match active navigation item size
   - [x] Eyebrow section labels for grouped navigation
   - [x] Increased spacing between header and first sidebar section

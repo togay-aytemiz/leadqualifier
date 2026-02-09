@@ -1,6 +1,6 @@
 {
     "common": {
-        "welcome": "Kişi Qualifier'a Hoşgeldiniz",
+        "welcome": "Qualy'ye hoş geldiniz",
         "loading": "Yükleniyor...",
         "submit": "Gönder",
         "cancel": "İptal",
@@ -18,7 +18,7 @@
         "success": "Başarılı",
         "error": "Hata",
         "search": "Ara...",
-        "appName": "Kişi Qualifier",
+        "appName": "Qualy",
         "adminBadge": "Admin",
         "loggedInAs": "Oturum açan",
         "defaultUserName": "Kullanıcı",

@@ -370,7 +370,7 @@ export function AuthMessengerPreview() {
                                                 {message.typingTargetText ? (
                                                     <div className="relative">
                                                         <p
-                                                            aria-hidden="true"
+                                                            aria-hidden
                                                             className="invisible whitespace-pre-wrap break-words"
                                                         >
                                                             {message.typingTargetText}
