@@ -29,9 +29,14 @@ export async function GET(req: NextRequest) {
     const mode = req.nextUrl.searchParams.get('hub.mode')
     const token = req.nextUrl.searchParams.get('hub.verify_token')
     const challenge = req.nextUrl.searchParams.get('hub.challenge')
+    const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim()
 
     if (mode !== 'subscribe' || !token || !challenge) {
         return NextResponse.json({ error: 'Invalid verification request' }, { status: 400 })
+    }
+
+    if (globalVerifyToken && token === globalVerifyToken) {
+        return new NextResponse(challenge, { status: 200 })
     }
 
     const supabase = createClient(
@@ -107,7 +112,7 @@ export async function POST(req: NextRequest) {
             }
 
             channel = data as WhatsAppChannelRecord
-            const appSecret = readConfigString(channel.config, 'app_secret')
+            const appSecret = process.env.META_APP_SECRET || readConfigString(channel.config, 'app_secret')
             const isValid = isValidMetaSignature(signatureHeader, rawBody, appSecret)
             if (!isValid) {
                 console.warn('WhatsApp Webhook: Invalid signature')

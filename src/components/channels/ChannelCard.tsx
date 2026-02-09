@@ -7,9 +7,7 @@ import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disc
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { useTranslations } from 'next-intl'
-import { FaTelegram } from 'react-icons/fa'
-import { IoLogoWhatsapp } from 'react-icons/io5'
-import { FaInstagram } from 'react-icons/fa6'
+import { RiTelegramFill, RiWhatsappFill, RiInstagramFill } from 'react-icons/ri'
 
 interface ChannelCardProps {
     channel?: Channel
@@ -70,11 +68,11 @@ export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: Ch
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${type === 'telegram' ? 'bg-blue-50' : type === 'whatsapp' ? 'bg-green-50' : 'bg-pink-50'
                     }`}>
                     {type === 'telegram' ? (
-                        <FaTelegram className="text-[#229ED9]" size={28} />
+                        <RiTelegramFill className="text-[#229ED9]" size={28} />
                     ) : type === 'whatsapp' ? (
-                        <IoLogoWhatsapp className="text-[#25D366]" size={28} />
+                        <RiWhatsappFill className="text-[#25D366]" size={28} />
                     ) : (
-                        <FaInstagram className="text-[#E1306C]" size={28} />
+                        <RiInstagramFill className="text-[#E1306C]" size={28} />
                     )}
                 </div>
 

@@ -28,7 +28,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
                             <div className="w-full max-w-md">{children}</div>
                         </section>
 
-                        <aside className="relative hidden border-l border-gray-200 bg-gray-50 lg:flex lg:flex-col lg:p-12">
+                        <aside className="relative hidden border-l border-gray-200 bg-gray-50 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:p-12">
                             <div className="absolute inset-0 bg-[radial-gradient(circle,_#d4d4d8_1px,_transparent_1px)] [background-size:18px_18px] opacity-70" />
                             <AuthMessengerPreview />
                         </aside>

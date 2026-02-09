@@ -4,11 +4,9 @@ import { Channel } from '@/types/database'
 import { useState } from 'react'
 import { ChannelCard } from '@/components/channels/ChannelCard'
 import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal'
-import { ConnectWhatsAppModal, type ConnectWhatsAppFormValues } from '@/components/channels/ConnectWhatsAppModal'
-import { ConnectInstagramModal, type ConnectInstagramFormValues } from '@/components/channels/ConnectInstagramModal'
-import { connectInstagramChannel, connectTelegramChannel, connectWhatsAppChannel } from '@/lib/channels/actions'
+import { connectTelegramChannel } from '@/lib/channels/actions'
 import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 interface ChannelsListProps {
     channels: Channel[]
@@ -19,9 +17,8 @@ interface ChannelsListProps {
 
 export function ChannelsList({ channels, organizationId, showDescription = true, isReadOnly = false }: ChannelsListProps) {
     const t = useTranslations('Channels')
+    const locale = useLocale()
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
-    const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false)
-    const [isInstagramModalOpen, setIsInstagramModalOpen] = useState(false)
     const router = useRouter()
 
     const telegramChannel = channels.find(c => c.type === 'telegram')
@@ -37,22 +34,15 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
         router.refresh()
     }
 
-    const handleConnectWhatsApp = async (values: ConnectWhatsAppFormValues) => {
+    const startMetaOAuth = async (channel: 'whatsapp' | 'instagram') => {
         if (isReadOnly) return
-        const result = await connectWhatsAppChannel(organizationId, values)
-        if (result.error) {
-            throw new Error(result.error)
-        }
-        router.refresh()
-    }
-
-    const handleConnectInstagram = async (values: ConnectInstagramFormValues) => {
-        if (isReadOnly) return
-        const result = await connectInstagramChannel(organizationId, values)
-        if (result.error) {
-            throw new Error(result.error)
-        }
-        router.refresh()
+        const params = new URLSearchParams({
+            channel,
+            organizationId,
+            locale,
+            returnTo: window.location.pathname
+        })
+        window.location.href = `/api/channels/meta/start?${params.toString()}`
     }
 
     return (
@@ -70,14 +60,14 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
                 <ChannelCard
                     type="whatsapp"
                     channel={whatsappChannel}
-                    onConnect={() => setIsWhatsAppModalOpen(true)}
+                    onConnect={() => startMetaOAuth('whatsapp')}
                     isReadOnly={isReadOnly}
                 />
 
                 <ChannelCard
                     type="instagram"
                     channel={instagramChannel}
-                    onConnect={() => setIsInstagramModalOpen(true)}
+                    onConnect={() => startMetaOAuth('instagram')}
                     isReadOnly={isReadOnly}
                 />
             </div>
@@ -88,16 +78,6 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
                         isOpen={isTelegramModalOpen}
                         onClose={() => setIsTelegramModalOpen(false)}
                         onConnect={handleConnectTelegram}
-                    />
-                    <ConnectWhatsAppModal
-                        isOpen={isWhatsAppModalOpen}
-                        onClose={() => setIsWhatsAppModalOpen(false)}
-                        onConnect={handleConnectWhatsApp}
-                    />
-                    <ConnectInstagramModal
-                        isOpen={isInstagramModalOpen}
-                        onClose={() => setIsInstagramModalOpen(false)}
-                        onConnect={handleConnectInstagram}
                     />
                 </>
             )}

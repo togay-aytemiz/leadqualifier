@@ -13,6 +13,7 @@
 - Added conversion-focused auth preview copy keys in EN/TR for rotating user and assistant messages, typing label, and idle composer prompt.
 - Added a redesigned public auth shell with top branding (`/logo-black.svg`), inline EN/TR language switcher, and a desktop right-side visual canvas panel.
 - Added password visibility toggles (show/hide) to both Sign In and Sign Up forms.
+- Added shared password-recovery style helpers and tests (`src/components/auth/passwordRecoveryStyles.ts`, `src/components/auth/passwordRecoveryStyles.test.ts`) to keep Forgot/Reset visuals aligned with auth defaults.
 - Added a required consent checkbox to Sign Up and localized copy keys for consent/password-visibility/language/auth-canvas labels in both EN/TR message catalogs.
 - Added system-admin org-context regression tests in `src/lib/organizations/active-context.test.ts` to lock slim-mode navigation behavior vs full-list mode.
 - Added `GET /api/organizations/active` for on-demand system-admin organization option loading in the sidebar picker.
@@ -25,7 +26,7 @@
 - Added admin dashboard lead visibility for active org context: selected-organization summary, recent leads preview table, and quick navigation to `/admin/leads`.
 - Added Admin sidebar navigation entry for `/admin/leads` plus TR/EN localization keys (`mainSidebar.adminLeads` and `admin.leads.*`).
 - Added desktop settings route warmup by prefetching settings destinations in `MainSidebar` and `SettingsResponsiveShell`.
-- Added WhatsApp Meta Cloud MVP implementation: manual channel connect modal, channel debug support, `POST/GET /api/webhooks/whatsapp`, and text-only reactive outbound sending from inbox.
+- Added WhatsApp Meta Cloud MVP implementation with Meta OAuth onboarding (`/api/channels/meta/start` + `/api/channels/meta/callback`), channel debug support, `POST/GET /api/webhooks/whatsapp`, and text-only reactive outbound sending from inbox.
 - Added WhatsApp integration helpers with unit tests (`src/lib/whatsapp/client.ts`, `src/lib/whatsapp/webhook.ts`, `src/lib/whatsapp/client.test.ts`, `src/lib/whatsapp/webhook.test.ts`).
 - Added Instagram channel implementation as a separate integration type (`channels.type='instagram'`) with dedicated webhook route `POST/GET /api/webhooks/instagram`.
 - Added Instagram integration helpers with unit tests (`src/lib/instagram/client.ts`, `src/lib/instagram/webhook.ts`, `src/lib/instagram/client.test.ts`, `src/lib/instagram/webhook.test.ts`).
@@ -33,7 +34,9 @@
 - Added Instagram connect/debug support in Channels settings, including connect modal fields and brand icon visibility across Channels, Inbox, and Leads surfaces.
 - Added database migration `00055_add_instagram_channel_support.sql` to extend channel/platform constraints for `instagram`.
 - Added simulator style helper tests (`src/components/chat/simulatorStyles.test.ts`) to lock neutral chatbot theming and prevent WhatsApp-style regressions.
-- Added WhatsApp Meta Cloud MVP design blueprint at `docs/plans/2026-02-08-whatsapp-meta-cloud-mvp-design.md` with validated scope: manual channel setup, inbound text-only processing, and reactive replies only.
+- Added WhatsApp Meta Cloud MVP design blueprint at `docs/plans/2026-02-08-whatsapp-meta-cloud-mvp-design.md` with validated scope: OAuth channel setup, inbound text-only processing, and reactive replies only.
+- Added shared Meta OAuth helper module (`src/lib/channels/meta-oauth.ts`) with signed-state validation and channel-candidate extraction tests.
+- Added one-click OAuth channel connect UX for WhatsApp/Instagram cards (direct redirect from `Bağla`).
 - Added prompt-budget guardrail for Knowledge→Offering Profile/Required Intake pipelines by truncating oversized document content before LLM suggestion prompts.
 - Added explicit `max_tokens` caps for router, fallback, RAG, summary, lead reasoning, and extraction calls to keep response size/cost predictable.
 - Added structured-output hardening for JSON-producing LLM calls by enabling `response_format: { type: "json_object" }` in lead extraction, required-intake follow-up, and offering-profile suggestion pipelines.
@@ -88,9 +91,12 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Telegram/WhatsApp/Instagram brand icons to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) for consistent channel visuals across Channels, Inbox, and Leads.
 - Changed desktop main sidebar `Settings` target from `/settings` to `/settings/ai` so desktop opens AI settings directly while mobile quick menu keeps `/settings` list-first flow.
 - Changed route prefetch warmups in `MainSidebar`, `SettingsResponsiveShell`, and `MobileBottomNav` to run with a short delayed schedule instead of immediate mount bursts.
 - Changed Channels summary count and bot-mode copy to include Instagram as a first-class channel alongside Telegram/WhatsApp.
+- Changed WhatsApp and Instagram channel-connect modals from manual credential forms to Meta OAuth authorization flow (no hand-entered access token fields in UI).
+- Changed channel platform icon set to filled WhatsApp/Instagram variants and aligned icon usage across Channels, Inbox, and Leads.
 - Changed auth forms to remove the in-form Sign In/Sign Up segmented switcher and rely on route-level pages plus footer links.
 - Changed auth header branding scale by reducing `/logo-black.svg` size for a lighter top bar.
 - Changed auth canvas flow to 3 clearly distinct two-turn scenarios instead of semantically chained conversations.
@@ -111,6 +117,12 @@
 - Changed auth right-panel preview alignment so the chat interaction block sits closer to vertical center.
 - Changed auth messenger preview sequence to send-first timing: customer composes message, message is sent, composer resets, and then Qualy response types in.
 - Changed auth right-panel visual from static prompt card to a dynamic messenger preview with top/bottom gradient composer accents and staged message transitions.
+- Changed auth preview conversation thread to a capped internal-scroll viewport with hidden scrollbar and top gradient cut, preventing auth layout growth on long previews.
+- Changed auth preview bubble stack alignment to bottom-anchor directly above the composer so new/active messages stay near input.
+- Changed auth preview thread to fixed/clamped viewport height so the 4th bubble fades/clips at top on shorter desktop heights instead of pushing the canvas.
+- Changed auth incoming bubble motion to use smooth enter animation plus typing-height reservation, reducing jitter while bot text appears.
+- Changed auth thread/composer spacing so multi-line bot bubbles no longer touch the input/composer area.
+- Changed Forgot Password and Reset Password pages to match Sign In/Sign Up visual system (removed nested inner-card wrapper, ink-accent input focus, CTA/link styling, and reset-form password visibility toggles).
 - Changed Sign Up input scope to the MVP set (`full_name`, `email`, `password`, consent) and removed the visible company-name input from the form.
 - Changed auth page structure to explicitly separate Sign In and Sign Up routes (`/login`, `/register`) and cross-link via footer actions.
 - Changed system-admin active organization resolution to default slim mode (active org only) during route transitions; full org list now loads lazily when the sidebar picker opens.
@@ -140,6 +152,8 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed Meta OAuth status redirects to always return to a safe channel-settings URL (`returnTo`) so failed OAuth/env states no longer strand users on non-matching paths.
+- Fixed mixed channel icon rendering inconsistencies by unifying Telegram/WhatsApp/Instagram under Remix fill variants (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`).
 - Fixed perceived navigation stalls during active interactions by deferring bulk prefetch calls with a short delayed schedule.
 - Fixed Sign In and Sign Up page CTA styling so primary submit buttons and auth switch links now use the ink accent `#242A40` instead of blue.
 - Fixed slow-feeling system-admin navigation caused by full organization-list reads on each route transition in dashboard context resolution.

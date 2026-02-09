@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-09 (Instagram added as independent channel with separate webhook route and shared inbound AI pipeline for Meta channels; channel settings + inbox/leads platform badges updated; build re-verified)  
+> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels page via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels/Inbox/Leads; auth preview chat thread now stays capped with internal scroll, hidden scrollbar, top gradient fade, and bottom-anchored bubbles above composer to prevent page growth and small-height bubble-push glitches; incoming bot bubbles now animate smoothly with typing-height reservation and extra composer gap to avoid overlap; forgot/reset password forms now match sign in/sign up visual system without legacy inner card wrapper; build re-verified)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -33,20 +33,24 @@
 ## Phase 2: Messaging Channels
 - [x] **WhatsApp (Meta Cloud API)**
   - [x] Choose provider (Meta Cloud API selected for MVP)
-  - [x] Finalize MVP scope (manual channel setup, inbound text-only, reactive replies only)
+  - [x] Finalize MVP scope (OAuth channel setup, inbound text-only, reactive replies only)
   - [x] Write WhatsApp integration design document (`docs/plans/2026-02-08-whatsapp-meta-cloud-mvp-design.md`)
   - [x] Webhook endpoint for incoming messages
   - [x] Outgoing message API
+  - [x] OAuth connect flow (`/api/channels/meta/start` + `/api/channels/meta/callback`)
+  - [x] One-click connect from channel card (no intermediate "continue with Meta" modal)
+  - [x] OAuth error/status redirects return to current channels route using signed/safe `returnTo` path
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
   - [x] Outgoing message API
   - [x] Skill-match failures fail open to KB/fallback instead of dropping reply flow
 - [x] **Instagram (Meta Messaging)**
-  - [x] Channel connect + webhook verification
+  - [x] Channel connect via Meta OAuth + webhook verification
   - [x] Incoming message webhook
   - [x] Outgoing message API (reactive replies only)
   - [x] First bot reply starts only after inbound customer message
+  - [x] One-click connect from channel card (no intermediate "continue with Meta" modal)
 - [x] **Shared Inbound AI Pipeline**
   - [x] Keep Telegram/WhatsApp/Instagram webhook routes separate
   - [x] Move inbound AI flow to shared pipeline function and reuse in WhatsApp + Instagram
@@ -101,6 +105,7 @@
   - [x] Lead snapshot header shows AI extraction chip and status uses dot + text
   - [x] Platform row shows channel icon and channel cards use consistent icon sizing
   - [x] Platform icons now use react-icons with brand colors
+  - [x] Platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels cards, Inbox badges, and Leads platform rows
   - [x] Inbox list avatars include platform badges for quick channel recognition
   - [x] Inbox list platform badges enlarged with brand-colored icons
   - [x] Inbox list platform badges centered under avatars
@@ -281,12 +286,18 @@
   - [x] Removed duplicate lead scoring panel under the composer (single scoring surface kept in top-left analysis chip)
   - [x] Support-only scenario closes with concise handoff copy (“Talebin destek ekibine iletildi.”)
   - [x] Auth bubbles now explicitly label customer messages as `Müşteri` for role clarity in the preview
+  - [x] Auth preview chat thread now uses max-height + internal scroll with hidden scrollbar and top gradient fade so long simulated conversations do not expand auth page height
+  - [x] Auth preview message bubbles are anchored at the bottom so chat stays immediately above the composer/input area
+  - [x] Auth preview thread now uses fixed/clamped viewport height with top fade clipping so the 4th bubble no longer pushes layout on shorter desktop heights
+  - [x] Auth preview incoming bot bubbles now use smooth enter animation + typing-height reservation to remove perceived jitter during agent typing
+  - [x] Auth preview thread/composer spacing increased so multi-line bot bubbles no longer touch the input/composer area
   - [x] Sign Up consent sentence now stays single-line on desktop and wraps only on smaller screens
   - [x] Removed in-form Sign In/Sign Up segmented switcher (route-level pages + footer link navigation only)
   - [x] Reduced auth header logo size for a lighter top bar visual balance
   - [x] Sign Up form simplified to Full Name + Email + Password + required consent
   - [x] Sign In and Sign Up forms now support password show/hide toggle
   - [x] Password Recovery flow (forgot + reset)
+  - [x] Forgot/Reset password forms now use the same auth visual language as Sign In/Sign Up (no nested card wrapper, ink-accent focus/CTA/link styles)
   - [x] Profile security: password reset CTA + email immutable note
 - [x] **Human Takeover**
   - [x] Detect business reply (or Inbox claim)

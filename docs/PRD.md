@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-09 (Instagram added as an independent channel with separate webhook route and shared inbound AI pipeline reuse for Meta channels; bot-mode/reactive reply behavior aligned across Telegram/WhatsApp/Instagram; build re-verified)  
+> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels route via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels + Inbox + Leads; auth preview thread now keeps fixed/clamped-height behavior with hidden-scroll + top fade and bottom-anchored bubbles above composer to avoid short-viewport push glitches, plus smooth incoming bubble motion and protected composer spacing; forgot/reset password forms now share sign in/sign up styling (no nested card wrapper); build re-verified)  
 > **Status:** In Development
 
 ---
@@ -38,8 +38,8 @@ Automate WhatsApp message handling:
 ### ✅ In Scope (Target MVP)
 | Feature | Description | Status (2026-02-04) |
 |---------|-------------|--------------------|
-| WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: manual channel setup, webhook verification, inbound text-only processing, and reactive outbound replies) |
-| Instagram Integration | Single business account per org | Implemented (manual channel setup, webhook verification, inbound text-only processing, reactive outbound replies; separate channel from WhatsApp) |
+| WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: OAuth channel setup, webhook verification, inbound text-only processing, and reactive outbound replies) |
+| Instagram Integration | Single business account per org | Implemented (Meta OAuth channel setup, webhook verification, inbound text-only processing, reactive outbound replies; separate channel from WhatsApp) |
 | AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + WhatsApp + Instagram + Simulator |
 | User-Generated Skills | Custom intent → response mappings | Implemented |
 | Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
@@ -282,8 +282,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ### 5.4 Channels (Telegram, WhatsApp, Instagram Implemented)
 - Telegram bot connection + webhook status/debug
-- WhatsApp Meta Cloud connection + webhook status/debug
-- Instagram Messaging connection + webhook status/debug
+- WhatsApp Meta Cloud connection via Meta OAuth + webhook status/debug
+- Instagram Messaging connection via Meta OAuth + webhook status/debug
+- WhatsApp/Instagram connection starts directly from `Bağla` (one click to Meta OAuth redirect; no extra intermediate modal)
 - Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
 ### 5.5 AI Settings (Implemented)
@@ -308,6 +309,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 5.6 Profile & Organization Settings
 - Profile: name and email visibility (email is read-only)
 - Profile security: password recovery via email reset link (Forgot + Reset)
+- Forgot/Reset password screens share the same auth form visual language as Sign In/Sign Up (typography, input focus, CTA/link accents) and avoid nested wrapped-card layout.
 - Public auth pages now include a top logo header and inline EN/TR language switcher.
 - Sign Up form fields for MVP are `full_name`, `email`, `password`, and required consent confirmation.
 - Sign In and Sign Up password inputs include show/hide toggle controls.
@@ -321,6 +323,11 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Auth preview shows a waiting placeholder before the first customer message (no pre-message score prediction shown).
 - Auth preview includes a compact internal scoring chip under the top-left canvas text block (score, status, progress bar, latest signal), updated after each message, with scenario mix covering 2 hot and 1 cold flow.
 - Auth preview does not render a secondary scoring card under the composer; analysis stays in the top-left internal chip only.
+- Auth preview thread has a capped height with internal scrolling, hidden scrollbar, and a top gradient cut so long conversations do not grow the auth page.
+- Auth preview message stack stays bottom-anchored so bubbles remain directly above the composer/input area.
+- Auth preview thread height is fixed/clamped on desktop so the 4th bubble is clipped/faded from the top instead of pushing the panel on short viewports.
+- Incoming bot typing now reserves target bubble height and uses smooth bubble-enter motion to avoid jitter while text is being typed.
+- Auth preview keeps extra spacing between message stack and composer so multi-line bot bubbles do not visually collide with input.
 - Support-only scenario agent closing copy is concise and handoff-oriented (“request forwarded to support team”).
 - Sign Up consent row keeps a compact single-line presentation on desktop and may wrap on smaller viewports.
 - Customer bubbles are explicitly labeled (`Müşteri` / `Customer`) to clarify that shown messages are incoming customer text in the simulation.
@@ -472,6 +479,10 @@ MVP is successful when:
 - **Auth Composer Send Behavior:** Keep typed text visible while sending, then reset to a placeholder-style empty state once send is confirmed.
 - **Auth Composer Density:** Prefer compact, single-line composer sizing with smooth transitions over oversized multi-line presentation.
 - **Auth Disabled Composer State:** Keep disabled/sending composer content single-line; only temporarily increase vertical density while `Sending...` feedback is shown.
+- **Auth Preview Thread Layout:** Keep preview chat thread capped with internal hidden-scroll and a top gradient fade, while anchoring message bubbles at the bottom near the composer.
+- **Auth Preview Small-Viewport Stability:** Prefer fixed/clamped thread height over content-driven growth so additional bubbles are clipped/faded rather than pushing the auth canvas.
+- **Auth Preview Motion Stability:** Animate incoming bubbles and reserve typing-bubble height to prevent micro-jumps while agent text appears.
+- **Password Recovery Visual Consistency:** Keep Forgot/Reset forms in the same auth form system as Sign In/Sign Up (ink accent focus/CTA/link styles, no secondary inner card wrapper).
 - **Auth Scenario Variety:** Avoid semantically chained scenario rotations; each scenario should represent a separate use-case category.
 - **Auth Scoring Visibility:** Do not show scoring before first customer input; start scoring only after initial message signal exists.
 - **Auth Scoring Placement:** Keep scoring UI detached from customer input area to avoid implying end-user visibility; prefer compact analyst-style top placement.
@@ -522,7 +533,7 @@ MVP is successful when:
 - **Inbox Details Layout:** Keep the contact header block and group the lead snapshot under Key Information for faster scanning.
 - **Lead Extraction Pause UI:** If the operator is active or AI is off, surface a paused notice and allow a manual lead refresh from inbox details.
 - **Lead Snapshot Styling:** Show a minimal AI extraction micro-label and render lead status as text with a small color dot.
-- **Platform Row Icon:** Show the channel icon next to the platform value; use consistent icon sizing across channel cards and brand-colored react-icons.
+- **Platform Row Icon:** Show the channel icon next to the platform value using the Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) with consistent sizing/colors across channel cards and Inbox/Leads platform rows.
 - **Inbox List Badges:** Show a small platform badge on conversation avatars so the channel is visible at a glance.
 - **Inbox Badge Styling:** Use brand-colored icons with a light backdrop for legibility on avatar colors.
 - **Inbox Badge Placement:** Center the platform badge beneath the avatar to reduce corner crowding.
@@ -564,9 +575,11 @@ MVP is successful when:
 - **Settings Title Parity:** Settings page headers should use the same labels as the corresponding settings sidebar items.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Channel Topology (MVP):** Treat `telegram`, `whatsapp`, and `instagram` as independent channels (`channels.type`) and store conversations with explicit per-channel platform values (`conversations.platform`).
+- **Meta Channel Onboarding (MVP):** Use Meta OAuth start/callback routes with signed state validation; do not require manual token entry in channel settings UI.
+- **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
-- **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with manual channel setup (`phone_number_id`, `business_account_id`, token, secrets), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
-- **Instagram MVP Channel Strategy:** Implemented via Meta Instagram Messaging API with manual channel setup (`page_id`, `instagram_business_account_id`, `page_access_token`, secrets), text-only inbound handling, webhook signature verification, and reactive replies only (first turn must come from customer inbound message).
+- **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
+- **Instagram MVP Channel Strategy:** Implemented via Meta Instagram Messaging API with OAuth-based channel setup (auto-resolved `page_id` + `instagram_business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (first turn must come from customer inbound message).
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.
 - **Skills Embedding Source:** Generate skill embeddings from both skill title and trigger examples; regenerate on title/trigger changes.

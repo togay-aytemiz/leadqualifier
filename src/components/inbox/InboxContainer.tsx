@@ -6,8 +6,8 @@ import {
     Inbox, ChevronDown,
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown
 } from 'lucide-react'
-import { FaTelegram, FaArrowTurnDown, FaArrowTurnUp, FaInstagram } from 'react-icons/fa6'
-import { IoLogoWhatsapp } from 'react-icons/io5'
+import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
+import { RiTelegramFill, RiWhatsappFill, RiInstagramFill } from 'react-icons/ri'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
     getMessages,
@@ -843,11 +843,11 @@ export function InboxContainer({
                                     <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
                                         <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
                                             {c.platform === 'telegram' ? (
-                                                <FaTelegram className="text-[#229ED9]" size={18} />
+                                                <RiTelegramFill className="text-[#229ED9]" size={18} />
                                             ) : c.platform === 'whatsapp' ? (
-                                                <IoLogoWhatsapp className="text-[#25D366]" size={18} />
+                                                <RiWhatsappFill className="text-[#25D366]" size={18} />
                                             ) : c.platform === 'instagram' ? (
-                                                <FaInstagram className="text-[#E1306C]" size={18} />
+                                                <RiInstagramFill className="text-[#E1306C]" size={18} />
                                             ) : (
                                                 <span className="text-[9px] font-semibold uppercase text-gray-400">{t('platformSimulatorShort')}</span>
                                             )}
@@ -1374,11 +1374,11 @@ export function InboxContainer({
                                         <div className="flex items-center gap-2">
                                             <span className="h-4 w-4 inline-flex items-center justify-center">
                                                 {selectedConversation.platform === 'telegram' ? (
-                                                    <FaTelegram className="text-[#229ED9]" size={16} />
+                                                    <RiTelegramFill className="text-[#229ED9]" size={16} />
                                                 ) : selectedConversation.platform === 'whatsapp' ? (
-                                                    <IoLogoWhatsapp className="text-[#25D366]" size={16} />
+                                                    <RiWhatsappFill className="text-[#25D366]" size={16} />
                                                 ) : selectedConversation.platform === 'instagram' ? (
-                                                    <FaInstagram className="text-[#E1306C]" size={16} />
+                                                    <RiInstagramFill className="text-[#E1306C]" size={16} />
                                                 ) : (
                                                     <span className="text-[10px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
                                                 )}

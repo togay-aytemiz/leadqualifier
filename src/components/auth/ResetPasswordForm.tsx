@@ -6,6 +6,12 @@ import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/design'
 import { Link } from '@/i18n/navigation'
+import { Eye, EyeOff } from 'lucide-react'
+import {
+    getPasswordRecoveryInputClasses,
+    getPasswordRecoveryLinkClasses,
+    getPasswordRecoveryPrimaryButtonClasses,
+} from '@/components/auth/passwordRecoveryStyles'
 
 type ResetStatus = 'loading' | 'ready' | 'invalid' | 'success'
 
@@ -17,6 +23,8 @@ export default function ResetPasswordForm() {
     const [status, setStatus] = useState<ResetStatus>('loading')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -78,7 +86,7 @@ export default function ResetPasswordForm() {
 
     if (status === 'loading') {
         return (
-            <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+            <div className="py-8 text-center text-sm text-gray-500">
                 <div className="text-center text-sm text-gray-500">{tc('loading')}</div>
             </div>
         )
@@ -86,11 +94,13 @@ export default function ResetPasswordForm() {
 
     if (status === 'invalid') {
         return (
-            <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-                <h1 className="text-2xl font-bold text-gray-900">{t('resetLinkInvalidTitle')}</h1>
+            <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                    {t('resetLinkInvalidTitle')}
+                </h1>
                 <p className="mt-2 text-sm text-gray-500">{t('resetLinkInvalidDescription')}</p>
                 <div className="mt-6">
-                    <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-700">
+                    <Link href="/forgot-password" className={getPasswordRecoveryLinkClasses()}>
                         {t('resetLinkInvalidAction')}
                     </Link>
                 </div>
@@ -100,11 +110,13 @@ export default function ResetPasswordForm() {
 
     if (status === 'success') {
         return (
-            <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-                <h1 className="text-2xl font-bold text-gray-900">{t('resetPasswordSuccessTitle')}</h1>
+            <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                    {t('resetPasswordSuccessTitle')}
+                </h1>
                 <p className="mt-2 text-sm text-gray-500">{t('resetPasswordSuccessDescription')}</p>
                 <div className="mt-6">
-                    <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+                    <Link href="/login" className={getPasswordRecoveryLinkClasses()}>
                         {t('backToLogin')}
                     </Link>
                 </div>
@@ -113,13 +125,15 @@ export default function ResetPasswordForm() {
     }
 
     return (
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-            <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-gray-900">{t('resetPasswordTitle')}</h1>
+        <div>
+            <div className="mb-7">
+                <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                    {t('resetPasswordTitle')}
+                </h1>
                 <p className="mt-2 text-sm text-gray-500">{t('resetPasswordSubtitle')}</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         {error}
@@ -130,33 +144,59 @@ export default function ResetPasswordForm() {
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                         {t('newPasswordLabel')}
                     </label>
-                    <input
-                        id="password"
-                        type="password"
-                        autoComplete="new-password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        placeholder={t('passwordPlaceholder')}
-                    />
+                    <div className="relative mt-2">
+                        <input
+                            id="password"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            className={getPasswordRecoveryInputClasses({ withTrailingIcon: true })}
+                            placeholder={t('passwordPlaceholder')}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((value) => !value)}
+                            aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                            title={showPassword ? t('hidePassword') : t('showPassword')}
+                            className="absolute inset-y-0 right-2 inline-flex items-center text-gray-500 hover:text-gray-700"
+                        >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                    </div>
                 </div>
 
                 <div>
                     <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                         {t('confirmPasswordLabel')}
                     </label>
-                    <input
-                        id="confirmPassword"
-                        type="password"
-                        autoComplete="new-password"
-                        value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        placeholder={t('passwordPlaceholder')}
-                    />
+                    <div className="relative mt-2">
+                        <input
+                            id="confirmPassword"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={confirmPassword}
+                            onChange={(event) => setConfirmPassword(event.target.value)}
+                            className={getPasswordRecoveryInputClasses({ withTrailingIcon: true })}
+                            placeholder={t('passwordPlaceholder')}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((value) => !value)}
+                            aria-label={showConfirmPassword ? t('hidePassword') : t('showPassword')}
+                            title={showConfirmPassword ? t('hidePassword') : t('showPassword')}
+                            className="absolute inset-y-0 right-2 inline-flex items-center text-gray-500 hover:text-gray-700"
+                        >
+                            {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                    </div>
                 </div>
 
-                <Button type="submit" disabled={isSubmitting} className="w-full h-10">
+                <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={getPasswordRecoveryPrimaryButtonClasses()}
+                >
                     {isSubmitting ? tc('loading') : t('resetPasswordButton')}
                 </Button>
             </form>

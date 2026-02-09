@@ -1,7 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import {
+    getAuthPreviewBubbleEnterClasses,
+    getAuthPreviewMessageStackClasses,
+    getAuthPreviewThreadFrameClasses,
+    getAuthPreviewThreadTopFadeClasses,
+    getAuthPreviewThreadViewportClasses,
+} from '@/components/auth/authMessengerPreviewStyles'
 
 type Phase = 'typingComposer' | 'sending' | 'sent' | 'typingAgent' | 'scenarioHold' | 'switchScenario'
 type Role = 'user' | 'agent'
@@ -11,6 +18,7 @@ type ChatMessage = {
     id: number
     role: Role
     text: string
+    typingTargetText?: string
 }
 
 type ChatTurn = {
@@ -131,6 +139,7 @@ export function AuthMessengerPreview() {
     const [agentText, setAgentText] = useState('')
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [nextMessageId, setNextMessageId] = useState(1)
+    const messageViewportRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
         setScenarioIndex(0)
@@ -247,6 +256,7 @@ export function AuthMessengerPreview() {
             phase === 'scenarioHold' ||
             phase === 'switchScenario')
     const showCaret = phase === 'typingComposer' && !hasComposerText
+    const typingTargetText = activeScenario.turns[turnIndex]?.agent ?? ''
     const visibleMessages: ChatMessage[] = showTypingAgentBubble
         ? [
               ...messages,
@@ -254,9 +264,17 @@ export function AuthMessengerPreview() {
                   id: nextMessageId + 999,
                   role: 'agent',
                   text: agentText,
+                  typingTargetText,
               },
           ]
         : messages
+
+    useEffect(() => {
+        const viewport = messageViewportRef.current
+        if (!viewport) return
+
+        viewport.scrollTop = viewport.scrollHeight
+    }, [agentText, phase, visibleMessages.length])
 
     const leadStep = Math.min(messages.length, activeScenario.lead.scoreByStep.length - 1)
     const leadScore = activeScenario.lead.scoreByStep[leadStep] ?? 0
@@ -277,7 +295,7 @@ export function AuthMessengerPreview() {
     const leadBarWidth = isLeadScoringPending ? 14 : leadScore
 
     return (
-        <div className="relative z-10 flex h-full flex-col">
+        <div className="relative z-10 flex h-full min-h-0 flex-col">
             <div className="max-w-sm">
                 <span className="inline-flex rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-sm">
                     {t('canvasPill')}
@@ -332,40 +350,59 @@ export function AuthMessengerPreview() {
                 </div>
             </div>
 
-            <div className="mt-2 flex flex-1 flex-col justify-center">
-                <div className="space-y-3 px-1">
-                    {visibleMessages.map((message) => (
-                        <div
-                            key={message.id}
-                            className={`transition-all duration-300 ${
-                                message.role === 'user' ? 'flex justify-end' : ''
-                            }`}
-                        >
-                            {message.role === 'agent' && (
-                                <div className="w-full">
-                                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                        {t('canvasAgentLabel')}
-                                    </div>
-                                    <div className="max-w-[88%] rounded-2xl rounded-bl-md border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm">
-                                        <p>{message.text}</p>
-                                    </div>
+            <div className="mt-2 flex min-h-0 flex-1 flex-col justify-end">
+                <div className={getAuthPreviewThreadFrameClasses()}>
+                    <div ref={messageViewportRef} className={getAuthPreviewThreadViewportClasses()}>
+                        <div className={getAuthPreviewMessageStackClasses()}>
+                            {visibleMessages.map((message) => (
+                                <div
+                                    key={message.id}
+                                    className={`${getAuthPreviewBubbleEnterClasses()} transition-all duration-300 ${
+                                        message.role === 'user' ? 'flex justify-end' : ''
+                                    }`}
+                                >
+                                    {message.role === 'agent' && (
+                                        <div className="w-full">
+                                            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                                {t('canvasAgentLabel')}
+                                            </div>
+                                            <div className="max-w-[88%] rounded-2xl rounded-bl-md border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm">
+                                                {message.typingTargetText ? (
+                                                    <div className="relative">
+                                                        <p
+                                                            aria-hidden="true"
+                                                            className="invisible whitespace-pre-wrap break-words"
+                                                        >
+                                                            {message.typingTargetText}
+                                                        </p>
+                                                        <p className="absolute inset-0 whitespace-pre-wrap break-words">
+                                                            {message.text}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p>{message.text}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {message.role === 'user' && (
+                                        <div className="flex flex-col items-end">
+                                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                                {t('canvasCustomerLabel')}
+                                            </div>
+                                            <div className="max-w-[84%] rounded-2xl rounded-br-md bg-[#111827] px-4 py-2.5 text-sm font-medium text-white shadow-sm">
+                                                <p>{message.text}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                            {message.role === 'user' && (
-                                <div className="flex flex-col items-end">
-                                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                                        {t('canvasCustomerLabel')}
-                                    </div>
-                                    <div className="max-w-[84%] rounded-2xl rounded-br-md bg-[#111827] px-4 py-2.5 text-sm font-medium text-white shadow-sm">
-                                        <p>{message.text}</p>
-                                    </div>
-                                </div>
-                            )}
+                            ))}
                         </div>
-                    ))}
+                    </div>
+                    <div className={getAuthPreviewThreadTopFadeClasses()} />
                 </div>
 
-                <div className="mt-5 w-full max-w-xl">
+                <div className="mt-4 w-full max-w-xl">
                     <div
                         className={`relative rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 ${
                             isComposerExpanded ? 'px-4 py-3.5' : 'px-4 py-2'

@@ -5,6 +5,11 @@ import { useLocale, useTranslations } from 'next-intl'
 import { requestPasswordReset } from '@/lib/auth/actions'
 import { Button } from '@/design'
 import { Link } from '@/i18n/navigation'
+import {
+    getPasswordRecoveryInputClasses,
+    getPasswordRecoveryLinkClasses,
+    getPasswordRecoveryPrimaryButtonClasses,
+} from '@/components/auth/passwordRecoveryStyles'
 
 export default function ForgotPasswordForm() {
     const t = useTranslations('auth')
@@ -34,13 +39,15 @@ export default function ForgotPasswordForm() {
     const buttonLabel = cooldown > 0 ? t('resendIn', { seconds: cooldown }) : t('sendResetLink')
 
     return (
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-            <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-gray-900">{t('forgotPasswordTitle')}</h1>
+        <div>
+            <div className="mb-7">
+                <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                    {t('forgotPasswordTitle')}
+                </h1>
                 <p className="mt-2 text-sm text-gray-500">{t('forgotPasswordSubtitle')}</p>
             </div>
 
-            <form action={formAction} className="space-y-5">
+            <form action={formAction} className="space-y-6">
                 {state?.error && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         {t('resetLinkError')}
@@ -62,20 +69,24 @@ export default function ForgotPasswordForm() {
                         type="email"
                         required
                         autoComplete="email"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        className={`mt-2 ${getPasswordRecoveryInputClasses()}`}
                         placeholder={t('emailPlaceholder')}
                     />
                 </div>
 
                 <input type="hidden" name="locale" value={locale} />
 
-                <Button type="submit" disabled={isDisabled} className="w-full h-10">
+                <Button
+                    type="submit"
+                    disabled={isDisabled}
+                    className={getPasswordRecoveryPrimaryButtonClasses()}
+                >
                     {pending ? tc('loading') : buttonLabel}
                 </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-gray-500">
-                <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+                <Link href="/login" className={getPasswordRecoveryLinkClasses()}>
                     {t('backToLogin')}
                 </Link>
             </p>
