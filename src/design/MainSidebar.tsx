@@ -40,6 +40,34 @@ interface ActiveOrganizationSummary {
     slug: string
 }
 
+function isActiveOrganizationSummary(value: unknown): value is ActiveOrganizationSummary {
+    if (typeof value !== 'object' || value === null) return false
+    const candidate = value as Record<string, unknown>
+    return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.name === 'string' &&
+        typeof candidate.slug === 'string'
+    )
+}
+
+function sortOrganizations(organizations: ActiveOrganizationSummary[]) {
+    return [...organizations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+}
+
+function mergeOrganizations(
+    current: ActiveOrganizationSummary[],
+    incoming: ActiveOrganizationSummary[]
+) {
+    const lookup = new Map<string, ActiveOrganizationSummary>()
+    for (const organization of current) {
+        lookup.set(organization.id, organization)
+    }
+    for (const organization of incoming) {
+        lookup.set(organization.id, organization)
+    }
+    return sortOrganizations(Array.from(lookup.values()))
+}
+
 interface MainSidebarProps {
     userName?: string
     isSystemAdmin?: boolean
@@ -66,9 +94,13 @@ export function MainSidebar({
     const [hasUnread, setHasUnread] = useState(false)
     const [hasPendingSuggestions, setHasPendingSuggestions] = useState(false)
     const [organizationId, setOrganizationId] = useState<string | null>(activeOrganizationId)
+    const [organizationOptions, setOrganizationOptions] = useState<ActiveOrganizationSummary[]>(sortOrganizations(organizations))
+    const [isLoadingOrganizationOptions, setIsLoadingOrganizationOptions] = useState(false)
+    const [hasLoadedOrganizationOptions, setHasLoadedOrganizationOptions] = useState(!isSystemAdmin)
     const [botMode, setBotMode] = useState<AiBotMode>('active')
     const [orgSearch, setOrgSearch] = useState('')
     const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
+    const [isOrgPickerOpen, setIsOrgPickerOpen] = useState(false)
     const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
     const localePrefix = localePrefixMatch && localePrefixMatch[1] !== 'tr'
         ? `/${localePrefixMatch[1]}`
@@ -81,20 +113,51 @@ export function MainSidebar({
     const supabase = supabaseRef.current
 
     const currentOrganization = useMemo(
-        () => organizations.find((organization) => organization.id === organizationId) ?? null,
-        [organizationId, organizations]
+        () => organizationOptions.find((organization) => organization.id === organizationId)
+            ?? organizations.find((organization) => organization.id === organizationId)
+            ?? null,
+        [organizationId, organizationOptions, organizations]
     )
 
     const filteredOrganizations = useMemo(() => {
         const query = orgSearch.trim().toLowerCase()
-        if (!query) return organizations
-        return organizations.filter((organization) => {
+        if (!query) return organizationOptions
+        return organizationOptions.filter((organization) => {
             return (
                 organization.name.toLowerCase().includes(query) ||
                 organization.slug.toLowerCase().includes(query)
             )
         })
-    }, [orgSearch, organizations])
+    }, [orgSearch, organizationOptions])
+
+    const loadOrganizationOptions = useCallback(async () => {
+        if (!isSystemAdmin || hasLoadedOrganizationOptions || isLoadingOrganizationOptions) {
+            return
+        }
+
+        setIsLoadingOrganizationOptions(true)
+        try {
+            const response = await fetch('/api/organizations/active', {
+                method: 'GET',
+                cache: 'no-store'
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to load organization options')
+            }
+
+            const payload = await response.json() as { organizations?: unknown[] }
+            const nextOrganizations = (payload.organizations ?? []).filter(isActiveOrganizationSummary)
+            if (nextOrganizations.length > 0) {
+                setOrganizationOptions((current) => mergeOrganizations(current, nextOrganizations))
+            }
+            setHasLoadedOrganizationOptions(true)
+        } catch (error) {
+            console.error(error)
+        } finally {
+            setIsLoadingOrganizationOptions(false)
+        }
+    }, [hasLoadedOrganizationOptions, isLoadingOrganizationOptions, isSystemAdmin])
 
     const refreshUnread = useCallback(async (orgId: string) => {
         const { count, error } = await supabase
@@ -167,6 +230,8 @@ export function MainSidebar({
             }
 
             setOrganizationId(nextOrganizationId)
+            setIsOrgPickerOpen(false)
+            setOrgSearch('')
             router.refresh()
         } catch (error) {
             console.error(error)
@@ -188,7 +253,8 @@ export function MainSidebar({
                 throw new Error('Failed to reset organization context')
             }
 
-            setOrganizationId(organizations[0]?.id ?? null)
+            setOrganizationId(null)
+            setIsOrgPickerOpen(false)
             setOrgSearch('')
             router.refresh()
         } catch (error) {
@@ -196,7 +262,7 @@ export function MainSidebar({
         } finally {
             setIsSwitchingOrg(false)
         }
-    }, [isSwitchingOrg, isSystemAdmin, organizations, router])
+    }, [isSwitchingOrg, isSystemAdmin, router])
 
     useEffect(() => {
         try {
@@ -218,6 +284,28 @@ export function MainSidebar({
     useEffect(() => {
         setOrganizationId(activeOrganizationId)
     }, [activeOrganizationId])
+
+    useEffect(() => {
+        const normalizedOrganizations = sortOrganizations(organizations)
+
+        if (!isSystemAdmin) {
+            setOrganizationOptions(normalizedOrganizations)
+            setHasLoadedOrganizationOptions(true)
+            return
+        }
+
+        if (normalizedOrganizations.length === 0) return
+        setOrganizationOptions((current) => mergeOrganizations(current, normalizedOrganizations))
+
+        if (normalizedOrganizations.length > 1) {
+            setHasLoadedOrganizationOptions(true)
+        }
+    }, [isSystemAdmin, organizations])
+
+    useEffect(() => {
+        if (!isSystemAdmin || !isOrgPickerOpen) return
+        loadOrganizationOptions()
+    }, [isOrgPickerOpen, isSystemAdmin, loadOrganizationOptions])
 
     useEffect(() => {
         if (!organizationId) {
@@ -298,6 +386,11 @@ export function MainSidebar({
 
     useEffect(() => {
         const routesToPrefetch = [
+            '/inbox',
+            '/leads',
+            '/simulator',
+            '/skills',
+            '/knowledge',
             '/settings',
             '/settings/profile',
             '/settings/organization',
@@ -307,10 +400,14 @@ export function MainSidebar({
             '/settings/billing'
         ]
 
-        routesToPrefetch.forEach((route) => {
+        if (isSystemAdmin) {
+            routesToPrefetch.push('/admin', '/admin/organizations', '/admin/leads', '/admin/users')
+        }
+
+        Array.from(new Set(routesToPrefetch)).forEach((route) => {
             router.prefetch(`${localePrefix}${route}`)
         })
-    }, [localePrefix, router])
+    }, [isSystemAdmin, localePrefix, router])
 
     const sections = useMemo(
         () => [
@@ -386,6 +483,13 @@ export function MainSidebar({
                         label: tSidebar('adminOrganizations'),
                         icon: Building2,
                         activeIcon: Building2,
+                    },
+                    {
+                        id: 'admin-leads',
+                        href: '/admin/leads',
+                        label: tSidebar('adminLeads'),
+                        icon: HiOutlineUser,
+                        activeIcon: HiMiniUser,
                     },
                     {
                         id: 'admin-users',
@@ -483,66 +587,159 @@ export function MainSidebar({
                 </div>
             </div>
 
-            {isSystemAdmin && !collapsed && (
-                <div className="px-3 pb-2 space-y-2">
-                    <div className="rounded-xl border border-slate-200 bg-white p-2">
-                        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            {tSidebar('organizationSwitcherTitle')}
-                        </p>
-                        <input
-                            value={orgSearch}
-                            onChange={(event) => setOrgSearch(event.target.value)}
-                            placeholder={tSidebar('organizationSwitcherSearch')}
-                            className="mt-2 h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 outline-none ring-[#242A40]/20 transition focus:bg-white focus:ring-2"
-                        />
-                        <div className="mt-2 max-h-32 space-y-1 overflow-auto pr-1">
-                            {filteredOrganizations.map((organization) => {
-                                const isActive = organization.id === organizationId
-                                return (
-                                    <button
-                                        key={organization.id}
-                                        type="button"
-                                        disabled={isSwitchingOrg || isActive}
-                                        onClick={() => handleOrganizationSwitch(organization.id)}
-                                        className={cn(
-                                            'w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors',
-                                            isActive
-                                                ? 'bg-[#242A40]/10 text-[#242A40]'
-                                                : 'text-slate-700 hover:bg-slate-100',
-                                            (isSwitchingOrg || isActive) && 'cursor-not-allowed opacity-80'
-                                        )}
-                                    >
-                                        <p className="truncate font-medium">{organization.name}</p>
-                                        <p className="truncate text-[11px] text-slate-400">{organization.slug}</p>
-                                    </button>
-                                )
-                            })}
-                            {filteredOrganizations.length === 0 && (
-                                <p className="px-2 py-1 text-xs text-slate-400">
-                                    {tSidebar('organizationSwitcherEmpty')}
-                                </p>
-                            )}
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-2 px-1">
-                            <p className="truncate text-[11px] text-slate-500">
+            {isSystemAdmin && (
+                <div className={cn('px-3 pb-2 space-y-2', collapsed && 'px-2')}>
+                    {collapsed ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsOrgPickerOpen(true)}
+                            title={currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
+                            className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                        >
+                            <Building2 size={15} />
+                        </button>
+                    ) : (
+                        <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {tSidebar('organizationSwitcherTitle')}
+                            </p>
+                            <p className="mt-2 truncate text-sm font-semibold text-slate-900">
                                 {currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
                             </p>
-                            <button
-                                type="button"
-                                disabled={isSwitchingOrg}
-                                onClick={handleOrganizationReset}
-                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                <RotateCcw size={12} />
-                                {tSidebar('organizationSwitcherReset')}
-                            </button>
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                                {currentOrganization?.slug ?? tSidebar('organizationSwitcherNoSelection')}
+                            </p>
+                            <div className="mt-3 flex items-center justify-between gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOrgPickerOpen(true)}
+                                    disabled={isSwitchingOrg}
+                                    className="inline-flex h-8 items-center rounded-md bg-[#242A40] px-3 text-xs font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {currentOrganization
+                                        ? tSidebar('organizationSwitcherChange')
+                                        : tSidebar('organizationSwitcherSelect')}
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isSwitchingOrg}
+                                    onClick={handleOrganizationReset}
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <RotateCcw size={12} />
+                                    {tSidebar('organizationSwitcherReset')}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    {readOnlyTenantMode && (
+                    )}
+                    {!collapsed && readOnlyTenantMode && (
                         <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-800">
                             {tSidebar('readOnlyTenantMode')}
                         </p>
                     )}
+                </div>
+            )}
+
+            {isSystemAdmin && isOrgPickerOpen && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/45 p-4"
+                    onClick={() => {
+                        if (!isSwitchingOrg) setIsOrgPickerOpen(false)
+                    }}
+                >
+                    <div
+                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="border-b border-slate-200 px-4 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        {tSidebar('organizationSwitcherModalTitle')}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {tSidebar('organizationSwitcherModalDescription')}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOrgPickerOpen(false)}
+                                    className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                >
+                                    {tSidebar('organizationSwitcherClose')}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-4">
+                            <input
+                                value={orgSearch}
+                                onChange={(event) => setOrgSearch(event.target.value)}
+                                placeholder={tSidebar('organizationSwitcherSearch')}
+                                className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none ring-[#242A40]/20 transition focus:bg-white focus:ring-2"
+                            />
+
+                            <div className="mt-3 max-h-64 space-y-1 overflow-auto pr-1">
+                                {filteredOrganizations.map((organization) => {
+                                    const isActive = organization.id === organizationId
+                                    return (
+                                        <button
+                                            key={organization.id}
+                                            type="button"
+                                            disabled={isSwitchingOrg || isActive}
+                                            onClick={() => handleOrganizationSwitch(organization.id)}
+                                            className={cn(
+                                                'w-full rounded-md border px-3 py-2 text-left transition-colors',
+                                                isActive
+                                                    ? 'border-[#242A40]/20 bg-[#242A40]/10 text-[#242A40]'
+                                                    : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50',
+                                                (isSwitchingOrg || isActive) && 'cursor-not-allowed opacity-80'
+                                            )}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="truncate text-sm font-medium">{organization.name}</p>
+                                                {isActive && (
+                                                    <span className="rounded-full bg-[#242A40]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#242A40]">
+                                                        {tSidebar('organizationSwitcherCurrent')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="mt-0.5 truncate text-xs text-slate-500">{organization.slug}</p>
+                                        </button>
+                                    )
+                                })}
+                                {filteredOrganizations.length === 0 && (
+                                    <p className="px-2 py-2 text-sm text-slate-400">
+                                        {tSidebar('organizationSwitcherEmpty')}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="mt-4 flex items-center justify-between gap-3">
+                                <p className="truncate text-xs text-slate-500">
+                                    {currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOrgPickerOpen(false)}
+                                        className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                                    >
+                                        {tSidebar('organizationSwitcherClose')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isSwitchingOrg}
+                                        onClick={handleOrganizationReset}
+                                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <RotateCcw size={12} />
+                                        {tSidebar('organizationSwitcherReset')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

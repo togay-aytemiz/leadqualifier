@@ -1,5 +1,5 @@
 import { AdminRouteLoading } from '@/components/common/AdminRouteLoading'
 
-export default function AdminLoading() {
+export default function AdminOrganizationDetailLoading() {
     return <AdminRouteLoading />
 }

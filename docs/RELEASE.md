@@ -7,6 +7,16 @@
 ## [Unreleased]
 
 ### Added
+- Added system-admin org-context regression tests in `src/lib/organizations/active-context.test.ts` to lock slim-mode navigation behavior vs full-list mode.
+- Added `GET /api/organizations/active` for on-demand system-admin organization option loading in the sidebar picker.
+- Added shared admin loading surface (`src/components/common/AdminRouteLoading.tsx`) using subtle animated `/icon-black.svg` branding.
+- Added explicit admin loading boundaries for `/admin/organizations`, `/admin/organizations/[id]`, `/admin/users`, and `/admin/users/[id]`.
+- Added system-admin sidebar organization picker modal flow with search, active indicator, and explicit `Select/Change` action from compact current-org summary.
+- Added system-admin organization discovery fallback to membership-linked organizations when full organization list query is unavailable.
+- Added inbox conversation loading fallback test coverage in `src/lib/inbox/actions.test.ts` for nested-query failure scenarios.
+- Added read-only system-admin lead list route at `/admin/leads`, scoped to the active organization switcher context and reusing existing lead search/sort/pagination UI.
+- Added admin dashboard lead visibility for active org context: selected-organization summary, recent leads preview table, and quick navigation to `/admin/leads`.
+- Added Admin sidebar navigation entry for `/admin/leads` plus TR/EN localization keys (`mainSidebar.adminLeads` and `admin.leads.*`).
 - Added desktop settings route warmup by prefetching settings destinations in `MainSidebar` and `SettingsResponsiveShell`.
 - Added WhatsApp Meta Cloud MVP implementation: manual channel connect modal, channel debug support, `POST/GET /api/webhooks/whatsapp`, and text-only reactive outbound sending from inbox.
 - Added WhatsApp integration helpers with unit tests (`src/lib/whatsapp/client.ts`, `src/lib/whatsapp/webhook.ts`, `src/lib/whatsapp/client.test.ts`, `src/lib/whatsapp/webhook.test.ts`).
@@ -66,7 +76,13 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed system-admin active organization resolution to default slim mode (active org only) during route transitions; full org list now loads lazily when the sidebar picker opens.
+- Changed desktop `MainSidebar` prefetch warmup to include core workspace/AI/admin routes in addition to settings destinations.
+- Changed admin organization switcher UX from always-open inline list to compact summary + modal picker to reduce sidebar noise.
+- Changed skill-testing scope to simulator-first in product docs (no separate per-skill playground planned for MVP).
+- Changed roadmap/PRD admin scope tracking to reflect completed dashboard recent-leads wiring and platform-admin lead-list flow.
 - Changed main sidebar Settings entry target from `/settings/channels` to `/settings` to reduce first-load weight and keep navigation app-like.
+- Changed Inbox conversation-list header surface from white to the same muted panel tone as the rest of the list column for visual consistency.
 - Simulator chat UI now uses a neutral chatbot surface (channel-agnostic header, message pane, and bubble styles) instead of WhatsApp-like wallpaper/green header/read ticks.
 - Changed Next.js locale interception file convention from `src/middleware.ts` to `src/proxy.ts` to align with Next.js 16.
 - Changed locale layout to remove the unused Material Symbols webfont `<link>` and keep shell font loading warning-free.
@@ -87,6 +103,11 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed slow-feeling system-admin navigation caused by full organization-list reads on each route transition in dashboard context resolution.
+- Fixed admin sub-route blank-wait transitions by adding explicit loading skeletons (organizations/users/detail pages) with immediate visual feedback.
+- Fixed Next.js server/client serialization errors on admin dashboard (`Only plain objects can be passed to Client Components`) by rendering stat cards server-side instead of passing icon components through `StatCard` props from a server route.
+- Fixed Inbox false-empty list states by adding a resilient fallback path in `getConversations`: when nested relational reads fail, the server now returns base conversations plus best-effort message/lead/assignee previews via flat per-table queries.
+- Fixed noisy admin dashboard runtime error overlay by downgrading expected totals-RPC fallback logging from error-level to graceful fallback logs.
 - Fixed slow-feeling settings transitions by removing a redundant auth read in settings layout and warming settings routes in advance.
 - Fixed stale-closure risk in unsaved-changes save flow by including `transformPendingHref` in `useUnsavedChangesGuard` callback dependencies.
 - Fixed failing inbox style tests by restoring `getInboxOutgoingBubbleClasses` export.

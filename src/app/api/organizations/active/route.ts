@@ -55,6 +55,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, organizationId })
 }
 
+export async function GET() {
+    const supabase = await createClient()
+
+    try {
+        await assertSystemAdmin(supabase)
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unauthorized'
+        const status = message === 'Forbidden' ? 403 : 401
+        return NextResponse.json({ error: message }, { status })
+    }
+
+    const access = await getAccessibleOrganizationsForUser(supabase)
+    if (!access) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    return NextResponse.json({
+        organizations: access.organizations
+    })
+}
+
 export async function DELETE() {
     const supabase = await createClient()
 
@@ -70,4 +91,3 @@ export async function DELETE() {
     cookieStore.delete(ACTIVE_ORG_COOKIE)
     return NextResponse.json({ ok: true })
 }
-

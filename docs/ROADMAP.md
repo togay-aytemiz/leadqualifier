@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — Roadmap
 
-> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes guard callback dependencies fixed, Knowledge New Content PDF option now clearly marked `Coming Soon`, Next.js middleware convention migrated to `src/proxy.ts`, structured-output JSON mode added for extraction/follow-up/offering profile LLM calls, LLM output token caps applied to router/fallback/RAG/summary/reasoning/extraction paths, and KB content now truncates before profile/intake suggestion prompts to control prompt growth; lint/test/build pipelines re-verified; repo-wide troubleshooting sweep completed: test suite stabilized, hook rule violations fixed, `no-unused-vars` cleaned, `no-explicit-any` removed across inbox/AI/knowledge/leads modules, and lint/test/build pipelines verified; desktop settings now keeps inner sidebar mounted while only detail content transitions/loading updates; mobile settings back navigation now uses client-side routing to avoid refresh-like behavior/stuck transitions; mobile knowledge edit header copy simplified to icon-only back + short `Düzenle/Kaydet`; skills detail actions now use standardized delete/save icons; mobile navbar transition lag reduced via route prefetch warmup; mobile skills detail header copy simplified to short labels; mobile skills single-pane list→detail flow; mobile settings single-pane list→detail flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout + tighter mobile spacing; desktop leads table now keeps status chips on one line and truncates long contact names to one line; summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off inbox assistant-state banner copy; inbox list header chevron removal; scroll-to-latest CTA anchored on composer divider with subtle gray tone; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening; WhatsApp Meta Cloud MVP design completed with validated scope decisions; WhatsApp Meta Cloud MVP implementation now includes manual channel connect/debug, inbound webhook, and outbound message API; settings route transitions accelerated via desktop/sidebar prefetch warmup and leaner settings layout auth flow; simulator visual theme shifted from WhatsApp mimic to neutral chatbot UI)  
+> **Last Updated:** 2026-02-08 (system-admin navigation latency reduced by resolving active org in slim mode by default; full org list now lazy-loads only when org picker opens; main sidebar prefetch now warms workspace/AI/admin routes; admin organizations/users/detail routes now have icon-animated loading skeletons; lint/test/build re-verified)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -60,8 +60,8 @@
   - [x] Similarity search (top-5)
   - [x] LLM re-ranking
   - [x] Confidence threshold logic
-- [ ] **Skill Testing**
-  - [ ] Per-skill playground in admin (use Simulator for now)
+- [x] **Skill Testing**
+  - [x] Simulator is the canonical skill testing surface for MVP (no separate per-skill playground)
 
 ## Phase 3.5: Chat Simulator (Neutral Chatbot UI) ✅
 - [x] **Chat Interface**
@@ -114,6 +114,7 @@
   - [x] Mobile details panel now dims background with a dark overlay and closes on outside tap
   - [x] Mobile details panel open/close now uses smooth transition (fade + slight slide)
   - [x] Inbox list header no longer shows the dropdown chevron next to the title
+  - [x] Inbox list header surface now matches the list column background for consistent sidebar visuals
   - [x] Chat view now shows an animated "scroll to latest" button only when not at bottom, positioned on the composer divider
   - [x] Reduced vertical gap between the "Konuşma Özeti" row and the assistant banner in composer area
   - [x] Shadow/Off bot modes now show compact inactive-state banner copy (single-line title + short body) in composer area
@@ -146,6 +147,7 @@
   - [x] Mobile Knowledge edit header now uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance
   - [x] Mobile bottom navbar now prefetches primary routes for faster tab transitions
   - [x] Desktop main sidebar and settings shell now prefetch settings routes to reduce transition latency
+  - [x] Desktop main sidebar now prefetches core workspace/AI/admin routes for faster route transitions
   - [x] Main sidebar Settings entry now opens `/settings` root (lighter first load than direct `/settings/channels`)
 - [x] **Inbox Reliability**
   - [x] Atomic operator assignment on manual send
@@ -153,6 +155,7 @@
   - [x] Realtime auth handshake for subscriptions
   - [x] Realtime auth token sync now refreshes missing tokens and listens to auth state changes to prevent stale inbox streams
   - [x] Realtime lead status updates for inbox list indicators
+  - [x] Conversation list loading now falls back to flat per-table reads when nested relational query fails, preventing false empty-state inbox views
 - [x] **Internationalization**
   - [x] Remove hardcoded UI strings
   - [x] Enforce EN/TR parity with automated checks
@@ -347,12 +350,12 @@
 ---
 
 ## Phase 7: Admin Panel
-- [ ] **Dashboard**
-  - [ ] Overview stats
-  - [ ] Recent leads
+- [x] **Dashboard**
+  - [x] Overview stats
+  - [x] Recent leads
 - [ ] **Lead List**
-  - [ ] Filterable/sortable table
-  - [ ] Score, summary, status display
+  - [x] Filterable/sortable table
+  - [x] Score, summary, status display
   - [ ] "Open in WhatsApp" button
 - [x] **Skills Management**
   - [x] CRUD UI
@@ -360,7 +363,7 @@
   - [x] Removed Core/Custom tab split; skills are managed in one list
   - [x] Skills empty-state icon now matches the sidebar Skills icon
   - [x] Backfill missing skill embeddings automatically when seeded skills exist without vectors
-  - [ ] Test playground
+  - [x] Simulator-first testing accepted for MVP (no additional per-skill playground)
 - [x] **Knowledge Base UI**
   - [x] CRUD with categories
   - [x] Rich text editor
@@ -372,13 +375,22 @@
 ---
 
 ## Phase 8: Platform Admin Features
-- [x] System admin dashboard + organizations/users lists
+- [x] System admin dashboard + organizations/users/leads lists
 - [x] Organization switcher
   - [x] Searchable org switcher in main sidebar (system admin)
+  - [x] Compact current-org summary in sidebar with explicit `Select/Change` action (always-open list removed)
+  - [x] Modal-based organization picker with search, active marker, and reset action
   - [x] Persist active organization context via server-side cookie
   - [x] Apply switched org context across Inbox/Leads/Skills/Knowledge/Simulator/Settings
+  - [x] Apply switched org context in platform-admin lead monitoring (`/admin` recent leads + `/admin/leads` list)
+  - [x] Fallback to membership-linked org list when full system-admin organization query is unavailable
+  - [x] Resolve system-admin active org in slim mode during navigation (avoid full org-list query on every route)
+  - [x] Lazy-load full system-admin organization options only when org-picker modal opens
   - [x] Enforce read-only impersonation mode across tenant modules
   - [x] Show clear "viewing as organization" state and reset action
+- [x] Admin route loading UX
+  - [x] Admin organizations/users/detail routes now show explicit loading skeletons
+  - [x] Loading UI now uses subtle animated `icon-black.svg` branding
 - [ ] Cross-org debugging tools
   - [x] Admin-only org details page (`/admin/organizations/[id]`)
   - [x] Read org-level snapshots: usage, token usage, skills, knowledge stats (read-only table)
@@ -398,6 +410,26 @@
   - [x] Show premium/trial periods (read-only placeholders until billing integration)
   - [x] Show token/message usage values (read-only)
   - [x] Defer edit controls until billing policy is finalized
+
+---
+
+## Phase 8.5: Monetization & Subscription (Pre-Pilot)
+- [ ] **Pricing Strategy**
+  - [ ] Define plan tiers, quotas, and overage policy
+  - [ ] Set Turkish market price points and annual discount policy
+  - [ ] Finalize feature gating by plan (channels, AI limits, seats)
+- [ ] **Plan Purchase (Online Payment)**
+  - [ ] Select payment provider + integration model (TR compliance and invoice requirements)
+  - [ ] Implement checkout flow for monthly/annual plan purchase
+  - [ ] Implement payment webhook sync + failed-payment handling
+- [ ] **Membership States (Trial / Premium)**
+  - [ ] Define state model (`trial_active`, `premium_active`, `past_due`, `canceled`)
+  - [ ] Enforce entitlements in tenant runtime and admin read models
+  - [ ] Surface membership state in settings and platform admin pages
+- [ ] **Trial Policy Finalization**
+  - [ ] Decide trial model: time-based, credit-based, or hybrid
+  - [ ] Define trial end behavior, conversion trigger, and grace rules
+  - [ ] Finalize upgrade prompts for in-product conversion
 
 ---
 

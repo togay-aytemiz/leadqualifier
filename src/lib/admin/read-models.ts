@@ -399,6 +399,18 @@ function getCount(counts: Map<string, number>, organizationId: string) {
     return counts.get(organizationId) ?? 0
 }
 
+function isExpectedAdminTotalsRpcFallback(error: unknown) {
+    if (!error || typeof error !== 'object') return false
+
+    const candidate = error as { code?: string | null; message?: string | null }
+    if (candidate.code === 'PGRST202' || candidate.code === '42883') {
+        return true
+    }
+
+    return typeof candidate.message === 'string'
+        && candidate.message.toLowerCase().includes('get_admin_dashboard_totals')
+}
+
 async function buildOrganizationSummariesFromRows(
     supabase: SupabaseClient,
     organizations: OrganizationRow[]
@@ -641,7 +653,11 @@ export async function getAdminDashboardSummary(
 
     if (error || !data) {
         if (error) {
-            console.error('Failed to load admin dashboard totals via RPC, using fallback:', error)
+            if (isExpectedAdminTotalsRpcFallback(error)) {
+                console.info('Admin dashboard totals RPC unavailable, using fallback aggregate queries.')
+            } else {
+                console.warn('Admin dashboard totals RPC failed, using fallback aggregate queries:', error)
+            }
         }
         return getAdminDashboardSummaryFallback(supabase)
     }

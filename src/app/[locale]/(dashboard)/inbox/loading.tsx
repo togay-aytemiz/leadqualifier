@@ -5,8 +5,8 @@ export default function InboxLoading() {
     return (
         <div className="flex h-full bg-white border-t border-gray-200">
             {/* Sidebar Skeleton */}
-            <div className="w-[320px] border-r border-gray-200 flex flex-col h-full bg-white">
-                <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
+            <div className="w-[320px] border-r border-gray-200 flex flex-col h-full bg-gray-50/30">
+                <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-gray-50/30">
                     <Skeleton className="h-6 w-16" />
                     <Skeleton className="h-8 w-8 rounded" />
                 </div>

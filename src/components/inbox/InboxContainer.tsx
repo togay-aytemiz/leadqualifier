@@ -945,7 +945,7 @@ export function InboxContainer({
                     mobileListPaneClasses
                 )}
             >
-                <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-white">
+                <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-gray-50/30">
                     <div className="flex items-center">
                         <span className="text-lg font-bold text-gray-900">{t('title')}</span>
                     </div>

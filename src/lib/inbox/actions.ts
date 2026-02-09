@@ -26,6 +26,9 @@ export type LeadRefreshResult =
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
 type ConversationLeadPreview = { status?: string | null }
 type ConversationAssigneePreview = { full_name?: string | null; email?: string | null }
+type ConversationPreviewMessageRow = Pick<Message, 'conversation_id' | 'content' | 'created_at' | 'sender_type'>
+type ConversationLeadPreviewRow = { conversation_id: string; status?: string | null }
+type ConversationAssigneePreviewRow = { id: string; full_name?: string | null; email?: string | null }
 const SUMMARY_MAX_OUTPUT_TOKENS = 180
 const LEAD_REASONING_MAX_OUTPUT_TOKENS = 220
 
@@ -33,6 +36,52 @@ export interface ConversationListItem extends Conversation {
     assignee?: ConversationAssigneePreview | null
     leads?: ConversationLeadPreview[]
     messages?: ConversationPreviewMessage[]
+}
+
+function buildConversationListItemsFromFallback(
+    conversations: Conversation[],
+    messageRows: ConversationPreviewMessageRow[],
+    leadRows: ConversationLeadPreviewRow[],
+    assigneeRows: ConversationAssigneePreviewRow[]
+): ConversationListItem[] {
+    const messageByConversationId = new Map<string, ConversationPreviewMessage>()
+    for (const message of messageRows) {
+        if (messageByConversationId.has(message.conversation_id)) continue
+        messageByConversationId.set(message.conversation_id, {
+            content: message.content,
+            created_at: message.created_at,
+            sender_type: message.sender_type
+        })
+    }
+
+    const leadByConversationId = new Map<string, ConversationLeadPreview>()
+    for (const lead of leadRows) {
+        if (leadByConversationId.has(lead.conversation_id)) continue
+        leadByConversationId.set(lead.conversation_id, { status: lead.status })
+    }
+
+    const assigneeById = new Map<string, ConversationAssigneePreview>()
+    for (const assignee of assigneeRows) {
+        assigneeById.set(assignee.id, {
+            full_name: assignee.full_name,
+            email: assignee.email
+        })
+    }
+
+    return conversations.map((conversation) => {
+        const latestMessage = messageByConversationId.get(conversation.id)
+        const lead = leadByConversationId.get(conversation.id)
+        const assignee = conversation.assignee_id
+            ? (assigneeById.get(conversation.assignee_id) ?? null)
+            : null
+
+        return {
+            ...conversation,
+            messages: latestMessage ? [latestMessage] : [],
+            leads: lead ? [lead] : [],
+            assignee
+        }
+    })
 }
 
 export async function getConversations(
@@ -70,12 +119,79 @@ export async function getConversations(
         .limit(1, { foreignTable: 'leads' })
         .range(from, to)
 
-    if (error) {
-        console.error('Error fetching conversations:', error)
+    if (!error) {
+        return (data ?? []) as ConversationListItem[]
+    }
+
+    console.warn('Error fetching conversations with nested query, using fallback:', error)
+
+    const { data: conversationRows, error: conversationError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('last_message_at', { ascending: false })
+        .range(from, to)
+
+    if (conversationError) {
+        console.error('Error fetching conversations fallback:', conversationError)
         return []
     }
 
-    return data as ConversationListItem[]
+    const conversations = (conversationRows ?? []) as Conversation[]
+    if (conversations.length === 0) {
+        return []
+    }
+
+    const conversationIds = conversations.map((conversation) => conversation.id)
+    const assigneeIds = Array.from(new Set(
+        conversations
+            .map((conversation) => conversation.assignee_id)
+            .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    ))
+
+    const [messagesResult, leadsResult, assigneesResult] = await Promise.all([
+        supabase
+            .from('messages')
+            .select('conversation_id, content, created_at, sender_type')
+            .eq('organization_id', organizationId)
+            .in('conversation_id', conversationIds)
+            .order('created_at', { ascending: false }),
+        supabase
+            .from('leads')
+            .select('conversation_id, status')
+            .eq('organization_id', organizationId)
+            .in('conversation_id', conversationIds),
+        assigneeIds.length > 0
+            ? supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', assigneeIds)
+            : Promise.resolve({
+                data: [] as ConversationAssigneePreviewRow[],
+                error: null
+            })
+    ])
+
+    if (messagesResult.error) {
+        console.warn('Failed to load conversation preview messages in fallback:', messagesResult.error)
+    }
+    if (leadsResult.error) {
+        console.warn('Failed to load conversation lead previews in fallback:', leadsResult.error)
+    }
+    if (assigneesResult.error) {
+        console.warn('Failed to load conversation assignees in fallback:', assigneesResult.error)
+    }
+
+    const messageRows = (messagesResult.data ?? []) as ConversationPreviewMessageRow[]
+    const leadRows = (leadsResult.data ?? []) as ConversationLeadPreviewRow[]
+    const assigneeRows = (assigneesResult.data ?? []) as ConversationAssigneePreviewRow[]
+
+    return buildConversationListItemsFromFallback(
+        conversations,
+        messageRows,
+        leadRows,
+        assigneeRows
+    )
 }
 
 export async function getMessages(conversationId: string) {

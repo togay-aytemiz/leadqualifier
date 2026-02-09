@@ -1,6 +1,6 @@
 # WhatsApp AI Lead Qualifier — PRD (MVP)
 
-> **Last Updated:** 2026-02-08 (troubleshooting hardening pass: unsaved-changes navigation guard dependency fixed, Next.js request interceptor migrated to `src/proxy.ts`, Knowledge New Content PDF source now explicitly marked `Coming Soon`, structured-output JSON mode enforced for extraction/follow-up/offering profile LLM calls, max output token caps added on fallback/RAG/summary/reasoning/extraction paths, and oversized KB content truncated before profile/intake suggestion prompts; repo-wide troubleshooting sweep completed: hook/lint regressions resolved, `no-explicit-any` removed from core modules, and lint/test/build pipelines re-verified; desktop settings now keeps the inner settings sidebar mounted while only detail content transitions/loading updates; mobile settings detail→list back flow now uses client-side navigation to avoid refresh-like behavior; mobile knowledge edit header now uses icon-only back + short `Düzenle/Kaydet`; skills detail action buttons now follow standardized icon usage for delete/save; mobile navbar prefetch warmup to reduce tab lag; mobile skills header labels simplified; mobile skills list→detail single-pane flow; mobile settings list→detail single-pane flow with animated back transition; mobile knowledge base single-pane flow with responsive file cards; mobile leads list compact-card layout on small screens; desktop leads table now keeps status chips and contact names single-line (name truncates on overflow); summary panel reopen now regenerates; mobile inbox details payload + visible operator-exit action + slide transitions; compact shadow/off assistant-state banner behavior; divider-anchored scroll-to-latest CTA styling; tighter summary-to-banner composer spacing; extraction summary-window alignment; Telegram skill-match fail-open fallback hardening; WhatsApp Meta Cloud MVP decisions validated with a dedicated design blueprint; WhatsApp Meta Cloud MVP implementation delivered (manual channel connect/debug, webhook verification + inbound text processing, reactive outbound API); desktop settings navigation now prefetches settings routes and opens from `/settings` root for faster perceived transitions; simulator UI moved from WhatsApp mimic to neutral chatbot styling)  
+> **Last Updated:** 2026-02-08 (system-admin route latency reduced with slim active-org context resolution; full organization list now lazy-loads only when org-picker opens; admin routes now use explicit icon-animated loading skeletons; main sidebar prefetch extended to workspace/AI/admin paths; lint/test/build re-verified)  
 > **Status:** In Development
 
 ---
@@ -260,7 +260,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Mobile layout uses compact, tappable card rows with reduced spacing; desktop keeps the full sortable table layout.
 - Desktop table keeps status chips on one line and keeps contact name on one line with truncation when needed.
 
-### 5.2 Skills Management (Implemented; Playground Planned)
+### 5.2 Skills Management (Implemented; Simulator-First Testing)
 - CRUD operations
 - Enable/disable toggle
 - `Requires Human Handover` toggle with read-only bot message preview and AI Settings deep-link
@@ -268,7 +268,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Mobile UX follows app-style single-pane navigation: full list page first, then detail/edit page after selection with a back action.
 - Mobile detail header uses compact action labels on small screens (e.g., `Düzenle`, `Kaydet`) while desktop keeps full labels.
 - Skills detail action buttons (delete/save) use a shared icon + label pattern for consistent desktop/mobile affordance.
-- No per-skill playground yet (use Simulator for end-to-end testing)
+- Simulator is the canonical skill-testing surface for MVP; a separate per-skill playground is intentionally out of scope.
 
 ### 5.3 Knowledge Base (Implemented)
 - CRUD with folders
@@ -329,10 +329,12 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ### 5.8 Platform Admin Workspace (Implemented v1, Read-Only)
 - **Searchable Organization Switcher (System Admin):**
-  - System admin can switch active org from a searchable switcher in the main sidebar.
+  - System admin sees current organization in sidebar and uses explicit `Select/Change` action to open a searchable modal picker.
   - Active org context is persisted via server cookie and applied across tenant modules (Inbox, Leads, Skills, Knowledge Base, Settings, Simulator).
+  - Active organization resolution now uses a slim read path on normal navigation; the full organization list is fetched lazily only when the switcher modal is opened.
   - Switched-org impersonation is read-only in tenant modules for MVP.
   - UI shows a clear "read-only impersonation" state and supports reset to default org context.
+  - If full organization listing is unavailable, fallback uses membership-linked organizations so tenant observation remains usable.
 - **Admin Organization List (Read-Only):**
   - Organization table includes:
     - organization identity
@@ -358,10 +360,28 @@ Customer Message → Skill Match? → Yes → Skill Response
 - **Admin Dashboard Totals (Read-Only):**
   - Top stat cards (organizations/users/skills/knowledge/messages/tokens) are fetched via a single DB aggregate RPC.
   - Dashboard avoids loading full organization summaries just to compute global totals.
+- **Admin Lead Monitoring (Read-Only, Active-Org Scoped):**
+  - `/admin` dashboard shows recent leads for the currently active organization context.
+  - `/admin/leads` provides a read-only lead list with search/sort/pagination, score/status visibility, and conversation jump links.
+  - Both views follow the active org selected from the sidebar organization switcher (`active_org_id` cookie).
 - **Deferred (Post-v1):**
   - Editable premium/trial/quota controls
   - Audit trail for platform-admin billing/plan actions
   - Advanced filters/sorting for admin tables
+
+### 5.9 Monetization & Subscription (Planned, Pre-Pilot)
+- **Pricing Strategy:**
+  - Define plan tiers, quota limits, overage policy, and annual discount policy for Turkish SMBs.
+  - Finalize feature gates by plan (channels, AI limits, seats, and premium-only controls).
+- **Plan Purchase (Online Payment):**
+  - Integrate online checkout for monthly/annual subscriptions with provider selection based on Turkey support and invoicing requirements.
+  - Add payment webhook lifecycle handling (success, failure, renewal, cancellation, retry).
+- **Membership Lifecycle (Trial / Premium):**
+  - Introduce explicit membership states (`trial_active`, `premium_active`, `past_due`, `canceled`) and entitlement enforcement in runtime + admin views.
+  - Keep current admin placeholders until billing backend integration is complete.
+- **Trial Policy Decision (Required Gate):**
+  - Finalize whether trial is duration-based, credit-based, or hybrid.
+  - Define conversion trigger, grace period, and upgrade UX behavior before payment rollout.
 
 ---
 
@@ -430,9 +450,14 @@ MVP is successful when:
 - **Chunk Overlap Alignment:** Overlap prefers paragraph/sentence boundaries and drops overlap when it would exceed max tokens.
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 - **Platform Admin Context:** Persist active admin-selected tenant context via `active_org_id` server cookie so tenant pages resolve a single active organization consistently.
+- **Platform Admin Navigation Performance:** Resolve system-admin org context in slim mode (active org only) during normal route transitions, and lazy-load full org options only when the sidebar picker is opened.
 - **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
 - **Billing Status Visibility Strategy:** Show premium/plan/trial as read-only placeholders (`not integrated`) until billing schema and policy are finalized.
+- **Monetization Rollout Order:** Finalize pricing strategy and trial model first, then implement checkout/payments and entitlement enforcement (avoid shipping payment flows before policy decisions are locked).
 - **Platform Admin Read Models:** Use DB-backed pagination/search, aggregate RPC totals, and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
+- **Platform Admin Lead Monitoring:** Expose read-only recent leads on `/admin` and a dedicated `/admin/leads` list, both scoped by the active organization switcher context.
+- **Admin Totals Fallback Logging:** When dashboard totals RPC is unavailable, degrade to fallback aggregates with non-error logging to avoid noisy runtime overlays during expected fallback paths.
+- **System Admin Org Discovery Fallback:** If all-organizations query is unavailable, derive accessible organization context from membership-linked organizations.
 - **KB Sidebar Sync:** Dispatch a client-side `knowledge-updated` event on folder create/delete to keep the sidebar in sync without full remounts.
 - **KB Sidebar Refresh:** Dispatch `knowledge-updated` on content create/update/delete and surface pending AI suggestions via a KB banner linked to Organization settings.
 - **KB Banner Styling:** Use an amber-toned banner for pending AI suggestion visibility in Knowledge Base.
@@ -450,6 +475,7 @@ MVP is successful when:
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
 - **Inbox Message Contrast:** Bot-authored inbox messages use a dark-violet bubble with light text to keep bot replies easy to scan against operator and contact messages.
 - **Simulator UI Direction:** Keep the simulator channel-agnostic with a neutral chatbot look (no WhatsApp wallpaper/green header/read ticks) while preserving the same matching/debug behavior.
+- **Skill Testing Strategy (MVP):** Use Simulator as the canonical skill testing workflow; do not build a separate per-skill playground in MVP.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
 - **Billing Message Metrics:** Message usage in Usage & Billing is computed from `messages.sender_type` with UTC monthly boundaries (`bot`, `user`, `contact`) and excludes `system` rows.
 - **Billing Storage Metrics:** Storage usage in Usage & Billing is an approximate UTF-8 text size based on Skills (`title`, `response_text`, `trigger_examples`) and Knowledge Documents (`title`, `content`).
@@ -478,6 +504,7 @@ MVP is successful when:
 - **Inbox Summary Reopen Behavior:** Closing and re-opening the summary panel should trigger a fresh summary generation (without requiring manual refresh).
 - **Inbox Scroll-to-Latest CTA:** Show an animated jump-to-latest button only when chat is away from bottom; anchor it on the composer divider with subtle gray styling.
 - **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
+- **Inbox List Header Surface:** Keep the Inbox conversation-list header on the same surface tone as the list column (non-white) for consistent sidebar visuals across dashboard modules.
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
 - **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
 - **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) on mount to reduce transition latency.
@@ -544,6 +571,7 @@ MVP is successful when:
 - **Quality Gate Discipline:** Keep lint free of errors (warnings tracked separately), avoid explicit `any` in core product modules, and require green `test` + `build` before closing iterations.
 - **Next.js Interceptor Convention:** Use `src/proxy.ts` (not `src/middleware.ts`) for locale interception on Next.js 16+.
 - **Placeholder Source Transparency:** Keep non-MVP Knowledge source options visible in New Content menu but mark inactive options (including PDF upload) with a `Coming Soon` badge.
+- **Inbox Query Resilience:** When nested relational conversation reads fail, fall back to flat per-table conversation/message/lead/assignee reads so Inbox does not incorrectly show an empty state.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

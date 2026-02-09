@@ -25,3 +25,15 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+@keyframes admin-loading-zoom {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
