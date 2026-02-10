@@ -7,6 +7,12 @@
 ## [Unreleased]
 
 ### Added
+- Added executable Phase 9 QA closure plan (`docs/plans/2026-02-10-phase-9-testing-qa-implementation-plan.md`) covering unit, WhatsApp integration, admin E2E, and load-test workstreams.
+- Added core channel QA unit suites for Phase 9 (`src/lib/channels/actions.test.ts`, `src/lib/channels/inbound-ai-pipeline.test.ts`) to cover WhatsApp channel actions and inbound AI pipeline guardrails.
+- Added WhatsApp webhook route integration tests (`src/app/api/webhooks/whatsapp/route.test.ts`) for verify challenge, signature rejection, and pipeline handoff.
+- Added admin panel Playwright smoke coverage with env-gated system-admin login helper (`tests/e2e/admin-panel.spec.ts`, `tests/e2e/helpers/auth.ts`).
+- Added message-handling load baseline script using `autocannon` (`scripts/load/whatsapp-webhook.autocannon.mjs`) plus thresholds doc (`docs/plans/phase-9-load-test-thresholds.md`).
+- Added Phase 9 QA npm command surface and tooling (`test:unit:core`, `test:integration:whatsapp`, `test:e2e:admin`, `test:load:messages`, `playwright.config.ts`, and dev deps `@playwright/test` + `autocannon`).
 - Added Channels card configuration helper + test coverage (`src/components/channels/channelCards.ts`, `src/components/channels/channelCards.test.ts`) to support launch-gated placeholder cards.
 - Added new lead status `undetermined` (TR: `Belirsiz`) across extraction/UI flows, including migration `supabase/migrations/00056_leads_status_undetermined.sql` to extend `leads.status` constraint.
 - Added localized status labels for `undetermined` in both Inbox and Leads dictionaries (`messages/en.json`, `messages/tr.json`) and wired admin/leads/inbox status maps to render them.
@@ -106,6 +112,9 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed monetization docs to record pre-pilot trial-only direction (no freemium), add trial-abuse prevention backlog items, and capture low-entry starter pricing posture (~USD 10 equivalent target band) in roadmap/PRD planning sections (`docs/ROADMAP.md`, `docs/PRD.md`).
+- Changed product docs to align Phase 7 Channels scope with implementation: WhatsApp connection status/debug is tracked as implemented, and the standalone "test message sandbox" backlog item was removed from MVP scope (`docs/ROADMAP.md`, `docs/PRD.md`).
+- Changed admin dashboard/admin leads markup to include stable Playwright selectors (`admin-dashboard-page`, `admin-leads-page`, `admin-readonly-banner`) for smoke automation.
 - Changed Inbox `Konuşma Özeti / Conversation Summary` trigger to a hybrid affordance: filled AI sparkles icon (purple→orange glow) plus an inline chevron beside the label for consistent open/close state indication; refresh action nudged slightly right for spacing balance.
 - Changed Settings > Channels so non-connected Instagram now shows a disabled `Çok Yakında / Coming Soon` CTA instead of `Bağla / Connect`, and added a Facebook Messenger placeholder card with the same launch-gated CTA.
 - Changed Settings > Channels card UI from multi-column tiles to stacked row cards (one channel per row) with full readable channel names and right-side status/action controls.
@@ -113,6 +122,7 @@
 - Changed Channels summary denominator from 3 to 4 to include the new Facebook Messenger placeholder card in the visible channel roster.
 - Changed lead-extraction status semantics: insufficient-information business turns now normalize to `undetermined` (score capped low), while `ignored` is preserved for non-business conversations only.
 - Changed lead-status visual mapping to include a dedicated purple treatment for `undetermined` chips/dots in Inbox, Admin dashboard recent leads, and Leads table badges.
+- Changed lead merge behavior so `service_type` is no longer carried forward from older snapshots when the latest extraction has no service clue; service now stays empty instead of showing stale inferred values.
 - Changed lead extraction prompt context to include recent role-labeled conversation turns (`customer`, `owner`, `assistant`) while preserving the latest-5 customer-message grounding window for extracted facts and scoring signals.
 - Changed lead extraction locale precedence to `preferred locale > organization locale > message heuristics`; manual Inbox lead refresh now sends active UI locale to extraction.
 - Changed inbound extraction locale wiring to avoid forcing per-message language when organization locale is available, improving TR consistency for mixed-message conversations.

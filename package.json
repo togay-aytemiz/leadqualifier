@@ -9,6 +9,10 @@
     "lint": "eslint && npm run i18n:check",
     "i18n:check": "node scripts/i18n/check-i18n.mjs",
     "test": "vitest",
+    "test:unit:core": "vitest run src/lib/channels/actions.test.ts src/lib/channels/inbound-ai-pipeline.test.ts",
+    "test:integration:whatsapp": "vitest run src/app/api/webhooks/whatsapp/route.test.ts",
+    "test:e2e:admin": "playwright test tests/e2e/admin-panel.spec.ts",
+    "test:load:messages": "node scripts/load/whatsapp-webhook.autocannon.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {
@@ -29,10 +33,12 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autocannon": "^8.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, Channels now mark Instagram connect as `Çok Yakında`, a Facebook Messenger placeholder card is visible as `Çok Yakında`, Channels cards now use full-width stacked rows with readable names and right-side status/actions, Messenger icon now uses `RiMessengerFill`, the inbox conversation-summary trigger now uses a glowing AI sparkles icon with an inline chevron toggle, and inbox list lead chips now persist after refresh via one-to-one nested payload normalization in `getConversations`)  
+> **Last Updated:** 2026-02-10 (Monetization direction now records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, greeting-only false `non_business` outputs are normalized to `undetermined`, `service_type` no longer carries forward when latest extraction has no service clue, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope, and Phase 9 QA closure now includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -383,6 +383,7 @@
   - [x] Enforce locale-aware output language (TR/EN) for lead summary and extracted detail fields
   - [x] Include manual profile note with approved AI suggestions in extraction context
   - [x] Preserve previously extracted lead details when later turns omit fields (merge-on-update instead of destructive overwrite)
+  - [x] `service_type` is intentionally not carry-forward merged; when current extraction has no service clue, service stays empty (`null`)
   - [x] Keep lead summary aligned to the current extraction window (avoid stale summary carry-over when omitted)
   - [x] Reject `service_type` inference on greeting-only/no-service-clue customer messages (prevents profile-only service hallucination)
   - [x] Force greeting-only conversations to `undetermined` even when model emits `non_business=true` (keeps `ignored` scoped to true non-business threads)
@@ -432,8 +433,7 @@
   - [x] Rich text editor
 - [x] **Channels**
   - [x] Telegram connection status + debug
-  - [ ] WhatsApp connection status (placeholder only)
-  - [ ] Test message sandbox
+  - [x] WhatsApp connection status + debug
 
 ---
 
@@ -479,6 +479,7 @@
 ## Phase 8.5: Monetization & Subscription (Pre-Pilot)
 - [ ] **Pricing Strategy**
   - [ ] Define plan tiers, quotas, and overage policy
+  - [x] Confirm launch pricing posture: low-entry starter around ~USD 10 equivalent (TRY-localized) to reduce first-purchase friction
   - [ ] Set Turkish market price points and annual discount policy
   - [ ] Finalize feature gating by plan (channels, AI limits, seats)
 - [ ] **Plan Purchase (Online Payment)**
@@ -490,9 +491,16 @@
   - [ ] Enforce entitlements in tenant runtime and admin read models
   - [ ] Surface membership state in settings and platform admin pages
 - [ ] **Trial Policy Finalization**
-  - [ ] Decide trial model: time-based, credit-based, or hybrid
+  - [x] Decide trial model: trial-only launch (no freemium plan in pre-pilot)
   - [ ] Define trial end behavior, conversion trigger, and grace rules
+  - [ ] Define trial limits (time cap + credit cap) and conversion trigger precedence (`limit reached` vs `time expired`)
   - [ ] Finalize upgrade prompts for in-product conversion
+- [ ] **Trial Abuse Prevention**
+  - [ ] Enforce one-trial-per-business policy keyed by `whatsapp_business_account_id` + normalized phone + company identity signals
+  - [ ] Add risk controls for disposable email domains, VOIP-heavy signup numbers, and repeated device/IP fingerprints
+  - [ ] Add signup velocity limits + cooldown windows for repeated failed/abusive trial attempts
+  - [ ] Define suspicious-signup review flow (auto-restrict to sandbox/no-live-reply until manually cleared)
+  - [ ] Add admin-side trial-abuse audit log for unblock/override actions
 
 ---
 
@@ -512,10 +520,11 @@
 - [x] Address strict TypeScript build errors (router history typing + indexed access guards)
 - [x] Stabilize test + lint + build quality gates after troubleshooting sweep
 - [x] Remove `no-explicit-any` debt in critical modules (AI, Inbox, Knowledge Base, Leads, Channels, shared types)
-- [ ] Unit tests for core logic
-- [ ] Integration tests for WhatsApp flow
-- [ ] E2E tests for admin panel
-- [ ] Load testing for message handling
+- [x] Document executable Phase 9 closure plan (`docs/plans/2026-02-10-phase-9-testing-qa-implementation-plan.md`)
+- [x] Unit tests for core logic
+- [x] Integration tests for WhatsApp flow
+- [x] E2E tests for admin panel
+- [x] Load testing for message handling
 
 ---
 

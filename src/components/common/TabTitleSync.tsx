@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { buildTabDocumentTitle, resolveTabRouteId, type TabRouteId } from '@/lib/tab-title'
 
@@ -21,11 +21,7 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
 
     const [hasUnread, setHasUnread] = useState(false)
 
-    const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-    if (!supabaseRef.current) {
-        supabaseRef.current = createClient()
-    }
-    const supabase = supabaseRef.current
+    const supabase = useMemo(() => createClient(), [])
 
     const titleMap = useMemo<Record<TabRouteId, string>>(
         () => ({
@@ -70,11 +66,19 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
 
     useEffect(() => {
         if (routeId === 'inbox') {
-            refreshUnread()
-            return
+            const timer = window.setTimeout(() => {
+                void refreshUnread()
+            }, 0)
+            return () => window.clearTimeout(timer)
         }
 
-        setHasUnread(false)
+        const timer = window.setTimeout(() => {
+            setHasUnread(false)
+        }, 0)
+
+        return () => {
+            window.clearTimeout(timer)
+        }
     }, [refreshUnread, routeId])
 
     useEffect(() => {
@@ -104,13 +108,13 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
                         filter: `organization_id=eq.${organizationId}`,
                     },
                     () => {
-                        refreshUnread()
+                        void refreshUnread()
                     }
                 )
                 .subscribe()
         }
 
-        setupRealtime()
+        void setupRealtime()
 
         return () => {
             isMounted = false

@@ -70,7 +70,7 @@ describe('safeParseLeadExtraction', () => {
 })
 
 describe('mergeExtractionWithExisting', () => {
-    it('keeps summary aligned with current extraction window when incoming summary is omitted', () => {
+    it('keeps summary aligned and clears service when incoming extraction has no service', () => {
         const merged = mergeExtractionWithExisting(
             {
                 service_type: null,
@@ -101,7 +101,7 @@ describe('mergeExtractionWithExisting', () => {
             }
         )
 
-        expect(merged.service_type).toBe('Yenidoğan çekimi')
+        expect(merged.service_type).toBeNull()
         expect(merged.summary).toBeNull()
         expect(merged.desired_date).toBe('1 Mart')
         expect(merged.location).toBe('Kadıköy')

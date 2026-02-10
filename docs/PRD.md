@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, ships localized `Belirsiz/Undetermined` lead labels with dedicated UI color treatment, Channels now show Instagram connect as `Çok Yakında`, a Facebook Messenger placeholder card is added as `Çok Yakında`, Channels cards now render as stacked full-width rows with right-side status/actions for readability, Messenger icon uses `RiMessengerFill`, Inbox conversation summary CTA now uses a glowing AI sparkles icon with an inline chevron toggle, and inbox lead chips persist after refresh by normalizing one-to-one nested lead payloads in conversation-list reads)  
+> **Last Updated:** 2026-02-10 (Monetization direction now records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs now reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, and Phase 9 QA closure now includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline)  
 > **Status:** In Development
 
 ---
@@ -36,17 +36,17 @@ Automate WhatsApp message handling:
 ## 3. MVP Scope
 
 ### ✅ In Scope (Target MVP)
-| Feature | Description | Status (2026-02-04) |
+| Feature | Description | Status (2026-02-10) |
 |---------|-------------|--------------------|
 | WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: OAuth channel setup, popup-based connect UX, webhook verification, inbound text-only processing, and reactive outbound replies) |
 | Instagram Integration | Single business account per org | Implemented (Meta OAuth channel setup, popup-based connect UX, webhook verification, inbound text-only processing, reactive outbound replies; separate channel from WhatsApp) |
 | AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + WhatsApp + Instagram + Simulator |
 | User-Generated Skills | Custom intent → response mappings | Implemented |
 | Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
-| Lead Extraction | AI summary + score (0-10) | Implemented (Telegram + WhatsApp + Instagram; Lead UI pending) |
+| Lead Extraction | AI summary + score (0-10) | Implemented (Telegram + WhatsApp + Instagram; Inbox manual overwrite UI for important-info fields pending) |
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
-| Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
+| Admin Panel | Leads, Skills, KB, Channels management | Partial (Dashboard + Leads + Skills/KB/Inbox/Settings/Channels implemented; pending: `Open in WhatsApp` quick action and platform-admin billing audit tooling) |
 | Public Legal Center | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json` | Implemented |
 | **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle** | Implemented |
 
@@ -188,7 +188,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - KB/fallback prompting also includes the last 3 assistant replies to reduce repeated greetings/openings in consecutive bot turns.
 - Final KB/RAG/fallback generation now receives recent multi-turn user+assistant history and known lead snapshot facts (when available) so replies continue naturally, avoid repetitive greetings, and reduce repeated question loops.
 - Lead extraction now stores collected required-intake values as `extracted_fields.required_intake_collected` when customer messages clearly provide them.
-- Lead extraction applies merge-on-update persistence for `service_type` and collected required fields, while `summary` is always tied to the current extraction window (latest 5 customer messages) to prevent stale status-summary mismatch.
+- Lead extraction applies merge-on-update persistence for collected required fields; `service_type` is not carry-forward merged when latest extraction has no service clue, and `summary` is always tied to the current extraction window (latest 5 customer messages) to prevent stale status-summary mismatch.
 - Lead extraction output language is locale-aware (TR/EN): summary and extracted detail values follow customer/locale signal instead of defaulting to English.
 - Service inference guard: when recent customer turns are generic greetings/acknowledgements without a clear service clue, extraction must keep `service_type = null` (do not infer solely from profile text).
 - Insufficient-information conversations (e.g., greeting-only/unclear short turns with no qualifying signals) are marked as `undetermined`.
@@ -266,7 +266,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ## 5. Admin Panel
 
-### 5.1 Lead List (Planned)
+### 5.1 Lead List (Partially Implemented)
 - Name, phone, status (Hot/Warm/Cold)
 - Score, AI Summary, last message time
 - "Open in WhatsApp" button
@@ -412,6 +412,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 5.9 Monetization & Subscription (Planned, Pre-Pilot)
 - **Pricing Strategy:**
   - Define plan tiers, quota limits, overage policy, and annual discount policy for Turkish SMBs.
+  - Launch target is a low-entry starter band around ~USD 10 equivalent (localized to TRY) before premium tier expansion.
   - Finalize feature gates by plan (channels, AI limits, seats, and premium-only controls).
 - **Plan Purchase (Online Payment):**
   - Integrate online checkout for monthly/annual subscriptions with provider selection based on Turkey support and invoicing requirements.
@@ -420,8 +421,14 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Introduce explicit membership states (`trial_active`, `premium_active`, `past_due`, `canceled`) and entitlement enforcement in runtime + admin views.
   - Keep current admin placeholders until billing backend integration is complete.
 - **Trial Policy Decision (Required Gate):**
-  - Finalize whether trial is duration-based, credit-based, or hybrid.
+  - Trial model decision (pre-pilot): **trial-only** onboarding (no freemium tier at launch).
+  - Define trial limits with both time and credit caps, and explicit precedence for conversion trigger (`time_expired` vs `credit_exhausted`).
   - Define conversion trigger, grace period, and upgrade UX behavior before payment rollout.
+  - Add abuse controls before opening self-serve trials broadly:
+    - one-trial-per-business identity policy (`whatsapp_business_account_id` + normalized phone + organization identity signals)
+    - disposable email / VOIP / device-fingerprint risk checks
+    - signup velocity throttling + cooldown windows
+    - suspicious-signup review flow and admin override audit trail
 
 ---
 
@@ -516,6 +523,9 @@ MVP is successful when:
 - **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
 - **Billing Status Visibility Strategy:** Show premium/plan/trial as read-only placeholders (`not integrated`) until billing schema and policy are finalized.
 - **Monetization Rollout Order:** Finalize pricing strategy and trial model first, then implement checkout/payments and entitlement enforcement (avoid shipping payment flows before policy decisions are locked).
+- **Trial Go-To-Market Model (Pre-Pilot):** Start with trial-only onboarding (no freemium) to reduce ongoing abuse vectors and keep support/sales qualification focused.
+- **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
+- **WhatsApp Cost Modeling Baseline:** For Meta Cloud API MVP, treat inbound webhook traffic and in-window free-form replies as zero template fee; meter WhatsApp variable cost only when sending template messages (country/category-dependent).
 - **Platform Admin Read Models:** Use DB-backed pagination/search, aggregate RPC totals, and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
 - **Platform Admin Lead Monitoring:** Expose read-only recent leads on `/admin` and a dedicated `/admin/leads` list, both scoped by the active organization switcher context.
 - **Admin Totals Fallback Logging:** When dashboard totals RPC is unavailable, degrade to fallback aggregates with non-error logging to avoid noisy runtime overlays during expected fallback paths.
@@ -597,6 +607,7 @@ MVP is successful when:
 - **Channel Topology (MVP):** Treat `telegram`, `whatsapp`, and `instagram` as independent channels (`channels.type`) and store conversations with explicit per-channel platform values (`conversations.platform`).
 - **Channel Launch Gating:** Keep Instagram connect CTA and Facebook Messenger card as `Coming Soon` placeholders in Settings > Channels until rollout is reopened; Telegram/WhatsApp flows remain active.
 - **Channels Settings Readability:** Render channel cards as full-width stacked rows (one channel per row), avoid truncating connected channel names, and place status/actions on the right side for fast scanning.
+- **Channels Verification Scope (MVP):** Use live channel connection status + debug diagnostics in Settings > Channels; do not maintain a separate channel-level "test message sandbox" surface in MVP.
 - **Messenger Brand Icon:** Use `RiMessengerFill` for Facebook Messenger placeholder visuals in Channels settings.
 - **Meta Channel Onboarding (MVP):** Use Meta OAuth start/callback routes with signed state validation; do not require manual token entry in channel settings UI.
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
@@ -645,6 +656,7 @@ MVP is successful when:
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 - **Quality Gate Discipline:** Keep lint free of errors (warnings tracked separately), avoid explicit `any` in core product modules, and require green `test` + `build` before closing iterations.
+- **Phase 9 QA Strategy (Implemented):** Phase 9 now runs Vitest-based core/unit + WhatsApp webhook integration coverage, Playwright admin smoke E2E, and a reproducible message-handling load baseline (`autocannon`) via `npm run test:unit:core`, `npm run test:integration:whatsapp`, `npm run test:e2e:admin`, and `npm run test:load:messages`.
 - **Next.js Interceptor Convention:** Use `src/proxy.ts` (not `src/middleware.ts`) for locale interception on Next.js 16+.
 - **Placeholder Source Transparency:** Keep non-MVP Knowledge source options visible in New Content menu but mark inactive options (including PDF upload) with a `Coming Soon` badge.
 - **Inbox Query Resilience:** When nested relational conversation reads fail, fall back to flat per-table conversation/message/lead/assignee reads so Inbox does not incorrectly show an empty state.

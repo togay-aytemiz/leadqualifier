@@ -108,13 +108,13 @@ export default async function AdminPage() {
     ]
 
     return (
-        <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
+        <div data-testid="admin-dashboard-page" className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
             <PageHeader title={t('dashboardTitle')} />
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-6xl mx-auto space-y-8">
                     <p className="text-gray-500">{t('overview')}</p>
-                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                    <p data-testid="admin-readonly-banner" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                         {t('readOnlyBanner')}
                     </p>
 

@@ -142,16 +142,6 @@ export function AuthMessengerPreview() {
     const messageViewportRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
-        setScenarioIndex(0)
-        setTurnIndex(0)
-        setPhase('typingComposer')
-        setComposerText('')
-        setAgentText('')
-        setMessages([])
-        setNextMessageId(1)
-    }, [scenarios])
-
-    useEffect(() => {
         const currentScenario = scenarios[scenarioIndex]
         const currentTurn = currentScenario?.turns[turnIndex]
         if (!currentScenario || !currentTurn) {

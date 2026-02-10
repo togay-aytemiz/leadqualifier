@@ -455,7 +455,7 @@ export function mergeExtractionWithExisting(
     const incomingCollected = normalizeCollectedFieldValues(incoming.required_intake_collected)
 
     return {
-        service_type: incoming.service_type ?? normalizeOptionalString(existingLead?.service_type) ?? null,
+        service_type: incoming.service_type,
         desired_date: incoming.desired_date ?? normalizeOptionalString(existingExtracted.desired_date) ?? null,
         location: incoming.location ?? normalizeOptionalString(existingExtracted.location) ?? null,
         budget_signals: incoming.budget_signals.length > 0
