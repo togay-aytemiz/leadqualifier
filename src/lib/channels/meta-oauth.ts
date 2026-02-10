@@ -57,6 +57,10 @@ interface MetaGraphErrorResponse {
     }
 }
 
+interface MetaGraphListResponse {
+    data?: unknown[]
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -214,6 +218,31 @@ export function pickWhatsAppConnectionCandidate(payload: unknown): WhatsAppConne
     return null
 }
 
+function isMissingWhatsAppBusinessAccountsFieldError(error: unknown) {
+    if (!(error instanceof Error) || !error.message) return false
+    return error.message.toLowerCase().includes('nonexisting field (whatsapp_business_accounts)')
+}
+
+function extractGraphDataItems(payload: unknown) {
+    if (!isRecord(payload) || !Array.isArray(payload.data)) return []
+    return payload.data
+}
+
+function dedupeWhatsAppBusinessAccountItems(items: unknown[]) {
+    const seenIds = new Set<string>()
+    const deduped: unknown[] = []
+
+    for (const item of items) {
+        if (!isRecord(item)) continue
+        const id = asString(item.id)
+        if (!id || seenIds.has(id)) continue
+        seenIds.add(id)
+        deduped.push(item)
+    }
+
+    return deduped
+}
+
 async function requestMetaGraph<T>(url: URL): Promise<T> {
     const response = await fetch(url.toString(), {
         method: 'GET'
@@ -272,8 +301,48 @@ export async function fetchMetaInstagramPages(userAccessToken: string) {
 }
 
 export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string) {
-    const url = new URL('https://graph.facebook.com/v21.0/me/whatsapp_business_accounts')
-    url.searchParams.set('access_token', userAccessToken)
-    url.searchParams.set('fields', 'id,name,phone_numbers{id,display_phone_number,verified_name}')
-    return requestMetaGraph<unknown>(url)
+    const directUrl = new URL('https://graph.facebook.com/v21.0/me/whatsapp_business_accounts')
+    directUrl.searchParams.set('access_token', userAccessToken)
+    directUrl.searchParams.set('fields', 'id,name,phone_numbers{id,display_phone_number,verified_name}')
+
+    try {
+        return await requestMetaGraph<unknown>(directUrl)
+    } catch (directError) {
+        if (!isMissingWhatsAppBusinessAccountsFieldError(directError)) {
+            throw directError
+        }
+
+        // Some Meta app/user-token combinations do not expose /me/whatsapp_business_accounts.
+        // Fallback through business graph edges to discover accessible WABA assets.
+        const businessesUrl = new URL('https://graph.facebook.com/v21.0/me/businesses')
+        businessesUrl.searchParams.set('access_token', userAccessToken)
+        businessesUrl.searchParams.set('fields', 'id,name')
+
+        const businessesPayload = await requestMetaGraph<MetaGraphListResponse>(businessesUrl)
+        const businesses = Array.isArray(businessesPayload.data) ? businessesPayload.data : []
+        const combinedAccounts: unknown[] = []
+
+        for (const business of businesses) {
+            if (!isRecord(business)) continue
+            const businessId = asString(business.id)
+            if (!businessId) continue
+
+            for (const edge of ['owned_whatsapp_business_accounts', 'client_whatsapp_business_accounts'] as const) {
+                const edgeUrl = new URL(`https://graph.facebook.com/v21.0/${businessId}/${edge}`)
+                edgeUrl.searchParams.set('access_token', userAccessToken)
+                edgeUrl.searchParams.set('fields', 'id,name,phone_numbers{id,display_phone_number,verified_name}')
+
+                try {
+                    const edgePayload = await requestMetaGraph<MetaGraphListResponse>(edgeUrl)
+                    combinedAccounts.push(...extractGraphDataItems(edgePayload))
+                } catch {
+                    // Continue collecting from other business edges.
+                }
+            }
+        }
+
+        return {
+            data: dedupeWhatsAppBusinessAccountItems(combinedAccounts)
+        }
+    }
 }

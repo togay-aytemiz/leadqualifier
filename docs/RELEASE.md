@@ -9,6 +9,7 @@
 ### Added
 - Added popup-based Meta OAuth channel connect flow for WhatsApp/Instagram in Channels settings, including postMessage handoff so popup completion returns status to the main page automatically.
 - Added shared Meta OAuth origin resolver utility (`src/lib/channels/meta-origin.ts`) with tests to prioritize canonical app URL and gracefully fall back to forwarded/request origin.
+- Added Meta OAuth WhatsApp discovery fallback logic that traverses `me/businesses` and business WABA edges when direct `/me/whatsapp_business_accounts` is unsupported for the logged-in user token.
 - Added landing legal center infrastructure in `qualy-lp`: markdown source docs (`legal/terms.md`, `legal/privacy.md`), runtime legal routes (`/legal`, `/terms`, `/privacy`), shared legal shell/pages, and legal markdown parser utilities with Vitest coverage (`lib/legal-utils.ts`, `lib/legal.test.ts`).
 - Added build-time legal manifest generation (`scripts/generate-legal-assets.mjs`) and `prebuild` hook to emit `public/legal_versions.json` from markdown frontmatter versions.
 - Added route-aware browser tab title sync component (`src/components/common/TabTitleSync.tsx`) with dashboard/auth layout wiring so tabs render `Page | Qualy`.
@@ -167,6 +168,7 @@
 - Fixed Meta OAuth route host resolution drift on Netlify by using canonical app URL/forwarded-host resolution for both start and callback routes.
 - Fixed opaque OAuth callback failures by attaching compact `meta_oauth_error` hints to `connect_failed` redirects.
 - Fixed popup OAuth handoff dropping `meta_oauth_error`; main Channels URL now preserves the callback error hint after popup closes.
+- Fixed WhatsApp connect failures caused by Graph error `(#100) Tried accessing nonexisting field (whatsapp_business_accounts) on node type (User)` by adding business-edge fallback queries.
 - Fixed Meta OAuth status redirects to always return to a safe channel-settings URL (`returnTo`) so failed OAuth/env states no longer strand users on non-matching paths.
 - Fixed mixed channel icon rendering inconsistencies by unifying Telegram/WhatsApp/Instagram under Remix fill variants (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`).
 - Fixed perceived navigation stalls during active interactions by deferring bulk prefetch calls with a short delayed schedule.

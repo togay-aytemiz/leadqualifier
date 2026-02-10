@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
     buildMetaAuthorizeUrl,
     decodeMetaOAuthState,
     encodeMetaOAuthState,
+    fetchMetaWhatsAppBusinessAccounts,
     getMetaOAuthScopes,
     resolveMetaChannelsReturnPath,
     pickInstagramConnectionCandidate,
@@ -11,6 +12,10 @@ import {
 } from '@/lib/channels/meta-oauth'
 
 describe('meta oauth helpers', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
     it('encodes and decodes signed oauth state', () => {
         const secret = 'state-secret'
         const encoded = encodeMetaOAuthState({
@@ -124,5 +129,74 @@ describe('meta oauth helpers', () => {
             phoneNumberId: 'phone-1',
             displayPhoneNumber: '+90 555 111 22 33'
         })
+    })
+
+    it('fetches whatsapp business accounts from direct /me endpoint when available', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                data: [
+                    {
+                        id: 'waba-1',
+                        name: 'Leadqualifier WABA'
+                    }
+                ]
+            })
+        })
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const payload = await fetchMetaWhatsAppBusinessAccounts('token-1') as { data: Array<{ id: string }> }
+        expect(payload.data[0]?.id).toBe('waba-1')
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        expect((fetchMock.mock.calls[0]?.[0] as string) ?? '').toContain('/me/whatsapp_business_accounts')
+    })
+
+    it('falls back to business edges when /me/whatsapp_business_accounts is unavailable', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 400,
+                json: async () => ({
+                    error: {
+                        message: '(#100) Tried accessing nonexisting field (whatsapp_business_accounts) on node type (User)'
+                    }
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [{ id: 'biz-1', name: 'Qualy Business' }]
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [
+                        {
+                            id: 'waba-1',
+                            name: 'Leadqualifier WABA'
+                        }
+                    ]
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 400,
+                json: async () => ({
+                    error: { message: '(#100) Unsupported get request.' }
+                })
+            })
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const payload = await fetchMetaWhatsAppBusinessAccounts('token-1') as { data: Array<{ id: string }> }
+        expect(payload.data.map((item) => item.id)).toEqual(['waba-1'])
+        expect(fetchMock).toHaveBeenCalledTimes(4)
+        expect((fetchMock.mock.calls[1]?.[0] as string) ?? '').toContain('/me/businesses')
+        expect((fetchMock.mock.calls[2]?.[0] as string) ?? '').toContain('/biz-1/owned_whatsapp_business_accounts')
     })
 })
