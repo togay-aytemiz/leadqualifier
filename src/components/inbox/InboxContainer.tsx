@@ -7,6 +7,7 @@ import {
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
+import { HiMiniSparkles } from 'react-icons/hi2'
 import { RiTelegramFill, RiWhatsappFill, RiInstagramFill } from 'react-icons/ri'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
@@ -1212,15 +1213,32 @@ export function InboxContainer({
                                             aria-controls={SUMMARY_PANEL_ID}
                                             className="flex items-center gap-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed"
                                         >
-                                            <ChevronDown className={`transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`} size={16} />
+                                            <span className="relative inline-flex h-5 w-5 items-center justify-center">
+                                                <span
+                                                    aria-hidden
+                                                    className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 opacity-80 blur-[3px]"
+                                                />
+                                                <span
+                                                    aria-hidden
+                                                    className={`relative inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 shadow-[0_0_8px_rgba(168,85,247,0.55)] transition-transform duration-300 ${
+                                                        isSummaryOpen ? 'scale-105' : ''
+                                                    }`}
+                                                >
+                                                    <HiMiniSparkles className="text-white" size={12} />
+                                                </span>
+                                            </span>
                                             {t('summary.button')}
+                                            <ChevronDown
+                                                className={`text-gray-500 transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`}
+                                                size={14}
+                                            />
                                         </button>
                                         {showSummaryRefresh && (
                                             <button
                                                 type="button"
                                                 onClick={handleRefreshSummary}
                                                 disabled={summaryRefreshDisabled}
-                                                className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                className="ml-1 h-8 w-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
                                             >
                                                 <RotateCw size={16} />
                                                 <span className="sr-only">{t('summary.refresh')}</span>

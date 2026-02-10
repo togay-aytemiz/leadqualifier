@@ -118,6 +118,42 @@ describe('getConversations', () => {
         expect(result).toEqual([nestedConversation])
     })
 
+    it('normalizes one-to-one lead payloads from nested query into an array', async () => {
+        const rawConversation = {
+            ...createConversation(),
+            assignee: {
+                full_name: 'Test User',
+                email: 'test@example.com'
+            },
+            leads: {
+                status: 'ignored'
+            },
+            messages: [{
+                content: 'Selam',
+                created_at: '2026-02-08T10:00:00.000Z',
+                sender_type: 'contact'
+            }]
+        }
+
+        const supabaseMock = createSupabaseMock({
+            conversations: [
+                createQueryBuilder({
+                    rangeResult: {
+                        data: [rawConversation],
+                        error: null
+                    }
+                })
+            ]
+        })
+
+        createClientMock.mockResolvedValue(supabaseMock)
+
+        const result = await getConversations('org-1')
+
+        expect(Array.isArray(result[0]?.leads)).toBe(true)
+        expect(result[0]?.leads?.[0]?.status).toBe('ignored')
+    })
+
     it('falls back to flat queries when primary nested query fails', async () => {
         const baseConversation = createConversation()
 

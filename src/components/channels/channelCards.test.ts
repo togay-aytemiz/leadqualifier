@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getChannelCardConfigs } from '@/components/channels/channelCards'
+import { getChannelCardConfigs, getChannelsListLayoutClasses } from '@/components/channels/channelCards'
 import type { Channel } from '@/types/database'
 
 const WHATSAPP_CHANNEL: Channel = {
@@ -34,5 +34,13 @@ describe('getChannelCardConfigs', () => {
 
         expect(messengerCard?.channel).toBeUndefined()
         expect(whatsappCard?.channel?.id).toBe('whatsapp-1')
+    })
+
+    it('returns vertical list classes for channels layout', () => {
+        const classes = getChannelsListLayoutClasses()
+
+        expect(classes).toContain('flex')
+        expect(classes).toContain('flex-col')
+        expect(classes).not.toContain('grid-cols')
     })
 })

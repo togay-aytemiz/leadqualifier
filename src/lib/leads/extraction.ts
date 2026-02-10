@@ -496,13 +496,23 @@ export function normalizeUndeterminedLeadStatus(options: {
     customerMessages: string[]
 }) {
     const extracted = options.extracted
-    if (extracted.non_business) return extracted
 
     const customerMessages = (options.customerMessages ?? [])
         .map((message) => message.trim())
         .filter(Boolean)
 
     const isGreetingOnlyConversation = customerMessages.length > 0 && customerMessages.every(isGenericGreetingOnly)
+    if (isGreetingOnlyConversation) {
+        return {
+            ...extracted,
+            non_business: false,
+            score: Math.min(extracted.score, 2),
+            status: 'undetermined'
+        } satisfies NormalizedLeadExtraction
+    }
+
+    if (extracted.non_business) return extracted
+
     const hasStructuredLeadSignals = Boolean(
         extracted.service_type
         || extracted.desired_date

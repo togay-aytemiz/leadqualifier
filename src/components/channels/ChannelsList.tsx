@@ -7,6 +7,7 @@ import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal
 import { connectTelegramChannel } from '@/lib/channels/actions'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
+import { getChannelCardConfigs, getChannelsListLayoutClasses, type ChannelCardType } from '@/components/channels/channelCards'
 
 interface ChannelsListProps {
     channels: Channel[]
@@ -21,10 +22,6 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
     const searchParams = useSearchParams()
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
     const router = useRouter()
-
-    const telegramChannel = channels.find(c => c.type === 'telegram')
-    const whatsappChannel = channels.find(c => c.type === 'whatsapp')
-    const instagramChannel = channels.find(c => c.type === 'instagram')
 
     const handleConnectTelegram = async (token: string) => {
         if (isReadOnly) return
@@ -99,31 +96,30 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
         return () => window.removeEventListener('message', onMessage)
     }, [])
 
+    const channelCards = getChannelCardConfigs(channels)
+    const channelsListLayoutClasses = getChannelsListLayoutClasses()
+
+    const getConnectHandler = (type: ChannelCardType) => {
+        if (type === 'telegram') return () => setIsTelegramModalOpen(true)
+        if (type === 'whatsapp') return () => startMetaOAuth('whatsapp')
+        return () => undefined
+    }
+
     return (
         <div>
             {showDescription && <p className="text-gray-500 mb-8">{t('description')}</p>}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <ChannelCard
-                    type="telegram"
-                    channel={telegramChannel}
-                    onConnect={() => setIsTelegramModalOpen(true)}
-                    isReadOnly={isReadOnly}
-                />
-
-                <ChannelCard
-                    type="whatsapp"
-                    channel={whatsappChannel}
-                    onConnect={() => startMetaOAuth('whatsapp')}
-                    isReadOnly={isReadOnly}
-                />
-
-                <ChannelCard
-                    type="instagram"
-                    channel={instagramChannel}
-                    onConnect={() => startMetaOAuth('instagram')}
-                    isReadOnly={isReadOnly}
-                />
+            <div className={channelsListLayoutClasses}>
+                {channelCards.map(card => (
+                    <ChannelCard
+                        key={card.type}
+                        type={card.type}
+                        channel={card.channel}
+                        onConnect={getConnectHandler(card.type)}
+                        isComingSoon={card.isComingSoon}
+                        isReadOnly={isReadOnly}
+                    />
+                ))}
             </div>
 
             {!isReadOnly && (

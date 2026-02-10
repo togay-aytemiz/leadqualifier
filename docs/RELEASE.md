@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- Added Channels card configuration helper + test coverage (`src/components/channels/channelCards.ts`, `src/components/channels/channelCards.test.ts`) to support launch-gated placeholder cards.
 - Added new lead status `undetermined` (TR: `Belirsiz`) across extraction/UI flows, including migration `supabase/migrations/00056_leads_status_undetermined.sql` to extend `leads.status` constraint.
 - Added localized status labels for `undetermined` in both Inbox and Leads dictionaries (`messages/en.json`, `messages/tr.json`) and wired admin/leads/inbox status maps to render them.
 - Added role-aware lead-extraction context builder (`buildLeadExtractionConversationContext`) with test coverage so extraction can read recent `customer`/`owner`/`assistant` turns and resolve short confirmations (for example, `Evet`) against the preceding question.
@@ -105,6 +106,11 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Inbox `Konuşma Özeti / Conversation Summary` trigger to a hybrid affordance: filled AI sparkles icon (purple→orange glow) plus an inline chevron beside the label for consistent open/close state indication; refresh action nudged slightly right for spacing balance.
+- Changed Settings > Channels so non-connected Instagram now shows a disabled `Çok Yakında / Coming Soon` CTA instead of `Bağla / Connect`, and added a Facebook Messenger placeholder card with the same launch-gated CTA.
+- Changed Settings > Channels card UI from multi-column tiles to stacked row cards (one channel per row) with full readable channel names and right-side status/action controls.
+- Changed Facebook Messenger placeholder icon to `RiMessengerFill` for visual consistency with the Remix icon set used in channel surfaces.
+- Changed Channels summary denominator from 3 to 4 to include the new Facebook Messenger placeholder card in the visible channel roster.
 - Changed lead-extraction status semantics: insufficient-information business turns now normalize to `undetermined` (score capped low), while `ignored` is preserved for non-business conversations only.
 - Changed lead-status visual mapping to include a dedicated purple treatment for `undetermined` chips/dots in Inbox, Admin dashboard recent leads, and Leads table badges.
 - Changed lead extraction prompt context to include recent role-labeled conversation turns (`customer`, `owner`, `assistant`) while preserving the latest-5 customer-message grounding window for extracted facts and scoring signals.
@@ -178,8 +184,10 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed greeting-only first-contact turns remaining `ignored` when extraction returned `non_business=true` by normalizing greeting-only conversations to `undetermined`.
 - Fixed profile-only service hallucination in greeting-only conversations (for example, `Hello`) by nulling inferred `service_type` unless customer text contains a concrete service clue.
 - Fixed Inbox conversation-list lead-chip drift by syncing row status on manual refresh/realtime lead updates, including `ignored` (`Yok sayıldı`).
+- Fixed Inbox refresh-time missing lead chips by normalizing one-to-one nested `leads` payloads in `getConversations`, so chips render without opening each conversation first.
 - Fixed TR UI extraction refresh mismatch where lead summary/details could remain English after Turkish UI-triggered refreshes.
 - Fixed Netlify deep-link 404s for landing legal routes by adding SPA redirect fallback (`public/_redirects` with `/* /index.html 200`), so direct visits to `/legal`, `/terms`, and `/privacy` resolve correctly.
 - Fixed Meta OAuth status/error redirects to use the active request origin for Channels-page return, preventing unexpected fallback to legacy Netlify domain URLs.

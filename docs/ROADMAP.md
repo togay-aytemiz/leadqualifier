@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, and prior confirmation-context/service-inference/locale-priority updates remain active)  
+> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, Channels now mark Instagram connect as `Çok Yakında`, a Facebook Messenger placeholder card is visible as `Çok Yakında`, Channels cards now use full-width stacked rows with readable names and right-side status/actions, Messenger icon now uses `RiMessengerFill`, the inbox conversation-summary trigger now uses a glowing AI sparkles icon with an inline chevron toggle, and inbox list lead chips now persist after refresh via one-to-one nested payload normalization in `getConversations`)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -56,6 +56,10 @@
   - [x] First bot reply starts only after inbound customer message
   - [x] One-click connect from channel card (no intermediate "continue with Meta" modal)
   - [x] OAuth popup flow mirrors WhatsApp and keeps main app context stable during Meta auth
+  - [x] Channels card connect CTA is temporarily disabled and shown as `Çok Yakında` for non-connected orgs
+- [x] **Facebook Messenger (Placeholder)**
+  - [x] Added Channels settings card with `Çok Yakında` CTA (no backend integration in MVP)
+  - [x] Placeholder card icon now uses `RiMessengerFill` and follows stacked row-card layout in Channels settings
 - [x] **Shared Inbound AI Pipeline**
   - [x] Keep Telegram/WhatsApp/Instagram webhook routes separate
   - [x] Move inbound AI flow to shared pipeline function and reuse in WhatsApp + Instagram
@@ -135,6 +139,7 @@
   - [x] Inbox list header surface now matches the list column background for consistent sidebar visuals
   - [x] Chat view now shows an animated "scroll to latest" button only when not at bottom, positioned on the composer divider
   - [x] Reduced vertical gap between the "Konuşma Özeti" row and the assistant banner in composer area
+  - [x] "Konuşma Özeti" action now uses a glowing gradient AI sparkles icon (filled style) plus an inline chevron toggle beside the label
   - [x] Shadow/Off bot modes now show compact inactive-state banner copy (single-line title + short body) in composer area
   - [x] Conversation switch now shows loading skeletons until selected-thread messages load, preventing avatar-first stale content flashes
   - [x] Lead status chips now sync after manual lead refresh and realtime lead events, including `ignored` (`Yok sayıldı`) and `undetermined` (`Belirsiz`)
@@ -180,6 +185,7 @@
   - [x] Realtime auth token sync now refreshes missing tokens and listens to auth state changes to prevent stale inbox streams
   - [x] Realtime lead status updates for inbox list indicators
   - [x] Conversation list loading now falls back to flat per-table reads when nested relational query fails, preventing false empty-state inbox views
+  - [x] Conversation list lead payloads are normalized for one-to-one nested responses so lead chips remain visible after full page refresh (without opening each thread)
 - [x] **Internationalization**
   - [x] Remove hardcoded UI strings
   - [x] Enforce EN/TR parity with automated checks
@@ -379,6 +385,7 @@
   - [x] Preserve previously extracted lead details when later turns omit fields (merge-on-update instead of destructive overwrite)
   - [x] Keep lead summary aligned to the current extraction window (avoid stale summary carry-over when omitted)
   - [x] Reject `service_type` inference on greeting-only/no-service-clue customer messages (prevents profile-only service hallucination)
+  - [x] Force greeting-only conversations to `undetermined` even when model emits `non_business=true` (keeps `ignored` scoped to true non-business threads)
   - [x] Resolve extraction language with precedence: explicit preferred locale, then organization locale, then message-language heuristics
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm

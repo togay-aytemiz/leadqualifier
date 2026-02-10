@@ -38,6 +38,35 @@ export interface ConversationListItem extends Conversation {
     messages?: ConversationPreviewMessage[]
 }
 
+type MaybeArray<T> = T | T[] | null | undefined
+
+function toArray<T>(value: MaybeArray<T>): T[] {
+    if (!value) return []
+    return Array.isArray(value) ? value : [value]
+}
+
+function toSingle<T>(value: MaybeArray<T>): T | null {
+    if (!value) return null
+    return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+function normalizeConversationListItems(items: unknown[]): ConversationListItem[] {
+    return items.map((item) => {
+        const normalized = item as ConversationListItem & {
+            assignee?: MaybeArray<ConversationAssigneePreview>
+            leads?: MaybeArray<ConversationLeadPreview>
+            messages?: MaybeArray<ConversationPreviewMessage>
+        }
+
+        return {
+            ...normalized,
+            assignee: toSingle(normalized.assignee),
+            leads: toArray(normalized.leads),
+            messages: toArray(normalized.messages)
+        }
+    })
+}
+
 function buildConversationListItemsFromFallback(
     conversations: Conversation[],
     messageRows: ConversationPreviewMessageRow[],
@@ -120,7 +149,7 @@ export async function getConversations(
         .range(from, to)
 
     if (!error) {
-        return (data ?? []) as ConversationListItem[]
+        return normalizeConversationListItems((data ?? []) as unknown[])
     }
 
     console.warn('Error fetching conversations with nested query, using fallback:', error)
@@ -186,12 +215,12 @@ export async function getConversations(
     const leadRows = (leadsResult.data ?? []) as ConversationLeadPreviewRow[]
     const assigneeRows = (assigneesResult.data ?? []) as ConversationAssigneePreviewRow[]
 
-    return buildConversationListItemsFromFallback(
+    return normalizeConversationListItems(buildConversationListItemsFromFallback(
         conversations,
         messageRows,
         leadRows,
         assigneeRows
-    )
+    ))
 }
 
 export async function getMessages(conversationId: string) {

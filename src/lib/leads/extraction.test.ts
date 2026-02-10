@@ -312,4 +312,15 @@ describe('normalizeUndeterminedLeadStatus', () => {
         expect(result.status).toBe('warm')
         expect(result.score).toBe(7)
     })
+
+    it('overrides non_business greeting-only outputs to undetermined', () => {
+        const result = normalizeUndeterminedLeadStatus({
+            extracted: safeParseLeadExtraction('{"score": 0, "status": "ignored", "non_business": true, "summary": "Sadece selam verdi"}'),
+            customerMessages: ['hello', 'merhaba']
+        })
+
+        expect(result.non_business).toBe(false)
+        expect(result.status).toBe('undetermined')
+        expect(result.score).toBe(0)
+    })
 })

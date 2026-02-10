@@ -7,22 +7,40 @@ import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disc
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { useTranslations } from 'next-intl'
-import { RiTelegramFill, RiWhatsappFill, RiInstagramFill } from 'react-icons/ri'
+import { RiTelegramFill, RiWhatsappFill, RiInstagramFill, RiMessengerFill } from 'react-icons/ri'
+import type { ChannelCardType } from '@/components/channels/channelCards'
 
 interface ChannelCardProps {
     channel?: Channel
-    type: 'telegram' | 'whatsapp' | 'instagram'
+    type: ChannelCardType
     onConnect: () => void
+    isComingSoon?: boolean
     isReadOnly?: boolean
 }
 
-export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: ChannelCardProps) {
+function getChannelSurfaceClasses(type: ChannelCardType) {
+    if (type === 'telegram') return 'bg-blue-50'
+    if (type === 'whatsapp') return 'bg-green-50'
+    if (type === 'instagram') return 'bg-pink-50'
+    return 'bg-[#0084FF]/10'
+}
+
+function getChannelIcon(type: ChannelCardType) {
+    if (type === 'telegram') return <RiTelegramFill className="text-[#229ED9]" size={28} />
+    if (type === 'whatsapp') return <RiWhatsappFill className="text-[#25D366]" size={28} />
+    if (type === 'instagram') return <RiInstagramFill className="text-[#E1306C]" size={28} />
+    return <RiMessengerFill className="text-[#0084FF]" size={28} />
+}
+
+export function ChannelCard({ channel, type, onConnect, isComingSoon = false, isReadOnly = false }: ChannelCardProps) {
     const t = useTranslations('Channels')
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
 
     const handleDebug = async () => {
         if (!channel) return
+        if (type === 'messenger') return
+
         const result = type === 'telegram'
             ? await debugTelegramChannel(channel.id)
             : type === 'whatsapp'
@@ -51,61 +69,66 @@ export function ChannelCard({ channel, type, onConnect, isReadOnly = false }: Ch
     }
 
     const isConnected = !!channel
+    const connectLabel = isComingSoon ? t('actions.comingSoon') : t('actions.connect')
+    const statusVariant = isConnected ? 'success' : 'neutral'
+    const statusLabel = isConnected ? t('status.active') : t('status.notConnected')
 
     return (
         <>
-            <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center relative overflow-hidden group shadow-sm hover:shadow-md transition-shadow">
-                {isConnected && (
-                    <button
-                        onClick={handleDebug}
-                        disabled={isReadOnly}
-                        className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={t('debug.tooltip')}
-                    >
-                        <Bug size={16} />
-                    </button>
-                )}
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${type === 'telegram' ? 'bg-blue-50' : type === 'whatsapp' ? 'bg-green-50' : 'bg-pink-50'
-                    }`}>
-                    {type === 'telegram' ? (
-                        <RiTelegramFill className="text-[#229ED9]" size={28} />
-                    ) : type === 'whatsapp' ? (
-                        <RiWhatsappFill className="text-[#25D366]" size={28} />
-                    ) : (
-                        <RiInstagramFill className="text-[#E1306C]" size={28} />
-                    )}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start gap-4 sm:flex-1 min-w-0">
+                    <div className={`w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center ${getChannelSurfaceClasses(type)}`}>
+                        {getChannelIcon(type)}
+                    </div>
+
+                    <div className="min-w-0 flex-1 text-left">
+                        <h3 className="text-base font-semibold text-gray-900">{t(`types.${type}`)}</h3>
+                        {isConnected ? (
+                            <p className="text-sm text-gray-600 mt-1 break-words">{channel.name}</p>
+                        ) : (
+                            <p className="text-sm text-gray-500 mt-1">{t('status.notConnected')}</p>
+                        )}
+                    </div>
                 </div>
 
-                <h3 className="text-lg font-semibold text-gray-900 mb-1 capitalize">{t(`types.${type}`)}</h3>
+                <div className="flex flex-col gap-3 sm:items-end sm:ml-auto sm:shrink-0">
+                    <Badge variant={statusVariant}>{statusLabel}</Badge>
 
-                {isConnected ? (
-                    <>
-                        <p className="text-gray-500 text-sm mb-4 truncate w-full px-4">{channel.name}</p>
-                        <div className="mt-auto">
-                            <Badge variant="success">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
-                                {t('status.active')}
-                            </Badge>
-                            <div className="mt-4 w-full">
+                    {isConnected ? (
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <Button
+                                onClick={() => setShowConfirm(true)}
+                                disabled={isDisconnecting || isReadOnly}
+                                variant="danger"
+                                className="w-full sm:w-auto sm:min-w-[160px]"
+                            >
+                                {t('actions.disconnect')}
+                            </Button>
+
+                            {type !== 'messenger' && (
                                 <Button
-                                    onClick={() => setShowConfirm(true)}
-                                    disabled={isDisconnecting || isReadOnly}
-                                    variant="danger"
-                                    className="w-full"
+                                    onClick={handleDebug}
+                                    disabled={isReadOnly}
+                                    variant="outline"
+                                    size="icon"
+                                    title={t('debug.tooltip')}
+                                    aria-label={t('debug.tooltip')}
                                 >
-                                    {t('actions.disconnect')}
+                                    <Bug size={16} />
                                 </Button>
-                            </div>
+                            )}
                         </div>
-                    </>
-                ) : (
-                    <>
-                        <p className="text-gray-400 text-sm mb-6">{t('status.notConnected')}</p>
-                        <Button onClick={onConnect} disabled={isReadOnly} variant="secondary" className="mt-auto w-full">
-                            {t('actions.connect')}
+                    ) : (
+                        <Button
+                            onClick={onConnect}
+                            disabled={isReadOnly || isComingSoon}
+                            variant="secondary"
+                            className="w-full sm:w-auto sm:min-w-[160px]"
+                        >
+                            {connectLabel}
                         </Button>
-                    </>
-                )}
+                    )}
+                </div>
             </div>
 
             {!isReadOnly && (

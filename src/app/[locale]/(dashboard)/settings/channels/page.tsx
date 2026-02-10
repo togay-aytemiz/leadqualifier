@@ -28,7 +28,7 @@ export default async function ChannelsPage() {
     }
 
     const channels = await getChannels(organizationId)
-    const totalChannels = 3
+    const totalChannels = 4
     const connectedChannels = (channels || []).filter(channel => channel.status === 'active').length
 
     return (

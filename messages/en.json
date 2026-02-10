@@ -373,7 +373,8 @@
         "types": {
             "telegram": "Telegram",
             "whatsapp": "WhatsApp",
-            "instagram": "Instagram"
+            "instagram": "Instagram",
+            "messenger": "Facebook Messenger"
         },
         "status": {
             "active": "Active",
@@ -381,6 +382,7 @@
         },
         "actions": {
             "connect": "Connect",
+            "comingSoon": "Coming Soon",
             "disconnect": "Disconnect",
             "cancel": "Cancel"
         },

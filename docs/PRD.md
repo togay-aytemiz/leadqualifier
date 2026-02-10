@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, ships localized `Belirsiz/Undetermined` lead labels with dedicated UI color treatment, and retains recent confirmation-context/service-inference/locale-precedence improvements)  
+> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, ships localized `Belirsiz/Undetermined` lead labels with dedicated UI color treatment, Channels now show Instagram connect as `Çok Yakında`, a Facebook Messenger placeholder card is added as `Çok Yakında`, Channels cards now render as stacked full-width rows with right-side status/actions for readability, Messenger icon uses `RiMessengerFill`, Inbox conversation summary CTA now uses a glowing AI sparkles icon with an inline chevron toggle, and inbox lead chips persist after refresh by normalizing one-to-one nested lead payloads in conversation-list reads)  
 > **Status:** In Development
 
 ---
@@ -48,7 +48,7 @@ Automate WhatsApp message handling:
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
 | Public Legal Center | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json` | Implemented |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, mobile list→conversation flow with details toggle** | Implemented |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle** | Implemented |
 
 ### ❌ Out of Scope (Intentional)
 - Calendar integration
@@ -192,6 +192,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Lead extraction output language is locale-aware (TR/EN): summary and extracted detail values follow customer/locale signal instead of defaulting to English.
 - Service inference guard: when recent customer turns are generic greetings/acknowledgements without a clear service clue, extraction must keep `service_type = null` (do not infer solely from profile text).
 - Insufficient-information conversations (e.g., greeting-only/unclear short turns with no qualifying signals) are marked as `undetermined`.
+- Greeting-only turns are normalized to `undetermined` even if raw model output marks `non_business=true`, preventing false `ignored` statuses on first-contact hellos.
 - Extraction locale precedence is deterministic: explicit preferred locale (UI/manual refresh) > organization locale > customer-message language heuristics.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
@@ -290,11 +291,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Mobile UX uses a single-pane flow (Knowledge sidebar hidden on mobile; content/files shown as responsive cards)
 - Mobile edit-content header uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance to prevent header wrap on small screens.
 
-### 5.4 Channels (Telegram, WhatsApp, Instagram Implemented)
+### 5.4 Channels (Telegram, WhatsApp, Instagram Implemented; Messenger Placeholder)
 - Telegram bot connection + webhook status/debug
 - WhatsApp Meta Cloud connection via Meta OAuth + webhook status/debug
 - Instagram Messaging connection via Meta OAuth + webhook status/debug
 - WhatsApp/Instagram connection starts directly from `Bağla` (one click to Meta OAuth redirect; no extra intermediate modal)
+- Instagram card connect CTA is currently gated as `Çok Yakında` for non-connected orgs in Settings > Channels
+- Facebook Messenger card is visible in Settings > Channels as `Çok Yakında` placeholder (integration out of MVP scope)
+- Channels settings card layout is a stacked single-column row list (one channel per row) with non-truncated names and right-side status/action controls for readability
 - Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
 ### 5.5 AI Settings (Implemented)
@@ -557,6 +561,7 @@ MVP is successful when:
 - **Inbox Lead Status Chip:** Show lead status as a text chip on the conversation name row (far right) for faster scanability.
 - **Inbox List Time Row:** Keep relative last-message time on a dedicated third line under the one-line preview.
 - **Inbox Lead Realtime:** Include `leads` in realtime publication and subscribe to status changes so list indicators update without manual refresh.
+- **Inbox Lead Payload Normalization:** Normalize nested one-to-one `leads` relation payloads to a stable array shape during conversation-list reads so chip rendering is consistent after page reloads.
 - **Inbox Realtime Auth Sync:** Bootstrap realtime auth from session, fall back to `refreshSession()` when missing, and re-apply tokens on auth state changes to avoid stale subscriptions.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Inbox Summary Reopen Behavior:** Closing and re-opening the summary panel should trigger a fresh summary generation (without requiring manual refresh).
@@ -590,6 +595,9 @@ MVP is successful when:
 - **Settings Title Parity:** Settings page headers should use the same labels as the corresponding settings sidebar items.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Channel Topology (MVP):** Treat `telegram`, `whatsapp`, and `instagram` as independent channels (`channels.type`) and store conversations with explicit per-channel platform values (`conversations.platform`).
+- **Channel Launch Gating:** Keep Instagram connect CTA and Facebook Messenger card as `Coming Soon` placeholders in Settings > Channels until rollout is reopened; Telegram/WhatsApp flows remain active.
+- **Channels Settings Readability:** Render channel cards as full-width stacked rows (one channel per row), avoid truncating connected channel names, and place status/actions on the right side for fast scanning.
+- **Messenger Brand Icon:** Use `RiMessengerFill` for Facebook Messenger placeholder visuals in Channels settings.
 - **Meta Channel Onboarding (MVP):** Use Meta OAuth start/callback routes with signed state validation; do not require manual token entry in channel settings UI.
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
@@ -633,6 +641,7 @@ MVP is successful when:
 - **Prompt Budget Guardrails:** Truncate oversized knowledge document content before sending profile/intake suggestion context to LLM tasks.
 - **LLM Output Caps:** Apply explicit `max_tokens` limits on router, fallback, RAG, summary, lead reasoning, and extraction calls to keep cost and latency bounded.
 - **Conversation Continuity:** Use recent multi-turn conversation history in final KB/RAG/fallback generation and apply repeated-greeting suppression when assistant already greeted recently.
+- **Inbox Summary Affordance:** Use a filled sparkles AI icon with purple→orange glow plus an inline chevron beside the summary label so open/close state remains explicit in the same control.
 - **Settings Layout:** Keep consistent settings column widths and remove duplicate right-column labels so inputs align with section titles.
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 - **Quality Gate Discipline:** Keep lint free of errors (warnings tracked separately), avoid explicit `any` in core product modules, and require green `test` + `build` before closing iterations.
