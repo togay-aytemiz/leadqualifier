@@ -138,7 +138,7 @@ export interface Channel {
     updated_at: string
 }
 
-export type LeadStatus = 'hot' | 'warm' | 'cold' | 'ignored'
+export type LeadStatus = 'hot' | 'warm' | 'cold' | 'ignored' | 'undetermined'
 export type ServiceCandidateStatus = 'pending' | 'approved' | 'rejected'
 
 export interface OfferingProfile {

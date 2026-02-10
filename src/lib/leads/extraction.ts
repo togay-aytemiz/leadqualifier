@@ -9,7 +9,12 @@ type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 const TURKISH_CHAR_PATTERN = /[ığüşöçİĞÜŞÖÇ]/
 const TURKISH_WORD_PATTERN = /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet|çekim|cekim|vazgeçtim|vazgectim)\b/i
 const ENGLISH_WORD_PATTERN = /\b(hello|hi|price|appointment|thank(s| you)|please|tomorrow|today|available|campaign|service|book|booking|schedule)\b/i
+const GENERIC_GREETING_PATTERN = /^(?:hi|hello|hey|selam|merhaba|slm|tesekkurler|teşekkürler|thanks|thank you|ok|tamam|👍|👌|👋|🙏)[.!?\s]*$/i
+const COMBINING_MARKS_PATTERN = /[\u0300-\u036f]/g
 const LEAD_EXTRACTION_MAX_OUTPUT_TOKENS = 320
+const LEAD_EXTRACTION_MAX_CONTEXT_TURNS = 10
+const LEAD_EXTRACTION_MAX_MESSAGES_TO_LOAD = 20
+const LEAD_EXTRACTION_MAX_CUSTOMER_MESSAGES = 5
 
 function isLikelyTurkishText(value: string) {
     const text = (value ?? '').trim()
@@ -27,12 +32,17 @@ function isLikelyEnglishText(value: string) {
 
 export function resolveLeadExtractionLocale(options?: {
     preferredLocale?: string | null
+    organizationLocale?: string | null
     customerMessages?: string[]
     latestMessage?: string | null
 }) {
     const preferredLocale = (options?.preferredLocale ?? '').toString().trim().toLowerCase()
     if (preferredLocale.startsWith('tr')) return 'tr' as const
     if (preferredLocale.startsWith('en')) return 'en' as const
+
+    const organizationLocale = (options?.organizationLocale ?? '').toString().trim().toLowerCase()
+    if (organizationLocale.startsWith('tr')) return 'tr' as const
+    if (organizationLocale.startsWith('en')) return 'en' as const
 
     const samples = [
         ...(options?.customerMessages ?? []),
@@ -63,14 +73,20 @@ function buildExtractionSystemPrompt(responseLanguage: 'Turkish' | 'English') {
 Return ONLY valid JSON (no code fences, no extra text).
 Return keys: service_type, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
 intent_signals can include: decisive (explicit booking/appointment intent), urgent (ASAP/today/tomorrow), indecisive (unsure), far_future (months later/next season).
+Recent conversation turns are labeled as one of: customer, owner, assistant.
 Customer messages are labeled "customer:" and represent the latest 5 customer messages.
 Prioritize customer intent and the most recent customer messages.
+Use owner/assistant turns only as context to interpret short customer confirmations (for example: "yes", "evet", "correct").
+Do not treat owner/assistant statements as customer facts unless the customer clearly confirms.
 Do not infer service_type solely from assistant replies; require customer confirmation.
 If the customer negates a service (e.g., "X istemiyorum"), do not output that service.
+If customer messages are only greeting/acknowledgement and contain no service clue, service_type must be null.
 Score must be an integer from 0 to 10.
-Status must be one of: hot, warm, cold, ignored.
+Status must be one of: hot, warm, cold, ignored, undetermined.
+Use status=undetermined when customer information is not enough to qualify intent (for example only greeting/acknowledgement or short unclear turns).
 If non_business is true, set score to 0 and status to ignored.
-Use catalog names when possible for service_type; if catalog is empty, infer service_type from the offering profile summary/suggestions when possible.
+Use catalog names when possible for service_type.
+If catalog is empty, infer service_type from offering profile summary/suggestions only when customer messages include a service clue.
 If service_type matches a provided catalog name, keep that catalog name exactly as-is.
 If no catalog match exists, write inferred service_type in ${responseLanguage}.
 When required intake fields are provided, fill required_intake_collected as an object that maps clearly collected field names to concise values.
@@ -79,6 +95,143 @@ If none are collected, return required_intake_collected as {}.
 Messages indicating cancellation/decline (e.g., "vazgeçtim", "istemiyorum") are still business-context messages, not personal/social chat.
 Use nulls if unknown. Use non_business=true only for personal/social conversations.
 Write summary, desired_date, location, and required_intake_collected values in ${responseLanguage}.`
+}
+
+function normalizeForMatch(value: string) {
+    return value
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(COMBINING_MARKS_PATTERN, '')
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function isGenericGreetingOnly(value: string) {
+    const normalized = value.trim()
+    if (!normalized) return true
+    return GENERIC_GREETING_PATTERN.test(normalized)
+}
+
+export interface ServiceCatalogCandidate {
+    name?: string | null
+    aliases?: string[] | null
+}
+
+export function shouldAcceptInferredServiceType(options: {
+    serviceType: string | null | undefined
+    customerMessages: string[]
+    catalogItems?: ServiceCatalogCandidate[]
+}) {
+    const serviceType = (options.serviceType ?? '').trim()
+    if (!serviceType) return false
+
+    const customerMessages = (options.customerMessages ?? [])
+        .map((message) => message.trim())
+        .filter(Boolean)
+
+    if (customerMessages.length === 0) return false
+    if (customerMessages.every(isGenericGreetingOnly)) return false
+
+    const normalizedMessages = customerMessages.map(normalizeForMatch)
+    const serviceTerms = new Set<string>()
+    const normalizedServiceType = normalizeForMatch(serviceType)
+    if (normalizedServiceType.length >= 3) {
+        serviceTerms.add(normalizedServiceType)
+    }
+
+    for (const catalogItem of options.catalogItems ?? []) {
+        const catalogName = normalizeForMatch((catalogItem.name ?? '').trim())
+        const aliases = (catalogItem.aliases ?? [])
+            .map((alias) => normalizeForMatch((alias ?? '').trim()))
+            .filter((alias) => alias.length >= 3)
+
+        const isLikelyMatchedCatalogItem = catalogName
+            ? normalizedServiceType === catalogName
+                || normalizedServiceType.includes(catalogName)
+                || catalogName.includes(normalizedServiceType)
+                || aliases.some((alias) => normalizedServiceType.includes(alias) || alias.includes(normalizedServiceType))
+            : aliases.some((alias) => normalizedServiceType.includes(alias) || alias.includes(normalizedServiceType))
+
+        if (!isLikelyMatchedCatalogItem) continue
+
+        if (catalogName.length >= 3) {
+            serviceTerms.add(catalogName)
+        }
+        aliases.forEach((alias) => serviceTerms.add(alias))
+    }
+
+    if (serviceTerms.size === 0) return false
+
+    return normalizedMessages.some((message) => {
+        return Array.from(serviceTerms).some((term) => message.includes(term))
+    })
+}
+
+interface LeadExtractionMessageRecord {
+    sender_type?: string | null
+    content?: string | null
+    created_at?: string | null
+}
+
+function normalizeLeadMessageContent(value: unknown) {
+    if (typeof value !== 'string') return ''
+    return value.trim()
+}
+
+function normalizeComparableLeadText(value: string) {
+    return normalizeLeadMessageContent(value)
+        .replace(/\s+/g, ' ')
+        .toLocaleLowerCase('tr')
+}
+
+function toLeadConversationRole(senderType: string | null | undefined) {
+    if (senderType === 'contact') return 'customer' as const
+    if (senderType === 'bot') return 'assistant' as const
+    if (senderType === 'user') return 'owner' as const
+    return null
+}
+
+export function buildLeadExtractionConversationContext(options: {
+    messages?: LeadExtractionMessageRecord[]
+    latestCustomerMessage?: string | null
+    maxTurns?: number
+}) {
+    const maxTurns = Math.max(1, Math.min(options.maxTurns ?? LEAD_EXTRACTION_MAX_CONTEXT_TURNS, 20))
+    const turns = [...(options.messages ?? [])]
+        .reverse()
+        .map((message) => {
+            const role = toLeadConversationRole(message.sender_type)
+            const content = normalizeLeadMessageContent(message.content)
+            if (!role || !content) return null
+            return { role, content }
+        })
+        .filter((turn): turn is { role: 'customer' | 'assistant' | 'owner'; content: string } => Boolean(turn))
+
+    const latestCustomerMessage = normalizeLeadMessageContent(options.latestCustomerMessage ?? '')
+    if (latestCustomerMessage) {
+        const lastCustomerTurn = [...turns]
+            .reverse()
+            .find((turn) => turn.role === 'customer')
+        const hasLatestCustomerMessage = lastCustomerTurn
+            ? normalizeComparableLeadText(lastCustomerTurn.content) === normalizeComparableLeadText(latestCustomerMessage)
+            : false
+        if (!hasLatestCustomerMessage) {
+            turns.push({ role: 'customer', content: latestCustomerMessage })
+        }
+    }
+
+    const customerMessages = turns
+        .filter((turn) => turn.role === 'customer')
+        .map((turn) => turn.content)
+        .slice(-LEAD_EXTRACTION_MAX_CUSTOMER_MESSAGES)
+
+    return {
+        conversationTurns: turns
+            .slice(-maxTurns)
+            .map((turn) => `${turn.role}: ${turn.content}`),
+        customerMessages
+    }
 }
 
 function normalizeStringArray(value: unknown) {
@@ -148,7 +301,7 @@ function normalizeScore(value: unknown) {
 function normalizeStatus(value: unknown) {
     if (typeof value !== 'string') return 'cold'
     const normalized = value.trim().toLowerCase()
-    const aliases: Record<string, 'hot' | 'warm' | 'cold' | 'ignored'> = {
+    const aliases: Record<string, 'hot' | 'warm' | 'cold' | 'ignored' | 'undetermined'> = {
         'sıcak': 'hot',
         'sicak': 'hot',
         'ılık': 'warm',
@@ -158,10 +311,18 @@ function normalizeStatus(value: unknown) {
         'yok sayıldı': 'ignored',
         'yoksayıldı': 'ignored',
         'ignore': 'ignored',
-        'ignored': 'ignored'
+        'ignored': 'ignored',
+        'belirsiz': 'undetermined',
+        'henüz belli değil': 'undetermined',
+        'henuz belli degil': 'undetermined',
+        'needs more info': 'undetermined',
+        'needs_more_info': 'undetermined',
+        'pending qualification': 'undetermined',
+        'pending_qualification': 'undetermined',
+        'undetermined': 'undetermined'
     }
     if (aliases[normalized]) return aliases[normalized]
-    if (normalized === 'hot' || normalized === 'warm' || normalized === 'cold' || normalized === 'ignored') {
+    if (normalized === 'hot' || normalized === 'warm' || normalized === 'cold' || normalized === 'ignored' || normalized === 'undetermined') {
         return normalized
     }
     return 'cold'
@@ -213,7 +374,7 @@ export interface NormalizedLeadExtraction {
     non_business: boolean
     summary: string | null
     score: number
-    status: 'hot' | 'warm' | 'cold' | 'ignored'
+    status: 'hot' | 'warm' | 'cold' | 'ignored' | 'undetermined'
 }
 
 function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction {
@@ -317,6 +478,53 @@ export function mergeExtractionWithExisting(
     }
 }
 
+function hasStrongIntentSignal(intentSignals: string[]) {
+    return intentSignals
+        .map((signal) => normalizeForMatch(signal))
+        .some((normalizedSignal) => (
+            normalizedSignal.includes('decisive')
+            || normalizedSignal.includes('urgent')
+            || normalizedSignal.includes('appointment')
+            || normalizedSignal.includes('book')
+            || normalizedSignal.includes('booking')
+            || normalizedSignal.includes('randevu')
+        ))
+}
+
+export function normalizeUndeterminedLeadStatus(options: {
+    extracted: NormalizedLeadExtraction
+    customerMessages: string[]
+}) {
+    const extracted = options.extracted
+    if (extracted.non_business) return extracted
+
+    const customerMessages = (options.customerMessages ?? [])
+        .map((message) => message.trim())
+        .filter(Boolean)
+
+    const isGreetingOnlyConversation = customerMessages.length > 0 && customerMessages.every(isGenericGreetingOnly)
+    const hasStructuredLeadSignals = Boolean(
+        extracted.service_type
+        || extracted.desired_date
+        || extracted.location
+        || extracted.budget_signals.length > 0
+        || Object.keys(extracted.required_intake_collected).length > 0
+    )
+    const hasStrongIntent = hasStrongIntentSignal(extracted.intent_signals)
+    const lacksQualificationSignals = !hasStructuredLeadSignals && !hasStrongIntent
+    const shouldMarkUndetermined = customerMessages.length === 0
+        || isGreetingOnlyConversation
+        || (lacksQualificationSignals && extracted.score <= 2)
+
+    if (!shouldMarkUndetermined) return extracted
+
+    return {
+        ...extracted,
+        score: Math.min(extracted.score, 2),
+        status: 'undetermined'
+    } satisfies NormalizedLeadExtraction
+}
+
 export async function runLeadExtraction(options: {
     organizationId: string
     conversationId: string
@@ -330,7 +538,7 @@ export async function runLeadExtraction(options: {
     const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }, { data: existingLead }] = await Promise.all([
         supabase
             .from('offering_profiles')
-            .select('summary, manual_profile_note, catalog_enabled, ai_suggestions_enabled, required_intake_fields')
+            .select('summary, manual_profile_note, catalog_enabled, ai_suggestions_enabled, ai_suggestions_locale, required_intake_fields')
             .eq('organization_id', options.organizationId)
             .maybeSingle(),
         supabase.from('service_catalog').select('name, aliases, active').eq('organization_id', options.organizationId).eq('active', true),
@@ -338,9 +546,8 @@ export async function runLeadExtraction(options: {
             .from('messages')
             .select('sender_type, content, created_at')
             .eq('conversation_id', options.conversationId)
-            .eq('sender_type', 'contact')
             .order('created_at', { ascending: false })
-            .limit(5),
+            .limit(LEAD_EXTRACTION_MAX_MESSAGES_TO_LOAD),
         supabase
             .from('offering_profile_suggestions')
             .select('content')
@@ -361,26 +568,13 @@ export async function runLeadExtraction(options: {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const catalogList = (catalog ?? []).map((row: { name?: string | null }) => row.name ?? '').join(', ')
-    const customerMessages = (messages ?? [])
-        .reverse()
-        .map((msg: { content?: string | null }) => {
-            const content = (msg.content ?? '').trim()
-            if (!content) return null
-            return content
-        })
-        .filter(Boolean) as string[]
-    const contextMessages = customerMessages.map((content) => `customer: ${content}`)
     const latestMessage = (options.latestMessage ?? '').trim()
-    if (latestMessage && !contextMessages.some((entry) => entry === `customer: ${latestMessage}`)) {
-        contextMessages.push(`customer: ${latestMessage}`)
-        customerMessages.push(latestMessage)
-    }
-    if (contextMessages.length > 5) {
-        contextMessages.splice(0, contextMessages.length - 5)
-    }
-    if (customerMessages.length > 5) {
-        customerMessages.splice(0, customerMessages.length - 5)
-    }
+    const { conversationTurns, customerMessages } = buildLeadExtractionConversationContext({
+        messages: (messages ?? []) as LeadExtractionMessageRecord[],
+        latestCustomerMessage: latestMessage,
+        maxTurns: LEAD_EXTRACTION_MAX_CONTEXT_TURNS
+    })
+    const customerContextMessages = customerMessages.map((content) => `customer: ${content}`)
     const suggestionText = (suggestions ?? [])
         .map((item: { content?: string | null }) => `- ${item.content}`)
         .reverse()
@@ -399,6 +593,7 @@ export async function runLeadExtraction(options: {
         : 'none'
     const extractionLocale = resolveLeadExtractionLocale({
         preferredLocale: options.preferredLocale,
+        organizationLocale: profile?.ai_suggestions_locale ?? null,
         customerMessages,
         latestMessage
     })
@@ -410,8 +605,9 @@ export async function runLeadExtraction(options: {
         `Offering profile:\n${profileText}`,
         `Catalog:${catalogList}`,
         `Required intake fields:\n${requiredIntakeBlock}`,
+        `Recent conversation turns (latest ${conversationTurns.length}, oldest to newest):\n${conversationTurns.length > 0 ? conversationTurns.join('\n') : 'none'}`,
         'Customer messages (latest 5, oldest to newest):',
-        contextMessages.join('\n')
+        customerContextMessages.length > 0 ? customerContextMessages.join('\n') : 'none'
     ].join('\n\n')
 
     const completion = await openai.chat.completions.create({
@@ -463,7 +659,18 @@ export async function runLeadExtraction(options: {
         response = retry.choices[0]?.message?.content?.trim() ?? response
         addUsage(retry, strictPrompt, response)
     }
-    const extracted = safeParseLeadExtraction(response)
+    let extracted = safeParseLeadExtraction(response)
+    if (!shouldAcceptInferredServiceType({
+        serviceType: extracted.service_type,
+        customerMessages,
+        catalogItems: (catalog ?? []) as ServiceCatalogCandidate[]
+    })) {
+        extracted = {
+            ...extracted,
+            service_type: null
+        }
+    }
+    extracted = normalizeUndeterminedLeadStatus({ extracted, customerMessages })
     const normalizedExtracted = mergeExtractionWithExisting(extracted, existingLead)
 
     await supabase.from('leads').upsert({

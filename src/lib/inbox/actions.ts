@@ -502,7 +502,8 @@ export async function getLeadScoreReasoning(
 
 export async function refreshConversationLead(
     conversationId: string,
-    organizationId: string
+    organizationId: string,
+    preferredLocale?: string | null
 ): Promise<LeadRefreshResult> {
     if (!process.env.OPENAI_API_KEY) {
         return { ok: false, reason: 'missing_api_key' }
@@ -530,6 +531,7 @@ export async function refreshConversationLead(
         await runLeadExtraction({
             organizationId,
             conversationId,
+            preferredLocale: preferredLocale ?? null,
             supabase
         })
         return { ok: true }

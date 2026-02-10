@@ -46,13 +46,15 @@ export default async function AdminPage() {
         hot: tLeads('statusHot'),
         warm: tLeads('statusWarm'),
         cold: tLeads('statusCold'),
-        ignored: tLeads('statusIgnored')
+        ignored: tLeads('statusIgnored'),
+        undetermined: tLeads('statusUndetermined')
     }
-    const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info'> = {
+    const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info' | 'purple'> = {
         hot: 'error',
         warm: 'warning',
         cold: 'neutral',
-        ignored: 'info'
+        ignored: 'info',
+        undetermined: 'purple'
     }
     const statCards = [
         {

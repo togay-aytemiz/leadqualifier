@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Meta channel OAuth UX updated to popup-based connect flow with canonical-origin status return; WhatsApp OAuth now includes Graph fallback discovery for account variants where `/me/whatsapp_business_accounts` is unavailable; landing legal routes now include Netlify SPA deep-link fallback via `public/_redirects`; previous legal/channel/auth/platform updates retained)  
+> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, ships localized `Belirsiz/Undetermined` lead labels with dedicated UI color treatment, and retains recent confirmation-context/service-inference/locale-precedence improvements)  
 > **Status:** In Development
 
 ---
@@ -81,6 +81,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
 - Shadow inactive banner copy is compact by default (single-line title + one short explanatory sentence).
+- Inbox conversation view should only render message content after selected-thread data is loaded; while loading, show skeletons to avoid stale previous-thread visuals.
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
  - Simulator chat visuals are channel-agnostic (no WhatsApp-specific brand mimicry)
@@ -169,7 +170,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
 - Service type inference prioritizes customer messages, ignores assistant-only suggestions, and respects explicit negations.
-- Lead score and status are produced directly by the LLM using the latest 5 customer messages only (assistant messages excluded).
+- Lead score and status are produced directly by the LLM using the latest 5 customer messages as grounding context, while recent role-labeled turns (`customer`, `owner`, `assistant`) are provided to disambiguate short confirmations (for example, "evet").
+- Owner/assistant turns are contextual only: extracted facts must still come from explicit customer statements or customer confirmations.
 - The most recent customer message is always injected into the extraction prompt to avoid replication delays.
 - Offering Profile consists of manual text plus AI suggestions generated from Skills/KB in the org UI language; suggestions use a hybrid format (short intro + 3-5 bullets), start pending, require admin approval, may propose updates to existing approved suggestions, and only approved suggestions are used for extraction (manual text is never overwritten). Suggestion generation is context-aware (manual summary + approved + rejected suggestions) and retries formatting when output is too sparse. Generation always follows the active UI locale (no dual-language generation). Rejected suggestions can be archived for audit (excluded from AI context), and users can regenerate suggestions whenever there are no pending items.
 - Lead extraction context includes both approved AI suggestions and the persistent manual profile note from Organization Settings.
@@ -188,10 +190,13 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Lead extraction now stores collected required-intake values as `extracted_fields.required_intake_collected` when customer messages clearly provide them.
 - Lead extraction applies merge-on-update persistence for `service_type` and collected required fields, while `summary` is always tied to the current extraction window (latest 5 customer messages) to prevent stale status-summary mismatch.
 - Lead extraction output language is locale-aware (TR/EN): summary and extracted detail values follow customer/locale signal instead of defaulting to English.
+- Service inference guard: when recent customer turns are generic greetings/acknowledgements without a clear service clue, extraction must keep `service_type = null` (do not infer solely from profile text).
+- Insufficient-information conversations (e.g., greeting-only/unclear short turns with no qualifying signals) are marked as `undetermined`.
+- Extraction locale precedence is deterministic: explicit preferred locale (UI/manual refresh) > organization locale > customer-message language heuristics.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
 - Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
-- Non-business conversations are excluded from lead scoring and marked as ignored.
+- Non-business conversations are excluded from lead scoring and marked as `ignored` (not `undetermined`).
 
 ---
 
@@ -558,6 +563,7 @@ MVP is successful when:
 - **Inbox Scroll-to-Latest CTA:** Show an animated jump-to-latest button only when chat is away from bottom; anchor it on the composer divider with subtle gray styling.
 - **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
 - **Inbox List Header Surface:** Keep the Inbox conversation-list header on the same surface tone as the list column (non-white) for consistent sidebar visuals across dashboard modules.
+- **Inbox Conversation Switch Loading:** Track selected-thread id separately from loaded-thread id and render skeletons during switches so avatar/details do not update against stale previous-thread messages.
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
 - **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
 - **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) with short delayed scheduling to reduce transition latency without adding click-time jank.
@@ -599,6 +605,9 @@ MVP is successful when:
 - **Human Escalation Policy:** Centralize escalation decisions in one policy layer with strict precedence `skill override > hot lead score`, where skill-triggered handover always sends the bot handover message and switches to operator.
 - **Operator Activity Resolution:** Use `active_agent` as the primary runtime switch for AI reply gating; treat `assignee_id` as ownership metadata (legacy fallback only when `active_agent` is missing).
 - **Extraction Language Resolution:** Lead extraction writes user-facing extracted outputs (summary + key detail values) in locale/customer language (TR/EN) instead of relying on English default prompts.
+- **Extraction Locale Precedence:** Resolve extraction output language as `preferred locale > organization locale > message heuristics` to keep UI-triggered refreshes language-consistent.
+- **Service Inference Guardrail:** Do not fill `service_type` from profile-only context when customer turns are greeting-only or otherwise missing explicit service clues.
+- **Extraction Confirmation Context:** Include recent role-labeled turns (`customer`/`owner`/`assistant`) in extraction prompts so short customer confirmations can be resolved against the immediately preceding question, while preserving customer-confirmed grounding.
 - **Default Guardrail Scope (MVP):** Ship universal explicit-intent guardrail skills (human support, complaint, urgent, privacy) and keep low-confidence/no-safe-answer auto-handover out of scope.
 - **Default Guardrail Provisioning:** Seed localized default guardrail skills for organizations that have no skills on first Skills load; manage them in the same list as user-created skills.
 - **Handover Locale Repair:** When legacy/default values create EN text in both localized fields, normalize to TR default for `hot_lead_handover_message_tr` and EN default for `hot_lead_handover_message_en`.
@@ -611,7 +620,8 @@ MVP is successful when:
 - **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.
 - **Offering Profile Context:** Suggestion generation includes the manual summary plus approved/rejected suggestion history for better alignment.
 - **Offering Profile Formatting:** Suggestions must include a short intro plus 3-5 labeled bullets; if output is too sparse, retry generation.
-- **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as ignored).
+- **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as `ignored`).
+- **Insufficient-Info Handling:** Use `undetermined` status for business-context conversations that do not yet contain enough qualification signal.
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 - **Organization AI Control:** Use independent section-level AI toggles for Offering Profile and Required Fields UX modes.
 - **AI Suggestions Header:** Keep a single pending indicator label in the accordion header and avoid duplicate right-side count chips.
@@ -631,6 +641,8 @@ MVP is successful when:
 - **Inbox Query Resilience:** When nested relational conversation reads fail, fall back to flat per-table conversation/message/lead/assignee reads so Inbox does not incorrectly show an empty state.
 - **Landing Legal Delivery:** Keep legal documents as versioned markdown source (`legal/*.md`), render `/legal`, `/terms`, `/privacy` from those files, and generate `public/legal_versions.json` during build for external consumption.
 - **Static Hosting Fallback:** For Netlify-hosted SPA landing routes, include `public/_redirects` catch-all (`/* /index.html 200`) so direct visits to `/legal`, `/terms`, and `/privacy` do not return 404.
+- **Footer Navigation Strategy (Landing):** Keep footer focused on Product and Legal columns only; Product items should deep-link to homepage sections with smooth-scroll behavior (`/#features`, `/#pricing`, `/#how-it-works`).
+- **Testimonials Anchor Strategy (Landing):** Footer product scoring item should point to Success Stories via `/#testimonials` and use testimonials-oriented copy in TR/EN.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

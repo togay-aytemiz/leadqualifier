@@ -153,7 +153,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             organizationId: orgId,
             conversationId: conversation.id,
             latestMessage: options.text,
-            preferredLocale: isLikelyTurkishMessage(options.text) ? 'tr' : 'en',
             supabase: options.supabase,
             source: options.source
         })

@@ -306,6 +306,7 @@
         "leadStatusHot": "Hot",
         "leadStatusWarm": "Warm",
         "leadStatusCold": "Cold",
+        "leadStatusUndetermined": "Undetermined",
         "leadStatusIgnored": "Ignored",
         "leadAiExtraction": "AI extraction",
         "leadUpdating": "Updating...",
@@ -947,6 +948,7 @@
         "statusHot": "Hot",
         "statusWarm": "Warm",
         "statusCold": "Cold",
+        "statusUndetermined": "Undetermined",
         "statusIgnored": "Ignored"
     }
 }

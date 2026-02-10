@@ -24,11 +24,12 @@ interface LeadsTableProps {
     requiredFields: string[]
 }
 
-const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info'> = {
+const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info' | 'purple'> = {
     hot: 'error',
     warm: 'warning',
     cold: 'neutral',
-    ignored: 'info'
+    ignored: 'info',
+    undetermined: 'purple'
 }
 
 // Summary Cell Component with Hover Popover
@@ -80,7 +81,8 @@ export function LeadsTable({
         hot: t('statusHot'),
         warm: t('statusWarm'),
         cold: t('statusCold'),
-        ignored: t('statusIgnored')
+        ignored: t('statusIgnored'),
+        undetermined: t('statusUndetermined')
     }
 
     // Column type with optional width

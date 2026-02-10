@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (WhatsApp Meta OAuth now supports user-token Graph fallback discovery when `/me/whatsapp_business_accounts` is unavailable, preserving connect flow across Meta app/account variants; popup status/error propagation and canonical-origin routing updates retained; landing legal routes now include Netlify SPA deep-link fallback via `public/_redirects` to prevent `/legal`, `/terms`, `/privacy` 404s)  
+> **Last Updated:** 2026-02-10 (Lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, and prior confirmation-context/service-inference/locale-priority updates remain active)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -136,6 +136,8 @@
   - [x] Chat view now shows an animated "scroll to latest" button only when not at bottom, positioned on the composer divider
   - [x] Reduced vertical gap between the "Konuşma Özeti" row and the assistant banner in composer area
   - [x] Shadow/Off bot modes now show compact inactive-state banner copy (single-line title + short body) in composer area
+  - [x] Conversation switch now shows loading skeletons until selected-thread messages load, preventing avatar-first stale content flashes
+  - [x] Lead status chips now sync after manual lead refresh and realtime lead events, including `ignored` (`Yok sayıldı`) and `undetermined` (`Belirsiz`)
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
@@ -370,17 +372,22 @@
   - [x] Extraction and lead-reasoning/summary helpers now enforce max output token caps
   - [x] Label customer vs assistant messages and respect customer negations
   - [x] Use last 5 customer messages and LLM-provided score/status
+  - [x] Add role-labeled recent-turn context (`customer`/`owner`/`assistant`) so short customer confirmations can resolve the referenced field reliably
   - [x] Ensure latest message is included even with async writes
   - [x] Enforce locale-aware output language (TR/EN) for lead summary and extracted detail fields
   - [x] Include manual profile note with approved AI suggestions in extraction context
   - [x] Preserve previously extracted lead details when later turns omit fields (merge-on-update instead of destructive overwrite)
   - [x] Keep lead summary aligned to the current extraction window (avoid stale summary carry-over when omitted)
+  - [x] Reject `service_type` inference on greeting-only/no-service-clue customer messages (prevents profile-only service hallucination)
+  - [x] Resolve extraction language with precedence: explicit preferred locale, then organization locale, then message-language heuristics
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
   - [x] Auto-generate AI summary
   - [x] Keyword-based intent fallback + score reasoning modal
 - [x] **Lead Status**
   - [x] Hot / Warm / Cold classification
+  - [x] Undetermined classification for insufficient-information turns (e.g., greeting-only/unclear short messages)
+  - [x] Ignored status constrained to non-business conversations
   - [x] Status update triggers
 - [x] **Inbox Lead Details**
   - [x] Read-only lead snapshot in conversation details
@@ -488,6 +495,9 @@
 - [x] Add build-time legal manifest generation (`scripts/generate-legal-assets.mjs` -> `public/legal_versions.json`)
 - [x] Wire footer legal navigation to legal center, privacy, and terms routes
 - [x] Add Netlify SPA redirect fallback (`public/_redirects`) so direct legal route visits resolve to `index.html`
+- [x] Simplify footer information architecture by removing Resources/Company columns and keeping Product + Legal columns
+- [x] Route Product footer links to homepage sections with smooth auto-scroll (`features`, `pricing`, `how-it-works`)
+- [x] Repoint Product scoring item to testimonials section and update label copy to testimonials (`#testimonials`)
 
 ---
 

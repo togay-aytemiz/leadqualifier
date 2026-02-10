@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal } from '@/design'
+import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
 import {
     Inbox, ChevronDown,
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown
@@ -37,8 +37,10 @@ import {
     getMobileListPaneClasses
 } from '@/components/inbox/mobilePaneState'
 import { resolveSummaryToggle } from '@/components/inbox/summaryPanelState'
+import { shouldShowConversationSkeleton } from '@/components/inbox/conversationSwitchState'
 import { cn } from '@/lib/utils'
 import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
+import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -72,6 +74,7 @@ export function InboxContainer({
     const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
+    const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null)
     const [lead, setLead] = useState<Lead | null>(null)
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
@@ -116,7 +119,8 @@ export function InboxContainer({
         hot: t('leadStatusHot'),
         warm: t('leadStatusWarm'),
         cold: t('leadStatusCold'),
-        ignored: t('leadStatusIgnored')
+        ignored: t('leadStatusIgnored'),
+        undetermined: t('leadStatusUndetermined')
     }
     const leadExtractedFields = lead?.extracted_fields && typeof lead.extracted_fields === 'object' && !Array.isArray(lead.extracted_fields)
         ? lead.extracted_fields as Record<string, unknown>
@@ -187,6 +191,7 @@ export function InboxContainer({
     const refreshLead = useCallback(async (conversationId: string) => {
         try {
             const result = await getConversationLead(conversationId)
+            setConversations(prev => applyLeadStatusToConversationList(prev, conversationId, result?.status ?? null))
             if (selectedIdRef.current !== conversationId) return
             setLead(result)
             return result
@@ -235,6 +240,7 @@ export function InboxContainer({
                 const msgs = await getMessages(nextId)
                 if (selectedIdRef.current !== nextId) continue
                 setMessages(msgs)
+                setLoadedConversationId(nextId)
                 setConversations(prev => prev.map(c =>
                     c.id === nextId ? { ...c, unread_count: 0 } : c
                 ))
@@ -317,9 +323,13 @@ export function InboxContainer({
 
     useEffect(() => {
         if (!selectedId) {
+            setMessages([])
+            setLoadedConversationId(null)
             setLead(null)
             return
         }
+        setMessages([])
+        setLead(null)
         refreshMessages(selectedId)
         refreshLead(selectedId)
     }, [refreshMessages, refreshLead, selectedId])
@@ -539,13 +549,11 @@ export function InboxContainer({
                     console.log('Realtime Lead event:', payload.eventType, leadRow)
                     if (!leadRow?.conversation_id) return
 
-                    setConversations(prev => prev.map(c => {
-                        if (c.id !== leadRow.conversation_id) return c
-                        if (payload.eventType === 'DELETE') {
-                            return { ...c, leads: [] }
-                        }
-                        return { ...c, leads: [{ status: leadRow.status }] }
-                    }))
+                    setConversations(prev => applyLeadStatusToConversationList(
+                        prev,
+                        leadRow.conversation_id,
+                        payload.eventType === 'DELETE' ? null : leadRow.status
+                    ))
 
                     if (leadRow.conversation_id === selectedIdRef.current) {
                         if (payload.eventType === 'DELETE') {
@@ -658,7 +666,7 @@ export function InboxContainer({
         setLeadRefreshStatus('loading')
         setLeadRefreshError(null)
         try {
-            const result = await refreshConversationLead(selectedId, organizationId)
+            const result = await refreshConversationLead(selectedId, organizationId, locale)
             if (result.ok) {
                 await refreshLead(selectedId)
                 setLeadRefreshStatus('success')
@@ -796,6 +804,10 @@ export function InboxContainer({
     }
 
     const handleSelectConversation = (conversationId: string) => {
+        if (conversationId === selectedIdRef.current) {
+            setIsMobileConversationOpen(true)
+            return
+        }
         setSelectedId(conversationId)
         setIsMobileConversationOpen(true)
     }
@@ -825,10 +837,12 @@ export function InboxContainer({
                         ? 'border-red-100 bg-red-50 text-red-700'
                         : leadStatus === 'warm'
                             ? 'border-amber-100 bg-amber-50 text-amber-700'
-                            : leadStatus === 'cold'
+                        : leadStatus === 'cold'
                                 ? 'border-slate-200 bg-slate-100 text-slate-600'
                                 : leadStatus === 'ignored'
                                     ? 'border-blue-100 bg-blue-50 text-blue-700'
+                                    : leadStatus === 'undetermined'
+                                        ? 'border-violet-100 bg-violet-50 text-violet-700'
                                     : 'border-gray-200 bg-gray-100 text-gray-600'
 
                     return (
@@ -897,6 +911,8 @@ export function InboxContainer({
     )
 
     const selectedConversation = conversations.find(c => c.id === selectedId)
+    const showConversationSkeleton = shouldShowConversationSkeleton(selectedConversation?.id ?? null, loadedConversationId)
+    const visibleMessages = showConversationSkeleton ? [] : messages
 
     const resolvedBotMode = (botMode ?? 'active')
     // NEW: Use explicit state from conversation
@@ -907,9 +923,10 @@ export function InboxContainer({
         botMode: resolvedBotMode
     })
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
-    const canSend = !!input.trim() && !isSending && !isReadOnly
-    const contactMessageCount = messages.filter(m => m.sender_type === 'contact').length
-    const hasBotMessage = messages.some(m => m.sender_type === 'bot')
+    const isComposerDisabled = isReadOnly || showConversationSkeleton
+    const canSend = !!input.trim() && !isSending && !isComposerDisabled
+    const contactMessageCount = visibleMessages.filter(m => m.sender_type === 'contact').length
+    const hasBotMessage = visibleMessages.some(m => m.sender_type === 'bot')
     const canSummarize = contactMessageCount >= 5 && hasBotMessage
     const summaryHeaderDisabled = !canSummarize
     const summaryRefreshDisabled = !canSummarize || summaryStatus === 'loading'
@@ -1015,46 +1032,66 @@ export function InboxContainer({
                             )}
                         >
                             <div className="max-h-[54vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white px-3 py-3 shadow-lg">
-                                <div className="mb-3 flex items-center gap-3">
-                                    <Avatar name={selectedConversation.contact_name} size="sm" />
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-900">{selectedConversation.contact_name}</p>
-                                        <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                                        <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadService')}</p>
-                                        <p className="mt-1 text-sm font-medium text-gray-900">{lead?.service_type || t('leadUnknown')}</p>
-                                    </div>
-                                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                                        <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
-                                        <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
-                                    </div>
-                                </div>
-                                <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
-                                    <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">{lead?.summary || t('leadEmpty')}</p>
-                                </div>
-                                <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadRequiredInfo')}</p>
-                                    {collectedRequiredIntake.length > 0 ? (
-                                        <div className="mt-2 space-y-2">
-                                            {collectedRequiredIntake.map((item) => (
-                                                <div key={item.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
-                                                    <span className="text-xs text-gray-500">{item.field}</span>
-                                                    <span className="break-words text-sm text-gray-900">{item.value}</span>
-                                                </div>
-                                            ))}
+                                {showConversationSkeleton ? (
+                                    <div className="space-y-3">
+                                        <div className="mb-3 flex items-center gap-3">
+                                            <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+                                            <div className="w-full space-y-2">
+                                                <Skeleton className="h-4 w-28" />
+                                                <Skeleton className="h-3 w-24" />
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
-                                    )}
-                                </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <Skeleton className="h-16 w-full rounded-lg" />
+                                            <Skeleton className="h-16 w-full rounded-lg" />
+                                        </div>
+                                        <Skeleton className="h-20 w-full rounded-lg" />
+                                        <Skeleton className="h-24 w-full rounded-lg" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="mb-3 flex items-center gap-3">
+                                            <Avatar name={selectedConversation.contact_name} size="sm" />
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">{selectedConversation.contact_name}</p>
+                                                <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                                <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadService')}</p>
+                                                <p className="mt-1 text-sm font-medium text-gray-900">{lead?.service_type || t('leadUnknown')}</p>
+                                            </div>
+                                            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                                <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
+                                                <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
+                                            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">{lead?.summary || t('leadEmpty')}</p>
+                                        </div>
+                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadRequiredInfo')}</p>
+                                            {collectedRequiredIntake.length > 0 ? (
+                                                <div className="mt-2 space-y-2">
+                                                    {collectedRequiredIntake.map((item) => (
+                                                        <div key={item.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
+                                                            <span className="text-xs text-gray-500">{item.field}</span>
+                                                            <span className="break-words text-sm text-gray-900">{item.value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {activeAgent === 'operator' && (
+                        {!showConversationSkeleton && activeAgent === 'operator' && (
                             <div className="border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
                                 <button
                                     onClick={handleLeaveConversation}
@@ -1074,50 +1111,67 @@ export function InboxContainer({
                             <div className="flex justify-center">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">{t('today')}</span>
                             </div>
-                            {messages.map(m => {
-                                const isMe = m.sender_type === 'user'
-                                const isBot = m.sender_type === 'bot'
-                                const isSystem = m.sender_type === 'system'
+                            {showConversationSkeleton ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-end gap-3">
+                                        <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                                        <Skeleton className="h-16 w-[min(70%,380px)] rounded-2xl rounded-bl-none" />
+                                    </div>
+                                    <div className="flex items-end justify-end gap-3">
+                                        <Skeleton className="h-12 w-[min(60%,300px)] rounded-2xl rounded-br-none" />
+                                        <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                                    </div>
+                                    <div className="flex items-end gap-3">
+                                        <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                                        <Skeleton className="h-20 w-[min(80%,420px)] rounded-2xl rounded-bl-none" />
+                                    </div>
+                                </div>
+                            ) : (
+                                visibleMessages.map(m => {
+                                    const isMe = m.sender_type === 'user'
+                                    const isBot = m.sender_type === 'bot'
+                                    const isSystem = m.sender_type === 'system'
 
-                                if (isSystem) {
-                                    return (
-                                        <div key={m.id} className="flex items-center justify-center w-full py-2">
-                                            <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                                                {m.content}
-                                            </span>
-                                        </div>
-                                    )
-                                }
-
-                                if (!isMe && !isBot) {
-                                    return (
-                                        <div key={m.id} className="flex items-end gap-3">
-                                            <Avatar name={selectedConversation.contact_name} size="md" />
-                                            <div className="flex flex-col gap-1 max-w-[80%]">
-                                                <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
+                                    if (isSystem) {
+                                        return (
+                                            <div key={m.id} className="flex items-center justify-center w-full py-2">
+                                                <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                                                     {m.content}
-                                                </div>
-                                                <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                }
-
-                                return (
-                                    <div key={m.id} className="flex items-end gap-3 justify-end">
-                                        <div className="flex flex-col gap-1 items-end max-w-[80%]">
-                                            <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
-                                                {m.content}
-                                            </div>
-                                            <div className="flex items-center gap-1.5 mr-1">
-                                                <span className="text-xs text-gray-400">
-                                                    {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                 </span>
                                             </div>
+                                        )
+                                    }
+
+                                    if (!isMe && !isBot) {
+                                        return (
+                                            <div key={m.id} className="flex items-end gap-3">
+                                                <Avatar name={selectedConversation.contact_name} size="md" />
+                                                <div className="flex flex-col gap-1 max-w-[80%]">
+                                                    <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
+                                                        {m.content}
+                                                    </div>
+                                                    <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+
+                                    return (
+                                        <div key={m.id} className="flex items-end gap-3 justify-end">
+                                            <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                                                <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
+                                                    {m.content}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mr-1">
+                                                    <span className="text-xs text-gray-400">
+                                                        {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                )
-                            })}
+                                    )
+                                })
+                            )}
                             <div ref={messagesEndRef} />
                         </div>
 
@@ -1263,7 +1317,7 @@ export function InboxContainer({
                                     <textarea
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
-                                        disabled={isReadOnly}
+                                        disabled={isComposerDisabled}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault()
@@ -1326,15 +1380,39 @@ export function InboxContainer({
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 flex flex-col">
-                            <div className="flex flex-col items-center text-center">
-                                <Avatar name={selectedConversation.contact_name} size="lg" className="mb-3 text-base" />
-                                <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
-                            </div>
+                            {showConversationSkeleton ? (
+                                <div className="space-y-6">
+                                    <div className="flex flex-col items-center text-center">
+                                        <Skeleton className="mb-3 h-16 w-16 rounded-full" />
+                                        <Skeleton className="h-5 w-32" />
+                                        <Skeleton className="mt-2 h-4 w-24" />
+                                    </div>
+                                    <hr className="border-gray-100 my-6" />
+                                    <div className="space-y-4">
+                                        <Skeleton className="h-4 w-24" />
+                                        <Skeleton className="h-12 w-full rounded-lg" />
+                                        <Skeleton className="h-12 w-full rounded-lg" />
+                                        <Skeleton className="h-12 w-full rounded-lg" />
+                                    </div>
+                                    <hr className="border-gray-100 my-6" />
+                                    <div className="space-y-4">
+                                        <Skeleton className="h-4 w-32" />
+                                        <Skeleton className="h-14 w-full rounded-lg" />
+                                        <Skeleton className="h-14 w-full rounded-lg" />
+                                        <Skeleton className="h-20 w-full rounded-lg" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex flex-col items-center text-center">
+                                        <Avatar name={selectedConversation.contact_name} size="lg" className="mb-3 text-base" />
+                                        <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
+                                        <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
+                                    </div>
 
-                            <hr className="border-gray-100 my-6" />
+                                    <hr className="border-gray-100 my-6" />
 
-                            <div className="flex-1">
+                                    <div className="flex-1">
                                 <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">{t('keyInfo')}</h4>
                                 <div className="space-y-4">
                                     {/* Active Agent Status */}
@@ -1441,6 +1519,8 @@ export function InboxContainer({
                                                                 ? 'bg-amber-500'
                                                                 : lead.status === 'ignored'
                                                                     ? 'bg-blue-500'
+                                                                    : lead.status === 'undetermined'
+                                                                        ? 'bg-violet-500'
                                                                     : 'bg-gray-400'
                                                             }`}
                                                     />
@@ -1506,7 +1586,7 @@ export function InboxContainer({
                             <hr className="border-gray-100 my-6" />
 
                             <div className="mt-auto">
-                                {activeAgent === 'operator' && (
+                                {!showConversationSkeleton && activeAgent === 'operator' && (
                                     <button
                                         onClick={handleLeaveConversation}
                                         disabled={isLeaving || isReadOnly}
@@ -1517,6 +1597,8 @@ export function InboxContainer({
                                     </button>
                                 )}
                             </div>
+                                </>
+                            )}
                         </div>
                     </div >
                 </>

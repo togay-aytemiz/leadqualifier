@@ -7,6 +7,12 @@
 ## [Unreleased]
 
 ### Added
+- Added new lead status `undetermined` (TR: `Belirsiz`) across extraction/UI flows, including migration `supabase/migrations/00056_leads_status_undetermined.sql` to extend `leads.status` constraint.
+- Added localized status labels for `undetermined` in both Inbox and Leads dictionaries (`messages/en.json`, `messages/tr.json`) and wired admin/leads/inbox status maps to render them.
+- Added role-aware lead-extraction context builder (`buildLeadExtractionConversationContext`) with test coverage so extraction can read recent `customer`/`owner`/`assistant` turns and resolve short confirmations (for example, `Evet`) against the preceding question.
+- Added lead-service inference guard coverage in `src/lib/leads/extraction.test.ts` for greeting-only messages, explicit service mentions, and catalog-alias matches.
+- Added conversation-list lead-status sync helper + tests (`src/components/inbox/conversationLeadStatus.ts`, `src/components/inbox/conversationLeadStatus.test.ts`) so left-pane lead chips stay aligned with latest lead state.
+- Added footer section-link mapping helpers and tests in `qualy-lp` (`lib/footer-links.ts`, `lib/footer-links.test.ts`) for stable Product→homepage section routing.
 - Added popup-based Meta OAuth channel connect flow for WhatsApp/Instagram in Channels settings, including postMessage handoff so popup completion returns status to the main page automatically.
 - Added shared Meta OAuth origin resolver utility (`src/lib/channels/meta-origin.ts`) with tests to prioritize canonical app URL and gracefully fall back to forwarded/request origin.
 - Added Meta OAuth WhatsApp discovery fallback logic that traverses `me/businesses` and business WABA edges when direct `/me/whatsapp_business_accounts` is unsupported for the logged-in user token.
@@ -99,6 +105,14 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed lead-extraction status semantics: insufficient-information business turns now normalize to `undetermined` (score capped low), while `ignored` is preserved for non-business conversations only.
+- Changed lead-status visual mapping to include a dedicated purple treatment for `undetermined` chips/dots in Inbox, Admin dashboard recent leads, and Leads table badges.
+- Changed lead extraction prompt context to include recent role-labeled conversation turns (`customer`, `owner`, `assistant`) while preserving the latest-5 customer-message grounding window for extracted facts and scoring signals.
+- Changed lead extraction locale precedence to `preferred locale > organization locale > message heuristics`; manual Inbox lead refresh now sends active UI locale to extraction.
+- Changed inbound extraction locale wiring to avoid forcing per-message language when organization locale is available, improving TR consistency for mixed-message conversations.
+- Changed `qualy-lp` footer scoring item semantics from lead scoring to testimonials by updating copy (`Testimonials` / `Müşteri Yorumları`) and retargeting anchor navigation to `/#testimonials`.
+- Changed `qualy-lp` footer structure to remove Resources and Company columns, keeping only Product and Legal groups.
+- Changed `qualy-lp` Product footer links to section-aware smooth-scroll behavior on homepage and `/#section` fallback navigation from other routes.
 - Changed auth messenger preview spacing density: reduced message stack gap, reduced thread viewport height/padding, and reduced thread-to-composer top margin for a tighter chat/composer rhythm.
 - Changed Inbox tab indicator behavior to show `(●)` when unread exists instead of unread count in tab title.
 - Changed runtime branding text from the legacy product name to `Qualy` in document metadata and shared EN/TR common app labels.
@@ -164,6 +178,9 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed profile-only service hallucination in greeting-only conversations (for example, `Hello`) by nulling inferred `service_type` unless customer text contains a concrete service clue.
+- Fixed Inbox conversation-list lead-chip drift by syncing row status on manual refresh/realtime lead updates, including `ignored` (`Yok sayıldı`).
+- Fixed TR UI extraction refresh mismatch where lead summary/details could remain English after Turkish UI-triggered refreshes.
 - Fixed Netlify deep-link 404s for landing legal routes by adding SPA redirect fallback (`public/_redirects` with `/* /index.html 200`), so direct visits to `/legal`, `/terms`, and `/privacy` resolve correctly.
 - Fixed Meta OAuth status/error redirects to use the active request origin for Channels-page return, preventing unexpected fallback to legacy Netlify domain URLs.
 - Fixed Meta OAuth route host resolution drift on Netlify by using canonical app URL/forwarded-host resolution for both start and callback routes.
@@ -189,6 +206,7 @@
 - Mobile Settings detail→list back navigation no longer behaves like a full refresh; it now returns via client-side transition for a stable mobile flow.
 - Inbox conversation list header no longer shows a dropdown chevron next to the “Gelen Kutusu / Inbox” title.
 - Inbox summary panel now regenerates summary on every reopen; manual refresh is no longer required after close/reopen.
+- Fixed inbox conversation switching flicker by tracking selected-thread vs loaded-thread state and showing skeletons until selected-thread messages hydrate, so avatars/details no longer jump ahead of message content.
 - Telegram webhook skill-matching failures now fail open to KB/fallback processing, preventing silent no-reply drops when embedding/match calls error.
 - Telegram webhook AI gating no longer gets blocked by stale `assignee_id` when `active_agent` is already bot; runtime operator-active checks now honor `active_agent` as source of truth.
 - Hot-lead `notify_only` escalation now preserves ongoing AI replies as intended (only `switch_to_operator` silences AI).

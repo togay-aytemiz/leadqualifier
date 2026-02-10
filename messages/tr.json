@@ -306,6 +306,7 @@
         "leadStatusHot": "Sıcak",
         "leadStatusWarm": "Ilık",
         "leadStatusCold": "Soğuk",
+        "leadStatusUndetermined": "Belirsiz",
         "leadStatusIgnored": "Yok sayıldı",
         "leadAiExtraction": "AI çıkarımı",
         "leadUpdating": "Güncelleniyor...",
@@ -947,6 +948,7 @@
         "statusHot": "Sıcak",
         "statusWarm": "Ilık",
         "statusCold": "Soğuk",
+        "statusUndetermined": "Belirsiz",
         "statusIgnored": "Yok sayıldı"
     }
 }
