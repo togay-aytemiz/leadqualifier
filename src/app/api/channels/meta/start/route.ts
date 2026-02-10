@@ -14,11 +14,14 @@ function getAppUrl(req: NextRequest) {
         || req.nextUrl.origin
 }
 
-function redirectToChannels(req: NextRequest, locale: string, status: string, channel: string, returnToPath?: string | null) {
-    const baseUrl = getAppUrl(req)
+function redirectToChannels(req: NextRequest, locale: string, status: string, channel: string, returnToPath?: string | null, popup = false) {
+    const baseUrl = req.nextUrl.origin
     const url = new URL(resolveMetaChannelsReturnPath(locale, returnToPath), baseUrl)
     url.searchParams.set('meta_oauth', status)
     url.searchParams.set('channel', channel)
+    if (popup) {
+        url.searchParams.set('meta_oauth_popup', '1')
+    }
     return NextResponse.redirect(url)
 }
 
@@ -27,11 +30,12 @@ export async function GET(req: NextRequest) {
     const channel = (channelParam === 'whatsapp' || channelParam === 'instagram')
         ? channelParam
         : null
+    const popup = req.nextUrl.searchParams.get('popup') === '1'
     const locale = normalizeLocale(req.nextUrl.searchParams.get('locale'))
     const returnToPath = resolveMetaChannelsReturnPath(locale, req.nextUrl.searchParams.get('returnTo'))
 
     if (!channel) {
-        return redirectToChannels(req, locale, 'invalid_channel', channelParam ?? 'unknown', returnToPath)
+        return redirectToChannels(req, locale, 'invalid_channel', channelParam ?? 'unknown', returnToPath, popup)
     }
 
     const appId = process.env.META_APP_ID
@@ -39,7 +43,7 @@ export async function GET(req: NextRequest) {
     const stateSecret = process.env.META_OAUTH_STATE_SECRET || appSecret
 
     if (!appId || !stateSecret) {
-        return redirectToChannels(req, locale, 'missing_meta_env', channel, returnToPath)
+        return redirectToChannels(req, locale, 'missing_meta_env', channel, returnToPath, popup)
     }
 
     const supabase = await createClient()
@@ -47,7 +51,7 @@ export async function GET(req: NextRequest) {
     try {
         await assertTenantWriteAllowed(supabase)
     } catch {
-        return redirectToChannels(req, locale, 'forbidden', channel, returnToPath)
+        return redirectToChannels(req, locale, 'forbidden', channel, returnToPath, popup)
     }
 
     const context = await resolveActiveOrganizationContext(supabase)
@@ -55,14 +59,17 @@ export async function GET(req: NextRequest) {
     const requestedOrganizationId = req.nextUrl.searchParams.get('organizationId')
 
     if (!activeOrganizationId) {
-        return redirectToChannels(req, locale, 'missing_org', channel, returnToPath)
+        return redirectToChannels(req, locale, 'missing_org', channel, returnToPath, popup)
     }
 
     if (requestedOrganizationId && requestedOrganizationId !== activeOrganizationId) {
-        return redirectToChannels(req, locale, 'org_mismatch', channel, returnToPath)
+        return redirectToChannels(req, locale, 'org_mismatch', channel, returnToPath, popup)
     }
 
-    const callbackUrl = new URL('/api/channels/meta/callback', getAppUrl(req)).toString()
+    const callbackUrl = new URL('/api/channels/meta/callback', getAppUrl(req))
+    if (popup) {
+        callbackUrl.searchParams.set('popup', '1')
+    }
 
     const state = encodeMetaOAuthState({
         channel: channel as MetaChannelType,
@@ -75,7 +82,7 @@ export async function GET(req: NextRequest) {
 
     const authorizeUrl = buildMetaAuthorizeUrl({
         appId,
-        redirectUri: callbackUrl,
+        redirectUri: callbackUrl.toString(),
         state,
         channel: channel as MetaChannelType
     })

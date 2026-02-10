@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (landing legal infrastructure added: markdown-backed privacy/terms pages with shared legal center route and build-time `legal_versions.json` manifest generation; previous channel/auth/platform updates retained)  
+> **Last Updated:** 2026-02-10 (Meta channel OAuth UX updated to popup-based connect flow with same-origin status return; previous legal/channel/auth/platform updates retained)  
 > **Status:** In Development
 
 ---
@@ -38,8 +38,8 @@ Automate WhatsApp message handling:
 ### ✅ In Scope (Target MVP)
 | Feature | Description | Status (2026-02-04) |
 |---------|-------------|--------------------|
-| WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: OAuth channel setup, webhook verification, inbound text-only processing, and reactive outbound replies) |
-| Instagram Integration | Single business account per org | Implemented (Meta OAuth channel setup, webhook verification, inbound text-only processing, reactive outbound replies; separate channel from WhatsApp) |
+| WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: OAuth channel setup, popup-based connect UX, webhook verification, inbound text-only processing, and reactive outbound replies) |
+| Instagram Integration | Single business account per org | Implemented (Meta OAuth channel setup, popup-based connect UX, webhook verification, inbound text-only processing, reactive outbound replies; separate channel from WhatsApp) |
 | AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + WhatsApp + Instagram + Simulator |
 | User-Generated Skills | Custom intent → response mappings | Implemented |
 | Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
@@ -73,6 +73,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
 - WhatsApp and Instagram MVP support text messages only and send replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
+- Meta OAuth channel connect starts in a separate popup and returns success/error status to the existing Channels page context (main app tab remains stable)
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.

@@ -1,11 +1,11 @@
 'use client'
 
 import { Channel } from '@/types/database'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChannelCard } from '@/components/channels/ChannelCard'
 import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal'
 import { connectTelegramChannel } from '@/lib/channels/actions'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 
 interface ChannelsListProps {
@@ -18,6 +18,7 @@ interface ChannelsListProps {
 export function ChannelsList({ channels, organizationId, showDescription = true, isReadOnly = false }: ChannelsListProps) {
     const t = useTranslations('Channels')
     const locale = useLocale()
+    const searchParams = useSearchParams()
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
     const router = useRouter()
 
@@ -40,10 +41,56 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
             channel,
             organizationId,
             locale,
-            returnTo: window.location.pathname
+            returnTo: window.location.pathname,
+            popup: '1'
         })
-        window.location.href = `/api/channels/meta/start?${params.toString()}`
+        const startUrl = `/api/channels/meta/start?${params.toString()}`
+        const popupWindow = window.open(
+            startUrl,
+            `meta_oauth_${channel}`,
+            'popup=yes,width=560,height=720,menubar=no,toolbar=no,location=yes,resizable=yes,scrollbars=yes,status=no'
+        )
+
+        if (!popupWindow) {
+            window.location.assign(startUrl)
+        }
     }
+
+    useEffect(() => {
+        const status = searchParams.get('meta_oauth')
+        const channel = searchParams.get('channel')
+        const isMetaPopup = searchParams.get('meta_oauth_popup') === '1'
+
+        if (!status || !isMetaPopup) return
+        if (!window.opener || window.opener.closed) return
+
+        window.opener.postMessage({
+            source: 'meta-oauth',
+            status,
+            channel
+        }, window.location.origin)
+        window.close()
+    }, [searchParams])
+
+    useEffect(() => {
+        const onMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return
+            const payload = event.data as { source?: string, status?: string, channel?: string } | null
+            if (!payload || payload.source !== 'meta-oauth' || !payload.status) return
+
+            const url = new URL(window.location.href)
+            url.searchParams.set('meta_oauth', payload.status)
+            if (payload.channel) {
+                url.searchParams.set('channel', payload.channel)
+            }
+            url.searchParams.delete('meta_oauth_popup')
+
+            window.location.assign(url.toString())
+        }
+
+        window.addEventListener('message', onMessage)
+        return () => window.removeEventListener('message', onMessage)
+    }, [])
 
     return (
         <div>

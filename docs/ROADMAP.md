@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (public legal center infrastructure added for landing: markdown-backed `/terms` + `/privacy`, shared `/legal` index, build-time `public/legal_versions.json` generation, and footer legal links wired; previous platform/auth updates retained)  
+> **Last Updated:** 2026-02-10 (Meta OAuth channel connect flow now opens in a separate popup and syncs result back to the settings page; OAuth error/status returns now stay on the active app origin to avoid wrong-domain redirects; previous legal/platform/auth updates retained)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -40,6 +40,7 @@
   - [x] OAuth connect flow (`/api/channels/meta/start` + `/api/channels/meta/callback`)
   - [x] One-click connect from channel card (no intermediate "continue with Meta" modal)
   - [x] OAuth error/status redirects return to current channels route using signed/safe `returnTo` path
+  - [x] OAuth connect now opens in a dedicated popup window and pushes success/error status back to the main Channels page
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
@@ -51,6 +52,7 @@
   - [x] Outgoing message API (reactive replies only)
   - [x] First bot reply starts only after inbound customer message
   - [x] One-click connect from channel card (no intermediate "continue with Meta" modal)
+  - [x] OAuth popup flow mirrors WhatsApp and keeps main app context stable during Meta auth
 - [x] **Shared Inbound AI Pipeline**
   - [x] Keep Telegram/WhatsApp/Instagram webhook routes separate
   - [x] Move inbound AI flow to shared pipeline function and reuse in WhatsApp + Instagram

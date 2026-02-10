@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- Added popup-based Meta OAuth channel connect flow for WhatsApp/Instagram in Channels settings, including postMessage handoff so popup completion returns status to the main page automatically.
 - Added landing legal center infrastructure in `qualy-lp`: markdown source docs (`legal/terms.md`, `legal/privacy.md`), runtime legal routes (`/legal`, `/terms`, `/privacy`), shared legal shell/pages, and legal markdown parser utilities with Vitest coverage (`lib/legal-utils.ts`, `lib/legal.test.ts`).
 - Added build-time legal manifest generation (`scripts/generate-legal-assets.mjs`) and `prebuild` hook to emit `public/legal_versions.json` from markdown frontmatter versions.
 - Added route-aware browser tab title sync component (`src/components/common/TabTitleSync.tsx`) with dashboard/auth layout wiring so tabs render `Page | Qualy`.
@@ -161,6 +162,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed Meta OAuth status/error redirects to use the active request origin for Channels-page return, preventing unexpected fallback to legacy Netlify domain URLs.
 - Fixed Meta OAuth status redirects to always return to a safe channel-settings URL (`returnTo`) so failed OAuth/env states no longer strand users on non-matching paths.
 - Fixed mixed channel icon rendering inconsistencies by unifying Telegram/WhatsApp/Instagram under Remix fill variants (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`).
 - Fixed perceived navigation stalls during active interactions by deferring bulk prefetch calls with a short delayed schedule.

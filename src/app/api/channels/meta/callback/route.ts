@@ -23,11 +23,21 @@ function getAppUrl(req: NextRequest) {
         || req.nextUrl.origin
 }
 
-function redirectToChannels(req: NextRequest, locale: string, status: string, channel: string, returnToPath?: string | null) {
-    const baseUrl = getAppUrl(req)
+function redirectToChannels(
+    req: NextRequest,
+    locale: string,
+    status: string,
+    channel: string,
+    returnToPath?: string | null,
+    popup = false
+) {
+    const baseUrl = req.nextUrl.origin
     const url = new URL(resolveMetaChannelsReturnPath(locale, returnToPath), baseUrl)
     url.searchParams.set('meta_oauth', status)
     url.searchParams.set('channel', channel)
+    if (popup) {
+        url.searchParams.set('meta_oauth_popup', '1')
+    }
     return NextResponse.redirect(url)
 }
 
@@ -39,18 +49,19 @@ export async function GET(req: NextRequest) {
     const appSecret = process.env.META_APP_SECRET
     const stateSecret = process.env.META_OAUTH_STATE_SECRET || appSecret
     const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || null
+    const popup = req.nextUrl.searchParams.get('popup') === '1'
 
     if (!appId || !appSecret || !stateSecret) {
-        return redirectToChannels(req, 'tr', 'missing_meta_env', 'unknown')
+        return redirectToChannels(req, 'tr', 'missing_meta_env', 'unknown', null, popup)
     }
 
     if (!stateValue) {
-        return redirectToChannels(req, 'tr', 'missing_state', 'unknown')
+        return redirectToChannels(req, 'tr', 'missing_state', 'unknown', null, popup)
     }
 
     const state = decodeMetaOAuthState(stateValue, stateSecret)
     if (!state) {
-        return redirectToChannels(req, 'tr', 'invalid_state', 'unknown')
+        return redirectToChannels(req, 'tr', 'invalid_state', 'unknown', null, popup)
     }
 
     const locale = normalizeLocale(state.locale)
@@ -58,11 +69,11 @@ export async function GET(req: NextRequest) {
 
     const metaError = req.nextUrl.searchParams.get('error')
     if (metaError) {
-        return redirectToChannels(req, locale, 'oauth_cancelled', state.channel, returnToPath)
+        return redirectToChannels(req, locale, 'oauth_cancelled', state.channel, returnToPath, popup)
     }
 
     if (!code) {
-        return redirectToChannels(req, locale, 'missing_code', state.channel, returnToPath)
+        return redirectToChannels(req, locale, 'missing_code', state.channel, returnToPath, popup)
     }
 
     const supabase = await createClient()
@@ -70,22 +81,25 @@ export async function GET(req: NextRequest) {
     try {
         await assertTenantWriteAllowed(supabase)
     } catch {
-        return redirectToChannels(req, locale, 'forbidden', state.channel, returnToPath)
+        return redirectToChannels(req, locale, 'forbidden', state.channel, returnToPath, popup)
     }
 
     const context = await resolveActiveOrganizationContext(supabase)
     const activeOrganizationId = context?.activeOrganizationId ?? null
     if (!activeOrganizationId || activeOrganizationId !== state.organizationId) {
-        return redirectToChannels(req, locale, 'org_mismatch', state.channel, returnToPath)
+        return redirectToChannels(req, locale, 'org_mismatch', state.channel, returnToPath, popup)
     }
 
-    const callbackUrl = new URL('/api/channels/meta/callback', getAppUrl(req)).toString()
+    const callbackUrl = new URL('/api/channels/meta/callback', getAppUrl(req))
+    if (popup) {
+        callbackUrl.searchParams.set('popup', '1')
+    }
 
     try {
         const shortLivedToken = await exchangeMetaCodeForToken({
             appId,
             appSecret,
-            redirectUri: callbackUrl,
+            redirectUri: callbackUrl.toString(),
             code
         })
 
@@ -104,7 +118,7 @@ export async function GET(req: NextRequest) {
             const pagesPayload = await fetchMetaInstagramPages(userAccessToken)
             const candidate = pickInstagramConnectionCandidate(pagesPayload)
             if (!candidate) {
-                return redirectToChannels(req, locale, 'missing_instagram_assets', state.channel, returnToPath)
+                return redirectToChannels(req, locale, 'missing_instagram_assets', state.channel, returnToPath, popup)
             }
 
             const channelName = candidate.instagramUsername
@@ -134,13 +148,13 @@ export async function GET(req: NextRequest) {
 
             if (error) throw error
 
-            return redirectToChannels(req, locale, 'success', state.channel, returnToPath)
+            return redirectToChannels(req, locale, 'success', state.channel, returnToPath, popup)
         }
 
         const wabaPayload = await fetchMetaWhatsAppBusinessAccounts(userAccessToken)
         const candidate = pickWhatsAppConnectionCandidate(wabaPayload)
         if (!candidate) {
-            return redirectToChannels(req, locale, 'missing_whatsapp_assets', state.channel, returnToPath)
+            return redirectToChannels(req, locale, 'missing_whatsapp_assets', state.channel, returnToPath, popup)
         }
 
         const channelName = candidate.displayPhoneNumber
@@ -170,9 +184,9 @@ export async function GET(req: NextRequest) {
 
         if (error) throw error
 
-        return redirectToChannels(req, locale, 'success', state.channel, returnToPath)
+        return redirectToChannels(req, locale, 'success', state.channel, returnToPath, popup)
     } catch (error) {
         console.error('Meta OAuth callback failed:', error)
-        return redirectToChannels(req, locale, 'connect_failed', state.channel, returnToPath)
+        return redirectToChannels(req, locale, 'connect_failed', state.channel, returnToPath, popup)
     }
 }
