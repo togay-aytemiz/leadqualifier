@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Meta channel OAuth UX updated to popup-based connect flow with same-origin status return; previous legal/channel/auth/platform updates retained)  
+> **Last Updated:** 2026-02-10 (Meta channel OAuth UX updated to popup-based connect flow with canonical-origin status return and callback error hinting; previous legal/channel/auth/platform updates retained)  
 > **Status:** In Development
 
 ---
@@ -74,6 +74,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
 - WhatsApp and Instagram MVP support text messages only and send replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
 - Meta OAuth channel connect starts in a separate popup and returns success/error status to the existing Channels page context (main app tab remains stable)
+- Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.

@@ -3,19 +3,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { buildMetaAuthorizeUrl, encodeMetaOAuthState, resolveMetaChannelsReturnPath, type MetaChannelType } from '@/lib/channels/meta-oauth'
+import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 
 function normalizeLocale(value: string | null) {
     return value === 'en' ? 'en' : 'tr'
 }
 
 function getAppUrl(req: NextRequest) {
-    return process.env.NEXT_PUBLIC_APP_URL
-        || process.env.NEXT_PUBLIC_SITE_URL
-        || req.nextUrl.origin
+    return resolveMetaOrigin({
+        appUrl: process.env.NEXT_PUBLIC_APP_URL,
+        siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+        forwardedHost: req.headers.get('x-forwarded-host'),
+        forwardedProto: req.headers.get('x-forwarded-proto'),
+        requestOrigin: req.nextUrl.origin
+    })
 }
 
 function redirectToChannels(req: NextRequest, locale: string, status: string, channel: string, returnToPath?: string | null, popup = false) {
-    const baseUrl = req.nextUrl.origin
+    const baseUrl = getAppUrl(req)
     const url = new URL(resolveMetaChannelsReturnPath(locale, returnToPath), baseUrl)
     url.searchParams.set('meta_oauth', status)
     url.searchParams.set('channel', channel)
