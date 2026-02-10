@@ -59,6 +59,7 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
     useEffect(() => {
         const status = searchParams.get('meta_oauth')
         const channel = searchParams.get('channel')
+        const error = searchParams.get('meta_oauth_error')
         const isMetaPopup = searchParams.get('meta_oauth_popup') === '1'
 
         if (!status || !isMetaPopup) return
@@ -67,7 +68,8 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
         window.opener.postMessage({
             source: 'meta-oauth',
             status,
-            channel
+            channel,
+            error
         }, window.location.origin)
         window.close()
     }, [searchParams])
@@ -75,13 +77,18 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
     useEffect(() => {
         const onMessage = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return
-            const payload = event.data as { source?: string, status?: string, channel?: string } | null
+            const payload = event.data as { source?: string, status?: string, channel?: string, error?: string | null } | null
             if (!payload || payload.source !== 'meta-oauth' || !payload.status) return
 
             const url = new URL(window.location.href)
             url.searchParams.set('meta_oauth', payload.status)
             if (payload.channel) {
                 url.searchParams.set('channel', payload.channel)
+            }
+            if (payload.error) {
+                url.searchParams.set('meta_oauth_error', payload.error)
+            } else {
+                url.searchParams.delete('meta_oauth_error')
             }
             url.searchParams.delete('meta_oauth_popup')
 

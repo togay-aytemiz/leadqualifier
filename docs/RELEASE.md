@@ -166,6 +166,7 @@
 - Fixed Meta OAuth status/error redirects to use the active request origin for Channels-page return, preventing unexpected fallback to legacy Netlify domain URLs.
 - Fixed Meta OAuth route host resolution drift on Netlify by using canonical app URL/forwarded-host resolution for both start and callback routes.
 - Fixed opaque OAuth callback failures by attaching compact `meta_oauth_error` hints to `connect_failed` redirects.
+- Fixed popup OAuth handoff dropping `meta_oauth_error`; main Channels URL now preserves the callback error hint after popup closes.
 - Fixed Meta OAuth status redirects to always return to a safe channel-settings URL (`returnTo`) so failed OAuth/env states no longer strand users on non-matching paths.
 - Fixed mixed channel icon rendering inconsistencies by unifying Telegram/WhatsApp/Instagram under Remix fill variants (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`).
 - Fixed perceived navigation stalls during active interactions by deferring bulk prefetch calls with a short delayed schedule.

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (Meta OAuth channel connect flow now opens in a separate popup and syncs result back to the settings page; OAuth redirects now resolve canonical app origin via configured URL/forwarded host fallback, and callback failures include a compact error hint for faster production debugging; previous legal/platform/auth updates retained)  
+> **Last Updated:** 2026-02-10 (Meta OAuth popup flow now preserves callback error hints when passing status back to the main Channels page; OAuth redirects resolve canonical app origin via configured URL/forwarded host fallback for Netlify consistency; previous legal/platform/auth updates retained)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -42,6 +42,7 @@
   - [x] OAuth error/status redirects return to current channels route using signed/safe `returnTo` path
   - [x] OAuth connect now opens in a dedicated popup window and pushes success/error status back to the main Channels page
   - [x] OAuth host resolution hardened for Netlify custom-domain deployments (configured app URL + forwarded host fallback)
+  - [x] Popup return flow now preserves `meta_oauth_error` for direct diagnosis on Channels URL
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
