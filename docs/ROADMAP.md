@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (WhatsApp Meta OAuth now supports user-token Graph fallback discovery when `/me/whatsapp_business_accounts` is unavailable, preserving connect flow across Meta app/account variants; popup status/error propagation and canonical-origin routing updates retained)  
+> **Last Updated:** 2026-02-10 (WhatsApp Meta OAuth now supports user-token Graph fallback discovery when `/me/whatsapp_business_accounts` is unavailable, preserving connect flow across Meta app/account variants; popup status/error propagation and canonical-origin routing updates retained; landing legal routes now include Netlify SPA deep-link fallback via `public/_redirects` to prevent `/legal`, `/terms`, `/privacy` 404s)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -487,6 +487,7 @@
 - [x] Add legal routing and rendering for `/legal`, `/terms`, `/privacy` on landing app
 - [x] Add build-time legal manifest generation (`scripts/generate-legal-assets.mjs` -> `public/legal_versions.json`)
 - [x] Wire footer legal navigation to legal center, privacy, and terms routes
+- [x] Add Netlify SPA redirect fallback (`public/_redirects`) so direct legal route visits resolve to `index.html`
 
 ---
 

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Meta channel OAuth UX updated to popup-based connect flow with canonical-origin status return; WhatsApp OAuth now includes Graph fallback discovery for account variants where `/me/whatsapp_business_accounts` is unavailable; previous legal/channel/auth/platform updates retained)  
+> **Last Updated:** 2026-02-10 (Meta channel OAuth UX updated to popup-based connect flow with canonical-origin status return; WhatsApp OAuth now includes Graph fallback discovery for account variants where `/me/whatsapp_business_accounts` is unavailable; landing legal routes now include Netlify SPA deep-link fallback via `public/_redirects`; previous legal/channel/auth/platform updates retained)  
 > **Status:** In Development
 
 ---
@@ -630,6 +630,7 @@ MVP is successful when:
 - **Placeholder Source Transparency:** Keep non-MVP Knowledge source options visible in New Content menu but mark inactive options (including PDF upload) with a `Coming Soon` badge.
 - **Inbox Query Resilience:** When nested relational conversation reads fail, fall back to flat per-table conversation/message/lead/assignee reads so Inbox does not incorrectly show an empty state.
 - **Landing Legal Delivery:** Keep legal documents as versioned markdown source (`legal/*.md`), render `/legal`, `/terms`, `/privacy` from those files, and generate `public/legal_versions.json` during build for external consumption.
+- **Static Hosting Fallback:** For Netlify-hosted SPA landing routes, include `public/_redirects` catch-all (`/* /index.html 200`) so direct visits to `/legal`, `/terms`, and `/privacy` do not return 404.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

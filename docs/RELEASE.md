@@ -164,6 +164,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed Netlify deep-link 404s for landing legal routes by adding SPA redirect fallback (`public/_redirects` with `/* /index.html 200`), so direct visits to `/legal`, `/terms`, and `/privacy` resolve correctly.
 - Fixed Meta OAuth status/error redirects to use the active request origin for Channels-page return, preventing unexpected fallback to legacy Netlify domain URLs.
 - Fixed Meta OAuth route host resolution drift on Netlify by using canonical app URL/forwarded-host resolution for both start and callback routes.
 - Fixed opaque OAuth callback failures by attaching compact `meta_oauth_error` hints to `connect_failed` redirects.
