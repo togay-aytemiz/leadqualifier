@@ -12,11 +12,11 @@ describe('auth messenger preview styles', () => {
     it('keeps long conversations inside a fixed viewport so new bubbles do not push layout', () => {
         const threadClasses = getAuthPreviewThreadViewportClasses()
 
-        expect(threadClasses).toContain('h-[clamp(12rem,35vh,18rem)]')
+        expect(threadClasses).toContain('h-[clamp(10rem,28vh,15rem)]')
         expect(threadClasses).toContain('overflow-y-auto')
         expect(threadClasses).toContain('[scrollbar-width:none]')
         expect(threadClasses).toContain('[&::-webkit-scrollbar]:hidden')
-        expect(threadClasses).toContain('pb-4')
+        expect(threadClasses).toContain('pb-3')
         expect(threadClasses).toContain(
             '[mask-image:linear-gradient(to_bottom,transparent_0%,black_12%,black_100%)]'
         )
@@ -41,8 +41,8 @@ describe('auth messenger preview styles', () => {
         const stackClasses = getAuthPreviewMessageStackClasses()
 
         expect(stackClasses).toContain('justify-end')
-        expect(stackClasses).toContain('gap-3')
-        expect(stackClasses).toContain('pb-4')
+        expect(stackClasses).toContain('gap-2.5')
+        expect(stackClasses).toContain('pb-3')
     })
 
     it('applies smooth enter animation to incoming bubbles', () => {

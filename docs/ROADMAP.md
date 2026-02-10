@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels page via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels/Inbox/Leads; auth preview chat thread now stays capped with internal scroll, hidden scrollbar, top gradient fade, and bottom-anchored bubbles above composer to prevent page growth and small-height bubble-push glitches; incoming bot bubbles now animate smoothly with typing-height reservation and extra composer gap to avoid overlap; forgot/reset password forms now match sign in/sign up visual system without legacy inner card wrapper; app branding switched to `Qualy` with tab metadata updates and `/icon-black.svg` favicon usage; browser tab title now follows active route (`Page | Qualy`) and Inbox shows unread dot indicator `(●)` instead of unread count in title; build re-verified)  
+> **Last Updated:** 2026-02-10 (public legal center infrastructure added for landing: markdown-backed `/terms` + `/privacy`, shared `/legal` index, build-time `public/legal_versions.json` generation, and footer legal links wired; previous platform/auth updates retained)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -293,6 +293,7 @@
   - [x] Auth preview thread now uses fixed/clamped viewport height with top fade clipping so the 4th bubble no longer pushes layout on shorter desktop heights
   - [x] Auth preview incoming bot bubbles now use smooth enter animation + typing-height reservation to remove perceived jitter during agent typing
   - [x] Auth preview thread/composer spacing increased so multi-line bot bubbles no longer touch the input/composer area
+  - [x] Auth preview thread/composer spacing and bubble gap density tightened to reduce excessive vertical whitespace
   - [x] Sign Up consent sentence now stays single-line on desktop and wraps only on smaller screens
   - [x] Removed in-form Sign In/Sign Up segmented switcher (route-level pages + footer link navigation only)
   - [x] Reduced auth header logo size for a lighter top bar visual balance
@@ -473,6 +474,14 @@
   - [ ] Decide trial model: time-based, credit-based, or hybrid
   - [ ] Define trial end behavior, conversion trigger, and grace rules
   - [ ] Finalize upgrade prompts for in-product conversion
+
+---
+
+## Phase 8.6: Public Legal Center
+- [x] Add markdown legal source folder (`legal/*.md`) with required version metadata (`id`, `version`, `last_updated`, `document_title`)
+- [x] Add legal routing and rendering for `/legal`, `/terms`, `/privacy` on landing app
+- [x] Add build-time legal manifest generation (`scripts/generate-legal-assets.mjs` -> `public/legal_versions.json`)
+- [x] Wire footer legal navigation to legal center, privacy, and terms routes
 
 ---
 

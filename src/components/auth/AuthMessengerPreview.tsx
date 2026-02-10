@@ -402,7 +402,7 @@ export function AuthMessengerPreview() {
                     <div className={getAuthPreviewThreadTopFadeClasses()} />
                 </div>
 
-                <div className="mt-4 w-full max-w-xl">
+                <div className="mt-2 w-full max-w-xl">
                     <div
                         className={`relative rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 ${
                             isComposerExpanded ? 'px-4 py-3.5' : 'px-4 py-2'

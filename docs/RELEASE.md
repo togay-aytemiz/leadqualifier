@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- Added landing legal center infrastructure in `qualy-lp`: markdown source docs (`legal/terms.md`, `legal/privacy.md`), runtime legal routes (`/legal`, `/terms`, `/privacy`), shared legal shell/pages, and legal markdown parser utilities with Vitest coverage (`lib/legal-utils.ts`, `lib/legal.test.ts`).
+- Added build-time legal manifest generation (`scripts/generate-legal-assets.mjs`) and `prebuild` hook to emit `public/legal_versions.json` from markdown frontmatter versions.
 - Added route-aware browser tab title sync component (`src/components/common/TabTitleSync.tsx`) with dashboard/auth layout wiring so tabs render `Page | Qualy`.
 - Added tab-title utility + tests (`src/lib/tab-title.ts`, `src/lib/tab-title.test.ts`) for locale-safe route resolution and title formatting.
 - Added branding regression coverage in `src/app/[locale]/layout.metadata.test.ts` to lock `Qualy` tab metadata/icon settings and prevent legacy name reintroduction in EN/TR common labels.
@@ -94,6 +96,7 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed auth messenger preview spacing density: reduced message stack gap, reduced thread viewport height/padding, and reduced thread-to-composer top margin for a tighter chat/composer rhythm.
 - Changed Inbox tab indicator behavior to show `(●)` when unread exists instead of unread count in tab title.
 - Changed runtime branding text from the legacy product name to `Qualy` in document metadata and shared EN/TR common app labels.
 - Changed app favicon pipeline to use `icon-black.svg` via locale metadata icons and app-level `src/app/icon.svg`; removed legacy `src/app/favicon.ico`.

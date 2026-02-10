@@ -3,7 +3,7 @@ export function getAuthPreviewThreadFrameClasses(): string {
 }
 
 export function getAuthPreviewMessageStackClasses(): string {
-    return 'flex min-h-full flex-col justify-end gap-3 pb-4'
+    return 'flex min-h-full flex-col justify-end gap-2.5 pb-3'
 }
 
 export function getAuthPreviewBubbleEnterClasses(): string {
@@ -13,14 +13,14 @@ export function getAuthPreviewBubbleEnterClasses(): string {
 export function getAuthPreviewThreadViewportClasses(): string {
     return [
         'min-h-0',
-        'h-[clamp(12rem,35vh,18rem)]',
+        'h-[clamp(10rem,28vh,15rem)]',
         'overflow-y-auto',
         'overscroll-contain',
         '[scrollbar-width:none]',
         '[-ms-overflow-style:none]',
         '[&::-webkit-scrollbar]:hidden',
         'px-1',
-        'pb-4',
+        'pb-3',
         'pt-8',
         '[mask-image:linear-gradient(to_bottom,transparent_0%,black_12%,black_100%)]',
         '[-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_12%,black_100%)]',

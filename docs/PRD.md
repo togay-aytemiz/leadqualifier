@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-09 (WhatsApp/Instagram channel onboarding moved to one-click Meta OAuth from channel cards; intermediate modal removed; OAuth status redirects now return to the active channels route via safe `returnTo`; platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels + Inbox + Leads; auth preview thread now keeps fixed/clamped-height behavior with hidden-scroll + top fade and bottom-anchored bubbles above composer to avoid short-viewport push glitches, plus smooth incoming bubble motion and protected composer spacing; forgot/reset password forms now share sign in/sign up styling (no nested card wrapper); app branding switched to `Qualy` with tab metadata updates and `/icon-black.svg` favicon usage; browser tab title now follows active route (`Page | Qualy`) and Inbox uses unread dot indicator `(●)` in title; build re-verified)  
+> **Last Updated:** 2026-02-10 (landing legal infrastructure added: markdown-backed privacy/terms pages with shared legal center route and build-time `legal_versions.json` manifest generation; previous channel/auth/platform updates retained)  
 > **Status:** In Development
 
 ---
@@ -47,6 +47,7 @@ Automate WhatsApp message handling:
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Skills/KB/Inbox/Settings/Channels done; Leads/Dashboard pending) |
+| Public Legal Center | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json` | Implemented |
 | **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, mobile list→conversation flow with details toggle** | Implemented |
 
 ### ❌ Out of Scope (Intentional)
@@ -485,6 +486,7 @@ MVP is successful when:
 - **Auth Preview Thread Layout:** Keep preview chat thread capped with internal hidden-scroll and a top gradient fade, while anchoring message bubbles at the bottom near the composer.
 - **Auth Preview Small-Viewport Stability:** Prefer fixed/clamped thread height over content-driven growth so additional bubbles are clipped/faded rather than pushing the auth canvas.
 - **Auth Preview Motion Stability:** Animate incoming bubbles and reserve typing-bubble height to prevent micro-jumps while agent text appears.
+- **Auth Preview Density:** Keep message stack and thread-to-composer spacing slightly compact to avoid excess whitespace while preserving readability.
 - **Password Recovery Visual Consistency:** Keep Forgot/Reset forms in the same auth form system as Sign In/Sign Up (ink accent focus/CTA/link styles, no secondary inner card wrapper).
 - **Auth Scenario Variety:** Avoid semantically chained scenario rotations; each scenario should represent a separate use-case category.
 - **Auth Scoring Visibility:** Do not show scoring before first customer input; start scoring only after initial message signal exists.
@@ -623,6 +625,7 @@ MVP is successful when:
 - **Next.js Interceptor Convention:** Use `src/proxy.ts` (not `src/middleware.ts`) for locale interception on Next.js 16+.
 - **Placeholder Source Transparency:** Keep non-MVP Knowledge source options visible in New Content menu but mark inactive options (including PDF upload) with a `Coming Soon` badge.
 - **Inbox Query Resilience:** When nested relational conversation reads fail, fall back to flat per-table conversation/message/lead/assignee reads so Inbox does not incorrectly show an empty state.
+- **Landing Legal Delivery:** Keep legal documents as versioned markdown source (`legal/*.md`), render `/legal`, `/terms`, `/privacy` from those files, and generate `public/legal_versions.json` during build for external consumption.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
