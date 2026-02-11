@@ -196,6 +196,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed Leads list required-field rendering so values extracted into Inbox "Important info" (`extracted_fields.required_intake_collected`) now appear in both desktop table columns and mobile lead cards.
 - Fixed greeting-only first-contact turns remaining `ignored` when extraction returned `non_business=true` by normalizing greeting-only conversations to `undetermined`.
 - Fixed profile-only service hallucination in greeting-only conversations (for example, `Hello`) by nulling inferred `service_type` unless customer text contains a concrete service clue.
 - Fixed Inbox conversation-list lead-chip drift by syncing row status on manual refresh/realtime lead updates, including `ignored` (`Yok sayıldı`).

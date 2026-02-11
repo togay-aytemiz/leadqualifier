@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Monetization direction now records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing now surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies now enforce explicit `max_tokens` output limits for cost predictability; lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs now reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, and Phase 9 QA closure now includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline)  
+> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the same required-intake resolver as Inbox "Important info" so `required_intake_collected` values appear consistently across details and list views; monetization direction records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies enforce explicit `max_tokens` output limits for cost predictability; lead extraction supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, and Phase 9 QA closure includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline)  
 > **Status:** In Development
 
 ---
@@ -195,6 +195,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Greeting-only turns are normalized to `undetermined` even if raw model output marks `non_business=true`, preventing false `ignored` statuses on first-contact hellos.
 - Extraction locale precedence is deterministic: explicit preferred locale (UI/manual refresh) > organization locale > customer-message language heuristics.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
+- Leads list required-field columns/cards use the same required-intake resolver as Inbox details so `required_intake_collected` values stay consistent across both surfaces.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
 - Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
 - Non-business conversations are excluded from lead scoring and marked as `ignored` (not `undetermined`).
@@ -272,6 +273,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - "Open in WhatsApp" button
 - Mobile layout uses compact, tappable card rows with reduced spacing; desktop keeps the full sortable table layout.
 - Desktop table keeps status chips on one line and keeps contact name on one line with truncation when needed.
+- Required-field values in lead rows are resolved from the same normalized source used by Inbox details (`required_intake_collected` + fallback logic) for parity.
 
 ### 5.2 Skills Management (Implemented; Simulator-First Testing)
 - CRUD operations
@@ -636,6 +638,7 @@ MVP is successful when:
 - **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.
 - **Lead Scoring Transparency:** Weight decisive booking intent higher (+3), add keyword fallback for intent signals, and expose on-demand score reasoning grounded in extracted inputs.
 - **Lead Score UX:** Reasoning copy respects the active UI locale and uses localized status labels.
+- **Required-Info Display Parity:** Lead list required-field rows/cards must reuse the Inbox required-intake resolver so `required_intake_collected` and fallback values stay consistent across both views.
 - **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and require admin approval before the service can be used in extraction.
 - **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; AI suggestions are generated from Skills/KB in org language using a hybrid format (intro + up to 5 bullets), start pending, can propose updates to existing approved suggestions, and only approved suggestions are used for extraction.
 - **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.

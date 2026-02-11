@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (Monetization direction now records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; Usage & Billing now shows a token-derived AI credit usage preview alongside token totals; shared inbound webhook RAG replies now enforce an explicit max output token cap for cost predictability; lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, greeting-only false `non_business` outputs are normalized to `undetermined`, `service_type` no longer carries forward when latest extraction has no service clue, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope, and Phase 9 QA closure now includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline)  
+> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the inbox required-intake resolver so `Important info` values from `required_intake_collected` appear consistently in Leads table/mobile cards; monetization direction records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; Usage & Billing shows token-derived AI credit usage preview alongside token totals; shared inbound webhook RAG replies enforce an explicit max output token cap; lead extraction supports `undetermined` status for insufficient-information conversations while reserving `ignored` for non-business cases; greeting-only false `non_business` outputs normalize to `undetermined`; `service_type` no longer carries forward when latest extraction has no service clue; inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling; stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope; and Phase 9 QA closure includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -410,6 +410,7 @@
 - [x] **Lead List UX**
   - [x] Mobile leads list now uses compact card rows with reduced spacing while preserving the existing desktop table layout
   - [x] Desktop leads table keeps status chips on a single line and truncates long contact names to a single line
+  - [x] Required-intake values shown in Inbox "Important info" are now rendered consistently in Leads table/mobile rows via shared resolver logic
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
 

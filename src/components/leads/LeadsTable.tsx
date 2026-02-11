@@ -11,7 +11,11 @@ import { tr, enUS } from 'date-fns/locale'
 import { useLocale } from 'next-intl'
 import * as Popover from '@radix-ui/react-popover'
 import { useState } from 'react'
-import { getMobileRequiredFieldHints, truncateForMobileSummary } from '@/components/leads/mobile-table'
+import {
+    getLeadRequiredFieldValue,
+    getMobileRequiredFieldHints,
+    truncateForMobileSummary
+} from '@/components/leads/mobile-table'
 
 interface LeadsTableProps {
     leads: LeadWithConversation[]
@@ -164,9 +168,7 @@ export function LeadsTable({
     }
 
     const getExtractedFieldValue = (lead: LeadWithConversation, fieldName: string): string => {
-        if (!lead.extracted_fields) return '-'
-        const fields = lead.extracted_fields as Record<string, string>
-        return fields[fieldName] || '-'
+        return getLeadRequiredFieldValue(lead, fieldName) ?? '-'
     }
 
     const from = (page - 1) * pageSize + 1

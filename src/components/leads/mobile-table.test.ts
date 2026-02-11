@@ -38,6 +38,25 @@ describe('mobile leads table helpers', () => {
         expect(hints[1]).toEqual({ field: 'budget', value: '20.000 TL' })
     })
 
+    it('reads required fields from required_intake_collected payload', () => {
+        const hints = getMobileRequiredFieldHints(
+            {
+                extracted_fields: {
+                    required_intake_collected: {
+                        city: 'Istanbul',
+                        budget: '20.000 TL',
+                        timeline: 'next week'
+                    }
+                }
+            },
+            ['city', 'budget', 'timeline']
+        )
+
+        expect(hints).toHaveLength(MOBILE_REQUIRED_FIELDS_MAX)
+        expect(hints[0]).toEqual({ field: 'city', value: 'Istanbul' })
+        expect(hints[1]).toEqual({ field: 'budget', value: '20.000 TL' })
+    })
+
     it('filters out missing required field values', () => {
         const hints = getMobileRequiredFieldHints(
             {
