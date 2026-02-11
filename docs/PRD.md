@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the same required-intake resolver as Inbox "Important info" so `required_intake_collected` values appear consistently across details and list views; monetization direction records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies enforce explicit `max_tokens` output limits for cost predictability; lead extraction supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, and Phase 9 QA closure includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline)  
+> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the same required-intake resolver as Inbox "Important info" so `required_intake_collected` values appear consistently across details and list views; monetization direction records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies enforce explicit `max_tokens` output limits for cost predictability; lead extraction supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, Phase 9 QA closure includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline, and Sign Up consent now uses inline clickable legal links in place of a required checkbox)  
 > **Status:** In Development
 
 ---
@@ -327,7 +327,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Profile security: password recovery via email reset link (Forgot + Reset)
 - Forgot/Reset password screens share the same auth form visual language as Sign In/Sign Up (typography, input focus, CTA/link accents) and avoid nested wrapped-card layout.
 - Public auth pages now include a top logo header and inline EN/TR language switcher.
-- Sign Up form fields for MVP are `full_name`, `email`, `password`, and required consent confirmation.
+- Sign Up form fields for MVP are `full_name`, `email`, and `password`; legal consent is communicated as inline Terms/Privacy links (no required checkbox).
 - Sign In and Sign Up password inputs include show/hide toggle controls.
 - Sign In and Sign Up are route-level separated (`/login`, `/register`) and no longer use an in-form segmented switcher.
 - Public auth desktop shell includes an animated messenger-style preview panel with conversion-focused typed user/assistant example flows.
@@ -514,7 +514,8 @@ MVP is successful when:
 - **Auth Scenario Variety:** Avoid semantically chained scenario rotations; each scenario should represent a separate use-case category.
 - **Auth Scoring Visibility:** Do not show scoring before first customer input; start scoring only after initial message signal exists.
 - **Auth Scoring Placement:** Keep scoring UI detached from customer input area to avoid implying end-user visibility; prefer compact analyst-style top placement.
-- **Auth Input Scope (MVP):** Keep Sign Up minimal (`full_name`, `email`, `password`, required consent) and postpone SSO/Google to post-MVP.
+- **Auth Input Scope (MVP):** Keep Sign Up minimal (`full_name`, `email`, `password`) and postpone SSO/Google to post-MVP.
+- **Auth Legal Consent UX (MVP):** Replace mandatory Sign Up consent checkbox with inline legal notice copy linking to Terms and Privacy in a new tab for lower friction while preserving policy visibility.
 - **Auth Password UX:** Provide explicit password show/hide controls on Sign In and Sign Up for entry confidence on desktop/mobile.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.

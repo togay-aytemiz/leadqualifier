@@ -42,6 +42,7 @@
         "showPassword": "Şifreyi göster",
         "hidePassword": "Şifreyi gizle",
         "consentLabel": "Hizmet Koşulları ve Gizlilik Politikası'nı kabul ediyorum.",
+        "consentNotice": "Kayıt olarak <terms>Hizmet Koşulları</terms> ve <privacy>Gizlilik Politikası</privacy> kabul etmiş olursunuz.",
         "language": "Dil",
         "languageEnglish": "EN",
         "languageTurkish": "TR",

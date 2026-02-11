@@ -6,15 +6,18 @@ import { register } from '@/lib/auth/actions'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/design'
 import {
+    getRegisterConsentLinkClasses,
     getRegisterConsentLabelClasses,
     getRegisterConsentTextClasses,
 } from '@/components/auth/registerConsentStyles'
+import { getRegisterConsentLinks } from '@/components/auth/registerConsentLinks'
 import { Eye, EyeOff } from 'lucide-react'
 
 export function RegisterForm() {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
     const [showPassword, setShowPassword] = useState(false)
+    const consentLinks = getRegisterConsentLinks()
     const [state, formAction, pending] = useActionState(
         async (_prevState: { error?: string } | null, formData: FormData) => {
             return await register(formData)
@@ -96,16 +99,30 @@ export function RegisterForm() {
                 <input type="hidden" name="companyName" value="" />
 
                 <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
-                    <label htmlFor="consent" className={getRegisterConsentLabelClasses()}>
-                        <input
-                            id="consent"
-                            name="consent"
-                            type="checkbox"
-                            required
-                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#242A40] focus:ring-[#242A40]/20"
-                        />
-                        <span className={getRegisterConsentTextClasses()}>{t('consentLabel')}</span>
-                    </label>
+                    <p className={`${getRegisterConsentLabelClasses()} ${getRegisterConsentTextClasses()}`}>
+                        {t.rich('consentNotice', {
+                            terms: (chunks) => (
+                                <a
+                                    href={consentLinks.terms.href}
+                                    target={consentLinks.terms.target}
+                                    rel={consentLinks.terms.rel}
+                                    className={getRegisterConsentLinkClasses()}
+                                >
+                                    {chunks}
+                                </a>
+                            ),
+                            privacy: (chunks) => (
+                                <a
+                                    href={consentLinks.privacy.href}
+                                    target={consentLinks.privacy.target}
+                                    rel={consentLinks.privacy.rel}
+                                    className={getRegisterConsentLinkClasses()}
+                                >
+                                    {chunks}
+                                </a>
+                            ),
+                        })}
+                    </p>
                 </div>
 
                 <Button
