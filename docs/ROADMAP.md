@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-10 (Monetization direction now records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, greeting-only false `non_business` outputs are normalized to `undetermined`, `service_type` no longer carries forward when latest extraction has no service clue, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope, and Phase 9 QA closure now includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline)  
+> **Last Updated:** 2026-02-10 (Monetization direction now records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; Usage & Billing now shows a token-derived AI credit usage preview alongside token totals; shared inbound webhook RAG replies now enforce an explicit max output token cap for cost predictability; lead extraction now supports `undetermined` status for insufficient-information conversations, `ignored` is reserved for non-business cases, greeting-only false `non_business` outputs are normalized to `undetermined`, `service_type` no longer carries forward when latest extraction has no service clue, inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling, stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope, and Phase 9 QA closure now includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -237,6 +237,7 @@
   - [x] Error handling
   - [x] Router responses now enforce a max output token cap for predictable cost
   - [x] Fallback/RAG responses now enforce max output token caps for predictable cost
+  - [x] Shared inbound webhook RAG generation path (`src/lib/channels/inbound-ai-pipeline.ts`) now sets explicit `max_tokens`
 - [x] **Bot Mode (Org-Level)**
   - [x] Active / Shadow / Off (Simulator excluded)
   - [x] AI Settings selector + sidebar status indicator
@@ -270,6 +271,7 @@
 - [x] **Usage & Billing UI:** Add message volume cards (AI-generated, operator-sent, inbound customer) for monthly UTC and all-time totals
 - [x] **Usage & Billing UI:** Add storage usage cards with total size plus Skills/Knowledge Base breakdown
 - [x] **Usage & Billing UI:** Show message breakdown metrics on separate rows per card for faster scanning
+- [x] **Usage & Billing UI:** Show token-derived AI credit usage preview next to monthly/all-time token totals
 - [x] **Settings UX:** Save buttons show a transient success state and clear dirty-state across settings pages
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs

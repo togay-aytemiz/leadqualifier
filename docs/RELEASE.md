@@ -112,6 +112,8 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Usage & Billing AI cards to keep token totals and also show token-derived credit usage preview values (weighted formula) for monthly/all-time visibility (`src/app/[locale]/(dashboard)/settings/billing/page.tsx`, `src/lib/billing/usage.ts`, `messages/en.json`, `messages/tr.json`).
+- Changed shared inbound webhook RAG generation to enforce explicit `max_tokens` on OpenAI completion calls (`src/lib/channels/inbound-ai-pipeline.ts`) and added regression coverage to lock the cap (`src/lib/channels/inbound-ai-pipeline.test.ts`).
 - Changed monetization docs to record pre-pilot trial-only direction (no freemium), add trial-abuse prevention backlog items, and capture low-entry starter pricing posture (~USD 10 equivalent target band) in roadmap/PRD planning sections (`docs/ROADMAP.md`, `docs/PRD.md`).
 - Changed product docs to align Phase 7 Channels scope with implementation: WhatsApp connection status/debug is tracked as implemented, and the standalone "test message sandbox" backlog item was removed from MVP scope (`docs/ROADMAP.md`, `docs/PRD.md`).
 - Changed admin dashboard/admin leads markup to include stable Playwright selectors (`admin-dashboard-page`, `admin-leads-page`, `admin-readonly-banner`) for smoke automation.

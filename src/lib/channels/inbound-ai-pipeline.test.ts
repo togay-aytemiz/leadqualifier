@@ -1,34 +1,70 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+    buildRagContextMock,
     buildFallbackResponseMock,
     decideHumanEscalationMock,
+    decideKnowledgeBaseRouteMock,
     getOrgAiSettingsMock,
     getRequiredIntakeFieldsMock,
     isOperatorActiveMock,
     matchSkillsSafelyMock,
+    openAiCreateMock,
+    recordAiUsageMock,
     resolveBotModeActionMock,
     resolveLeadExtractionAllowanceMock,
-    runLeadExtractionMock
+    runLeadExtractionMock,
+    searchKnowledgeBaseMock
 } = vi.hoisted(() => ({
+    buildRagContextMock: vi.fn(),
     buildFallbackResponseMock: vi.fn(),
     decideHumanEscalationMock: vi.fn(),
+    decideKnowledgeBaseRouteMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     getRequiredIntakeFieldsMock: vi.fn(),
     isOperatorActiveMock: vi.fn(),
     matchSkillsSafelyMock: vi.fn(),
+    openAiCreateMock: vi.fn(),
+    recordAiUsageMock: vi.fn(),
     resolveBotModeActionMock: vi.fn(),
     resolveLeadExtractionAllowanceMock: vi.fn(),
-    runLeadExtractionMock: vi.fn()
+    runLeadExtractionMock: vi.fn(),
+    searchKnowledgeBaseMock: vi.fn()
 }))
 
 vi.mock('@/lib/ai/settings', () => ({
     getOrgAiSettings: getOrgAiSettingsMock
 }))
 
+vi.mock('openai', () => ({
+    default: class OpenAIMock {
+        chat = {
+            completions: {
+                create: openAiCreateMock
+            }
+        }
+    }
+}))
+
 vi.mock('@/lib/ai/followup', () => ({
     getRequiredIntakeFields: getRequiredIntakeFieldsMock,
     buildRequiredIntakeFollowupGuidance: vi.fn(() => '')
+}))
+
+vi.mock('@/lib/knowledge-base/router', () => ({
+    decideKnowledgeBaseRoute: decideKnowledgeBaseRouteMock
+}))
+
+vi.mock('@/lib/knowledge-base/rag', () => ({
+    buildRagContext: buildRagContextMock
+}))
+
+vi.mock('@/lib/knowledge-base/actions', () => ({
+    searchKnowledgeBase: searchKnowledgeBaseMock
+}))
+
+vi.mock('@/lib/ai/usage', () => ({
+    recordAiUsage: recordAiUsageMock
 }))
 
 vi.mock('@/lib/ai/bot-mode', () => ({
@@ -146,6 +182,38 @@ function createSkillDetailsBuilder(skill: Record<string, unknown> | null) {
     }
 }
 
+function createMessageHistoryBuilder(messages: Array<Record<string, unknown>>) {
+    const limitMock = vi.fn(async () => ({ data: messages, error: null }))
+    const orderMock = vi.fn(() => ({ limit: limitMock }))
+    const eqMock = vi.fn(() => ({ order: orderMock }))
+    const selectMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            select: selectMock
+        },
+        selectMock,
+        eqMock,
+        orderMock,
+        limitMock
+    }
+}
+
+function createLeadSnapshotBuilder(lead: Record<string, unknown> | null) {
+    const maybeSingleMock = vi.fn(async () => ({ data: lead, error: null }))
+    const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+    const selectMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            select: selectMock
+        },
+        selectMock,
+        eqMock,
+        maybeSingleMock
+    }
+}
+
 function createConversation(overrides: Record<string, unknown> = {}) {
     return {
         id: 'conv-1',
@@ -205,6 +273,26 @@ describe('processInboundAiPipeline guardrails', () => {
         resolveLeadExtractionAllowanceMock.mockReturnValue(false)
         isOperatorActiveMock.mockReturnValue(false)
         matchSkillsSafelyMock.mockResolvedValue([])
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: false,
+            rewritten_query: '',
+            reason: 'not_needed'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([])
+        buildRagContextMock.mockReturnValue({
+            context: '',
+            chunks: [],
+            tokenCount: 0
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'RAG response' } }],
+            usage: {
+                prompt_tokens: 120,
+                completion_tokens: 30,
+                total_tokens: 150
+            }
+        })
+        recordAiUsageMock.mockResolvedValue(undefined)
         decideHumanEscalationMock.mockReturnValue({ shouldEscalate: false })
         buildFallbackResponseMock.mockResolvedValue('Fallback response')
     })
@@ -284,6 +372,81 @@ describe('processInboundAiPipeline guardrails', () => {
         )
         expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover')
         expect(decideHumanEscalationMock).toHaveBeenCalled()
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('sets a max_tokens cap for inbound RAG completion', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Paket fiyatı nedir?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Paket fiyatı',
+            reason: 'knowledge_question',
+            usage: {
+                inputTokens: 12,
+                outputTokens: 5,
+                totalTokens: 17
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Newborn paket başlangıç fiyatı 1000 TL'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Newborn paket başlangıç fiyatı 1000 TL',
+            chunks: [{ document_id: 'doc-1', content: 'Newborn paket başlangıç fiyatı 1000 TL' }],
+            tokenCount: 7
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Newborn paket başlangıç fiyatı 1000 TL.' } }],
+            usage: {
+                prompt_tokens: 150,
+                completion_tokens: 25,
+                total_tokens: 175
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(
+                supabase,
+                sendOutbound
+            )
+        )
+
+        expect(openAiCreateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'gpt-4o-mini',
+                max_tokens: 320
+            })
+        )
+        expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 })

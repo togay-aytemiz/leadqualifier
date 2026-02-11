@@ -41,11 +41,20 @@ export interface FormattedStorageSize {
     unit: 'B' | 'KB' | 'MB' | 'GB'
 }
 
+export interface AiTokenTotalsLike {
+    inputTokens: number
+    outputTokens: number
+}
+
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
 interface GetSummaryOptions {
     supabase?: SupabaseClient
 }
+
+const CREDIT_INPUT_TOKEN_WEIGHT = 1
+const CREDIT_OUTPUT_TOKEN_WEIGHT = 4
+const TOKENS_PER_CREDIT = 3000
 
 function normalizeCount(value?: number | null) {
     if (!Number.isFinite(value ?? Number.NaN)) return 0
@@ -59,6 +68,29 @@ function getUtf8ByteSize(value: string | null | undefined) {
 function getStringArrayByteSize(values: string[] | null | undefined) {
     if (!Array.isArray(values)) return 0
     return values.reduce((total, value) => total + getUtf8ByteSize(value), 0)
+}
+
+function ceilToSingleDecimal(value: number) {
+    return Math.ceil(value * 10) / 10
+}
+
+export function calculateAiCreditsFromTokens(totals: AiTokenTotalsLike) {
+    const inputTokens = normalizeCount(totals.inputTokens)
+    const outputTokens = normalizeCount(totals.outputTokens)
+    const weightedTokens =
+        (inputTokens * CREDIT_INPUT_TOKEN_WEIGHT)
+        + (outputTokens * CREDIT_OUTPUT_TOKEN_WEIGHT)
+
+    if (weightedTokens <= 0) return 0
+    return ceilToSingleDecimal(weightedTokens / TOKENS_PER_CREDIT)
+}
+
+export function formatCreditAmount(credits: number, locale: string = 'en') {
+    const safeCredits = Math.max(0, Number.isFinite(credits) ? credits : 0)
+    return new Intl.NumberFormat(locale, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    }).format(safeCredits)
 }
 
 export function buildMessageUsageTotals(counts: MessageUsageCounts): MessageUsageTotals {

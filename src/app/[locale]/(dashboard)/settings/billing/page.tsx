@@ -4,7 +4,13 @@ import { PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { getOrgAiUsageSummary } from '@/lib/ai/usage'
 import { UsageBreakdownDetails } from './UsageBreakdownDetails'
-import { formatStorageSize, getOrgMessageUsageSummary, getOrgStorageUsageSummary } from '@/lib/billing/usage'
+import {
+    calculateAiCreditsFromTokens,
+    formatCreditAmount,
+    formatStorageSize,
+    getOrgMessageUsageSummary,
+    getOrgStorageUsageSummary
+} from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
 export default async function BillingSettingsPage() {
@@ -47,6 +53,8 @@ export default async function BillingSettingsPage() {
 
     const monthlyTotal = usage.monthly.totalTokens
     const totalTotal = usage.total.totalTokens
+    const monthlyCredits = calculateAiCreditsFromTokens(usage.monthly)
+    const totalCredits = calculateAiCreditsFromTokens(usage.total)
     const monthlyMessagesTotal = messageUsage.monthly.totalMessages
     const totalMessagesTotal = messageUsage.total.totalMessages
     const storageTotalSize = formatStorageSize(storageUsage.totalBytes, locale)
@@ -77,6 +85,10 @@ export default async function BillingSettingsPage() {
                                     {formatNumber.format(monthlyTotal)}
                                     <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
                                 </p>
+                                <p className="mt-1 text-sm font-medium text-gray-700">
+                                    {tBilling('creditsLabel')}: {formatCreditAmount(monthlyCredits, locale)}
+                                    <span className="ml-1 text-xs text-gray-500">{tBilling('creditsUnit')}</span>
+                                </p>
                                 <p className="mt-2 text-xs text-gray-500">
                                     {tBilling('inputLabel')}: {formatNumber.format(usage.monthly.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.monthly.outputTokens)}
                                 </p>
@@ -88,11 +100,17 @@ export default async function BillingSettingsPage() {
                                     {formatNumber.format(totalTotal)}
                                     <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
                                 </p>
+                                <p className="mt-1 text-sm font-medium text-gray-700">
+                                    {tBilling('creditsLabel')}: {formatCreditAmount(totalCredits, locale)}
+                                    <span className="ml-1 text-xs text-gray-500">{tBilling('creditsUnit')}</span>
+                                </p>
                                 <p className="mt-2 text-xs text-gray-500">
                                     {tBilling('inputLabel')}: {formatNumber.format(usage.total.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.total.outputTokens)}
                                 </p>
                             </div>
                         </div>
+
+                        <p className="mt-4 text-xs text-gray-500">{tBilling('creditsFormulaNote')}</p>
 
                         {totalTotal === 0 && (
                             <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-10 (Monetization direction now records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs now reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, and Phase 9 QA closure now includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline)  
+> **Last Updated:** 2026-02-10 (Monetization direction now records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing now surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies now enforce explicit `max_tokens` output limits for cost predictability; lead extraction now supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs now reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, and Phase 9 QA closure now includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline)  
 > **Status:** In Development
 
 ---
@@ -359,6 +359,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Report usage breakdown by summary, messages (router/RAG/fallback), and lead extraction (including lead reasoning)
 - Monthly usage card surfaces the UTC month label (e.g., February 2026)
 - Usage details link appears under the UTC note in the Usage & Billing section
+- AI usage cards show a token-derived credit preview next to monthly/all-time token totals to visualize future credit billing impact.
 - Add monthly UTC + all-time message volume cards for:
   - AI-generated messages (`sender_type='bot'`)
   - Operator-sent messages (`sender_type='user'`)
@@ -551,6 +552,7 @@ MVP is successful when:
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.
 - **Billing Message Metrics:** Message usage in Usage & Billing is computed from `messages.sender_type` with UTC monthly boundaries (`bot`, `user`, `contact`) and excludes `system` rows.
 - **Billing Storage Metrics:** Storage usage in Usage & Billing is an approximate UTF-8 text size based on Skills (`title`, `response_text`, `trigger_examples`) and Knowledge Documents (`title`, `content`).
+- **Billing Credit Preview Formula:** AI credit preview uses weighted token totals (`input + 4 × output`) divided by `3000` and rounded up to one decimal place.
 - **Billing Message Layout:** Present AI/operator/customer message counts on separate rows inside each message usage card to improve scanability.
 - **Fallback Prompt Source:** Use the UI-configured fallback prompt directly (no hardcoded system append).
 - **Inbox Assistant-State Banner:** Composer banner copy reflects org `bot_mode` (`active` vs `shadow`/`off`) so runtime reply availability is explicit.
@@ -648,6 +650,7 @@ MVP is successful when:
 - **Required Fields Sync:** On Skill/KB updates, ask AI for only missing required fields by sending existing fields in prompt context; normalize/dedupe before persisting so manual and AI chips do not duplicate.
 - **Required Fields Parsing:** Accept fenced/noisy JSON responses when extracting required fields so KB/Skill-triggered chip generation remains resilient.
 - **Required Fields Follow-Up:** For KB/fallback response generation, include required fields, recent customer messages, and the last 3 assistant replies in prompt context so LLM can naturally ask one concise follow-up question when needed and avoid repetitive openings.
+- **Webhook RAG Output Cap:** Shared inbound webhook RAG generation path (`src/lib/channels/inbound-ai-pipeline.ts`) must set explicit `max_tokens` to keep output size/cost bounded across Meta channels.
 - **Structured Output Mode:** For JSON-producing LLM tasks (lead extraction, required-intake follow-up, offering profile suggestion/repair, required-field proposal), enforce `response_format: json_object` to reduce parse drift and retry churn.
 - **Prompt Budget Guardrails:** Truncate oversized knowledge document content before sending profile/intake suggestion context to LLM tasks.
 - **LLM Output Caps:** Apply explicit `max_tokens` limits on router, fallback, RAG, summary, lead reasoning, and extraction calls to keep cost and latency bounded.

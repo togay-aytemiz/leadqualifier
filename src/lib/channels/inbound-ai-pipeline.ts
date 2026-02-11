@@ -20,6 +20,8 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 
+const RAG_MAX_OUTPUT_TOKENS = 320
+
 export interface InboundAiPipelineInput {
     supabase: SupabaseClient
     organizationId: string
@@ -397,7 +399,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         ...historyMessages,
                         { role: 'user', content: options.text }
                     ],
-                    temperature: 0.3
+                    temperature: 0.3,
+                    max_tokens: RAG_MAX_OUTPUT_TOKENS
                 })
 
                 const ragResponse = completion.choices[0]?.message?.content?.trim()
