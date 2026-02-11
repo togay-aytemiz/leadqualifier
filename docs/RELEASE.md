@@ -113,7 +113,7 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
-- Changed Sign Up consent UX to Crisp-style inline notice text (`Kayıt olarak ... kabul etmiş olursunuz`) with clickable underlined legal links that open `https://askqualy.com/terms` and `https://askqualy.com/privacy` in a new tab; removed the required checkbox from register form (`src/components/auth/RegisterForm.tsx`, `messages/tr.json`, `messages/en.json`).
+- Changed Sign Up consent UX to Crisp-style inline notice text (`Kayıt olarak ... kabul etmiş olursunuz`) with clickable underlined legal links that open `https://askqualy.com/terms` and `https://askqualy.com/privacy` in a new tab; removed the required checkbox and boxed/wrapper container from register form (`src/components/auth/RegisterForm.tsx`, `messages/tr.json`, `messages/en.json`).
 - Changed Usage & Billing AI cards to keep token totals and also show token-derived credit usage preview values (weighted formula) for monthly/all-time visibility (`src/app/[locale]/(dashboard)/settings/billing/page.tsx`, `src/lib/billing/usage.ts`, `messages/en.json`, `messages/tr.json`).
 - Changed shared inbound webhook RAG generation to enforce explicit `max_tokens` on OpenAI completion calls (`src/lib/channels/inbound-ai-pipeline.ts`) and added regression coverage to lock the cap (`src/lib/channels/inbound-ai-pipeline.test.ts`).
 - Changed monetization docs to record pre-pilot trial-only direction (no freemium), add trial-abuse prevention backlog items, and capture low-entry starter pricing posture (~USD 10 equivalent target band) in roadmap/PRD planning sections (`docs/ROADMAP.md`, `docs/PRD.md`).

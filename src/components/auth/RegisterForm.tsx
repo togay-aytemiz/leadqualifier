@@ -98,32 +98,30 @@ export function RegisterForm() {
 
                 <input type="hidden" name="companyName" value="" />
 
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
-                    <p className={`${getRegisterConsentLabelClasses()} ${getRegisterConsentTextClasses()}`}>
-                        {t.rich('consentNotice', {
-                            terms: (chunks) => (
-                                <a
-                                    href={consentLinks.terms.href}
-                                    target={consentLinks.terms.target}
-                                    rel={consentLinks.terms.rel}
-                                    className={getRegisterConsentLinkClasses()}
-                                >
-                                    {chunks}
-                                </a>
-                            ),
-                            privacy: (chunks) => (
-                                <a
-                                    href={consentLinks.privacy.href}
-                                    target={consentLinks.privacy.target}
-                                    rel={consentLinks.privacy.rel}
-                                    className={getRegisterConsentLinkClasses()}
-                                >
-                                    {chunks}
-                                </a>
-                            ),
-                        })}
-                    </p>
-                </div>
+                <p className={`${getRegisterConsentLabelClasses()} ${getRegisterConsentTextClasses()}`}>
+                    {t.rich('consentNotice', {
+                        terms: (chunks) => (
+                            <a
+                                href={consentLinks.terms.href}
+                                target={consentLinks.terms.target}
+                                rel={consentLinks.terms.rel}
+                                className={getRegisterConsentLinkClasses()}
+                            >
+                                {chunks}
+                            </a>
+                        ),
+                        privacy: (chunks) => (
+                            <a
+                                href={consentLinks.privacy.href}
+                                target={consentLinks.privacy.target}
+                                rel={consentLinks.privacy.rel}
+                                className={getRegisterConsentLinkClasses()}
+                            >
+                                {chunks}
+                            </a>
+                        ),
+                    })}
+                </p>
 
                 <Button
                     type="submit"

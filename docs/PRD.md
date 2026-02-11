@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the same required-intake resolver as Inbox "Important info" so `required_intake_collected` values appear consistently across details and list views; monetization direction records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies enforce explicit `max_tokens` output limits for cost predictability; lead extraction supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, Phase 9 QA closure includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline, and Sign Up consent now uses inline clickable legal links in place of a required checkbox)  
+> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the same required-intake resolver as Inbox "Important info" so `required_intake_collected` values appear consistently across details and list views; monetization direction records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies enforce explicit `max_tokens` output limits for cost predictability; lead extraction supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, Phase 9 QA closure includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline, and Sign Up consent now uses inline clickable legal links in place of a required checkbox/boxed wrapper)  
 > **Status:** In Development
 
 ---
@@ -345,7 +345,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Incoming bot typing now reserves target bubble height and uses smooth bubble-enter motion to avoid jitter while text is being typed.
 - Auth preview keeps extra spacing between message stack and composer so multi-line bot bubbles do not visually collide with input.
 - Support-only scenario agent closing copy is concise and handoff-oriented (“request forwarded to support team”).
-- Sign Up consent row keeps a compact single-line presentation on desktop and may wrap on smaller viewports.
+- Sign Up consent notice is plain inline text (no bordered/boxed wrapper), stays compact on desktop, and may wrap on smaller viewports.
 - Customer bubbles are explicitly labeled (`Müşteri` / `Customer`) to clarify that shown messages are incoming customer text in the simulation.
 - Organization: company name and future org-level defaults
 - Mobile Settings navigation now opens with a dedicated settings list page first, then transitions to selected detail pages with an explicit back action.
@@ -516,6 +516,7 @@ MVP is successful when:
 - **Auth Scoring Placement:** Keep scoring UI detached from customer input area to avoid implying end-user visibility; prefer compact analyst-style top placement.
 - **Auth Input Scope (MVP):** Keep Sign Up minimal (`full_name`, `email`, `password`) and postpone SSO/Google to post-MVP.
 - **Auth Legal Consent UX (MVP):** Replace mandatory Sign Up consent checkbox with inline legal notice copy linking to Terms and Privacy in a new tab for lower friction while preserving policy visibility.
+- **Auth Consent Visual Style (MVP):** Render legal consent notice as normal inline text (no bordered/boxed container) so it reads like supporting form copy.
 - **Auth Password UX:** Provide explicit password show/hide controls on Sign In and Sign Up for entry confidence on desktop/mobile.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
