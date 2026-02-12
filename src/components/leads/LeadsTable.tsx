@@ -4,13 +4,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { DataTable, TableBody, TableRow, TableCell, Badge, Button } from '@/design'
 import { LeadWithConversation } from '@/lib/leads/list-actions'
-import { RiTelegramFill, RiWhatsappFill, RiInstagramFill } from 'react-icons/ri'
+import type { ConversationPlatform } from '@/types/database'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { useLocale } from 'next-intl'
 import * as Popover from '@radix-ui/react-popover'
 import { useState } from 'react'
+import { getConversationPlatformIconSrc } from '@/lib/channels/platform-icons'
 import {
     getLeadRequiredFieldValue,
     getMobileRequiredFieldHints,
@@ -154,15 +155,10 @@ export function LeadsTable({
         return <ChevronsUpDown size={14} className="text-gray-300" />
     }
 
-    const getPlatformIcon = (platform: string) => {
-        if (platform === 'telegram') {
-            return <RiTelegramFill className="text-[#229ED9]" size={18} />
-        }
-        if (platform === 'whatsapp') {
-            return <RiWhatsappFill className="text-[#25D366]" size={18} />
-        }
-        if (platform === 'instagram') {
-            return <RiInstagramFill className="text-[#E1306C]" size={18} />
+    const getPlatformIcon = (platform: ConversationPlatform) => {
+        const src = getConversationPlatformIconSrc(platform)
+        if (src) {
+            return <img alt="" aria-hidden className="h-[18px] w-[18px]" src={src} />
         }
         return <span className="text-xs text-gray-400">{t('platformSimulatorShort')}</span>
     }

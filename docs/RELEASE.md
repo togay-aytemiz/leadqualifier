@@ -113,6 +113,7 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed channel platform icon rendering in Settings > Channels, Inbox, and Leads list to use shared public SVG assets (`/Telegram.svg`, `/whatsapp.svg`, `/instagram.svg`, `/messenger.svg`) while keeping Telegram/WhatsApp active and Instagram/Messenger launch-gated as `Coming Soon` (`src/lib/channels/platform-icons.ts`, `src/components/channels/ChannelCard.tsx`, `src/components/inbox/InboxContainer.tsx`, `src/components/leads/LeadsTable.tsx`).
 - Changed Sign Up consent UX to Crisp-style inline notice text (`Kayıt olarak ... kabul etmiş olursunuz`) with clickable underlined legal links that open `https://askqualy.com/terms` and `https://askqualy.com/privacy` in a new tab; removed the required checkbox and boxed/wrapper container from register form (`src/components/auth/RegisterForm.tsx`, `messages/tr.json`, `messages/en.json`).
 - Changed Usage & Billing AI cards to keep token totals and also show token-derived credit usage preview values (weighted formula) for monthly/all-time visibility (`src/app/[locale]/(dashboard)/settings/billing/page.tsx`, `src/lib/billing/usage.ts`, `messages/en.json`, `messages/tr.json`).
 - Changed shared inbound webhook RAG generation to enforce explicit `max_tokens` on OpenAI completion calls (`src/lib/channels/inbound-ai-pipeline.ts`) and added regression coverage to lock the cap (`src/lib/channels/inbound-ai-pipeline.test.ts`).

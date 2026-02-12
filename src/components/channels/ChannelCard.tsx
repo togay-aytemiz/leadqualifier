@@ -7,8 +7,8 @@ import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disc
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { useTranslations } from 'next-intl'
-import { RiTelegramFill, RiWhatsappFill, RiInstagramFill, RiMessengerFill } from 'react-icons/ri'
 import type { ChannelCardType } from '@/components/channels/channelCards'
+import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 
 interface ChannelCardProps {
     channel?: Channel
@@ -26,10 +26,14 @@ function getChannelSurfaceClasses(type: ChannelCardType) {
 }
 
 function getChannelIcon(type: ChannelCardType) {
-    if (type === 'telegram') return <RiTelegramFill className="text-[#229ED9]" size={28} />
-    if (type === 'whatsapp') return <RiWhatsappFill className="text-[#25D366]" size={28} />
-    if (type === 'instagram') return <RiInstagramFill className="text-[#E1306C]" size={28} />
-    return <RiMessengerFill className="text-[#0084FF]" size={28} />
+    return (
+        <img
+            alt=""
+            aria-hidden
+            className="h-7 w-7"
+            src={getChannelPlatformIconSrc(type)}
+        />
+    )
 }
 
 export function ChannelCard({ channel, type, onConnect, isComingSoon = false, isReadOnly = false }: ChannelCardProps) {

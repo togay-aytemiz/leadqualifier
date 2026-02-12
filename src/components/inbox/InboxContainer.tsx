@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { HiMiniSparkles } from 'react-icons/hi2'
-import { RiTelegramFill, RiWhatsappFill, RiInstagramFill } from 'react-icons/ri'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
     getMessages,
@@ -42,6 +41,7 @@ import { shouldShowConversationSkeleton } from '@/components/inbox/conversationS
 import { cn } from '@/lib/utils'
 import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
 import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
+import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -857,12 +857,8 @@ export function InboxContainer({
                                     <Avatar name={c.contact_name} size="sm" />
                                     <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
                                         <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
-                                            {c.platform === 'telegram' ? (
-                                                <RiTelegramFill className="text-[#229ED9]" size={18} />
-                                            ) : c.platform === 'whatsapp' ? (
-                                                <RiWhatsappFill className="text-[#25D366]" size={18} />
-                                            ) : c.platform === 'instagram' ? (
-                                                <RiInstagramFill className="text-[#E1306C]" size={18} />
+                                            {c.platform !== 'simulator' ? (
+                                                <img alt="" aria-hidden className="h-[18px] w-[18px]" src={getChannelPlatformIconSrc(c.platform)} />
                                             ) : (
                                                 <span className="text-[9px] font-semibold uppercase text-gray-400">{t('platformSimulatorShort')}</span>
                                             )}
@@ -1469,12 +1465,8 @@ export function InboxContainer({
                                         <span className="text-sm text-gray-500">{t('platform')}</span>
                                         <div className="flex items-center gap-2">
                                             <span className="h-4 w-4 inline-flex items-center justify-center">
-                                                {selectedConversation.platform === 'telegram' ? (
-                                                    <RiTelegramFill className="text-[#229ED9]" size={16} />
-                                                ) : selectedConversation.platform === 'whatsapp' ? (
-                                                    <RiWhatsappFill className="text-[#25D366]" size={16} />
-                                                ) : selectedConversation.platform === 'instagram' ? (
-                                                    <RiInstagramFill className="text-[#E1306C]" size={16} />
+                                                {selectedConversation.platform !== 'simulator' ? (
+                                                    <img alt="" aria-hidden className="h-4 w-4" src={getChannelPlatformIconSrc(selectedConversation.platform)} />
                                                 ) : (
                                                     <span className="text-[10px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
                                                 )}

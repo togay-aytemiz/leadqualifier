@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-11 (Lead list required-field rendering now reuses the inbox required-intake resolver so `Important info` values from `required_intake_collected` appear consistently in Leads table/mobile cards; monetization direction records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; Usage & Billing shows token-derived AI credit usage preview alongside token totals; shared inbound webhook RAG replies enforce an explicit max output token cap; lead extraction supports `undetermined` status for insufficient-information conversations while reserving `ignored` for non-business cases; greeting-only false `non_business` outputs normalize to `undetermined`; `service_type` no longer carries forward when latest extraction has no service clue; inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling; stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope; Phase 9 QA closure includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline; and Sign Up consent now uses inline clickable legal links (Terms/Privacy in new tab) as plain text instead of a required checkbox/boxed wrapper)  
+> **Last Updated:** 2026-02-12 (Lead list required-field rendering now reuses the inbox required-intake resolver so `Important info` values from `required_intake_collected` appear consistently in Leads table/mobile cards; monetization direction records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; Usage & Billing shows token-derived AI credit usage preview alongside token totals; shared inbound webhook RAG replies enforce an explicit max output token cap; lead extraction supports `undetermined` status for insufficient-information conversations while reserving `ignored` for non-business cases; greeting-only false `non_business` outputs normalize to `undetermined`; `service_type` no longer carries forward when latest extraction has no service clue; inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling; stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope; Phase 9 QA closure includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline; Sign Up consent now uses inline clickable legal links (Terms/Privacy in new tab) as plain text instead of a required checkbox/boxed wrapper; and Channels + Inbox + Leads now use shared public social SVG logos while Instagram/Messenger remain `Coming Soon`)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -59,7 +59,7 @@
   - [x] Channels card connect CTA is temporarily disabled and shown as `Çok Yakında` for non-connected orgs
 - [x] **Facebook Messenger (Placeholder)**
   - [x] Added Channels settings card with `Çok Yakında` CTA (no backend integration in MVP)
-  - [x] Placeholder card icon now uses `RiMessengerFill` and follows stacked row-card layout in Channels settings
+  - [x] Placeholder card icon now uses `public/messenger.svg` and follows stacked row-card layout in Channels settings
 - [x] **Shared Inbound AI Pipeline**
   - [x] Keep Telegram/WhatsApp/Instagram webhook routes separate
   - [x] Move inbound AI flow to shared pipeline function and reuse in WhatsApp + Instagram
@@ -113,8 +113,7 @@
   - [x] Lead extraction paused notice + manual refresh in details panel
   - [x] Lead snapshot header shows AI extraction chip and status uses dot + text
   - [x] Platform row shows channel icon and channel cards use consistent icon sizing
-  - [x] Platform icons now use react-icons with brand colors
-  - [x] Platform icons standardized to Remix fill set (`RiTelegramFill`, `RiWhatsappFill`, `RiInstagramFill`) across Channels cards, Inbox badges, and Leads platform rows
+  - [x] Platform icons in Channels cards + Inbox badges/details + Leads list now use shared public SVG assets (`/Telegram.svg`, `/whatsapp.svg`, `/instagram.svg`, `/messenger.svg`)
   - [x] Inbox list avatars include platform badges for quick channel recognition
   - [x] Inbox list platform badges enlarged with brand-colored icons
   - [x] Inbox list platform badges centered under avatars
