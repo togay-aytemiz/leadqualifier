@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-14 (Paywall implementation advanced with trial-first conversion UX: `/settings/plans` now includes mock subscription and top-up checkout simulations (success/failure), clear trial/premium status cards, and policy-aligned guards; desktop sidebar + mobile More surface trial/package progress with direct Plans actions. Migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs into trial mode and adds mock checkout + extended admin override SQL helpers. System-admin org detail now supports trial/package credit adjustments and membership/lock overrides with reason capture. Real provider integration + webhook sync remains pending.)  
+> **Last Updated:** 2026-02-14 (Paywall implementation advanced with trial-first conversion UX: `/settings/plans` now includes mock subscription and top-up checkout simulations (success/failure), clear trial/premium status cards, and policy-aligned guards; desktop sidebar + mobile More surface trial/package progress with direct Plans actions, and sidebar usage card is positioned in the bottom area (below Settings, above profile) for clearer information hierarchy. System-admin sidebar now shows only `Yönetim/Admin` until an explicit organization is selected. Platform billing defaults controls moved to dedicated `/admin/billing` page (removed from `/admin` dashboard), and admin tables are standardized to full-width with horizontal overflow support. Migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs into trial mode and adds mock checkout + extended admin override SQL helpers. System-admin org detail now supports trial/package credit adjustments, membership/lock overrides with reason capture, and organization-level billing action history visibility (actor/action/reason). Real provider integration + webhook sync remains pending; signout redirect now resolves destination host from runtime request origin/forwarded headers instead of static deployment URL env fallback.)  
 > **Status:** In Development
 
 ---
@@ -46,7 +46,7 @@ Automate WhatsApp message handling:
 | Lead Extraction | AI summary + score (0-10) | Implemented (Telegram + WhatsApp + Instagram; Inbox manual overwrite UI for important-info fields pending) |
 | Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
 | Multi-Tenant | Organization-based isolation | Implemented |
-| Admin Panel | Leads, Skills, KB, Channels management | Partial (Dashboard + Leads + Skills/KB/Inbox/Settings/Channels implemented; pending: `Open in WhatsApp` quick action and platform-admin billing audit tooling) |
+| Admin Panel | Leads, Skills, KB, Channels management | Partial (Dashboard + Leads + Skills/KB/Inbox/Settings/Channels implemented; organization-level billing audit history is visible in org detail; pending: `Open in WhatsApp` quick action and cross-org billing audit tooling) |
 | Public Legal Center | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json` | Implemented |
 | **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle** | Implemented |
 
@@ -330,6 +330,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Sign Up form fields for MVP are `full_name`, `email`, and `password`; legal consent is communicated as inline Terms/Privacy links (no required checkbox).
 - Sign In and Sign Up password inputs include show/hide toggle controls.
 - Sign In and Sign Up are route-level separated (`/login`, `/register`) and no longer use an in-form segmented switcher.
+- Signout endpoint redirects to `register` using the incoming request origin (with forwarded-header support) so custom domains are preserved.
 - Public auth desktop shell includes an animated messenger-style preview panel with conversion-focused typed user/assistant example flows.
 - Messenger preview interaction follows a send lifecycle (`type -> sent -> input reset -> assistant reply`) to better reflect real chat behavior.
 - Composer resets to a placeholder-style empty state after send and before assistant reply to mirror real messenger input reset behavior.
@@ -533,6 +534,7 @@ MVP is successful when:
 - **Auth Scoring Visibility:** Do not show scoring before first customer input; start scoring only after initial message signal exists.
 - **Auth Scoring Placement:** Keep scoring UI detached from customer input area to avoid implying end-user visibility; prefer compact analyst-style top placement.
 - **Auth Input Scope (MVP):** Keep Sign Up minimal (`full_name`, `email`, `password`) and postpone SSO/Google to post-MVP.
+- **Signout Redirect Host Resolution:** Build post-signout `register` redirect from request/forwarded origin at runtime to avoid environment hardcoding drift across custom domains.
 - **Auth Legal Consent UX (MVP):** Replace mandatory Sign Up consent checkbox with inline legal notice copy linking to Terms and Privacy in a new tab for lower friction while preserving policy visibility.
 - **Auth Consent Visual Style (MVP):** Render legal consent notice as normal inline text (no bordered/boxed container) so it reads like supporting form copy.
 - **Auth Password UX:** Provide explicit password show/hide controls on Sign In and Sign Up for entry confidence on desktop/mobile.
@@ -541,11 +543,16 @@ MVP is successful when:
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
 - **Chunk Overlap Alignment:** Overlap prefers paragraph/sentence boundaries and drops overlap when it would exceed max tokens.
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
+- **Billing Terminology (TR):** All user-facing Turkish billing/paywall copy uses `Ücretsiz deneme` wording instead of `Trial`.
 - **Platform Admin Context:** Persist active admin-selected tenant context via `active_org_id` server cookie so tenant pages resolve a single active organization consistently.
 - **Platform Admin Navigation Performance:** Resolve system-admin org context in slim mode (active org only) during normal route transitions, and lazy-load full org options only when the sidebar picker is opened.
+- **System Admin Sidebar Gating:** Tenant sections in the desktop sidebar (`Çalışma Alanı`, `Yapay Zeka Araçları`, `Diğer/Ayarlar`, and usage card) remain hidden until an explicit organization selection exists; without selection, only `Yönetim/Admin` navigation is visible.
+- **Platform Billing Controls Surface:** Platform-level trial/package defaults are managed from dedicated `/admin/billing`; `/admin` dashboard remains overview-focused.
+- **Admin Tables Layout Standard:** All `/admin` list/detail tables must use full available width and allow horizontal scrolling for wide column sets.
 - **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
 - **Billing Visibility + Control Strategy:** Billing status ships as live snapshots (membership state, lock reason, and trial/package/top-up used/remaining) in tenant Billing settings + platform-admin organization/user views; system-admin can also run guarded billing controls (platform defaults + per-organization manual overrides) with mandatory reason capture.
 - **Tenant Billing IA Split (Implementation v1):** `Settings > Plans` is the action surface for subscription/top-up/trial conversion status, while `Settings > Billing` remains the detailed usage + receipts/ledger surface.
+- **Tenant Billing IA Clarification (Implementation v1.1):** `Settings > Billing` is read-only and avoids duplicate purchase widgets; it keeps account snapshot context + immutable ledger + usage analytics, while all plan/purchase controls stay in `Settings > Plans`.
 - **Monetization Rollout Order:** Finalize pricing strategy and trial model first, then implement checkout/payments and entitlement enforcement (avoid shipping payment flows before policy decisions are locked).
 - **Trial Go-To-Market Model (Pre-Pilot):** Start with trial-only onboarding (no freemium) to reduce ongoing abuse vectors and keep support/sales qualification focused.
 - **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
@@ -559,6 +566,7 @@ MVP is successful when:
 - **Admin Manual Billing Operations (Locked v1):** System-admin can extend trial, adjust credits, and assign/cancel premium per organization.
 - **Admin Override Scope (Implementation v1):** In org detail, system-admin can adjust top-up/trial/package credits and set explicit `membership_state` + `lock_reason` overrides (with required reason + audit logging).
 - **Admin Action Audit Requirement (Locked v1):** Every manual billing action must include reason, actor, previous state, and resulting state.
+- **Admin Audit Visibility (Implementation v1.1):** `/admin/organizations/[id]` shows recent billing audit rows (date, action, actor, reason) sourced from `billing_admin_audit_log`.
 - **Usage Visibility Requirement (Locked v1):** Users must be able to track trial/package progress from quick surfaces (desktop sidebar + mobile More menu), with deep link to detailed Billing page.
 - **Billing Snapshot Source (Implementation v1):** Tenant/admin visibility reads from `organization_billing_accounts` plus immutable `organization_credit_ledger` history; frontend derives progress/eligibility from a shared billing snapshot mapper to keep sidebar/mobile/settings/admin surfaces consistent.
 - **Runtime Entitlement Gate (Implementation v1):** Before token-consuming AI paths (shared inbound pipeline, Telegram webhook AI flow, simulator response generation, inbox summary/reasoning/manual lead-refresh), runtime resolves billing entitlement and exits early when usage is locked.

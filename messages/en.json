@@ -218,6 +218,7 @@
         "adminOrganizations": "Organizations",
         "adminLeads": "Leads",
         "adminUsers": "Users",
+        "adminBilling": "Billing",
         "other": "Other",
         "organizationSwitcherTitle": "Organization",
         "organizationSwitcherSearch": "Search organizations...",
@@ -497,14 +498,17 @@
         },
         "status": {
             "title": "Current Plan Status",
-            "description": "Your current trial/premium state and remaining credits.",
+            "description": "Plan state and conversion context. Detailed usage history is in Usage & Billing.",
             "membershipLabel": "Membership",
             "lockRuleTrial": "Trial usage is locked when trial time or trial credits run out first.",
             "lockRulePremium": "Top-up is available only after premium package credits are exhausted.",
+            "structureHint": "This page is for plan state and purchase actions.",
             "trialCreditsTitle": "Trial credits",
             "trialTimeTitle": "Trial time",
             "packageCreditsTitle": "Monthly package",
             "topupCreditsTitle": "Top-up balance",
+            "upgradeOfferTitle": "Upgrade offer after trial",
+            "nonActiveMembershipNote": "Subscription is not active. Use the action center below to continue.",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "days",
             "trialCredits": "Trial credits: {remaining} / {limit}",
@@ -531,6 +535,9 @@
                 "packageSummary": "{price} per month • {credits} credits included",
                 "alreadyActive": "Premium is already active for this organization.",
                 "notConfigured": "Premium package credits are not configured yet. Contact your admin.",
+                "activeTitle": "Premium is active",
+                "activeDescription": "Subscription is currently active for this organization.",
+                "activeResetAt": "Current period ends at {date}.",
                 "submit": "Start premium (mock checkout)"
             },
             "topup": {
@@ -567,7 +574,7 @@
     "billingUsage": {
         "pageTitle": "Usage & Billing",
         "title": "AI Usage",
-        "description": "Track AI token usage across production features.",
+        "description": "Review immutable credit history and detailed usage analytics.",
         "membership": {
             "trialActive": "Trial active",
             "trialExhausted": "Trial exhausted",
@@ -595,22 +602,26 @@
             "none": "No active pool"
         },
         "controlPanel": {
-            "title": "Usage Control Panel",
-            "description": "Track trial, package, and top-up balances from one place.",
+            "title": "Billing Account Snapshot",
+            "description": "Read-only billing state for ledger context. Purchase actions are managed in Plans & Credits.",
+            "planActionsHint": "Purchase and subscription actions are managed in Plans & Credits.",
+            "managePlansLink": "Go to Plans & Credits",
             "membershipLabel": "Membership",
             "lockReasonLabel": "Lock reason",
             "activePoolLabel": "Active pool",
+            "usageStatusLabel": "Usage status",
             "remainingCredits": "Remaining credits",
             "trialCreditsCard": "Trial credits",
             "trialTimeCard": "Trial time",
             "packageCreditsCard": "Monthly package",
-            "topupCard": "Top-up balance",
+            "topupCard": "Top-up balance (read-only)",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "days",
             "trialEndsAt": "Ends at {date}",
             "packageResetAt": "Resets at {date}",
             "topupAllowed": "Top-up is available.",
             "topupBlocked": "Top-up is blocked until premium + package exhaustion.",
+            "topupPurchaseManaged": "Top-up purchases are managed in Plans & Credits.",
             "usageAllowed": "Usage is currently allowed.",
             "usageBlocked": "Usage is currently locked.",
             "unavailable": "Billing data is not available yet."
@@ -975,8 +986,14 @@
         "manageOrganizationsDesc": "Review organization-level usage, tokens, and content counts",
         "manageLeads": "Lead List",
         "manageLeadsDesc": "Review lead score/status for the active organization",
+        "manageBilling": "Billing Controls",
+        "manageBillingDesc": "Manage platform trial and premium package defaults",
         "manageUsers": "User Overview",
         "manageUsersDesc": "Review all profiles and organization memberships",
+        "billingPage": {
+            "title": "Billing Controls",
+            "description": "Manage platform-level trial and premium package defaults."
+        },
         "selectedOrganization": "Active Organization",
         "noOrganizationSelected": "No organization selected",
         "organizationSwitcherHint": "Use the sidebar organization switcher to change tenant context.",
@@ -1202,6 +1219,27 @@
                     "lockReasonLabel": "Lock reason",
                     "reasonLabel": "Reason",
                     "submit": "Apply membership override"
+                }
+            },
+            "billingAudit": {
+                "title": "Billing Action History",
+                "description": "Organization-level audit log for manual billing actions and overrides.",
+                "emptyTitle": "No billing actions yet",
+                "emptyDescription": "Manual billing operations will appear here after the first change.",
+                "actorFallback": "Unknown actor",
+                "columns": {
+                    "date": "Date",
+                    "action": "Action",
+                    "actor": "Actor",
+                    "reason": "Reason"
+                },
+                "actionType": {
+                    "extendTrial": "Extend trial",
+                    "creditAdjustment": "Credit adjustment",
+                    "premiumAssign": "Assign premium",
+                    "premiumCancel": "Cancel premium",
+                    "packageConfigUpdate": "Membership/package override",
+                    "unknown": "Unknown action"
                 }
             },
             "profiles": {

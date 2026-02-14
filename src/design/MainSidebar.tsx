@@ -34,6 +34,7 @@ import {
     LogOut,
     RotateCcw,
     Users,
+    Wallet,
 } from 'lucide-react'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
@@ -461,7 +462,7 @@ export function MainSidebar({
         ]
 
         if (isSystemAdmin) {
-            routesToPrefetch.push('/admin', '/admin/organizations', '/admin/leads', '/admin/users')
+            routesToPrefetch.push('/admin', '/admin/billing', '/admin/organizations', '/admin/leads', '/admin/users')
         }
 
         const uniqueRoutes = Array.from(new Set(routesToPrefetch))
@@ -551,6 +552,13 @@ export function MainSidebar({
                         activeIcon: Building2,
                     },
                     {
+                        id: 'admin-billing',
+                        href: '/admin/billing',
+                        label: tSidebar('adminBilling'),
+                        icon: Wallet,
+                        activeIcon: Wallet,
+                    },
+                    {
                         id: 'admin-leads',
                         href: '/admin/leads',
                         label: tSidebar('adminLeads'),
@@ -599,6 +607,9 @@ export function MainSidebar({
         : botMode === 'off'
             ? 'bg-red-500'
             : 'bg-emerald-500'
+    const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
+    const navigationSections = canAccessTenantModules ? [...sections, ...adminSections] : adminSections
+    const visibleFooterSections = canAccessTenantModules ? footerSections : []
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
 
@@ -881,58 +892,33 @@ export function MainSidebar({
                 </div>
             )}
 
-            <div className="px-3 pb-2">
-                <Link
-                    href="/settings/ai"
-                    title={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
-                    aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
-                    className={cn(
-                        'group flex items-center rounded-xl text-xs font-medium text-slate-600 transition-colors duration-150 motion-reduce:transition-none hover:bg-white hover:text-slate-900',
-                        collapsed ? 'mx-auto h-9 w-9 justify-center' : 'w-full gap-2 px-3 py-2'
-                    )}
-                >
-                    <span className={cn('h-2.5 w-2.5 rounded-full', botModeDot)} />
-                    {collapsed ? (
-                        <span className="sr-only">{`${tSidebar('botStatusLabel')}: ${botModeLabel}`}</span>
-                    ) : (
-                        <>
-                            <span className="text-xs text-slate-500">{tSidebar('botStatusLabel')}</span>
-                            <span className="ml-auto text-xs font-semibold text-slate-900">{botModeLabel}</span>
-                        </>
-                    )}
-                </Link>
-            </div>
-
-            {billingSnapshot && !collapsed && (
+            {canAccessTenantModules && (
                 <div className="px-3 pb-2">
                     <Link
-                        href="/settings/plans"
-                        className="block rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300"
+                        href="/settings/ai"
+                        title={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                        aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                        className={cn(
+                            'group flex items-center rounded-xl text-xs font-medium text-slate-600 transition-colors duration-150 motion-reduce:transition-none hover:bg-white hover:text-slate-900',
+                            collapsed ? 'mx-auto h-9 w-9 justify-center' : 'w-full gap-2 px-3 py-2'
+                        )}
                     >
-                        <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                {tSidebar('billingStatusLabel')}
-                            </p>
-                            <p className="text-xs font-semibold text-slate-700">{billingMembershipLabel}</p>
-                        </div>
-                        <p className="mt-1 text-base font-semibold text-slate-900">
-                            {formatCredits(billingSnapshot.totalRemainingCredits)}
-                            <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
-                        </p>
-                        <div className="mt-2 h-1.5 rounded-full bg-slate-100">
-                            <div
-                                className="h-1.5 rounded-full bg-[#242A40]"
-                                style={{ width: `${Math.min(100, billingProgress)}%` }}
-                            />
-                        </div>
-                        <p className="mt-2 text-[11px] text-slate-500">{billingSubline}</p>
+                        <span className={cn('h-2.5 w-2.5 rounded-full', botModeDot)} />
+                        {collapsed ? (
+                            <span className="sr-only">{`${tSidebar('botStatusLabel')}: ${botModeLabel}`}</span>
+                        ) : (
+                            <>
+                                <span className="text-xs text-slate-500">{tSidebar('botStatusLabel')}</span>
+                                <span className="ml-auto text-xs font-semibold text-slate-900">{botModeLabel}</span>
+                            </>
+                        )}
                     </Link>
                 </div>
             )}
 
             <nav className="flex-1 px-3 pt-3">
                 <div className="space-y-4">
-                    {[...sections, ...adminSections].map(section => (
+                    {navigationSections.map(section => (
                         <div key={section.id} className="space-y-2">
                             <p
                                 className={cn(
@@ -1008,77 +994,106 @@ export function MainSidebar({
                 </div>
             </nav>
 
-            <div className="px-3 pb-3">
-                <div className="space-y-2">
-                    {footerSections.map(section => (
-                        <div key={section.id} className="space-y-2">
-                            <p
-                                className={cn(
-                                    'px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400',
-                                    collapsed && 'sr-only'
-                                )}
-                            >
-                                {section.label}
-                            </p>
-                            <div className="space-y-1">
-                                {section.items.map(item => {
-                                    const isActive = pathWithoutLocale.startsWith('/settings')
-                                    const Icon = isActive ? item.activeIcon : item.icon
-                                    const showPending = item.id === 'settings' && hasPendingSuggestions
-                                    return (
-                                        <Link
-                                            key={item.id}
-                                            href={item.href}
-                                            title={item.label}
-                                            aria-label={item.label}
-                                            className={cn(
-                                                'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
-                                                collapsed
-                                                    ? 'mx-auto h-11 w-11 justify-center gap-0'
-                                                    : 'w-full gap-3 px-3 py-2',
-                                                isActive
-                                                    ? 'bg-[#242A40] text-white shadow-sm'
-                                                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                                            )}
-                                        >
-                                            <span className="relative flex items-center">
-                                                <Icon
-                                                    size={18}
-                                                    className={cn(
-                                                        'shrink-0',
-                                                        isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
-                                                    )}
-                                                />
-                                                {showPending && collapsed && (
-                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
-                                                )}
-                                            </span>
-                                            <span
+            {visibleFooterSections.length > 0 && (
+                <div className="px-3 pb-3">
+                    <div className="space-y-2">
+                        {visibleFooterSections.map(section => (
+                            <div key={section.id} className="space-y-2">
+                                <p
+                                    className={cn(
+                                        'px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400',
+                                        collapsed && 'sr-only'
+                                    )}
+                                >
+                                    {section.label}
+                                </p>
+                                <div className="space-y-1">
+                                    {section.items.map(item => {
+                                        const isActive = pathWithoutLocale.startsWith('/settings')
+                                        const Icon = isActive ? item.activeIcon : item.icon
+                                        const showPending = item.id === 'settings' && hasPendingSuggestions
+                                        return (
+                                            <Link
+                                                key={item.id}
+                                                href={item.href}
+                                                title={item.label}
+                                                aria-label={item.label}
                                                 className={cn(
-                                                    'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
+                                                    'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
                                                     collapsed
-                                                        ? 'w-0 translate-x-2 overflow-hidden opacity-0'
-                                                        : 'opacity-100'
+                                                        ? 'mx-auto h-11 w-11 justify-center gap-0'
+                                                        : 'w-full gap-3 px-3 py-2',
+                                                    isActive
+                                                        ? 'bg-[#242A40] text-white shadow-sm'
+                                                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
                                                 )}
                                             >
-                                                {item.label}
-                                            </span>
-                                            {showPending && !collapsed && (
+                                                <span className="relative flex items-center">
+                                                    <Icon
+                                                        size={18}
+                                                        className={cn(
+                                                            'shrink-0',
+                                                            isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
+                                                        )}
+                                                    />
+                                                    {showPending && collapsed && (
+                                                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
+                                                    )}
+                                                </span>
                                                 <span
                                                     className={cn(
-                                                        'ml-auto h-2 w-2 rounded-full ring-2',
-                                                        isActive ? 'bg-white ring-[#242A40]/25' : 'bg-[#242A40] ring-white'
+                                                        'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
+                                                        collapsed
+                                                            ? 'w-0 translate-x-2 overflow-hidden opacity-0'
+                                                            : 'opacity-100'
                                                     )}
-                                                />
-                                            )}
-                                        </Link>
-                                    )
-                                })}
+                                                >
+                                                    {item.label}
+                                                </span>
+                                                {showPending && !collapsed && (
+                                                    <span
+                                                        className={cn(
+                                                            'ml-auto h-2 w-2 rounded-full ring-2',
+                                                            isActive ? 'bg-white ring-[#242A40]/25' : 'bg-[#242A40] ring-white'
+                                                        )}
+                                                    />
+                                                )}
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {billingSnapshot && !collapsed && canAccessTenantModules && (
+                <div className="px-3 pb-2">
+                    <Link
+                        href="/settings/plans"
+                        className="block rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300"
+                    >
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {tSidebar('billingStatusLabel')}
+                            </p>
+                            <p className="text-xs font-semibold text-slate-700">{billingMembershipLabel}</p>
+                        </div>
+                        <p className="mt-1 text-base font-semibold text-slate-900">
+                            {formatCredits(billingSnapshot.totalRemainingCredits)}
+                            <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
+                        </p>
+                        <div className="mt-2 h-1.5 rounded-full bg-slate-100">
+                            <div
+                                className="h-1.5 rounded-full bg-[#242A40]"
+                                style={{ width: `${Math.min(100, billingProgress)}%` }}
+                            />
+                        </div>
+                        <p className="mt-2 text-[11px] text-slate-500">{billingSubline}</p>
+                    </Link>
+                </div>
+            )}
 
             <div className="px-3 pb-4">
                 <div className="relative group">

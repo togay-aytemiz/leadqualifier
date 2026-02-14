@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import type {
+    BillingAdminAuditLog,
     BillingLockReason,
     BillingMembershipState,
+    Json,
     OrganizationBillingAccount
 } from '@/types/database'
 import { buildOrganizationBillingSnapshot } from '@/lib/billing/snapshot'
@@ -74,6 +76,20 @@ export interface AdminOrganizationProfileSnapshot {
 export interface AdminOrganizationDetail {
     organization: AdminOrganizationSummary
     profiles: AdminOrganizationProfileSnapshot[]
+    billingAuditEntries: AdminBillingAuditEntry[]
+}
+
+export interface AdminBillingAuditEntry {
+    id: string
+    actionType: BillingAdminAuditLog['action_type']
+    actorId: string
+    actorName: string | null
+    actorEmail: string | null
+    reason: string
+    beforeState: Json
+    afterState: Json
+    metadata: Json
+    createdAt: string
 }
 
 export interface AdminOrganizationListResult {
@@ -504,6 +520,47 @@ async function getMembershipsByOrganizationId(
     }
 
     return (data ?? []) as MembershipRow[]
+}
+
+async function getBillingAdminAuditEntriesByOrganizationId(
+    supabase: SupabaseClient,
+    organizationId: string,
+    limit = 25
+): Promise<AdminBillingAuditEntry[]> {
+    const { data, error } = await supabase
+        .from('billing_admin_audit_log')
+        .select('id, action_type, actor_id, reason, before_state, after_state, metadata, created_at')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+    if (error) {
+        console.error('Failed to load billing admin audit rows for organization detail:', error)
+        return []
+    }
+
+    const rows = (data ?? []) as BillingAdminAuditLog[]
+    if (rows.length === 0) return []
+
+    const actorIds = Array.from(new Set(rows.map((row) => row.actor_id)))
+    const actorProfiles = await getProfilesByIds(supabase, actorIds)
+    const actorById = new Map(actorProfiles.map((profile) => [profile.id, profile]))
+
+    return rows.map((row) => {
+        const actor = actorById.get(row.actor_id)
+        return {
+            id: row.id,
+            actionType: row.action_type,
+            actorId: row.actor_id,
+            actorName: actor?.full_name ?? null,
+            actorEmail: actor?.email ?? null,
+            reason: row.reason,
+            beforeState: row.before_state,
+            afterState: row.after_state,
+            metadata: row.metadata,
+            createdAt: row.created_at
+        } satisfies AdminBillingAuditEntry
+    })
 }
 
 function buildLikeSearchInput(value: string) {
@@ -967,9 +1024,10 @@ export async function getAdminOrganizationDetail(
     const organizations = await getOrganizationsByIds(supabase, [organizationId])
     if (organizations.length === 0) return null
 
-    const [organizationSummaryList, organizationMemberships] = await Promise.all([
+    const [organizationSummaryList, organizationMemberships, billingAuditEntries] = await Promise.all([
         buildOrganizationSummariesFromRows(supabase, organizations),
-        getMembershipsByOrganizationId(supabase, organizationId)
+        getMembershipsByOrganizationId(supabase, organizationId),
+        getBillingAdminAuditEntriesByOrganizationId(supabase, organizationId)
     ])
 
     const organization = organizationSummaryList[0]
@@ -1039,6 +1097,7 @@ export async function getAdminOrganizationDetail(
 
     return {
         organization,
-        profiles: profilesSnapshot
+        profiles: profilesSnapshot,
+        billingAuditEntries
     }
 }

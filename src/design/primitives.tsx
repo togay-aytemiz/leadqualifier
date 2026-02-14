@@ -144,8 +144,8 @@ interface DataTableProps {
 
 export function DataTable({ children, className }: DataTableProps) {
     return (
-        <div className={cn("bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm", className)}>
-            <table className="w-full text-left text-sm text-gray-600">
+        <div className={cn("bg-white rounded-xl border border-gray-200 overflow-x-auto overflow-y-hidden shadow-sm", className)}>
+            <table className="w-max min-w-full text-left text-sm text-gray-600">
                 {children}
             </table>
         </div>

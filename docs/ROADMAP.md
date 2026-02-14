@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-14 (Paywall execution advanced: `/settings/plans` now includes mock subscription + top-up checkout actions (success/failure simulation), tenant trial/package/top-up status cards, and conversion-first guardrails (top-up disabled during trial and before package exhaustion); desktop sidebar + mobile More now deep-link plan actions while showing trial/premium progress details; migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs to trial and adds mock checkout/admin override SQL helpers; admin organization detail now includes trial/package credit adjustments and membership/lock override actions with required reason capture. Real payment provider + webhook sync remains pending).  
+> **Last Updated:** 2026-02-14 (Paywall execution advanced: `/settings/plans` now includes mock subscription + top-up checkout actions (success/failure simulation), tenant trial/package/top-up status cards, and conversion-first guardrails (top-up disabled during trial and before package exhaustion); desktop sidebar + mobile More now deep-link plan actions while showing trial/premium progress details; desktop sidebar usage card position is now anchored in the bottom area (below the Settings block, above profile) for cleaner hierarchy; system-admin sidebar now keeps only the `Yönetim/Admin` section visible until an explicit organization selection is made (workspace/AI/settings/usage blocks stay hidden); platform billing defaults controls moved from `/admin` dashboard to dedicated `/admin/billing`; admin tables are now full-width with horizontal overflow support for wide datasets; migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs to trial and adds mock checkout/admin override SQL helpers; admin organization detail now includes trial/package credit adjustments and membership/lock override actions with required reason capture plus organization-level billing action history table (actor/action/reason). Real payment provider + webhook sync remains pending; signout redirect host resolution now uses runtime request origin/forwarded headers to avoid hardcoded-domain fallbacks).  
 > Mark items with `[x]` when completed.
 
 ---
@@ -27,6 +27,7 @@
   - [x] Supabase Auth integration
   - [x] User-organization relationship
   - [x] Role-based access (admin, member)
+  - [x] Signout redirect now resolves `register` URL from runtime request origin instead of static app URL env fallback
 
 ---
 
@@ -510,11 +511,17 @@
   - [x] Add billing schema (`organization_billing_accounts`, `organization_credit_ledger`, `credit_purchase_orders`, `platform_billing_settings`) with RLS and entitlement SQL helpers
   - [x] Enforce paywall gates in inbound AI pipeline + dashboard token-consuming actions
   - [x] Split tenant settings IA into `/settings/plans` (subscription/top-up management entry) and `/settings/billing` (usage + receipts details)
+  - [x] Refine IA split to remove duplicate plan controls from `/settings/billing` and keep `/settings/billing` focused on read-only account snapshot + ledger/usage analytics
   - [x] Add admin trial-default controls (new organizations only) and admin premium-package controls (`X TL`, `Y` credits)
   - [x] Add admin credit visibility (used/remaining/lock reason) on organization/user detail surfaces
   - [x] Add admin per-organization manual overrides: trial extension, top-up/trial/package credit increment-decrement, premium activation/deactivation, and membership/lock override
+  - [x] Add admin per-organization billing action history visibility (audit rows with actor + reason)
   - [x] Add tenant billing paywall UI foundations (membership/lock banners, trial/package/top-up balances, credit usage history)
   - [x] Add lightweight usage visibility entry points in desktop sidebar and mobile More menu (trial + package progress and quick links to Plans action surface)
+  - [x] Standardize Turkish billing terminology to use `ücretsiz deneme` instead of `trial` in user-facing copy
+  - [x] Gate system-admin tenant sidebar sections behind explicit organization selection (no selection shows only Admin navigation)
+  - [x] Move platform billing default controls from `/admin` dashboard to dedicated `/admin/billing` page
+  - [x] Standardize `/admin` tables as full-width with horizontal overflow support
   - [x] Add mock checkout simulation (subscription + top-up success/failure states) to validate flow before real provider integration
   - [x] Backfill existing non-system-admin organizations into trial mode baseline for rollout (`00058` migration)
   - [ ] Add recurring premium checkout + top-up checkout + payment webhook sync + idempotent credit grants

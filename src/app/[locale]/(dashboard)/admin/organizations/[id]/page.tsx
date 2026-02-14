@@ -3,9 +3,13 @@ import { notFound, redirect } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { Badge, DataTable, EmptyState, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
-import { ArrowLeft, Users } from 'lucide-react'
+import { ArrowLeft, ScrollText, Users } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
-import { getAdminOrganizationDetail, type AdminBillingSnapshot } from '@/lib/admin/read-models'
+import {
+    getAdminOrganizationDetail,
+    type AdminBillingAuditEntry,
+    type AdminBillingSnapshot
+} from '@/lib/admin/read-models'
 import {
     adminAdjustPackageCredits,
     adminAdjustTrialCredits,
@@ -122,6 +126,26 @@ function resolveLockReasonOptionLabel(
     }
 }
 
+function resolveBillingAuditActionLabel(
+    tAdmin: Awaited<ReturnType<typeof getTranslations>>,
+    actionType: AdminBillingAuditEntry['actionType']
+) {
+    switch (actionType) {
+    case 'extend_trial':
+        return tAdmin('organizationDetail.billingAudit.actionType.extendTrial')
+    case 'credit_adjustment':
+        return tAdmin('organizationDetail.billingAudit.actionType.creditAdjustment')
+    case 'premium_assign':
+        return tAdmin('organizationDetail.billingAudit.actionType.premiumAssign')
+    case 'premium_cancel':
+        return tAdmin('organizationDetail.billingAudit.actionType.premiumCancel')
+    case 'package_config_update':
+        return tAdmin('organizationDetail.billingAudit.actionType.packageConfigUpdate')
+    default:
+        return tAdmin('organizationDetail.billingAudit.actionType.unknown')
+    }
+}
+
 function buildBillingActionRedirect(
     locale: string,
     organizationId: string,
@@ -154,6 +178,13 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
         year: 'numeric',
         month: 'short',
         day: 'numeric'
+    })
+    const formatDateTime = new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
     })
     const todayDate = new Date().toISOString().slice(0, 10)
     const defaultTrialEndDate = details.organization.billing.trialEndsAt?.slice(0, 10) ?? todayDate
@@ -389,7 +420,7 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
             />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-6xl mx-auto space-y-8">
+                <div className="w-full space-y-8">
                     <p className="text-gray-500">{tAdmin('organizationDetail.description')}</p>
                     <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900">
                         {tAdmin('organizationDetail.manualActions.banner')}
@@ -783,6 +814,61 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                 </button>
                             </form>
                         </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-900">{tAdmin('organizationDetail.billingAudit.title')}</h2>
+                            <p className="mt-1 text-sm text-gray-500">{tAdmin('organizationDetail.billingAudit.description')}</p>
+                        </div>
+
+                        <DataTable>
+                            {details.billingAuditEntries.length === 0 ? (
+                                <EmptyState
+                                    icon={ScrollText}
+                                    title={tAdmin('organizationDetail.billingAudit.emptyTitle')}
+                                    description={tAdmin('organizationDetail.billingAudit.emptyDescription')}
+                                />
+                            ) : (
+                                <>
+                                    <TableHead columns={[
+                                        tAdmin('organizationDetail.billingAudit.columns.date'),
+                                        tAdmin('organizationDetail.billingAudit.columns.action'),
+                                        tAdmin('organizationDetail.billingAudit.columns.actor'),
+                                        tAdmin('organizationDetail.billingAudit.columns.reason')
+                                    ]} />
+                                    <TableBody>
+                                        {details.billingAuditEntries.map((entry) => (
+                                            <TableRow key={entry.id}>
+                                                <TableCell>
+                                                    <span className="whitespace-nowrap text-sm text-gray-600">
+                                                        {formatDateTime.format(new Date(entry.createdAt))}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm font-medium text-gray-800">
+                                                        {resolveBillingAuditActionLabel(tAdmin, entry.actionType)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm text-gray-800">
+                                                            {entry.actorName ?? entry.actorEmail ?? tAdmin('organizationDetail.billingAudit.actorFallback')}
+                                                        </p>
+                                                        {entry.actorName && entry.actorEmail && (
+                                                            <p className="text-xs text-gray-500">{entry.actorEmail}</p>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm text-gray-700">{entry.reason}</span>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </>
+                            )}
+                        </DataTable>
                     </div>
 
                     <DataTable>

@@ -69,7 +69,7 @@ export default async function AdminUserDetailsPage({ params }: AdminUserDetailsP
             />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-6xl mx-auto space-y-8">
+                <div className="w-full space-y-8">
                     <p className="text-gray-500">{tAdmin('userDetail.description')}</p>
                     <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                         {tAdmin('readOnlyBanner')}

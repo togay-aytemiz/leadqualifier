@@ -42,7 +42,7 @@ export default async function AdminLeadsPage({ searchParams }: AdminLeadsPagePro
                     actions={<LeadSearch />}
                 />
                 <div className="flex-1 overflow-auto p-8">
-                    <div className="max-w-6xl mx-auto space-y-6">
+                    <div className="w-full space-y-6">
                         <p className="text-gray-500">{tAdmin('leads.description')}</p>
                         <p data-testid="admin-readonly-banner" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                             {tAdmin('readOnlyBanner')}
@@ -85,7 +85,7 @@ export default async function AdminLeadsPage({ searchParams }: AdminLeadsPagePro
             />
 
             <div className="flex-1 overflow-auto p-3 md:p-6">
-                <div className="mx-auto max-w-6xl space-y-4 md:space-y-6">
+                <div className="w-full space-y-4 md:space-y-6">
                     <p className="text-gray-500">{tAdmin('leads.description')}</p>
                     <p data-testid="admin-readonly-banner" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                         {tAdmin('readOnlyBanner')}

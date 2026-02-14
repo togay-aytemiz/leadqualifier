@@ -191,6 +191,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             && packageOffer.monthlyCredits > 0
         : false
     const topupState = resolveTopupActionState(snapshot)
+    const showTopupAction = snapshot?.membershipState === 'premium_active'
     const topupCredits = 1000
     const topupAmountTry = (() => {
         if (packageOffer.monthlyPriceTry > 0 && packageOffer.monthlyCredits > 0) {
@@ -199,6 +200,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         }
         return 40
     })()
+    const isTrialMembership = snapshot?.membershipState === 'trial_active' || snapshot?.membershipState === 'trial_exhausted'
+    const isPremiumMembership = snapshot?.membershipState === 'premium_active'
 
     const getCheckoutTitle = () => {
         if (!checkoutStatus) return ''
@@ -326,90 +329,116 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                             ? tPlans('status.lockRuleTrial')
                                             : tPlans('status.lockRulePremium')}
                                     </p>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {tPlans('status.structureHint')}
+                                    </p>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialCreditsTitle')}</p>
-                                        <p className="mt-2 text-lg font-semibold text-gray-900">
-                                            {formatNumber.format(snapshot.trial.credits.remaining)}
-                                            <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            {tPlans('status.usedVsLimit', {
-                                                used: formatNumber.format(snapshot.trial.credits.used),
-                                                limit: formatNumber.format(snapshot.trial.credits.limit)
-                                            })}
-                                        </p>
-                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                            <div
-                                                className="h-2 rounded-full bg-emerald-500"
-                                                style={{ width: `${Math.min(100, snapshot.trial.credits.progress)}%` }}
-                                            />
-                                        </div>
-                                    </div>
+                                {isTrialMembership && (
+                                    <>
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialCreditsTitle')}</p>
+                                                <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                    {formatNumber.format(snapshot.trial.credits.remaining)}
+                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {tPlans('status.usedVsLimit', {
+                                                        used: formatNumber.format(snapshot.trial.credits.used),
+                                                        limit: formatNumber.format(snapshot.trial.credits.limit)
+                                                    })}
+                                                </p>
+                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                    <div
+                                                        className="h-2 rounded-full bg-emerald-500"
+                                                        style={{ width: `${Math.min(100, snapshot.trial.credits.progress)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
 
-                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialTimeTitle')}</p>
-                                        <p className="mt-2 text-lg font-semibold text-gray-900">
-                                            {formatNumber.format(snapshot.trial.remainingDays)}
-                                            <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('status.daysUnit')}</span>
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            {tPlans('status.trialEndsAt', {
-                                                date: formatDateTime.format(new Date(snapshot.trial.endsAt))
-                                            })}
-                                        </p>
-                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                            <div
-                                                className="h-2 rounded-full bg-sky-500"
-                                                style={{ width: `${Math.min(100, snapshot.trial.timeProgress)}%` }}
-                                            />
+                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialTimeTitle')}</p>
+                                                <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                    {formatNumber.format(snapshot.trial.remainingDays)}
+                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('status.daysUnit')}</span>
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {tPlans('status.trialEndsAt', {
+                                                        date: formatDateTime.format(new Date(snapshot.trial.endsAt))
+                                                    })}
+                                                </p>
+                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                    <div
+                                                        className="h-2 rounded-full bg-sky-500"
+                                                        style={{ width: `${Math.min(100, snapshot.trial.timeProgress)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.packageCreditsTitle')}</p>
-                                        <p className="mt-2 text-lg font-semibold text-gray-900">
-                                            {formatNumber.format(snapshot.package.credits.remaining)}
-                                            <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            {tPlans('status.usedVsLimit', {
-                                                used: formatNumber.format(snapshot.package.credits.used),
-                                                limit: formatNumber.format(snapshot.package.credits.limit)
-                                            })}
-                                        </p>
-                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                            <div
-                                                className="h-2 rounded-full bg-violet-500"
-                                                style={{ width: `${Math.min(100, snapshot.package.credits.progress)}%` }}
-                                            />
-                                        </div>
-                                        {snapshot.package.periodEnd && (
-                                            <p className="mt-2 text-xs text-gray-500">
-                                                {tPlans('status.packageResetAt', {
-                                                    date: formatDateTime.format(new Date(snapshot.package.periodEnd))
+                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.upgradeOfferTitle')}</p>
+                                            <p className="mt-2 text-sm font-semibold text-gray-900">
+                                                {tPlans('actions.subscribe.packageSummary', {
+                                                    price: formatCurrency.format(packageOffer.monthlyPriceTry),
+                                                    credits: formatNumber.format(packageOffer.monthlyCredits)
                                                 })}
                                             </p>
-                                        )}
-                                    </div>
+                                            <p className="mt-1 text-xs text-gray-500">{tPlans('actions.topupBlockedTrial')}</p>
+                                        </div>
+                                    </>
+                                )}
 
-                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.topupCreditsTitle')}</p>
-                                        <p className="mt-2 text-lg font-semibold text-gray-900">
-                                            {formatNumber.format(snapshot.topupBalance)}
-                                            <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            {snapshot.isTopupAllowed
-                                                ? tPlans('status.topupAllowed')
-                                                : tPlans('status.topupBlocked')}
-                                        </p>
+                                {isPremiumMembership && (
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.packageCreditsTitle')}</p>
+                                            <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                {formatNumber.format(snapshot.package.credits.remaining)}
+                                                <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {tPlans('status.usedVsLimit', {
+                                                    used: formatNumber.format(snapshot.package.credits.used),
+                                                    limit: formatNumber.format(snapshot.package.credits.limit)
+                                                })}
+                                            </p>
+                                            <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                <div
+                                                    className="h-2 rounded-full bg-violet-500"
+                                                    style={{ width: `${Math.min(100, snapshot.package.credits.progress)}%` }}
+                                                />
+                                            </div>
+                                            {snapshot.package.periodEnd && (
+                                                <p className="mt-2 text-xs text-gray-500">
+                                                    {tPlans('status.packageResetAt', {
+                                                        date: formatDateTime.format(new Date(snapshot.package.periodEnd))
+                                                    })}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.topupCreditsTitle')}</p>
+                                            <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                {formatNumber.format(snapshot.topupBalance)}
+                                                <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {snapshot.isTopupAllowed
+                                                    ? tPlans('status.topupAllowed')
+                                                    : tPlans('status.topupBlocked')}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {!isTrialMembership && !isPremiumMembership && (
+                                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                        {tPlans('status.nonActiveMembershipNote')}
+                                    </p>
+                                )}
                             </div>
                         ) : (
                             <p className="text-sm text-gray-500">{tPlans('status.unavailable')}</p>
@@ -424,82 +453,98 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                             {tPlans('actions.mockModeNotice')}
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <form action={handleMockSubscribe} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                                <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.subscribe.title')}</h3>
-                                <p className="text-sm text-gray-600">
-                                    {tPlans('actions.subscribe.packageSummary', {
-                                        price: formatCurrency.format(packageOffer.monthlyPriceTry),
-                                        credits: formatNumber.format(packageOffer.monthlyCredits)
-                                    })}
-                                </p>
-                                <label className="block text-xs font-medium text-gray-600">
-                                    {tPlans('actions.simulatedOutcomeLabel')}
-                                </label>
-                                <select
-                                    name="simulatedOutcome"
-                                    defaultValue="success"
-                                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                    disabled={!subscribeAllowed}
-                                >
-                                    <option value="success">{tPlans('actions.simulatedOutcome.success')}</option>
-                                    <option value="failed">{tPlans('actions.simulatedOutcome.failed')}</option>
-                                </select>
-                                <input type="hidden" name="organizationId" value={organizationId} />
-                                <input type="hidden" name="monthlyPriceTry" value={String(packageOffer.monthlyPriceTry)} />
-                                <input type="hidden" name="monthlyCredits" value={String(packageOffer.monthlyCredits)} />
-                                {!subscribeAllowed && (
-                                    <p className="text-xs text-amber-700">
-                                        {packageOffer.monthlyCredits <= 0
-                                            ? tPlans('actions.subscribe.notConfigured')
-                                            : snapshot?.membershipState === 'premium_active'
-                                                ? tPlans('actions.subscribe.alreadyActive')
-                                                : tPlans('actions.adminLocked')}
+                        <div className={`grid grid-cols-1 gap-4 ${showTopupAction ? 'md:grid-cols-2' : ''}`}>
+                            {isPremiumMembership ? (
+                                <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2">
+                                    <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.subscribe.activeTitle')}</h3>
+                                    <p className="text-sm text-gray-600">{tPlans('actions.subscribe.activeDescription')}</p>
+                                    {snapshot?.package.periodEnd && (
+                                        <p className="text-xs text-gray-500">
+                                            {tPlans('actions.subscribe.activeResetAt', {
+                                                date: formatDateTime.format(new Date(snapshot.package.periodEnd))
+                                            })}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <form action={handleMockSubscribe} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                                    <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.subscribe.title')}</h3>
+                                    <p className="text-sm text-gray-600">
+                                        {tPlans('actions.subscribe.packageSummary', {
+                                            price: formatCurrency.format(packageOffer.monthlyPriceTry),
+                                            credits: formatNumber.format(packageOffer.monthlyCredits)
+                                        })}
                                     </p>
-                                )}
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                    disabled={!subscribeAllowed}
-                                >
-                                    {tPlans('actions.subscribe.submit')}
-                                </button>
-                            </form>
+                                    <label className="block text-xs font-medium text-gray-600">
+                                        {tPlans('actions.simulatedOutcomeLabel')}
+                                    </label>
+                                    <select
+                                        name="simulatedOutcome"
+                                        defaultValue="success"
+                                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
+                                        disabled={!subscribeAllowed}
+                                    >
+                                        <option value="success">{tPlans('actions.simulatedOutcome.success')}</option>
+                                        <option value="failed">{tPlans('actions.simulatedOutcome.failed')}</option>
+                                    </select>
+                                    <input type="hidden" name="organizationId" value={organizationId} />
+                                    <input type="hidden" name="monthlyPriceTry" value={String(packageOffer.monthlyPriceTry)} />
+                                    <input type="hidden" name="monthlyCredits" value={String(packageOffer.monthlyCredits)} />
+                                    {!subscribeAllowed && (
+                                        <p className="text-xs text-amber-700">
+                                            {packageOffer.monthlyCredits <= 0
+                                                ? tPlans('actions.subscribe.notConfigured')
+                                                : snapshot?.membershipState === 'premium_active'
+                                                    ? tPlans('actions.subscribe.alreadyActive')
+                                                    : tPlans('actions.adminLocked')}
+                                        </p>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                        disabled={!subscribeAllowed}
+                                    >
+                                        {tPlans('actions.subscribe.submit')}
+                                    </button>
+                                </form>
+                            )}
 
-                            <form action={handleMockTopup} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                                <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.topup.title')}</h3>
-                                <p className="text-sm text-gray-600">
-                                    {tPlans('actions.topup.packageSummary', {
-                                        credits: formatNumber.format(topupCredits),
-                                        amount: formatCurrency.format(topupAmountTry)
-                                    })}
-                                </p>
-                                <label className="block text-xs font-medium text-gray-600">
-                                    {tPlans('actions.simulatedOutcomeLabel')}
-                                </label>
-                                <select
-                                    name="simulatedOutcome"
-                                    defaultValue="success"
-                                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                    disabled={!topupState.allowed}
-                                >
-                                    <option value="success">{tPlans('actions.simulatedOutcome.success')}</option>
-                                    <option value="failed">{tPlans('actions.simulatedOutcome.failed')}</option>
-                                </select>
-                                <input type="hidden" name="organizationId" value={organizationId} />
-                                <input type="hidden" name="credits" value={String(topupCredits)} />
-                                <input type="hidden" name="amountTry" value={String(topupAmountTry)} />
-                                {!topupState.allowed && topupState.reasonKey && (
-                                    <p className="text-xs text-amber-700">{tPlans(`actions.${topupState.reasonKey}`)}</p>
-                                )}
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                    disabled={!topupState.allowed}
-                                >
-                                    {tPlans('actions.topup.submit')}
-                                </button>
-                            </form>
+                            {showTopupAction && (
+                                <form action={handleMockTopup} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                                    <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.topup.title')}</h3>
+                                    <p className="text-sm text-gray-600">
+                                        {tPlans('actions.topup.packageSummary', {
+                                            credits: formatNumber.format(topupCredits),
+                                            amount: formatCurrency.format(topupAmountTry)
+                                        })}
+                                    </p>
+                                    <label className="block text-xs font-medium text-gray-600">
+                                        {tPlans('actions.simulatedOutcomeLabel')}
+                                    </label>
+                                    <select
+                                        name="simulatedOutcome"
+                                        defaultValue="success"
+                                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
+                                        disabled={!topupState.allowed}
+                                    >
+                                        <option value="success">{tPlans('actions.simulatedOutcome.success')}</option>
+                                        <option value="failed">{tPlans('actions.simulatedOutcome.failed')}</option>
+                                    </select>
+                                    <input type="hidden" name="organizationId" value={organizationId} />
+                                    <input type="hidden" name="credits" value={String(topupCredits)} />
+                                    <input type="hidden" name="amountTry" value={String(topupAmountTry)} />
+                                    {!topupState.allowed && topupState.reasonKey && (
+                                        <p className="text-xs text-amber-700">{tPlans(`actions.${topupState.reasonKey}`)}</p>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                        disabled={!topupState.allowed}
+                                    >
+                                        {tPlans('actions.topup.submit')}
+                                    </button>
+                                </form>
+                            )}
                         </div>
 
                         <div className="mt-4">

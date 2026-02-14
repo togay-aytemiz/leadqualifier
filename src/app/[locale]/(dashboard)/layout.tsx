@@ -20,6 +20,11 @@ export default async function DashboardLayout({
         .eq('id', user?.id)
         .single()
     const orgContext = await resolveActiveOrganizationContext(supabase)
+    const hasExplicitAdminOrganizationSelection = !(orgContext?.isSystemAdmin ?? false)
+        || orgContext?.source === 'cookie'
+    const sidebarOrganizationId = hasExplicitAdminOrganizationSelection
+        ? (orgContext?.activeOrganizationId ?? null)
+        : null
 
     const userName = profile?.full_name || profile?.email || 'User'
 
@@ -31,7 +36,7 @@ export default async function DashboardLayout({
                     userName={userName}
                     isSystemAdmin={orgContext?.isSystemAdmin ?? false}
                     organizations={orgContext?.accessibleOrganizations ?? []}
-                    activeOrganizationId={orgContext?.activeOrganizationId ?? null}
+                    activeOrganizationId={sidebarOrganizationId}
                     readOnlyTenantMode={orgContext?.readOnlyTenantMode ?? false}
                 />
             </div>

@@ -30,7 +30,7 @@ function buildLockedSimulatorMessage(lockReason: string | null, inputMessage: st
 
     if (lockReason === 'trial_time_expired' || lockReason === 'trial_credits_exhausted' || lockReason === 'subscription_required') {
         return tr
-            ? 'Trial limitine ulaştın. Devam etmek için aylık premium pakete geçmen gerekiyor.'
+            ? 'Ücretsiz deneme limitine ulaştın. Devam etmek için aylık premium pakete geçmen gerekiyor.'
             : 'You reached your trial limit. Subscribe to the monthly premium package to continue.'
     }
 
