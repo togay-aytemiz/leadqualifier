@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { Badge, DataTable, EmptyState, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
+import { Badge, DataTable, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import { getAdminUserDetail, type AdminBillingSnapshot } from '@/lib/admin/read-models'
@@ -102,11 +102,17 @@ export default async function AdminUserDetailsPage({ params }: AdminUserDetailsP
 
                     <DataTable>
                         {details.organizationSnapshots.length === 0 ? (
-                            <EmptyState
-                                icon={Building2}
-                                title={tAdmin('userDetail.emptyTitle')}
-                                description={tAdmin('userDetail.emptyDesc')}
-                            />
+                            <tbody>
+                                <tr>
+                                    <td colSpan={9} className="px-6 py-12 text-center">
+                                        <div className="mx-auto flex max-w-md flex-col items-center">
+                                            <Building2 className="mb-3 text-gray-300" size={40} />
+                                            <p className="text-lg font-medium text-gray-900">{tAdmin('userDetail.emptyTitle')}</p>
+                                            <p className="mt-1 text-sm text-gray-500">{tAdmin('userDetail.emptyDesc')}</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
                         ) : (
                             <>
                                 <TableHead columns={[

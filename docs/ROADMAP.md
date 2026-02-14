@@ -522,6 +522,7 @@
   - [x] Gate system-admin tenant sidebar sections behind explicit organization selection (no selection shows only Admin navigation)
   - [x] Move platform billing default controls from `/admin` dashboard to dedicated `/admin/billing` page
   - [x] Standardize `/admin` tables as full-width with horizontal overflow support
+  - [x] Fix admin empty-state rendering on server routes by avoiding non-serializable icon component props across server-client boundaries
   - [x] Add mock checkout simulation (subscription + top-up success/failure states) to validate flow before real provider integration
   - [x] Backfill existing non-system-admin organizations into trial mode baseline for rollout (`00058` migration)
   - [ ] Add recurring premium checkout + top-up checkout + payment webhook sync + idempotent credit grants

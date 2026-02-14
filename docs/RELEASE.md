@@ -227,6 +227,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed admin runtime serialization errors (`Only plain objects can be passed to Client Components`) by removing server-to-client icon constructor props in admin empty-state tables and rendering icon markup directly in server pages (`src/app/[locale]/(dashboard)/admin/organizations/[id]/page.tsx`, `src/app/[locale]/(dashboard)/admin/organizations/page.tsx`, `src/app/[locale]/(dashboard)/admin/users/page.tsx`, `src/app/[locale]/(dashboard)/admin/users/[id]/page.tsx`).
 - Fixed signout redirect host drift by deriving `/register` redirect origin from runtime request/forwarded headers instead of static `NEXT_PUBLIC_APP_URL`, preventing redirects to legacy Netlify domains on custom-host deployments (`src/app/api/auth/signout/route.ts`, `src/app/api/auth/signout/route.test.ts`).
 - Fixed Leads list required-field rendering so values extracted into Inbox "Important info" (`extracted_fields.required_intake_collected`) now appear in both desktop table columns and mobile lead cards.
 - Fixed greeting-only first-contact turns remaining `ignored` when extraction returned `non_business=true` by normalizing greeting-only conversations to `undetermined`.

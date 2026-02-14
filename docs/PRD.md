@@ -549,6 +549,7 @@ MVP is successful when:
 - **System Admin Sidebar Gating:** Tenant sections in the desktop sidebar (`Çalışma Alanı`, `Yapay Zeka Araçları`, `Diğer/Ayarlar`, and usage card) remain hidden until an explicit organization selection exists; without selection, only `Yönetim/Admin` navigation is visible.
 - **Platform Billing Controls Surface:** Platform-level trial/package defaults are managed from dedicated `/admin/billing`; `/admin` dashboard remains overview-focused.
 - **Admin Tables Layout Standard:** All `/admin` list/detail tables must use full available width and allow horizontal scrolling for wide column sets.
+- **Server/Client Boundary Safety:** Server-rendered admin routes must not pass non-serializable component constructors (e.g., icon functions) into client primitives; render empty-state icon markup directly in server tables.
 - **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
 - **Billing Visibility + Control Strategy:** Billing status ships as live snapshots (membership state, lock reason, and trial/package/top-up used/remaining) in tenant Billing settings + platform-admin organization/user views; system-admin can also run guarded billing controls (platform defaults + per-organization manual overrides) with mandatory reason capture.
 - **Tenant Billing IA Split (Implementation v1):** `Settings > Plans` is the action surface for subscription/top-up/trial conversion status, while `Settings > Billing` remains the detailed usage + receipts/ledger surface.

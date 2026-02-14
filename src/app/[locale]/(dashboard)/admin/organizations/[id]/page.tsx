@@ -2,7 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { notFound, redirect } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { Badge, DataTable, EmptyState, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
+import { Badge, DataTable, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
 import { ArrowLeft, ScrollText, Users } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import {
@@ -824,11 +824,21 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
 
                         <DataTable>
                             {details.billingAuditEntries.length === 0 ? (
-                                <EmptyState
-                                    icon={ScrollText}
-                                    title={tAdmin('organizationDetail.billingAudit.emptyTitle')}
-                                    description={tAdmin('organizationDetail.billingAudit.emptyDescription')}
-                                />
+                                <tbody>
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-12 text-center">
+                                            <div className="mx-auto flex max-w-md flex-col items-center">
+                                                <ScrollText className="mb-3 text-gray-300" size={40} />
+                                                <p className="text-lg font-medium text-gray-900">
+                                                    {tAdmin('organizationDetail.billingAudit.emptyTitle')}
+                                                </p>
+                                                <p className="mt-1 text-sm text-gray-500">
+                                                    {tAdmin('organizationDetail.billingAudit.emptyDescription')}
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
                             ) : (
                                 <>
                                     <TableHead columns={[
@@ -873,11 +883,21 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
 
                     <DataTable>
                         {details.profiles.length === 0 ? (
-                            <EmptyState
-                                icon={Users}
-                                title={tAdmin('organizationDetail.profiles.emptyTitle')}
-                                description={tAdmin('organizationDetail.profiles.emptyDesc')}
-                            />
+                            <tbody>
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-12 text-center">
+                                        <div className="mx-auto flex max-w-md flex-col items-center">
+                                            <Users className="mb-3 text-gray-300" size={40} />
+                                            <p className="text-lg font-medium text-gray-900">
+                                                {tAdmin('organizationDetail.profiles.emptyTitle')}
+                                            </p>
+                                            <p className="mt-1 text-sm text-gray-500">
+                                                {tAdmin('organizationDetail.profiles.emptyDesc')}
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
                         ) : (
                             <>
                                 <TableHead columns={[

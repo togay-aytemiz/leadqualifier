@@ -1,6 +1,6 @@
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, EmptyState, Badge } from '@/design'
+import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, Badge } from '@/design'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import { getAdminOrganizationListResult, type AdminBillingSnapshot } from '@/lib/admin/read-models'
@@ -125,11 +125,21 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
 
                     <DataTable>
                         {organizations.length === 0 ? (
-                            <EmptyState
-                                icon={Building2}
-                                title={search ? tAdmin('organizations.emptySearchTitle') : tAdmin('organizations.emptyTitle')}
-                                description={search ? tAdmin('organizations.emptySearchDesc') : tAdmin('organizations.emptyDesc')}
-                            />
+                            <tbody>
+                                <tr>
+                                    <td colSpan={12} className="px-6 py-12 text-center">
+                                        <div className="mx-auto flex max-w-md flex-col items-center">
+                                            <Building2 className="mb-3 text-gray-300" size={40} />
+                                            <p className="text-lg font-medium text-gray-900">
+                                                {search ? tAdmin('organizations.emptySearchTitle') : tAdmin('organizations.emptyTitle')}
+                                            </p>
+                                            <p className="mt-1 text-sm text-gray-500">
+                                                {search ? tAdmin('organizations.emptySearchDesc') : tAdmin('organizations.emptyDesc')}
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
                         ) : (
                             <>
                                 <TableHead columns={[
