@@ -478,12 +478,12 @@
         "integrations": "Entegrasyonlar",
         "channels": "Kanallar",
         "billing": "Faturalandırma",
-        "plans": "Planlar ve Krediler",
-        "receipts": "Kullanım ve Faturalandırma"
+        "plans": "Planlar",
+        "receipts": "Kullanım"
     },
     "billingPlans": {
-        "pageTitle": "Planlar ve Krediler",
-        "description": "Ücretsiz deneme/premium durumunuzu ve kredi satın alma aksiyonlarını buradan yönetin.",
+        "pageTitle": "Planlar",
+        "description": "Mevcut planını ve kredi satın alımını yönet.",
         "noOrganization": "Organizasyon Bulunamadı",
         "noOrganizationDesc": "Planları yönetmek için bir organizasyona bağlı olmalısınız.",
         "creditsUnit": "kredi",
@@ -497,9 +497,9 @@
             "unavailable": "Kullanılamıyor"
         },
         "status": {
-            "title": "Mevcut Plan Durumu",
-            "description": "Plan durumu ve dönüşüm bağlamı. Detay kullanım geçmişi Kullanım ve Faturalandırma ekranındadır.",
-            "membershipLabel": "Üyelik",
+            "title": "Mevcut plan",
+            "description": "Plan durumunu ve kalan kredini gör.",
+            "membershipLabel": "Plan durumu",
             "lockRuleTrial": "Ücretsiz deneme kullanımında süre veya ücretsiz deneme kredisi hangisi önce biterse sistem kilitlenir.",
             "lockRulePremium": "Top-up sadece premium pakette, paket kredileri bittikten sonra açılır.",
             "structureHint": "Bu sayfa plan durumu ve satın alma aksiyonları içindir.",
@@ -507,8 +507,8 @@
             "trialTimeTitle": "Ücretsiz deneme süresi",
             "packageCreditsTitle": "Aylık paket",
             "topupCreditsTitle": "Top-up bakiyesi",
-            "upgradeOfferTitle": "Ücretsiz deneme sonrası yükseltme teklifi",
-            "nonActiveMembershipNote": "Abonelik şu an aktif değil. Devam etmek için aşağıdaki aksiyon merkezini kullanın.",
+            "upgradeOfferTitle": "Yükseltme teklifi",
+            "nonActiveMembershipNote": "Plan aktif değil. Aşağıdan işlem yapabilirsin.",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "gün",
             "trialCredits": "Ücretsiz deneme kredileri: {remaining} / {limit}",
@@ -522,8 +522,8 @@
             "unavailable": "Plan durumu alınamıyor."
         },
         "actions": {
-            "title": "Satın Alma Aksiyonları",
-            "description": "Premium abonelik ve top-up kredi satın alımını bu sayfadan yöneteceksiniz.",
+            "title": "İşlemler",
+            "description": "Premium'a geç veya ek kredi al.",
             "mockModeNotice": "Mock ödeme modu aktif. Gerçek sağlayıcı entegrasyonundan önce success/failed sonuçlarıyla ödeme davranışını test edin.",
             "simulatedOutcomeLabel": "Simüle ödeme sonucu",
             "simulatedOutcome": {
@@ -531,36 +531,36 @@
                 "failed": "Başarısız simüle et"
             },
             "subscribe": {
-                "title": "Aylık Premium Paket",
-                "packageSummary": "Aylık {price} • {credits} kredi dahil",
+                "title": "Premium plan",
+                "packageSummary": "Aylık {price} • {credits} kredi",
                 "alreadyActive": "Bu organizasyonda premium zaten aktif.",
                 "notConfigured": "Premium paket kredisi henüz tanımlı değil. Admin ile iletişime geçin.",
                 "activeTitle": "Premium aktif",
                 "activeDescription": "Bu organizasyon için abonelik şu anda aktif.",
                 "activeResetAt": "Mevcut dönem {date} tarihinde biter.",
-                "submit": "Premium başlat (mock checkout)"
+                "submit": "Premium başlat"
             },
             "topup": {
-                "title": "Top-up Kredileri",
+                "title": "Ek kredi",
                 "packageSummary": "{credits} kredi • {amount}",
-                "submit": "Top-up al (mock checkout)"
+                "submit": "Kredi al"
             },
             "adminLocked": "Bu organizasyon yönetici tarafından kilitli. Faturalandırma aksiyonları kapalı.",
             "topupBlockedTrial": "Ücretsiz deneme süresince top-up kapalıdır. Önce premium başlatılmalı.",
             "topupRequiresPremium": "Top-up için aktif premium paket gerekir.",
             "topupAfterPackageExhausted": "Top-up yalnızca paket kredileri bittiğinde açılır.",
             "topupUnavailable": "Top-up şu anda kullanılamıyor.",
-            "viewUsageLink": "Kullanım detayları ve kredi hareketlerini gör"
+            "viewUsageLink": "Kullanımı gör"
         },
         "checkoutStatus": {
-            "successTitle": "Checkout simülasyonu başarılı",
-            "failedTitle": "Checkout simülasyonu başarısız",
-            "blockedTitle": "Checkout politika nedeniyle bloklandı",
-            "errorTitle": "Checkout simülasyonu başarısız oldu",
-            "successSubscribe": "Mock modda premium paket aktifleştirildi.",
-            "successTopup": "Mock modda top-up kredisi eklendi.",
-            "failedSubscribe": "Abonelik ödeme simülasyonu başarısız döndü.",
-            "failedTopup": "Top-up ödeme simülasyonu başarısız döndü.",
+            "successTitle": "Ödeme tamamlandı",
+            "failedTitle": "Ödeme başarısız",
+            "blockedTitle": "Ödeme engellendi",
+            "errorTitle": "Ödeme hatası",
+            "successSubscribe": "Premium aktifleştirildi.",
+            "successTopup": "Kredi eklendi.",
+            "failedSubscribe": "Premium aktifleştirilemedi.",
+            "failedTopup": "Kredi eklenemedi.",
             "errors": {
                 "unauthorized": "Oturum doğrulanamadı.",
                 "invalidInput": "Checkout form değerleri geçersiz. Lütfen tekrar deneyin.",
@@ -572,9 +572,9 @@
         }
     },
     "billingUsage": {
-        "pageTitle": "Kullanım ve Faturalandırma",
-        "title": "Yapay Zeka Kullanımı",
-        "description": "Değiştirilemez kredi geçmişini ve detaylı kullanım analitiğini izleyin.",
+        "pageTitle": "Kullanım",
+        "title": "Yapay zeka kullanımı",
+        "description": "Kullanımı ve kredi geçmişini takip et.",
         "membership": {
             "trialActive": "Ücretsiz deneme aktif",
             "trialExhausted": "Ücretsiz deneme bitti",
@@ -602,14 +602,14 @@
             "none": "Aktif havuz yok"
         },
         "controlPanel": {
-            "title": "Faturalandırma hesap özeti",
-            "description": "Kredi hareketlerini okumak için salt okunur hesap durumu. Satın alma aksiyonları Planlar ve Krediler ekranından yönetilir.",
+            "title": "Hesap durumu",
+            "description": "Mevcut plan ve erişim durumu.",
             "planActionsHint": "Satın alma ve abonelik aksiyonları Planlar ve Krediler ekranından yönetilir.",
             "managePlansLink": "Planlar ve Krediler'e git",
-            "membershipLabel": "Üyelik",
-            "lockReasonLabel": "Kilit nedeni",
+            "membershipLabel": "Plan",
+            "lockReasonLabel": "Neden",
             "activePoolLabel": "Aktif havuz",
-            "usageStatusLabel": "Kullanım durumu",
+            "usageStatusLabel": "Erişim",
             "remainingCredits": "Kalan krediler",
             "trialCreditsCard": "Ücretsiz deneme kredileri",
             "trialTimeCard": "Ücretsiz deneme süresi",
@@ -622,13 +622,13 @@
             "topupAllowed": "Top-up kullanılabilir.",
             "topupBlocked": "Top-up için premium + paket tükenmesi gerekir.",
             "topupPurchaseManaged": "Top-up satın alma işlemleri Planlar ve Krediler ekranından yapılır.",
-            "usageAllowed": "Kullanım şu an açık.",
-            "usageBlocked": "Kullanım şu an kilitli.",
+            "usageAllowed": "Açık",
+            "usageBlocked": "Kilitli",
             "unavailable": "Faturalandırma verisi henüz alınamadı."
         },
         "ledger": {
-            "title": "Kredi kullanım geçmişi",
-            "description": "Kredi artış/azalışlarının değiştirilemez kayıtları.",
+            "title": "Kredi geçmişi",
+            "description": "Son kredi hareketleri.",
             "empty": "Henüz kredi hareketi kaydı yok.",
             "reasonFallback": "Neden yok",
             "columns": {
@@ -657,7 +657,7 @@
         "creditsLabel": "Kredi",
         "creditsUnit": "kredi",
         "creditsFormulaNote": "Önizleme formülü: kredi = ceil((girdi + 4×çıktı) / 3000, 0.1).",
-        "utcNote": "Aylık kullanım UTC takvim ayına göre hesaplanır.",
+        "utcNote": "Aylık kullanım UTC ayına göre hesaplanır.",
         "emptyState": "Henüz kullanım verisi yok.",
         "detailsCta": "Detayları gör",
         "detailsTitle": "Kullanım dökümü",

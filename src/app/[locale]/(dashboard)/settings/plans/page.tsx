@@ -324,14 +324,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                         <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.membershipLabel')}</p>
                                         <p className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">{membershipLabel}</p>
                                     </div>
-                                    <p className="mt-2 text-sm text-gray-600">
-                                        {snapshot.membershipState === 'trial_active' || snapshot.membershipState === 'trial_exhausted'
-                                            ? tPlans('status.lockRuleTrial')
-                                            : tPlans('status.lockRulePremium')}
-                                    </p>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        {tPlans('status.structureHint')}
-                                    </p>
                                 </div>
 
                                 {isTrialMembership && (
@@ -377,16 +369,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                             </div>
                                         </div>
 
-                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.upgradeOfferTitle')}</p>
-                                            <p className="mt-2 text-sm font-semibold text-gray-900">
-                                                {tPlans('actions.subscribe.packageSummary', {
-                                                    price: formatCurrency.format(packageOffer.monthlyPriceTry),
-                                                    credits: formatNumber.format(packageOffer.monthlyCredits)
-                                                })}
-                                            </p>
-                                            <p className="mt-1 text-xs text-gray-500">{tPlans('actions.topupBlockedTrial')}</p>
-                                        </div>
                                     </>
                                 )}
 
@@ -449,10 +431,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                         title={tPlans('actions.title')}
                         description={tPlans('actions.description')}
                     >
-                        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                            {tPlans('actions.mockModeNotice')}
-                        </div>
-
                         <div className={`grid grid-cols-1 gap-4 ${showTopupAction ? 'md:grid-cols-2' : ''}`}>
                             {isPremiumMembership ? (
                                 <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2">
@@ -475,21 +453,10 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                             credits: formatNumber.format(packageOffer.monthlyCredits)
                                         })}
                                     </p>
-                                    <label className="block text-xs font-medium text-gray-600">
-                                        {tPlans('actions.simulatedOutcomeLabel')}
-                                    </label>
-                                    <select
-                                        name="simulatedOutcome"
-                                        defaultValue="success"
-                                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                        disabled={!subscribeAllowed}
-                                    >
-                                        <option value="success">{tPlans('actions.simulatedOutcome.success')}</option>
-                                        <option value="failed">{tPlans('actions.simulatedOutcome.failed')}</option>
-                                    </select>
                                     <input type="hidden" name="organizationId" value={organizationId} />
                                     <input type="hidden" name="monthlyPriceTry" value={String(packageOffer.monthlyPriceTry)} />
                                     <input type="hidden" name="monthlyCredits" value={String(packageOffer.monthlyCredits)} />
+                                    <input type="hidden" name="simulatedOutcome" value="success" />
                                     {!subscribeAllowed && (
                                         <p className="text-xs text-amber-700">
                                             {packageOffer.monthlyCredits <= 0
@@ -518,21 +485,10 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                             amount: formatCurrency.format(topupAmountTry)
                                         })}
                                     </p>
-                                    <label className="block text-xs font-medium text-gray-600">
-                                        {tPlans('actions.simulatedOutcomeLabel')}
-                                    </label>
-                                    <select
-                                        name="simulatedOutcome"
-                                        defaultValue="success"
-                                        className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                        disabled={!topupState.allowed}
-                                    >
-                                        <option value="success">{tPlans('actions.simulatedOutcome.success')}</option>
-                                        <option value="failed">{tPlans('actions.simulatedOutcome.failed')}</option>
-                                    </select>
                                     <input type="hidden" name="organizationId" value={organizationId} />
                                     <input type="hidden" name="credits" value={String(topupCredits)} />
                                     <input type="hidden" name="amountTry" value={String(topupAmountTry)} />
+                                    <input type="hidden" name="simulatedOutcome" value="success" />
                                     {!topupState.allowed && topupState.reasonKey && (
                                         <p className="text-xs text-amber-700">{tPlans(`actions.${topupState.reasonKey}`)}</p>
                                     )}

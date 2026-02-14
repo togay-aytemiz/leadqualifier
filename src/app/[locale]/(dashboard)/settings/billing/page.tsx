@@ -2,15 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
-import { Link } from '@/i18n/navigation'
 import { getOrgAiUsageSummary } from '@/lib/ai/usage'
-import { UsageBreakdownDetails } from './UsageBreakdownDetails'
 import {
     calculateAiCreditsFromTokens,
     formatCreditAmount,
-    formatStorageSize,
-    getOrgMessageUsageSummary,
-    getOrgStorageUsageSummary
 } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getOrganizationBillingLedger, getOrganizationBillingSnapshot } from '@/lib/billing/server'
@@ -53,21 +48,6 @@ function resolveLockReasonLabel(tBilling: Awaited<ReturnType<typeof getTranslati
         return tBilling('lockReason.adminLocked')
     default:
         return snapshot.lockReason
-    }
-}
-
-function resolvePoolLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, snapshot: OrganizationBillingSnapshot) {
-    switch (snapshot.activeCreditPool) {
-    case 'trial_pool':
-        return tBilling('pool.trial')
-    case 'package_pool':
-        return tBilling('pool.package')
-    case 'topup_pool':
-        return tBilling('pool.topup')
-    case 'mixed':
-        return tBilling('pool.mixed')
-    default:
-        return tBilling('pool.none')
     }
 }
 
@@ -129,10 +109,8 @@ export default async function BillingSettingsPage() {
         )
     }
 
-    const [usage, messageUsage, storageUsage, billingSnapshot, billingLedger] = await Promise.all([
+    const [usage, billingSnapshot, billingLedger] = await Promise.all([
         getOrgAiUsageSummary(organizationId, { supabase }),
-        getOrgMessageUsageSummary(organizationId, { supabase }),
-        getOrgStorageUsageSummary(organizationId, { supabase }),
         getOrganizationBillingSnapshot(organizationId, { supabase }),
         getOrganizationBillingLedger(organizationId, { supabase, limit: 20 })
     ])
@@ -158,14 +136,9 @@ export default async function BillingSettingsPage() {
     const totalTotal = usage.total.totalTokens
     const monthlyCredits = calculateAiCreditsFromTokens(usage.monthly)
     const totalCredits = calculateAiCreditsFromTokens(usage.total)
-    const monthlyMessagesTotal = messageUsage.monthly.totalMessages
-    const totalMessagesTotal = messageUsage.total.totalMessages
-    const storageTotalSize = formatStorageSize(storageUsage.totalBytes, locale)
-    const storageSkillsSize = formatStorageSize(storageUsage.skillsBytes, locale)
-    const storageKnowledgeSize = formatStorageSize(storageUsage.knowledgeBytes, locale)
     const membershipLabel = billingSnapshot ? resolveMembershipLabel(tBilling, billingSnapshot) : tBilling('membership.unavailable')
     const lockReasonLabel = billingSnapshot ? resolveLockReasonLabel(tBilling, billingSnapshot) : tBilling('lockReason.unavailable')
-    const activePoolLabel = billingSnapshot ? resolvePoolLabel(tBilling, billingSnapshot) : tBilling('pool.none')
+    const isUsageAllowed = billingSnapshot?.isUsageAllowed ?? false
 
     return (
         <>
@@ -173,15 +146,6 @@ export default async function BillingSettingsPage() {
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-5xl space-y-6">
-                    <p className="text-sm text-gray-500">{tBilling('description')}</p>
-                    <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                        {tBilling('controlPanel.planActionsHint')}
-                        {' '}
-                        <Link href="/settings/plans" className="font-semibold underline-offset-2 hover:underline">
-                            {tBilling('controlPanel.managePlansLink')}
-                        </Link>
-                    </p>
-
                     <SettingsSection
                         title={tBilling('controlPanel.title')}
                         description={tBilling('controlPanel.description')}
@@ -197,27 +161,23 @@ export default async function BillingSettingsPage() {
                                     </div>
                                     <div>
                                         <p className="text-xs uppercase tracking-wider text-gray-400">
-                                            {tBilling('controlPanel.lockReasonLabel')}
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-gray-900">{lockReasonLabel}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">
-                                            {tBilling('controlPanel.activePoolLabel')}
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-gray-900">{activePoolLabel}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">
                                             {tBilling('controlPanel.usageStatusLabel')}
                                         </p>
                                         <p className="mt-1 text-sm font-semibold text-gray-900">
-                                            {billingSnapshot.isUsageAllowed
+                                            {isUsageAllowed
                                                 ? tBilling('controlPanel.usageAllowed')
                                                 : tBilling('controlPanel.usageBlocked')}
                                         </p>
                                     </div>
                                 </div>
+                                {!isUsageAllowed && (
+                                    <div className="mt-4">
+                                        <p className="text-xs uppercase tracking-wider text-gray-400">
+                                            {tBilling('controlPanel.lockReasonLabel')}
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold text-gray-900">{lockReasonLabel}</p>
+                                    </div>
+                                )}
                                 {billingSnapshot.package.periodEnd && (
                                     <p className="mt-4 text-xs text-gray-500">
                                         {tBilling('controlPanel.packageResetAt', {
@@ -286,7 +246,6 @@ export default async function BillingSettingsPage() {
                     <SettingsSection
                         title={tBilling('title')}
                         description={tBilling('utcNote')}
-                        descriptionAddon={<UsageBreakdownDetails usage={usage} />}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -303,9 +262,6 @@ export default async function BillingSettingsPage() {
                                     {tBilling('creditsLabel')}: {formatCreditAmount(monthlyCredits, locale)}
                                     <span className="ml-1 text-xs text-gray-500">{tBilling('creditsUnit')}</span>
                                 </p>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    {tBilling('inputLabel')}: {formatNumber.format(usage.monthly.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.monthly.outputTokens)}
-                                </p>
                             </div>
 
                             <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -318,92 +274,12 @@ export default async function BillingSettingsPage() {
                                     {tBilling('creditsLabel')}: {formatCreditAmount(totalCredits, locale)}
                                     <span className="ml-1 text-xs text-gray-500">{tBilling('creditsUnit')}</span>
                                 </p>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    {tBilling('inputLabel')}: {formatNumber.format(usage.total.inputTokens)} · {tBilling('outputLabel')}: {formatNumber.format(usage.total.outputTokens)}
-                                </p>
                             </div>
                         </div>
-
-                        <p className="mt-4 text-xs text-gray-500">{tBilling('creditsFormulaNote')}</p>
 
                         {totalTotal === 0 && (
                             <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>
                         )}
-                    </SettingsSection>
-
-                    <SettingsSection
-                        title={tBilling('messageUsageTitle')}
-                        description={tBilling('messageUsageDescription')}
-                    >
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
-                                    <span className="uppercase">{tBilling('monthLabel')}</span>
-                                    <span className="text-[11px]">•</span>
-                                    <span className="normal-case font-medium">{monthLabel}</span>
-                                </div>
-                                <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                    {formatNumber.format(monthlyMessagesTotal)}
-                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('messagesUnit')}</span>
-                                </p>
-                                <div className="mt-2 space-y-1 text-xs text-gray-500">
-                                    <p>{tBilling('messageAiLabel')}: {formatNumber.format(messageUsage.monthly.aiGenerated)}</p>
-                                    <p>{tBilling('messageOperatorLabel')}: {formatNumber.format(messageUsage.monthly.operatorSent)}</p>
-                                    <p>{tBilling('messageIncomingLabel')}: {formatNumber.format(messageUsage.monthly.incoming)}</p>
-                                </div>
-                            </div>
-
-                            <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
-                                <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                    {formatNumber.format(totalMessagesTotal)}
-                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('messagesUnit')}</span>
-                                </p>
-                                <div className="mt-2 space-y-1 text-xs text-gray-500">
-                                    <p>{tBilling('messageAiLabel')}: {formatNumber.format(messageUsage.total.aiGenerated)}</p>
-                                    <p>{tBilling('messageOperatorLabel')}: {formatNumber.format(messageUsage.total.operatorSent)}</p>
-                                    <p>{tBilling('messageIncomingLabel')}: {formatNumber.format(messageUsage.total.incoming)}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {totalMessagesTotal === 0 && (
-                            <p className="mt-4 text-sm text-gray-500">{tBilling('messageUsageEmptyState')}</p>
-                        )}
-                    </SettingsSection>
-
-                    <SettingsSection
-                        title={tBilling('storageUsageTitle')}
-                        description={tBilling('storageUsageDescription')}
-                    >
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
-                                <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                    {storageTotalSize.value}
-                                    <span className="ml-1 text-sm font-medium text-gray-400">{storageTotalSize.unit}</span>
-                                </p>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    {tBilling('storageSkillsCountLabel', { count: formatNumber.format(storageUsage.skillCount) })} · {tBilling('storageKnowledgeCountLabel', { count: formatNumber.format(storageUsage.knowledgeDocumentCount) })}
-                                </p>
-                            </div>
-
-                            <div className="rounded-xl border border-gray-200 bg-white p-4">
-                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('storageBreakdownLabel')}</p>
-                                <div className="mt-3 space-y-3 text-sm text-gray-700">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-medium">{tBilling('storageSkillsLabel')}</span>
-                                        <span>{storageSkillsSize.value} {storageSkillsSize.unit}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-medium">{tBilling('storageKnowledgeLabel')}</span>
-                                        <span>{storageKnowledgeSize.value} {storageKnowledgeSize.unit}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <p className="mt-4 text-xs text-gray-500">{tBilling('storageUsageApproxNote')}</p>
                     </SettingsSection>
                 </div>
             </div>

@@ -478,12 +478,12 @@
         "integrations": "Integrations",
         "channels": "Channels",
         "billing": "Billing",
-        "plans": "Plans & Credits",
-        "receipts": "Usage & Billing"
+        "plans": "Plans",
+        "receipts": "Usage"
     },
     "billingPlans": {
-        "pageTitle": "Plans & Credits",
-        "description": "Manage your trial/premium status and credit purchase actions.",
+        "pageTitle": "Plans",
+        "description": "Manage your current plan and credit purchases.",
         "noOrganization": "No Organization Found",
         "noOrganizationDesc": "You need to be part of an organization to manage plans.",
         "creditsUnit": "credits",
@@ -497,9 +497,9 @@
             "unavailable": "Unavailable"
         },
         "status": {
-            "title": "Current Plan Status",
-            "description": "Plan state and conversion context. Detailed usage history is in Usage & Billing.",
-            "membershipLabel": "Membership",
+            "title": "Current plan",
+            "description": "See your plan and remaining credits.",
+            "membershipLabel": "Plan status",
             "lockRuleTrial": "Trial usage is locked when trial time or trial credits run out first.",
             "lockRulePremium": "Top-up is available only after premium package credits are exhausted.",
             "structureHint": "This page is for plan state and purchase actions.",
@@ -507,8 +507,8 @@
             "trialTimeTitle": "Trial time",
             "packageCreditsTitle": "Monthly package",
             "topupCreditsTitle": "Top-up balance",
-            "upgradeOfferTitle": "Upgrade offer after trial",
-            "nonActiveMembershipNote": "Subscription is not active. Use the action center below to continue.",
+            "upgradeOfferTitle": "Upgrade offer",
+            "nonActiveMembershipNote": "Plan is not active. Continue with an action below.",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "days",
             "trialCredits": "Trial credits: {remaining} / {limit}",
@@ -522,8 +522,8 @@
             "unavailable": "Plan status is unavailable."
         },
         "actions": {
-            "title": "Purchase Actions",
-            "description": "Subscribe to premium and buy top-up credits from this page.",
+            "title": "Actions",
+            "description": "Upgrade to premium or buy extra credits.",
             "mockModeNotice": "Mock payment mode is active. Use success/failed outcomes to simulate checkout behavior before live provider integration.",
             "simulatedOutcomeLabel": "Simulated payment outcome",
             "simulatedOutcome": {
@@ -531,36 +531,36 @@
                 "failed": "Simulate failure"
             },
             "subscribe": {
-                "title": "Monthly Premium Package",
-                "packageSummary": "{price} per month • {credits} credits included",
+                "title": "Premium plan",
+                "packageSummary": "{price} / month • {credits} credits",
                 "alreadyActive": "Premium is already active for this organization.",
                 "notConfigured": "Premium package credits are not configured yet. Contact your admin.",
                 "activeTitle": "Premium is active",
                 "activeDescription": "Subscription is currently active for this organization.",
                 "activeResetAt": "Current period ends at {date}.",
-                "submit": "Start premium (mock checkout)"
+                "submit": "Start premium"
             },
             "topup": {
-                "title": "Top-up Credits",
+                "title": "Extra credits",
                 "packageSummary": "{credits} credits • {amount}",
-                "submit": "Buy top-up (mock checkout)"
+                "submit": "Buy credits"
             },
             "adminLocked": "This organization is admin-locked. Billing actions are blocked.",
             "topupBlockedTrial": "Top-up is blocked during trial. Start premium first.",
             "topupRequiresPremium": "Top-up requires an active premium package.",
             "topupAfterPackageExhausted": "Top-up unlocks only after package credits are exhausted.",
             "topupUnavailable": "Top-up is unavailable right now.",
-            "viewUsageLink": "View usage details and credit ledger"
+            "viewUsageLink": "View usage"
         },
         "checkoutStatus": {
-            "successTitle": "Checkout simulated successfully",
-            "failedTitle": "Checkout simulated as failed",
-            "blockedTitle": "Checkout blocked by policy",
-            "errorTitle": "Checkout simulation failed",
-            "successSubscribe": "Premium package has been activated in mock mode.",
-            "successTopup": "Top-up credits have been added in mock mode.",
-            "failedSubscribe": "Subscription payment simulation returned a failed outcome.",
-            "failedTopup": "Top-up payment simulation returned a failed outcome.",
+            "successTitle": "Payment completed",
+            "failedTitle": "Payment failed",
+            "blockedTitle": "Payment blocked",
+            "errorTitle": "Payment error",
+            "successSubscribe": "Premium has been activated.",
+            "successTopup": "Credits have been added.",
+            "failedSubscribe": "Could not activate premium.",
+            "failedTopup": "Could not add credits.",
             "errors": {
                 "unauthorized": "Your session is not authenticated.",
                 "invalidInput": "Invalid checkout form values. Please retry.",
@@ -572,9 +572,9 @@
         }
     },
     "billingUsage": {
-        "pageTitle": "Usage & Billing",
-        "title": "AI Usage",
-        "description": "Review immutable credit history and detailed usage analytics.",
+        "pageTitle": "Usage",
+        "title": "AI usage",
+        "description": "Track usage and credit history.",
         "membership": {
             "trialActive": "Trial active",
             "trialExhausted": "Trial exhausted",
@@ -602,14 +602,14 @@
             "none": "No active pool"
         },
         "controlPanel": {
-            "title": "Billing Account Snapshot",
-            "description": "Read-only billing state for ledger context. Purchase actions are managed in Plans & Credits.",
+            "title": "Account status",
+            "description": "Current plan and access status.",
             "planActionsHint": "Purchase and subscription actions are managed in Plans & Credits.",
             "managePlansLink": "Go to Plans & Credits",
-            "membershipLabel": "Membership",
-            "lockReasonLabel": "Lock reason",
+            "membershipLabel": "Plan",
+            "lockReasonLabel": "Reason",
             "activePoolLabel": "Active pool",
-            "usageStatusLabel": "Usage status",
+            "usageStatusLabel": "Access",
             "remainingCredits": "Remaining credits",
             "trialCreditsCard": "Trial credits",
             "trialTimeCard": "Trial time",
@@ -622,13 +622,13 @@
             "topupAllowed": "Top-up is available.",
             "topupBlocked": "Top-up is blocked until premium + package exhaustion.",
             "topupPurchaseManaged": "Top-up purchases are managed in Plans & Credits.",
-            "usageAllowed": "Usage is currently allowed.",
-            "usageBlocked": "Usage is currently locked.",
+            "usageAllowed": "Active",
+            "usageBlocked": "Locked",
             "unavailable": "Billing data is not available yet."
         },
         "ledger": {
-            "title": "Credit Usage History",
-            "description": "Immutable ledger of credit grants and debits.",
+            "title": "Credit history",
+            "description": "Recent credit changes.",
             "empty": "No credit ledger records yet.",
             "reasonFallback": "No reason",
             "columns": {
@@ -657,7 +657,7 @@
         "creditsLabel": "Credits",
         "creditsUnit": "credits",
         "creditsFormulaNote": "Preview formula: credits = ceil((input + 4×output) / 3000, 0.1).",
-        "utcNote": "Monthly usage is based on the UTC calendar month.",
+        "utcNote": "Monthly usage is based on the UTC month.",
         "emptyState": "No usage data yet.",
         "detailsCta": "View details",
         "detailsTitle": "Usage breakdown",
