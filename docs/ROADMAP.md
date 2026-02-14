@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-12 (Lead list required-field rendering now reuses the inbox required-intake resolver so `Important info` values from `required_intake_collected` appear consistently in Leads table/mobile cards; monetization direction records a trial-only launch stance, adds explicit trial-abuse prevention work items, and captures a low-entry-price target band before final TR price-point locking; Usage & Billing shows token-derived AI credit usage preview alongside token totals; shared inbound webhook RAG replies enforce an explicit max output token cap; lead extraction supports `undetermined` status for insufficient-information conversations while reserving `ignored` for non-business cases; greeting-only false `non_business` outputs normalize to `undetermined`; `service_type` no longer carries forward when latest extraction has no service clue; inbox/admin status chips include localized `Belirsiz/Undetermined` labels with dedicated purple styling; stale Phase 7 Channels TODOs were cleaned so WhatsApp status/debug is tracked as implemented while test-message sandbox is removed from scope; Phase 9 QA closure includes core unit tests, WhatsApp integration tests, admin panel E2E smoke coverage, and message-handling load baseline; Sign Up consent now uses inline clickable legal links (Terms/Privacy in new tab) as plain text instead of a required checkbox/boxed wrapper; and Channels + Inbox + Leads now use shared public social SVG logos while Instagram/Messenger remain `Coming Soon`)  
+> **Last Updated:** 2026-02-14 (Paywall execution advanced: `/settings/plans` now includes mock subscription + top-up checkout actions (success/failure simulation), tenant trial/package/top-up status cards, and conversion-first guardrails (top-up disabled during trial and before package exhaustion); desktop sidebar + mobile More now deep-link plan actions while showing trial/premium progress details; migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs to trial and adds mock checkout/admin override SQL helpers; admin organization detail now includes trial/package credit adjustments and membership/lock override actions with required reason capture. Real payment provider + webhook sync remains pending).  
 > Mark items with `[x]` when completed.
 
 ---
@@ -463,9 +463,10 @@
   - [x] Read org-level snapshots: usage, token usage, skills, knowledge stats (read-only table)
   - [x] Include profile-level details via user details view (multi-profile-ready membership listing)
   - [ ] Audit trail for admin-driven plan/quota updates
+  - [x] Manual billing actions (system-admin): extend trial, adjust credits, assign/cancel premium with required reason
 - [ ] Usage analytics per org
   - [x] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
-  - [x] Add premium/trial status visibility and plan cycle/status visibility (placeholder: not integrated)
+  - [x] Add premium/trial status visibility and plan cycle/status visibility (integrated with membership + credit snapshot read model)
   - [x] Add search + pagination for admin organization and user lists
   - [x] Compute admin dashboard stat cards via DB-side aggregate RPC (avoid full org summary scan on dashboard load)
   - [x] Move organization list search/pagination to DB-level count + range queries (no in-memory full-list slicing)
@@ -474,9 +475,9 @@
   - [x] Avoid heavy org-summary aggregation when building admin user lists (use lightweight organization lookup only)
   - [x] Load admin user detail via targeted profile + memberships + related-org snapshots (no full user/org scan)
 - [x] Billing/Quota Visibility (Admin)
-  - [x] Show premium/trial periods (read-only placeholders until billing integration)
+  - [x] Show premium/trial periods with membership/lock reason + credit used/remaining visibility (read-only)
   - [x] Show token/message usage values (read-only)
-  - [x] Defer edit controls until billing policy is finalized
+  - [x] Enable system-admin billing edit controls with required reason capture
 
 ---
 
@@ -484,21 +485,39 @@
 - [ ] **Pricing Strategy**
   - [ ] Define plan tiers, quotas, and overage policy
   - [x] Confirm launch pricing posture: low-entry starter around ~USD 10 equivalent (TRY-localized) to reduce first-purchase friction
+  - [x] Lock billing order: recurring monthly premium package first, credit top-up only after package credits are exhausted
+  - [x] Lock top-up eligibility: disabled during trial; enabled only for active premium organizations after package exhaustion
+  - [x] Lock package credit policy: monthly package credits do not roll over to the next billing cycle
+  - [x] Define monthly premium package defaults (`X TL` price, `Y` included credits) and admin change boundaries
   - [ ] Set Turkish market price points and annual discount policy
   - [ ] Finalize feature gating by plan (channels, AI limits, seats)
 - [ ] **Plan Purchase (Online Payment)**
-  - [ ] Select payment provider + integration model (TR compliance and invoice requirements)
-  - [ ] Implement checkout flow for monthly/annual plan purchase
+  - [ ] Select payment provider + integration model (TR compliance and invoice requirements; recurring subscriptions required)
+  - [ ] Implement recurring monthly premium checkout flow
+  - [ ] Implement top-up checkout flow (only when package credits are exhausted)
   - [ ] Implement payment webhook sync + failed-payment handling
 - [ ] **Membership States (Trial / Premium)**
-  - [ ] Define state model (`trial_active`, `premium_active`, `past_due`, `canceled`)
-  - [ ] Enforce entitlements in tenant runtime and admin read models
-  - [ ] Surface membership state in settings and platform admin pages
+  - [x] Define state model (`trial_active`, `trial_exhausted`, `premium_active`, `past_due`, `canceled`, `admin_locked`)
+  - [x] Enforce entitlements in tenant runtime and admin read models
+  - [x] Surface membership state in settings and platform admin pages
 - [ ] **Trial Policy Finalization**
   - [x] Decide trial model: trial-only launch (no freemium plan in pre-pilot)
-  - [ ] Define trial end behavior, conversion trigger, and grace rules
-  - [ ] Define trial limits (time cap + credit cap) and conversion trigger precedence (`limit reached` vs `time expired`)
+  - [x] Define trial end behavior and lock rule: system locks token-consuming features when either time or credit cap is reached first
+  - [x] Define trial limits and precedence (`14 days`, `120.0 credits`, precedence: whichever is reached first)
   - [ ] Finalize upgrade prompts for in-product conversion
+  - [ ] Add grace/extension policy for manual sales-assisted overrides (if needed)
+- [ ] **Paywall Implementation (Execution)**
+  - [x] Add billing schema (`organization_billing_accounts`, `organization_credit_ledger`, `credit_purchase_orders`, `platform_billing_settings`) with RLS and entitlement SQL helpers
+  - [x] Enforce paywall gates in inbound AI pipeline + dashboard token-consuming actions
+  - [x] Split tenant settings IA into `/settings/plans` (subscription/top-up management entry) and `/settings/billing` (usage + receipts details)
+  - [x] Add admin trial-default controls (new organizations only) and admin premium-package controls (`X TL`, `Y` credits)
+  - [x] Add admin credit visibility (used/remaining/lock reason) on organization/user detail surfaces
+  - [x] Add admin per-organization manual overrides: trial extension, top-up/trial/package credit increment-decrement, premium activation/deactivation, and membership/lock override
+  - [x] Add tenant billing paywall UI foundations (membership/lock banners, trial/package/top-up balances, credit usage history)
+  - [x] Add lightweight usage visibility entry points in desktop sidebar and mobile More menu (trial + package progress and quick links to Plans action surface)
+  - [x] Add mock checkout simulation (subscription + top-up success/failure states) to validate flow before real provider integration
+  - [x] Backfill existing non-system-admin organizations into trial mode baseline for rollout (`00058` migration)
+  - [ ] Add recurring premium checkout + top-up checkout + payment webhook sync + idempotent credit grants
 - [ ] **Trial Abuse Prevention**
   - [ ] Enforce one-trial-per-business policy keyed by `whatsapp_business_account_id` + normalized phone + company identity signals
   - [ ] Add risk controls for disposable email domains, VOIP-heavy signup numbers, and repeated device/IP fingerprints

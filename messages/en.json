@@ -203,6 +203,7 @@
         "knowledgeBase": "Knowledge Base",
         "leads": "Leads",
         "settings": "Settings",
+        "billing": "Billing",
         "inbox": "Inbox",
         "simulator": "Simulator",
         "other": "Other",
@@ -233,7 +234,23 @@
         "botStatusLabel": "Bot",
         "botStatusActive": "Active",
         "botStatusShadow": "Shadow",
-        "botStatusOff": "Off"
+        "botStatusOff": "Off",
+        "billingStatusLabel": "Usage",
+        "billingCreditsUnit": "credits left",
+        "billingUnavailable": "Unavailable",
+        "billingUnavailableDescription": "Billing status is unavailable.",
+        "billingTrialActive": "Trial active",
+        "billingTrialExhausted": "Trial exhausted",
+        "billingPremiumActive": "Premium active",
+        "billingPastDue": "Past due",
+        "billingCanceled": "Canceled",
+        "billingAdminLocked": "Admin locked",
+        "billingTrialSubline": "{days} days left in trial",
+        "billingTrialSublineDetailed": "{days} days left • {credits} trial credits",
+        "billingTopupSubline": "Top-up active: {credits} credits",
+        "billingPackageSubline": "Monthly package usage",
+        "billingPackageSublineWithDate": "Resets on {date}",
+        "billingUsageMenuLabel": "Usage details"
     },
     "inbox": {
         "title": "Inbox",
@@ -321,11 +338,13 @@
         "leadRefreshError": "Refresh failed. Try again.",
         "leadRefreshMissing": "AI key is missing.",
         "leadRefreshMissingConversation": "Conversation not found.",
+        "leadRefreshBillingLocked": "Usage is locked. Activate premium or add credits to continue.",
         "scoreReason": "Show reasoning",
         "scoreReasonTitle": "Score reasoning",
         "scoreReasonError": "Score explanation unavailable. Try again.",
         "scoreReasonMissing": "Score explanation unavailable because the AI key is missing.",
         "scoreReasonNoLead": "No lead data available for this conversation.",
+        "scoreReasonBillingLocked": "Usage is locked. Activate premium or add credits to continue.",
         "scrollToLatest": "Jump to latest message"
     },
     "simulator": {
@@ -458,13 +477,167 @@
         "integrations": "Integrations",
         "channels": "Channels",
         "billing": "Billing",
-        "plans": "Plans",
+        "plans": "Plans & Credits",
         "receipts": "Usage & Billing"
+    },
+    "billingPlans": {
+        "pageTitle": "Plans & Credits",
+        "description": "Manage your trial/premium status and credit purchase actions.",
+        "noOrganization": "No Organization Found",
+        "noOrganizationDesc": "You need to be part of an organization to manage plans.",
+        "creditsUnit": "credits",
+        "membership": {
+            "trialActive": "Trial active",
+            "trialExhausted": "Trial exhausted",
+            "premiumActive": "Premium active",
+            "pastDue": "Past due",
+            "canceled": "Canceled",
+            "adminLocked": "Admin locked",
+            "unavailable": "Unavailable"
+        },
+        "status": {
+            "title": "Current Plan Status",
+            "description": "Your current trial/premium state and remaining credits.",
+            "membershipLabel": "Membership",
+            "lockRuleTrial": "Trial usage is locked when trial time or trial credits run out first.",
+            "lockRulePremium": "Top-up is available only after premium package credits are exhausted.",
+            "trialCreditsTitle": "Trial credits",
+            "trialTimeTitle": "Trial time",
+            "packageCreditsTitle": "Monthly package",
+            "topupCreditsTitle": "Top-up balance",
+            "usedVsLimit": "{used} / {limit}",
+            "daysUnit": "days",
+            "trialCredits": "Trial credits: {remaining} / {limit}",
+            "trialDays": "Days left in trial: {days}",
+            "trialEndsAt": "Trial ends at: {date}",
+            "packageCredits": "Package credits: {remaining} / {limit}",
+            "topupCredits": "Top-up credits: {remaining}",
+            "packageResetAt": "Resets at: {date}",
+            "topupAllowed": "Top-up is available.",
+            "topupBlocked": "Top-up is blocked until premium + package exhaustion.",
+            "unavailable": "Plan status is unavailable."
+        },
+        "actions": {
+            "title": "Purchase Actions",
+            "description": "Subscribe to premium and buy top-up credits from this page.",
+            "mockModeNotice": "Mock payment mode is active. Use success/failed outcomes to simulate checkout behavior before live provider integration.",
+            "simulatedOutcomeLabel": "Simulated payment outcome",
+            "simulatedOutcome": {
+                "success": "Simulate success",
+                "failed": "Simulate failure"
+            },
+            "subscribe": {
+                "title": "Monthly Premium Package",
+                "packageSummary": "{price} per month • {credits} credits included",
+                "alreadyActive": "Premium is already active for this organization.",
+                "notConfigured": "Premium package credits are not configured yet. Contact your admin.",
+                "submit": "Start premium (mock checkout)"
+            },
+            "topup": {
+                "title": "Top-up Credits",
+                "packageSummary": "{credits} credits • {amount}",
+                "submit": "Buy top-up (mock checkout)"
+            },
+            "adminLocked": "This organization is admin-locked. Billing actions are blocked.",
+            "topupBlockedTrial": "Top-up is blocked during trial. Start premium first.",
+            "topupRequiresPremium": "Top-up requires an active premium package.",
+            "topupAfterPackageExhausted": "Top-up unlocks only after package credits are exhausted.",
+            "topupUnavailable": "Top-up is unavailable right now.",
+            "viewUsageLink": "View usage details and credit ledger"
+        },
+        "checkoutStatus": {
+            "successTitle": "Checkout simulated successfully",
+            "failedTitle": "Checkout simulated as failed",
+            "blockedTitle": "Checkout blocked by policy",
+            "errorTitle": "Checkout simulation failed",
+            "successSubscribe": "Premium package has been activated in mock mode.",
+            "successTopup": "Top-up credits have been added in mock mode.",
+            "failedSubscribe": "Subscription payment simulation returned a failed outcome.",
+            "failedTopup": "Top-up payment simulation returned a failed outcome.",
+            "errors": {
+                "unauthorized": "Your session is not authenticated.",
+                "invalidInput": "Invalid checkout form values. Please retry.",
+                "notAvailable": "Mock checkout functions are not available in this environment yet.",
+                "requestFailed": "The checkout request failed. Please retry.",
+                "adminLocked": "This organization is admin-locked.",
+                "topupNotAllowed": "Top-up is not allowed by current membership/package state."
+            }
+        }
     },
     "billingUsage": {
         "pageTitle": "Usage & Billing",
         "title": "AI Usage",
         "description": "Track AI token usage across production features.",
+        "membership": {
+            "trialActive": "Trial active",
+            "trialExhausted": "Trial exhausted",
+            "premiumActive": "Premium active",
+            "pastDue": "Past due",
+            "canceled": "Canceled",
+            "adminLocked": "Admin locked",
+            "unavailable": "Unavailable"
+        },
+        "lockReason": {
+            "none": "No lock",
+            "trialTimeExpired": "Trial time expired",
+            "trialCreditsExhausted": "Trial credits exhausted",
+            "subscriptionRequired": "Subscription required",
+            "packageCreditsExhausted": "Package credits exhausted",
+            "pastDue": "Payment past due",
+            "adminLocked": "Locked by admin",
+            "unavailable": "Unavailable"
+        },
+        "pool": {
+            "trial": "Trial pool",
+            "package": "Package pool",
+            "topup": "Top-up pool",
+            "mixed": "Mixed pool",
+            "none": "No active pool"
+        },
+        "controlPanel": {
+            "title": "Usage Control Panel",
+            "description": "Track trial, package, and top-up balances from one place.",
+            "membershipLabel": "Membership",
+            "lockReasonLabel": "Lock reason",
+            "activePoolLabel": "Active pool",
+            "remainingCredits": "Remaining credits",
+            "trialCreditsCard": "Trial credits",
+            "trialTimeCard": "Trial time",
+            "packageCreditsCard": "Monthly package",
+            "topupCard": "Top-up balance",
+            "usedVsLimit": "{used} / {limit}",
+            "daysUnit": "days",
+            "trialEndsAt": "Ends at {date}",
+            "packageResetAt": "Resets at {date}",
+            "topupAllowed": "Top-up is available.",
+            "topupBlocked": "Top-up is blocked until premium + package exhaustion.",
+            "usageAllowed": "Usage is currently allowed.",
+            "usageBlocked": "Usage is currently locked.",
+            "unavailable": "Billing data is not available yet."
+        },
+        "ledger": {
+            "title": "Credit Usage History",
+            "description": "Immutable ledger of credit grants and debits.",
+            "empty": "No credit ledger records yet.",
+            "reasonFallback": "No reason",
+            "columns": {
+                "date": "Date",
+                "type": "Type",
+                "pool": "Pool",
+                "delta": "Delta",
+                "balance": "Balance",
+                "reason": "Reason"
+            },
+            "entryType": {
+                "trialGrant": "Trial grant",
+                "packageGrant": "Package grant",
+                "usageDebit": "Usage debit",
+                "purchaseCredit": "Top-up purchase",
+                "adjustment": "Adjustment",
+                "refund": "Refund",
+                "reversal": "Reversal"
+            }
+        },
         "monthLabel": "This month",
         "totalLabel": "All-time total",
         "inputLabel": "Input",
@@ -764,14 +937,38 @@
     "admin": {
         "dashboardTitle": "Admin Dashboard",
         "overview": "System-wide overview and read-only monitoring.",
-        "readOnlyBanner": "This area is read-only for now. Premium, trial, and quota updates are not yet integrated.",
+        "readOnlyBanner": "This area is read-only for now. Billing visibility is live, but manual admin updates and checkout actions are not enabled yet.",
+        "billingControlsBanner": "Billing controls are enabled for system admins. Changes are audited and should be used carefully.",
+        "billingDefaults": {
+            "title": "Billing Defaults (Platform)",
+            "description": "Configure trial defaults and monthly premium package defaults.",
+            "scopeNote": "These defaults are applied to newly created organizations.",
+            "trialDaysLabel": "Default trial days",
+            "trialCreditsLabel": "Default trial credits",
+            "packagePriceLabel": "Default monthly package price (TRY)",
+            "packageCreditsLabel": "Default monthly package credits",
+            "reasonLabel": "Change reason",
+            "reasonPlaceholder": "Why is this default changing?",
+            "submit": "Save billing defaults",
+            "successTitle": "Billing defaults updated",
+            "errorTitle": "Billing defaults update failed",
+            "successDescription": "New organizations will use the updated defaults.",
+            "errors": {
+                "unauthorized": "Your session is not authenticated.",
+                "forbidden": "Only system admins can update billing defaults.",
+                "invalidInput": "Some fields are invalid. Check the form values.",
+                "notAvailable": "Billing defaults are not available on this environment yet.",
+                "requestFailed": "The update request failed. Please try again."
+            }
+        },
         "stats": {
             "organizations": "Total Organizations",
             "users": "Total Users",
             "skills": "Total Skills",
             "knowledge": "Total Knowledge Docs",
             "messages": "Total Usage",
-            "tokens": "Total Tokens"
+            "tokens": "Total Tokens",
+            "credits": "Total Credits Used"
         },
         "quickActions": "Quick Actions",
         "manageOrganizations": "Organization Overview",
@@ -794,7 +991,26 @@
             "updated": "Updated"
         },
         "status": {
-            "notIntegrated": "Not integrated"
+            "notIntegrated": "Not integrated",
+            "notAvailable": "Unavailable",
+            "remainingLabel": "Remaining: {value}",
+            "membership": {
+                "trialActive": "Trial active",
+                "trialExhausted": "Trial exhausted",
+                "premiumActive": "Premium active",
+                "pastDue": "Past due",
+                "canceled": "Canceled",
+                "adminLocked": "Admin locked"
+            },
+            "lockReason": {
+                "none": "No lock",
+                "trialTimeExpired": "Trial time expired",
+                "trialCreditsExhausted": "Trial credits exhausted",
+                "subscriptionRequired": "Subscription required",
+                "packageCreditsExhausted": "Package credits exhausted",
+                "pastDue": "Payment past due",
+                "adminLocked": "Locked by admin"
+            }
         },
         "leads": {
             "title": "Admin Lead List",
@@ -831,9 +1047,9 @@
                 "tokens": "Total Tokens",
                 "skills": "Skills",
                 "knowledge": "Knowledge Base",
-                "premium": "Premium",
-                "plan": "Plan",
-                "trial": "Trial",
+                "premium": "Membership",
+                "plan": "Package Credits",
+                "trial": "Trial Credits",
                 "created": "Created",
                 "details": "Details"
             }
@@ -890,14 +1106,14 @@
                 "tokens": "Total Tokens",
                 "skills": "Skills",
                 "knowledge": "Knowledge Base",
-                "premium": "Premium",
-                "plan": "Plan",
-                "trial": "Trial"
+                "premium": "Membership",
+                "plan": "Package Credits",
+                "trial": "Trial Credits"
             }
         },
         "organizationDetail": {
             "title": "Organization Details",
-            "description": "Read-only organization snapshot with profile memberships.",
+            "description": "Organization snapshot with profile memberships and billing controls.",
             "summary": {
                 "name": "Organization",
                 "slug": "Slug",
@@ -909,9 +1125,84 @@
                 "knowledge": "Knowledge Base"
             },
             "billing": {
-                "premium": "Premium",
-                "plan": "Plan",
-                "trial": "Trial"
+                "membership": "Membership",
+                "lockReasonLabel": "Lock reason",
+                "packageCredits": "Package Credits",
+                "trialCredits": "Trial Credits",
+                "trialEndsAt": "Trial ends: {date}",
+                "topup": "Top-up Credits",
+                "topupAllowed": "Top-up available",
+                "topupBlocked": "Top-up blocked"
+            },
+            "manualActions": {
+                "banner": "Manual billing actions are active for system admins. Every action requires a reason and is audit logged.",
+                "title": "Manual Billing Actions",
+                "description": "Use these tools for trial/premium overrides at organization level.",
+                "reasonPlaceholder": "Describe why this action is required...",
+                "successTitle": "Billing action completed",
+                "errorTitle": "Billing action failed",
+                "successDescription": "The requested organization billing change was applied.",
+                "actionLabels": {
+                    "extendTrial": "Extend trial",
+                    "adjustTopup": "Adjust top-up credits",
+                    "adjustTrial": "Adjust trial credits",
+                    "adjustPackage": "Adjust package credits",
+                    "assignPremium": "Assign premium",
+                    "cancelPremium": "Cancel premium",
+                    "setMembership": "Set membership override"
+                },
+                "errors": {
+                    "unauthorized": "Your session is not authenticated.",
+                    "forbidden": "Only system admins can perform this action.",
+                    "invalidInput": "Some form values are invalid. Please check the fields.",
+                    "notAvailable": "This admin billing action is not available in this environment yet.",
+                    "requestFailed": "The action request failed. Please try again."
+                },
+                "extendTrial": {
+                    "title": "Extend Trial",
+                    "newEndDateLabel": "New trial end date",
+                    "reasonLabel": "Reason",
+                    "submit": "Apply trial extension"
+                },
+                "adjustCredits": {
+                    "title": "Adjust Top-up Credits",
+                    "deltaLabel": "Credit delta (+/-)",
+                    "reasonLabel": "Reason",
+                    "submit": "Apply credit adjustment"
+                },
+                "adjustTrialCredits": {
+                    "title": "Adjust Trial Credits",
+                    "deltaLabel": "Credit delta (+/-)",
+                    "reasonLabel": "Reason",
+                    "submit": "Apply trial credit adjustment"
+                },
+                "adjustPackageCredits": {
+                    "title": "Adjust Package Credits",
+                    "deltaLabel": "Credit delta (+/-)",
+                    "reasonLabel": "Reason",
+                    "submit": "Apply package credit adjustment"
+                },
+                "assignPremium": {
+                    "title": "Assign Premium Package",
+                    "periodStartLabel": "Billing period start",
+                    "periodEndLabel": "Billing period end",
+                    "priceLabel": "Monthly price (TRY)",
+                    "creditsLabel": "Monthly included credits",
+                    "reasonLabel": "Reason",
+                    "submit": "Activate premium"
+                },
+                "cancelPremium": {
+                    "title": "Cancel Premium",
+                    "reasonLabel": "Reason",
+                    "submit": "Cancel premium subscription"
+                },
+                "membershipOverride": {
+                    "title": "Set Membership Override",
+                    "membershipStateLabel": "Membership state",
+                    "lockReasonLabel": "Lock reason",
+                    "reasonLabel": "Reason",
+                    "submit": "Apply membership override"
+                }
             },
             "profiles": {
                 "emptyTitle": "No profiles in this organization",

@@ -1,4 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import type {
+    BillingLockReason,
+    BillingMembershipState,
+    OrganizationBillingAccount
+} from '@/types/database'
+import { buildOrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -13,9 +19,23 @@ export interface AdminOrganizationSummary {
     knowledgeDocumentCount: number
     totalMessageCount: number
     totalTokenCount: number
-    premiumStatus: 'not_integrated'
-    trialStatus: 'not_integrated'
-    planStatus: 'not_integrated'
+    billing: AdminBillingSnapshot
+}
+
+export interface AdminBillingSnapshot {
+    membershipState: BillingMembershipState | null
+    lockReason: BillingLockReason | null
+    isUsageAllowed: boolean
+    isTopupAllowed: boolean
+    trialEndsAt: string | null
+    currentPeriodEnd: string | null
+    trialCreditsUsed: number
+    trialCreditsLimit: number
+    trialCreditsRemaining: number
+    packageCreditsUsed: number
+    packageCreditsLimit: number
+    packageCreditsRemaining: number
+    topupCreditsRemaining: number
 }
 
 export interface AdminUserOrganizationMembership {
@@ -81,6 +101,7 @@ export interface AdminDashboardSummary {
     knowledgeDocumentCount: number
     messageCount: number
     totalTokenCount: number
+    totalCreditUsage: number
 }
 
 function buildOrganizationMembershipLookup(organizations: OrganizationRow[]) {
@@ -149,6 +170,22 @@ interface MembershipRow {
 interface TokenUsageRow {
     organization_id: string
     total_tokens: number | null
+}
+
+const EMPTY_BILLING_SNAPSHOT: AdminBillingSnapshot = {
+    membershipState: null,
+    lockReason: null,
+    isUsageAllowed: false,
+    isTopupAllowed: false,
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    trialCreditsUsed: 0,
+    trialCreditsLimit: 0,
+    trialCreditsRemaining: 0,
+    packageCreditsUsed: 0,
+    packageCreditsLimit: 0,
+    packageCreditsRemaining: 0,
+    topupCreditsRemaining: 0
 }
 
 const EMPTY_COUNT_MAP = new Map<string, number>()
@@ -228,6 +265,54 @@ async function getTokenTotalsByOrganization(
     return totals
 }
 
+function mapBillingRowToAdminSnapshot(row: OrganizationBillingAccount): AdminBillingSnapshot {
+    const snapshot = buildOrganizationBillingSnapshot(row)
+
+    return {
+        membershipState: snapshot.membershipState,
+        lockReason: snapshot.lockReason,
+        isUsageAllowed: snapshot.isUsageAllowed,
+        isTopupAllowed: snapshot.isTopupAllowed,
+        trialEndsAt: snapshot.trial.endsAt,
+        currentPeriodEnd: snapshot.package.periodEnd,
+        trialCreditsUsed: snapshot.trial.credits.used,
+        trialCreditsLimit: snapshot.trial.credits.limit,
+        trialCreditsRemaining: snapshot.trial.credits.remaining,
+        packageCreditsUsed: snapshot.package.credits.used,
+        packageCreditsLimit: snapshot.package.credits.limit,
+        packageCreditsRemaining: snapshot.package.credits.remaining,
+        topupCreditsRemaining: snapshot.topupBalance
+    }
+}
+
+async function getBillingByOrganization(
+    supabase: SupabaseClient,
+    organizationIds: string[]
+): Promise<Map<string, AdminBillingSnapshot>> {
+    if (organizationIds.length === 0) return new Map()
+
+    const billingByOrganization = new Map<string, AdminBillingSnapshot>()
+
+    for (const organizationIdBatch of chunkValues(organizationIds, 100)) {
+        const { data, error } = await supabase
+            .from('organization_billing_accounts')
+            .select('*')
+            .in('organization_id', organizationIdBatch)
+
+        if (error) {
+            console.error('Failed to load billing accounts for organization batch:', error)
+            continue
+        }
+
+        const rows = (data ?? []) as OrganizationBillingAccount[]
+        for (const row of rows) {
+            billingByOrganization.set(row.organization_id, mapBillingRowToAdminSnapshot(row))
+        }
+    }
+
+    return billingByOrganization
+}
+
 async function getOrganizations(supabase: SupabaseClient): Promise<OrganizationRow[]> {
     const { data, error } = await supabase
         .from('organizations')
@@ -292,6 +377,36 @@ async function getGlobalTokenTotalFallback(supabase: SupabaseClient): Promise<nu
         const rows = (data ?? []) as Array<{ total_tokens: number | null }>
         for (const row of rows) {
             total += row.total_tokens ?? 0
+        }
+
+        if (rows.length < pageSize) break
+        offset += pageSize
+    }
+
+    return total
+}
+
+async function getGlobalCreditUsageFallback(supabase: SupabaseClient): Promise<number> {
+    const pageSize = 1000
+    let offset = 0
+    let total = 0
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('organization_credit_ledger')
+            .select('credits_delta')
+            .eq('entry_type', 'usage_debit')
+            .order('created_at', { ascending: true })
+            .range(offset, offset + pageSize - 1)
+
+        if (error) {
+            console.error('Failed to load credit usage totals for dashboard fallback:', error)
+            return total
+        }
+
+        const rows = (data ?? []) as Array<{ credits_delta: number | null }>
+        for (const row of rows) {
+            total += Math.abs(Number(row.credits_delta ?? 0))
         }
 
         if (rows.length < pageSize) break
@@ -419,12 +534,13 @@ async function buildOrganizationSummariesFromRows(
 
     const organizationIds = organizations.map((organization) => organization.id)
 
-    const [memberCounts, skillCounts, knowledgeCounts, messageCounts, tokenTotals] = await Promise.all([
+    const [memberCounts, skillCounts, knowledgeCounts, messageCounts, tokenTotals, billingByOrganization] = await Promise.all([
         getCountByOrganization(supabase, organizationIds, 'organization_members'),
         getCountByOrganization(supabase, organizationIds, 'skills'),
         getCountByOrganization(supabase, organizationIds, 'knowledge_documents'),
         getCountByOrganization(supabase, organizationIds, 'messages'),
-        getTokenTotalsByOrganization(supabase, organizationIds)
+        getTokenTotalsByOrganization(supabase, organizationIds),
+        getBillingByOrganization(supabase, organizationIds)
     ])
 
     return organizations.map((organization) => {
@@ -441,9 +557,7 @@ async function buildOrganizationSummariesFromRows(
             knowledgeDocumentCount: getCount(knowledgeCounts, organization.id),
             totalMessageCount: getCount(messageCounts, organization.id),
             totalTokenCount: getCount(tokenTotals, organization.id),
-            premiumStatus: 'not_integrated',
-            trialStatus: 'not_integrated',
-            planStatus: 'not_integrated'
+            billing: billingByOrganization.get(organization.id) ?? EMPTY_BILLING_SNAPSHOT
         }
     })
 }
@@ -623,13 +737,22 @@ async function buildUserSummariesFromProfiles(
 async function getAdminDashboardSummaryFallback(
     supabase: SupabaseClient
 ): Promise<AdminDashboardSummary> {
-    const [organizationCount, userCount, skillCount, knowledgeDocumentCount, messageCount, totalTokenCount] = await Promise.all([
+    const [
+        organizationCount,
+        userCount,
+        skillCount,
+        knowledgeDocumentCount,
+        messageCount,
+        totalTokenCount,
+        totalCreditUsage
+    ] = await Promise.all([
         getTableCount(supabase, 'organizations'),
         getTableCount(supabase, 'profiles'),
         getTableCount(supabase, 'skills'),
         getTableCount(supabase, 'knowledge_documents'),
         getTableCount(supabase, 'messages'),
-        getGlobalTokenTotalFallback(supabase)
+        getGlobalTokenTotalFallback(supabase),
+        getGlobalCreditUsageFallback(supabase)
     ])
 
     return {
@@ -638,7 +761,8 @@ async function getAdminDashboardSummaryFallback(
         skillCount,
         knowledgeDocumentCount,
         messageCount,
-        totalTokenCount
+        totalTokenCount,
+        totalCreditUsage
     }
 }
 
@@ -647,9 +771,12 @@ export async function getAdminDashboardSummary(
 ): Promise<AdminDashboardSummary> {
     const supabase = supabaseOverride ?? await createClient()
 
-    const { data, error } = await supabase
-        .rpc('get_admin_dashboard_totals')
-        .maybeSingle()
+    const [{ data, error }, totalCreditUsage] = await Promise.all([
+        supabase
+            .rpc('get_admin_dashboard_totals')
+            .maybeSingle(),
+        getGlobalCreditUsageFallback(supabase)
+    ])
 
     if (error || !data) {
         if (error) {
@@ -677,7 +804,8 @@ export async function getAdminDashboardSummary(
         skillCount: toNonNegativeInteger(row.skill_count),
         knowledgeDocumentCount: toNonNegativeInteger(row.knowledge_document_count),
         messageCount: toNonNegativeInteger(row.message_count),
-        totalTokenCount: toNonNegativeInteger(row.total_token_count)
+        totalTokenCount: toNonNegativeInteger(row.total_token_count),
+        totalCreditUsage
     }
 }
 

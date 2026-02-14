@@ -19,6 +19,7 @@ import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -143,6 +144,20 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)
     const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
+    const entitlement = await resolveOrganizationUsageEntitlement(orgId, {
+        supabase: options.supabase
+    })
+
+    if (!entitlement.isUsageAllowed) {
+        console.info(`${options.logPrefix}: Billing usage locked`, {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            membership_state: entitlement.membershipState,
+            lock_reason: entitlement.lockReason
+        })
+        return
+    }
+
     const shouldRunLeadExtraction = resolveLeadExtractionAllowance({
         botMode,
         operatorActive,

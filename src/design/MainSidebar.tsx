@@ -7,7 +7,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import type { AiBotMode } from '@/types/database'
+import type { AiBotMode, OrganizationBillingAccount } from '@/types/database'
+import {
+    buildOrganizationBillingSnapshot,
+    type OrganizationBillingSnapshot
+} from '@/lib/billing/snapshot'
 import {
     HiMiniChatBubbleBottomCenterText,
     HiOutlineChatBubbleBottomCenterText,
@@ -68,6 +72,14 @@ function mergeOrganizations(
     return sortOrganizations(Array.from(lookup.values()))
 }
 
+function formatCredits(value: number) {
+    const safe = Math.max(0, Number.isFinite(value) ? value : 0)
+    return new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    }).format(safe)
+}
+
 interface MainSidebarProps {
     userName?: string
     isSystemAdmin?: boolean
@@ -98,6 +110,7 @@ export function MainSidebar({
     const [isLoadingOrganizationOptions, setIsLoadingOrganizationOptions] = useState(false)
     const [hasLoadedOrganizationOptions, setHasLoadedOrganizationOptions] = useState(!isSystemAdmin)
     const [botMode, setBotMode] = useState<AiBotMode>('active')
+    const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
     const [orgSearch, setOrgSearch] = useState('')
     const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
     const [isOrgPickerOpen, setIsOrgPickerOpen] = useState(false)
@@ -210,6 +223,27 @@ export function MainSidebar({
         }
     }, [supabase])
 
+    const refreshBillingSnapshot = useCallback(async (orgId: string) => {
+        const { data, error } = await supabase
+            .from('organization_billing_accounts')
+            .select('*')
+            .eq('organization_id', orgId)
+            .maybeSingle()
+
+        if (error) {
+            console.error('Failed to load billing status', error)
+            setBillingSnapshot(null)
+            return
+        }
+
+        if (!data) {
+            setBillingSnapshot(null)
+            return
+        }
+
+        setBillingSnapshot(buildOrganizationBillingSnapshot(data as OrganizationBillingAccount))
+    }, [supabase])
+
     const handleOrganizationSwitch = useCallback(async (nextOrganizationId: string) => {
         if (!isSystemAdmin || isSwitchingOrg || !nextOrganizationId || nextOrganizationId === organizationId) {
             return
@@ -312,18 +346,21 @@ export function MainSidebar({
             setHasUnread(false)
             setHasPendingSuggestions(false)
             setBotMode('active')
+            setBillingSnapshot(null)
             return
         }
 
         refreshUnread(organizationId)
         fetchBotMode(organizationId)
         refreshPendingSuggestions(organizationId)
-    }, [fetchBotMode, organizationId, refreshPendingSuggestions, refreshUnread])
+        refreshBillingSnapshot(organizationId)
+    }, [fetchBotMode, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread])
 
     useEffect(() => {
         if (!organizationId) return
         let unreadChannel: ReturnType<typeof supabase.channel> | null = null
         let suggestionChannel: ReturnType<typeof supabase.channel> | null = null
+        let billingChannel: ReturnType<typeof supabase.channel> | null = null
         let isMounted = true
 
         const setupRealtime = async () => {
@@ -355,6 +392,25 @@ export function MainSidebar({
                     refreshPendingSuggestions(organizationId)
                 })
                 .subscribe()
+
+            billingChannel = supabase.channel(`sidebar_billing_${organizationId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'organization_billing_accounts',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    refreshBillingSnapshot(organizationId)
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'organization_credit_ledger',
+                    filter: `organization_id=eq.${organizationId}`
+                }, () => {
+                    refreshBillingSnapshot(organizationId)
+                })
+                .subscribe()
         }
 
         setupRealtime()
@@ -367,8 +423,11 @@ export function MainSidebar({
             if (suggestionChannel) {
                 supabase.removeChannel(suggestionChannel)
             }
+            if (billingChannel) {
+                supabase.removeChannel(billingChannel)
+            }
         }
-    }, [organizationId, refreshPendingSuggestions, refreshUnread, supabase])
+    }, [organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread, supabase])
 
     useEffect(() => {
         if (!organizationId) return
@@ -392,6 +451,7 @@ export function MainSidebar({
             '/skills',
             '/knowledge',
             '/settings',
+            '/settings/plans',
             '/settings/profile',
             '/settings/organization',
             '/settings/general',
@@ -539,6 +599,78 @@ export function MainSidebar({
         : botMode === 'off'
             ? 'bg-red-500'
             : 'bg-emerald-500'
+    const billingMembershipLabel = useMemo(() => {
+        if (!billingSnapshot) return tSidebar('billingUnavailable')
+
+        switch (billingSnapshot.membershipState) {
+        case 'trial_active':
+            return tSidebar('billingTrialActive')
+        case 'trial_exhausted':
+            return tSidebar('billingTrialExhausted')
+        case 'premium_active':
+            return tSidebar('billingPremiumActive')
+        case 'past_due':
+            return tSidebar('billingPastDue')
+        case 'canceled':
+            return tSidebar('billingCanceled')
+        case 'admin_locked':
+            return tSidebar('billingAdminLocked')
+        default:
+            return billingSnapshot.membershipState
+        }
+    }, [billingSnapshot, tSidebar])
+    const billingProgress = useMemo(() => {
+        if (!billingSnapshot) return 0
+
+        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
+            return Math.max(
+                billingSnapshot.trial.credits.progress,
+                billingSnapshot.trial.timeProgress
+            )
+        }
+
+        if (billingSnapshot.membershipState === 'premium_active') {
+            if (billingSnapshot.package.credits.remaining <= 0 && billingSnapshot.topupBalance > 0) {
+                return 100
+            }
+            return billingSnapshot.package.credits.progress
+        }
+
+        return 0
+    }, [billingSnapshot])
+    const billingSubline = useMemo(() => {
+        if (!billingSnapshot) return tSidebar('billingUnavailableDescription')
+
+        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
+            return tSidebar('billingTrialSublineDetailed', {
+                days: String(billingSnapshot.trial.remainingDays),
+                credits: formatCredits(billingSnapshot.trial.credits.remaining)
+            })
+        }
+
+        if (billingSnapshot.membershipState === 'premium_active'
+            && billingSnapshot.package.credits.remaining <= 0
+            && billingSnapshot.topupBalance > 0
+        ) {
+            return tSidebar('billingTopupSubline', {
+                credits: formatCredits(billingSnapshot.topupBalance)
+            })
+        }
+
+        if (billingSnapshot.package.periodEnd) {
+            try {
+                const resetDate = new Intl.DateTimeFormat(undefined, {
+                    month: 'short',
+                    day: 'numeric'
+                }).format(new Date(billingSnapshot.package.periodEnd))
+                return tSidebar('billingPackageSublineWithDate', { date: resetDate })
+            } catch {
+                return tSidebar('billingPackageSubline')
+            }
+        }
+
+        return tSidebar('billingPackageSubline')
+    }, [billingSnapshot, tSidebar])
 
     return (
         <aside
@@ -770,6 +902,33 @@ export function MainSidebar({
                     )}
                 </Link>
             </div>
+
+            {billingSnapshot && !collapsed && (
+                <div className="px-3 pb-2">
+                    <Link
+                        href="/settings/plans"
+                        className="block rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300"
+                    >
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {tSidebar('billingStatusLabel')}
+                            </p>
+                            <p className="text-xs font-semibold text-slate-700">{billingMembershipLabel}</p>
+                        </div>
+                        <p className="mt-1 text-base font-semibold text-slate-900">
+                            {formatCredits(billingSnapshot.totalRemainingCredits)}
+                            <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
+                        </p>
+                        <div className="mt-2 h-1.5 rounded-full bg-slate-100">
+                            <div
+                                className="h-1.5 rounded-full bg-[#242A40]"
+                                style={{ width: `${Math.min(100, billingProgress)}%` }}
+                            />
+                        </div>
+                        <p className="mt-2 text-[11px] text-slate-500">{billingSubline}</p>
+                    </Link>
+                </div>
+            )}
 
             <nav className="flex-1 px-3 pt-3">
                 <div className="space-y-4">

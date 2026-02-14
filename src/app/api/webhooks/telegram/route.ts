@@ -20,6 +20,7 @@ import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { v4 as uuidv4 } from 'uuid'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
@@ -192,6 +193,17 @@ export async function POST(req: NextRequest) {
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)
     const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
+    const entitlement = await resolveOrganizationUsageEntitlement(orgId, { supabase })
+    if (!entitlement.isUsageAllowed) {
+        console.info('Telegram Webhook: Billing usage locked, skipping AI processing', {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            membership_state: entitlement.membershipState,
+            lock_reason: entitlement.lockReason
+        })
+        return NextResponse.json({ ok: true })
+    }
+
     const shouldRunLeadExtraction = resolveLeadExtractionAllowance({
         botMode,
         operatorActive,

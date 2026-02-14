@@ -4,10 +4,37 @@ import { Link } from '@/i18n/navigation'
 import { Badge, DataTable, EmptyState, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
-import { getAdminUserDetail } from '@/lib/admin/read-models'
+import { getAdminUserDetail, type AdminBillingSnapshot } from '@/lib/admin/read-models'
 
 interface AdminUserDetailsPageProps {
     params: Promise<{ id: string }>
+}
+
+function resolveMembershipBadgeVariant(state: AdminBillingSnapshot['membershipState']) {
+    if (state === 'premium_active') return 'purple' as const
+    if (state === 'trial_active') return 'info' as const
+    if (state === 'trial_exhausted' || state === 'past_due') return 'warning' as const
+    if (state === 'admin_locked' || state === 'canceled') return 'error' as const
+    return 'neutral' as const
+}
+
+function resolveMembershipLabel(tAdmin: Awaited<ReturnType<typeof getTranslations>>, billing: AdminBillingSnapshot) {
+    switch (billing.membershipState) {
+    case 'trial_active':
+        return tAdmin('status.membership.trialActive')
+    case 'trial_exhausted':
+        return tAdmin('status.membership.trialExhausted')
+    case 'premium_active':
+        return tAdmin('status.membership.premiumActive')
+    case 'past_due':
+        return tAdmin('status.membership.pastDue')
+    case 'canceled':
+        return tAdmin('status.membership.canceled')
+    case 'admin_locked':
+        return tAdmin('status.membership.adminLocked')
+    default:
+        return tAdmin('status.notAvailable')
+    }
 }
 
 export default async function AdminUserDetailsPage({ params }: AdminUserDetailsPageProps) {
@@ -118,13 +145,33 @@ export default async function AdminUserDetailsPage({ params }: AdminUserDetailsP
                                                 <span className="text-sm text-gray-600">{formatNumber.format(organization.knowledgeDocumentCount)}</span>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="warning">{tAdmin('status.notIntegrated')}</Badge>
+                                                <Badge variant={resolveMembershipBadgeVariant(organization.billing.membershipState)}>
+                                                    {resolveMembershipLabel(tAdmin, organization.billing)}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="neutral">{tAdmin('status.notIntegrated')}</Badge>
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-sm font-medium text-gray-700">
+                                                        {formatNumber.format(organization.billing.packageCreditsUsed)} / {formatNumber.format(organization.billing.packageCreditsLimit)}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {tAdmin('status.remainingLabel', {
+                                                            value: formatNumber.format(organization.billing.packageCreditsRemaining)
+                                                        })}
+                                                    </p>
+                                                </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="info">{tAdmin('status.notIntegrated')}</Badge>
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-sm font-medium text-gray-700">
+                                                        {formatNumber.format(organization.billing.trialCreditsUsed)} / {formatNumber.format(organization.billing.trialCreditsLimit)}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {tAdmin('status.remainingLabel', {
+                                                            value: formatNumber.format(organization.billing.trialCreditsRemaining)
+                                                        })}
+                                                    </p>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}

@@ -41,6 +41,130 @@ export interface OrganizationAiUsage {
     created_at: string
 }
 
+export type BillingMembershipState =
+    | 'trial_active'
+    | 'trial_exhausted'
+    | 'premium_active'
+    | 'past_due'
+    | 'canceled'
+    | 'admin_locked'
+
+export type BillingLockReason =
+    | 'none'
+    | 'trial_time_expired'
+    | 'trial_credits_exhausted'
+    | 'subscription_required'
+    | 'package_credits_exhausted'
+    | 'past_due'
+    | 'admin_locked'
+
+export type BillingCreditLedgerType =
+    | 'trial_grant'
+    | 'package_grant'
+    | 'usage_debit'
+    | 'purchase_credit'
+    | 'adjustment'
+    | 'refund'
+    | 'reversal'
+
+export type BillingCreditPoolType = 'trial_pool' | 'package_pool' | 'topup_pool' | 'mixed'
+
+export interface PlatformBillingSettings {
+    key: 'default'
+    default_trial_days: number
+    default_trial_credits: number
+    default_package_price_try: number
+    default_package_credits: number
+    updated_by: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface BillingPackageVersion {
+    id: string
+    monthly_price_try: number
+    monthly_credits: number
+    effective_from: string
+    effective_to: string | null
+    created_by: string | null
+    created_at: string
+}
+
+export interface OrganizationBillingAccount {
+    organization_id: string
+    membership_state: BillingMembershipState
+    lock_reason: BillingLockReason
+    trial_started_at: string
+    trial_ends_at: string
+    trial_credit_limit: number
+    trial_credit_used: number
+    current_period_start: string | null
+    current_period_end: string | null
+    monthly_package_credit_limit: number
+    monthly_package_credit_used: number
+    topup_credit_balance: number
+    premium_assigned_at: string | null
+    last_manual_action_at: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface OrganizationCreditLedger {
+    id: string
+    organization_id: string
+    entry_type: BillingCreditLedgerType
+    credit_pool: BillingCreditPoolType
+    credits_delta: number
+    balance_after: number
+    usage_id: string | null
+    performed_by: string | null
+    reason: string | null
+    metadata: Json
+    created_at: string
+}
+
+export interface OrganizationSubscriptionRecord {
+    id: string
+    organization_id: string
+    provider: string
+    provider_subscription_id: string | null
+    status: 'pending' | 'active' | 'past_due' | 'canceled' | 'incomplete'
+    period_start: string | null
+    period_end: string | null
+    canceled_at: string | null
+    metadata: Json
+    created_at: string
+    updated_at: string
+}
+
+export interface CreditPurchaseOrder {
+    id: string
+    organization_id: string
+    provider: string
+    provider_checkout_id: string | null
+    provider_payment_id: string | null
+    status: 'pending' | 'paid' | 'failed' | 'canceled' | 'expired' | 'refunded'
+    credits: number
+    amount_try: number
+    currency: string
+    paid_at: string | null
+    metadata: Json
+    created_at: string
+    updated_at: string
+}
+
+export interface BillingAdminAuditLog {
+    id: string
+    organization_id: string
+    action_type: 'extend_trial' | 'credit_adjustment' | 'premium_assign' | 'premium_cancel' | 'package_config_update'
+    actor_id: string
+    reason: string
+    before_state: Json
+    after_state: Json
+    metadata: Json
+    created_at: string
+}
+
 export interface OrganizationMember {
     id: string
     organization_id: string
@@ -278,6 +402,41 @@ export interface Database {
                 Row: OrganizationAiUsage
                 Insert: Omit<OrganizationAiUsage, 'id' | 'created_at'>
                 Update: Partial<Omit<OrganizationAiUsage, 'id' | 'organization_id' | 'created_at'>>
+            }
+            platform_billing_settings: {
+                Row: PlatformBillingSettings
+                Insert: Omit<PlatformBillingSettings, 'created_at' | 'updated_at'> & { key?: 'default' }
+                Update: Partial<Omit<PlatformBillingSettings, 'key' | 'created_at' | 'updated_at'>>
+            }
+            billing_package_versions: {
+                Row: BillingPackageVersion
+                Insert: Omit<BillingPackageVersion, 'id' | 'created_at'>
+                Update: Partial<Omit<BillingPackageVersion, 'id' | 'created_at'>>
+            }
+            organization_billing_accounts: {
+                Row: OrganizationBillingAccount
+                Insert: Omit<OrganizationBillingAccount, 'created_at' | 'updated_at'>
+                Update: Partial<Omit<OrganizationBillingAccount, 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            organization_credit_ledger: {
+                Row: OrganizationCreditLedger
+                Insert: Omit<OrganizationCreditLedger, 'id' | 'created_at'>
+                Update: Partial<Omit<OrganizationCreditLedger, 'id' | 'organization_id' | 'created_at'>>
+            }
+            organization_subscription_records: {
+                Row: OrganizationSubscriptionRecord
+                Insert: Omit<OrganizationSubscriptionRecord, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<OrganizationSubscriptionRecord, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            credit_purchase_orders: {
+                Row: CreditPurchaseOrder
+                Insert: Omit<CreditPurchaseOrder, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<CreditPurchaseOrder, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            billing_admin_audit_log: {
+                Row: BillingAdminAuditLog
+                Insert: Omit<BillingAdminAuditLog, 'id' | 'created_at'>
+                Update: Partial<Omit<BillingAdminAuditLog, 'id' | 'organization_id' | 'created_at'>>
             }
             offering_profiles: {
                 Row: OfferingProfile

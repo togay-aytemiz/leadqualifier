@@ -84,10 +84,10 @@ export function InboxContainer({
     const [isSummaryOpen, setIsSummaryOpen] = useState(false)
     const [scoreReasonStatus, setScoreReasonStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
     const [scoreReasonText, setScoreReasonText] = useState('')
-    const [scoreReasonError, setScoreReasonError] = useState<'missing_api_key' | 'missing_lead' | 'request_failed' | null>(null)
+    const [scoreReasonError, setScoreReasonError] = useState<'missing_api_key' | 'missing_lead' | 'billing_locked' | 'request_failed' | null>(null)
     const [isScoreReasonOpen, setIsScoreReasonOpen] = useState(false)
     const [leadRefreshStatus, setLeadRefreshStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-    const [leadRefreshError, setLeadRefreshError] = useState<'missing_api_key' | 'missing_conversation' | 'request_failed' | null>(null)
+    const [leadRefreshError, setLeadRefreshError] = useState<'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'request_failed' | null>(null)
     const [leadAutoRefreshStatus, setLeadAutoRefreshStatus] = useState<'idle' | 'loading'>('idle')
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
@@ -932,6 +932,8 @@ export function InboxContainer({
         ? t('scoreReasonMissing')
         : scoreReasonError === 'missing_lead'
             ? t('scoreReasonNoLead')
+            : scoreReasonError === 'billing_locked'
+                ? t('scoreReasonBillingLocked')
             : t('scoreReasonError')
     const operatorActive = isOperatorActive(selectedConversation)
     const allowDuringOperator = Boolean(allowLeadExtractionDuringOperator)
@@ -944,6 +946,8 @@ export function InboxContainer({
         ? t('leadRefreshMissing')
         : leadRefreshError === 'missing_conversation'
             ? t('leadRefreshMissingConversation')
+            : leadRefreshError === 'billing_locked'
+                ? t('leadRefreshBillingLocked')
             : t('leadRefreshError')
     const isLeadUpdating = leadRefreshStatus === 'loading' || leadAutoRefreshStatus === 'loading'
     const mobileListPaneClasses = getMobileListPaneClasses(isMobileConversationOpen)

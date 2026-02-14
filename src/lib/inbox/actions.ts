@@ -9,19 +9,20 @@ import { recordAiUsage } from '@/lib/ai/usage'
 import { matchesCatalog } from '@/lib/leads/catalog'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
     | { ok: true; summary: string }
-    | { ok: false; reason: 'insufficient_data' | 'missing_api_key' | 'request_failed' }
+    | { ok: false; reason: 'insufficient_data' | 'missing_api_key' | 'billing_locked' | 'request_failed' }
 
 export type LeadScoreReasonResult =
     | { ok: true; reasoning: string }
-    | { ok: false; reason: 'missing_api_key' | 'missing_lead' | 'request_failed' }
+    | { ok: false; reason: 'missing_api_key' | 'missing_lead' | 'billing_locked' | 'request_failed' }
 
 export type LeadRefreshResult =
     | { ok: true }
-    | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'request_failed' }
+    | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'request_failed' }
 
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
 type ConversationLeadPreview = { status?: string | null }
@@ -283,11 +284,16 @@ export async function getConversationSummary(
     organizationId: string,
     locale: string = 'tr'
 ): Promise<ConversationSummaryResult> {
+    const supabase = await createClient()
+    const entitlement = await resolveOrganizationUsageEntitlement(organizationId, { supabase })
+    if (!entitlement.isUsageAllowed) {
+        return { ok: false, reason: 'billing_locked' }
+    }
+
     if (!process.env.OPENAI_API_KEY) {
         return { ok: false, reason: 'missing_api_key' }
     }
 
-    const supabase = await createClient()
     const aiSettings = await getOrgAiSettings(organizationId, { supabase })
 
     const [contactResult, botResult] = await Promise.all([
@@ -391,11 +397,15 @@ export async function getLeadScoreReasoning(
     locale: string = 'tr',
     statusLabel?: string
 ): Promise<LeadScoreReasonResult> {
+    const supabase = await createClient()
+    const entitlement = await resolveOrganizationUsageEntitlement(organizationId, { supabase })
+    if (!entitlement.isUsageAllowed) {
+        return { ok: false, reason: 'billing_locked' }
+    }
+
     if (!process.env.OPENAI_API_KEY) {
         return { ok: false, reason: 'missing_api_key' }
     }
-
-    const supabase = await createClient()
 
     const [{ data: lead }, { data: profile }, { data: catalog }, { data: suggestions }] = await Promise.all([
         supabase
@@ -534,11 +544,16 @@ export async function refreshConversationLead(
     organizationId: string,
     preferredLocale?: string | null
 ): Promise<LeadRefreshResult> {
+    const supabase = await createClient()
+    const entitlement = await resolveOrganizationUsageEntitlement(organizationId, { supabase })
+    if (!entitlement.isUsageAllowed) {
+        return { ok: false, reason: 'billing_locked' }
+    }
+
     if (!process.env.OPENAI_API_KEY) {
         return { ok: false, reason: 'missing_api_key' }
     }
 
-    const supabase = await createClient()
     try {
         await assertTenantWriteAllowed(supabase)
     } catch {

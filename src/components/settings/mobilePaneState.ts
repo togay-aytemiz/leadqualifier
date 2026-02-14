@@ -1,7 +1,7 @@
 export const SETTINGS_MOBILE_BACK_EVENT = 'settings-mobile-back'
 const SETTINGS_BASE_PATH = '/settings'
 
-export type SettingsNavItemId = 'profile' | 'organization' | 'general' | 'ai' | 'channels' | 'billing'
+export type SettingsNavItemId = 'profile' | 'organization' | 'general' | 'ai' | 'channels' | 'plans' | 'billing'
 
 const SETTINGS_NAV_ITEMS = new Set<SettingsNavItemId>([
     'profile',
@@ -9,6 +9,7 @@ const SETTINGS_NAV_ITEMS = new Set<SettingsNavItemId>([
     'general',
     'ai',
     'channels',
+    'plans',
     'billing'
 ])
 

@@ -32,7 +32,7 @@ interface SettingsResponsiveShellProps {
 type SettingsGroup = 'preferences' | 'integrations' | 'billing'
 
 interface SettingsNavItem {
-    id: SettingsNavItemId | 'plans'
+    id: SettingsNavItemId
     group: SettingsGroup
     label: string
     href?: string
@@ -104,7 +104,9 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
             id: 'plans',
             group: 'billing',
             label: tSidebar('plans'),
-            icon: <HiOutlineCreditCard size={18} />
+            href: getLocalizedHref(locale, '/settings/plans'),
+            icon: <HiOutlineCreditCard size={18} />,
+            active: activeItem === 'plans'
         },
         {
             id: 'billing',

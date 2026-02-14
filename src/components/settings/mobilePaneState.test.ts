@@ -51,6 +51,7 @@ describe('settings mobile pane state helpers', () => {
         expect(getSettingsNavItemFromPath('/tr/settings/general')).toBe('general')
         expect(getSettingsNavItemFromPath('/settings/ai')).toBe('ai')
         expect(getSettingsNavItemFromPath('/settings/channels')).toBe('channels')
+        expect(getSettingsNavItemFromPath('/settings/plans')).toBe('plans')
         expect(getSettingsNavItemFromPath('/settings/billing')).toBe('billing')
         expect(getSettingsNavItemFromPath('/settings/unknown')).toBeNull()
     })

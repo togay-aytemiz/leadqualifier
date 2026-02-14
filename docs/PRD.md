@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-12 (Lead list required-field rendering now reuses the same required-intake resolver as Inbox "Important info" so `required_intake_collected` values appear consistently across details and list views; monetization direction records trial-only pre-pilot onboarding with explicit abuse-prevention requirements and a low-entry starter pricing target; Usage & Billing surfaces token-derived AI credit usage preview values alongside token totals; shared inbound webhook RAG replies enforce explicit `max_tokens` output limits for cost predictability; lead extraction supports `undetermined` status for insufficient-information conversations, reserves `ignored` for non-business-only cases, normalizes greeting-only false `non_business` outputs to `undetermined`, prevents stale `service_type` carry-forward when latest extraction has no service clue, Phase 7 channel scope docs reflect that WhatsApp status/debug is implemented while a separate test-message sandbox is out of MVP scope, Phase 9 QA closure includes implemented core/unit coverage, WhatsApp webhook integration tests, admin panel E2E smoke tests, and a reproducible load baseline; Sign Up consent now uses inline clickable legal links in place of a required checkbox/boxed wrapper; and Channels + Inbox + Leads now render shared public social SVG logos while Telegram/WhatsApp stay active and Instagram/Messenger remain `Coming Soon`)  
+> **Last Updated:** 2026-02-14 (Paywall implementation advanced with trial-first conversion UX: `/settings/plans` now includes mock subscription and top-up checkout simulations (success/failure), clear trial/premium status cards, and policy-aligned guards; desktop sidebar + mobile More surface trial/package progress with direct Plans actions. Migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs into trial mode and adds mock checkout + extended admin override SQL helpers. System-admin org detail now supports trial/package credit adjustments and membership/lock overrides with reason capture. Real provider integration + webhook sync remains pending.)  
 > **Status:** In Development
 
 ---
@@ -408,25 +408,43 @@ Customer Message → Skill Match? → Yes → Skill Response
   - `/admin/leads` provides a read-only lead list with search/sort/pagination, score/status visibility, and conversation jump links.
   - Both views follow the active org selected from the sidebar organization switcher (`active_org_id` cookie).
 - **Deferred (Post-v1):**
-  - Editable premium/trial/quota controls
-  - Audit trail for platform-admin billing/plan actions
+  - Full self-serve billing automation is deferred, but support-driven admin actions are in-scope for paywall rollout:
+    - trial extension
+    - credit increase/decrease (ledger-backed adjustment)
+    - premium assign/disable
+  - Audit trail for platform-admin billing/plan actions (required with reason capture)
   - Advanced filters/sorting for admin tables
 
 ### 5.9 Monetization & Subscription (Planned, Pre-Pilot)
 - **Pricing Strategy:**
   - Define plan tiers, quota limits, overage policy, and annual discount policy for Turkish SMBs.
   - Launch target is a low-entry starter band around ~USD 10 equivalent (localized to TRY) before premium tier expansion.
+  - Lock v1 billing order as: trial -> recurring monthly premium package -> credit top-up overflow.
+  - Define v1 premium package controls: admin-managed monthly price (`X TL`) and included credits (`Y`).
+  - Lock v1 package policy: monthly included credits are non-rollover.
   - Finalize feature gates by plan (channels, AI limits, seats, and premium-only controls).
 - **Plan Purchase (Online Payment):**
-  - Integrate online checkout for monthly/annual subscriptions with provider selection based on Turkey support and invoicing requirements.
+  - Integrate recurring monthly premium checkout with provider selection based on Turkey support and invoicing requirements.
+  - Integrate one-time credit top-up checkout only for active premium organizations that exhaust monthly package credits.
+  - Top-up is not available during trial.
+  - Until provider integration is completed, run the same flow in mock mode with simulated `success` / `failed` outcomes for checkout QA.
   - Add payment webhook lifecycle handling (success, failure, renewal, cancellation, retry).
 - **Membership Lifecycle (Trial / Premium):**
-  - Introduce explicit membership states (`trial_active`, `premium_active`, `past_due`, `canceled`) and entitlement enforcement in runtime + admin views.
-  - Keep current admin placeholders until billing backend integration is complete.
+  - Membership state model is defined as `trial_active`, `trial_exhausted`, `premium_active`, `past_due`, `canceled`, `admin_locked`.
+  - Enforce entitlement checks in runtime + admin visibility using locked-state reasons (`trial_time_expired`, `trial_credits_exhausted`, `past_due`, `admin_locked`).
+  - Include system-admin operational controls for per-organization support actions:
+    - extend trial end date
+    - adjust credit balance via ledger (`adjustment`)
+    - assign/cancel premium state
+  - All manual billing actions must require reason + actor metadata and be audit logged.
 - **Trial Policy Decision (Required Gate):**
   - Trial model decision (pre-pilot): **trial-only** onboarding (no freemium tier at launch).
-  - Define trial limits with both time and credit caps, and explicit precedence for conversion trigger (`time_expired` vs `credit_exhausted`).
-  - Define conversion trigger, grace period, and upgrade UX behavior before payment rollout.
+  - Trial defaults are locked for implementation: `14 days` and `120.0 credits`.
+  - Trial lock precedence is locked: system stops token-consuming features when **either** `time_expired` or `credit_exhausted` occurs first.
+  - Admin trial-default controls update only future/new organizations.
+  - Rollout migration backfills existing non-system-admin organizations into trial baseline before subscription enforcement.
+  - Define conversion trigger, optional grace policy, and upgrade UX behavior before payment rollout.
+  - After trial lock, user must first purchase the recurring monthly premium package; top-up is blocked until premium is active.
   - Add abuse controls before opening self-serve trials broadly:
     - one-trial-per-business identity policy (`whatsapp_business_account_id` + normalized phone + organization identity signals)
     - disposable email / VOIP / device-fingerprint risk checks
@@ -441,7 +459,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 |---------|----------------|
 | Organization | 1 customer = 1 org |
 | Data Isolation | All tables have `organization_id` |
-| Platform Admin | System admin dashboard, org/user lists, searchable org switcher, and read-only cross-org impersonation implemented; billing/quota edits and audit tooling are deferred |
+| Platform Admin | System admin dashboard, org/user lists, searchable org switcher, read-only cross-org impersonation for tenant surfaces, and billing default/override controls with reason capture implemented; advanced audit tooling UI remains deferred |
 
 ---
 
@@ -526,10 +544,25 @@ MVP is successful when:
 - **Platform Admin Context:** Persist active admin-selected tenant context via `active_org_id` server cookie so tenant pages resolve a single active organization consistently.
 - **Platform Admin Navigation Performance:** Resolve system-admin org context in slim mode (active org only) during normal route transitions, and lazy-load full org options only when the sidebar picker is opened.
 - **System Admin Impersonation Guard:** Tenant-scoped mutations reject system-admin writes to enforce read-only impersonation in MVP.
-- **Billing Status Visibility Strategy:** Show premium/plan/trial as read-only placeholders (`not integrated`) until billing schema and policy are finalized.
+- **Billing Visibility + Control Strategy:** Billing status ships as live snapshots (membership state, lock reason, and trial/package/top-up used/remaining) in tenant Billing settings + platform-admin organization/user views; system-admin can also run guarded billing controls (platform defaults + per-organization manual overrides) with mandatory reason capture.
+- **Tenant Billing IA Split (Implementation v1):** `Settings > Plans` is the action surface for subscription/top-up/trial conversion status, while `Settings > Billing` remains the detailed usage + receipts/ledger surface.
 - **Monetization Rollout Order:** Finalize pricing strategy and trial model first, then implement checkout/payments and entitlement enforcement (avoid shipping payment flows before policy decisions are locked).
 - **Trial Go-To-Market Model (Pre-Pilot):** Start with trial-only onboarding (no freemium) to reduce ongoing abuse vectors and keep support/sales qualification focused.
 - **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
+- **Trial Defaults (Locked v1):** Provision new organizations with `14 days` and `120.0 credits` by default.
+- **Trial Lock Precedence (Locked v1):** Enforce `first limit reached wins` between trial time and trial credits.
+- **Trial Default Scope:** Admin updates to default trial values apply to newly created organizations only.
+- **Subscription-First Conversion Rule (Locked v1):** Organizations locked by trial exhaustion must purchase a recurring monthly premium package before normal AI usage resumes.
+- **Top-Up Eligibility Rule (Locked v1):** Top-up is unavailable during trial and becomes available only for active premium organizations after monthly package credits are exhausted.
+- **Package Credit Expiry Rule (Locked v1):** Monthly package credits are non-rollover and reset on each billing cycle.
+- **Admin Premium Package Controls (Locked v1):** Admin can update monthly package price (`X TL`) and included credits (`Y`), with changes applied according to billing policy versioning.
+- **Admin Manual Billing Operations (Locked v1):** System-admin can extend trial, adjust credits, and assign/cancel premium per organization.
+- **Admin Override Scope (Implementation v1):** In org detail, system-admin can adjust top-up/trial/package credits and set explicit `membership_state` + `lock_reason` overrides (with required reason + audit logging).
+- **Admin Action Audit Requirement (Locked v1):** Every manual billing action must include reason, actor, previous state, and resulting state.
+- **Usage Visibility Requirement (Locked v1):** Users must be able to track trial/package progress from quick surfaces (desktop sidebar + mobile More menu), with deep link to detailed Billing page.
+- **Billing Snapshot Source (Implementation v1):** Tenant/admin visibility reads from `organization_billing_accounts` plus immutable `organization_credit_ledger` history; frontend derives progress/eligibility from a shared billing snapshot mapper to keep sidebar/mobile/settings/admin surfaces consistent.
+- **Runtime Entitlement Gate (Implementation v1):** Before token-consuming AI paths (shared inbound pipeline, Telegram webhook AI flow, simulator response generation, inbox summary/reasoning/manual lead-refresh), runtime resolves billing entitlement and exits early when usage is locked.
+- **TR Payment Provider Strategy (Locked v1):** Prioritize a TR-valid recurring provider (Iyzico first, PayTR alternative); use Stripe only with a supported non-TR entity/account model.
 - **WhatsApp Cost Modeling Baseline:** For Meta Cloud API MVP, treat inbound webhook traffic and in-window free-form replies as zero template fee; meter WhatsApp variable cost only when sending template messages (country/category-dependent).
 - **Platform Admin Read Models:** Use DB-backed pagination/search, aggregate RPC totals, and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
 - **Platform Admin Lead Monitoring:** Expose read-only recent leads on `/admin` and a dedicated `/admin/leads` list, both scoped by the active organization switcher context.

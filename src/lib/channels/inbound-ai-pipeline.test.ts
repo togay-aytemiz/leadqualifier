@@ -11,6 +11,7 @@ const {
     matchSkillsSafelyMock,
     openAiCreateMock,
     recordAiUsageMock,
+    resolveOrganizationUsageEntitlementMock,
     resolveBotModeActionMock,
     resolveLeadExtractionAllowanceMock,
     runLeadExtractionMock,
@@ -26,6 +27,7 @@ const {
     matchSkillsSafelyMock: vi.fn(),
     openAiCreateMock: vi.fn(),
     recordAiUsageMock: vi.fn(),
+    resolveOrganizationUsageEntitlementMock: vi.fn(),
     resolveBotModeActionMock: vi.fn(),
     resolveLeadExtractionAllowanceMock: vi.fn(),
     runLeadExtractionMock: vi.fn(),
@@ -70,6 +72,10 @@ vi.mock('@/lib/ai/usage', () => ({
 vi.mock('@/lib/ai/bot-mode', () => ({
     resolveBotModeAction: resolveBotModeActionMock,
     resolveLeadExtractionAllowance: resolveLeadExtractionAllowanceMock
+}))
+
+vi.mock('@/lib/billing/entitlements', () => ({
+    resolveOrganizationUsageEntitlement: resolveOrganizationUsageEntitlementMock
 }))
 
 vi.mock('@/lib/leads/extraction', () => ({
@@ -270,6 +276,12 @@ describe('processInboundAiPipeline guardrails', () => {
         })
         getRequiredIntakeFieldsMock.mockResolvedValue([])
         resolveBotModeActionMock.mockReturnValue({ allowReplies: true })
+        resolveOrganizationUsageEntitlementMock.mockResolvedValue({
+            isUsageAllowed: true,
+            lockReason: null,
+            membershipState: null,
+            snapshot: null
+        })
         resolveLeadExtractionAllowanceMock.mockReturnValue(false)
         isOperatorActiveMock.mockReturnValue(false)
         matchSkillsSafelyMock.mockResolvedValue([])
@@ -333,6 +345,33 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(sendOutbound).not.toHaveBeenCalled()
         expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
         expect(runLeadExtractionMock).not.toHaveBeenCalled()
+    })
+
+    it('halts token-consuming flow when billing usage is locked', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({ active_agent: 'bot' }))
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        resolveOrganizationUsageEntitlementMock.mockResolvedValueOnce({
+            isUsageAllowed: false,
+            lockReason: 'subscription_required',
+            membershipState: 'trial_exhausted',
+            snapshot: null
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
+        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
     it('sends matched skill reply and persists bot message metadata', async () => {

@@ -14,8 +14,48 @@ import {
     toOpenAiConversationMessages
 } from '@/lib/ai/conversation'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
+
+function isLikelyTurkishMessage(value: string) {
+    const text = (value ?? '').trim()
+    if (!text) return true
+    if (/[ığüşöçİĞÜŞÖÇ]/.test(text)) return true
+    return /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet)\b/i.test(text)
+}
+
+function buildLockedSimulatorMessage(lockReason: string | null, inputMessage: string) {
+    const tr = isLikelyTurkishMessage(inputMessage)
+
+    if (lockReason === 'trial_time_expired' || lockReason === 'trial_credits_exhausted' || lockReason === 'subscription_required') {
+        return tr
+            ? 'Trial limitine ulaştın. Devam etmek için aylık premium pakete geçmen gerekiyor.'
+            : 'You reached your trial limit. Subscribe to the monthly premium package to continue.'
+    }
+
+    if (lockReason === 'package_credits_exhausted') {
+        return tr
+            ? 'Aylık paket kredilerin bitti. Premium hesabında ek kredi (top-up) alarak devam edebilirsin.'
+            : 'Your monthly package credits are exhausted. You can continue by purchasing top-up credits on premium.'
+    }
+
+    if (lockReason === 'past_due') {
+        return tr
+            ? 'Ödeme gecikmesi nedeniyle AI kullanımı durduruldu. Ödeme yöntemini güncellemen gerekiyor.'
+            : 'AI usage is paused due to a past-due payment. Update your payment method to continue.'
+    }
+
+    if (lockReason === 'admin_locked') {
+        return tr
+            ? 'Hesabın yönetici tarafından kilitlendi. Destekle iletişime geçebilirsin.'
+            : 'Your account is locked by an admin. Please contact support.'
+    }
+
+    return tr
+        ? 'AI kullanımı şu anda kilitli.'
+        : 'AI usage is currently locked.'
+}
 
 export interface ChatMessage {
     id: string
@@ -66,6 +106,28 @@ export async function simulateChat(
     let routerOutputTokens = 0
     let ragInputTokens = 0
     let ragOutputTokens = 0
+
+    const entitlement = await resolveOrganizationUsageEntitlement(organizationId)
+    if (!entitlement.isUsageAllowed) {
+        return {
+            response: buildLockedSimulatorMessage(entitlement.lockReason, message),
+            tokenUsage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                router: {
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 0
+                },
+                rag: {
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 0
+                }
+            }
+        }
+    }
 
     const aiSettings = await getOrgAiSettings(organizationId)
     const matchThreshold = typeof threshold === 'number' ? threshold : aiSettings.match_threshold

@@ -12,6 +12,99 @@ import {
     getOrgStorageUsageSummary
 } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { getOrganizationBillingLedger, getOrganizationBillingSnapshot } from '@/lib/billing/server'
+import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
+
+function resolveMembershipLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, snapshot: OrganizationBillingSnapshot) {
+    switch (snapshot.membershipState) {
+    case 'trial_active':
+        return tBilling('membership.trialActive')
+    case 'trial_exhausted':
+        return tBilling('membership.trialExhausted')
+    case 'premium_active':
+        return tBilling('membership.premiumActive')
+    case 'past_due':
+        return tBilling('membership.pastDue')
+    case 'canceled':
+        return tBilling('membership.canceled')
+    case 'admin_locked':
+        return tBilling('membership.adminLocked')
+    default:
+        return snapshot.membershipState
+    }
+}
+
+function resolveLockReasonLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, snapshot: OrganizationBillingSnapshot) {
+    switch (snapshot.lockReason) {
+    case 'none':
+        return tBilling('lockReason.none')
+    case 'trial_time_expired':
+        return tBilling('lockReason.trialTimeExpired')
+    case 'trial_credits_exhausted':
+        return tBilling('lockReason.trialCreditsExhausted')
+    case 'subscription_required':
+        return tBilling('lockReason.subscriptionRequired')
+    case 'package_credits_exhausted':
+        return tBilling('lockReason.packageCreditsExhausted')
+    case 'past_due':
+        return tBilling('lockReason.pastDue')
+    case 'admin_locked':
+        return tBilling('lockReason.adminLocked')
+    default:
+        return snapshot.lockReason
+    }
+}
+
+function resolvePoolLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, snapshot: OrganizationBillingSnapshot) {
+    switch (snapshot.activeCreditPool) {
+    case 'trial_pool':
+        return tBilling('pool.trial')
+    case 'package_pool':
+        return tBilling('pool.package')
+    case 'topup_pool':
+        return tBilling('pool.topup')
+    case 'mixed':
+        return tBilling('pool.mixed')
+    default:
+        return tBilling('pool.none')
+    }
+}
+
+function resolveLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
+    switch (value) {
+    case 'trial_grant':
+        return tBilling('ledger.entryType.trialGrant')
+    case 'package_grant':
+        return tBilling('ledger.entryType.packageGrant')
+    case 'usage_debit':
+        return tBilling('ledger.entryType.usageDebit')
+    case 'purchase_credit':
+        return tBilling('ledger.entryType.purchaseCredit')
+    case 'adjustment':
+        return tBilling('ledger.entryType.adjustment')
+    case 'refund':
+        return tBilling('ledger.entryType.refund')
+    case 'reversal':
+        return tBilling('ledger.entryType.reversal')
+    default:
+        return value
+    }
+}
+
+function resolveLedgerPoolLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
+    switch (value) {
+    case 'trial_pool':
+        return tBilling('pool.trial')
+    case 'package_pool':
+        return tBilling('pool.package')
+    case 'topup_pool':
+        return tBilling('pool.topup')
+    case 'mixed':
+        return tBilling('pool.mixed')
+    default:
+        return value
+    }
+}
 
 export default async function BillingSettingsPage() {
     const supabase = await createClient()
@@ -35,12 +128,26 @@ export default async function BillingSettingsPage() {
         )
     }
 
-    const [usage, messageUsage, storageUsage] = await Promise.all([
+    const [usage, messageUsage, storageUsage, billingSnapshot, billingLedger] = await Promise.all([
         getOrgAiUsageSummary(organizationId, { supabase }),
         getOrgMessageUsageSummary(organizationId, { supabase }),
-        getOrgStorageUsageSummary(organizationId, { supabase })
+        getOrgStorageUsageSummary(organizationId, { supabase }),
+        getOrganizationBillingSnapshot(organizationId, { supabase }),
+        getOrganizationBillingLedger(organizationId, { supabase, limit: 20 })
     ])
     const formatNumber = new Intl.NumberFormat(locale)
+    const formatDate = new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    })
+    const formatDateTime = new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
     const [year, month] = usage.month.split('-').map(Number)
     const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getUTCFullYear()
     const safeMonth = Number.isFinite(month ?? Number.NaN) ? (month as number) : new Date().getUTCMonth() + 1
@@ -60,6 +167,9 @@ export default async function BillingSettingsPage() {
     const storageTotalSize = formatStorageSize(storageUsage.totalBytes, locale)
     const storageSkillsSize = formatStorageSize(storageUsage.skillsBytes, locale)
     const storageKnowledgeSize = formatStorageSize(storageUsage.knowledgeBytes, locale)
+    const membershipLabel = billingSnapshot ? resolveMembershipLabel(tBilling, billingSnapshot) : tBilling('membership.unavailable')
+    const lockReasonLabel = billingSnapshot ? resolveLockReasonLabel(tBilling, billingSnapshot) : tBilling('lockReason.unavailable')
+    const activePoolLabel = billingSnapshot ? resolvePoolLabel(tBilling, billingSnapshot) : tBilling('pool.none')
 
     return (
         <>
@@ -68,6 +178,179 @@ export default async function BillingSettingsPage() {
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-5xl space-y-6">
                     <p className="text-sm text-gray-500">{tBilling('description')}</p>
+
+                    <SettingsSection
+                        title={tBilling('controlPanel.title')}
+                        description={tBilling('controlPanel.description')}
+                    >
+                        {billingSnapshot ? (
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                        <div className="space-y-1">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">
+                                                {tBilling('controlPanel.membershipLabel')}
+                                            </p>
+                                            <p className="text-base font-semibold text-gray-900">{membershipLabel}</p>
+                                            <p className="text-sm text-gray-600">
+                                                {tBilling('controlPanel.lockReasonLabel')}: {lockReasonLabel}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                                {tBilling('controlPanel.activePoolLabel')}: {activePoolLabel}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-right">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('controlPanel.remainingCredits')}</p>
+                                            <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                                {formatCreditAmount(billingSnapshot.totalRemainingCredits, locale)}
+                                                <span className="ml-1 text-sm font-medium text-gray-500">{tBilling('creditsUnit')}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('controlPanel.trialCreditsCard')}</p>
+                                        <p className="mt-2 text-xl font-semibold text-gray-900">
+                                            {formatCreditAmount(billingSnapshot.trial.credits.remaining, locale)}
+                                            <span className="ml-1 text-sm font-medium text-gray-500">{tBilling('creditsUnit')}</span>
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {tBilling('controlPanel.usedVsLimit', {
+                                                used: formatCreditAmount(billingSnapshot.trial.credits.used, locale),
+                                                limit: formatCreditAmount(billingSnapshot.trial.credits.limit, locale)
+                                            })}
+                                        </p>
+                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                            <div
+                                                className="h-2 rounded-full bg-emerald-500"
+                                                style={{ width: `${Math.min(100, billingSnapshot.trial.credits.progress)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('controlPanel.trialTimeCard')}</p>
+                                        <p className="mt-2 text-xl font-semibold text-gray-900">
+                                            {formatNumber.format(billingSnapshot.trial.remainingDays)}
+                                            <span className="ml-1 text-sm font-medium text-gray-500">{tBilling('controlPanel.daysUnit')}</span>
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {tBilling('controlPanel.trialEndsAt', {
+                                                date: formatDateTime.format(new Date(billingSnapshot.trial.endsAt))
+                                            })}
+                                        </p>
+                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                            <div
+                                                className="h-2 rounded-full bg-sky-500"
+                                                style={{ width: `${Math.min(100, billingSnapshot.trial.timeProgress)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('controlPanel.packageCreditsCard')}</p>
+                                        <p className="mt-2 text-xl font-semibold text-gray-900">
+                                            {formatCreditAmount(billingSnapshot.package.credits.remaining, locale)}
+                                            <span className="ml-1 text-sm font-medium text-gray-500">{tBilling('creditsUnit')}</span>
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {tBilling('controlPanel.usedVsLimit', {
+                                                used: formatCreditAmount(billingSnapshot.package.credits.used, locale),
+                                                limit: formatCreditAmount(billingSnapshot.package.credits.limit, locale)
+                                            })}
+                                        </p>
+                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                            <div
+                                                className="h-2 rounded-full bg-violet-500"
+                                                style={{ width: `${Math.min(100, billingSnapshot.package.credits.progress)}%` }}
+                                            />
+                                        </div>
+                                        {billingSnapshot.package.periodEnd && (
+                                            <p className="mt-2 text-xs text-gray-500">
+                                                {tBilling('controlPanel.packageResetAt', {
+                                                    date: formatDate.format(new Date(billingSnapshot.package.periodEnd))
+                                                })}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('controlPanel.topupCard')}</p>
+                                        <p className="mt-2 text-xl font-semibold text-gray-900">
+                                            {formatCreditAmount(billingSnapshot.topupBalance, locale)}
+                                            <span className="ml-1 text-sm font-medium text-gray-500">{tBilling('creditsUnit')}</span>
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {billingSnapshot.isTopupAllowed
+                                                ? tBilling('controlPanel.topupAllowed')
+                                                : tBilling('controlPanel.topupBlocked')}
+                                        </p>
+                                        <p className="mt-2 text-xs text-gray-500">
+                                            {billingSnapshot.isUsageAllowed
+                                                ? tBilling('controlPanel.usageAllowed')
+                                                : tBilling('controlPanel.usageBlocked')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">{tBilling('controlPanel.unavailable')}</p>
+                        )}
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={tBilling('ledger.title')}
+                        description={tBilling('ledger.description')}
+                    >
+                        {billingLedger.length === 0 ? (
+                            <p className="text-sm text-gray-500">{tBilling('ledger.empty')}</p>
+                        ) : (
+                            <div className="overflow-x-auto rounded-xl border border-gray-200">
+                                <table className="min-w-full divide-y divide-gray-200 bg-white text-sm">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.date')}</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.type')}</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.pool')}</th>
+                                            <th className="px-4 py-3 text-right font-medium text-gray-500">{tBilling('ledger.columns.delta')}</th>
+                                            <th className="px-4 py-3 text-right font-medium text-gray-500">{tBilling('ledger.columns.balance')}</th>
+                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.reason')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {billingLedger.map((entry) => {
+                                            const isDebit = entry.creditsDelta < 0
+                                            return (
+                                                <tr key={entry.id}>
+                                                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                                                        {formatDateTime.format(new Date(entry.createdAt))}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-700">
+                                                        {resolveLedgerEntryLabel(tBilling, entry.entryType)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-700">
+                                                        {resolveLedgerPoolLabel(tBilling, entry.creditPool)}
+                                                    </td>
+                                                    <td className={`whitespace-nowrap px-4 py-3 text-right font-medium ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                        {isDebit ? '-' : '+'}
+                                                        {formatCreditAmount(Math.abs(entry.creditsDelta), locale)}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-4 py-3 text-right text-gray-700">
+                                                        {formatCreditAmount(entry.balanceAfter, locale)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-500">
+                                                        {entry.reason ?? tBilling('ledger.reasonFallback')}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </SettingsSection>
 
                     <SettingsSection
                         title={tBilling('title')}

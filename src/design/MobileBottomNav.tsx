@@ -18,6 +18,9 @@ import { LogOut, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
+import { createClient } from '@/lib/supabase/client'
+import type { OrganizationBillingAccount } from '@/types/database'
+import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 
 interface NavItem {
     id: Exclude<MobileNavItemId, 'other'>
@@ -27,13 +30,28 @@ interface NavItem {
     activeIcon: ComponentType<{ size?: number }>
 }
 
-export function MobileBottomNav() {
+function formatCredits(value: number) {
+    const safe = Math.max(0, Number.isFinite(value) ? value : 0)
+    return new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    }).format(safe)
+}
+
+interface MobileBottomNavProps {
+    activeOrganizationId?: string | null
+}
+
+export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNavProps) {
     const pathname = usePathname()
     const router = useRouter()
     const tNav = useTranslations('nav')
+    const tSidebar = useTranslations('mainSidebar')
     const [isOtherOpen, setIsOtherOpen] = useState(false)
+    const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
 
     const activeItem = resolveMobileNavActiveItem(pathname)
+    const supabase = useMemo(() => createClient(), [])
 
     const navItems = useMemo<NavItem[]>(
         () => [
@@ -70,7 +88,7 @@ export function MobileBottomNav() {
     )
 
     useEffect(() => {
-        const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings']
+        const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings', '/settings/plans', '/settings/billing']
 
         const prefetchRoutes = () => {
             hotRoutes.forEach((href) => router.prefetch(href))
@@ -79,6 +97,102 @@ export function MobileBottomNav() {
         const timeoutId = setTimeout(prefetchRoutes, 250)
         return () => clearTimeout(timeoutId)
     }, [router])
+
+    useEffect(() => {
+        let isActive = true
+
+        const loadBillingSnapshot = async () => {
+            if (!activeOrganizationId) {
+                if (isActive) setBillingSnapshot(null)
+                return
+            }
+
+            const { data, error } = await supabase
+                .from('organization_billing_accounts')
+                .select('*')
+                .eq('organization_id', activeOrganizationId)
+                .maybeSingle()
+
+            if (!isActive) return
+
+            if (error || !data) {
+                if (error) {
+                    console.error('Failed to load mobile billing status', error)
+                }
+                setBillingSnapshot(null)
+                return
+            }
+
+            setBillingSnapshot(buildOrganizationBillingSnapshot(data as OrganizationBillingAccount))
+        }
+
+        loadBillingSnapshot()
+
+        return () => {
+            isActive = false
+        }
+    }, [activeOrganizationId, supabase])
+
+    const billingMembershipLabel = useMemo(() => {
+        if (!billingSnapshot) return tSidebar('billingUnavailable')
+
+        switch (billingSnapshot.membershipState) {
+        case 'trial_active':
+            return tSidebar('billingTrialActive')
+        case 'trial_exhausted':
+            return tSidebar('billingTrialExhausted')
+        case 'premium_active':
+            return tSidebar('billingPremiumActive')
+        case 'past_due':
+            return tSidebar('billingPastDue')
+        case 'canceled':
+            return tSidebar('billingCanceled')
+        case 'admin_locked':
+            return tSidebar('billingAdminLocked')
+        default:
+            return billingSnapshot.membershipState
+        }
+    }, [billingSnapshot, tSidebar])
+    const billingProgress = useMemo(() => {
+        if (!billingSnapshot) return 0
+
+        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
+            return Math.max(
+                billingSnapshot.trial.credits.progress,
+                billingSnapshot.trial.timeProgress
+            )
+        }
+
+        if (billingSnapshot.membershipState === 'premium_active') {
+            if (billingSnapshot.package.credits.remaining <= 0 && billingSnapshot.topupBalance > 0) {
+                return 100
+            }
+            return billingSnapshot.package.credits.progress
+        }
+
+        return 0
+    }, [billingSnapshot])
+    const billingSubline = useMemo(() => {
+        if (!billingSnapshot) return tSidebar('billingUnavailableDescription')
+
+        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
+            return tSidebar('billingTrialSublineDetailed', {
+                days: String(billingSnapshot.trial.remainingDays),
+                credits: formatCredits(billingSnapshot.trial.credits.remaining)
+            })
+        }
+
+        if (billingSnapshot.membershipState === 'premium_active'
+            && billingSnapshot.package.credits.remaining <= 0
+            && billingSnapshot.topupBalance > 0
+        ) {
+            return tSidebar('billingTopupSubline', {
+                credits: formatCredits(billingSnapshot.topupBalance)
+            })
+        }
+
+        return tSidebar('billingPackageSubline')
+    }, [billingSnapshot, tSidebar])
 
     return (
         <>
@@ -91,6 +205,29 @@ export function MobileBottomNav() {
                         className="fixed inset-0 z-40 bg-black/25 lg:hidden"
                     />
                     <div className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl lg:hidden">
+                        {billingSnapshot && (
+                            <Link
+                                href="/settings/plans"
+                                onClick={() => setIsOtherOpen(false)}
+                                className="mb-1 block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
+                            >
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    {tSidebar('billingStatusLabel')}
+                                </p>
+                                <p className="mt-1 text-sm font-semibold text-slate-900">
+                                    {formatCredits(billingSnapshot.totalRemainingCredits)}
+                                    <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
+                                </p>
+                                <div className="mt-2 h-1.5 rounded-full bg-slate-200">
+                                    <div
+                                        className="h-1.5 rounded-full bg-[#242A40]"
+                                        style={{ width: `${Math.min(100, billingProgress)}%` }}
+                                    />
+                                </div>
+                                <p className="mt-1 text-xs text-slate-500">{billingMembershipLabel}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{billingSubline}</p>
+                            </Link>
+                        )}
                         <Link
                             href="/simulator"
                             onClick={() => setIsOtherOpen(false)}
@@ -106,6 +243,22 @@ export function MobileBottomNav() {
                         >
                             <Settings size={16} />
                             {tNav('settings')}
+                        </Link>
+                        <Link
+                            href="/settings/plans"
+                            onClick={() => setIsOtherOpen(false)}
+                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                            <Settings size={16} />
+                            {tNav('billing')}
+                        </Link>
+                        <Link
+                            href="/settings/billing"
+                            onClick={() => setIsOtherOpen(false)}
+                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                            <Settings size={16} />
+                            {tSidebar('billingUsageMenuLabel')}
                         </Link>
                         <form action="/api/auth/signout" method="POST">
                             <button

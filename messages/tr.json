@@ -203,6 +203,7 @@
         "knowledgeBase": "Bilgi Bankası",
         "leads": "Kişiler",
         "settings": "Ayarlar",
+        "billing": "Faturalandırma",
         "inbox": "Gelen Kutusu",
         "simulator": "Simülatör",
         "other": "Diğer",
@@ -233,7 +234,23 @@
         "botStatusLabel": "Bot",
         "botStatusActive": "Aktif",
         "botStatusShadow": "Dinleyici",
-        "botStatusOff": "Kapalı"
+        "botStatusOff": "Kapalı",
+        "billingStatusLabel": "Kullanım",
+        "billingCreditsUnit": "kredi kaldı",
+        "billingUnavailable": "Kullanılamıyor",
+        "billingUnavailableDescription": "Faturalandırma durumu alınamıyor.",
+        "billingTrialActive": "Trial aktif",
+        "billingTrialExhausted": "Trial bitti",
+        "billingPremiumActive": "Premium aktif",
+        "billingPastDue": "Ödeme gecikmiş",
+        "billingCanceled": "İptal edildi",
+        "billingAdminLocked": "Yönetici kilidi",
+        "billingTrialSubline": "Trial için {days} gün kaldı",
+        "billingTrialSublineDetailed": "{days} gün kaldı • {credits} trial kredisi",
+        "billingTopupSubline": "Top-up aktif: {credits} kredi",
+        "billingPackageSubline": "Aylık paket kullanımı",
+        "billingPackageSublineWithDate": "{date} tarihinde sıfırlanır",
+        "billingUsageMenuLabel": "Kullanım detayları"
     },
     "inbox": {
         "title": "Gelen Kutusu",
@@ -321,11 +338,13 @@
         "leadRefreshError": "Güncelleme başarısız oldu. Tekrar deneyin.",
         "leadRefreshMissing": "Yapay zeka anahtarı eksik.",
         "leadRefreshMissingConversation": "Konuşma bulunamadı.",
+        "leadRefreshBillingLocked": "Kullanım kilitli. Devam etmek için premium açmalı veya kredi eklemelisin.",
         "scoreReason": "Gerekçeyi göster",
         "scoreReasonTitle": "Skor gerekçesi",
         "scoreReasonError": "Skor açıklaması alınamadı. Tekrar deneyin.",
         "scoreReasonMissing": "Skor açıklaması için yapay zeka anahtarı eksik.",
         "scoreReasonNoLead": "Bu konuşma için lead verisi bulunamadı.",
+        "scoreReasonBillingLocked": "Kullanım kilitli. Devam etmek için premium açmalı veya kredi eklemelisin.",
         "scrollToLatest": "Son mesaja git"
     },
     "simulator": {
@@ -458,13 +477,167 @@
         "integrations": "Entegrasyonlar",
         "channels": "Kanallar",
         "billing": "Faturalandırma",
-        "plans": "Planlar",
+        "plans": "Planlar ve Krediler",
         "receipts": "Kullanım ve Faturalandırma"
+    },
+    "billingPlans": {
+        "pageTitle": "Planlar ve Krediler",
+        "description": "Trial/premium durumunuzu ve kredi satın alma aksiyonlarını buradan yönetin.",
+        "noOrganization": "Organizasyon Bulunamadı",
+        "noOrganizationDesc": "Planları yönetmek için bir organizasyona bağlı olmalısınız.",
+        "creditsUnit": "kredi",
+        "membership": {
+            "trialActive": "Trial aktif",
+            "trialExhausted": "Trial bitti",
+            "premiumActive": "Premium aktif",
+            "pastDue": "Ödeme gecikmiş",
+            "canceled": "İptal edildi",
+            "adminLocked": "Yönetici kilidi",
+            "unavailable": "Kullanılamıyor"
+        },
+        "status": {
+            "title": "Mevcut Plan Durumu",
+            "description": "Anlık trial/premium durumunuzu ve kalan kredilerinizi görüntüleyin.",
+            "membershipLabel": "Üyelik",
+            "lockRuleTrial": "Trial kullanımında süre veya trial kredisi hangisi önce biterse sistem kilitlenir.",
+            "lockRulePremium": "Top-up sadece premium pakette, paket kredileri bittikten sonra açılır.",
+            "trialCreditsTitle": "Trial kredileri",
+            "trialTimeTitle": "Trial süresi",
+            "packageCreditsTitle": "Aylık paket",
+            "topupCreditsTitle": "Top-up bakiyesi",
+            "usedVsLimit": "{used} / {limit}",
+            "daysUnit": "gün",
+            "trialCredits": "Trial kredileri: {remaining} / {limit}",
+            "trialDays": "Trial için kalan gün: {days}",
+            "trialEndsAt": "Trial bitişi: {date}",
+            "packageCredits": "Paket kredileri: {remaining} / {limit}",
+            "topupCredits": "Top-up kredileri: {remaining}",
+            "packageResetAt": "Sıfırlanma: {date}",
+            "topupAllowed": "Top-up kullanılabilir.",
+            "topupBlocked": "Top-up için premium + paket tükenmesi gerekir.",
+            "unavailable": "Plan durumu alınamıyor."
+        },
+        "actions": {
+            "title": "Satın Alma Aksiyonları",
+            "description": "Premium abonelik ve top-up kredi satın alımını bu sayfadan yöneteceksiniz.",
+            "mockModeNotice": "Mock ödeme modu aktif. Gerçek sağlayıcı entegrasyonundan önce success/failed sonuçlarıyla ödeme davranışını test edin.",
+            "simulatedOutcomeLabel": "Simüle ödeme sonucu",
+            "simulatedOutcome": {
+                "success": "Başarılı simüle et",
+                "failed": "Başarısız simüle et"
+            },
+            "subscribe": {
+                "title": "Aylık Premium Paket",
+                "packageSummary": "Aylık {price} • {credits} kredi dahil",
+                "alreadyActive": "Bu organizasyonda premium zaten aktif.",
+                "notConfigured": "Premium paket kredisi henüz tanımlı değil. Admin ile iletişime geçin.",
+                "submit": "Premium başlat (mock checkout)"
+            },
+            "topup": {
+                "title": "Top-up Kredileri",
+                "packageSummary": "{credits} kredi • {amount}",
+                "submit": "Top-up al (mock checkout)"
+            },
+            "adminLocked": "Bu organizasyon yönetici tarafından kilitli. Faturalandırma aksiyonları kapalı.",
+            "topupBlockedTrial": "Trial süresince top-up kapalıdır. Önce premium başlatılmalı.",
+            "topupRequiresPremium": "Top-up için aktif premium paket gerekir.",
+            "topupAfterPackageExhausted": "Top-up yalnızca paket kredileri bittiğinde açılır.",
+            "topupUnavailable": "Top-up şu anda kullanılamıyor.",
+            "viewUsageLink": "Kullanım detayları ve kredi hareketlerini gör"
+        },
+        "checkoutStatus": {
+            "successTitle": "Checkout simülasyonu başarılı",
+            "failedTitle": "Checkout simülasyonu başarısız",
+            "blockedTitle": "Checkout politika nedeniyle bloklandı",
+            "errorTitle": "Checkout simülasyonu başarısız oldu",
+            "successSubscribe": "Mock modda premium paket aktifleştirildi.",
+            "successTopup": "Mock modda top-up kredisi eklendi.",
+            "failedSubscribe": "Abonelik ödeme simülasyonu başarısız döndü.",
+            "failedTopup": "Top-up ödeme simülasyonu başarısız döndü.",
+            "errors": {
+                "unauthorized": "Oturum doğrulanamadı.",
+                "invalidInput": "Checkout form değerleri geçersiz. Lütfen tekrar deneyin.",
+                "notAvailable": "Bu ortamda mock checkout fonksiyonları henüz aktif değil.",
+                "requestFailed": "Checkout isteği başarısız oldu. Lütfen tekrar deneyin.",
+                "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
+                "topupNotAllowed": "Mevcut üyelik/paket durumunda top-up izinli değil."
+            }
+        }
     },
     "billingUsage": {
         "pageTitle": "Kullanım ve Faturalandırma",
         "title": "Yapay Zeka Kullanımı",
         "description": "Üretim ortamındaki yapay zeka özelliklerinin token kullanımını takip edin.",
+        "membership": {
+            "trialActive": "Trial aktif",
+            "trialExhausted": "Trial bitti",
+            "premiumActive": "Premium aktif",
+            "pastDue": "Ödeme gecikmiş",
+            "canceled": "İptal edildi",
+            "adminLocked": "Yönetici kilidi",
+            "unavailable": "Kullanılamıyor"
+        },
+        "lockReason": {
+            "none": "Kilit yok",
+            "trialTimeExpired": "Trial süresi doldu",
+            "trialCreditsExhausted": "Trial kredileri bitti",
+            "subscriptionRequired": "Abonelik gerekli",
+            "packageCreditsExhausted": "Paket kredileri bitti",
+            "pastDue": "Ödeme gecikmiş",
+            "adminLocked": "Yönetici tarafından kilitlendi",
+            "unavailable": "Kullanılamıyor"
+        },
+        "pool": {
+            "trial": "Trial havuzu",
+            "package": "Paket havuzu",
+            "topup": "Top-up havuzu",
+            "mixed": "Karma havuz",
+            "none": "Aktif havuz yok"
+        },
+        "controlPanel": {
+            "title": "Kullanım kontrol paneli",
+            "description": "Trial, paket ve top-up bakiyelerini tek yerden takip edin.",
+            "membershipLabel": "Üyelik",
+            "lockReasonLabel": "Kilit nedeni",
+            "activePoolLabel": "Aktif havuz",
+            "remainingCredits": "Kalan krediler",
+            "trialCreditsCard": "Trial kredileri",
+            "trialTimeCard": "Trial süresi",
+            "packageCreditsCard": "Aylık paket",
+            "topupCard": "Top-up bakiyesi",
+            "usedVsLimit": "{used} / {limit}",
+            "daysUnit": "gün",
+            "trialEndsAt": "Bitiş: {date}",
+            "packageResetAt": "Sıfırlanma: {date}",
+            "topupAllowed": "Top-up kullanılabilir.",
+            "topupBlocked": "Top-up için premium + paket tükenmesi gerekir.",
+            "usageAllowed": "Kullanım şu an açık.",
+            "usageBlocked": "Kullanım şu an kilitli.",
+            "unavailable": "Faturalandırma verisi henüz alınamadı."
+        },
+        "ledger": {
+            "title": "Kredi kullanım geçmişi",
+            "description": "Kredi artış/azalışlarının değiştirilemez kayıtları.",
+            "empty": "Henüz kredi hareketi kaydı yok.",
+            "reasonFallback": "Neden yok",
+            "columns": {
+                "date": "Tarih",
+                "type": "Tür",
+                "pool": "Havuz",
+                "delta": "Değişim",
+                "balance": "Bakiye",
+                "reason": "Neden"
+            },
+            "entryType": {
+                "trialGrant": "Trial tanımı",
+                "packageGrant": "Paket tanımı",
+                "usageDebit": "Kullanım düşümü",
+                "purchaseCredit": "Top-up satın alımı",
+                "adjustment": "Düzeltme",
+                "refund": "İade",
+                "reversal": "Ters kayıt"
+            }
+        },
         "monthLabel": "Bu ay",
         "totalLabel": "Toplam",
         "inputLabel": "Girdi",
@@ -764,14 +937,38 @@
     "admin": {
         "dashboardTitle": "Yönetici Paneli",
         "overview": "Sistem genel görünümü ve salt okunur izleme.",
-        "readOnlyBanner": "Bu alan şimdilik salt okunur. Premium, trial ve kota güncellemeleri henüz entegre edilmedi.",
+        "readOnlyBanner": "Bu alan şimdilik salt okunur. Faturalandırma görünürlüğü aktif, ancak manuel admin güncellemeleri ve ödeme aksiyonları henüz açık değil.",
+        "billingControlsBanner": "Faturalandırma kontrolleri sistem yöneticileri için açıktır. Değişiklikler audit kaydına alınır, dikkatli kullanılmalıdır.",
+        "billingDefaults": {
+            "title": "Faturalandırma Varsayılanları (Platform)",
+            "description": "Trial varsayılanlarını ve aylık premium paket varsayılanlarını yönetin.",
+            "scopeNote": "Bu varsayılanlar sadece yeni oluşturulan organizasyonlara uygulanır.",
+            "trialDaysLabel": "Varsayılan trial günü",
+            "trialCreditsLabel": "Varsayılan trial kredisi",
+            "packagePriceLabel": "Varsayılan aylık paket fiyatı (TRY)",
+            "packageCreditsLabel": "Varsayılan aylık paket kredisi",
+            "reasonLabel": "Değişiklik nedeni",
+            "reasonPlaceholder": "Bu varsayılan neden değişiyor?",
+            "submit": "Faturalandırma varsayılanlarını kaydet",
+            "successTitle": "Faturalandırma varsayılanları güncellendi",
+            "errorTitle": "Faturalandırma varsayılanları güncellenemedi",
+            "successDescription": "Yeni organizasyonlar güncel varsayılanlarla açılacak.",
+            "errors": {
+                "unauthorized": "Oturum doğrulanamadı.",
+                "forbidden": "Sadece sistem yöneticileri bu varsayılanları güncelleyebilir.",
+                "invalidInput": "Bazı alanlar geçersiz. Form değerlerini kontrol edin.",
+                "notAvailable": "Bu ortamda faturalandırma varsayılanları henüz aktif değil.",
+                "requestFailed": "Güncelleme isteği başarısız oldu. Lütfen tekrar deneyin."
+            }
+        },
         "stats": {
             "organizations": "Toplam Organizasyonlar",
             "users": "Toplam Kullanıcılar",
             "skills": "Toplam Yetenekler",
             "knowledge": "Toplam Bilgi Dokümanı",
             "messages": "Toplam Kullanım",
-            "tokens": "Toplam Token"
+            "tokens": "Toplam Token",
+            "credits": "Toplam Kullanılan Kredi"
         },
         "quickActions": "Hızlı İşlemler",
         "manageOrganizations": "Organizasyon Özeti",
@@ -794,7 +991,26 @@
             "updated": "Güncelleme"
         },
         "status": {
-            "notIntegrated": "Henüz entegre değil"
+            "notIntegrated": "Henüz entegre değil",
+            "notAvailable": "Kullanılamıyor",
+            "remainingLabel": "Kalan: {value}",
+            "membership": {
+                "trialActive": "Trial aktif",
+                "trialExhausted": "Trial bitti",
+                "premiumActive": "Premium aktif",
+                "pastDue": "Ödeme gecikmiş",
+                "canceled": "İptal edildi",
+                "adminLocked": "Yönetici kilidi"
+            },
+            "lockReason": {
+                "none": "Kilit yok",
+                "trialTimeExpired": "Trial süresi doldu",
+                "trialCreditsExhausted": "Trial kredileri bitti",
+                "subscriptionRequired": "Abonelik gerekli",
+                "packageCreditsExhausted": "Paket kredileri bitti",
+                "pastDue": "Ödeme gecikmiş",
+                "adminLocked": "Yönetici kilidi"
+            }
         },
         "leads": {
             "title": "Yönetici Kişi Listesi",
@@ -831,9 +1047,9 @@
                 "tokens": "Toplam Token",
                 "skills": "Yetenekler",
                 "knowledge": "Bilgi Bankası",
-                "premium": "Premium",
-                "plan": "Plan",
-                "trial": "Trial",
+                "premium": "Üyelik",
+                "plan": "Paket Kredileri",
+                "trial": "Trial Kredileri",
                 "created": "Oluşturulma",
                 "details": "Detay"
             }
@@ -890,14 +1106,14 @@
                 "tokens": "Toplam Token",
                 "skills": "Yetenekler",
                 "knowledge": "Bilgi Bankası",
-                "premium": "Premium",
-                "plan": "Plan",
-                "trial": "Trial"
+                "premium": "Üyelik",
+                "plan": "Paket Kredileri",
+                "trial": "Trial Kredileri"
             }
         },
         "organizationDetail": {
             "title": "Organizasyon Detayı",
-            "description": "Profil üyelikleriyle birlikte salt okunur organizasyon snapshot görünümü.",
+            "description": "Profil üyelikleri ve faturalandırma kontrolleri ile organizasyon snapshot görünümü.",
             "summary": {
                 "name": "Organizasyon",
                 "slug": "Kısa Ad",
@@ -909,9 +1125,84 @@
                 "knowledge": "Bilgi Bankası"
             },
             "billing": {
-                "premium": "Premium",
-                "plan": "Plan",
-                "trial": "Trial"
+                "membership": "Üyelik",
+                "lockReasonLabel": "Kilit nedeni",
+                "packageCredits": "Paket Kredileri",
+                "trialCredits": "Trial Kredileri",
+                "trialEndsAt": "Trial bitişi: {date}",
+                "topup": "Top-up Kredileri",
+                "topupAllowed": "Top-up açık",
+                "topupBlocked": "Top-up kapalı"
+            },
+            "manualActions": {
+                "banner": "Manuel faturalandırma aksiyonları sistem yöneticileri için aktiftir. Her aksiyon neden ister ve audit log’a yazılır.",
+                "title": "Manuel Faturalandırma Aksiyonları",
+                "description": "Organizasyon seviyesinde trial/premium override işlemlerini bu alandan yapın.",
+                "reasonPlaceholder": "Bu aksiyonun nedenini yazın...",
+                "successTitle": "Faturalandırma aksiyonu tamamlandı",
+                "errorTitle": "Faturalandırma aksiyonu başarısız oldu",
+                "successDescription": "İstenen organizasyon faturalandırma değişikliği uygulandı.",
+                "actionLabels": {
+                    "extendTrial": "Trial uzat",
+                    "adjustTopup": "Top-up kredisi ayarla",
+                    "adjustTrial": "Trial kredisini ayarla",
+                    "adjustPackage": "Paket kredisini ayarla",
+                    "assignPremium": "Premium tanımla",
+                    "cancelPremium": "Premium iptal et",
+                    "setMembership": "Üyelik override uygula"
+                },
+                "errors": {
+                    "unauthorized": "Oturum doğrulanamadı.",
+                    "forbidden": "Bu aksiyonu sadece sistem yöneticileri yapabilir.",
+                    "invalidInput": "Bazı form değerleri geçersiz. Alanları kontrol edin.",
+                    "notAvailable": "Bu manuel faturalandırma aksiyonu bu ortamda henüz aktif değil.",
+                    "requestFailed": "Aksiyon isteği başarısız oldu. Lütfen tekrar deneyin."
+                },
+                "extendTrial": {
+                    "title": "Trial Uzat",
+                    "newEndDateLabel": "Yeni trial bitiş tarihi",
+                    "reasonLabel": "Neden",
+                    "submit": "Trial uzatmayı uygula"
+                },
+                "adjustCredits": {
+                    "title": "Top-up Kredisi Ayarla",
+                    "deltaLabel": "Kredi farkı (+/-)",
+                    "reasonLabel": "Neden",
+                    "submit": "Kredi ayarını uygula"
+                },
+                "adjustTrialCredits": {
+                    "title": "Trial Kredisini Ayarla",
+                    "deltaLabel": "Kredi farkı (+/-)",
+                    "reasonLabel": "Neden",
+                    "submit": "Trial kredi ayarını uygula"
+                },
+                "adjustPackageCredits": {
+                    "title": "Paket Kredisini Ayarla",
+                    "deltaLabel": "Kredi farkı (+/-)",
+                    "reasonLabel": "Neden",
+                    "submit": "Paket kredi ayarını uygula"
+                },
+                "assignPremium": {
+                    "title": "Premium Paket Tanımla",
+                    "periodStartLabel": "Dönem başlangıcı",
+                    "periodEndLabel": "Dönem bitişi",
+                    "priceLabel": "Aylık fiyat (TRY)",
+                    "creditsLabel": "Aylık dahil kredi",
+                    "reasonLabel": "Neden",
+                    "submit": "Premium’u aktifleştir"
+                },
+                "cancelPremium": {
+                    "title": "Premium İptal Et",
+                    "reasonLabel": "Neden",
+                    "submit": "Premium aboneliğini iptal et"
+                },
+                "membershipOverride": {
+                    "title": "Üyelik Override Uygula",
+                    "membershipStateLabel": "Üyelik durumu",
+                    "lockReasonLabel": "Kilit nedeni",
+                    "reasonLabel": "Neden",
+                    "submit": "Üyelik override uygula"
+                }
             },
             "profiles": {
                 "emptyTitle": "Bu organizasyonda profil yok",
