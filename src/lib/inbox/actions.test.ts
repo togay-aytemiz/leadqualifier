@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase/server', () => ({
     createClient: createClientMock
 }))
 
-import { getConversations, type ConversationListItem } from '@/lib/inbox/actions'
+import { getConversationCreditUsage, getConversations, type ConversationListItem } from '@/lib/inbox/actions'
 import type { Conversation } from '@/types/database'
 
 type QueryResult<T = unknown> = {
@@ -219,5 +219,64 @@ describe('getConversations', () => {
         expect(result[0]?.messages?.[0]?.content).toBe('En son mesaj')
         expect(result[0]?.leads?.[0]?.status).toBe('warm')
         expect(result[0]?.assignee?.email).toBe('operator@example.com')
+    })
+})
+
+describe('getConversationCreditUsage', () => {
+    beforeEach(() => {
+        createClientMock.mockReset()
+    })
+
+    it('returns summed token totals and weighted credit usage for a conversation', async () => {
+        const supabaseMock = createSupabaseMock({
+            organization_ai_usage: [
+                createQueryBuilder({
+                    orderResult: {
+                        data: [
+                            { input_tokens: 120, output_tokens: 30, total_tokens: 150 },
+                            { input_tokens: 60, output_tokens: 45, total_tokens: 105 }
+                        ],
+                        error: null
+                    }
+                })
+            ]
+        })
+
+        createClientMock.mockResolvedValue(supabaseMock)
+
+        const result = await getConversationCreditUsage('conv-1', 'org-1')
+
+        expect(result).toEqual({
+            inputTokens: 180,
+            outputTokens: 75,
+            totalTokens: 255,
+            usageCount: 2,
+            totalCredits: 0.2
+        })
+    })
+
+    it('returns empty usage totals when query fails', async () => {
+        const supabaseMock = createSupabaseMock({
+            organization_ai_usage: [
+                createQueryBuilder({
+                    orderResult: {
+                        data: null,
+                        error: { message: 'query failed' }
+                    }
+                })
+            ]
+        })
+
+        createClientMock.mockResolvedValue(supabaseMock)
+
+        const result = await getConversationCreditUsage('conv-1', 'org-1')
+
+        expect(result).toEqual({
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            usageCount: 0,
+            totalCredits: 0
+        })
     })
 })

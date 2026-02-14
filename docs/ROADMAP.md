@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-14 (Paywall execution advanced: `/settings/plans` now includes mock subscription + top-up checkout actions (success/failure simulation), tenant trial/package/top-up status cards, and conversion-first guardrails (top-up disabled during trial and before package exhaustion); desktop sidebar + mobile More now deep-link plan actions while showing trial/premium progress details; desktop sidebar usage card position is now anchored in the bottom area (below the Settings block, above profile) for cleaner hierarchy; system-admin sidebar now keeps only the `Yönetim/Admin` section visible until an explicit organization selection is made (workspace/AI/settings/usage blocks stay hidden); platform billing defaults controls moved from `/admin` dashboard to dedicated `/admin/billing`; admin tables are now full-width with horizontal overflow support for wide datasets; migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs to trial and adds mock checkout/admin override SQL helpers; admin organization detail now includes trial/package credit adjustments and membership/lock override actions with required reason capture plus organization-level billing action history table (actor/action/reason); tenant billing UX copy and IA were simplified to a decision-first flow by removing mock outcome selectors from Plans UI and reducing Billing to account status + credit history + core AI usage. Real payment provider + webhook sync remains pending; signout redirect host resolution now uses runtime request origin/forwarded headers to avoid hardcoded-domain fallbacks).  
+> **Last Updated:** 2026-02-14 (Paywall execution advanced: `/settings/plans` now includes mock subscription + top-up checkout actions (success/failure simulation), tenant trial/package/top-up status cards, and conversion-first guardrails (top-up disabled during trial and before package exhaustion); desktop sidebar + mobile More now deep-link plan actions while showing trial/premium progress details; desktop sidebar usage card position is now anchored in the bottom area (below the Settings block, above profile) for cleaner hierarchy; system-admin sidebar now keeps only the `Yönetim/Admin` section visible until an explicit organization selection is made (workspace/AI/settings/usage blocks stay hidden); platform billing defaults controls moved from `/admin` dashboard to dedicated `/admin/billing`; admin tables are now full-width with horizontal overflow support for wide datasets; migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs to trial and adds mock checkout/admin override SQL helpers; admin organization detail now includes trial/package credit adjustments and membership/lock override actions with required reason capture plus organization-level billing action history table (actor/action/reason); tenant billing UX copy and IA were simplified to a decision-first flow by removing mock outcome selectors from Plans UI and reducing Billing to account status + credit history + core AI usage. Real payment provider + webhook sync remains pending; signout redirect host resolution now uses runtime request origin/forwarded headers to avoid hardcoded-domain fallbacks; auth mobile screens now prevent iOS input zoom and avoid top/bottom black bars with dynamic viewport + stable light background; settings IA now hides dedicated General settings, moves interface language control under Organization settings, and redirects `/settings/general` to `/settings/organization`).  
 > Mark items with `[x]` when completed.
 
 ---
@@ -110,6 +110,7 @@
   - [x] Details avatar initials match conversation list
   - [x] Conversation avatars use shared initials/colors across list, chat, and details
   - [x] Lead snapshot grouped under Key Information with contact header restored
+  - [x] Conversation details panel now shows cumulative AI credit usage (all AI operations) since conversation start
   - [x] Score reasoning UI uses locale-aware copy and labels
   - [x] Lead extraction paused notice + manual refresh in details panel
   - [x] Lead snapshot header shows AI extraction chip and status uses dot + text
@@ -164,11 +165,13 @@
   - [x] Sidebar accent and active-state color updated from blue to `#242A40`
   - [x] Mobile bottom navbar with 5 items (Inbox, Kişiler, Yetenekler, Bilgi Bankası, Diğer)
   - [x] Mobile “Diğer” quick menu with Simülatör, Ayarlar, and Signout
+  - [x] Mobile “Diğer” menüden tekrar eden Faturalandırma/Kullanım kısa yolları kaldırıldı (Ayarlar içinden erişim tek kaynak)
   - [x] Mobile Skills page now uses app-style single-pane navigation (list page → detail page with back action)
   - [x] Mobile Skills detail header uses shorter labels (`Düzenle`, `Kaydet`) to reduce top-bar clutter
   - [x] Mobile Settings now uses app-style single-pane navigation (settings list page → detail page with back action)
   - [x] Mobile Settings detail pages now use animated back transition to the settings list (Inbox-style slide-out)
   - [x] Mobile Settings back action now performs client-side navigation (no full refresh feel on detail→list return)
+  - [x] Mobile Settings detail geri akışında history döngüsü düzeltildi (`replace` tabanlı geri dönüş)
   - [x] Desktop Settings now keeps the inner settings sidebar persistent while only detail content switches/loading states
   - [x] Mobile Knowledge Base now uses a single-pane flow (sidebar hidden on mobile and files rendered as responsive cards)
   - [x] Mobile Knowledge edit header now uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance
@@ -182,6 +185,7 @@
   - [x] Atomic operator assignment on manual send
   - [x] Message refresh fallback for bot/contact updates
   - [x] Realtime auth handshake for subscriptions
+  - [x] Fixed inbox credit-usage refresh hook dependency regression causing React `useEffect` dependency-size console error in dev hot-reload
   - [x] Realtime auth token sync now refreshes missing tokens and listens to auth state changes to prevent stale inbox streams
   - [x] Realtime lead status updates for inbox list indicators
   - [x] Conversation list loading now falls back to flat per-table reads when nested relational query fails, preventing false empty-state inbox views
@@ -277,7 +281,8 @@
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs
 - [x] **Settings UX:** Align settings column widths and remove duplicate field labels for cleaner alignment
 - [x] **Settings UX:** Refresh settings sidebar icons with bubbles/circle-user icons
-- [x] **Settings UX:** Settings page headers now match sidebar item labels (AI + General)
+- [x] **Settings UX:** Settings page headers now match sidebar item labels (AI + Organization)
+- [x] **Settings IA:** Removed dedicated General settings entry; language selector moved under Organization settings and `/settings/general` now redirects to `/settings/organization`
 - [x] **AI Settings UI:** Compact bot mode/escalation selection cards (smaller title, radio, and padding)
 - [x] **AI Settings UI:** Downsize selection card title text to section-title scale and reduce description font one step
 - [x] **AI Settings UI:** Align sensitivity slider with hot lead threshold styling (blue `>=` right-side highlight)
@@ -316,6 +321,8 @@
   - [x] Sign Up consent copy now links `Hizmet Koşulları` and `Gizlilik Politikası` to `https://askqualy.com/terms` and `https://askqualy.com/privacy` in a new tab
   - [x] Sign Up consent notice now renders as plain inline text (no bordered/boxed wrapper)
   - [x] Sign In and Sign Up forms now support password show/hide toggle
+  - [x] Mobile Sign In/Sign Up inputs now use iOS-safe sizing (`text-base` on small screens) to prevent keyboard-triggered auto zoom
+  - [x] Auth shell now uses dynamic viewport height (`dvh`) with stable light background defaults to avoid top/bottom black bars on mobile
   - [x] Password Recovery flow (forgot + reset)
   - [x] Forgot/Reset password forms now use the same auth visual language as Sign In/Sign Up (no nested card wrapper, ink-accent focus/CTA/link styles)
   - [x] Profile security: password reset CTA + email immutable note
@@ -519,6 +526,7 @@
   - [x] Add tenant billing paywall UI foundations (membership/lock banners, trial/package/top-up balances, credit usage history)
   - [x] Simplify tenant billing UX copy/labels (Plans + Billing) and remove non-essential Billing sub-analytics to keep decision-first flow
   - [x] Add lightweight usage visibility entry points in desktop sidebar and mobile More menu (trial + package progress and quick links to Plans action surface)
+  - [x] Refine desktop sidebar + mobile More usage card copy to decision-first state matrix (trial credits until trial end, then package credits + top-up breakdown with actionable lock/upgrade hints)
   - [x] Standardize Turkish billing terminology to use `ücretsiz deneme` instead of `trial` in user-facing copy
   - [x] Gate system-admin tenant sidebar sections behind explicit organization selection (no selection shows only Admin navigation)
   - [x] Move platform billing default controls from `/admin` dashboard to dedicated `/admin/billing` page

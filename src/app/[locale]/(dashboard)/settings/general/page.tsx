@@ -1,11 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import GeneralSettingsClient from './GeneralSettingsClient'
+import { getLocale } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 
 export default async function GeneralSettingsPage() {
-    const supabase = await createClient()
+    const locale = await getLocale()
+    const target = locale === 'tr' ? '/settings/organization' : `/${locale}/settings/organization`
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    return <GeneralSettingsClient />
+    redirect(target)
 }

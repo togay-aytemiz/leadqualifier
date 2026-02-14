@@ -13,6 +13,7 @@ import {
     getMessages,
     sendMessage,
     getConversations,
+    getConversationCreditUsage,
     deleteConversation,
     sendSystemMessage,
     setConversationAgent,
@@ -21,6 +22,7 @@ import {
     getConversationLead,
     getLeadScoreReasoning,
     refreshConversationLead,
+    type ConversationCreditUsageSummary,
     type ConversationListItem
 } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
@@ -77,6 +79,8 @@ export function InboxContainer({
     const [messages, setMessages] = useState<Message[]>([])
     const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null)
     const [lead, setLead] = useState<Lead | null>(null)
+    const [conversationCreditUsage, setConversationCreditUsage] = useState<ConversationCreditUsageSummary | null>(null)
+    const [conversationCreditStatus, setConversationCreditStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
     const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -147,6 +151,8 @@ export function InboxContainer({
         setLeadRefreshStatus('idle')
         setLeadRefreshError(null)
         setLeadAutoRefreshStatus('idle')
+        setConversationCreditUsage(null)
+        setConversationCreditStatus('idle')
         setIsMobileDetailsOpen(false)
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
@@ -202,6 +208,27 @@ export function InboxContainer({
         return null
     }, [])
 
+    const refreshConversationCreditUsage = useCallback(async (conversationId: string) => {
+        if (!conversationId) {
+            setConversationCreditUsage(null)
+            setConversationCreditStatus('idle')
+            return
+        }
+
+        setConversationCreditStatus('loading')
+        try {
+            const result = await getConversationCreditUsage(conversationId, organizationId)
+            if (selectedIdRef.current !== conversationId) return
+            setConversationCreditUsage(result)
+            setConversationCreditStatus('success')
+        } catch (error) {
+            console.error('Failed to refresh conversation credit usage', error)
+            if (selectedIdRef.current !== conversationId) return
+            setConversationCreditUsage(null)
+            setConversationCreditStatus('error')
+        }
+    }, [organizationId])
+
     const scheduleLeadAutoRefresh = useCallback((conversationId: string) => {
         if (!conversationId) return
         if (leadAutoRefreshTimeoutRef.current) {
@@ -247,13 +274,14 @@ export function InboxContainer({
                 ))
                 await markConversationRead(nextId)
                 await refreshLead(nextId)
+                await refreshConversationCreditUsage(nextId)
             }
         } catch (error) {
             console.error('Failed to refresh messages', error)
         } finally {
             refreshInFlightRef.current = false
         }
-    }, [refreshLead])
+    }, [refreshConversationCreditUsage, refreshLead])
 
     const resolveAssignee = useCallback(async (assigneeId: string | null) => {
         if (!assigneeId) return null
@@ -333,7 +361,8 @@ export function InboxContainer({
         setLead(null)
         refreshMessages(selectedId)
         refreshLead(selectedId)
-    }, [refreshMessages, refreshLead, selectedId])
+        refreshConversationCreditUsage(selectedId)
+    }, [refreshConversationCreditUsage, refreshMessages, refreshLead, selectedId])
 
     // Scroll Management
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -950,6 +979,15 @@ export function InboxContainer({
                 ? t('leadRefreshBillingLocked')
             : t('leadRefreshError')
     const isLeadUpdating = leadRefreshStatus === 'loading' || leadAutoRefreshStatus === 'loading'
+    const formattedConversationCredits = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    }).format(conversationCreditUsage?.totalCredits ?? 0)
+    const conversationCreditValue = conversationCreditStatus === 'loading'
+        ? t('creditUsageLoading')
+        : conversationCreditStatus === 'error'
+            ? t('creditUsageUnavailable')
+            : t('creditUsageValue', { credits: formattedConversationCredits })
     const mobileListPaneClasses = getMobileListPaneClasses(isMobileConversationOpen)
     const mobileConversationPaneClasses = getMobileConversationPaneClasses(isMobileConversationOpen)
     const mobileDetailsOverlayClasses = getMobileDetailsOverlayClasses(isMobileDetailsOpen)
@@ -1067,6 +1105,10 @@ export function InboxContainer({
                                                 <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
                                                 <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
                                             </div>
+                                        </div>
+                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                            <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('creditUsage')}</p>
+                                            <p className="mt-1 text-sm font-medium text-gray-900">{conversationCreditValue}</p>
                                         </div>
                                         <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
                                             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
@@ -1482,6 +1524,11 @@ export function InboxContainer({
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">{t('received')}</span>
                                         <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p', { locale: dateLocale })}</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
+                                        <span className="text-sm text-gray-500">{t('creditUsage')}</span>
+                                        <span className="text-sm text-gray-900">{conversationCreditValue}</span>
                                     </div>
                                 </div>
 

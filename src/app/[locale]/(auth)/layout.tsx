@@ -8,7 +8,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
     const tc = await getTranslations('common')
 
     return (
-        <div className="min-h-screen bg-[#f3f4f6] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="min-h-dvh bg-[#f3f4f6] px-4 py-5 sm:px-6 lg:px-8">
             <TabTitleSync />
             <div className="mx-auto flex w-full max-w-7xl flex-col">
                 <header className="mb-5 flex items-center justify-between">
@@ -25,7 +25,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
                 </header>
 
                 <main className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-                    <div className="grid min-h-[calc(100vh-8rem)] lg:grid-cols-2">
+                    <div className="grid min-h-[calc(100vh-8rem)] min-h-[calc(100dvh-8rem)] lg:grid-cols-2">
                         <section className="flex items-center justify-center p-6 sm:p-10 lg:p-14">
                             <div className="w-full max-w-md">{children}</div>
                         </section>

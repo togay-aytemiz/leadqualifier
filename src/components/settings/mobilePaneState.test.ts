@@ -48,7 +48,7 @@ describe('settings mobile pane state helpers', () => {
         expect(getSettingsNavItemFromPath('/en/settings')).toBeNull()
         expect(getSettingsNavItemFromPath('/settings/profile')).toBe('profile')
         expect(getSettingsNavItemFromPath('/en/settings/organization')).toBe('organization')
-        expect(getSettingsNavItemFromPath('/tr/settings/general')).toBe('general')
+        expect(getSettingsNavItemFromPath('/tr/settings/general')).toBeNull()
         expect(getSettingsNavItemFromPath('/settings/ai')).toBe('ai')
         expect(getSettingsNavItemFromPath('/settings/channels')).toBe('channels')
         expect(getSettingsNavItemFromPath('/settings/plans')).toBe('plans')

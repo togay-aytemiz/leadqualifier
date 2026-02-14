@@ -153,6 +153,19 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
             return billingSnapshot.membershipState
         }
     }, [billingSnapshot, tSidebar])
+    const billingDisplayCredits = useMemo(() => {
+        if (!billingSnapshot) return 0
+
+        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
+            return billingSnapshot.trial.credits.remaining
+        }
+
+        if (billingSnapshot.membershipState === 'premium_active') {
+            return billingSnapshot.package.credits.remaining + billingSnapshot.topupBalance
+        }
+
+        return billingSnapshot.totalRemainingCredits
+    }, [billingSnapshot])
     const billingProgress = useMemo(() => {
         if (!billingSnapshot) return 0
 
@@ -172,26 +185,71 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
 
         return 0
     }, [billingSnapshot])
-    const billingSubline = useMemo(() => {
+    const billingDetailPrimary = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailableDescription')
 
-        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
-            return tSidebar('billingTrialSublineDetailed', {
-                days: String(billingSnapshot.trial.remainingDays),
+        if (billingSnapshot.membershipState === 'trial_active') {
+            return tSidebar('billingTrialSubline', {
+                days: String(billingSnapshot.trial.remainingDays)
+            })
+        }
+
+        if (billingSnapshot.membershipState === 'trial_exhausted') {
+            return tSidebar('billingUpgradePromptSubline')
+        }
+
+        if (billingSnapshot.membershipState === 'premium_active') {
+            return tSidebar('billingPackageCreditsSubline', {
+                credits: formatCredits(billingSnapshot.package.credits.remaining)
+            })
+        }
+
+        if (billingSnapshot.membershipState === 'past_due') {
+            return tSidebar('billingPaymentRequiredSubline')
+        }
+
+        if (billingSnapshot.membershipState === 'canceled') {
+            return tSidebar('billingUpgradePromptSubline')
+        }
+
+        if (billingSnapshot.membershipState === 'admin_locked') {
+            return tSidebar('billingContactSupportSubline')
+        }
+
+        return tSidebar('billingUnavailableDescription')
+    }, [billingSnapshot, tSidebar])
+    const billingDetailSecondary = useMemo(() => {
+        if (!billingSnapshot) return null
+
+        if (billingSnapshot.membershipState === 'trial_active') {
+            return tSidebar('billingTrialCreditsSubline', {
                 credits: formatCredits(billingSnapshot.trial.credits.remaining)
             })
         }
 
-        if (billingSnapshot.membershipState === 'premium_active'
-            && billingSnapshot.package.credits.remaining <= 0
-            && billingSnapshot.topupBalance > 0
-        ) {
+        if (billingSnapshot.membershipState !== 'premium_active') {
+            return null
+        }
+
+        if (billingSnapshot.topupBalance > 0) {
             return tSidebar('billingTopupSubline', {
                 credits: formatCredits(billingSnapshot.topupBalance)
             })
         }
 
-        return tSidebar('billingPackageSubline')
+        if (!billingSnapshot.package.periodEnd) {
+            return tSidebar('billingPackageSubline')
+        }
+
+        try {
+            const resetDate = new Intl.DateTimeFormat(undefined, {
+                month: 'short',
+                day: 'numeric'
+            }).format(new Date(billingSnapshot.package.periodEnd))
+            return tSidebar('billingPackageSublineWithDate', { date: resetDate })
+        } catch {
+            return tSidebar('billingPackageSubline')
+        }
     }, [billingSnapshot, tSidebar])
 
     return (
@@ -215,7 +273,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                     {tSidebar('billingStatusLabel')}
                                 </p>
                                 <p className="mt-1 text-sm font-semibold text-slate-900">
-                                    {formatCredits(billingSnapshot.totalRemainingCredits)}
+                                    {formatCredits(billingDisplayCredits)}
                                     <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
                                 </p>
                                 <div className="mt-2 h-1.5 rounded-full bg-slate-200">
@@ -225,7 +283,10 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                     />
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">{billingMembershipLabel}</p>
-                                <p className="mt-0.5 text-xs text-slate-500">{billingSubline}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{billingDetailPrimary}</p>
+                                {billingDetailSecondary && (
+                                    <p className="mt-0.5 text-xs text-slate-500">{billingDetailSecondary}</p>
+                                )}
                             </Link>
                         )}
                         <Link
@@ -243,22 +304,6 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                         >
                             <Settings size={16} />
                             {tNav('settings')}
-                        </Link>
-                        <Link
-                            href="/settings/plans"
-                            onClick={() => setIsOtherOpen(false)}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                            <Settings size={16} />
-                            {tNav('billing')}
-                        </Link>
-                        <Link
-                            href="/settings/billing"
-                            onClick={() => setIsOtherOpen(false)}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                            <Settings size={16} />
-                            {tSidebar('billingUsageMenuLabel')}
                         </Link>
                         <form action="/api/auth/signout" method="POST">
                             <button

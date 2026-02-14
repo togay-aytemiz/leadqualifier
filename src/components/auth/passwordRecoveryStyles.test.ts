@@ -12,6 +12,8 @@ describe('password recovery styles', () => {
 
         expect(classes).toContain('focus:border-[#242A40]')
         expect(classes).toContain('focus:ring-[#242A40]/10')
+        expect(classes).toContain('text-base')
+        expect(classes).toContain('sm:text-sm')
     })
 
     it('supports icon paddings for password visibility toggles', () => {

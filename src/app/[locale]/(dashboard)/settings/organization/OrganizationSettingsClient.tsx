@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter as useLocaleRouter } from '@/i18n/navigation'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
+import { transformPendingHrefForLocale } from '@/components/settings/localeHref'
 import { updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
@@ -38,8 +40,11 @@ export default function OrganizationSettingsClient({
 }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
-    const locale = useLocale()
+    const locale = useLocale() as 'en' | 'tr'
     const router = useRouter()
+    const localeRouter = useLocaleRouter()
+    const pathname = usePathname()
+    const [, startTransition] = useTransition()
     const searchParams = useSearchParams()
     const autoOpenOfferingSuggestions = searchParams.get('focus') === 'offering-suggestions'
     const initialRequiredFields = normalizeIntakeFields(offeringProfile?.required_intake_fields ?? [])
@@ -47,6 +52,7 @@ export default function OrganizationSettingsClient({
 
     const [baseline, setBaseline] = useState({
         name: initialName,
+        locale,
         profileSummary: offeringProfile?.summary ?? '',
         manualProfileNote: offeringProfile?.manual_profile_note ?? '',
         offeringProfileAiEnabled: offeringProfile?.ai_suggestions_enabled ?? false,
@@ -56,6 +62,7 @@ export default function OrganizationSettingsClient({
     })
 
     const [name, setName] = useState(initialName)
+    const [selectedLocale, setSelectedLocale] = useState<'en' | 'tr'>(locale)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
     const [manualProfileNote, setManualProfileNote] = useState(offeringProfile?.manual_profile_note ?? '')
     const [offeringProfileAiEnabled, setOfferingProfileAiEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
@@ -87,6 +94,7 @@ export default function OrganizationSettingsClient({
     const isDirty = useMemo(() => {
         return (
             name !== baseline.name ||
+            selectedLocale !== baseline.locale ||
             profileSummary !== baseline.profileSummary ||
             manualProfileNote !== baseline.manualProfileNote ||
             offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
@@ -96,6 +104,7 @@ export default function OrganizationSettingsClient({
         )
     }, [
         name,
+        selectedLocale,
         profileSummary,
         manualProfileNote,
         offeringProfileAiEnabled,
@@ -137,6 +146,11 @@ export default function OrganizationSettingsClient({
             status: item.status ?? 'pending'
         })))
     }, [initialSuggestions])
+
+    useEffect(() => {
+        setSelectedLocale(locale)
+        setBaseline((prev) => ({ ...prev, locale }))
+    }, [locale])
 
     useEffect(() => {
         if (!offeringProfile || localeSynced) return
@@ -186,8 +200,8 @@ export default function OrganizationSettingsClient({
         return `${approvedSummary}\n\n${trimmedCustomNote}`
     }
 
-    const refreshSuggestions = async () => {
-        const refreshed = await getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
+    const refreshSuggestions = async (suggestionLocale: 'en' | 'tr' = locale) => {
+        const refreshed = await getOfferingProfileSuggestions(organizationId, suggestionLocale, { includeArchived: true })
         const normalized = refreshed.map((item) => ({ ...item, status: item.status ?? 'pending' }))
         setSuggestions(normalized)
         return normalized
@@ -209,6 +223,13 @@ export default function OrganizationSettingsClient({
         setSaved(false)
 
         try {
+            const nextLocale = selectedLocale
+            const localeChanged = nextLocale !== baseline.locale
+
+            if (localeChanged) {
+                await updateOfferingProfileLocaleForUser(nextLocale)
+            }
+
             if (name !== baseline.name) {
                 await updateOrganizationName(name)
             }
@@ -231,18 +252,19 @@ export default function OrganizationSettingsClient({
                     manualProfileNote,
                     offeringProfileAiEnabled,
                     requiredIntakeFieldsAiEnabled,
-                    locale,
+                    nextLocale,
                     normalizedRequiredIntakeFields,
                     normalizedRequiredIntakeFieldsAi,
                     { generateInitialSuggestion: offeringProfileAiEnabled && !baseline.offeringProfileAiEnabled }
                 )
-                await refreshSuggestions()
+                await refreshSuggestions(nextLocale)
             }
 
             setProfileSummary(effectiveSummary)
 
             setBaseline({
                 name,
+                locale: nextLocale,
                 profileSummary: effectiveSummary,
                 manualProfileNote,
                 offeringProfileAiEnabled,
@@ -251,6 +273,13 @@ export default function OrganizationSettingsClient({
                 requiredIntakeFieldsAi: normalizedRequiredIntakeFieldsAi
             })
             setSaved(true)
+
+            if (localeChanged) {
+                startTransition(() => {
+                    localeRouter.replace(pathname, { locale: nextLocale })
+                })
+            }
+
             return true
         } catch (error) {
             console.error(error)
@@ -321,6 +350,7 @@ export default function OrganizationSettingsClient({
 
     const handleDiscard = () => {
         setName(baseline.name)
+        setSelectedLocale(baseline.locale)
         setProfileSummary(baseline.profileSummary)
         setManualProfileNote(baseline.manualProfileNote)
         setOfferingProfileAiEnabled(baseline.offeringProfileAiEnabled)
@@ -331,10 +361,18 @@ export default function OrganizationSettingsClient({
         setSaved(false)
     }
 
+    const transformPendingHref = (href: string) =>
+        transformPendingHrefForLocale({
+            href,
+            currentLocale: locale,
+            nextLocale: selectedLocale
+        })
+
     const guard = useUnsavedChangesGuard({
         isDirty,
         onSave: handleSave,
-        onDiscard: handleDiscard
+        onDiscard: handleDiscard,
+        transformPendingHref
     })
 
     return (
@@ -359,6 +397,44 @@ export default function OrganizationSettingsClient({
                 </div>
 
                 <div className="max-w-5xl">
+                    <SettingsSection title={t('languageTitle')} description={t('languageDescription')}>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedLocale('en')}
+                                className={`rounded-lg border p-4 text-left transition-colors ${selectedLocale === 'en'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
+                                        }`}>
+                                        {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{t('languageEnglish')}</span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSelectedLocale('tr')}
+                                className={`rounded-lg border p-4 text-left transition-colors ${selectedLocale === 'tr'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
+                                        }`}>
+                                        {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{t('languageTurkish')}</span>
+                                </div>
+                            </button>
+                        </div>
+                    </SettingsSection>
+
                     <SettingsSection title={t('nameTitle')} description={t('nameDescription')}>
                         <input
                             type="text"

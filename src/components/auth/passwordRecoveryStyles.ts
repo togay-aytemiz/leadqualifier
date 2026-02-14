@@ -4,7 +4,7 @@ type PasswordRecoveryInputOptions = {
 
 export function getPasswordRecoveryInputClasses(options?: PasswordRecoveryInputOptions): string {
     return [
-        'block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400',
+        'block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-400 sm:text-sm',
         options?.withTrailingIcon ? 'pr-10' : '',
         'focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10',
     ]

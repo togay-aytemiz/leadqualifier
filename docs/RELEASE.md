@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- Added per-conversation cumulative AI credit usage visibility in Inbox details (desktop right panel + mobile details card), computed from all conversation-linked `organization_ai_usage` events (`src/lib/inbox/actions.ts`, `src/components/inbox/InboxContainer.tsx`, `messages/en.json`, `messages/tr.json`).
 - Added tenant `Plans & Credits` action surface with mock checkout simulation controls for recurring premium and top-up purchases (success/failure outcomes), policy-aware lock messaging, and localized checkout status feedback (`src/app/[locale]/(dashboard)/settings/plans/page.tsx`, `src/lib/billing/mock-checkout.ts`).
 - Added billing package-offer resolver + unit tests to derive tenant-visible monthly premium price/credit defaults from versioned package rows with safe fallbacks (`src/lib/billing/package-offer.ts`, `src/lib/billing/package-offer.test.ts`).
 - Added rollout migration `supabase/migrations/00058_trial_backfill_mock_checkout_and_admin_overrides.sql` to backfill existing non-system-admin orgs into trial, expose mock checkout SQL functions, and extend admin override SQL functions.
@@ -127,6 +128,9 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed mobile `Diğer` menu to keep a single Settings entry and removed duplicated `Faturalandırma` / `Kullanım` shortcuts (`src/design/MobileBottomNav.tsx`).
+- Changed settings IA by moving interface language selection from `Settings > General` into `Settings > Organization`, removing the `General` item from settings navigation, and redirecting legacy `/settings/general` requests to `/settings/organization` (`src/app/[locale]/(dashboard)/settings/organization/OrganizationSettingsClient.tsx`, `src/components/settings/SettingsResponsiveShell.tsx`, `src/components/settings/mobilePaneState.ts`, `src/app/[locale]/(dashboard)/settings/general/page.tsx`, `src/design/MainSidebar.tsx`, `messages/en.json`, `messages/tr.json`).
+- Changed desktop sidebar and mobile More usage cards to state-aware, decision-first copy: trial shows trial credits only, premium shows package remaining + top-up breakdown, and locked/non-active states show short action prompts (`src/design/MainSidebar.tsx`, `src/design/MobileBottomNav.tsx`, `messages/en.json`, `messages/tr.json`).
 - Changed desktop sidebar layout to anchor the `Usage` card in the bottom area (below the `Other/Settings` block and above profile) for a clearer hierarchy (`src/design/MainSidebar.tsx`).
 - Changed system-admin sidebar behavior so tenant navigation groups (`Workspace`, `AI Tools`, `Other/Settings`) and the usage card stay hidden until an explicit organization is selected; no-selection state now shows only the `Admin` section (`src/app/[locale]/(dashboard)/layout.tsx`, `src/design/MainSidebar.tsx`).
 - Changed platform billing defaults management IA by moving controls from `/admin` dashboard to dedicated `/admin/billing`, with new admin sidebar entry and dashboard quick-action link (`src/app/[locale]/(dashboard)/admin/page.tsx`, `src/app/[locale]/(dashboard)/admin/billing/page.tsx`, `src/design/MainSidebar.tsx`, `messages/en.json`, `messages/tr.json`).
@@ -228,6 +232,9 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed mobile Settings detail back navigation history loop by switching to replace-based return flow (prevents back/forward oscillation between `/settings` and detail routes) (`src/components/settings/SettingsResponsiveShell.tsx`).
+- Fixed mobile auth UX on Sign In/Sign Up (and shared password-recovery inputs) by using iOS-safe small-screen input sizing (`text-base` / 16px) to prevent keyboard-triggered auto zoom, and stabilized auth viewport/background behavior to remove top/bottom black bars on mobile (`src/components/auth/LoginForm.tsx`, `src/components/auth/RegisterForm.tsx`, `src/components/auth/passwordRecoveryStyles.ts`, `src/app/[locale]/(auth)/layout.tsx`, `src/app/globals.css`).
+- Fixed Inbox details refresh `useEffect` dependency regression that triggered React console error (`The final argument passed to useEffect changed size between renders`) during Turbopack hot reloads (`src/components/inbox/InboxContainer.tsx`).
 - Fixed admin runtime serialization errors (`Only plain objects can be passed to Client Components`) by removing server-to-client icon constructor props in admin empty-state tables and rendering icon markup directly in server pages (`src/app/[locale]/(dashboard)/admin/organizations/[id]/page.tsx`, `src/app/[locale]/(dashboard)/admin/organizations/page.tsx`, `src/app/[locale]/(dashboard)/admin/users/page.tsx`, `src/app/[locale]/(dashboard)/admin/users/[id]/page.tsx`).
 - Fixed signout redirect host drift by deriving `/register` redirect origin from runtime request/forwarded headers instead of static `NEXT_PUBLIC_APP_URL`, preventing redirects to legacy Netlify domains on custom-host deployments (`src/app/api/auth/signout/route.ts`, `src/app/api/auth/signout/route.test.ts`).
 - Fixed Leads list required-field rendering so values extracted into Inbox "Important info" (`extracted_fields.required_intake_collected`) now appear in both desktop table columns and mobile lead cards.

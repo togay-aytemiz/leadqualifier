@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-14 (Paywall implementation advanced with trial-first conversion UX: `/settings/plans` now includes mock subscription and top-up checkout simulations (success/failure), clear trial/premium status cards, and policy-aligned guards; desktop sidebar + mobile More surface trial/package progress with direct Plans actions, and sidebar usage card is positioned in the bottom area (below Settings, above profile) for clearer information hierarchy. System-admin sidebar now shows only `Yönetim/Admin` until an explicit organization is selected. Platform billing defaults controls moved to dedicated `/admin/billing` page (removed from `/admin` dashboard), and admin tables are standardized to full-width with horizontal overflow support. Migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs into trial mode and adds mock checkout + extended admin override SQL helpers. System-admin org detail now supports trial/package credit adjustments, membership/lock overrides with reason capture, and organization-level billing action history visibility (actor/action/reason). Tenant billing UX labels were simplified to a decision-first IA: Plans keeps only actionable upgrade/top-up flow, while Billing is streamlined to account status + credit history + core AI usage. Real provider integration + webhook sync remains pending; signout redirect now resolves destination host from runtime request origin/forwarded headers instead of static deployment URL env fallback.)  
+> **Last Updated:** 2026-02-14 (Paywall implementation advanced with trial-first conversion UX: `/settings/plans` now includes mock subscription and top-up checkout simulations (success/failure), clear trial/premium status cards, and policy-aligned guards; desktop sidebar + mobile More surface trial/package progress with direct Plans actions, and sidebar usage card is positioned in the bottom area (below Settings, above profile) for clearer information hierarchy. System-admin sidebar now shows only `Yönetim/Admin` until an explicit organization is selected. Platform billing defaults controls moved to dedicated `/admin/billing` page (removed from `/admin` dashboard), and admin tables are standardized to full-width with horizontal overflow support. Migration `00058_trial_backfill_mock_checkout_and_admin_overrides.sql` backfills existing non-system-admin orgs into trial mode and adds mock checkout + extended admin override SQL helpers. System-admin org detail now supports trial/package credit adjustments, membership/lock overrides with reason capture, and organization-level billing action history visibility (actor/action/reason). Tenant billing UX labels were simplified to a decision-first IA: Plans keeps only actionable upgrade/top-up flow, while Billing is streamlined to account status + credit history + core AI usage. Real provider integration + webhook sync remains pending; signout redirect now resolves destination host from runtime request origin/forwarded headers instead of static deployment URL env fallback; mobile auth forms now prevent iOS auto-zoom and avoid top/bottom black bars via dynamic viewport + light background defaults; settings IA now hides dedicated General settings, moves interface language control under Organization settings, and redirects `/settings/general` to `/settings/organization`.)  
 > **Status:** In Development
 
 ---
@@ -48,7 +48,7 @@ Automate WhatsApp message handling:
 | Multi-Tenant | Organization-based isolation | Implemented |
 | Admin Panel | Leads, Skills, KB, Channels management | Partial (Dashboard + Leads + Skills/KB/Inbox/Settings/Channels implemented; organization-level billing audit history is visible in org detail; pending: `Open in WhatsApp` quick action and cross-org billing audit tooling) |
 | Public Legal Center | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json` | Implemented |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle** | Implemented |
+| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle, and cumulative per-conversation AI credit usage in details** | Implemented |
 
 ### ❌ Out of Scope (Intentional)
 - Calendar integration
@@ -329,8 +329,10 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Public auth pages now include a top logo header and inline EN/TR language switcher.
 - Sign Up form fields for MVP are `full_name`, `email`, and `password`; legal consent is communicated as inline Terms/Privacy links (no required checkbox).
 - Sign In and Sign Up password inputs include show/hide toggle controls.
+- On mobile, Sign In and Sign Up inputs use iOS-safe font sizing (`16px` baseline via `text-base`) to prevent keyboard-triggered auto zoom.
 - Sign In and Sign Up are route-level separated (`/login`, `/register`) and no longer use an in-form segmented switcher.
 - Signout endpoint redirects to `register` using the incoming request origin (with forwarded-header support) so custom domains are preserved.
+- Public auth layout uses dynamic viewport height (`dvh`) and light background defaults so mobile top/bottom chrome areas do not show black bars.
 - Public auth desktop shell includes an animated messenger-style preview panel with conversion-focused typed user/assistant example flows.
 - Messenger preview interaction follows a send lifecycle (`type -> sent -> input reset -> assistant reply`) to better reflect real chat behavior.
 - Composer resets to a placeholder-style empty state after send and before assistant reply to mirror real messenger input reset behavior.
@@ -349,6 +351,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Sign Up consent notice is plain inline text (no bordered/boxed wrapper), stays compact on desktop, and may wrap on smaller viewports.
 - Customer bubbles are explicitly labeled (`Müşteri` / `Customer`) to clarify that shown messages are incoming customer text in the simulation.
 - Organization: company name and future org-level defaults
+- Organization settings include interface language selection (TR/EN); dedicated General settings is hidden from navigation and legacy `/settings/general` redirects to `/settings/organization`.
 - Mobile Settings navigation now opens with a dedicated settings list page first, then transitions to selected detail pages with an explicit back action.
 - Mobile Settings back action uses client-side route transition (not full-page refresh) to keep mobile flow stable.
 - Desktop Settings keeps the inner settings sidebar persistent across sub-route navigation; only the detail pane content swaps and shows loading states.
@@ -538,6 +541,8 @@ MVP is successful when:
 - **Auth Legal Consent UX (MVP):** Replace mandatory Sign Up consent checkbox with inline legal notice copy linking to Terms and Privacy in a new tab for lower friction while preserving policy visibility.
 - **Auth Consent Visual Style (MVP):** Render legal consent notice as normal inline text (no bordered/boxed container) so it reads like supporting form copy.
 - **Auth Password UX:** Provide explicit password show/hide controls on Sign In and Sign Up for entry confidence on desktop/mobile.
+- **Auth Mobile Input Sizing:** Use `text-base` (`16px`) on small-screen auth inputs to avoid iOS Safari auto-zoom while preserving compact `sm:text-sm` on larger screens.
+- **Auth Mobile Viewport Stability:** Use `dvh`-based auth shell height and fixed light background tokens to avoid visible black bands at top/bottom on mobile browsers.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
@@ -570,6 +575,7 @@ MVP is successful when:
 - **Admin Action Audit Requirement (Locked v1):** Every manual billing action must include reason, actor, previous state, and resulting state.
 - **Admin Audit Visibility (Implementation v1.1):** `/admin/organizations/[id]` shows recent billing audit rows (date, action, actor, reason) sourced from `billing_admin_audit_log`.
 - **Usage Visibility Requirement (Locked v1):** Users must be able to track trial/package progress from quick surfaces (desktop sidebar + mobile More menu), with deep link to detailed Billing page.
+- **Usage Card Decision-First Matrix (Implementation v1.3):** Quick usage card must show active pool by lifecycle state: during trial show trial credits only; during premium show package remaining + top-up (if any); when locked/exhausted show short action-oriented subline.
 - **Billing Snapshot Source (Implementation v1):** Tenant/admin visibility reads from `organization_billing_accounts` plus immutable `organization_credit_ledger` history; frontend derives progress/eligibility from a shared billing snapshot mapper to keep sidebar/mobile/settings/admin surfaces consistent.
 - **Runtime Entitlement Gate (Implementation v1):** Before token-consuming AI paths (shared inbound pipeline, Telegram webhook AI flow, simulator response generation, inbox summary/reasoning/manual lead-refresh), runtime resolves billing entitlement and exits early when usage is locked.
 - **TR Payment Provider Strategy (Locked v1):** Prioritize a TR-valid recurring provider (Iyzico first, PayTR alternative); use Stripe only with a supported non-TR entity/account model.
@@ -606,6 +612,7 @@ MVP is successful when:
 - **Skill Matching Fail-Open:** If semantic skill matching fails at runtime, continue via KB/fallback path instead of terminating the webhook flow.
 - **Inbox Composer:** Show an AI-assistant-active banner with a takeover prompt while keeping manual reply enabled.
 - **Inbox Details:** Use consistent contact initials between list avatars and details panel.
+- **Inbox Credit Usage Visibility:** Show cumulative AI credit usage per conversation in details (sum all `organization_ai_usage` rows by `metadata.conversation_id`, then convert with weighted credit formula).
 - **Inbox Avatars:** Use the shared Avatar component across list, chat, and details to keep initials/colors consistent.
 - **Inbox Details Layout:** Keep the contact header block and group the lead snapshot under Key Information for faster scanning.
 - **Lead Extraction Pause UI:** If the operator is active or AI is off, surface a paused notice and allow a manual lead refresh from inbox details.
@@ -630,6 +637,8 @@ MVP is successful when:
 - **Inbox Conversation Switch Loading:** Track selected-thread id separately from loaded-thread id and render skeletons during switches so avatar/details do not update against stale previous-thread messages.
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
 - **Mobile Navigation Shell:** Hide desktop sidebar on mobile and use a fixed bottom navbar (`Inbox`, `Kişiler`, `Yetenekler`, `Bilgi Bankası`, `Diğer`) where `Diğer` opens quick actions (`Simülatör`, `Ayarlar`, `Signout`).
+- **Mobile More Menu Simplification:** Do not duplicate `Plans/Billing Usage` links in `Diğer`; billing routes are accessed from Settings navigation to avoid redundant entry points.
+- **Mobile Settings Back Behavior:** In settings detail pages, back action should return to `/settings` without adding extra history entries (prevent back/forward oscillation loops).
 - **Mobile Navigation Performance:** Prefetch key bottom-nav destinations (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/simulator`, `/settings`) with short delayed scheduling to reduce transition latency without adding click-time jank.
 - **Desktop Settings Navigation Performance:** Prefetch settings destinations from main sidebar/settings shell with short delayed scheduling, and route the desktop main Settings entry to `/settings/ai` while preserving mobile quick action target `/settings`.
 - **Mobile Inbox Details Payload:** Mobile details must prioritize lead context by showing `service_type`, `summary`, and collected required-intake fields.
@@ -650,8 +659,9 @@ MVP is successful when:
 - **AI Settings Threshold Semantics Runtime:** Apply inclusive threshold checks (`>=`) in skill and KB similarity matching so backend behavior matches UI wording.
 - **Unsaved Changes Modal:** Secondary actions hug content, discard is soft-danger, and primary save CTA stays single-line.
 - **Settings Save Feedback:** Show saved state via the save button (no inline “Saved” text) and clear dirty-state after persistence across settings pages.
-- **Settings Sidebar Icons:** Use the updated settings menu icon set (bubbles/circle user) for profile/org/general/AI/channels/billing entries.
+- **Settings Sidebar Icons:** Use the updated settings menu icon set (bubbles/circle user) for profile/org/AI/channels/billing entries.
 - **Settings Title Parity:** Settings page headers should use the same labels as the corresponding settings sidebar items.
+- **Settings IA Simplification:** Keep language selection under Organization settings and hide dedicated General settings from the sidebar; retain `/settings/general` as a compatibility redirect to `/settings/organization`.
 - **Password Recovery:** Use Supabase reset email with locale-aware redirect to `/{locale}/reset-password` and a 120-second resend cooldown.
 - **Channel Topology (MVP):** Treat `telegram`, `whatsapp`, and `instagram` as independent channels (`channels.type`) and store conversations with explicit per-channel platform values (`conversations.platform`).
 - **Channel Launch Gating:** Keep Instagram connect CTA and Facebook Messenger card as `Coming Soon` placeholders in Settings > Channels until rollout is reopened; Telegram/WhatsApp flows remain active.

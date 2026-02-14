@@ -1,13 +1,11 @@
 'use client'
 
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import {
-    HiOutlineAdjustmentsHorizontal,
     HiOutlineBanknotes,
     HiOutlineBriefcase,
     HiOutlineChatBubbleLeftRight,
@@ -19,7 +17,6 @@ import {
     getSettingsNavItemFromPath,
     getSettingsMobileDetailPaneClasses,
     getSettingsMobileListPaneClasses,
-    isSettingsDetailPath,
     SETTINGS_MOBILE_BACK_EVENT,
     type SettingsNavItemId
 } from '@/components/settings/mobilePaneState'
@@ -53,9 +50,7 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
     const activeItem = getSettingsNavItemFromPath(pathname)
     const tSidebar = useTranslations('Sidebar')
     const hasDetail = Boolean(activeItem && children)
-    const backAnchorRef = useRef<HTMLAnchorElement | null>(null)
     const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const reopenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const isClosingRef = useRef(false)
     const settingsRootHref = getLocalizedHref(locale, '/settings')
     const navItems = useMemo<SettingsNavItem[]>(() => [
@@ -75,14 +70,6 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
             icon: <HiOutlineBriefcase size={18} />,
             active: activeItem === 'organization',
             indicator: pendingCount > 0
-        },
-        {
-            id: 'general',
-            group: 'preferences',
-            label: tSidebar('general'),
-            href: getLocalizedHref(locale, '/settings/general'),
-            icon: <HiOutlineAdjustmentsHorizontal size={18} />,
-            active: activeItem === 'general'
         },
         {
             id: 'ai',
@@ -139,9 +126,6 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
             if (closeTimeoutRef.current) {
                 clearTimeout(closeTimeoutRef.current)
             }
-            if (reopenTimeoutRef.current) {
-                clearTimeout(reopenTimeoutRef.current)
-            }
         }
     }, [])
 
@@ -151,19 +135,16 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
         isClosingRef.current = true
         setIsMobileDetailOpen(false)
 
-        closeTimeoutRef.current = setTimeout(() => {
-            backAnchorRef.current?.click()
-            closeTimeoutRef.current = null
+        if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current)
+        }
 
-            reopenTimeoutRef.current = setTimeout(() => {
-                if (isSettingsDetailPath(window.location.pathname)) {
-                    setIsMobileDetailOpen(true)
-                }
-                reopenTimeoutRef.current = null
-                isClosingRef.current = false
-            }, 80)
+        closeTimeoutRef.current = setTimeout(() => {
+            router.replace(settingsRootHref)
+            closeTimeoutRef.current = null
+            isClosingRef.current = false
         }, 220)
-    }, [hasDetail])
+    }, [hasDetail, router, settingsRootHref])
 
     useEffect(() => {
         const handleBack = () => {
@@ -271,8 +252,6 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
                     {children}
                 </div>
             </div>
-
-            <Link ref={backAnchorRef} href={settingsRootHref} className="hidden" aria-hidden />
         </div>
     )
 }

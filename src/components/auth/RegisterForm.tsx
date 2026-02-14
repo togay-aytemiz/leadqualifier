@@ -49,7 +49,7 @@ export function RegisterForm() {
                         type="text"
                         required
                         autoComplete="name"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10"
+                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10 sm:text-sm"
                         placeholder={t('fullNamePlaceholder')}
                     />
                 </div>
@@ -64,7 +64,7 @@ export function RegisterForm() {
                         type="email"
                         required
                         autoComplete="email"
-                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10"
+                        className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10 sm:text-sm"
                         placeholder={t('emailPlaceholder')}
                     />
                 </div>
@@ -81,7 +81,7 @@ export function RegisterForm() {
                             required
                             minLength={6}
                             autoComplete="new-password"
-                            className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10"
+                            className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pr-10 text-base text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10 sm:text-sm"
                             placeholder={t('passwordPlaceholder')}
                         />
                         <button
