@@ -3,21 +3,50 @@ import { Badge, DataTable, PageHeader, TableBody, TableCell, TableHead, TableRow
 import { Link } from '@/i18n/navigation'
 import { Activity, Building2, Database, Sparkles, Users, Wallet } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
-import { getAdminDashboardSummary } from '@/lib/admin/read-models'
+import {
+    getAdminBillingPlanMetricsSummary,
+    getAdminDashboardSummary,
+    getAdminUsageMetricsSummary
+} from '@/lib/admin/read-models'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getLeads } from '@/lib/leads/list-actions'
+import { resolveAdminDashboardOrganizationContext } from '@/lib/admin/dashboard-context'
+import {
+    ADMIN_METRIC_PERIOD_ALL,
+    buildRecentAdminMetricMonthKeys,
+    resolveAdminMetricPeriodKey
+} from '@/lib/admin/dashboard-metric-period'
 
-export default async function AdminPage() {
+interface AdminPageProps {
+    searchParams: Promise<{
+        usagePeriod?: string
+    }>
+}
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
     const locale = await getLocale()
     const t = await getTranslations('admin')
     const tLeads = await getTranslations('leads')
     const { supabase } = await requireSystemAdmin(locale)
-    const [summary, orgContext] = await Promise.all([
+    const [summary, orgContext, search] = await Promise.all([
         getAdminDashboardSummary(supabase),
-        resolveActiveOrganizationContext(supabase)
+        resolveActiveOrganizationContext(supabase),
+        searchParams
     ])
 
-    const activeOrganization = orgContext?.activeOrganization ?? null
+    const dashboardOrgContext = resolveAdminDashboardOrganizationContext(orgContext)
+    const activeOrganization = dashboardOrgContext.activeOrganization
+    const scopedOrganizationId = dashboardOrgContext.hasExplicitSelection
+        ? (activeOrganization?.id ?? null)
+        : null
+    const requestedUsagePeriod = resolveAdminMetricPeriodKey(search.usagePeriod)
+    const [usageMetrics, billingPlanMetrics] = await Promise.all([
+        getAdminUsageMetricsSummary({
+            organizationId: scopedOrganizationId,
+            periodKey: requestedUsagePeriod
+        }, supabase),
+        getAdminBillingPlanMetricsSummary(scopedOrganizationId, supabase)
+    ])
     const recentLeadsResult = activeOrganization
         ? await getLeads(
             {
@@ -37,10 +66,23 @@ export default async function AdminPage() {
         }
 
     const formatter = new Intl.NumberFormat(locale)
+    const monthFormatter = new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'long',
+        timeZone: 'UTC'
+    })
     const dateFormatter = new Intl.DateTimeFormat(locale, {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
+    })
+    const currencyFormatter = new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'TRY',
+        maximumFractionDigits: 2
+    })
+    const creditFormatter = new Intl.NumberFormat(locale, {
+        maximumFractionDigits: 1
     })
     const statusLabels: Record<string, string> = {
         hot: tLeads('statusHot'),
@@ -56,6 +98,36 @@ export default async function AdminPage() {
         ignored: 'info',
         undetermined: 'purple'
     }
+    const formatPeriodLabel = (periodKey: string) => {
+        if (periodKey === ADMIN_METRIC_PERIOD_ALL) return t('stats.period.allTime')
+        const [yearText, monthText] = periodKey.split('-')
+        const year = Number.parseInt(yearText ?? '', 10)
+        const monthIndex = Number.parseInt(monthText ?? '', 10) - 1
+
+        if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+            return t('stats.period.allTime')
+        }
+
+        return monthFormatter.format(new Date(Date.UTC(year, monthIndex, 1)))
+    }
+    const selectedPeriodLabel = formatPeriodLabel(usageMetrics.periodKey)
+    const periodKeyCandidates = buildRecentAdminMetricMonthKeys({ months: 12 })
+    if (
+        usageMetrics.periodKey !== ADMIN_METRIC_PERIOD_ALL
+        && !periodKeyCandidates.some((periodKey) => periodKey === usageMetrics.periodKey)
+    ) {
+        periodKeyCandidates.unshift(usageMetrics.periodKey)
+    }
+    const usagePeriodOptions = [
+        {
+            value: ADMIN_METRIC_PERIOD_ALL,
+            label: t('stats.period.allTime')
+        },
+        ...periodKeyCandidates.map((periodKey) => ({
+            value: periodKey,
+            label: formatPeriodLabel(periodKey)
+        }))
+    ]
 
     const statCards = [
         {
@@ -96,7 +168,8 @@ export default async function AdminPage() {
             iconBgClass: 'bg-red-50',
             iconClass: 'text-red-500',
             title: t('stats.messages'),
-            value: formatter.format(summary.messageCount)
+            value: formatter.format(usageMetrics.messageCount),
+            periodLabel: selectedPeriodLabel
         },
         {
             key: 'tokens',
@@ -104,17 +177,49 @@ export default async function AdminPage() {
             iconBgClass: 'bg-purple-50',
             iconClass: 'text-purple-500',
             title: t('stats.tokens'),
-            value: formatter.format(summary.totalTokenCount)
+            value: formatter.format(usageMetrics.totalTokenCount),
+            periodLabel: selectedPeriodLabel
         },
         {
             key: 'credits',
             icon: Wallet,
             iconBgClass: 'bg-emerald-50',
             iconClass: 'text-emerald-600',
-            title: t('stats.credits'),
-            value: formatter.format(summary.totalCreditUsage)
+            title: dashboardOrgContext.hasExplicitSelection ? t('stats.creditsActiveOrganization') : t('stats.credits'),
+            value: formatter.format(usageMetrics.totalCreditUsage),
+            periodLabel: selectedPeriodLabel
         }
     ]
+    const billingDetailCards = [
+        {
+            key: 'monthlySubscriptionAmountTry',
+            title: t('planMetrics.monthlySubscriptionAmount'),
+            value: currencyFormatter.format(billingPlanMetrics.monthlySubscriptionAmountTry)
+        },
+        {
+            key: 'monthlySubscriptionCount',
+            title: t('planMetrics.monthlySubscriptionCount'),
+            value: formatter.format(billingPlanMetrics.monthlySubscriptionCount)
+        },
+        {
+            key: 'monthlyTopupAmountTry',
+            title: t('planMetrics.monthlyTopupAmount'),
+            value: currencyFormatter.format(billingPlanMetrics.monthlyTopupAmountTry)
+        },
+        {
+            key: 'monthlyTopupCreditsUsed',
+            title: t('planMetrics.monthlyTopupCreditsUsed'),
+            value: creditFormatter.format(billingPlanMetrics.monthlyTopupCreditsUsed)
+        },
+        {
+            key: 'monthlyTopupCreditsPurchased',
+            title: t('planMetrics.monthlyTopupCreditsPurchased'),
+            value: creditFormatter.format(billingPlanMetrics.monthlyTopupCreditsPurchased)
+        }
+    ]
+    const billingScopeText = dashboardOrgContext.hasExplicitSelection
+        ? t('planMetrics.scopeActiveOrganization', { organization: activeOrganization?.name ?? '-' })
+        : t('planMetrics.scopePlatform')
 
     return (
         <div data-testid="admin-dashboard-page" className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
@@ -122,25 +227,31 @@ export default async function AdminPage() {
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="w-full space-y-8">
-                    <p className="text-gray-500">{t('overview')}</p>
-                    <p data-testid="admin-readonly-banner" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-                        {t('readOnlyBanner')}
-                    </p>
-
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {t('selectedOrganization')}
-                        </p>
-                        <p className="mt-2 text-base font-semibold text-gray-900">
-                            {activeOrganization?.name ?? t('noOrganizationSelected')}
-                        </p>
-                        <p className="mt-1 text-sm text-gray-500">
-                            {activeOrganization?.slug ?? t('organizationSwitcherHint')}
-                        </p>
-                        <p className="mt-2 text-xs text-gray-500">
-                            {t('organizationSwitcherHint')}
-                        </p>
-                    </div>
+                    <form method="get" className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                            <label htmlFor="usagePeriod" className="text-sm font-medium text-gray-700">
+                                {t('stats.period.label')}
+                            </label>
+                            <select
+                                id="usagePeriod"
+                                name="usagePeriod"
+                                defaultValue={usageMetrics.periodKey}
+                                className="h-10 min-w-[220px] rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 transition focus:ring-2"
+                            >
+                                {usagePeriodOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="submit"
+                                className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                            >
+                                {t('stats.period.apply')}
+                            </button>
+                        </div>
+                    </form>
 
                     <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
                         {statCards.map((stat) => {
@@ -155,9 +266,30 @@ export default async function AdminPage() {
                                     </div>
                                     <h3 className="text-sm font-medium text-gray-500 mb-1">{stat.title}</h3>
                                     <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                                    {stat.periodLabel ? (
+                                        <p className="mt-1 text-xs text-gray-400">
+                                            {t('stats.period.current', { period: stat.periodLabel })}
+                                        </p>
+                                    ) : null}
                                 </div>
                             )
                         })}
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="mb-4">
+                            <h2 className="text-lg font-semibold text-gray-900">{t('planMetrics.title')}</h2>
+                            <p className="text-sm text-gray-500">{t('planMetrics.description')}</p>
+                            <p className="mt-1 text-xs text-gray-500">{billingScopeText}</p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                            {billingDetailCards.map((card) => (
+                                <div key={card.key} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                    <p className="text-xs font-medium text-gray-500">{card.title}</p>
+                                    <p className="mt-2 text-2xl font-semibold text-gray-900">{card.value}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">

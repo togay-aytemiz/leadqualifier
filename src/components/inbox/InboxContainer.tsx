@@ -13,7 +13,6 @@ import {
     getMessages,
     sendMessage,
     getConversations,
-    getConversationCreditUsage,
     deleteConversation,
     sendSystemMessage,
     setConversationAgent,
@@ -22,7 +21,6 @@ import {
     getConversationLead,
     getLeadScoreReasoning,
     refreshConversationLead,
-    type ConversationCreditUsageSummary,
     type ConversationListItem
 } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
@@ -79,8 +77,6 @@ export function InboxContainer({
     const [messages, setMessages] = useState<Message[]>([])
     const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null)
     const [lead, setLead] = useState<Lead | null>(null)
-    const [conversationCreditUsage, setConversationCreditUsage] = useState<ConversationCreditUsageSummary | null>(null)
-    const [conversationCreditStatus, setConversationCreditStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
     const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -151,8 +147,6 @@ export function InboxContainer({
         setLeadRefreshStatus('idle')
         setLeadRefreshError(null)
         setLeadAutoRefreshStatus('idle')
-        setConversationCreditUsage(null)
-        setConversationCreditStatus('idle')
         setIsMobileDetailsOpen(false)
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
@@ -208,27 +202,6 @@ export function InboxContainer({
         return null
     }, [])
 
-    const refreshConversationCreditUsage = useCallback(async (conversationId: string) => {
-        if (!conversationId) {
-            setConversationCreditUsage(null)
-            setConversationCreditStatus('idle')
-            return
-        }
-
-        setConversationCreditStatus('loading')
-        try {
-            const result = await getConversationCreditUsage(conversationId, organizationId)
-            if (selectedIdRef.current !== conversationId) return
-            setConversationCreditUsage(result)
-            setConversationCreditStatus('success')
-        } catch (error) {
-            console.error('Failed to refresh conversation credit usage', error)
-            if (selectedIdRef.current !== conversationId) return
-            setConversationCreditUsage(null)
-            setConversationCreditStatus('error')
-        }
-    }, [organizationId])
-
     const scheduleLeadAutoRefresh = useCallback((conversationId: string) => {
         if (!conversationId) return
         if (leadAutoRefreshTimeoutRef.current) {
@@ -274,14 +247,13 @@ export function InboxContainer({
                 ))
                 await markConversationRead(nextId)
                 await refreshLead(nextId)
-                await refreshConversationCreditUsage(nextId)
             }
         } catch (error) {
             console.error('Failed to refresh messages', error)
         } finally {
             refreshInFlightRef.current = false
         }
-    }, [refreshConversationCreditUsage, refreshLead])
+    }, [refreshLead])
 
     const resolveAssignee = useCallback(async (assigneeId: string | null) => {
         if (!assigneeId) return null
@@ -361,8 +333,7 @@ export function InboxContainer({
         setLead(null)
         refreshMessages(selectedId)
         refreshLead(selectedId)
-        refreshConversationCreditUsage(selectedId)
-    }, [refreshConversationCreditUsage, refreshMessages, refreshLead, selectedId])
+    }, [refreshMessages, refreshLead, selectedId])
 
     // Scroll Management
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -982,12 +953,8 @@ export function InboxContainer({
     const formattedConversationCredits = new Intl.NumberFormat(locale, {
         minimumFractionDigits: 1,
         maximumFractionDigits: 1
-    }).format(conversationCreditUsage?.totalCredits ?? 0)
-    const conversationCreditValue = conversationCreditStatus === 'loading'
-        ? t('creditUsageLoading')
-        : conversationCreditStatus === 'error'
-            ? t('creditUsageUnavailable')
-            : t('creditUsageValue', { credits: formattedConversationCredits })
+    }).format(selectedConversation?.ai_usage_total_credits ?? 0)
+    const conversationCreditValue = t('creditUsageValue', { credits: formattedConversationCredits })
     const mobileListPaneClasses = getMobileListPaneClasses(isMobileConversationOpen)
     const mobileConversationPaneClasses = getMobileConversationPaneClasses(isMobileConversationOpen)
     const mobileDetailsOverlayClasses = getMobileDetailsOverlayClasses(isMobileDetailsOpen)

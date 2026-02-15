@@ -989,9 +989,27 @@
             "users": "Toplam Kullanıcılar",
             "skills": "Toplam Yetenekler",
             "knowledge": "Toplam Bilgi Dokümanı",
-            "messages": "Toplam Kullanım",
+            "messages": "Toplam Mesaj",
             "tokens": "Toplam Token",
-            "credits": "Toplam Kullanılan Kredi"
+            "credits": "Toplam Kullanılan Kredi",
+            "creditsActiveOrganization": "Aktif Org Kullanılan Kredi",
+            "period": {
+                "label": "Metrik Dönemi",
+                "allTime": "Tüm Zamanlar",
+                "apply": "Uygula",
+                "current": "Dönem: {period}"
+            }
+        },
+        "planMetrics": {
+            "title": "Plan Detayları (Aylık)",
+            "description": "Aylık plan ödemeleri ve top-up hareket özeti.",
+            "scopePlatform": "Kapsam: Tüm organizasyonlar",
+            "scopeActiveOrganization": "Kapsam: {organization}",
+            "monthlySubscriptionAmount": "Aylık Plan Ödemesi (TRY)",
+            "monthlySubscriptionCount": "Aylık Plan İşlemi",
+            "monthlyTopupAmount": "Aylık Top-up Ödemesi (TRY)",
+            "monthlyTopupCreditsUsed": "Aylık Top-up Kullanımı (Kredi)",
+            "monthlyTopupCreditsPurchased": "Aylık Top-up Satın Alımı (Kredi)"
         },
         "quickActions": "Hızlı İşlemler",
         "manageOrganizations": "Organizasyon Özeti",

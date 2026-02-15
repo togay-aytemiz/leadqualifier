@@ -989,9 +989,27 @@
             "users": "Total Users",
             "skills": "Total Skills",
             "knowledge": "Total Knowledge Docs",
-            "messages": "Total Usage",
+            "messages": "Total Messages",
             "tokens": "Total Tokens",
-            "credits": "Total Credits Used"
+            "credits": "Total Credits Used",
+            "creditsActiveOrganization": "Credits Used (Active Org)",
+            "period": {
+                "label": "Metrics Period",
+                "allTime": "All Time",
+                "apply": "Apply",
+                "current": "Period: {period}"
+            }
+        },
+        "planMetrics": {
+            "title": "Plan Details (Monthly)",
+            "description": "Monthly subscription payments and top-up usage overview.",
+            "scopePlatform": "Scope: All organizations",
+            "scopeActiveOrganization": "Scope: {organization}",
+            "monthlySubscriptionAmount": "Monthly Plan Payment (TRY)",
+            "monthlySubscriptionCount": "Monthly Plan Transactions",
+            "monthlyTopupAmount": "Monthly Top-up Payment (TRY)",
+            "monthlyTopupCreditsUsed": "Monthly Top-up Usage (Credits)",
+            "monthlyTopupCreditsPurchased": "Monthly Top-up Purchased (Credits)"
         },
         "quickActions": "Quick Actions",
         "manageOrganizations": "Organization Overview",

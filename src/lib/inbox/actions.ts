@@ -10,7 +10,6 @@ import { matchesCatalog } from '@/lib/leads/catalog'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
-import { calculateAiCreditsFromTokens } from '@/lib/billing/usage'
 import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -38,14 +37,6 @@ export interface ConversationListItem extends Conversation {
     assignee?: ConversationAssigneePreview | null
     leads?: ConversationLeadPreview[]
     messages?: ConversationPreviewMessage[]
-}
-
-export interface ConversationCreditUsageSummary {
-    inputTokens: number
-    outputTokens: number
-    totalTokens: number
-    usageCount: number
-    totalCredits: number
 }
 
 type MaybeArray<T> = T | T[] | null | undefined
@@ -265,59 +256,6 @@ export async function getConversationLead(conversationId: string): Promise<Lead 
     }
 
     return (data as Lead) ?? null
-}
-
-export async function getConversationCreditUsage(
-    conversationId: string,
-    organizationId: string
-): Promise<ConversationCreditUsageSummary> {
-    const supabase = await createClient()
-    const emptySummary: ConversationCreditUsageSummary = {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-        usageCount: 0,
-        totalCredits: 0
-    }
-
-    const trimmedConversationId = conversationId.trim()
-    if (!trimmedConversationId) return emptySummary
-
-    const { data, error } = await supabase
-        .from('organization_ai_usage')
-        .select('input_tokens, output_tokens, total_tokens')
-        .eq('organization_id', organizationId)
-        .eq('metadata->>conversation_id', trimmedConversationId)
-        .order('created_at', { ascending: true })
-
-    if (error) {
-        console.error('Error fetching conversation AI usage:', error)
-        return emptySummary
-    }
-
-    const rows = (data ?? []) as Array<{
-        input_tokens: number | null
-        output_tokens: number | null
-        total_tokens: number | null
-    }>
-
-    const totals = rows.reduce(
-        (acc, row) => ({
-            inputTokens: acc.inputTokens + Math.max(0, row.input_tokens ?? 0),
-            outputTokens: acc.outputTokens + Math.max(0, row.output_tokens ?? 0),
-            totalTokens: acc.totalTokens + Math.max(0, row.total_tokens ?? 0)
-        }),
-        { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
-    )
-
-    return {
-        ...totals,
-        usageCount: rows.length,
-        totalCredits: calculateAiCreditsFromTokens({
-            inputTokens: totals.inputTokens,
-            outputTokens: totals.outputTokens
-        })
-    }
 }
 
 const SUMMARY_USER_LIMIT = 5

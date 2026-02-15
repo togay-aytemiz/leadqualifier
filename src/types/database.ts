@@ -237,6 +237,11 @@ export interface Conversation {
     active_agent: 'bot' | 'operator'
     last_message_at: string
     unread_count: number
+    ai_usage_input_tokens_total?: number
+    ai_usage_output_tokens_total?: number
+    ai_usage_total_tokens_total?: number
+    ai_usage_count?: number
+    ai_usage_total_credits?: number
     tags: string[]
     created_at: string
     updated_at: string

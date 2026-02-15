@@ -7,6 +7,16 @@ import type {
     OrganizationBillingAccount
 } from '@/types/database'
 import { buildOrganizationBillingSnapshot } from '@/lib/billing/snapshot'
+import {
+    resolveMonthlySubscriptionAmountTry,
+    resolveTopupUsageDebit
+} from '@/lib/admin/billing-plan-metrics'
+import {
+    ADMIN_METRIC_PERIOD_ALL,
+    resolveAdminMetricPeriodKey,
+    resolveAdminMetricPeriodRange
+} from '@/lib/admin/dashboard-metric-period'
+import { summarizeUsageMetricRows } from '@/lib/admin/dashboard-usage-metrics'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -120,6 +130,22 @@ export interface AdminDashboardSummary {
     totalCreditUsage: number
 }
 
+export interface AdminUsageMetricsSummary {
+    periodKey: string
+    isAllTime: boolean
+    messageCount: number
+    totalTokenCount: number
+    totalCreditUsage: number
+}
+
+export interface AdminBillingPlanMetricsSummary {
+    monthlySubscriptionAmountTry: number
+    monthlySubscriptionCount: number
+    monthlyTopupAmountTry: number
+    monthlyTopupCreditsPurchased: number
+    monthlyTopupCreditsUsed: number
+}
+
 function buildOrganizationMembershipLookup(organizations: OrganizationRow[]) {
     return new Map<string, OrganizationRow>(
         organizations.map((organization) => [organization.id, organization])
@@ -210,6 +236,12 @@ function toNonNegativeInteger(value: unknown): number {
     const normalized = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value)
     if (!Number.isFinite(normalized)) return 0
     return Math.max(0, Math.floor(normalized))
+}
+
+function toNonNegativeNumber(value: unknown): number {
+    const normalized = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
+    if (!Number.isFinite(normalized)) return 0
+    return Math.max(0, normalized)
 }
 
 function chunkValues<T>(values: T[], chunkSize: number): T[][] {
@@ -373,63 +405,271 @@ async function getTableCount(
     return count ?? 0
 }
 
-async function getGlobalTokenTotalFallback(supabase: SupabaseClient): Promise<number> {
+interface AdminUsageDateRange {
+    monthStartIso: string
+    nextMonthStartIso: string
+}
+
+async function getMessageCountForRange(
+    supabase: SupabaseClient,
+    options: {
+        organizationId?: string
+        dateRange?: AdminUsageDateRange | null
+    }
+): Promise<number> {
+    let query = supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+
+    if (options.organizationId) {
+        query = query.eq('organization_id', options.organizationId)
+    }
+
+    if (options.dateRange) {
+        query = query
+            .gte('created_at', options.dateRange.monthStartIso)
+            .lt('created_at', options.dateRange.nextMonthStartIso)
+    }
+
+    const { count, error } = await query
+    if (error) {
+        console.error('Failed to load message totals for admin dashboard usage metrics:', error)
+        return 0
+    }
+
+    return toNonNegativeInteger(count)
+}
+
+async function getUsageTotalsForRange(
+    supabase: SupabaseClient,
+    options: {
+        organizationId?: string
+        dateRange?: AdminUsageDateRange | null
+    }
+) {
     const pageSize = 1000
     let offset = 0
-    let total = 0
+    let totalTokenCount = 0
+    let totalCreditUsageTenths = 0
 
     while (true) {
-        const { data, error } = await supabase
+        let query = supabase
             .from('organization_ai_usage')
-            .select('total_tokens')
+            .select('total_tokens, input_tokens, output_tokens')
             .order('created_at', { ascending: true })
             .range(offset, offset + pageSize - 1)
 
-        if (error) {
-            console.error('Failed to load token totals for dashboard fallback:', error)
-            return total
+        if (options.organizationId) {
+            query = query.eq('organization_id', options.organizationId)
         }
 
-        const rows = (data ?? []) as Array<{ total_tokens: number | null }>
-        for (const row of rows) {
-            total += row.total_tokens ?? 0
+        if (options.dateRange) {
+            query = query
+                .gte('created_at', options.dateRange.monthStartIso)
+                .lt('created_at', options.dateRange.nextMonthStartIso)
         }
+
+        const { data, error } = await query
+        if (error) {
+            console.error('Failed to load AI usage totals for admin dashboard usage metrics:', error)
+            return {
+                totalTokenCount,
+                totalCreditUsage: totalCreditUsageTenths / 10
+            }
+        }
+
+        const rows = (data ?? []) as Array<{
+            total_tokens: number | null
+            input_tokens: number | null
+            output_tokens: number | null
+        }>
+
+        const chunkSummary = summarizeUsageMetricRows(rows.map((row) => ({
+            totalTokens: toNonNegativeNumber(row.total_tokens),
+            inputTokens: toNonNegativeNumber(row.input_tokens),
+            outputTokens: toNonNegativeNumber(row.output_tokens)
+        })))
+        totalTokenCount += chunkSummary.totalTokenCount
+        totalCreditUsageTenths += Math.round(chunkSummary.totalCreditUsage * 10)
 
         if (rows.length < pageSize) break
         offset += pageSize
     }
 
-    return total
+    return {
+        totalTokenCount: Math.floor(totalTokenCount),
+        totalCreditUsage: totalCreditUsageTenths / 10
+    }
+}
+
+async function getGlobalTokenTotalFallback(supabase: SupabaseClient): Promise<number> {
+    const usageTotals = await getUsageTotalsForRange(supabase, {})
+    return usageTotals.totalTokenCount
+}
+
+async function getCreditUsageTotalFallback(
+    supabase: SupabaseClient,
+    organizationId?: string
+): Promise<number> {
+    const usageTotals = await getUsageTotalsForRange(supabase, {
+        organizationId
+    })
+
+    return usageTotals.totalCreditUsage
 }
 
 async function getGlobalCreditUsageFallback(supabase: SupabaseClient): Promise<number> {
-    const pageSize = 1000
-    let offset = 0
-    let total = 0
+    return getCreditUsageTotalFallback(supabase)
+}
 
-    while (true) {
-        const { data, error } = await supabase
-            .from('organization_credit_ledger')
-            .select('credits_delta')
-            .eq('entry_type', 'usage_debit')
-            .order('created_at', { ascending: true })
-            .range(offset, offset + pageSize - 1)
+export async function getAdminUsageMetricsSummary(
+    options: {
+        organizationId: string | null
+        periodKey?: string | null
+    },
+    supabaseOverride?: SupabaseClient
+): Promise<AdminUsageMetricsSummary> {
+    const supabase = supabaseOverride ?? await createClient()
+    const periodKey = resolveAdminMetricPeriodKey(options.periodKey)
+    const dateRange = resolveAdminMetricPeriodRange(periodKey)
+    const organizationId = options.organizationId ?? undefined
 
-        if (error) {
-            console.error('Failed to load credit usage totals for dashboard fallback:', error)
-            return total
-        }
+    const [messageCount, usageTotals] = await Promise.all([
+        getMessageCountForRange(supabase, {
+            organizationId,
+            dateRange
+        }),
+        getUsageTotalsForRange(supabase, {
+            organizationId,
+            dateRange
+        })
+    ])
 
-        const rows = (data ?? []) as Array<{ credits_delta: number | null }>
-        for (const row of rows) {
-            total += Math.abs(Number(row.credits_delta ?? 0))
-        }
+    return {
+        periodKey,
+        isAllTime: periodKey === ADMIN_METRIC_PERIOD_ALL,
+        messageCount,
+        totalTokenCount: usageTotals.totalTokenCount,
+        totalCreditUsage: usageTotals.totalCreditUsage
+    }
+}
 
-        if (rows.length < pageSize) break
-        offset += pageSize
+export async function getAdminCreditUsageTotal(
+    organizationId: string | null,
+    supabaseOverride?: SupabaseClient,
+    periodKey?: string | null
+): Promise<number> {
+    const summary = await getAdminUsageMetricsSummary(
+        {
+            organizationId,
+            periodKey
+        },
+        supabaseOverride
+    )
+    return summary.totalCreditUsage
+}
+
+function getCurrentUtcMonthRange() {
+    const now = new Date()
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+
+    return {
+        monthStartIso: monthStart.toISOString(),
+        nextMonthStartIso: nextMonthStart.toISOString()
+    }
+}
+
+export async function getAdminBillingPlanMetricsSummary(
+    organizationId: string | null,
+    supabaseOverride?: SupabaseClient
+): Promise<AdminBillingPlanMetricsSummary> {
+    const supabase = supabaseOverride ?? await createClient()
+    const { monthStartIso, nextMonthStartIso } = getCurrentUtcMonthRange()
+
+    let subscriptionsQuery = supabase
+        .from('organization_subscription_records')
+        .select('metadata')
+        .eq('status', 'active')
+        .gte('created_at', monthStartIso)
+        .lt('created_at', nextMonthStartIso)
+
+    let topupPurchasesQuery = supabase
+        .from('credit_purchase_orders')
+        .select('credits, amount_try')
+        .eq('status', 'paid')
+        .gte('paid_at', monthStartIso)
+        .lt('paid_at', nextMonthStartIso)
+
+    let topupUsageQuery = supabase
+        .from('organization_credit_ledger')
+        .select('metadata, credit_pool, credits_delta')
+        .eq('entry_type', 'usage_debit')
+        .gte('created_at', monthStartIso)
+        .lt('created_at', nextMonthStartIso)
+
+    if (organizationId) {
+        subscriptionsQuery = subscriptionsQuery.eq('organization_id', organizationId)
+        topupPurchasesQuery = topupPurchasesQuery.eq('organization_id', organizationId)
+        topupUsageQuery = topupUsageQuery.eq('organization_id', organizationId)
     }
 
-    return total
+    const [subscriptionsResult, topupPurchasesResult, topupUsageResult] = await Promise.all([
+        subscriptionsQuery,
+        topupPurchasesQuery,
+        topupUsageQuery
+    ])
+
+    if (subscriptionsResult.error) {
+        console.error('Failed to load monthly subscription metrics for admin dashboard:', subscriptionsResult.error)
+    }
+
+    if (topupPurchasesResult.error) {
+        console.error('Failed to load monthly top-up purchase metrics for admin dashboard:', topupPurchasesResult.error)
+    }
+
+    if (topupUsageResult.error) {
+        console.error('Failed to load monthly top-up usage metrics for admin dashboard:', topupUsageResult.error)
+    }
+
+    const subscriptionRows = (subscriptionsResult.data ?? []) as Array<{ metadata: Json }>
+    const topupPurchaseRows = (topupPurchasesResult.data ?? []) as Array<{
+        credits: number | null
+        amount_try: number | null
+    }>
+    const topupUsageRows = (topupUsageResult.data ?? []) as Array<{
+        metadata: Json
+        credit_pool: string | null
+        credits_delta: number | null
+    }>
+
+    const monthlySubscriptionAmountTry = subscriptionRows.reduce((sum, row) => (
+        sum + resolveMonthlySubscriptionAmountTry(row.metadata)
+    ), 0)
+
+    const monthlyTopupAmountTry = topupPurchaseRows.reduce((sum, row) => (
+        sum + Number(row.amount_try ?? 0)
+    ), 0)
+
+    const monthlyTopupCreditsPurchased = topupPurchaseRows.reduce((sum, row) => (
+        sum + Number(row.credits ?? 0)
+    ), 0)
+
+    const monthlyTopupCreditsUsed = topupUsageRows.reduce((sum, row) => (
+        sum + resolveTopupUsageDebit({
+            metadata: row.metadata,
+            creditPool: row.credit_pool,
+            creditsDelta: row.credits_delta
+        })
+    ), 0)
+
+    return {
+        monthlySubscriptionAmountTry,
+        monthlySubscriptionCount: subscriptionRows.length,
+        monthlyTopupAmountTry,
+        monthlyTopupCreditsPurchased,
+        monthlyTopupCreditsUsed
+    }
 }
 
 async function getOrganizationsByIds(

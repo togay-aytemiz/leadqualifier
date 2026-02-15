@@ -13,7 +13,7 @@ test.describe('admin panel smoke', () => {
 
         await page.goto('/tr/admin')
         await expect(page.getByTestId('admin-dashboard-page')).toBeVisible()
-        await expect(page.getByTestId('admin-readonly-banner')).toBeVisible()
+        await expect(page.getByText('Plan Detayları (Aylık)')).toBeVisible()
 
         await page.goto('/tr/admin/leads')
         await expect(page.getByTestId('admin-leads-page')).toBeVisible()
