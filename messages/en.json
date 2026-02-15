@@ -249,14 +249,21 @@
         "billingTrialSubline": "{days} days left in trial",
         "billingTrialSublineDetailed": "{days} days left • {credits} trial credits",
         "billingTrialCreditsSubline": "Trial credits: {credits}",
-        "billingTopupSubline": "Top-up active: {credits} credits",
+        "billingTopupSubline": "Extra credits active: {credits} credits",
         "billingPackageCreditsSubline": "Package credits left: {credits}",
         "billingPackageSubline": "Monthly package usage",
         "billingPackageSublineWithDate": "Resets on {date}",
         "billingUpgradePromptSubline": "Upgrade to premium to continue.",
         "billingPaymentRequiredSubline": "Payment update required to continue.",
         "billingContactSupportSubline": "Usage is admin-locked. Contact support.",
-        "billingUsageMenuLabel": "Usage details"
+        "billingUsageMenuLabel": "Usage details",
+        "billingExpandDetails": "Show breakdown",
+        "billingCollapseDetails": "Hide breakdown",
+        "billingBreakdownPackage": "Package",
+        "billingBreakdownTopup": "Extra credits",
+        "billingLowCreditWarning": "Approaching usage limit",
+        "billingPackageRenewalDate": "Package renews: {date}",
+        "billingPackageRenewalUnknown": "Package renewal date is being prepared"
     },
     "inbox": {
         "title": "Inbox",
@@ -509,12 +516,12 @@
             "description": "See your plan and remaining credits.",
             "membershipLabel": "Plan status",
             "lockRuleTrial": "Trial usage is locked when trial time or trial credits run out first.",
-            "lockRulePremium": "Top-up is available only after premium package credits are exhausted.",
+            "lockRulePremium": "Extra credits are available for active premium subscriptions.",
             "structureHint": "This page is for plan state and purchase actions.",
             "trialCreditsTitle": "Trial credits",
             "trialTimeTitle": "Trial time",
             "packageCreditsTitle": "Monthly package",
-            "topupCreditsTitle": "Top-up balance",
+            "topupCreditsTitle": "Extra credit balance",
             "upgradeOfferTitle": "Upgrade offer",
             "nonActiveMembershipNote": "Plan is not active. Continue with an action below.",
             "usedVsLimit": "{used} / {limit}",
@@ -523,15 +530,16 @@
             "trialDays": "Days left in trial: {days}",
             "trialEndsAt": "Trial ends at: {date}",
             "packageCredits": "Package credits: {remaining} / {limit}",
-            "topupCredits": "Top-up credits: {remaining}",
+            "topupCredits": "Extra credits: {remaining}",
             "packageResetAt": "Resets at: {date}",
-            "topupAllowed": "Top-up is available.",
-            "topupBlocked": "Top-up is blocked until premium + package exhaustion.",
+            "topupAllowed": "Extra credits are available.",
+            "topupBlocked": "Extra credits require an active premium subscription.",
+            "lowCreditWarning": "Approaching usage limit",
             "unavailable": "Plan status is unavailable."
         },
         "actions": {
             "title": "Actions",
-            "description": "Upgrade to premium or buy extra credits.",
+            "description": "Manage premium and extra credit actions.",
             "mockModeNotice": "Mock payment mode is active. Use success/failed outcomes to simulate checkout behavior before live provider integration.",
             "simulatedOutcomeLabel": "Simulated payment outcome",
             "simulatedOutcome": {
@@ -551,13 +559,22 @@
             "topup": {
                 "title": "Extra credits",
                 "packageSummary": "{credits} credits • {amount}",
-                "submit": "Buy credits"
+                "submit": "Add credits",
+                "oneTimeNotice": "Extra credits are one-time purchases and do not renew monthly.",
+                "modal": {
+                    "title": "Get more credits",
+                    "description": "Add extra credits so you can continue without waiting for the monthly package renewal.",
+                    "packageMeta": "One-time extra credit package",
+                    "cancel": "Cancel",
+                    "next": "Next",
+                    "close": "Close modal"
+                }
             },
             "adminLocked": "This organization is admin-locked. Billing actions are blocked.",
-            "topupBlockedTrial": "Top-up is blocked during trial. Start premium first.",
-            "topupRequiresPremium": "Top-up requires an active premium package.",
-            "topupAfterPackageExhausted": "Top-up unlocks only after package credits are exhausted.",
-            "topupUnavailable": "Top-up is unavailable right now.",
+            "topupBlockedTrial": "Extra credits are unavailable during trial. Start premium first.",
+            "topupRequiresPremium": "Extra credits require an active premium package.",
+            "topupAfterPackageExhausted": "Extra credits require an active premium package.",
+            "topupUnavailable": "Extra credits are unavailable right now.",
             "viewUsageLink": "View usage"
         },
         "checkoutStatus": {
@@ -575,13 +592,13 @@
                 "notAvailable": "Mock checkout functions are not available in this environment yet.",
                 "requestFailed": "The checkout request failed. Please retry.",
                 "adminLocked": "This organization is admin-locked.",
-                "topupNotAllowed": "Top-up is not allowed by current membership/package state."
+                "topupNotAllowed": "Extra credits are not allowed by current membership/package state."
             }
         }
     },
     "billingUsage": {
         "pageTitle": "Usage",
-        "title": "AI usage",
+        "title": "Credit usage",
         "description": "Track usage and credit history.",
         "membership": {
             "trialActive": "Trial active",
@@ -605,7 +622,7 @@
         "pool": {
             "trial": "Trial pool",
             "package": "Package pool",
-            "topup": "Top-up pool",
+            "topup": "Extra credit pool",
             "mixed": "Mixed pool",
             "none": "No active pool"
         },
@@ -622,14 +639,14 @@
             "trialCreditsCard": "Trial credits",
             "trialTimeCard": "Trial time",
             "packageCreditsCard": "Monthly package",
-            "topupCard": "Top-up balance (read-only)",
+            "topupCard": "Extra credit balance (read-only)",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "days",
             "trialEndsAt": "Ends at {date}",
             "packageResetAt": "Resets at {date}",
-            "topupAllowed": "Top-up is available.",
-            "topupBlocked": "Top-up is blocked until premium + package exhaustion.",
-            "topupPurchaseManaged": "Top-up purchases are managed in Plans & Credits.",
+            "topupAllowed": "Extra credits are available.",
+            "topupBlocked": "Extra credits require an active premium subscription.",
+            "topupPurchaseManaged": "Extra credit purchases are managed in Plans & Credits.",
             "usageAllowed": "Active",
             "usageBlocked": "Locked",
             "unavailable": "Billing data is not available yet."
@@ -639,6 +656,8 @@
             "description": "Recent credit changes.",
             "empty": "No credit ledger records yet.",
             "reasonFallback": "No reason",
+            "showMore": "Show more",
+            "showLess": "Show less",
             "columns": {
                 "date": "Date",
                 "type": "Type",
@@ -647,11 +666,16 @@
                 "balance": "Balance",
                 "reason": "Reason"
             },
+            "reasonMap": {
+                "aiUsageDebit": "AI usage debit",
+                "mockSubscriptionSuccess": "Mock premium checkout success",
+                "mockTopupSuccess": "Mock extra credit checkout success"
+            },
             "entryType": {
                 "trialGrant": "Trial grant",
                 "packageGrant": "Package grant",
                 "usageDebit": "Usage debit",
-                "purchaseCredit": "Top-up purchase",
+                "purchaseCredit": "Extra credit purchase",
                 "adjustment": "Adjustment",
                 "refund": "Refund",
                 "reversal": "Reversal"
@@ -1002,14 +1026,14 @@
         },
         "planMetrics": {
             "title": "Plan Details (Monthly)",
-            "description": "Monthly subscription payments and top-up usage overview.",
+            "description": "Monthly subscription payments and extra credit usage overview.",
             "scopePlatform": "Scope: All organizations",
             "scopeActiveOrganization": "Scope: {organization}",
             "monthlySubscriptionAmount": "Monthly Plan Payment (TRY)",
             "monthlySubscriptionCount": "Monthly Plan Transactions",
-            "monthlyTopupAmount": "Monthly Top-up Payment (TRY)",
-            "monthlyTopupCreditsUsed": "Monthly Top-up Usage (Credits)",
-            "monthlyTopupCreditsPurchased": "Monthly Top-up Purchased (Credits)"
+            "monthlyTopupAmount": "Monthly Extra Credit Payment (TRY)",
+            "monthlyTopupCreditsUsed": "Monthly Extra Credit Usage (Credits)",
+            "monthlyTopupCreditsPurchased": "Monthly Extra Credit Purchased (Credits)"
         },
         "quickActions": "Quick Actions",
         "manageOrganizations": "Organization Overview",
@@ -1177,9 +1201,9 @@
                 "packageCredits": "Package Credits",
                 "trialCredits": "Trial Credits",
                 "trialEndsAt": "Trial ends: {date}",
-                "topup": "Top-up Credits",
-                "topupAllowed": "Top-up available",
-                "topupBlocked": "Top-up blocked"
+                "topup": "Extra Credits",
+                "topupAllowed": "Extra credits available",
+                "topupBlocked": "Extra credits blocked"
             },
             "manualActions": {
                 "banner": "Manual billing actions are active for system admins. Every action requires a reason and is audit logged.",
@@ -1191,7 +1215,7 @@
                 "successDescription": "The requested organization billing change was applied.",
                 "actionLabels": {
                     "extendTrial": "Extend trial",
-                    "adjustTopup": "Adjust top-up credits",
+                    "adjustTopup": "Adjust extra credits",
                     "adjustTrial": "Adjust trial credits",
                     "adjustPackage": "Adjust package credits",
                     "assignPremium": "Assign premium",
@@ -1212,7 +1236,7 @@
                     "submit": "Apply trial extension"
                 },
                 "adjustCredits": {
-                    "title": "Adjust Top-up Credits",
+                    "title": "Adjust Extra Credits",
                     "deltaLabel": "Credit delta (+/-)",
                     "reasonLabel": "Reason",
                     "submit": "Apply credit adjustment"

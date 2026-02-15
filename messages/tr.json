@@ -249,14 +249,21 @@
         "billingTrialSubline": "Ücretsiz deneme için {days} gün kaldı",
         "billingTrialSublineDetailed": "{days} gün kaldı • {credits} ücretsiz deneme kredisi",
         "billingTrialCreditsSubline": "Ücretsiz deneme kredisi: {credits}",
-        "billingTopupSubline": "Top-up aktif: {credits} kredi",
+        "billingTopupSubline": "Ek kredi aktif: {credits} kredi",
         "billingPackageCreditsSubline": "Paketten kalan kredi: {credits}",
         "billingPackageSubline": "Aylık paket kullanımı",
         "billingPackageSublineWithDate": "{date} tarihinde sıfırlanır",
         "billingUpgradePromptSubline": "Devam etmek için premium'a geç.",
         "billingPaymentRequiredSubline": "Devam etmek için ödeme güncellemesi gerekli.",
         "billingContactSupportSubline": "Kullanım yönetici tarafından kilitli. Destekle iletişime geç.",
-        "billingUsageMenuLabel": "Kullanım detayları"
+        "billingUsageMenuLabel": "Kullanım detayları",
+        "billingExpandDetails": "Kırılımı göster",
+        "billingCollapseDetails": "Kırılımı gizle",
+        "billingBreakdownPackage": "Paket",
+        "billingBreakdownTopup": "Ek kredi",
+        "billingLowCreditWarning": "Kullanım limitine yaklaşılıyor",
+        "billingPackageRenewalDate": "Paket yenileme: {date}",
+        "billingPackageRenewalUnknown": "Paket yenileme tarihi hazırlanıyor"
     },
     "inbox": {
         "title": "Gelen Kutusu",
@@ -509,12 +516,12 @@
             "description": "Plan durumunu ve kalan kredini gör.",
             "membershipLabel": "Plan durumu",
             "lockRuleTrial": "Ücretsiz deneme kullanımında süre veya ücretsiz deneme kredisi hangisi önce biterse sistem kilitlenir.",
-            "lockRulePremium": "Top-up sadece premium pakette, paket kredileri bittikten sonra açılır.",
+            "lockRulePremium": "Ek kredi aktif premium aboneliklerde kullanılabilir.",
             "structureHint": "Bu sayfa plan durumu ve satın alma aksiyonları içindir.",
             "trialCreditsTitle": "Ücretsiz deneme kredileri",
             "trialTimeTitle": "Ücretsiz deneme süresi",
             "packageCreditsTitle": "Aylık paket",
-            "topupCreditsTitle": "Top-up bakiyesi",
+            "topupCreditsTitle": "Ek kredi bakiyesi",
             "upgradeOfferTitle": "Yükseltme teklifi",
             "nonActiveMembershipNote": "Plan aktif değil. Aşağıdan işlem yapabilirsin.",
             "usedVsLimit": "{used} / {limit}",
@@ -523,15 +530,16 @@
             "trialDays": "Ücretsiz deneme için kalan gün: {days}",
             "trialEndsAt": "Ücretsiz deneme bitişi: {date}",
             "packageCredits": "Paket kredileri: {remaining} / {limit}",
-            "topupCredits": "Top-up kredileri: {remaining}",
+            "topupCredits": "Ek kredi: {remaining}",
             "packageResetAt": "Sıfırlanma: {date}",
-            "topupAllowed": "Top-up kullanılabilir.",
-            "topupBlocked": "Top-up için premium + paket tükenmesi gerekir.",
+            "topupAllowed": "Ek kredi kullanılabilir.",
+            "topupBlocked": "Ek kredi için aktif premium abonelik gerekir.",
+            "lowCreditWarning": "Kullanım limitine yaklaşılıyor",
             "unavailable": "Plan durumu alınamıyor."
         },
         "actions": {
             "title": "İşlemler",
-            "description": "Premium'a geç veya ek kredi al.",
+            "description": "Premium ve ek kredi işlemleri yapalım.",
             "mockModeNotice": "Mock ödeme modu aktif. Gerçek sağlayıcı entegrasyonundan önce success/failed sonuçlarıyla ödeme davranışını test edin.",
             "simulatedOutcomeLabel": "Simüle ödeme sonucu",
             "simulatedOutcome": {
@@ -551,13 +559,22 @@
             "topup": {
                 "title": "Ek kredi",
                 "packageSummary": "{credits} kredi • {amount}",
-                "submit": "Kredi al"
+                "submit": "Kredi ekle",
+                "oneTimeNotice": "Ek krediler tek seferliktir, aylık olarak yenilenmez.",
+                "modal": {
+                    "title": "Daha fazla kredi al",
+                    "description": "Plan limitin dolduğunda kesintisiz devam etmek için ek kredi satın al.",
+                    "packageMeta": "Tek seferlik ek kredi paketi",
+                    "cancel": "İptal",
+                    "next": "Sonraki",
+                    "close": "Modalı kapat"
+                }
             },
             "adminLocked": "Bu organizasyon yönetici tarafından kilitli. Faturalandırma aksiyonları kapalı.",
-            "topupBlockedTrial": "Ücretsiz deneme süresince top-up kapalıdır. Önce premium başlatılmalı.",
-            "topupRequiresPremium": "Top-up için aktif premium paket gerekir.",
-            "topupAfterPackageExhausted": "Top-up yalnızca paket kredileri bittiğinde açılır.",
-            "topupUnavailable": "Top-up şu anda kullanılamıyor.",
+            "topupBlockedTrial": "Ücretsiz deneme süresince ek kredi kapalıdır. Önce premium başlatılmalı.",
+            "topupRequiresPremium": "Ek kredi için aktif premium paket gerekir.",
+            "topupAfterPackageExhausted": "Ek kredi için aktif premium paket gerekir.",
+            "topupUnavailable": "Ek kredi şu anda kullanılamıyor.",
             "viewUsageLink": "Kullanımı gör"
         },
         "checkoutStatus": {
@@ -575,13 +592,13 @@
                 "notAvailable": "Bu ortamda mock checkout fonksiyonları henüz aktif değil.",
                 "requestFailed": "Checkout isteği başarısız oldu. Lütfen tekrar deneyin.",
                 "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
-                "topupNotAllowed": "Mevcut üyelik/paket durumunda top-up izinli değil."
+                "topupNotAllowed": "Mevcut üyelik/paket durumunda ek kredi izinli değil."
             }
         }
     },
     "billingUsage": {
         "pageTitle": "Kullanım",
-        "title": "Yapay zeka kullanımı",
+        "title": "Kredi kullanımı",
         "description": "Kullanımı ve kredi geçmişini takip et.",
         "membership": {
             "trialActive": "Ücretsiz deneme aktif",
@@ -605,7 +622,7 @@
         "pool": {
             "trial": "Ücretsiz deneme havuzu",
             "package": "Paket havuzu",
-            "topup": "Top-up havuzu",
+            "topup": "Ek kredi havuzu",
             "mixed": "Karma havuz",
             "none": "Aktif havuz yok"
         },
@@ -622,14 +639,14 @@
             "trialCreditsCard": "Ücretsiz deneme kredileri",
             "trialTimeCard": "Ücretsiz deneme süresi",
             "packageCreditsCard": "Aylık paket",
-            "topupCard": "Top-up bakiyesi (salt okunur)",
+            "topupCard": "Ek kredi bakiyesi (salt okunur)",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "gün",
             "trialEndsAt": "Bitiş: {date}",
             "packageResetAt": "Sıfırlanma: {date}",
-            "topupAllowed": "Top-up kullanılabilir.",
-            "topupBlocked": "Top-up için premium + paket tükenmesi gerekir.",
-            "topupPurchaseManaged": "Top-up satın alma işlemleri Planlar ve Krediler ekranından yapılır.",
+            "topupAllowed": "Ek kredi kullanılabilir.",
+            "topupBlocked": "Ek kredi için aktif premium abonelik gerekir.",
+            "topupPurchaseManaged": "Ek kredi satın alma işlemleri Planlar ve Krediler ekranından yapılır.",
             "usageAllowed": "Açık",
             "usageBlocked": "Kilitli",
             "unavailable": "Faturalandırma verisi henüz alınamadı."
@@ -639,6 +656,8 @@
             "description": "Son kredi hareketleri.",
             "empty": "Henüz kredi hareketi kaydı yok.",
             "reasonFallback": "Neden yok",
+            "showMore": "Daha fazla göster",
+            "showLess": "Daha az göster",
             "columns": {
                 "date": "Tarih",
                 "type": "Tür",
@@ -647,11 +666,16 @@
                 "balance": "Bakiye",
                 "reason": "Neden"
             },
+            "reasonMap": {
+                "aiUsageDebit": "Yapay zeka kullanım düşümü",
+                "mockSubscriptionSuccess": "Mock premium ödeme başarılı",
+                "mockTopupSuccess": "Mock ek kredi ödeme başarılı"
+            },
             "entryType": {
                 "trialGrant": "Ücretsiz deneme tanımı",
                 "packageGrant": "Paket tanımı",
                 "usageDebit": "Kullanım düşümü",
-                "purchaseCredit": "Top-up satın alımı",
+                "purchaseCredit": "Ek kredi satın alımı",
                 "adjustment": "Düzeltme",
                 "refund": "İade",
                 "reversal": "Ters kayıt"
@@ -1002,14 +1026,14 @@
         },
         "planMetrics": {
             "title": "Plan Detayları (Aylık)",
-            "description": "Aylık plan ödemeleri ve top-up hareket özeti.",
+            "description": "Aylık plan ödemeleri ve ek kredi hareket özeti.",
             "scopePlatform": "Kapsam: Tüm organizasyonlar",
             "scopeActiveOrganization": "Kapsam: {organization}",
             "monthlySubscriptionAmount": "Aylık Plan Ödemesi (TRY)",
             "monthlySubscriptionCount": "Aylık Plan İşlemi",
-            "monthlyTopupAmount": "Aylık Top-up Ödemesi (TRY)",
-            "monthlyTopupCreditsUsed": "Aylık Top-up Kullanımı (Kredi)",
-            "monthlyTopupCreditsPurchased": "Aylık Top-up Satın Alımı (Kredi)"
+            "monthlyTopupAmount": "Aylık Ek Kredi Ödemesi (TRY)",
+            "monthlyTopupCreditsUsed": "Aylık Ek Kredi Kullanımı (Kredi)",
+            "monthlyTopupCreditsPurchased": "Aylık Ek Kredi Satın Alımı (Kredi)"
         },
         "quickActions": "Hızlı İşlemler",
         "manageOrganizations": "Organizasyon Özeti",
@@ -1177,9 +1201,9 @@
                 "packageCredits": "Paket Kredileri",
                 "trialCredits": "Ücretsiz Deneme Kredileri",
                 "trialEndsAt": "Ücretsiz deneme bitişi: {date}",
-                "topup": "Top-up Kredileri",
-                "topupAllowed": "Top-up açık",
-                "topupBlocked": "Top-up kapalı"
+                "topup": "Ek Kredi",
+                "topupAllowed": "Ek kredi açık",
+                "topupBlocked": "Ek kredi kapalı"
             },
             "manualActions": {
                 "banner": "Manuel faturalandırma aksiyonları sistem yöneticileri için aktiftir. Her aksiyon neden ister ve audit log’a yazılır.",
@@ -1191,7 +1215,7 @@
                 "successDescription": "İstenen organizasyon faturalandırma değişikliği uygulandı.",
                 "actionLabels": {
                     "extendTrial": "Ücretsiz denemeyi uzat",
-                    "adjustTopup": "Top-up kredisi ayarla",
+                    "adjustTopup": "Ek kredi ayarla",
                     "adjustTrial": "Ücretsiz deneme kredisini ayarla",
                     "adjustPackage": "Paket kredisini ayarla",
                     "assignPremium": "Premium tanımla",
@@ -1212,7 +1236,7 @@
                     "submit": "Ücretsiz deneme uzatmayı uygula"
                 },
                 "adjustCredits": {
-                    "title": "Top-up Kredisi Ayarla",
+                    "title": "Ek Kredi Ayarla",
                     "deltaLabel": "Kredi farkı (+/-)",
                     "reasonLabel": "Neden",
                     "submit": "Kredi ayarını uygula"

@@ -16,7 +16,13 @@ import {
     type MockCheckoutStatus,
     type MockPaymentOutcome
 } from '@/lib/billing/mock-checkout'
+import {
+    calculateSidebarBillingProgress,
+    isLowCreditWarningVisible
+} from '@/lib/billing/sidebar-progress'
 import { Link } from '@/i18n/navigation'
+import { AlertCircle } from 'lucide-react'
+import { TopupCheckoutCard } from './TopupCheckoutCard'
 
 interface PlansSettingsPageProps {
     searchParams: Promise<{
@@ -24,6 +30,30 @@ interface PlansSettingsPageProps {
         checkout_status?: string
         checkout_error?: string
     }>
+}
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+async function getPaidTopupCreditsTotal(
+    organizationId: string,
+    supabase: SupabaseClient
+) {
+    const { data, error } = await supabase
+        .from('credit_purchase_orders')
+        .select('credits')
+        .eq('organization_id', organizationId)
+        .eq('status', 'paid')
+
+    if (error) {
+        console.error('Failed to load paid top-up credits total for plans page:', error)
+        return 0
+    }
+
+    return (data ?? []).reduce((sum, row) => {
+        const credits = Number(row.credits ?? 0)
+        if (!Number.isFinite(credits) || credits <= 0) return sum
+        return sum + credits
+    }, 0)
 }
 
 function resolveMembershipLabel(
@@ -75,7 +105,7 @@ function buildCheckoutRedirect(
 
 function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): {
     allowed: boolean
-    reasonKey: 'topupBlockedTrial' | 'topupRequiresPremium' | 'topupAfterPackageExhausted' | 'adminLocked' | 'topupUnavailable' | null
+    reasonKey: 'topupBlockedTrial' | 'topupRequiresPremium' | 'adminLocked' | 'topupUnavailable' | null
 } {
     if (!snapshot) {
         return {
@@ -102,13 +132,6 @@ function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): 
         return {
             allowed: false,
             reasonKey: 'topupRequiresPremium'
-        }
-    }
-
-    if (!snapshot.isTopupAllowed) {
-        return {
-            allowed: false,
-            reasonKey: 'topupAfterPackageExhausted'
         }
     }
 
@@ -142,10 +165,13 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     }
 
     const snapshot = await getOrganizationBillingSnapshot(organizationId, { supabase })
-    const packageOffer = await getCurrentBillingPackageOffer({
-        fallbackMonthlyCredits: snapshot?.package.credits.limit ?? 0,
-        supabase
-    })
+    const [packageOffer, paidTopupCreditsTotal] = await Promise.all([
+        getCurrentBillingPackageOffer({
+            fallbackMonthlyCredits: snapshot?.package.credits.limit ?? 0,
+            supabase
+        }),
+        getPaidTopupCreditsTotal(organizationId, supabase)
+    ])
     const formatNumber = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1
     })
@@ -202,6 +228,55 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     })()
     const isTrialMembership = snapshot?.membershipState === 'trial_active' || snapshot?.membershipState === 'trial_exhausted'
     const isPremiumMembership = snapshot?.membershipState === 'premium_active'
+    const topupBlockedReason = !topupState.allowed && topupState.reasonKey
+        ? tPlans(`actions.${topupState.reasonKey}`)
+        : null
+    const trialCreditsProgress = snapshot
+        ? calculateSidebarBillingProgress({
+            membershipState: 'trial_active',
+            trialRemainingCredits: snapshot.trial.credits.remaining,
+            trialCreditLimit: snapshot.trial.credits.limit,
+            packageRemainingCredits: 0,
+            packageCreditLimit: 0,
+            topupBalance: 0
+        })
+        : 0
+    const packageCreditsProgress = snapshot
+        ? calculateSidebarBillingProgress({
+            membershipState: 'premium_active',
+            trialRemainingCredits: 0,
+            trialCreditLimit: 0,
+            packageRemainingCredits: snapshot.package.credits.remaining,
+            packageCreditLimit: snapshot.package.credits.limit,
+            topupBalance: 0
+        })
+        : 0
+    const showTrialLowCreditWarning = snapshot
+        ? isLowCreditWarningVisible({
+            membershipState: 'trial_active',
+            trialRemainingCredits: snapshot.trial.credits.remaining,
+            trialCreditLimit: snapshot.trial.credits.limit,
+            packageRemainingCredits: 0,
+            packageCreditLimit: 0,
+            topupBalance: 0
+        })
+        : false
+    const showPremiumLowCreditWarning = snapshot
+        ? isLowCreditWarningVisible({
+            membershipState: 'premium_active',
+            trialRemainingCredits: 0,
+            trialCreditLimit: 0,
+            packageRemainingCredits: snapshot.package.credits.remaining,
+            packageCreditLimit: snapshot.package.credits.limit,
+            topupBalance: snapshot.topupBalance
+        })
+        : false
+    const topupTotalCredits = snapshot
+        ? Math.max(snapshot.topupBalance, paidTopupCreditsTotal)
+        : 0
+    const topupCreditsProgress = topupTotalCredits > 0 && snapshot
+        ? Math.min(100, Math.max(0, (snapshot.topupBalance / topupTotalCredits) * 100))
+        : 0
 
     const getCheckoutTitle = () => {
         if (!checkoutStatus) return ''
@@ -337,16 +412,22 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                                 </p>
                                                 <p className="mt-1 text-xs text-gray-500">
                                                     {tPlans('status.usedVsLimit', {
-                                                        used: formatNumber.format(snapshot.trial.credits.used),
+                                                        used: formatNumber.format(snapshot.trial.credits.remaining),
                                                         limit: formatNumber.format(snapshot.trial.credits.limit)
                                                     })}
                                                 </p>
                                                 <div className="mt-3 h-2 rounded-full bg-gray-100">
                                                     <div
-                                                        className="h-2 rounded-full bg-emerald-500"
-                                                        style={{ width: `${Math.min(100, snapshot.trial.credits.progress)}%` }}
+                                                        className="h-2 rounded-full bg-[#242A40]"
+                                                        style={{ width: `${Math.min(100, trialCreditsProgress)}%` }}
                                                     />
                                                 </div>
+                                                {showTrialLowCreditWarning && (
+                                                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                                                        <AlertCircle size={12} />
+                                                        {tPlans('status.lowCreditWarning')}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             <div className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -382,16 +463,22 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                             </p>
                                             <p className="mt-1 text-xs text-gray-500">
                                                 {tPlans('status.usedVsLimit', {
-                                                    used: formatNumber.format(snapshot.package.credits.used),
+                                                    used: formatNumber.format(snapshot.package.credits.remaining),
                                                     limit: formatNumber.format(snapshot.package.credits.limit)
                                                 })}
                                             </p>
                                             <div className="mt-3 h-2 rounded-full bg-gray-100">
                                                 <div
-                                                    className="h-2 rounded-full bg-violet-500"
-                                                    style={{ width: `${Math.min(100, snapshot.package.credits.progress)}%` }}
+                                                    className="h-2 rounded-full bg-[#242A40]"
+                                                    style={{ width: `${Math.min(100, packageCreditsProgress)}%` }}
                                                 />
                                             </div>
+                                            {showPremiumLowCreditWarning && (
+                                                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                                                    <AlertCircle size={12} />
+                                                    {tPlans('status.lowCreditWarning')}
+                                                </p>
+                                            )}
                                             {snapshot.package.periodEnd && (
                                                 <p className="mt-2 text-xs text-gray-500">
                                                     {tPlans('status.packageResetAt', {
@@ -408,10 +495,17 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                                 <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
                                             </p>
                                             <p className="mt-1 text-xs text-gray-500">
-                                                {snapshot.isTopupAllowed
-                                                    ? tPlans('status.topupAllowed')
-                                                    : tPlans('status.topupBlocked')}
+                                                {tPlans('status.usedVsLimit', {
+                                                    used: formatNumber.format(snapshot.topupBalance),
+                                                    limit: formatNumber.format(topupTotalCredits)
+                                                })}
                                             </p>
+                                            <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                <div
+                                                    className="h-2 rounded-full bg-purple-600"
+                                                    style={{ width: `${Math.min(100, topupCreditsProgress)}%` }}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -430,12 +524,19 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                     <SettingsSection
                         title={tPlans('actions.title')}
                         description={tPlans('actions.description')}
+                        descriptionAddon={(
+                            <Link
+                                href="/settings/billing"
+                                className="text-sm font-medium text-[#242A40] underline decoration-1 underline-offset-2 hover:text-[#1f2437]"
+                            >
+                                {tPlans('actions.viewUsageLink')}
+                            </Link>
+                        )}
                     >
                         <div className={`grid grid-cols-1 gap-4 ${showTopupAction ? 'md:grid-cols-2' : ''}`}>
                             {isPremiumMembership ? (
                                 <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2">
                                     <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.subscribe.activeTitle')}</h3>
-                                    <p className="text-sm text-gray-600">{tPlans('actions.subscribe.activeDescription')}</p>
                                     {snapshot?.package.periodEnd && (
                                         <p className="text-xs text-gray-500">
                                             {tPlans('actions.subscribe.activeResetAt', {
@@ -477,36 +578,15 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                             )}
 
                             {showTopupAction && (
-                                <form action={handleMockTopup} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                                    <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.topup.title')}</h3>
-                                    <p className="text-sm text-gray-600">
-                                        {tPlans('actions.topup.packageSummary', {
-                                            credits: formatNumber.format(topupCredits),
-                                            amount: formatCurrency.format(topupAmountTry)
-                                        })}
-                                    </p>
-                                    <input type="hidden" name="organizationId" value={organizationId} />
-                                    <input type="hidden" name="credits" value={String(topupCredits)} />
-                                    <input type="hidden" name="amountTry" value={String(topupAmountTry)} />
-                                    <input type="hidden" name="simulatedOutcome" value="success" />
-                                    {!topupState.allowed && topupState.reasonKey && (
-                                        <p className="text-xs text-amber-700">{tPlans(`actions.${topupState.reasonKey}`)}</p>
-                                    )}
-                                    <button
-                                        type="submit"
-                                        className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                        disabled={!topupState.allowed}
-                                    >
-                                        {tPlans('actions.topup.submit')}
-                                    </button>
-                                </form>
+                                <TopupCheckoutCard
+                                    organizationId={organizationId}
+                                    topupCredits={topupCredits}
+                                    topupAmountTry={topupAmountTry}
+                                    topupAllowed={topupState.allowed}
+                                    blockedReason={topupBlockedReason}
+                                    topupAction={handleMockTopup}
+                                />
                             )}
-                        </div>
-
-                        <div className="mt-4">
-                            <Link href="/settings/billing" className="text-sm font-medium text-[#242A40] underline-offset-2 hover:underline">
-                                {tPlans('actions.viewUsageLink')}
-                            </Link>
                         </div>
                     </SettingsSection>
                 </div>

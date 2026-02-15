@@ -36,8 +36,8 @@ function buildLockedSimulatorMessage(lockReason: string | null, inputMessage: st
 
     if (lockReason === 'package_credits_exhausted') {
         return tr
-            ? 'Aylık paket kredilerin bitti. Premium hesabında ek kredi (top-up) alarak devam edebilirsin.'
-            : 'Your monthly package credits are exhausted. You can continue by purchasing top-up credits on premium.'
+            ? 'Aylık paket kredilerin bitti. Premium hesabında ek kredi alarak devam edebilirsin.'
+            : 'Your monthly package credits are exhausted. You can continue by purchasing extra credits on premium.'
     }
 
     if (lockReason === 'past_due') {

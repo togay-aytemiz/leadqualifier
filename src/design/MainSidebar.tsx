@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
@@ -12,6 +12,7 @@ import {
     buildOrganizationBillingSnapshot,
     type OrganizationBillingSnapshot
 } from '@/lib/billing/snapshot'
+import { buildBillingRefreshSignal } from '@/lib/billing/refresh-signal'
 import {
     HiMiniChatBubbleBottomCenterText,
     HiOutlineChatBubbleBottomCenterText,
@@ -35,12 +36,18 @@ import {
     HiOutlineCog6Tooth,
 } from 'react-icons/hi2'
 import {
+    AlertCircle,
     ArrowLeftFromLine,
     ArrowRightFromLine,
     Building2,
+    ChevronDown,
     LogOut,
     RotateCcw,
 } from 'lucide-react'
+import {
+    calculateSidebarBillingProgressSegments,
+    isLowCreditWarningVisible
+} from '@/lib/billing/sidebar-progress'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -86,6 +93,14 @@ function formatCredits(value: number) {
     }).format(safe)
 }
 
+function formatCompactCredits(value: number) {
+    const safe = Math.max(0, Number.isFinite(value) ? value : 0)
+    return new Intl.NumberFormat(undefined, {
+        notation: 'compact',
+        maximumFractionDigits: safe >= 10000 ? 0 : 1
+    }).format(safe)
+}
+
 interface MainSidebarProps {
     userName?: string
     isSystemAdmin?: boolean
@@ -103,6 +118,7 @@ export function MainSidebar({
 }: MainSidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
     const tNav = useTranslations('nav')
     const tCommon = useTranslations('common')
@@ -117,6 +133,7 @@ export function MainSidebar({
     const [hasLoadedOrganizationOptions, setHasLoadedOrganizationOptions] = useState(!isSystemAdmin)
     const [botMode, setBotMode] = useState<AiBotMode>('active')
     const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
+    const [isBillingDetailsExpanded, setIsBillingDetailsExpanded] = useState(false)
     const [orgSearch, setOrgSearch] = useState('')
     const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
     const [isOrgPickerOpen, setIsOrgPickerOpen] = useState(false)
@@ -148,6 +165,10 @@ export function MainSidebar({
             )
         })
     }, [orgSearch, organizationOptions])
+    const billingRefreshSignal = useMemo(
+        () => buildBillingRefreshSignal(searchParams),
+        [searchParams]
+    )
 
     const loadOrganizationOptions = useCallback(async () => {
         if (!isSystemAdmin || hasLoadedOrganizationOptions || isLoadingOrganizationOptions) {
@@ -353,6 +374,7 @@ export function MainSidebar({
             setHasPendingSuggestions(false)
             setBotMode('active')
             setBillingSnapshot(null)
+            setIsBillingDetailsExpanded(false)
             return
         }
 
@@ -361,6 +383,18 @@ export function MainSidebar({
         refreshPendingSuggestions(organizationId)
         refreshBillingSnapshot(organizationId)
     }, [fetchBotMode, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread])
+
+    useEffect(() => {
+        if (!organizationId) return
+        if (!billingRefreshSignal) return
+        refreshBillingSnapshot(organizationId)
+    }, [billingRefreshSignal, organizationId, refreshBillingSnapshot])
+
+    useEffect(() => {
+        if (billingSnapshot?.membershipState !== 'premium_active') {
+            setIsBillingDetailsExpanded(false)
+        }
+    }, [billingSnapshot?.membershipState])
 
     useEffect(() => {
         if (!organizationId) return
@@ -529,6 +563,19 @@ export function MainSidebar({
                     },
                 ],
             },
+            {
+                id: 'other',
+                label: tSidebar('other'),
+                items: [
+                    {
+                        id: 'settings',
+                        href: '/settings/ai',
+                        label: tNav('settings'),
+                        icon: HiOutlineCog6Tooth,
+                        activeIcon: HiMiniCog6Tooth,
+                    },
+                ],
+            },
         ],
         [tNav, tSidebar]
     )
@@ -581,25 +628,6 @@ export function MainSidebar({
         ]
     }, [isSystemAdmin, tSidebar])
 
-    const footerSections = useMemo(
-        () => [
-            {
-                id: 'other',
-                label: tSidebar('other'),
-                items: [
-                    {
-                        id: 'settings',
-                        href: '/settings/ai',
-                        label: tNav('settings'),
-                        icon: HiOutlineCog6Tooth,
-                        activeIcon: HiMiniCog6Tooth,
-                    },
-                ],
-            },
-        ],
-        [tNav, tSidebar]
-    )
-
     const toggleLabel = collapsed ? tCommon('expandSidebar') : tCommon('collapseSidebar')
     const botModeLabel = useMemo(() => {
         if (botMode === 'shadow') return tSidebar('botStatusShadow')
@@ -613,7 +641,6 @@ export function MainSidebar({
             : 'bg-emerald-500'
     const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
     const navigationSections = canAccessTenantModules ? [...sections, ...adminSections] : adminSections
-    const visibleFooterSections = canAccessTenantModules ? footerSections : []
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
 
@@ -647,24 +674,53 @@ export function MainSidebar({
 
         return billingSnapshot.totalRemainingCredits
     }, [billingSnapshot])
-    const billingProgress = useMemo(() => {
-        if (!billingSnapshot) return 0
-
-        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
-            return Math.max(
-                billingSnapshot.trial.credits.progress,
-                billingSnapshot.trial.timeProgress
-            )
-        }
-
-        if (billingSnapshot.membershipState === 'premium_active') {
-            if (billingSnapshot.package.credits.remaining <= 0 && billingSnapshot.topupBalance > 0) {
-                return 100
+    const billingProgressSegments = useMemo(() => {
+        if (!billingSnapshot) {
+            return {
+                packagePercent: 0,
+                topupPercent: 0
             }
-            return billingSnapshot.package.credits.progress
         }
 
-        return 0
+        return calculateSidebarBillingProgressSegments({
+            membershipState: billingSnapshot.membershipState,
+            trialRemainingCredits: billingSnapshot.trial.credits.remaining,
+            trialCreditLimit: billingSnapshot.trial.credits.limit,
+            packageRemainingCredits: billingSnapshot.package.credits.remaining,
+            packageCreditLimit: billingSnapshot.package.credits.limit,
+            topupBalance: billingSnapshot.topupBalance
+        })
+    }, [billingSnapshot])
+    const collapsedBillingRingBackground = useMemo(() => {
+        const packagePercent = Math.max(0, Math.min(100, billingProgressSegments.packagePercent))
+        const topupPercent = Math.max(0, Math.min(100, billingProgressSegments.topupPercent))
+        const totalPercent = Math.max(0, Math.min(100, packagePercent + topupPercent))
+
+        if (totalPercent <= 0) {
+            return 'conic-gradient(#e2e8f0 0deg 360deg)'
+        }
+
+        const packageDegrees = (packagePercent / 100) * 360
+        const topupDegrees = (topupPercent / 100) * 360
+        const filledDegrees = (totalPercent / 100) * 360
+
+        if (topupDegrees > 0) {
+            return `conic-gradient(#242A40 0deg ${packageDegrees}deg, #9333ea ${packageDegrees}deg ${packageDegrees + topupDegrees}deg, #e2e8f0 ${filledDegrees}deg 360deg)`
+        }
+
+        return `conic-gradient(#242A40 0deg ${filledDegrees}deg, #e2e8f0 ${filledDegrees}deg 360deg)`
+    }, [billingProgressSegments])
+    const showLowCreditWarning = useMemo(() => {
+        if (!billingSnapshot) return false
+
+        return isLowCreditWarningVisible({
+            membershipState: billingSnapshot.membershipState,
+            trialRemainingCredits: billingSnapshot.trial.credits.remaining,
+            trialCreditLimit: billingSnapshot.trial.credits.limit,
+            packageRemainingCredits: billingSnapshot.package.credits.remaining,
+            packageCreditLimit: billingSnapshot.package.credits.limit,
+            topupBalance: billingSnapshot.topupBalance
+        })
     }, [billingSnapshot])
     const billingDetailPrimary = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailableDescription')
@@ -732,6 +788,24 @@ export function MainSidebar({
             return tSidebar('billingPackageSubline')
         }
     }, [billingSnapshot, tSidebar])
+    const billingPackageRenewalDetail = useMemo(() => {
+        if (!billingSnapshot || billingSnapshot.membershipState !== 'premium_active') return null
+
+        if (!billingSnapshot.package.periodEnd) {
+            return tSidebar('billingPackageRenewalUnknown')
+        }
+
+        try {
+            const renewalDate = new Intl.DateTimeFormat(undefined, {
+                month: 'short',
+                day: 'numeric'
+            }).format(new Date(billingSnapshot.package.periodEnd))
+            return tSidebar('billingPackageRenewalDate', { date: renewalDate })
+        } catch {
+            return tSidebar('billingPackageRenewalUnknown')
+        }
+    }, [billingSnapshot, tSidebar])
+    const canExpandBillingDetails = billingSnapshot?.membershipState === 'premium_active'
 
     return (
         <aside
@@ -989,6 +1063,8 @@ export function MainSidebar({
                                             : pathWithoutLocale.startsWith(item.href)
                                     const Icon = isActive ? item.activeIcon : item.icon
                                     const showUnread = item.id === 'inbox' && hasUnread
+                                    const showPending = item.id === 'settings' && hasPendingSuggestions
+                                    const showIndicator = showUnread || showPending
                                     return (
                                         <Link
                                             key={item.id}
@@ -1013,7 +1089,7 @@ export function MainSidebar({
                                                         isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
                                                     )}
                                                 />
-                                                {showUnread && collapsed && (
+                                                {showIndicator && collapsed && (
                                                     <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
                                                 )}
                                             </span>
@@ -1024,10 +1100,10 @@ export function MainSidebar({
                                                         ? 'w-0 translate-x-2 overflow-hidden opacity-0'
                                                         : 'opacity-100'
                                                 )}
-                                            >
-                                                {item.label}
-                                            </span>
-                                            {showUnread && !collapsed && (
+                                                >
+                                                    {item.label}
+                                                </span>
+                                            {showIndicator && !collapsed && (
                                                 <span
                                                     className={cn(
                                                         'ml-auto h-2 w-2 rounded-full ring-2',
@@ -1044,107 +1120,141 @@ export function MainSidebar({
                 </div>
             </nav>
 
-            {visibleFooterSections.length > 0 && (
-                <div className="px-3 pb-3">
-                    <div className="space-y-2">
-                        {visibleFooterSections.map(section => (
-                            <div key={section.id} className="space-y-2">
-                                <p
-                                    className={cn(
-                                        'px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400',
-                                        collapsed && 'sr-only'
-                                    )}
-                                >
-                                    {section.label}
+            {billingSnapshot && !collapsed && canAccessTenantModules && (
+                <div className="px-3 pb-2">
+                    <div className="rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
+                        <Link href="/settings/plans" className="block px-3 pt-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    {tSidebar('billingStatusLabel')}
                                 </p>
-                                <div className="space-y-1">
-                                    {section.items.map(item => {
-                                        const isActive = pathWithoutLocale.startsWith('/settings')
-                                        const Icon = isActive ? item.activeIcon : item.icon
-                                        const showPending = item.id === 'settings' && hasPendingSuggestions
-                                        return (
-                                            <Link
-                                                key={item.id}
-                                                href={item.href}
-                                                title={item.label}
-                                                aria-label={item.label}
-                                                className={cn(
-                                                    'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
-                                                    collapsed
-                                                        ? 'mx-auto h-11 w-11 justify-center gap-0'
-                                                        : 'w-full gap-3 px-3 py-2',
-                                                    isActive
-                                                        ? 'bg-[#242A40] text-white shadow-sm'
-                                                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                                                )}
-                                            >
-                                                <span className="relative flex items-center">
-                                                    <Icon
-                                                        size={18}
-                                                        className={cn(
-                                                            'shrink-0',
-                                                            isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
-                                                        )}
-                                                    />
-                                                    {showPending && collapsed && (
-                                                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
-                                                    )}
-                                                </span>
-                                                <span
-                                                    className={cn(
-                                                        'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
-                                                        collapsed
-                                                            ? 'w-0 translate-x-2 overflow-hidden opacity-0'
-                                                            : 'opacity-100'
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </span>
-                                                {showPending && !collapsed && (
-                                                    <span
-                                                        className={cn(
-                                                            'ml-auto h-2 w-2 rounded-full ring-2',
-                                                            isActive ? 'bg-white ring-[#242A40]/25' : 'bg-[#242A40] ring-white'
-                                                        )}
-                                                    />
-                                                )}
-                                            </Link>
-                                        )
-                                    })}
-                                </div>
+                                <p className="text-xs font-semibold text-slate-700">{billingMembershipLabel}</p>
                             </div>
-                        ))}
+                            <p className="mt-1 text-base font-semibold text-slate-900">
+                                {formatCredits(billingDisplayCredits)}
+                                <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
+                            </p>
+                        </Link>
+
+                        <div className="px-3 pb-3">
+                            <div className="mt-2 flex items-center gap-2">
+                                <div className="h-1.5 flex flex-1 overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                        className="h-1.5 bg-[#242A40]"
+                                        style={{ width: `${Math.min(100, billingProgressSegments.packagePercent)}%` }}
+                                    />
+                                    {billingProgressSegments.topupPercent > 0 && (
+                                        <div
+                                            className="h-1.5 bg-purple-600"
+                                            style={{ width: `${Math.min(100, billingProgressSegments.topupPercent)}%` }}
+                                        />
+                                    )}
+                                </div>
+                                {canExpandBillingDetails && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsBillingDetailsExpanded((prev) => !prev)}
+                                        className="inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                        aria-expanded={isBillingDetailsExpanded}
+                                        aria-label={isBillingDetailsExpanded
+                                            ? tSidebar('billingCollapseDetails')
+                                            : tSidebar('billingExpandDetails')}
+                                    >
+                                        <ChevronDown
+                                            size={14}
+                                            className={cn(
+                                                'transition-transform duration-300 ease-out',
+                                                isBillingDetailsExpanded && 'rotate-180'
+                                            )}
+                                        />
+                                    </button>
+                                )}
+                            </div>
+                            {showLowCreditWarning && (
+                                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                                    <AlertCircle size={12} />
+                                    {tSidebar('billingLowCreditWarning')}
+                                </p>
+                            )}
+
+                            {canExpandBillingDetails ? (
+                                <div
+                                    className={cn(
+                                        'overflow-hidden transition-[max-height,opacity,margin] duration-300 ease-out',
+                                        isBillingDetailsExpanded ? 'mt-2 max-h-32 opacity-100' : 'max-h-0 opacity-0'
+                                    )}
+                                    aria-hidden={!isBillingDetailsExpanded}
+                                >
+                                    <div className="space-y-1 text-[11px] text-slate-600">
+                                        <p className="flex items-center gap-1.5">
+                                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#242A40]" aria-hidden />
+                                            {tSidebar('billingBreakdownPackage')}: {formatCredits(billingSnapshot.package.credits.remaining)}
+                                        </p>
+                                        <p className="flex items-center gap-1.5">
+                                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-600" aria-hidden />
+                                            {tSidebar('billingBreakdownTopup')}: {formatCredits(billingSnapshot.topupBalance)}
+                                        </p>
+                                        {billingPackageRenewalDetail && <p>{billingPackageRenewalDetail}</p>}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-2">
+                                    <p className="text-[11px] text-slate-500">{billingDetailPrimary}</p>
+                                    {billingDetailSecondary && (
+                                        <p className="mt-0.5 text-[11px] text-slate-500">{billingDetailSecondary}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
-
-            {billingSnapshot && !collapsed && canAccessTenantModules && (
-                <div className="px-3 pb-2">
-                    <Link
-                        href="/settings/plans"
-                        className="block rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300"
-                    >
-                        <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                {tSidebar('billingStatusLabel')}
-                            </p>
-                            <p className="text-xs font-semibold text-slate-700">{billingMembershipLabel}</p>
-                        </div>
-                        <p className="mt-1 text-base font-semibold text-slate-900">
-                            {formatCredits(billingDisplayCredits)}
-                            <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
-                        </p>
-                        <div className="mt-2 h-1.5 rounded-full bg-slate-100">
+            {billingSnapshot && collapsed && canAccessTenantModules && (
+                <div className="px-2 pb-2">
+                    <div className="relative group">
+                        <Link
+                            href="/settings/plans"
+                            aria-label={tSidebar('billingUsageMenuLabel')}
+                            title={`${tSidebar('billingStatusLabel')}: ${formatCredits(billingDisplayCredits)} ${tSidebar('billingCreditsUnit')}`}
+                            className={cn(
+                                'mx-auto flex h-11 w-11 items-center justify-center rounded-xl border bg-white shadow-sm transition hover:border-slate-300',
+                                showLowCreditWarning ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                            )}
+                        >
                             <div
-                                className="h-1.5 rounded-full bg-[#242A40]"
-                                style={{ width: `${Math.min(100, billingProgress)}%` }}
-                            />
+                                className="relative flex h-8 w-8 items-center justify-center rounded-full p-[2px]"
+                                style={{ background: collapsedBillingRingBackground }}
+                            >
+                                <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-[9px] font-semibold text-slate-700">
+                                    {formatCompactCredits(billingDisplayCredits)}
+                                </div>
+                            </div>
+                        </Link>
+
+                        <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-56 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-700 shadow-lg opacity-0 invisible transition-all duration-150 group-hover:visible group-hover:opacity-100">
+                            <p className="font-semibold text-slate-900">{tSidebar('billingStatusLabel')}</p>
+                            <p className="mt-1 text-slate-600">{billingMembershipLabel}</p>
+                            <p className="mt-1 text-slate-600">
+                                {formatCredits(billingDisplayCredits)} {tSidebar('billingCreditsUnit')}
+                            </p>
+                            <p className="mt-1 text-slate-500">{billingDetailPrimary}</p>
+                            {billingDetailSecondary && (
+                                <p className="mt-1 text-slate-500">{billingDetailSecondary}</p>
+                            )}
+                            {billingSnapshot.membershipState === 'premium_active' && (
+                                <div className="mt-2 space-y-1 text-slate-600">
+                                    <p>{tSidebar('billingBreakdownPackage')}: {formatCredits(billingSnapshot.package.credits.remaining)}</p>
+                                    <p>{tSidebar('billingBreakdownTopup')}: {formatCredits(billingSnapshot.topupBalance)}</p>
+                                </div>
+                            )}
+                            {showLowCreditWarning && (
+                                <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                                    <AlertCircle size={10} />
+                                    {tSidebar('billingLowCreditWarning')}
+                                </p>
+                            )}
                         </div>
-                        <p className="mt-2 text-[11px] text-slate-500">{billingDetailPrimary}</p>
-                        {billingDetailSecondary && (
-                            <p className="mt-0.5 text-[11px] text-slate-500">{billingDetailSecondary}</p>
-                        )}
-                    </Link>
+                    </div>
                 </div>
             )}
 

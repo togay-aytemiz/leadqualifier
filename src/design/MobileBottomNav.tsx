@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
 import {
@@ -14,13 +14,18 @@ import {
     HiOutlineSquare3Stack3D,
     HiOutlineUser
 } from 'react-icons/hi2'
-import { LogOut, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
+import { AlertCircle, LogOut, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { OrganizationBillingAccount } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
+import { buildBillingRefreshSignal } from '@/lib/billing/refresh-signal'
+import {
+    calculateSidebarBillingProgressSegments,
+    isLowCreditWarningVisible
+} from '@/lib/billing/sidebar-progress'
 
 interface NavItem {
     id: Exclude<MobileNavItemId, 'other'>
@@ -44,6 +49,7 @@ interface MobileBottomNavProps {
 
 export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNavProps) {
     const pathname = usePathname()
+    const searchParams = useSearchParams()
     const router = useRouter()
     const tNav = useTranslations('nav')
     const tSidebar = useTranslations('mainSidebar')
@@ -52,6 +58,10 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
 
     const activeItem = resolveMobileNavActiveItem(pathname)
     const supabase = useMemo(() => createClient(), [])
+    const billingRefreshSignal = useMemo(
+        () => buildBillingRefreshSignal(searchParams),
+        [searchParams]
+    )
 
     const navItems = useMemo<NavItem[]>(
         () => [
@@ -131,7 +141,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         return () => {
             isActive = false
         }
-    }, [activeOrganizationId, supabase])
+    }, [activeOrganizationId, billingRefreshSignal, supabase])
 
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
@@ -166,24 +176,34 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
 
         return billingSnapshot.totalRemainingCredits
     }, [billingSnapshot])
-    const billingProgress = useMemo(() => {
-        if (!billingSnapshot) return 0
-
-        if (billingSnapshot.membershipState === 'trial_active' || billingSnapshot.membershipState === 'trial_exhausted') {
-            return Math.max(
-                billingSnapshot.trial.credits.progress,
-                billingSnapshot.trial.timeProgress
-            )
-        }
-
-        if (billingSnapshot.membershipState === 'premium_active') {
-            if (billingSnapshot.package.credits.remaining <= 0 && billingSnapshot.topupBalance > 0) {
-                return 100
+    const billingProgressSegments = useMemo(() => {
+        if (!billingSnapshot) {
+            return {
+                packagePercent: 0,
+                topupPercent: 0
             }
-            return billingSnapshot.package.credits.progress
         }
 
-        return 0
+        return calculateSidebarBillingProgressSegments({
+            membershipState: billingSnapshot.membershipState,
+            trialRemainingCredits: billingSnapshot.trial.credits.remaining,
+            trialCreditLimit: billingSnapshot.trial.credits.limit,
+            packageRemainingCredits: billingSnapshot.package.credits.remaining,
+            packageCreditLimit: billingSnapshot.package.credits.limit,
+            topupBalance: billingSnapshot.topupBalance
+        })
+    }, [billingSnapshot])
+    const showLowCreditWarning = useMemo(() => {
+        if (!billingSnapshot) return false
+
+        return isLowCreditWarningVisible({
+            membershipState: billingSnapshot.membershipState,
+            trialRemainingCredits: billingSnapshot.trial.credits.remaining,
+            trialCreditLimit: billingSnapshot.trial.credits.limit,
+            packageRemainingCredits: billingSnapshot.package.credits.remaining,
+            packageCreditLimit: billingSnapshot.package.credits.limit,
+            topupBalance: billingSnapshot.topupBalance
+        })
     }, [billingSnapshot])
     const billingDetailPrimary = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailableDescription')
@@ -276,16 +296,28 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                     {formatCredits(billingDisplayCredits)}
                                     <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
                                 </p>
-                                <div className="mt-2 h-1.5 rounded-full bg-slate-200">
+                                <div className="mt-2 h-1.5 flex overflow-hidden rounded-full bg-slate-200">
                                     <div
-                                        className="h-1.5 rounded-full bg-[#242A40]"
-                                        style={{ width: `${Math.min(100, billingProgress)}%` }}
+                                        className="h-1.5 bg-[#242A40]"
+                                        style={{ width: `${Math.min(100, billingProgressSegments.packagePercent)}%` }}
                                     />
+                                    {billingProgressSegments.topupPercent > 0 && (
+                                        <div
+                                            className="h-1.5 bg-purple-600"
+                                            style={{ width: `${Math.min(100, billingProgressSegments.topupPercent)}%` }}
+                                        />
+                                    )}
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">{billingMembershipLabel}</p>
                                 <p className="mt-0.5 text-xs text-slate-500">{billingDetailPrimary}</p>
                                 {billingDetailSecondary && (
                                     <p className="mt-0.5 text-xs text-slate-500">{billingDetailSecondary}</p>
+                                )}
+                                {showLowCreditWarning && (
+                                    <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                                        <AlertCircle size={10} />
+                                        {tSidebar('billingLowCreditWarning')}
+                                    </p>
                                 )}
                             </Link>
                         )}

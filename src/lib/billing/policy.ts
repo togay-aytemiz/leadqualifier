@@ -31,8 +31,7 @@ function clampNonNegative(value: number) {
 }
 
 export function isTopupAllowed(input: TopupEligibilityInput) {
-    if (input.membershipState !== 'premium_active') return false
-    return clampNonNegative(input.remainingPackageCredits) <= 0
+    return input.membershipState === 'premium_active'
 }
 
 export function isUsageAllowed(input: UsageEligibilityInput) {

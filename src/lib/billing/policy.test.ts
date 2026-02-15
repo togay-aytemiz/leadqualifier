@@ -24,16 +24,16 @@ describe('billing policy helpers', () => {
         ).toBe(false)
     })
 
-    it('disables top-up when premium package credits are still available', () => {
+    it('enables top-up when premium package credits are still available', () => {
         expect(
             isTopupAllowed({
                 membershipState: premiumState(),
                 remainingPackageCredits: 12.4
             })
-        ).toBe(false)
+        ).toBe(true)
     })
 
-    it('enables top-up only for active premium accounts after package exhaustion', () => {
+    it('enables top-up for active premium accounts after package exhaustion', () => {
         expect(
             isTopupAllowed({
                 membershipState: premiumState(),

@@ -8,48 +8,8 @@ import {
     formatCreditAmount,
 } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
-import { getOrganizationBillingLedger, getOrganizationBillingSnapshot } from '@/lib/billing/server'
-import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
-
-function resolveMembershipLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, snapshot: OrganizationBillingSnapshot) {
-    switch (snapshot.membershipState) {
-    case 'trial_active':
-        return tBilling('membership.trialActive')
-    case 'trial_exhausted':
-        return tBilling('membership.trialExhausted')
-    case 'premium_active':
-        return tBilling('membership.premiumActive')
-    case 'past_due':
-        return tBilling('membership.pastDue')
-    case 'canceled':
-        return tBilling('membership.canceled')
-    case 'admin_locked':
-        return tBilling('membership.adminLocked')
-    default:
-        return snapshot.membershipState
-    }
-}
-
-function resolveLockReasonLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, snapshot: OrganizationBillingSnapshot) {
-    switch (snapshot.lockReason) {
-    case 'none':
-        return tBilling('lockReason.none')
-    case 'trial_time_expired':
-        return tBilling('lockReason.trialTimeExpired')
-    case 'trial_credits_exhausted':
-        return tBilling('lockReason.trialCreditsExhausted')
-    case 'subscription_required':
-        return tBilling('lockReason.subscriptionRequired')
-    case 'package_credits_exhausted':
-        return tBilling('lockReason.packageCreditsExhausted')
-    case 'past_due':
-        return tBilling('lockReason.pastDue')
-    case 'admin_locked':
-        return tBilling('lockReason.adminLocked')
-    default:
-        return snapshot.lockReason
-    }
-}
+import { getOrganizationBillingLedger } from '@/lib/billing/server'
+import { BillingLedgerTable } from './BillingLedgerTable'
 
 function resolveLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
     switch (value) {
@@ -87,6 +47,29 @@ function resolveLedgerPoolLabel(tBilling: Awaited<ReturnType<typeof getTranslati
     }
 }
 
+function resolveLedgerReasonLabel(
+    tBilling: Awaited<ReturnType<typeof getTranslations>>,
+    reason: string | null
+) {
+    if (!reason) return tBilling('ledger.reasonFallback')
+
+    const normalizedReason = reason.trim().toLowerCase()
+
+    if (normalizedReason === 'ai usage debit') {
+        return tBilling('ledger.reasonMap.aiUsageDebit')
+    }
+
+    if (normalizedReason === 'mock subscription checkout success') {
+        return tBilling('ledger.reasonMap.mockSubscriptionSuccess')
+    }
+
+    if (normalizedReason === 'mock top-up checkout success' || normalizedReason === 'mock topup checkout success') {
+        return tBilling('ledger.reasonMap.mockTopupSuccess')
+    }
+
+    return reason
+}
+
 export default async function BillingSettingsPage() {
     const supabase = await createClient()
     const locale = await getLocale()
@@ -109,9 +92,8 @@ export default async function BillingSettingsPage() {
         )
     }
 
-    const [usage, billingSnapshot, billingLedger] = await Promise.all([
+    const [usage, billingLedger] = await Promise.all([
         getOrgAiUsageSummary(organizationId, { supabase }),
-        getOrganizationBillingSnapshot(organizationId, { supabase }),
         getOrganizationBillingLedger(organizationId, { supabase, limit: 20 })
     ])
     const formatNumber = new Intl.NumberFormat(locale)
@@ -136,9 +118,19 @@ export default async function BillingSettingsPage() {
     const totalTotal = usage.total.totalTokens
     const monthlyCredits = calculateAiCreditsFromTokens(usage.monthly)
     const totalCredits = calculateAiCreditsFromTokens(usage.total)
-    const membershipLabel = billingSnapshot ? resolveMembershipLabel(tBilling, billingSnapshot) : tBilling('membership.unavailable')
-    const lockReasonLabel = billingSnapshot ? resolveLockReasonLabel(tBilling, billingSnapshot) : tBilling('lockReason.unavailable')
-    const isUsageAllowed = billingSnapshot?.isUsageAllowed ?? false
+    const ledgerRows = billingLedger.map((entry) => {
+        const isDebit = entry.creditsDelta < 0
+        return {
+            id: entry.id,
+            dateLabel: formatDateTime.format(new Date(entry.createdAt)),
+            typeLabel: resolveLedgerEntryLabel(tBilling, entry.entryType),
+            poolLabel: resolveLedgerPoolLabel(tBilling, entry.creditPool),
+            deltaLabel: `${isDebit ? '-' : '+'}${formatCreditAmount(Math.abs(entry.creditsDelta), locale)}`,
+            balanceLabel: formatCreditAmount(entry.balanceAfter, locale),
+            reasonLabel: resolveLedgerReasonLabel(tBilling, entry.reason),
+            isDebit
+        }
+    })
 
     return (
         <>
@@ -146,103 +138,6 @@ export default async function BillingSettingsPage() {
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-5xl space-y-6">
-                    <SettingsSection
-                        title={tBilling('controlPanel.title')}
-                        description={tBilling('controlPanel.description')}
-                    >
-                        {billingSnapshot ? (
-                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">
-                                            {tBilling('controlPanel.membershipLabel')}
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-gray-900">{membershipLabel}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">
-                                            {tBilling('controlPanel.usageStatusLabel')}
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-gray-900">
-                                            {isUsageAllowed
-                                                ? tBilling('controlPanel.usageAllowed')
-                                                : tBilling('controlPanel.usageBlocked')}
-                                        </p>
-                                    </div>
-                                </div>
-                                {!isUsageAllowed && (
-                                    <div className="mt-4">
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">
-                                            {tBilling('controlPanel.lockReasonLabel')}
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-gray-900">{lockReasonLabel}</p>
-                                    </div>
-                                )}
-                                {billingSnapshot.package.periodEnd && (
-                                    <p className="mt-4 text-xs text-gray-500">
-                                        {tBilling('controlPanel.packageResetAt', {
-                                            date: formatDateTime.format(new Date(billingSnapshot.package.periodEnd))
-                                        })}
-                                    </p>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-gray-500">{tBilling('controlPanel.unavailable')}</p>
-                        )}
-                    </SettingsSection>
-
-                    <SettingsSection
-                        title={tBilling('ledger.title')}
-                        description={tBilling('ledger.description')}
-                    >
-                        {billingLedger.length === 0 ? (
-                            <p className="text-sm text-gray-500">{tBilling('ledger.empty')}</p>
-                        ) : (
-                            <div className="overflow-x-auto rounded-xl border border-gray-200">
-                                <table className="min-w-full divide-y divide-gray-200 bg-white text-sm">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.date')}</th>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.type')}</th>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.pool')}</th>
-                                            <th className="px-4 py-3 text-right font-medium text-gray-500">{tBilling('ledger.columns.delta')}</th>
-                                            <th className="px-4 py-3 text-right font-medium text-gray-500">{tBilling('ledger.columns.balance')}</th>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500">{tBilling('ledger.columns.reason')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {billingLedger.map((entry) => {
-                                            const isDebit = entry.creditsDelta < 0
-                                            return (
-                                                <tr key={entry.id}>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                                                        {formatDateTime.format(new Date(entry.createdAt))}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-gray-700">
-                                                        {resolveLedgerEntryLabel(tBilling, entry.entryType)}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-gray-700">
-                                                        {resolveLedgerPoolLabel(tBilling, entry.creditPool)}
-                                                    </td>
-                                                    <td className={`whitespace-nowrap px-4 py-3 text-right font-medium ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                        {isDebit ? '-' : '+'}
-                                                        {formatCreditAmount(Math.abs(entry.creditsDelta), locale)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-right text-gray-700">
-                                                        {formatCreditAmount(entry.balanceAfter, locale)}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-gray-500">
-                                                        {entry.reason ?? tBilling('ledger.reasonFallback')}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </SettingsSection>
-
                     <SettingsSection
                         title={tBilling('title')}
                         description={tBilling('utcNote')}
@@ -280,6 +175,26 @@ export default async function BillingSettingsPage() {
                         {totalTotal === 0 && (
                             <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>
                         )}
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={tBilling('ledger.title')}
+                        description={tBilling('ledger.description')}
+                    >
+                        <BillingLedgerTable
+                            rows={ledgerRows}
+                            columns={{
+                                date: tBilling('ledger.columns.date'),
+                                type: tBilling('ledger.columns.type'),
+                                pool: tBilling('ledger.columns.pool'),
+                                delta: tBilling('ledger.columns.delta'),
+                                balance: tBilling('ledger.columns.balance'),
+                                reason: tBilling('ledger.columns.reason')
+                            }}
+                            emptyText={tBilling('ledger.empty')}
+                            showMoreLabel={tBilling('ledger.showMore')}
+                            showLessLabel={tBilling('ledger.showLess')}
+                        />
                     </SettingsSection>
                 </div>
             </div>
