@@ -542,6 +542,7 @@
         "packageCatalog": {
             "title": "Aylık paketler",
             "description": "İşletmene en uygun aylık paketi seç.",
+            "currentPackageLabel": "Mevcut aylık paketin",
             "currentPackageActive": "Mevcut aylık paketiniz: {plan}",
             "currentPackageInactive": "Şu an aktif bir aylık paketiniz yok.",
             "assumption": "Aşağıdaki konuşma sayıları yaklaşık değerlerdir; müşteri mesaj uzunluğu ve konuşma akışına göre değişebilir.",
@@ -565,6 +566,36 @@
             "downgrade": "Düşür",
             "switch": "Planı değiştir",
             "current": "Aktif paket"
+        },
+        "manager": {
+            "title": "Aboneliğini yönet",
+            "description": "Yükseltme hemen uygulanır. Daha düşük pakete geçiş dönem sonunda devreye girer.",
+            "manageCtaPrimary": "Yükselt veya değiştir",
+            "manageCtaFallback": "Planı yönet",
+            "cancelCta": "Aboneliği iptal et",
+            "resumeCta": "İptali geri al",
+            "cancelScheduledWithDate": "Abonelik iptali planlandı. Planın {date} tarihine kadar aktif kalacak.",
+            "cancelScheduledNoDate": "Abonelik iptali planlandı. Planın mevcut dönem sonuna kadar aktif kalacak.",
+            "pendingPlanWithDate": "Yeni plan: {plan}. Geçiş tarihi: {date}.",
+            "pendingPlanNoDate": "Yeni plan: {plan}. Geçiş bir sonraki dönem başında uygulanacak."
+        },
+        "planModal": {
+            "title": "Planı yönet",
+            "description": "Mevcut planını gör, yükselt veya bir sonraki dönem için farklı plana geç.",
+            "close": "Kapat",
+            "current": "Mevcut planın",
+            "upgrade": "Bu plana yükselt",
+            "downgrade": "Bu plana geç (dönem sonu)",
+            "switch": "Bu plana geç",
+            "downgradeHint": "Daha düşük plan değişikliği dönem sonunda uygulanır."
+        },
+        "cancelModal": {
+            "title": "Aboneliği iptal et",
+            "descriptionWithDate": "İptal edersen abonelik yenilenmez ve planın {date} tarihine kadar aktif kalır.",
+            "descriptionNoDate": "İptal edersen abonelik yenilenmez ve planın mevcut dönem sonuna kadar aktif kalır.",
+            "keep": "Vazgeç",
+            "confirm": "İptali onayla",
+            "close": "Kapat"
         },
         "downgradeHiddenHint": "Daha düşük pakete geçiş, aşağıdaki paket yönetimi alanından dönem sonu için planlanır.",
         "planManagement": {
@@ -599,9 +630,9 @@
         "topups": {
             "sectionTitle": "Ek kredi",
             "sectionDescription": "Kredin bittiğinde tek seferlik ek kredi alarak devam edebilirsin.",
-            "title": "Tek seferlik ek kredi",
+            "title": "Tek Seferlik Ek Kredi",
             "oneTimeNotice": "Ek krediler tek seferliktir, otomatik yenilenmez.",
-            "openModal": "Kredi al",
+            "openModal": "Tek seferlik kredi ekle",
             "approxConversations": "Yaklaşık {min}-{max} konuşma",
             "unavailable": "Ek kredi paketleri şu anda kullanılamıyor.",
             "modal": {

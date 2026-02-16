@@ -35,6 +35,7 @@ import {
 import { Link } from '@/i18n/navigation'
 import { AlertCircle } from 'lucide-react'
 import { TopupCheckoutCard, type TopupPackOption } from './TopupCheckoutCard'
+import { SubscriptionPlanManager, type SubscriptionPlanOption } from './SubscriptionPlanManager'
 
 interface PlansSettingsPageProps {
     searchParams: Promise<{
@@ -238,10 +239,20 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         })
         return {
             ...plan,
+            currency: localizedMoney.currency,
             localizedPrice: localizedMoney.amount,
             unitPrice: plan.credits > 0 ? localizedMoney.amount / plan.credits : 0
         }
     })
+    const subscriptionPlanOptions: SubscriptionPlanOption[] = localizedPlanTiers.map((plan) => ({
+        id: plan.id,
+        credits: plan.credits,
+        priceTry: plan.priceTry,
+        localizedPrice: plan.localizedPrice,
+        currency: plan.currency,
+        conversationRange: plan.conversationRange,
+        unitPrice: plan.unitPrice
+    }))
     const topupPacks: TopupPackOption[] = pricingCatalog.topups.map((pack) => {
         const localizedMoney = resolveLocalizedMoneyForLocale(locale, {
             priceTry: pack.priceTry,
@@ -268,6 +279,9 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     const activePlanCredits = activePlanId
         ? localizedPlanTiers.find((plan) => plan.id === activePlanId)?.credits ?? 0
         : 0
+    const activePlanOption = activePlanId
+        ? localizedPlanTiers.find((plan) => plan.id === activePlanId) ?? null
+        : null
     const canSubmitPlanSelection = snapshot
         ? snapshot.membershipState !== 'admin_locked'
         : false
@@ -349,9 +363,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     const pendingPlanName = pendingPlanId
         ? tPlans(`packageCatalog.planNames.${pendingPlanId}`)
         : null
-    const lowerPlanOptions = isPremiumMembership
-        ? localizedPlanTiers.filter((plan) => plan.credits < activePlanCredits)
-        : []
     const topupBlockedReason = !topupState.allowed && topupState.reasonKey
         ? tPlans(`actions.${topupState.reasonKey}`)
         : null
@@ -532,36 +543,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         revalidatePath(`/${locale}/settings/plans`)
         revalidatePath(`/${locale}/settings/billing`)
         redirect(buildCheckoutRedirect(locale, 'topup', result))
-    }
-
-    const handleScheduleDowngrade = async (formData: FormData) => {
-        'use server'
-
-        const orgId = String(formData.get('organizationId') ?? '')
-        const requestedPlanId = String(formData.get('scheduledPlanId') ?? '')
-        const targetPlan = localizedPlanTiers.find((plan) => plan.id === requestedPlanId)
-
-        if (!targetPlan) {
-            const invalidResult: MockCheckoutResult = {
-                ok: false,
-                status: 'error',
-                error: 'invalid_input',
-                changeType: null,
-                effectiveAt: null
-            }
-            redirect(buildCheckoutRedirect(locale, 'subscribe', invalidResult))
-        }
-
-        const result = await simulateMockSubscriptionCheckout({
-            organizationId: orgId,
-            simulatedOutcome: 'success',
-            monthlyPriceTry: targetPlan.priceTry,
-            monthlyCredits: targetPlan.credits
-        })
-
-        revalidatePath(`/${locale}/settings/plans`)
-        revalidatePath(`/${locale}/settings/billing`)
-        redirect(buildCheckoutRedirect(locale, 'subscribe', result))
     }
 
     const handleCancelRenewal = async (formData: FormData) => {
@@ -786,89 +767,111 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                         )}
                     >
                         <div className="space-y-4">
-                            <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                                {activePlanName
-                                    ? tPlans('packageCatalog.currentPackageActive', { plan: activePlanName })
-                                    : tPlans('packageCatalog.currentPackageInactive')}
-                            </p>
-                            <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
-                                {tPlans('packageCatalog.assumption')}
-                            </p>
-
-                            <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-                                {localizedPlanTiers.map((plan) => {
-                                    const isCurrentPlan = isPremiumMembership && activePlanId === plan.id
-                                    const isLowerPlanOption = isPremiumMembership && plan.credits < activePlanCredits
-                                    const isScheduledPlan = hasPendingDowngrade && pendingPlanId === plan.id
-                                    const isPopularPlan = plan.id === 'growth'
-                                    const isDisabled = !canSubmitPlanSelection || isCurrentPlan
-                                    const actionLabel = (() => {
-                                        if (isCurrentPlan) return tPlans('packageCatalog.planCta.current')
-                                        if (!isPremiumMembership) return tPlans('packageCatalog.planCta.start')
-                                        if (plan.credits > activePlanCredits) return tPlans('packageCatalog.planCta.upgrade')
-                                        return tPlans('packageCatalog.planCta.switch')
-                                    })()
-
-                                    return (
-                                        <article
-                                            key={plan.id}
-                                            className={`flex h-full flex-col rounded-2xl border bg-white p-5 shadow-sm ${
-                                                isCurrentPlan
-                                                    ? 'border-[#242A40]'
-                                                    : isPopularPlan
-                                                        ? 'border-sky-200'
-                                                        : 'border-gray-200'
-                                            }`}
-                                        >
-                                            <div className="mb-4 flex min-h-7 items-center justify-between gap-2">
-                                                <p className="text-sm font-semibold text-gray-900">
-                                                    {tPlans(`packageCatalog.planNames.${plan.id}`)}
-                                                </p>
-                                                {isCurrentPlan && (
-                                                    <p className="rounded-full bg-[#242A40] px-2.5 py-1 text-[11px] font-semibold text-white">
-                                                        {tPlans('packageCatalog.badges.current')}
-                                                    </p>
-                                                )}
-                                                {!isCurrentPlan && isScheduledPlan && (
-                                                    <p className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
-                                                        {tPlans('packageCatalog.badges.scheduled')}
-                                                    </p>
-                                                )}
-                                                {!isCurrentPlan && !isScheduledPlan && isPopularPlan && (
-                                                    <p className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800">
-                                                        {tPlans('packageCatalog.badges.popular')}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <p className="tabular-nums text-3xl font-semibold leading-tight text-gray-900">
-                                                {formatCurrency.format(plan.localizedPrice)}
-                                                <span className="ml-1 text-base font-medium text-gray-500">
-                                                    / {tPlans('packageCatalog.month')}
-                                                </span>
+                            {isPremiumMembership && activePlanOption ? (
+                                <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">
+                                                {tPlans('packageCatalog.currentPackageLabel')}
+                                            </p>
+                                            <p className="mt-1 text-xl font-semibold text-gray-900">
+                                                {activePlanName ?? tPlans('status.currentPackageUnknown')}
                                             </p>
                                             <p className="mt-3 text-sm text-gray-700">
                                                 {tPlans('packageCatalog.creditsIncluded', {
-                                                    credits: formatNumber.format(plan.credits)
+                                                    credits: formatNumber.format(activePlanOption.credits)
                                                 })}
                                             </p>
                                             <p className="mt-1 text-xs text-gray-600">
                                                 {tPlans('packageCatalog.approxConversations', {
-                                                    min: formatNumber.format(plan.conversationRange.min),
-                                                    max: formatNumber.format(plan.conversationRange.max)
+                                                    min: formatNumber.format(activePlanOption.conversationRange.min),
+                                                    max: formatNumber.format(activePlanOption.conversationRange.max)
                                                 })}
                                             </p>
                                             <p className="mt-1 text-xs text-gray-500">
                                                 {tPlans('packageCatalog.unitPrice', {
-                                                    price: formatCurrency.format(plan.unitPrice)
+                                                    price: formatCurrency.format(activePlanOption.unitPrice)
                                                 })}
                                             </p>
+                                        </div>
 
-                                            {isLowerPlanOption ? (
-                                                <p className="mt-4 text-xs text-gray-500">
-                                                    {tPlans('packageCatalog.downgradeHiddenHint')}
+                                        <p className="tabular-nums text-4xl font-semibold leading-tight text-gray-900 md:text-right">
+                                            {formatCurrency.format(activePlanOption.localizedPrice)}
+                                            <span className="ml-1 text-base font-medium text-gray-500">
+                                                / {tPlans('packageCatalog.month')}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </article>
+                            ) : (
+                                <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                                    {activePlanName
+                                        ? tPlans('packageCatalog.currentPackageActive', { plan: activePlanName })
+                                        : tPlans('packageCatalog.currentPackageInactive')}
+                                </p>
+                            )}
+
+                            {isPremiumMembership ? (
+                                <SubscriptionPlanManager
+                                    organizationId={organizationId}
+                                    plans={subscriptionPlanOptions}
+                                    activePlanId={activePlanId}
+                                    activePlanCredits={activePlanCredits}
+                                    canManage={canSubmitPlanSelection}
+                                    autoRenewEnabled={autoRenewEnabled}
+                                    renewalPeriodEnd={renewalPeriodEnd}
+                                    pendingPlanId={hasPendingDowngrade ? pendingPlanId : null}
+                                    pendingPlanName={hasPendingDowngrade ? pendingPlanName : null}
+                                    pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
+                                    planAction={handleMockSubscribe}
+                                    cancelAction={handleCancelRenewal}
+                                    resumeAction={handleResumeRenewal}
+                                />
+                            ) : (
+                                <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+                                    {localizedPlanTiers.map((plan) => {
+                                        const isPopularPlan = plan.id === 'growth'
+                                        return (
+                                            <article
+                                                key={plan.id}
+                                                className={`flex h-full flex-col rounded-2xl border bg-white p-5 shadow-sm ${
+                                                    isPopularPlan ? 'border-sky-200' : 'border-gray-200'
+                                                }`}
+                                            >
+                                                <div className="mb-4 flex min-h-7 items-center justify-between gap-2">
+                                                    <p className="text-sm font-semibold text-gray-900">
+                                                        {tPlans(`packageCatalog.planNames.${plan.id}`)}
+                                                    </p>
+                                                    {isPopularPlan && (
+                                                        <p className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800">
+                                                            {tPlans('packageCatalog.badges.popular')}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <p className="tabular-nums text-3xl font-semibold leading-tight text-gray-900">
+                                                    {formatCurrency.format(plan.localizedPrice)}
+                                                    <span className="ml-1 text-base font-medium text-gray-500">
+                                                        / {tPlans('packageCatalog.month')}
+                                                    </span>
                                                 </p>
-                                            ) : (
+                                                <p className="mt-3 text-sm text-gray-700">
+                                                    {tPlans('packageCatalog.creditsIncluded', {
+                                                        credits: formatNumber.format(plan.credits)
+                                                    })}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-600">
+                                                    {tPlans('packageCatalog.approxConversations', {
+                                                        min: formatNumber.format(plan.conversationRange.min),
+                                                        max: formatNumber.format(plan.conversationRange.max)
+                                                    })}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {tPlans('packageCatalog.unitPrice', {
+                                                        price: formatCurrency.format(plan.unitPrice)
+                                                    })}
+                                                </p>
+
                                                 <form action={handleMockSubscribe} className="mt-4">
                                                     <input type="hidden" name="organizationId" value={organizationId} />
                                                     <input type="hidden" name="monthlyPriceTry" value={String(plan.priceTry)} />
@@ -877,153 +880,35 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                                     <button
                                                         type="submit"
                                                         className="inline-flex h-10 min-w-[132px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                                        disabled={isDisabled}
+                                                        disabled={!canSubmitPlanSelection}
                                                     >
-                                                        {actionLabel}
+                                                        {tPlans('packageCatalog.planCta.start')}
                                                     </button>
                                                 </form>
-                                            )}
-                                        </article>
-                                    )
-                                })}
+                                            </article>
+                                        )
+                                    })}
+                                </div>
+                            )}
 
-                                <article className="lg:col-span-3 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5">
-                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
-                                            <p className="text-base font-semibold text-gray-900">
-                                                {tPlans('packageCatalog.customPackage.title')}
-                                            </p>
-                                            <p className="mt-1 text-sm text-gray-600">
-                                                {tPlans('packageCatalog.customPackage.description')}
-                                            </p>
-                                        </div>
-                                        <a
-                                            href="mailto:askqualy@gmail.com"
-                                            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437]"
-                                        >
-                                            {tPlans('packageCatalog.customPackage.cta')}
-                                        </a>
-                                    </div>
-                                </article>
-                            </div>
-
-                            {isPremiumMembership && lowerPlanOptions.length > 0 && (
-                                <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                                    <div className="space-y-3">
+                            <article className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5">
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
                                         <p className="text-base font-semibold text-gray-900">
-                                            {tPlans('packageCatalog.planManagement.title')}
+                                            {tPlans('packageCatalog.customPackage.title')}
                                         </p>
-                                        <p className="text-sm text-gray-600">
-                                            {tPlans('packageCatalog.planManagement.description')}
+                                        <p className="mt-1 text-sm text-gray-600">
+                                            {tPlans('packageCatalog.customPackage.description')}
                                         </p>
-                                        {hasPendingDowngrade && (
-                                            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                                {pendingPlanName && pendingPlanChange?.effectiveAt
-                                                    ? tPlans('packageCatalog.planManagement.pendingWithDate', {
-                                                        plan: pendingPlanName,
-                                                        date: formatDateTime.format(new Date(pendingPlanChange.effectiveAt))
-                                                    })
-                                                    : pendingPlanName
-                                                        ? tPlans('packageCatalog.planManagement.pendingNoDate', {
-                                                            plan: pendingPlanName
-                                                        })
-                                                        : tPlans('packageCatalog.planManagement.pendingUnknown')}
-                                            </p>
-                                        )}
-                                        <form action={handleScheduleDowngrade} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                                            <input type="hidden" name="organizationId" value={organizationId} />
-                                            <select
-                                                name="scheduledPlanId"
-                                                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 sm:max-w-xs"
-                                                defaultValue={pendingPlanId ?? lowerPlanOptions[0]?.id ?? ''}
-                                                required
-                                                disabled={!canSubmitPlanSelection}
-                                            >
-                                                {lowerPlanOptions.map((plan) => (
-                                                    <option key={plan.id} value={plan.id}>
-                                                        {tPlans(`packageCatalog.planNames.${plan.id}`)} · {formatCurrency.format(plan.localizedPrice)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                type="submit"
-                                                className="inline-flex h-10 min-w-[220px] items-center justify-center rounded-lg border border-[#242A40] bg-white px-4 text-sm font-semibold text-[#242A40] hover:bg-gray-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500"
-                                                disabled={!canSubmitPlanSelection}
-                                            >
-                                                {tPlans('packageCatalog.planManagement.submit')}
-                                            </button>
-                                        </form>
                                     </div>
-                                </article>
-                            )}
-
-                            {isPremiumMembership && (
-                                <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                                        <div className="space-y-1.5">
-                                            <p className="text-base font-semibold text-gray-900">
-                                                {tPlans('packageCatalog.renewalCard.title')}
-                                            </p>
-                                            <p className="text-sm text-gray-600">
-                                                {tPlans('packageCatalog.renewalCard.description')}
-                                            </p>
-                                            <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                                                {tPlans('packageCatalog.renewalCard.statusLabel')}
-                                            </p>
-                                            <p
-                                                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                                    autoRenewEnabled
-                                                        ? 'bg-emerald-100 text-emerald-800'
-                                                        : 'bg-amber-100 text-amber-800'
-                                                }`}
-                                            >
-                                                {autoRenewEnabled
-                                                    ? tPlans('packageCatalog.renewalCard.statusOn')
-                                                    : tPlans('packageCatalog.renewalCard.statusOff')}
-                                            </p>
-                                            <p className="text-xs text-gray-600">
-                                                {autoRenewEnabled
-                                                    ? tPlans('packageCatalog.renewalCard.onHint')
-                                                    : renewalPeriodEnd
-                                                        ? tPlans('packageCatalog.renewalCard.offHintWithDate', {
-                                                            date: formatDateTime.format(new Date(renewalPeriodEnd))
-                                                        })
-                                                        : tPlans('packageCatalog.renewalCard.offHintNoDate')}
-                                            </p>
-                                        </div>
-
-                                        <form action={autoRenewEnabled ? handleCancelRenewal : handleResumeRenewal} className="md:pt-1">
-                                            <input type="hidden" name="organizationId" value={organizationId} />
-                                            <button
-                                                type="submit"
-                                                className={`inline-flex h-10 min-w-[190px] items-center justify-center rounded-lg px-4 text-sm font-semibold ${
-                                                    autoRenewEnabled
-                                                        ? 'bg-[#242A40] text-white hover:bg-[#1f2437]'
-                                                        : 'border border-[#242A40] bg-white text-[#242A40] hover:bg-gray-50'
-                                                } disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500`}
-                                                disabled={!canSubmitPlanSelection}
-                                            >
-                                                {autoRenewEnabled
-                                                    ? tPlans('packageCatalog.renewalCard.turnOff')
-                                                    : tPlans('packageCatalog.renewalCard.turnOn')}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </article>
-                            )}
-
-                            {isPremiumMembership && (
-                                <p className="text-xs text-gray-600">
-                                    {tPlans('packageCatalog.manageHint')}
-                                    {' '}
                                     <a
                                         href="mailto:askqualy@gmail.com"
-                                        className="font-medium text-[#242A40] underline decoration-1 underline-offset-2 hover:text-[#1f2437]"
+                                        className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437]"
                                     >
-                                        {tPlans('packageCatalog.manageHintContact')}
+                                        {tPlans('packageCatalog.customPackage.cta')}
                                     </a>
-                                </p>
-                            )}
+                                </div>
+                            </article>
 
                             {!canSubmitPlanSelection && (
                                 <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">

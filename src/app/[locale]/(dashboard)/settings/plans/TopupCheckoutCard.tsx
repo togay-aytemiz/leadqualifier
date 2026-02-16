@@ -198,20 +198,25 @@ export function TopupCheckoutCard({
 
     return (
         <>
-            <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-5">
-                <h3 className="text-sm font-semibold text-gray-900">{tPlans('topups.title')}</h3>
-                <p className="text-xs text-gray-500">{tPlans('topups.oneTimeNotice')}</p>
-                {!topupAllowed && blockedReason && (
-                    <p className="text-xs text-amber-700">{blockedReason}</p>
-                )}
-                <button
-                    type="button"
-                    onClick={() => setIsModalOpen(true)}
-                    className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                    disabled={!topupAllowed || packs.length === 0}
-                >
-                    {tPlans('topups.openModal')}
-                </button>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 className="text-base font-semibold text-gray-900">{tPlans('topups.title')}</h3>
+                        <p className="mt-1 text-sm text-gray-600">{tPlans('topups.oneTimeNotice')}</p>
+                        {!topupAllowed && blockedReason && (
+                            <p className="mt-1 text-sm text-amber-700">{blockedReason}</p>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsModalOpen(true)}
+                        className="inline-flex h-10 items-center justify-center self-start whitespace-nowrap rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300 sm:self-auto"
+                        disabled={!topupAllowed || packs.length === 0}
+                    >
+                        {tPlans('topups.openModal')}
+                    </button>
+                </div>
             </div>
 
             {isClient && isModalOpen && createPortal(modal, document.body)}

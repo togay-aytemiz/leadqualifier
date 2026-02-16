@@ -542,6 +542,7 @@
         "packageCatalog": {
             "title": "Monthly packages",
             "description": "Pick the monthly package that fits your business.",
+            "currentPackageLabel": "Your current monthly package",
             "currentPackageActive": "Current monthly package: {plan}",
             "currentPackageInactive": "You do not have an active monthly package yet.",
             "assumption": "Conversation ranges are estimates and can change based on message length and usage style.",
@@ -565,6 +566,36 @@
             "downgrade": "Downgrade",
             "switch": "Switch package",
             "current": "Current package"
+        },
+        "manager": {
+            "title": "Manage subscription",
+            "description": "Upgrades apply immediately. Lower-tier changes start at period end.",
+            "manageCtaPrimary": "Upgrade or switch",
+            "manageCtaFallback": "Manage plan",
+            "cancelCta": "Cancel subscription",
+            "resumeCta": "Undo cancellation",
+            "cancelScheduledWithDate": "Cancellation scheduled. Your plan stays active until {date}.",
+            "cancelScheduledNoDate": "Cancellation scheduled. Your plan stays active until the current period ends.",
+            "pendingPlanWithDate": "Upcoming plan: {plan}. Effective on {date}.",
+            "pendingPlanNoDate": "Upcoming plan: {plan}. Effective at next billing period."
+        },
+        "planModal": {
+            "title": "Manage plan",
+            "description": "Review your current package, upgrade, or switch for the next billing period.",
+            "close": "Close",
+            "current": "Current plan",
+            "upgrade": "Upgrade to this",
+            "downgrade": "Switch at period end",
+            "switch": "Go to this plan",
+            "downgradeHint": "Lower-tier changes apply at period end."
+        },
+        "cancelModal": {
+            "title": "Cancel subscription",
+            "descriptionWithDate": "If you cancel, renewal stops and your plan stays active until {date}.",
+            "descriptionNoDate": "If you cancel, renewal stops and your plan stays active until the current period ends.",
+            "keep": "Keep plan",
+            "confirm": "Confirm cancellation",
+            "close": "Close"
         },
         "downgradeHiddenHint": "Downgrades are scheduled from plan management and apply at period end.",
         "planManagement": {
@@ -599,9 +630,9 @@
         "topups": {
             "sectionTitle": "Extra credits",
             "sectionDescription": "When credits run low, continue with a one-time credit purchase.",
-            "title": "One-time extra credits",
+            "title": "One-Time Extra Credits",
             "oneTimeNotice": "Extra credits are one-time purchases and do not auto-renew.",
-            "openModal": "Buy credits",
+            "openModal": "Add one-time credits",
             "approxConversations": "~{min}-{max} conversations",
             "unavailable": "Top-up packages are unavailable right now.",
             "modal": {
