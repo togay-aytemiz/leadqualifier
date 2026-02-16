@@ -297,6 +297,14 @@
                 "insufficient": "Özet için yeterli mesaj yok"
             }
         },
+        "whatsappReplyWindow": {
+            "replyable": "Yanıtlanabilir",
+            "blocked": "Yanıtlanamaz",
+            "tooltipExpired": "WhatsApp 24 saat yanıt penceresi doldu. MVP'de template mesaj kapalı.",
+            "tooltipNoInbound": "WhatsApp API üzerinden yanıt için önce müşteriden mesaj gelmeli.",
+            "composerLockedExpired": "24 saat penceresi doldu. Gerekirse telefondan yanıtlayın.",
+            "composerLockedNoInbound": "Önce müşterinin mesaj göndermesini bekleyin."
+        },
         "details": "Detaylar",
         "hideDetails": "Detayları gizle",
         "backToInbox": "Gelen kutusuna dön",

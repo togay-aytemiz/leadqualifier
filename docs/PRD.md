@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-15 (Billing policy update: extra credit purchase is allowed for any active premium subscription, without waiting for monthly package exhaustion. Plans action gating/copy, billing policy helpers, and SQL mock-checkout/entitlement functions are aligned to this rule. Added checkout compatibility fallback so premium organizations can still complete extra-credit purchases when a hosted DB has not yet applied the latest top-up SQL migration. Sidebar/mobile billing refresh and `ek kredi / extra credits` terminology improvements remain active. Usage quick card is compact by default with a decreasing remaining-credit progress bar; premium breakdown details expand from an inline chevron and progress visualization now supports distinct package vs extra-credit segments. Extra-credit segment styling is aligned with inbox AI purple, and expanded breakdown rows include color-dot markers to clarify which segment maps to package vs extra credits. Plans extra-credit purchase UX now uses a confirmation modal step (`Add credits` → `Next`) and explicitly marks extra credits as one-time purchases (not monthly). Modal naming is generalized to `Get more credits / Daha fazla kredi al`, the modal visual style matches existing light product dialogs, and backdrop dimming is rendered at the app root so the full UI is covered. Actions-section copy is simplified and the usage link is positioned under the section description with a clear always-underlined affordance. The extra-credit action card intentionally avoids showing a fixed amount/credit pair in-card so future multiple package tiers can be introduced without card redesign. Billing usage information architecture now places `Credit usage / Kredi kullanımı` before ledger details, with ledger collapsed to recent-3 by default and expandable on demand to reduce page length. The separate account-status block is removed from Billing > Usage for a more compact usage-focused view. Plans status credit bars now align with sidebar behavior and decrease as remaining credits are consumed. Desktop sidebar navigation hierarchy is simplified by placing `Other` directly under AI tools with the same section spacing/styling model. A shared low-credit warning appears in sidebar and plans when remaining credits drop below 10%. Plans extra-credit status card now mirrors monthly package semantics by showing remaining/total plus a dedicated depletion progress bar (purple). Collapsed desktop sidebar keeps billing visibility with a compact circular progress indicator and hover tooltip details. Mobile More menu now uses the same low-credit warning signal under the shared threshold.)  
+> **Last Updated:** 2026-02-16 (Inbox now surfaces WhatsApp reply-window state in context: far-right `reply available / reply unavailable` indicator beside summary, tooltip reason when blocked, and composer/send lock with short overlay message after the 24-hour window. MVP keeps template messaging out of scope and preserves `active_agent` when sending is blocked.)  
 > **Status:** In Development
 
 ---
@@ -434,6 +434,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - **Pricing Strategy:**
   - Define plan tiers, quota limits, overage policy, and annual discount policy for Turkish SMBs.
   - Launch target is a low-entry starter band around ~USD 10 equivalent (localized to TRY) before premium tier expansion.
+  - Pricing calibration guide published (`docs/plans/2026-02-16-pricing-credit-strategy-guide.md`) with recommendation set: trial baseline `200` credits (next revision), starter package anchor `~USD 10` equivalent, and extra credits priced at a premium per-credit vs recurring package pricing.
   - Lock v1 billing order as: trial -> recurring monthly premium package -> credit top-up overflow.
   - Define v1 premium package controls: admin-managed monthly price (`X TL`) and included credits (`Y`).
   - Lock v1 package policy: monthly included credits are non-rollover.
@@ -455,6 +456,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - **Trial Policy Decision (Required Gate):**
   - Trial model decision (pre-pilot): **trial-only** onboarding (no freemium tier at launch).
   - Trial defaults are locked for implementation: `14 days` and `120.0 credits`.
+  - Next pricing-policy recommendation is to raise trial credits to `200` after explicit approval/migration; current live implementation baseline remains `120.0` until applied.
   - Trial lock precedence is locked: system stops token-consuming features when **either** `time_expired` or `credit_exhausted` occurs first.
   - Admin trial-default controls update only future/new organizations.
   - Rollout migration backfills existing non-system-admin organizations into trial baseline before subscription enforcement.
@@ -576,6 +578,7 @@ MVP is successful when:
 - **Monetization Rollout Order:** Finalize pricing strategy and trial model first, then implement checkout/payments and entitlement enforcement (avoid shipping payment flows before policy decisions are locked).
 - **Trial Go-To-Market Model (Pre-Pilot):** Start with trial-only onboarding (no freemium) to reduce ongoing abuse vectors and keep support/sales qualification focused.
 - **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
+- **Pricing & Credit Calibration Guide (Pre-Pilot):** `docs/plans/2026-02-16-pricing-credit-strategy-guide.md` is the policy reference for trial-credit calibration (`100/120/200/250/1000` comparison), model-cost math, and extra-credit pricing strategy.
 - **Trial Defaults (Locked v1):** Provision new organizations with `14 days` and `120.0 credits` by default.
 - **Trial Lock Precedence (Locked v1):** Enforce `first limit reached wins` between trial time and trial credits.
 - **Trial Default Scope:** Admin updates to default trial values apply to newly created organizations only.
@@ -647,6 +650,8 @@ MVP is successful when:
 - **Inbox Realtime Auth Sync:** Bootstrap realtime auth from session, fall back to `refreshSession()` when missing, and re-apply tokens on auth state changes to avoid stale subscriptions.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Inbox Summary Reopen Behavior:** Closing and re-opening the summary panel should trigger a fresh summary generation (without requiring manual refresh).
+- **Inbox WhatsApp Replyability UX (MVP):** For WhatsApp conversations, show a far-right status indicator (`reply available` / `reply unavailable`) on the summary row; when blocked, show reason via tooltip and lock composer/send with a short overlay notice.
+- **Inbox Agent-State Rule (MVP):** WhatsApp 24-hour send lock must not mutate `active_agent`; conversation control state remains unchanged.
 - **Inbox Scroll-to-Latest CTA:** Show an animated jump-to-latest button only when chat is away from bottom; anchor it on the composer divider with subtle gray styling.
 - **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
 - **Inbox List Header Surface:** Keep the Inbox conversation-list header on the same surface tone as the list column (non-white) for consistent sidebar visuals across dashboard modules.
@@ -688,6 +693,7 @@ MVP is successful when:
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
+- **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.
 - **Instagram MVP Channel Strategy:** Implemented via Meta Instagram Messaging API with OAuth-based channel setup (auto-resolved `page_id` + `instagram_business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (first turn must come from customer inbound message).
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.

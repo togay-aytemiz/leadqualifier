@@ -10,6 +10,7 @@ import { matchesCatalog } from '@/lib/leads/catalog'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
+import { resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
 import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -618,6 +619,32 @@ export async function sendMessage(
 
     if (!conversation) throw new Error('Conversation not found')
     if (!conversation.contact_phone) throw new Error('Conversation contact is missing')
+
+    if (conversation.platform === 'whatsapp') {
+        const { data: latestInbound, error: latestInboundError } = await supabase
+            .from('messages')
+            .select('created_at')
+            .eq('conversation_id', conversationId)
+            .eq('sender_type', 'contact')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (latestInboundError) {
+            console.error('Failed to validate WhatsApp reply window:', latestInboundError)
+            throw new Error('Failed to validate WhatsApp conversation state')
+        }
+
+        const replyWindowState = resolveWhatsAppReplyWindowState({
+            latestInboundAt: latestInbound?.created_at ?? null
+        })
+        if (!replyWindowState.canReply) {
+            if (replyWindowState.reason === 'missing_inbound') {
+                throw new Error('WhatsApp messages can only be sent after the customer starts the conversation')
+            }
+            throw new Error('WhatsApp free-form reply window has expired')
+        }
+    }
 
     const asConfigRecord = (value: Json): Record<string, Json | undefined> => {
         if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}

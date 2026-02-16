@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils'
 import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
 import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
+import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -163,7 +164,6 @@ export function InboxContainer({
             setIsMobileConversationOpen(false)
         }
     }, [selectedId])
-
 
     const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
@@ -690,7 +690,7 @@ export function InboxContainer({
 
     const handleSendMessage = async () => {
         if (isReadOnly) return
-        if (!selectedId || !input.trim() || isSending) return
+        if (!selectedId || !input.trim() || isSending || isWhatsAppReplyBlocked) return
         const tempMsg: Message = {
             id: 'temp-' + Date.now(),
             conversation_id: selectedId,
@@ -910,6 +910,22 @@ export function InboxContainer({
     const selectedConversation = conversations.find(c => c.id === selectedId)
     const showConversationSkeleton = shouldShowConversationSkeleton(selectedConversation?.id ?? null, loadedConversationId)
     const visibleMessages = showConversationSkeleton ? [] : messages
+    const isWhatsAppConversation = selectedConversation?.platform === 'whatsapp'
+    const latestWhatsAppInboundAt = isWhatsAppConversation && !showConversationSkeleton
+        ? getLatestContactMessageAt(visibleMessages)
+        : null
+    const whatsappReplyWindowState = isWhatsAppConversation && !showConversationSkeleton
+        ? resolveWhatsAppReplyWindowState({
+            latestInboundAt: latestWhatsAppInboundAt
+        })
+        : null
+    const isWhatsAppReplyBlocked = Boolean(whatsappReplyWindowState && !whatsappReplyWindowState.canReply)
+    const whatsappReplyBlockedTooltip = whatsappReplyWindowState?.reason === 'window_expired'
+        ? t('whatsappReplyWindow.tooltipExpired')
+        : t('whatsappReplyWindow.tooltipNoInbound')
+    const whatsappComposerOverlayMessage = whatsappReplyWindowState?.reason === 'window_expired'
+        ? t('whatsappReplyWindow.composerLockedExpired')
+        : t('whatsappReplyWindow.composerLockedNoInbound')
 
     const resolvedBotMode = (botMode ?? 'active')
     // NEW: Use explicit state from conversation
@@ -920,7 +936,7 @@ export function InboxContainer({
         botMode: resolvedBotMode
     })
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
-    const isComposerDisabled = isReadOnly || showConversationSkeleton
+    const isComposerDisabled = isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked
     const canSend = !!input.trim() && !isSending && !isComposerDisabled
     const contactMessageCount = visibleMessages.filter(m => m.sender_type === 'contact').length
     const hasBotMessage = visibleMessages.some(m => m.sender_type === 'bot')
@@ -1209,54 +1225,86 @@ export function InboxContainer({
                                 </div>
                             </div>
                             <div className="mb-1">
-                                <div
-                                    className="relative inline-flex group"
-                                    title={!canSummarize ? t('summary.tooltip.insufficient') : undefined}
-                                >
-                                    <div className={`inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 transition-all duration-300 ${summaryHeaderDisabled ? 'opacity-60' : ''}`}>
-                                        <button
-                                            type="button"
-                                            onClick={handleToggleSummary}
-                                            disabled={summaryHeaderDisabled}
-                                            aria-expanded={isSummaryOpen}
-                                            aria-controls={SUMMARY_PANEL_ID}
-                                            className="flex items-center gap-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed"
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div
+                                            className="relative inline-flex group"
+                                            title={!canSummarize ? t('summary.tooltip.insufficient') : undefined}
                                         >
-                                            <span className="relative inline-flex h-5 w-5 items-center justify-center">
-                                                <span
-                                                    aria-hidden
-                                                    className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 opacity-80 blur-[3px]"
-                                                />
-                                                <span
-                                                    aria-hidden
-                                                    className={`relative inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 shadow-[0_0_8px_rgba(168,85,247,0.55)] transition-transform duration-300 ${
-                                                        isSummaryOpen ? 'scale-105' : ''
-                                                    }`}
+                                            <div className={`inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 transition-all duration-300 ${summaryHeaderDisabled ? 'opacity-60' : ''}`}>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleToggleSummary}
+                                                    disabled={summaryHeaderDisabled}
+                                                    aria-expanded={isSummaryOpen}
+                                                    aria-controls={SUMMARY_PANEL_ID}
+                                                    className="flex items-center gap-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed"
                                                 >
-                                                    <HiMiniSparkles className="text-white" size={12} />
-                                                </span>
-                                            </span>
-                                            {t('summary.button')}
-                                            <ChevronDown
-                                                className={`text-gray-500 transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`}
-                                                size={14}
-                                            />
-                                        </button>
-                                        {showSummaryRefresh && (
-                                            <button
-                                                type="button"
-                                                onClick={handleRefreshSummary}
-                                                disabled={summaryRefreshDisabled}
-                                                className="ml-1 h-8 w-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                                            >
-                                                <RotateCw size={16} />
-                                                <span className="sr-only">{t('summary.refresh')}</span>
-                                            </button>
-                                        )}
+                                                    <span className="relative inline-flex h-5 w-5 items-center justify-center">
+                                                        <span
+                                                            aria-hidden
+                                                            className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 opacity-80 blur-[3px]"
+                                                        />
+                                                        <span
+                                                            aria-hidden
+                                                            className={`relative inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 shadow-[0_0_8px_rgba(168,85,247,0.55)] transition-transform duration-300 ${
+                                                                isSummaryOpen ? 'scale-105' : ''
+                                                            }`}
+                                                        >
+                                                            <HiMiniSparkles className="text-white" size={12} />
+                                                        </span>
+                                                    </span>
+                                                    {t('summary.button')}
+                                                    <ChevronDown
+                                                        className={`text-gray-500 transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`}
+                                                        size={14}
+                                                    />
+                                                </button>
+                                                {showSummaryRefresh && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRefreshSummary}
+                                                        disabled={summaryRefreshDisabled}
+                                                        className="ml-1 h-8 w-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    >
+                                                        <RotateCw size={16} />
+                                                        <span className="sr-only">{t('summary.refresh')}</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {!canSummarize && (
+                                                <div className="pointer-events-none absolute left-0 top-full mt-2 z-10 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                                                    {t('summary.tooltip.insufficient')}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    {!canSummarize && (
-                                        <div className="pointer-events-none absolute left-0 top-full mt-2 z-10 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
-                                            {t('summary.tooltip.insufficient')}
+                                    {isWhatsAppConversation && whatsappReplyWindowState && (
+                                        <div className="relative group shrink-0">
+                                            <span
+                                                className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${
+                                                    whatsappReplyWindowState.canReply
+                                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                        : 'border-amber-200 bg-amber-50 text-amber-800'
+                                                }`}
+                                                title={!whatsappReplyWindowState.canReply ? whatsappReplyBlockedTooltip : undefined}
+                                                aria-label={!whatsappReplyWindowState.canReply ? whatsappReplyBlockedTooltip : undefined}
+                                            >
+                                                <span
+                                                    className={`h-1.5 w-1.5 rounded-full ${
+                                                        whatsappReplyWindowState.canReply ? 'bg-emerald-500' : 'bg-amber-500'
+                                                    }`}
+                                                    aria-hidden
+                                                />
+                                                {whatsappReplyWindowState.canReply
+                                                    ? t('whatsappReplyWindow.replyable')
+                                                    : t('whatsappReplyWindow.blocked')}
+                                            </span>
+                                            {!whatsappReplyWindowState.canReply && (
+                                                <div className="pointer-events-none absolute right-0 top-full z-10 mt-2 max-w-[260px] rounded-md bg-gray-900 px-2.5 py-1.5 text-xs leading-4 text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                                                    {whatsappReplyBlockedTooltip}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1337,28 +1385,46 @@ export function InboxContainer({
                             )}
 
                             <div className="flex items-center gap-2 lg:gap-3">
-                                <div className="flex items-center gap-2 flex-1 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
-                                    <IconButton icon={Paperclip} size="sm" />
-                                    <IconButton icon={Image} size="sm" />
-                                    <div className="h-6 w-px bg-gray-200 mx-1" />
-                                    <textarea
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        disabled={isComposerDisabled}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault()
-                                                handleSendMessage()
-                                            }
-                                        }}
-                                        rows={1}
-                                        className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 h-6 min-h-[24px]"
-                                        placeholder={inputPlaceholder}
-                                    />
+                                <div className="relative flex-1">
+                                    {isWhatsAppReplyBlocked && (
+                                        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border border-amber-200 bg-white/90 px-3 text-center text-xs font-medium text-amber-900">
+                                            {whatsappComposerOverlayMessage}
+                                        </div>
+                                    )}
+                                    <div className={`flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppReplyBlocked ? 'opacity-60' : ''}`}>
+                                        <IconButton
+                                            icon={Paperclip}
+                                            size="sm"
+                                            disabled={isComposerDisabled}
+                                            className="disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                        <IconButton
+                                            icon={Image}
+                                            size="sm"
+                                            disabled={isComposerDisabled}
+                                            className="disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                        <div className="h-6 w-px bg-gray-200 mx-1" />
+                                        <textarea
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            disabled={isComposerDisabled}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault()
+                                                    handleSendMessage()
+                                                }
+                                            }}
+                                            rows={1}
+                                            className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 h-6 min-h-[24px]"
+                                            placeholder={inputPlaceholder}
+                                        />
+                                    </div>
                                 </div>
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!canSend}
+                                    title={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
                                     className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${canSend
                                         ? 'bg-blue-500 text-white hover:bg-blue-600'
                                         : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'

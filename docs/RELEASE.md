@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- Added shared WhatsApp reply-window helper + unit tests (`src/lib/whatsapp/reply-window.ts`, `src/lib/whatsapp/reply-window.test.ts`) to calculate 24-hour reply eligibility from the latest inbound customer message.
+- Added pricing and credit calibration guide `docs/plans/2026-02-16-pricing-credit-strategy-guide.md` covering token-cost formulas, trial-credit option comparison (`100/120/200/250/1000`), and recommended pre-pilot package/top-up baseline.
 - Added migration `00060_topup_premium_eligibility_update.sql` to align SQL entitlement + mock checkout behavior with the updated top-up policy (premium-active organizations can purchase extra credits without waiting for package exhaustion).
 - Added sidebar billing-progress helper + unit tests to compute decreasing remaining-credit progress for trial/premium states (`src/lib/billing/sidebar-progress.ts`, `src/lib/billing/sidebar-progress.test.ts`).
 - Added billing checkout refresh signal helper + unit tests so query-based checkout state changes can trigger deterministic billing snapshot refresh in client navigation surfaces (`src/lib/billing/refresh-signal.ts`, `src/lib/billing/refresh-signal.test.ts`).
@@ -131,6 +133,8 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Inbox composer header to include a far-right WhatsApp replyability indicator (`Reply available / Reply unavailable`) beside the summary control, with tooltip reason when sending is blocked (`src/components/inbox/InboxContainer.tsx`, `messages/en.json`, `messages/tr.json`).
+- Changed Inbox composer behavior for WhatsApp: when the 24-hour free-form window is closed, manual input/send is disabled with a short overlay message, while `active_agent` remains unchanged (`src/components/inbox/InboxContainer.tsx`).
 - Changed mobile More-menu usage card to show the same low-credit warning badge used by desktop/sidebar/plans when remaining credits fall below 10% (`src/design/MobileBottomNav.tsx`).
 - Changed desktop collapsed sidebar billing visibility by adding a compact circular credit-progress chip (segment-aware package + extra-credit ring) with hover tooltip details and Plans deep-link, so remaining credits stay visible even when the sidebar is collapsed (`src/design/MainSidebar.tsx`).
 - Changed Plans > Current plan extra-credit card to mirror monthly-package credit semantics: replaced status copy with remaining/total values and added a dedicated depletion progress bar using purple styling (`src/app/[locale]/(dashboard)/settings/plans/page.tsx`).
@@ -260,6 +264,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed WhatsApp manual-send policy gap by adding server-side 24-hour free-form window validation in `sendMessage`, preventing API send attempts when the reply window is closed or inbound customer message is missing (`src/lib/inbox/actions.ts`).
 - Fixed premium extra-credit checkout being blocked (`topup_not_allowed`) on environments still running the legacy DB top-up rule by adding a compatibility fallback in `simulateMockTopupCheckout` that validates premium membership and completes the mock top-up flow via service-role writes (`src/lib/billing/mock-checkout.ts`, `src/lib/billing/mock-checkout.test.ts`).
 - Fixed admin dashboard used-credit inconsistencies (for example dashboard showing `0,2` while org detail showed ~`30`) by recalculating dashboard credit totals from `organization_ai_usage` with the billing-weighted credit-cost formula instead of relying on incomplete ledger rows (`src/lib/admin/read-models.ts`, `src/lib/admin/dashboard-usage-metrics.ts`).
 - Fixed mobile Settings detail back navigation history loop by switching to replace-based return flow (prevents back/forward oscillation between `/settings` and detail routes) (`src/components/settings/SettingsResponsiveShell.tsx`).

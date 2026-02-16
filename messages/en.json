@@ -297,6 +297,14 @@
                 "insufficient": "Not enough messages for a summary"
             }
         },
+        "whatsappReplyWindow": {
+            "replyable": "Reply available",
+            "blocked": "Reply unavailable",
+            "tooltipExpired": "24-hour WhatsApp reply window has expired. Template messaging is disabled in MVP.",
+            "tooltipNoInbound": "A customer message is required before sending via WhatsApp API.",
+            "composerLockedExpired": "24-hour window expired. Send from phone if needed.",
+            "composerLockedNoInbound": "Wait for a customer message to start this conversation."
+        },
         "details": "Details",
         "hideDetails": "Hide details",
         "backToInbox": "Back to inbox",
