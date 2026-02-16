@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { SkillsContainer } from '@/components/skills/SkillsContainer'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getLocale, getTranslations } from 'next-intl/server'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,6 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
 
     console.log('SkillsPage search query:', query)
 
-
     const {
         data: { user },
     } = await supabase.auth.getUser()
@@ -31,6 +31,15 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
     const orgContext = await resolveActiveOrganizationContext(supabase)
     const organizationId = orgContext?.activeOrganizationId ?? null
 
+    if (organizationId) {
+        await enforceWorkspaceAccessOrRedirect({
+            organizationId,
+            locale,
+            currentPath: '/skills',
+            supabase,
+            bypassLock: orgContext?.isSystemAdmin ?? false
+        })
+    }
 
     let skills: Awaited<ReturnType<typeof getSkills>> = []
     let handoverMessage = locale === 'tr' ? DEFAULT_HANDOVER_MESSAGE_TR : DEFAULT_HANDOVER_MESSAGE_EN

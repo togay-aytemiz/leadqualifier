@@ -10,11 +10,12 @@ import {
     HiMiniSquare3Stack3D,
     HiMiniUser,
     HiOutlineChatBubbleBottomCenterText,
+    HiOutlineCreditCard,
     HiOutlineSparkles,
     HiOutlineSquare3Stack3D,
     HiOutlineUser
 } from 'react-icons/hi2'
-import { AlertCircle, LogOut, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
+import { AlertCircle, Banknote, LogOut, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
@@ -26,6 +27,7 @@ import {
     calculateSidebarBillingProgressSegments,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 
 interface NavItem {
     id: Exclude<MobileNavItemId, 'other'>
@@ -63,39 +65,51 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         [searchParams]
     )
 
-    const navItems = useMemo<NavItem[]>(
-        () => [
-            {
-                id: 'inbox',
-                href: '/inbox',
-                label: tNav('inbox'),
-                icon: HiOutlineChatBubbleBottomCenterText,
-                activeIcon: HiMiniChatBubbleBottomCenterText
-            },
-            {
-                id: 'contacts',
-                href: '/leads',
-                label: tNav('leads'),
-                icon: HiOutlineUser,
-                activeIcon: HiMiniUser
-            },
-            {
-                id: 'skills',
-                href: '/skills',
-                label: tNav('skills'),
-                icon: HiOutlineSparkles,
-                activeIcon: HiMiniSparkles
-            },
-            {
-                id: 'knowledge',
-                href: '/knowledge',
-                label: tNav('knowledgeBase'),
-                icon: HiOutlineSquare3Stack3D,
-                activeIcon: HiMiniSquare3Stack3D
-            }
-        ],
-        [tNav]
+    const workspaceAccess = useMemo(
+        () => resolveWorkspaceAccessState(billingSnapshot),
+        [billingSnapshot]
     )
+    const shouldRestrictToBilling = workspaceAccess.isLocked
+    const navItems = useMemo<NavItem[]>(
+        () => {
+            if (shouldRestrictToBilling) {
+                return []
+            }
+
+            return [
+                {
+                    id: 'inbox',
+                    href: '/inbox',
+                    label: tNav('inbox'),
+                    icon: HiOutlineChatBubbleBottomCenterText,
+                    activeIcon: HiMiniChatBubbleBottomCenterText
+                },
+                {
+                    id: 'contacts',
+                    href: '/leads',
+                    label: tNav('leads'),
+                    icon: HiOutlineUser,
+                    activeIcon: HiMiniUser
+                },
+                {
+                    id: 'skills',
+                    href: '/skills',
+                    label: tNav('skills'),
+                    icon: HiOutlineSparkles,
+                    activeIcon: HiMiniSparkles
+                },
+                {
+                    id: 'knowledge',
+                    href: '/knowledge',
+                    label: tNav('knowledgeBase'),
+                    icon: HiOutlineSquare3Stack3D,
+                    activeIcon: HiMiniSquare3Stack3D
+                }
+            ]
+        },
+        [shouldRestrictToBilling, tNav]
+    )
+    const navGridColumnsClass = navItems.length > 0 ? 'grid-cols-5' : 'grid-cols-1'
 
     useEffect(() => {
         const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings', '/settings/plans', '/settings/billing']
@@ -321,22 +335,34 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                 )}
                             </Link>
                         )}
+                        {!shouldRestrictToBilling && (
+                            <Link
+                                href="/simulator"
+                                onClick={() => setIsOtherOpen(false)}
+                                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                            >
+                                <Puzzle size={16} />
+                                {tNav('simulator')}
+                            </Link>
+                        )}
                         <Link
-                            href="/simulator"
+                            href={shouldRestrictToBilling ? '/settings/plans' : '/settings'}
                             onClick={() => setIsOtherOpen(false)}
                             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                         >
-                            <Puzzle size={16} />
-                            {tNav('simulator')}
+                            {shouldRestrictToBilling ? <HiOutlineCreditCard size={16} /> : <Settings size={16} />}
+                            {shouldRestrictToBilling ? tSidebar('billingPlansLink') : tNav('settings')}
                         </Link>
-                        <Link
-                            href="/settings"
-                            onClick={() => setIsOtherOpen(false)}
-                            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                            <Settings size={16} />
-                            {tNav('settings')}
-                        </Link>
+                        {shouldRestrictToBilling && (
+                            <Link
+                                href="/settings/billing"
+                                onClick={() => setIsOtherOpen(false)}
+                                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                            >
+                                <Banknote size={16} />
+                                {tSidebar('billingUsageLink')}
+                            </Link>
+                        )}
                         <form action="/api/auth/signout" method="POST">
                             <button
                                 type="submit"
@@ -351,7 +377,10 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
             )}
 
             <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden">
-                <div className="grid grid-cols-5 gap-1 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2">
+                <div className={cn(
+                    'grid gap-1 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2',
+                    navGridColumnsClass
+                )}>
                     {navItems.map((item) => {
                         const isActive = activeItem === item.id
                         const Icon = isActive ? item.activeIcon : item.icon

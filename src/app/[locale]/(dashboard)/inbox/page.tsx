@@ -6,9 +6,11 @@ import { InboxContainer } from '@/components/inbox/InboxContainer'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { redirect } from 'next/navigation'
 import { Building2 } from 'lucide-react'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function InboxPage() {
+    const locale = await getLocale()
     const t = await getTranslations('inbox')
     const supabase = await createClient()
 
@@ -34,6 +36,14 @@ export default async function InboxPage() {
             </div>
         )
     }
+
+    await enforceWorkspaceAccessOrRedirect({
+        organizationId,
+        locale,
+        currentPath: '/inbox',
+        supabase,
+        bypassLock: orgContext?.isSystemAdmin ?? false
+    })
 
     const [conversations, aiSettings, requiredIntakeFields] = await Promise.all([
         getConversations(organizationId),

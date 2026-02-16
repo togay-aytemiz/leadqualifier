@@ -23,6 +23,7 @@ import {
 
 interface SettingsResponsiveShellProps {
     pendingCount: number
+    billingOnlyMode?: boolean
     children?: ReactNode
 }
 
@@ -43,7 +44,11 @@ function getLocalizedHref(locale: string, href: string): string {
     return `/${locale}${href}`
 }
 
-export function SettingsResponsiveShell({ pendingCount, children }: SettingsResponsiveShellProps) {
+export function SettingsResponsiveShell({
+    pendingCount,
+    billingOnlyMode = false,
+    children
+}: SettingsResponsiveShellProps) {
     const locale = useLocale()
     const pathname = usePathname()
     const router = useRouter()
@@ -53,57 +58,65 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
     const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const isClosingRef = useRef(false)
     const settingsRootHref = getLocalizedHref(locale, '/settings')
-    const navItems = useMemo<SettingsNavItem[]>(() => [
-        {
-            id: 'profile',
-            group: 'preferences',
-            label: tSidebar('profile'),
-            href: getLocalizedHref(locale, '/settings/profile'),
-            icon: <HiOutlineUserCircle size={18} />,
-            active: activeItem === 'profile'
-        },
-        {
-            id: 'organization',
-            group: 'preferences',
-            label: tSidebar('organization'),
-            href: getLocalizedHref(locale, '/settings/organization'),
-            icon: <HiOutlineBriefcase size={18} />,
-            active: activeItem === 'organization',
-            indicator: pendingCount > 0
-        },
-        {
-            id: 'ai',
-            group: 'preferences',
-            label: tSidebar('ai'),
-            href: getLocalizedHref(locale, '/settings/ai'),
-            icon: <HiOutlineSparkles size={18} />,
-            active: activeItem === 'ai'
-        },
-        {
-            id: 'channels',
-            group: 'integrations',
-            label: tSidebar('channels'),
-            href: getLocalizedHref(locale, '/settings/channels'),
-            icon: <HiOutlineChatBubbleLeftRight size={18} />,
-            active: activeItem === 'channels'
-        },
-        {
-            id: 'plans',
-            group: 'billing',
-            label: tSidebar('plans'),
-            href: getLocalizedHref(locale, '/settings/plans'),
-            icon: <HiOutlineCreditCard size={18} />,
-            active: activeItem === 'plans'
-        },
-        {
-            id: 'billing',
-            group: 'billing',
-            label: tSidebar('receipts'),
-            href: getLocalizedHref(locale, '/settings/billing'),
-            icon: <HiOutlineBanknotes size={18} />,
-            active: activeItem === 'billing'
+    const navItems = useMemo<SettingsNavItem[]>(() => {
+        const fullNavItems: SettingsNavItem[] = [
+            {
+                id: 'profile',
+                group: 'preferences',
+                label: tSidebar('profile'),
+                href: getLocalizedHref(locale, '/settings/profile'),
+                icon: <HiOutlineUserCircle size={18} />,
+                active: activeItem === 'profile'
+            },
+            {
+                id: 'organization',
+                group: 'preferences',
+                label: tSidebar('organization'),
+                href: getLocalizedHref(locale, '/settings/organization'),
+                icon: <HiOutlineBriefcase size={18} />,
+                active: activeItem === 'organization',
+                indicator: pendingCount > 0
+            },
+            {
+                id: 'ai',
+                group: 'preferences',
+                label: tSidebar('ai'),
+                href: getLocalizedHref(locale, '/settings/ai'),
+                icon: <HiOutlineSparkles size={18} />,
+                active: activeItem === 'ai'
+            },
+            {
+                id: 'channels',
+                group: 'integrations',
+                label: tSidebar('channels'),
+                href: getLocalizedHref(locale, '/settings/channels'),
+                icon: <HiOutlineChatBubbleLeftRight size={18} />,
+                active: activeItem === 'channels'
+            },
+            {
+                id: 'plans',
+                group: 'billing',
+                label: tSidebar('plans'),
+                href: getLocalizedHref(locale, '/settings/plans'),
+                icon: <HiOutlineCreditCard size={18} />,
+                active: activeItem === 'plans'
+            },
+            {
+                id: 'billing',
+                group: 'billing',
+                label: tSidebar('receipts'),
+                href: getLocalizedHref(locale, '/settings/billing'),
+                icon: <HiOutlineBanknotes size={18} />,
+                active: activeItem === 'billing'
+            }
+        ]
+
+        if (!billingOnlyMode) {
+            return fullNavItems
         }
-    ], [activeItem, locale, pendingCount, tSidebar])
+
+        return fullNavItems.filter((item) => item.group === 'billing')
+    }, [activeItem, billingOnlyMode, locale, pendingCount, tSidebar])
     const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
 
     useEffect(() => {
@@ -180,42 +193,48 @@ export function SettingsResponsiveShell({ pendingCount, children }: SettingsResp
 
         return (
             <>
-                <SidebarGroup title={tSidebar('preferences')}>
-                    {preferences.map((item) => (
-                        <SidebarItem
-                            key={item.id}
-                            icon={item.icon}
-                            label={item.label}
-                            href={item.href}
-                            active={item.active}
-                            indicator={item.indicator}
-                        />
-                    ))}
-                </SidebarGroup>
+                {preferences.length > 0 && (
+                    <SidebarGroup title={tSidebar('preferences')}>
+                        {preferences.map((item) => (
+                            <SidebarItem
+                                key={item.id}
+                                icon={item.icon}
+                                label={item.label}
+                                href={item.href}
+                                active={item.active}
+                                indicator={item.indicator}
+                            />
+                        ))}
+                    </SidebarGroup>
+                )}
 
-                <SidebarGroup title={tSidebar('integrations')}>
-                    {integrations.map((item) => (
-                        <SidebarItem
-                            key={item.id}
-                            icon={item.icon}
-                            label={item.label}
-                            href={item.href}
-                            active={item.active}
-                        />
-                    ))}
-                </SidebarGroup>
+                {integrations.length > 0 && (
+                    <SidebarGroup title={tSidebar('integrations')}>
+                        {integrations.map((item) => (
+                            <SidebarItem
+                                key={item.id}
+                                icon={item.icon}
+                                label={item.label}
+                                href={item.href}
+                                active={item.active}
+                            />
+                        ))}
+                    </SidebarGroup>
+                )}
 
-                <SidebarGroup title={tSidebar('billing')}>
-                    {billing.map((item) => (
-                        <SidebarItem
-                            key={item.id}
-                            icon={item.icon}
-                            label={item.label}
-                            href={item.href}
-                            active={item.active}
-                        />
-                    ))}
-                </SidebarGroup>
+                {billing.length > 0 && (
+                    <SidebarGroup title={tSidebar('billing')}>
+                        {billing.map((item) => (
+                            <SidebarItem
+                                key={item.id}
+                                icon={item.icon}
+                                label={item.label}
+                                href={item.href}
+                                active={item.active}
+                            />
+                        ))}
+                    </SidebarGroup>
+                )}
             </>
         )
     }

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-16 (Inbox now surfaces WhatsApp 24-hour reply-window state directly in the composer header: a right-aligned `reply available / reply unavailable` indicator with tooltip reason, plus composer lock + overlay when the window is closed. MVP keeps template messaging out of scope and preserves current `active_agent` state when the window expires.)  
+> **Last Updated:** 2026-02-16 (Inbox now surfaces WhatsApp 24-hour reply-window state directly in the composer header: a right-aligned `reply available / reply unavailable` indicator with tooltip reason, plus composer lock + overlay when the window is closed. MVP keeps template messaging out of scope and preserves current `active_agent` state when the window expires. Pricing rollout is now implemented end-to-end: final Starter/Growth/Scale + top-up ladder decisions, safe monthly conversation-range copy in `/settings/plans`, locale-based TRY/USD rendering, and system-admin TRY/USD pricing controls in `/admin/billing` backed by migration `00061_multicurrency_pricing_catalog.sql`. Plans UI copy was then simplified to user-friendly language (TR package names + explicit current package label), top-up UX was refined to a single `Kredi al / Buy credits` CTA with modal package selection, package-card CTA spacing/alignment was tightened, Scale baseline price was updated to `999 TRY`, and a full-width custom-package CTA (`Daha fazla kredi mi lazım?`) was added with `mailto:askqualy@gmail.com`. `/settings/plans` now also includes self-serve subscription renewal controls (auto-renew on/off) so premium users can manually stop renewal at period end and re-enable it without admin support, backed by migration `00062_mock_subscription_renewal_controls.sql`. Billing hard-lock now enforces `Plans + Usage only` tenant access when trial/premium entitlement is locked, with route-level redirects and inbox read/send lock. Package-change UX now mirrors common SaaS behavior: direct downgrade CTA is hidden from tier cards, downgrades are scheduled for next cycle, and effective date is shown in plan management, backed by `00063_mock_checkout_schedule_downgrades.sql`.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -499,14 +499,17 @@
 
 ## Phase 8.5: Monetization & Subscription (Pre-Pilot)
 - [ ] **Pricing Strategy**
-  - [ ] Define plan tiers, quotas, and overage policy
+  - [x] Define plan tiers, quotas, and overage policy
   - [x] Confirm launch pricing posture: low-entry starter around ~USD 10 equivalent (TRY-localized) to reduce first-purchase friction
   - [x] Lock billing order: recurring monthly premium package first, then optional credit top-up overflow
   - [x] Lock top-up eligibility: disabled during trial; enabled for any active premium organization (package exhaustion not required)
   - [x] Lock package credit policy: monthly package credits do not roll over to the next billing cycle
   - [x] Define monthly premium package defaults (`X TL` price, `Y` included credits) and admin change boundaries
   - [x] Publish pricing/credit guide with token-based COGS, trial credit option analysis (`100/120/200/250/1000`), and recommended baseline (`docs/plans/2026-02-16-pricing-credit-strategy-guide.md`)
-  - [ ] Set Turkish market price points and annual discount policy
+  - [x] Define Lovable-like `upgrade-first` reference model in pricing guide (plan-tier ladder + non-stacking mid-cycle upgrade behavior + premium burst top-up packs)
+  - [x] Add customer-facing conversation-equivalent ranges and package-level cost/profit tables to pricing guide
+  - [x] Set Turkish market baseline price points and localized USD prices (admin-configurable TRY/USD per plan and top-up)
+  - [ ] Define annual discount policy
   - [ ] Finalize feature gating by plan (channels, AI limits, seats)
 - [ ] **Plan Purchase (Online Payment)**
   - [ ] Select payment provider + integration model (TR compliance and invoice requirements; recurring subscriptions required)
@@ -520,7 +523,7 @@
 - [ ] **Trial Policy Finalization**
   - [x] Decide trial model: trial-only launch (no freemium plan in pre-pilot)
   - [x] Define trial end behavior and lock rule: system locks token-consuming features when either time or credit cap is reached first
-  - [x] Define trial limits and precedence (`14 days`, `120.0 credits`, precedence: whichever is reached first)
+  - [x] Define trial limits and precedence (`14 days`, `200.0 credits`, precedence: whichever is reached first)
   - [ ] Finalize upgrade prompts for in-product conversion
   - [ ] Add grace/extension policy for manual sales-assisted overrides (if needed)
 - [ ] **Paywall Implementation (Execution)**
@@ -542,9 +545,14 @@
   - [x] Make sidebar usage card compact: default view shows remaining credits + decreasing progress bar, with chevron-expand breakdown (package vs extra credits)
   - [x] Gate system-admin tenant sidebar sections behind explicit organization selection (no selection shows only Admin navigation)
   - [x] Move platform billing default controls from `/admin` dashboard to dedicated `/admin/billing` page
+  - [x] Expand platform billing defaults for multi-currency pricing catalog (Starter/Growth/Scale + top-up 250/500/1000 in TRY/USD) and seed final baseline values via migration `00061_multicurrency_pricing_catalog.sql`
+  - [x] Overhaul `/settings/plans` with package ladder + top-up ladder, locale-based currency display (TR=TRY, EN=USD), and safe monthly conversation-range marketing copy
   - [x] Standardize `/admin` tables as full-width with horizontal overflow support
   - [x] Fix admin empty-state rendering on server routes by avoiding non-serializable icon component props across server-client boundaries
   - [x] Add mock checkout simulation (subscription + top-up success/failure states) to validate flow before real provider integration
+  - [x] Add tenant self-serve subscription renewal controls in `/settings/plans` (turn auto-renew off/on with period-end effect) backed by migration `00062_mock_subscription_renewal_controls.sql`
+  - [x] Align package-change UX with common SaaS behavior: upgrades stay immediate, downgrades are scheduled to next cycle with effective-date messaging, and tier cards hide direct downgrade CTA (`00063_mock_checkout_schedule_downgrades.sql`)
+  - [x] Enforce billing hard-lock workspace mode: when entitlement is locked, tenant access is restricted to `/settings/plans` and `/settings/billing` only; inbox read/send access is blocked
   - [x] Backfill existing non-system-admin organizations into trial mode baseline for rollout (`00058` migration)
   - [ ] Add recurring premium checkout + top-up checkout + payment webhook sync + idempotent credit grants
 - [ ] **Trial Abuse Prevention**

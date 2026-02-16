@@ -257,6 +257,8 @@
         "billingPaymentRequiredSubline": "Devam etmek için ödeme güncellemesi gerekli.",
         "billingContactSupportSubline": "Kullanım yönetici tarafından kilitli. Destekle iletişime geç.",
         "billingUsageMenuLabel": "Kullanım detayları",
+        "billingPlansLink": "Planlar",
+        "billingUsageLink": "Kullanım",
         "billingExpandDetails": "Kırılımı göster",
         "billingCollapseDetails": "Kırılımı gizle",
         "billingBreakdownPackage": "Paket",
@@ -505,8 +507,8 @@
         "receipts": "Kullanım"
     },
     "billingPlans": {
-        "pageTitle": "Planlar",
-        "description": "Mevcut planını ve kredi satın alımını yönet.",
+        "pageTitle": "Planlar ve Krediler",
+        "description": "Aylık paketini seç, gerektiğinde tek seferlik ek kredi al.",
         "noOrganization": "Organizasyon Bulunamadı",
         "noOrganizationDesc": "Planları yönetmek için bir organizasyona bağlı olmalısınız.",
         "creditsUnit": "kredi",
@@ -523,77 +525,115 @@
             "title": "Mevcut plan",
             "description": "Plan durumunu ve kalan kredini gör.",
             "membershipLabel": "Plan durumu",
-            "lockRuleTrial": "Ücretsiz deneme kullanımında süre veya ücretsiz deneme kredisi hangisi önce biterse sistem kilitlenir.",
-            "lockRulePremium": "Ek kredi aktif premium aboneliklerde kullanılabilir.",
-            "structureHint": "Bu sayfa plan durumu ve satın alma aksiyonları içindir.",
+            "currentPackage": "Mevcut aylık paketiniz: {plan}",
+            "currentPackageUnknown": "Mevcut aylık paketiniz: Belirlenemedi",
             "trialCreditsTitle": "Ücretsiz deneme kredileri",
             "trialTimeTitle": "Ücretsiz deneme süresi",
             "packageCreditsTitle": "Aylık paket",
             "topupCreditsTitle": "Ek kredi bakiyesi",
-            "upgradeOfferTitle": "Yükseltme teklifi",
-            "nonActiveMembershipNote": "Plan aktif değil. Aşağıdan işlem yapabilirsin.",
+            "nonActiveMembershipNote": "Plan aktif değil. Aşağıdan bir paket işlemiyle devam edebilirsin.",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "gün",
-            "trialCredits": "Ücretsiz deneme kredileri: {remaining} / {limit}",
-            "trialDays": "Ücretsiz deneme için kalan gün: {days}",
             "trialEndsAt": "Ücretsiz deneme bitişi: {date}",
-            "packageCredits": "Paket kredileri: {remaining} / {limit}",
-            "topupCredits": "Ek kredi: {remaining}",
             "packageResetAt": "Sıfırlanma: {date}",
-            "topupAllowed": "Ek kredi kullanılabilir.",
-            "topupBlocked": "Ek kredi için aktif premium abonelik gerekir.",
             "lowCreditWarning": "Kullanım limitine yaklaşılıyor",
             "unavailable": "Plan durumu alınamıyor."
         },
+        "packageCatalog": {
+            "title": "Aylık paketler",
+            "description": "İşletmene en uygun aylık paketi seç.",
+            "currentPackageActive": "Mevcut aylık paketiniz: {plan}",
+            "currentPackageInactive": "Şu an aktif bir aylık paketiniz yok.",
+            "assumption": "Aşağıdaki konuşma sayıları yaklaşık değerlerdir; müşteri mesaj uzunluğu ve konuşma akışına göre değişebilir.",
+            "planNames": {
+                "starter": "Başlangıç",
+                "growth": "Büyüme",
+                "scale": "Kurumsal"
+            },
+            "badges": {
+                "current": "Aktif paket",
+                "popular": "Önerilen",
+                "scheduled": "Planlandı"
+            },
+            "month": "ay",
+            "creditsIncluded": "{credits} kredi dahil",
+            "approxConversations": "Ayda yaklaşık {min}-{max} konuşma",
+            "unitPrice": "Kredi başı {price}",
+        "planCta": {
+            "start": "Planı başlat",
+            "upgrade": "Yükselt",
+            "downgrade": "Düşür",
+            "switch": "Planı değiştir",
+            "current": "Aktif paket"
+        },
+        "downgradeHiddenHint": "Daha düşük pakete geçiş, aşağıdaki paket yönetimi alanından dönem sonu için planlanır.",
+        "planManagement": {
+            "title": "Paket yönetimi",
+            "description": "Daha düşük bir pakete geçmek istersen değişiklik mevcut dönem bitiminde devreye girer.",
+            "submit": "Bir sonraki dönem için planla",
+            "pendingWithDate": "{plan} paketi {date} tarihinde devreye girecek.",
+            "pendingNoDate": "{plan} paketi bir sonraki dönem başlangıcında devreye girecek.",
+            "pendingUnknown": "Daha düşük paket değişikliği bir sonraki dönem için planlandı."
+        },
+        "customPackage": {
+            "title": "Daha fazla kredi mi lazım?",
+            "description": "Daha yüksek limit veya özel paket ihtiyacın varsa konuşalım, işletmene uygun bir plan oluşturalım.",
+            "cta": "Hadi konuşalım"
+        },
+        "renewalCard": {
+            "title": "Abonelik yönetimi",
+            "description": "İstediğin zaman otomatik yenilemeyi buradan kapatıp tekrar açabilirsin.",
+            "statusLabel": "Otomatik yenileme",
+            "statusOn": "Açık",
+            "statusOff": "Kapalı",
+            "onHint": "Paketin dönem sonunda otomatik olarak yenilenir.",
+            "offHintWithDate": "Paketin {date} tarihine kadar aktif kalır. Sonrasında otomatik yenileme yapılmaz.",
+            "offHintNoDate": "Paketin mevcut dönem sonuna kadar aktif kalır. Sonrasında otomatik yenileme yapılmaz.",
+            "turnOff": "Yenilemeyi kapat",
+            "turnOn": "Yenilemeyi aç"
+        },
+        "manageHint": "Plan geçişlerini bu ekrandan yapabilirsin. Özel faturalandırma ihtiyaçları için",
+        "manageHintContact": "bize yaz.",
+        "footnote": "Konuşma aralıkları rehber niteliğindedir. Gerçek tüketim kullanım şekline göre değişebilir."
+    },
+        "topups": {
+            "sectionTitle": "Ek kredi",
+            "sectionDescription": "Kredin bittiğinde tek seferlik ek kredi alarak devam edebilirsin.",
+            "title": "Tek seferlik ek kredi",
+            "oneTimeNotice": "Ek krediler tek seferliktir, otomatik yenilenmez.",
+            "openModal": "Kredi al",
+            "approxConversations": "Yaklaşık {min}-{max} konuşma",
+            "unavailable": "Ek kredi paketleri şu anda kullanılamıyor.",
+            "modal": {
+                "title": "Ek kredi paketi seç",
+                "description": "İhtiyacına uygun kredi miktarını seç. Satın alma tek seferliktir.",
+                "selectedSummary": "Seçiminiz: {credits} kredi • {amount}",
+                "cancel": "İptal",
+                "submit": "Kredi al",
+                "close": "Kapat"
+            }
+        },
         "actions": {
-            "title": "İşlemler",
-            "description": "Premium ve ek kredi işlemleri yapalım.",
-            "mockModeNotice": "Mock ödeme modu aktif. Gerçek sağlayıcı entegrasyonundan önce success/failed sonuçlarıyla ödeme davranışını test edin.",
-            "simulatedOutcomeLabel": "Simüle ödeme sonucu",
-            "simulatedOutcome": {
-                "success": "Başarılı simüle et",
-                "failed": "Başarısız simüle et"
-            },
-            "subscribe": {
-                "title": "Premium plan",
-                "packageSummary": "Aylık {price} • {credits} kredi",
-                "alreadyActive": "Bu organizasyonda premium zaten aktif.",
-                "notConfigured": "Premium paket kredisi henüz tanımlı değil. Admin ile iletişime geçin.",
-                "activeTitle": "Premium aktif",
-                "activeDescription": "Bu organizasyon için abonelik şu anda aktif.",
-                "activeResetAt": "Mevcut dönem {date} tarihinde biter.",
-                "submit": "Premium başlat"
-            },
-            "topup": {
-                "title": "Ek kredi",
-                "packageSummary": "{credits} kredi • {amount}",
-                "submit": "Kredi ekle",
-                "oneTimeNotice": "Ek krediler tek seferliktir, aylık olarak yenilenmez.",
-                "modal": {
-                    "title": "Daha fazla kredi al",
-                    "description": "Plan limitin dolduğunda kesintisiz devam etmek için ek kredi satın al.",
-                    "packageMeta": "Tek seferlik ek kredi paketi",
-                    "cancel": "İptal",
-                    "next": "Sonraki",
-                    "close": "Modalı kapat"
-                }
-            },
-            "adminLocked": "Bu organizasyon yönetici tarafından kilitli. Faturalandırma aksiyonları kapalı.",
-            "topupBlockedTrial": "Ücretsiz deneme süresince ek kredi kapalıdır. Önce premium başlatılmalı.",
-            "topupRequiresPremium": "Ek kredi için aktif premium paket gerekir.",
-            "topupAfterPackageExhausted": "Ek kredi için aktif premium paket gerekir.",
+            "adminLocked": "Bu organizasyon yönetici tarafından kilitli. Faturalandırma işlemleri kapalı.",
+            "topupBlockedTrial": "Ücretsiz deneme süresince ek kredi kapalıdır. Önce aylık paket başlatılmalı.",
+            "topupRequiresPremium": "Ek kredi için aktif aylık paket gerekir.",
+            "topupAfterPackageExhausted": "Ek kredi için aktif aylık paket gerekir.",
             "topupUnavailable": "Ek kredi şu anda kullanılamıyor.",
             "viewUsageLink": "Kullanımı gör"
         },
         "checkoutStatus": {
             "successTitle": "Ödeme tamamlandı",
+            "scheduledTitle": "Plan değişikliği planlandı",
             "failedTitle": "Ödeme başarısız",
             "blockedTitle": "Ödeme engellendi",
             "errorTitle": "Ödeme hatası",
-            "successSubscribe": "Premium aktifleştirildi.",
-            "successTopup": "Kredi eklendi.",
-            "failedSubscribe": "Premium aktifleştirilemedi.",
-            "failedTopup": "Kredi eklenemedi.",
+            "successSubscribe": "Paket aktifleştirildi.",
+            "successTopup": "Ek kredi eklendi.",
+            "scheduledDowngradeWithDate": "Daha düşük pakete geçiş planlandı. Yeni paket {date} tarihinde başlayacak.",
+            "scheduledDowngradeNoDate": "Daha düşük pakete geçiş planlandı. Yeni paket bir sonraki dönem başlangıcında devreye girecek.",
+            "scheduledGeneric": "Paket değişikliği bir sonraki dönem için planlandı.",
+            "failedSubscribe": "Paket aktifleştirilemedi.",
+            "failedTopup": "Ek kredi eklenemedi.",
             "errors": {
                 "unauthorized": "Oturum doğrulanamadı.",
                 "invalidInput": "Checkout form değerleri geçersiz. Lütfen tekrar deneyin.",
@@ -601,6 +641,21 @@
                 "requestFailed": "Checkout isteği başarısız oldu. Lütfen tekrar deneyin.",
                 "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
                 "topupNotAllowed": "Mevcut üyelik/paket durumunda ek kredi izinli değil."
+            }
+        },
+        "renewalStatus": {
+            "successTitle": "Abonelik güncellendi",
+            "blockedTitle": "İşlem engellendi",
+            "errorTitle": "İşlem başarısız",
+            "successCancel": "Otomatik yenileme kapatıldı.",
+            "successResume": "Otomatik yenileme yeniden açıldı.",
+            "errors": {
+                "unauthorized": "Oturum doğrulanamadı.",
+                "invalidInput": "İstek verileri geçersiz. Lütfen tekrar deneyin.",
+                "notAvailable": "Bu ortamda otomatik yenileme kontrolü henüz aktif değil.",
+                "requestFailed": "İşlem tamamlanamadı. Lütfen tekrar deneyin.",
+                "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
+                "premiumRequired": "Bu işlem için aktif aylık paket gerekir."
             }
         }
     },
@@ -996,12 +1051,37 @@
         "billingControlsBanner": "Faturalandırma kontrolleri sistem yöneticileri için açıktır. Değişiklikler audit kaydına alınır, dikkatli kullanılmalıdır.",
         "billingDefaults": {
             "title": "Faturalandırma Varsayılanları (Platform)",
-            "description": "Ücretsiz deneme varsayılanlarını ve aylık premium paket varsayılanlarını yönetin.",
+            "description": "Ücretsiz deneme varsayılanlarını, aylık paket merdivenini ve ek kredi fiyatlarını yönetin.",
             "scopeNote": "Bu varsayılanlar sadece yeni oluşturulan organizasyonlara uygulanır.",
             "trialDaysLabel": "Varsayılan ücretsiz deneme günü",
             "trialCreditsLabel": "Varsayılan ücretsiz deneme kredisi",
-            "packagePriceLabel": "Varsayılan aylık paket fiyatı (TRY)",
-            "packageCreditsLabel": "Varsayılan aylık paket kredisi",
+            "sections": {
+                "trial": "Ücretsiz deneme varsayılanları",
+                "plans": "Aylık paket merdiveni (TRY / USD)",
+                "topups": "Ek kredi paketleri (TRY / USD)"
+            },
+            "planHeaders": {
+                "plan": "Plan",
+                "credits": "Kredi",
+                "priceTry": "Fiyat (TRY)",
+                "priceUsd": "Fiyat (USD)"
+            },
+            "planLabels": {
+                "starter": "Starter",
+                "growth": "Growth",
+                "scale": "Scale"
+            },
+            "topupHeaders": {
+                "pack": "Ek kredi paketi",
+                "credits": "Kredi",
+                "priceTry": "Fiyat (TRY)",
+                "priceUsd": "Fiyat (USD)"
+            },
+            "topupLabels": {
+                "topup250": "Ek kredi 250",
+                "topup500": "Ek kredi 500",
+                "topup1000": "Ek kredi 1000"
+            },
             "reasonLabel": "Değişiklik nedeni",
             "reasonPlaceholder": "Bu varsayılan neden değişiyor?",
             "submit": "Faturalandırma varsayılanlarını kaydet",

@@ -121,6 +121,9 @@ export async function getConversations(
     pageSize: number = 20
 ): Promise<ConversationListItem[]> {
     const supabase = await createClient()
+    if (await isOrganizationWorkspaceLocked(organizationId, supabase)) {
+        return []
+    }
 
     const from = page * pageSize
     const to = from + pageSize - 1
@@ -227,6 +230,16 @@ export async function getConversations(
 
 export async function getMessages(conversationId: string) {
     const supabase = await createClient()
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('organization_id')
+        .eq('id', conversationId)
+        .maybeSingle()
+
+    if (!conversation) return []
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        return []
+    }
 
     const { data, error } = await supabase
         .from('messages')
@@ -244,6 +257,16 @@ export async function getMessages(conversationId: string) {
 
 export async function getConversationLead(conversationId: string): Promise<Lead | null> {
     const supabase = await createClient()
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('organization_id')
+        .eq('id', conversationId)
+        .maybeSingle()
+
+    if (!conversation) return null
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        return null
+    }
 
     const { data, error } = await supabase
         .from('leads')
@@ -278,6 +301,14 @@ function formatSummaryMessages(messages: SummaryMessage[], botName: string, loca
         const content = truncateSummaryText(message.content ?? '', SUMMARY_MAX_CHARS)
         return `${index + 1}. [${timestamp}] ${roleLabel}: ${content}`
     }).join('\n')
+}
+
+async function isOrganizationWorkspaceLocked(
+    organizationId: string,
+    supabase: Awaited<ReturnType<typeof createClient>>
+) {
+    const entitlement = await resolveOrganizationUsageEntitlement(organizationId, { supabase })
+    return !entitlement.isUsageAllowed
 }
 
 export async function getConversationSummary(
@@ -619,6 +650,9 @@ export async function sendMessage(
 
     if (!conversation) throw new Error('Conversation not found')
     if (!conversation.contact_phone) throw new Error('Conversation contact is missing')
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        throw new Error('Billing workspace is locked')
+    }
 
     if (conversation.platform === 'whatsapp') {
         const { data: latestInbound, error: latestInboundError } = await supabase

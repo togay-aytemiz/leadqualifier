@@ -4,7 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 
 export type MockPaymentOutcome = 'success' | 'failed'
-export type MockCheckoutStatus = 'success' | 'failed' | 'blocked' | 'error'
+export type MockCheckoutStatus = 'success' | 'scheduled' | 'failed' | 'blocked' | 'error'
 export type MockCheckoutError =
     | 'unauthorized'
     | 'invalid_input'
@@ -17,12 +17,16 @@ export interface MockCheckoutResult {
     ok: boolean
     status: MockCheckoutStatus
     error: MockCheckoutError | null
+    changeType?: string | null
+    effectiveAt?: string | null
 }
 
 interface MockCheckoutRpcPayload {
     ok?: boolean
     status?: string
     reason?: string
+    change_type?: string
+    effective_at?: string
 }
 
 interface BillingAccountFallbackRow {
@@ -37,7 +41,9 @@ function errorResult(error: MockCheckoutError): MockCheckoutResult {
     return {
         ok: false,
         status: 'error',
-        error
+        error,
+        changeType: null,
+        effectiveAt: null
     }
 }
 
@@ -61,7 +67,9 @@ function mapRpcPayloadToResult(payload: MockCheckoutRpcPayload | null): MockChec
         return {
             ok: false,
             status: 'error',
-            error: 'request_failed'
+            error: 'request_failed',
+            changeType: null,
+            effectiveAt: null
         }
     }
 
@@ -69,7 +77,19 @@ function mapRpcPayloadToResult(payload: MockCheckoutRpcPayload | null): MockChec
         return {
             ok: true,
             status: 'success',
-            error: null
+            error: null,
+            changeType: typeof payload.change_type === 'string' ? payload.change_type : null,
+            effectiveAt: typeof payload.effective_at === 'string' ? payload.effective_at : null
+        }
+    }
+
+    if (payload.status === 'scheduled') {
+        return {
+            ok: true,
+            status: 'scheduled',
+            error: null,
+            changeType: typeof payload.change_type === 'string' ? payload.change_type : null,
+            effectiveAt: typeof payload.effective_at === 'string' ? payload.effective_at : null
         }
     }
 
@@ -77,7 +97,9 @@ function mapRpcPayloadToResult(payload: MockCheckoutRpcPayload | null): MockChec
         return {
             ok: false,
             status: 'failed',
-            error: null
+            error: null,
+            changeType: null,
+            effectiveAt: null
         }
     }
 
@@ -87,21 +109,27 @@ function mapRpcPayloadToResult(payload: MockCheckoutRpcPayload | null): MockChec
             return {
                 ok: false,
                 status: 'blocked',
-                error: reason
+                error: reason,
+                changeType: null,
+                effectiveAt: null
             }
         }
 
         return {
             ok: false,
             status: 'blocked',
-            error: 'request_failed'
+            error: 'request_failed',
+            changeType: null,
+            effectiveAt: null
         }
     }
 
     return {
         ok: false,
         status: 'error',
-        error: 'request_failed'
+        error: 'request_failed',
+        changeType: null,
+        effectiveAt: null
     }
 }
 
@@ -206,7 +234,9 @@ async function tryLegacyPremiumTopupFallback(input: {
         return {
             ok: false,
             status: 'failed',
-            error: null
+            error: null,
+            changeType: null,
+            effectiveAt: null
         }
     }
 
@@ -266,7 +296,9 @@ async function tryLegacyPremiumTopupFallback(input: {
     return {
         ok: true,
         status: 'success',
-        error: null
+        error: null,
+        changeType: null,
+        effectiveAt: null
     }
 }
 

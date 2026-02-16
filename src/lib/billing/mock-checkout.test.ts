@@ -161,7 +161,9 @@ describe('mock checkout simulation wrappers', () => {
         expect(result).toEqual({
             ok: false,
             status: 'error',
-            error: 'invalid_input'
+            error: 'invalid_input',
+            changeType: null,
+            effectiveAt: null
         })
         expect(createClientMock).not.toHaveBeenCalled()
     })
@@ -180,7 +182,9 @@ describe('mock checkout simulation wrappers', () => {
         expect(result).toEqual({
             ok: false,
             status: 'error',
-            error: 'unauthorized'
+            error: 'unauthorized',
+            changeType: null,
+            effectiveAt: null
         })
     })
 
@@ -208,7 +212,41 @@ describe('mock checkout simulation wrappers', () => {
         expect(result).toEqual({
             ok: false,
             status: 'failed',
-            error: null
+            error: null,
+            changeType: null,
+            effectiveAt: null
+        })
+    })
+
+    it('passes through scheduled downgrade status for subscription simulation', async () => {
+        const { supabase } = createSupabaseMock({
+            rpcResultByFn: {
+                mock_checkout_subscribe: {
+                    data: {
+                        ok: true,
+                        status: 'scheduled',
+                        change_type: 'downgrade',
+                        effective_at: '2026-03-01T00:00:00.000Z'
+                    },
+                    error: null
+                }
+            }
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 49,
+            monthlyCredits: 1000
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            status: 'scheduled',
+            error: null,
+            changeType: 'downgrade',
+            effectiveAt: '2026-03-01T00:00:00.000Z'
         })
     })
 
@@ -247,7 +285,9 @@ describe('mock checkout simulation wrappers', () => {
         expect(result).toEqual({
             ok: true,
             status: 'success',
-            error: null
+            error: null,
+            changeType: null,
+            effectiveAt: null
         })
         expect(createServiceClientMock).toHaveBeenCalledTimes(1)
         expect(serviceSupabase.spies.ledgerInsertMock).toHaveBeenCalledTimes(1)
@@ -285,7 +325,9 @@ describe('mock checkout simulation wrappers', () => {
         expect(result).toEqual({
             ok: false,
             status: 'blocked',
-            error: 'topup_not_allowed'
+            error: 'topup_not_allowed',
+            changeType: null,
+            effectiveAt: null
         })
         expect(createServiceClientMock).not.toHaveBeenCalled()
     })
@@ -314,7 +356,9 @@ describe('mock checkout simulation wrappers', () => {
         expect(result).toEqual({
             ok: true,
             status: 'success',
-            error: null
+            error: null,
+            changeType: null,
+            effectiveAt: null
         })
     })
 })

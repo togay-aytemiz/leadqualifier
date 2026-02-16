@@ -32,6 +32,8 @@ import {
     HiOutlineSparkles,
     HiMiniSquare3Stack3D,
     HiOutlineSquare3Stack3D,
+    HiMiniCreditCard,
+    HiOutlineCreditCard,
     HiMiniCog6Tooth,
     HiOutlineCog6Tooth,
 } from 'react-icons/hi2'
@@ -48,6 +50,7 @@ import {
     calculateSidebarBillingProgressSegments,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -579,6 +582,31 @@ export function MainSidebar({
         ],
         [tNav, tSidebar]
     )
+    const billingOnlySections = useMemo(
+        () => [
+            {
+                id: 'billing',
+                label: tSidebar('billingStatusLabel'),
+                items: [
+                    {
+                        id: 'settings-plans',
+                        href: '/settings/plans',
+                        label: tSidebar('billingPlansLink'),
+                        icon: HiOutlineCreditCard,
+                        activeIcon: HiMiniCreditCard,
+                    },
+                    {
+                        id: 'settings-billing',
+                        href: '/settings/billing',
+                        label: tSidebar('billingUsageLink'),
+                        icon: HiOutlineBanknotes,
+                        activeIcon: HiMiniBanknotes,
+                    },
+                ],
+            },
+        ],
+        [tSidebar]
+    )
 
     const adminSections = useMemo(() => {
         if (!isSystemAdmin) return []
@@ -639,8 +667,15 @@ export function MainSidebar({
         : botMode === 'off'
             ? 'bg-red-500'
             : 'bg-emerald-500'
+    const workspaceAccess = useMemo(
+        () => resolveWorkspaceAccessState(billingSnapshot),
+        [billingSnapshot]
+    )
+    const shouldRestrictToBilling = workspaceAccess.isLocked && !isSystemAdmin
     const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
-    const navigationSections = canAccessTenantModules ? [...sections, ...adminSections] : adminSections
+    const navigationSections = canAccessTenantModules
+        ? (shouldRestrictToBilling ? billingOnlySections : [...sections, ...adminSections])
+        : adminSections
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
 
@@ -1016,7 +1051,7 @@ export function MainSidebar({
                 </div>
             )}
 
-            {canAccessTenantModules && (
+            {canAccessTenantModules && !shouldRestrictToBilling && (
                 <div className="px-3 pb-2">
                     <Link
                         href="/settings/ai"

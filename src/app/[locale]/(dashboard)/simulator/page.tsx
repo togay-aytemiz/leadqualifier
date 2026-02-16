@@ -5,6 +5,7 @@ import { PageHeader } from '@/design'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 interface SimulatorPageProps {
     params: Promise<{ locale: string }>
@@ -37,6 +38,14 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
             </div>
         )
     }
+
+    await enforceWorkspaceAccessOrRedirect({
+        organizationId: orgContext.activeOrganization.id,
+        locale,
+        currentPath: '/simulator',
+        supabase,
+        bypassLock: orgContext?.isSystemAdmin ?? false
+    })
 
     const aiSettings = await getOrgAiSettings(orgContext.activeOrganization.id, { supabase })
 

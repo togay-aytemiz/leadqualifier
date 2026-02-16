@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 import OrganizationSettingsClient from './OrganizationSettingsClient'
 import { getOfferingProfile, getOfferingProfileSuggestions } from '@/lib/leads/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function OrganizationSettingsPage() {
     const supabase = await createClient()
@@ -25,6 +26,14 @@ export default async function OrganizationSettingsPage() {
             </div>
         )
     }
+
+    await enforceWorkspaceAccessOrRedirect({
+        organizationId,
+        locale,
+        currentPath: '/settings/organization',
+        supabase,
+        bypassLock: orgContext?.isSystemAdmin ?? false
+    })
 
     const [{ data: organization }, offeringProfile, offeringProfileSuggestions] = await Promise.all([
         supabase

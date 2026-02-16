@@ -1,13 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { getChannels } from '@/lib/channels/actions'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { ChannelsList } from '@/components/channels/ChannelsList'
 import { PageHeader, Button } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function ChannelsPage() {
     const supabase = await createClient()
+    const locale = await getLocale()
     const tChannels = await getTranslations('Channels')
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -26,6 +28,14 @@ export default async function ChannelsPage() {
             </div>
         )
     }
+
+    await enforceWorkspaceAccessOrRedirect({
+        organizationId,
+        locale,
+        currentPath: '/settings/channels',
+        supabase,
+        bypassLock: orgContext?.isSystemAdmin ?? false
+    })
 
     const channels = await getChannels(organizationId)
     const totalChannels = 4

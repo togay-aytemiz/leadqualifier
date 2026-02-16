@@ -7,7 +7,11 @@ import { SettingsSection } from '@/components/settings/SettingsSection'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getOrganizationBillingSnapshot } from '@/lib/billing/server'
 import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
-import { getCurrentBillingPackageOffer } from '@/lib/billing/package-offer'
+import {
+    getBillingPricingCatalog,
+    resolveBillingCurrencyByLocale,
+    resolveLocalizedMoneyForLocale
+} from '@/lib/billing/pricing-catalog'
 import {
     simulateMockSubscriptionCheckout,
     simulateMockTopupCheckout,
@@ -17,18 +21,31 @@ import {
     type MockPaymentOutcome
 } from '@/lib/billing/mock-checkout'
 import {
+    cancelSubscriptionRenewal,
+    getSubscriptionRenewalState,
+    resumeSubscriptionRenewal,
+    type RenewalActionError,
+    type RenewalActionResult,
+    type RenewalActionStatus
+} from '@/lib/billing/subscription-renewal'
+import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
 import { Link } from '@/i18n/navigation'
 import { AlertCircle } from 'lucide-react'
-import { TopupCheckoutCard } from './TopupCheckoutCard'
+import { TopupCheckoutCard, type TopupPackOption } from './TopupCheckoutCard'
 
 interface PlansSettingsPageProps {
     searchParams: Promise<{
         checkout_action?: string
         checkout_status?: string
         checkout_error?: string
+        checkout_change_type?: string
+        checkout_effective_at?: string
+        renewal_action?: string
+        renewal_status?: string
+        renewal_error?: string
     }>
 }
 
@@ -100,6 +117,26 @@ function buildCheckoutRedirect(
     if (result.error) {
         query.set('checkout_error', result.error)
     }
+    if (result.changeType) {
+        query.set('checkout_change_type', result.changeType)
+    }
+    if (result.effectiveAt) {
+        query.set('checkout_effective_at', result.effectiveAt)
+    }
+    return `/${locale}/settings/plans?${query.toString()}`
+}
+
+function buildRenewalRedirect(
+    locale: string,
+    action: 'cancel' | 'resume',
+    result: RenewalActionResult
+) {
+    const query = new URLSearchParams()
+    query.set('renewal_action', action)
+    query.set('renewal_status', result.status)
+    if (result.error) {
+        query.set('renewal_error', result.error)
+    }
     return `/${locale}/settings/plans?${query.toString()}`
 }
 
@@ -165,20 +202,25 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     }
 
     const snapshot = await getOrganizationBillingSnapshot(organizationId, { supabase })
-    const [packageOffer, paidTopupCreditsTotal] = await Promise.all([
-        getCurrentBillingPackageOffer({
-            fallbackMonthlyCredits: snapshot?.package.credits.limit ?? 0,
+    const [pricingCatalog, paidTopupCreditsTotal, subscriptionRenewalState] = await Promise.all([
+        getBillingPricingCatalog({
             supabase
         }),
-        getPaidTopupCreditsTotal(organizationId, supabase)
+        getPaidTopupCreditsTotal(organizationId, supabase),
+        getSubscriptionRenewalState({
+            organizationId,
+            supabase
+        })
     ])
+
+    const billingCurrency = resolveBillingCurrencyByLocale(locale)
     const formatNumber = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1
     })
     const formatCurrency = new Intl.NumberFormat(locale, {
         style: 'currency',
-        currency: 'TRY',
-        minimumFractionDigits: 2,
+        currency: billingCurrency,
+        minimumFractionDigits: 0,
         maximumFractionDigits: 2
     })
     const formatDateTime = new Intl.DateTimeFormat(locale, {
@@ -188,11 +230,58 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         hour: '2-digit',
         minute: '2-digit'
     })
+
+    const localizedPlanTiers = pricingCatalog.plans.map((plan) => {
+        const localizedMoney = resolveLocalizedMoneyForLocale(locale, {
+            priceTry: plan.priceTry,
+            priceUsd: plan.priceUsd
+        })
+        return {
+            ...plan,
+            localizedPrice: localizedMoney.amount,
+            unitPrice: plan.credits > 0 ? localizedMoney.amount / plan.credits : 0
+        }
+    })
+    const topupPacks: TopupPackOption[] = pricingCatalog.topups.map((pack) => {
+        const localizedMoney = resolveLocalizedMoneyForLocale(locale, {
+            priceTry: pack.priceTry,
+            priceUsd: pack.priceUsd
+        })
+        return {
+            id: pack.id,
+            credits: pack.credits,
+            amountTry: pack.priceTry,
+            localizedAmount: localizedMoney.amount,
+            currency: localizedMoney.currency,
+            conversationRange: pack.conversationRange
+        }
+    })
+
+    const activePlanId = snapshot?.membershipState === 'premium_active'
+        ? localizedPlanTiers.find(
+            (plan) => Math.round(plan.credits) === Math.round(snapshot.package.credits.limit)
+        )?.id ?? null
+        : null
+    const activePlanName = activePlanId
+        ? tPlans(`packageCatalog.planNames.${activePlanId}`)
+        : null
+    const activePlanCredits = activePlanId
+        ? localizedPlanTiers.find((plan) => plan.id === activePlanId)?.credits ?? 0
+        : 0
+    const canSubmitPlanSelection = snapshot
+        ? snapshot.membershipState !== 'admin_locked'
+        : false
     const membershipLabel = snapshot ? resolveMembershipLabel(tPlans, snapshot) : tPlans('membership.unavailable')
     const checkoutAction = search.checkout_action === 'topup' ? 'topup' : search.checkout_action === 'subscribe' ? 'subscribe' : null
     const checkoutStatus = (() => {
         const value = search.checkout_status
-        if (value === 'success' || value === 'failed' || value === 'blocked' || value === 'error') {
+        if (
+            value === 'success'
+            || value === 'scheduled'
+            || value === 'failed'
+            || value === 'blocked'
+            || value === 'error'
+        ) {
             return value as MockCheckoutStatus
         }
         return null
@@ -211,23 +300,58 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         }
         return null
     })()
-    const subscribeAllowed = snapshot
-        ? snapshot.membershipState !== 'premium_active'
-            && snapshot.membershipState !== 'admin_locked'
-            && packageOffer.monthlyCredits > 0
-        : false
-    const topupState = resolveTopupActionState(snapshot)
-    const showTopupAction = snapshot?.membershipState === 'premium_active'
-    const topupCredits = 1000
-    const topupAmountTry = (() => {
-        if (packageOffer.monthlyPriceTry > 0 && packageOffer.monthlyCredits > 0) {
-            const perCredit = packageOffer.monthlyPriceTry / packageOffer.monthlyCredits
-            return Number((topupCredits * perCredit).toFixed(2))
+    const checkoutChangeType = typeof search.checkout_change_type === 'string'
+        ? search.checkout_change_type
+        : null
+    const checkoutEffectiveAt = typeof search.checkout_effective_at === 'string'
+        ? search.checkout_effective_at
+        : null
+    const renewalAction = (() => {
+        const value = search.renewal_action
+        if (value === 'cancel' || value === 'resume') {
+            return value as 'cancel' | 'resume'
         }
-        return 40
+        return null
     })()
+    const renewalStatus = (() => {
+        const value = search.renewal_status
+        if (value === 'success' || value === 'blocked' || value === 'error') {
+            return value as RenewalActionStatus
+        }
+        return null
+    })()
+    const renewalError = (() => {
+        const value = search.renewal_error
+        if (
+            value === 'unauthorized'
+            || value === 'invalid_input'
+            || value === 'not_available'
+            || value === 'request_failed'
+            || value === 'admin_locked'
+            || value === 'premium_required'
+        ) {
+            return value as RenewalActionError
+        }
+        return null
+    })()
+    const topupState = resolveTopupActionState(snapshot)
     const isTrialMembership = snapshot?.membershipState === 'trial_active' || snapshot?.membershipState === 'trial_exhausted'
     const isPremiumMembership = snapshot?.membershipState === 'premium_active'
+    const autoRenewEnabled = subscriptionRenewalState.autoRenew
+    const renewalPeriodEnd = subscriptionRenewalState.periodEnd ?? snapshot?.package.periodEnd ?? null
+    const pendingPlanChange = subscriptionRenewalState.pendingPlanChange
+    const hasPendingDowngrade = pendingPlanChange?.changeType === 'downgrade'
+    const pendingPlanId = hasPendingDowngrade
+        ? localizedPlanTiers.find(
+            (plan) => Math.round(plan.credits) === Math.round(pendingPlanChange.requestedMonthlyCredits)
+        )?.id ?? null
+        : null
+    const pendingPlanName = pendingPlanId
+        ? tPlans(`packageCatalog.planNames.${pendingPlanId}`)
+        : null
+    const lowerPlanOptions = isPremiumMembership
+        ? localizedPlanTiers.filter((plan) => plan.credits < activePlanCredits)
+        : []
     const topupBlockedReason = !topupState.allowed && topupState.reasonKey
         ? tPlans(`actions.${topupState.reasonKey}`)
         : null
@@ -282,6 +406,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         if (!checkoutStatus) return ''
 
         if (checkoutStatus === 'success') return tPlans('checkoutStatus.successTitle')
+        if (checkoutStatus === 'scheduled') return tPlans('checkoutStatus.scheduledTitle')
         if (checkoutStatus === 'failed') return tPlans('checkoutStatus.failedTitle')
         if (checkoutStatus === 'blocked') return tPlans('checkoutStatus.blockedTitle')
         return tPlans('checkoutStatus.errorTitle')
@@ -294,6 +419,18 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             return checkoutAction === 'topup'
                 ? tPlans('checkoutStatus.successTopup')
                 : tPlans('checkoutStatus.successSubscribe')
+        }
+
+        if (checkoutStatus === 'scheduled') {
+            if (checkoutAction === 'subscribe' && checkoutChangeType === 'downgrade') {
+                if (checkoutEffectiveAt) {
+                    return tPlans('checkoutStatus.scheduledDowngradeWithDate', {
+                        date: formatDateTime.format(new Date(checkoutEffectiveAt))
+                    })
+                }
+                return tPlans('checkoutStatus.scheduledDowngradeNoDate')
+            }
+            return tPlans('checkoutStatus.scheduledGeneric')
         }
 
         if (checkoutStatus === 'failed') {
@@ -321,6 +458,39 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             return tPlans('checkoutStatus.errors.topupNotAllowed')
         default:
             return tPlans('checkoutStatus.errors.requestFailed')
+        }
+    }
+
+    const getRenewalTitle = () => {
+        if (!renewalStatus) return ''
+
+        if (renewalStatus === 'success') return tPlans('renewalStatus.successTitle')
+        if (renewalStatus === 'blocked') return tPlans('renewalStatus.blockedTitle')
+        return tPlans('renewalStatus.errorTitle')
+    }
+
+    const getRenewalDescription = () => {
+        if (!renewalStatus) return ''
+
+        if (renewalStatus === 'success') {
+            return renewalAction === 'cancel'
+                ? tPlans('renewalStatus.successCancel')
+                : tPlans('renewalStatus.successResume')
+        }
+
+        switch (renewalError) {
+        case 'unauthorized':
+            return tPlans('renewalStatus.errors.unauthorized')
+        case 'invalid_input':
+            return tPlans('renewalStatus.errors.invalidInput')
+        case 'not_available':
+            return tPlans('renewalStatus.errors.notAvailable')
+        case 'admin_locked':
+            return tPlans('renewalStatus.errors.adminLocked')
+        case 'premium_required':
+            return tPlans('renewalStatus.errors.premiumRequired')
+        default:
+            return tPlans('renewalStatus.errors.requestFailed')
         }
     }
 
@@ -364,12 +534,72 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         redirect(buildCheckoutRedirect(locale, 'topup', result))
     }
 
+    const handleScheduleDowngrade = async (formData: FormData) => {
+        'use server'
+
+        const orgId = String(formData.get('organizationId') ?? '')
+        const requestedPlanId = String(formData.get('scheduledPlanId') ?? '')
+        const targetPlan = localizedPlanTiers.find((plan) => plan.id === requestedPlanId)
+
+        if (!targetPlan) {
+            const invalidResult: MockCheckoutResult = {
+                ok: false,
+                status: 'error',
+                error: 'invalid_input',
+                changeType: null,
+                effectiveAt: null
+            }
+            redirect(buildCheckoutRedirect(locale, 'subscribe', invalidResult))
+        }
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: orgId,
+            simulatedOutcome: 'success',
+            monthlyPriceTry: targetPlan.priceTry,
+            monthlyCredits: targetPlan.credits
+        })
+
+        revalidatePath(`/${locale}/settings/plans`)
+        revalidatePath(`/${locale}/settings/billing`)
+        redirect(buildCheckoutRedirect(locale, 'subscribe', result))
+    }
+
+    const handleCancelRenewal = async (formData: FormData) => {
+        'use server'
+
+        const orgId = String(formData.get('organizationId') ?? '')
+
+        const result = await cancelSubscriptionRenewal({
+            organizationId: orgId,
+            reason: 'self_serve_cancel_renewal'
+        })
+
+        revalidatePath(`/${locale}/settings/plans`)
+        revalidatePath(`/${locale}/settings/billing`)
+        redirect(buildRenewalRedirect(locale, 'cancel', result))
+    }
+
+    const handleResumeRenewal = async (formData: FormData) => {
+        'use server'
+
+        const orgId = String(formData.get('organizationId') ?? '')
+
+        const result = await resumeSubscriptionRenewal({
+            organizationId: orgId,
+            reason: 'self_serve_resume_renewal'
+        })
+
+        revalidatePath(`/${locale}/settings/plans`)
+        revalidatePath(`/${locale}/settings/billing`)
+        redirect(buildRenewalRedirect(locale, 'resume', result))
+    }
+
     return (
         <>
             <PageHeader title={tPlans('pageTitle')} />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-5xl space-y-6">
+                <div className="max-w-6xl space-y-6">
                     <p className="text-sm text-gray-500">{tPlans('description')}</p>
 
                     {checkoutStatus && (
@@ -377,6 +607,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                             className={`rounded-xl border px-4 py-3 text-sm font-medium ${
                                 checkoutStatus === 'success'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                    : checkoutStatus === 'scheduled'
+                                        ? 'border-sky-200 bg-sky-50 text-sky-900'
                                     : checkoutStatus === 'failed' || checkoutStatus === 'blocked'
                                         ? 'border-amber-200 bg-amber-50 text-amber-900'
                                         : 'border-rose-200 bg-rose-50 text-rose-900'
@@ -385,6 +617,22 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                             {getCheckoutTitle()}
                             {' — '}
                             {getCheckoutDescription()}
+                        </p>
+                    )}
+
+                    {renewalStatus && (
+                        <p
+                            className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                                renewalStatus === 'success'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                    : renewalStatus === 'blocked'
+                                        ? 'border-amber-200 bg-amber-50 text-amber-900'
+                                        : 'border-rose-200 bg-rose-50 text-rose-900'
+                            }`}
+                        >
+                            {getRenewalTitle()}
+                            {' — '}
+                            {getRenewalDescription()}
                         </p>
                     )}
 
@@ -399,58 +647,62 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                         <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.membershipLabel')}</p>
                                         <p className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">{membershipLabel}</p>
                                     </div>
+                                    {isPremiumMembership && (
+                                        <p className="mt-2 text-sm text-gray-700">
+                                            {activePlanName
+                                                ? tPlans('status.currentPackage', { plan: activePlanName })
+                                                : tPlans('status.currentPackageUnknown')}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {isTrialMembership && (
-                                    <>
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialCreditsTitle')}</p>
-                                                <p className="mt-2 text-lg font-semibold text-gray-900">
-                                                    {formatNumber.format(snapshot.trial.credits.remaining)}
-                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                                </p>
-                                                <p className="mt-1 text-xs text-gray-500">
-                                                    {tPlans('status.usedVsLimit', {
-                                                        used: formatNumber.format(snapshot.trial.credits.remaining),
-                                                        limit: formatNumber.format(snapshot.trial.credits.limit)
-                                                    })}
-                                                </p>
-                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                                    <div
-                                                        className="h-2 rounded-full bg-[#242A40]"
-                                                        style={{ width: `${Math.min(100, trialCreditsProgress)}%` }}
-                                                    />
-                                                </div>
-                                                {showTrialLowCreditWarning && (
-                                                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
-                                                        <AlertCircle size={12} />
-                                                        {tPlans('status.lowCreditWarning')}
-                                                    </p>
-                                                )}
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialCreditsTitle')}</p>
+                                            <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                {formatNumber.format(snapshot.trial.credits.remaining)}
+                                                <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {tPlans('status.usedVsLimit', {
+                                                    used: formatNumber.format(snapshot.trial.credits.remaining),
+                                                    limit: formatNumber.format(snapshot.trial.credits.limit)
+                                                })}
+                                            </p>
+                                            <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                <div
+                                                    className="h-2 rounded-full bg-[#242A40]"
+                                                    style={{ width: `${Math.min(100, trialCreditsProgress)}%` }}
+                                                />
                                             </div>
-
-                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialTimeTitle')}</p>
-                                                <p className="mt-2 text-lg font-semibold text-gray-900">
-                                                    {formatNumber.format(snapshot.trial.remainingDays)}
-                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('status.daysUnit')}</span>
+                                            {showTrialLowCreditWarning && (
+                                                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                                                    <AlertCircle size={12} />
+                                                    {tPlans('status.lowCreditWarning')}
                                                 </p>
-                                                <p className="mt-1 text-xs text-gray-500">
-                                                    {tPlans('status.trialEndsAt', {
-                                                        date: formatDateTime.format(new Date(snapshot.trial.endsAt))
-                                                    })}
-                                                </p>
-                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                                    <div
-                                                        className="h-2 rounded-full bg-sky-500"
-                                                        style={{ width: `${Math.min(100, snapshot.trial.timeProgress)}%` }}
-                                                    />
-                                                </div>
-                                            </div>
+                                            )}
                                         </div>
 
-                                    </>
+                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.trialTimeTitle')}</p>
+                                            <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                {formatNumber.format(snapshot.trial.remainingDays)}
+                                                <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('status.daysUnit')}</span>
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {tPlans('status.trialEndsAt', {
+                                                    date: formatDateTime.format(new Date(snapshot.trial.endsAt))
+                                                })}
+                                            </p>
+                                            <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                <div
+                                                    className="h-2 rounded-full bg-sky-500"
+                                                    style={{ width: `${Math.min(100, snapshot.trial.timeProgress)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
 
                                 {isPremiumMembership && (
@@ -522,8 +774,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                     </SettingsSection>
 
                     <SettingsSection
-                        title={tPlans('actions.title')}
-                        description={tPlans('actions.description')}
+                        title={tPlans('packageCatalog.title')}
+                        description={tPlans('packageCatalog.description')}
                         descriptionAddon={(
                             <Link
                                 href="/settings/billing"
@@ -533,61 +785,265 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                             </Link>
                         )}
                     >
-                        <div className={`grid grid-cols-1 gap-4 ${showTopupAction ? 'md:grid-cols-2' : ''}`}>
-                            {isPremiumMembership ? (
-                                <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-2">
-                                    <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.subscribe.activeTitle')}</h3>
-                                    {snapshot?.package.periodEnd && (
-                                        <p className="text-xs text-gray-500">
-                                            {tPlans('actions.subscribe.activeResetAt', {
-                                                date: formatDateTime.format(new Date(snapshot.package.periodEnd))
-                                            })}
+                        <div className="space-y-4">
+                            <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                                {activePlanName
+                                    ? tPlans('packageCatalog.currentPackageActive', { plan: activePlanName })
+                                    : tPlans('packageCatalog.currentPackageInactive')}
+                            </p>
+                            <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+                                {tPlans('packageCatalog.assumption')}
+                            </p>
+
+                            <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+                                {localizedPlanTiers.map((plan) => {
+                                    const isCurrentPlan = isPremiumMembership && activePlanId === plan.id
+                                    const isLowerPlanOption = isPremiumMembership && plan.credits < activePlanCredits
+                                    const isScheduledPlan = hasPendingDowngrade && pendingPlanId === plan.id
+                                    const isPopularPlan = plan.id === 'growth'
+                                    const isDisabled = !canSubmitPlanSelection || isCurrentPlan
+                                    const actionLabel = (() => {
+                                        if (isCurrentPlan) return tPlans('packageCatalog.planCta.current')
+                                        if (!isPremiumMembership) return tPlans('packageCatalog.planCta.start')
+                                        if (plan.credits > activePlanCredits) return tPlans('packageCatalog.planCta.upgrade')
+                                        return tPlans('packageCatalog.planCta.switch')
+                                    })()
+
+                                    return (
+                                        <article
+                                            key={plan.id}
+                                            className={`flex h-full flex-col rounded-2xl border bg-white p-5 shadow-sm ${
+                                                isCurrentPlan
+                                                    ? 'border-[#242A40]'
+                                                    : isPopularPlan
+                                                        ? 'border-sky-200'
+                                                        : 'border-gray-200'
+                                            }`}
+                                        >
+                                            <div className="mb-4 flex min-h-7 items-center justify-between gap-2">
+                                                <p className="text-sm font-semibold text-gray-900">
+                                                    {tPlans(`packageCatalog.planNames.${plan.id}`)}
+                                                </p>
+                                                {isCurrentPlan && (
+                                                    <p className="rounded-full bg-[#242A40] px-2.5 py-1 text-[11px] font-semibold text-white">
+                                                        {tPlans('packageCatalog.badges.current')}
+                                                    </p>
+                                                )}
+                                                {!isCurrentPlan && isScheduledPlan && (
+                                                    <p className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                                                        {tPlans('packageCatalog.badges.scheduled')}
+                                                    </p>
+                                                )}
+                                                {!isCurrentPlan && !isScheduledPlan && isPopularPlan && (
+                                                    <p className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800">
+                                                        {tPlans('packageCatalog.badges.popular')}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <p className="tabular-nums text-3xl font-semibold leading-tight text-gray-900">
+                                                {formatCurrency.format(plan.localizedPrice)}
+                                                <span className="ml-1 text-base font-medium text-gray-500">
+                                                    / {tPlans('packageCatalog.month')}
+                                                </span>
+                                            </p>
+                                            <p className="mt-3 text-sm text-gray-700">
+                                                {tPlans('packageCatalog.creditsIncluded', {
+                                                    credits: formatNumber.format(plan.credits)
+                                                })}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-600">
+                                                {tPlans('packageCatalog.approxConversations', {
+                                                    min: formatNumber.format(plan.conversationRange.min),
+                                                    max: formatNumber.format(plan.conversationRange.max)
+                                                })}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {tPlans('packageCatalog.unitPrice', {
+                                                    price: formatCurrency.format(plan.unitPrice)
+                                                })}
+                                            </p>
+
+                                            {isLowerPlanOption ? (
+                                                <p className="mt-4 text-xs text-gray-500">
+                                                    {tPlans('packageCatalog.downgradeHiddenHint')}
+                                                </p>
+                                            ) : (
+                                                <form action={handleMockSubscribe} className="mt-4">
+                                                    <input type="hidden" name="organizationId" value={organizationId} />
+                                                    <input type="hidden" name="monthlyPriceTry" value={String(plan.priceTry)} />
+                                                    <input type="hidden" name="monthlyCredits" value={String(plan.credits)} />
+                                                    <input type="hidden" name="simulatedOutcome" value="success" />
+                                                    <button
+                                                        type="submit"
+                                                        className="inline-flex h-10 min-w-[132px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                                        disabled={isDisabled}
+                                                    >
+                                                        {actionLabel}
+                                                    </button>
+                                                </form>
+                                            )}
+                                        </article>
+                                    )
+                                })}
+
+                                <article className="lg:col-span-3 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-base font-semibold text-gray-900">
+                                                {tPlans('packageCatalog.customPackage.title')}
+                                            </p>
+                                            <p className="mt-1 text-sm text-gray-600">
+                                                {tPlans('packageCatalog.customPackage.description')}
+                                            </p>
+                                        </div>
+                                        <a
+                                            href="mailto:askqualy@gmail.com"
+                                            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437]"
+                                        >
+                                            {tPlans('packageCatalog.customPackage.cta')}
+                                        </a>
+                                    </div>
+                                </article>
+                            </div>
+
+                            {isPremiumMembership && lowerPlanOptions.length > 0 && (
+                                <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                                    <div className="space-y-3">
+                                        <p className="text-base font-semibold text-gray-900">
+                                            {tPlans('packageCatalog.planManagement.title')}
                                         </p>
-                                    )}
-                                </div>
-                            ) : (
-                                <form action={handleMockSubscribe} className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-                                    <h3 className="text-sm font-semibold text-gray-900">{tPlans('actions.subscribe.title')}</h3>
-                                    <p className="text-sm text-gray-600">
-                                        {tPlans('actions.subscribe.packageSummary', {
-                                            price: formatCurrency.format(packageOffer.monthlyPriceTry),
-                                            credits: formatNumber.format(packageOffer.monthlyCredits)
-                                        })}
-                                    </p>
-                                    <input type="hidden" name="organizationId" value={organizationId} />
-                                    <input type="hidden" name="monthlyPriceTry" value={String(packageOffer.monthlyPriceTry)} />
-                                    <input type="hidden" name="monthlyCredits" value={String(packageOffer.monthlyCredits)} />
-                                    <input type="hidden" name="simulatedOutcome" value="success" />
-                                    {!subscribeAllowed && (
-                                        <p className="text-xs text-amber-700">
-                                            {packageOffer.monthlyCredits <= 0
-                                                ? tPlans('actions.subscribe.notConfigured')
-                                                : snapshot?.membershipState === 'premium_active'
-                                                    ? tPlans('actions.subscribe.alreadyActive')
-                                                    : tPlans('actions.adminLocked')}
+                                        <p className="text-sm text-gray-600">
+                                            {tPlans('packageCatalog.planManagement.description')}
                                         </p>
-                                    )}
-                                    <button
-                                        type="submit"
-                                        className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                        disabled={!subscribeAllowed}
-                                    >
-                                        {tPlans('actions.subscribe.submit')}
-                                    </button>
-                                </form>
+                                        {hasPendingDowngrade && (
+                                            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                                {pendingPlanName && pendingPlanChange?.effectiveAt
+                                                    ? tPlans('packageCatalog.planManagement.pendingWithDate', {
+                                                        plan: pendingPlanName,
+                                                        date: formatDateTime.format(new Date(pendingPlanChange.effectiveAt))
+                                                    })
+                                                    : pendingPlanName
+                                                        ? tPlans('packageCatalog.planManagement.pendingNoDate', {
+                                                            plan: pendingPlanName
+                                                        })
+                                                        : tPlans('packageCatalog.planManagement.pendingUnknown')}
+                                            </p>
+                                        )}
+                                        <form action={handleScheduleDowngrade} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                            <input type="hidden" name="organizationId" value={organizationId} />
+                                            <select
+                                                name="scheduledPlanId"
+                                                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2 sm:max-w-xs"
+                                                defaultValue={pendingPlanId ?? lowerPlanOptions[0]?.id ?? ''}
+                                                required
+                                                disabled={!canSubmitPlanSelection}
+                                            >
+                                                {lowerPlanOptions.map((plan) => (
+                                                    <option key={plan.id} value={plan.id}>
+                                                        {tPlans(`packageCatalog.planNames.${plan.id}`)} · {formatCurrency.format(plan.localizedPrice)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                type="submit"
+                                                className="inline-flex h-10 min-w-[220px] items-center justify-center rounded-lg border border-[#242A40] bg-white px-4 text-sm font-semibold text-[#242A40] hover:bg-gray-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500"
+                                                disabled={!canSubmitPlanSelection}
+                                            >
+                                                {tPlans('packageCatalog.planManagement.submit')}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </article>
                             )}
 
-                            {showTopupAction && (
-                                <TopupCheckoutCard
-                                    organizationId={organizationId}
-                                    topupCredits={topupCredits}
-                                    topupAmountTry={topupAmountTry}
-                                    topupAllowed={topupState.allowed}
-                                    blockedReason={topupBlockedReason}
-                                    topupAction={handleMockTopup}
-                                />
+                            {isPremiumMembership && (
+                                <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                        <div className="space-y-1.5">
+                                            <p className="text-base font-semibold text-gray-900">
+                                                {tPlans('packageCatalog.renewalCard.title')}
+                                            </p>
+                                            <p className="text-sm text-gray-600">
+                                                {tPlans('packageCatalog.renewalCard.description')}
+                                            </p>
+                                            <p className="pt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                                {tPlans('packageCatalog.renewalCard.statusLabel')}
+                                            </p>
+                                            <p
+                                                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                                    autoRenewEnabled
+                                                        ? 'bg-emerald-100 text-emerald-800'
+                                                        : 'bg-amber-100 text-amber-800'
+                                                }`}
+                                            >
+                                                {autoRenewEnabled
+                                                    ? tPlans('packageCatalog.renewalCard.statusOn')
+                                                    : tPlans('packageCatalog.renewalCard.statusOff')}
+                                            </p>
+                                            <p className="text-xs text-gray-600">
+                                                {autoRenewEnabled
+                                                    ? tPlans('packageCatalog.renewalCard.onHint')
+                                                    : renewalPeriodEnd
+                                                        ? tPlans('packageCatalog.renewalCard.offHintWithDate', {
+                                                            date: formatDateTime.format(new Date(renewalPeriodEnd))
+                                                        })
+                                                        : tPlans('packageCatalog.renewalCard.offHintNoDate')}
+                                            </p>
+                                        </div>
+
+                                        <form action={autoRenewEnabled ? handleCancelRenewal : handleResumeRenewal} className="md:pt-1">
+                                            <input type="hidden" name="organizationId" value={organizationId} />
+                                            <button
+                                                type="submit"
+                                                className={`inline-flex h-10 min-w-[190px] items-center justify-center rounded-lg px-4 text-sm font-semibold ${
+                                                    autoRenewEnabled
+                                                        ? 'bg-[#242A40] text-white hover:bg-[#1f2437]'
+                                                        : 'border border-[#242A40] bg-white text-[#242A40] hover:bg-gray-50'
+                                                } disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500`}
+                                                disabled={!canSubmitPlanSelection}
+                                            >
+                                                {autoRenewEnabled
+                                                    ? tPlans('packageCatalog.renewalCard.turnOff')
+                                                    : tPlans('packageCatalog.renewalCard.turnOn')}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </article>
+                            )}
+
+                            {isPremiumMembership && (
+                                <p className="text-xs text-gray-600">
+                                    {tPlans('packageCatalog.manageHint')}
+                                    {' '}
+                                    <a
+                                        href="mailto:askqualy@gmail.com"
+                                        className="font-medium text-[#242A40] underline decoration-1 underline-offset-2 hover:text-[#1f2437]"
+                                    >
+                                        {tPlans('packageCatalog.manageHintContact')}
+                                    </a>
+                                </p>
+                            )}
+
+                            {!canSubmitPlanSelection && (
+                                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                                    {tPlans('actions.adminLocked')}
+                                </p>
                             )}
                         </div>
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={tPlans('topups.sectionTitle')}
+                        description={tPlans('topups.sectionDescription')}
+                    >
+                        <TopupCheckoutCard
+                            organizationId={organizationId}
+                            packs={topupPacks}
+                            topupAllowed={topupState.allowed}
+                            blockedReason={topupBlockedReason}
+                            topupAction={handleMockTopup}
+                        />
                     </SettingsSection>
                 </div>
             </div>

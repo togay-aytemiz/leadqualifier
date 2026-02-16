@@ -257,6 +257,8 @@
         "billingPaymentRequiredSubline": "Payment update required to continue.",
         "billingContactSupportSubline": "Usage is admin-locked. Contact support.",
         "billingUsageMenuLabel": "Usage details",
+        "billingPlansLink": "Plans",
+        "billingUsageLink": "Usage",
         "billingExpandDetails": "Show breakdown",
         "billingCollapseDetails": "Hide breakdown",
         "billingBreakdownPackage": "Package",
@@ -505,8 +507,8 @@
         "receipts": "Usage"
     },
     "billingPlans": {
-        "pageTitle": "Plans",
-        "description": "Manage your current plan and credit purchases.",
+        "pageTitle": "Plans & Credits",
+        "description": "Choose your monthly package and buy one-time credits when needed.",
         "noOrganization": "No Organization Found",
         "noOrganizationDesc": "You need to be part of an organization to manage plans.",
         "creditsUnit": "credits",
@@ -523,84 +525,137 @@
             "title": "Current plan",
             "description": "See your plan and remaining credits.",
             "membershipLabel": "Plan status",
-            "lockRuleTrial": "Trial usage is locked when trial time or trial credits run out first.",
-            "lockRulePremium": "Extra credits are available for active premium subscriptions.",
-            "structureHint": "This page is for plan state and purchase actions.",
+            "currentPackage": "Current monthly package: {plan}",
+            "currentPackageUnknown": "Current monthly package: Not detected",
             "trialCreditsTitle": "Trial credits",
             "trialTimeTitle": "Trial time",
             "packageCreditsTitle": "Monthly package",
             "topupCreditsTitle": "Extra credit balance",
-            "upgradeOfferTitle": "Upgrade offer",
-            "nonActiveMembershipNote": "Plan is not active. Continue with an action below.",
+            "nonActiveMembershipNote": "Plan is not active. Continue with a package action below.",
             "usedVsLimit": "{used} / {limit}",
             "daysUnit": "days",
-            "trialCredits": "Trial credits: {remaining} / {limit}",
-            "trialDays": "Days left in trial: {days}",
             "trialEndsAt": "Trial ends at: {date}",
-            "packageCredits": "Package credits: {remaining} / {limit}",
-            "topupCredits": "Extra credits: {remaining}",
             "packageResetAt": "Resets at: {date}",
-            "topupAllowed": "Extra credits are available.",
-            "topupBlocked": "Extra credits require an active premium subscription.",
             "lowCreditWarning": "Approaching usage limit",
             "unavailable": "Plan status is unavailable."
         },
+        "packageCatalog": {
+            "title": "Monthly packages",
+            "description": "Pick the monthly package that fits your business.",
+            "currentPackageActive": "Current monthly package: {plan}",
+            "currentPackageInactive": "You do not have an active monthly package yet.",
+            "assumption": "Conversation ranges are estimates and can change based on message length and usage style.",
+            "planNames": {
+                "starter": "Starter",
+                "growth": "Growth",
+                "scale": "Scale"
+            },
+            "badges": {
+                "current": "Current package",
+                "popular": "Recommended",
+                "scheduled": "Scheduled"
+            },
+            "month": "month",
+            "creditsIncluded": "{credits} credits included",
+            "approxConversations": "~{min}-{max} conversations / month",
+            "unitPrice": "{price} / credit",
+        "planCta": {
+            "start": "Start package",
+            "upgrade": "Upgrade",
+            "downgrade": "Downgrade",
+            "switch": "Switch package",
+            "current": "Current package"
+        },
+        "downgradeHiddenHint": "Downgrades are scheduled from plan management and apply at period end.",
+        "planManagement": {
+            "title": "Plan management",
+            "description": "If you move to a lower package, the change starts after the current billing period ends.",
+            "submit": "Schedule for next period",
+            "pendingWithDate": "{plan} will start on {date}.",
+            "pendingNoDate": "{plan} will start at the beginning of the next billing period.",
+            "pendingUnknown": "A lower package change is scheduled for the next period."
+        },
+        "customPackage": {
+            "title": "Need more credits?",
+            "description": "If you need higher limits or a custom package, let's talk and shape a plan for your business.",
+            "cta": "Let's talk"
+        },
+        "renewalCard": {
+            "title": "Subscription management",
+            "description": "You can turn auto-renew off and on here anytime.",
+            "statusLabel": "Auto-renew",
+            "statusOn": "On",
+            "statusOff": "Off",
+            "onHint": "Your package renews automatically at period end.",
+            "offHintWithDate": "Your package stays active until {date}. After that, it will not auto-renew.",
+            "offHintNoDate": "Your package stays active until the end of the current period. After that, it will not auto-renew.",
+            "turnOff": "Turn off auto-renew",
+            "turnOn": "Turn on auto-renew"
+        },
+        "manageHint": "You can change plans directly from this page. For custom billing needs,",
+        "manageHintContact": "contact us.",
+        "footnote": "Conversation ranges are guidance values. Actual usage may vary."
+    },
+        "topups": {
+            "sectionTitle": "Extra credits",
+            "sectionDescription": "When credits run low, continue with a one-time credit purchase.",
+            "title": "One-time extra credits",
+            "oneTimeNotice": "Extra credits are one-time purchases and do not auto-renew.",
+            "openModal": "Buy credits",
+            "approxConversations": "~{min}-{max} conversations",
+            "unavailable": "Top-up packages are unavailable right now.",
+            "modal": {
+                "title": "Select a credit package",
+                "description": "Choose the amount that fits your need. This purchase is one-time.",
+                "selectedSummary": "Selected: {credits} credits • {amount}",
+                "cancel": "Cancel",
+                "submit": "Buy credits",
+                "close": "Close"
+            }
+        },
         "actions": {
-            "title": "Actions",
-            "description": "Manage premium and extra credit actions.",
-            "mockModeNotice": "Mock payment mode is active. Use success/failed outcomes to simulate checkout behavior before live provider integration.",
-            "simulatedOutcomeLabel": "Simulated payment outcome",
-            "simulatedOutcome": {
-                "success": "Simulate success",
-                "failed": "Simulate failure"
-            },
-            "subscribe": {
-                "title": "Premium plan",
-                "packageSummary": "{price} / month • {credits} credits",
-                "alreadyActive": "Premium is already active for this organization.",
-                "notConfigured": "Premium package credits are not configured yet. Contact your admin.",
-                "activeTitle": "Premium is active",
-                "activeDescription": "Subscription is currently active for this organization.",
-                "activeResetAt": "Current period ends at {date}.",
-                "submit": "Start premium"
-            },
-            "topup": {
-                "title": "Extra credits",
-                "packageSummary": "{credits} credits • {amount}",
-                "submit": "Add credits",
-                "oneTimeNotice": "Extra credits are one-time purchases and do not renew monthly.",
-                "modal": {
-                    "title": "Get more credits",
-                    "description": "Add extra credits so you can continue without waiting for the monthly package renewal.",
-                    "packageMeta": "One-time extra credit package",
-                    "cancel": "Cancel",
-                    "next": "Next",
-                    "close": "Close modal"
-                }
-            },
             "adminLocked": "This organization is admin-locked. Billing actions are blocked.",
-            "topupBlockedTrial": "Extra credits are unavailable during trial. Start premium first.",
-            "topupRequiresPremium": "Extra credits require an active premium package.",
-            "topupAfterPackageExhausted": "Extra credits require an active premium package.",
-            "topupUnavailable": "Extra credits are unavailable right now.",
+            "topupBlockedTrial": "Top-ups are unavailable during trial. Start a monthly package first.",
+            "topupRequiresPremium": "Top-ups require an active monthly package.",
+            "topupAfterPackageExhausted": "Top-ups require an active monthly package.",
+            "topupUnavailable": "Top-ups are unavailable right now.",
             "viewUsageLink": "View usage"
         },
         "checkoutStatus": {
             "successTitle": "Payment completed",
+            "scheduledTitle": "Plan change scheduled",
             "failedTitle": "Payment failed",
             "blockedTitle": "Payment blocked",
             "errorTitle": "Payment error",
-            "successSubscribe": "Premium has been activated.",
-            "successTopup": "Credits have been added.",
-            "failedSubscribe": "Could not activate premium.",
-            "failedTopup": "Could not add credits.",
+            "successSubscribe": "Package has been activated.",
+            "successTopup": "Extra credits have been added.",
+            "scheduledDowngradeWithDate": "Downgrade scheduled. The new package starts on {date}.",
+            "scheduledDowngradeNoDate": "Downgrade scheduled. The new package starts in the next billing period.",
+            "scheduledGeneric": "Plan change scheduled for the next billing period.",
+            "failedSubscribe": "Could not activate package.",
+            "failedTopup": "Could not add extra credits.",
             "errors": {
                 "unauthorized": "Your session is not authenticated.",
                 "invalidInput": "Invalid checkout form values. Please retry.",
                 "notAvailable": "Mock checkout functions are not available in this environment yet.",
                 "requestFailed": "The checkout request failed. Please retry.",
                 "adminLocked": "This organization is admin-locked.",
-                "topupNotAllowed": "Extra credits are not allowed by current membership/package state."
+                "topupNotAllowed": "Top-up credits are not allowed by current membership/package state."
+            }
+        },
+        "renewalStatus": {
+            "successTitle": "Subscription updated",
+            "blockedTitle": "Action blocked",
+            "errorTitle": "Action failed",
+            "successCancel": "Auto-renew is now turned off.",
+            "successResume": "Auto-renew is now turned on.",
+            "errors": {
+                "unauthorized": "Your session is not authenticated.",
+                "invalidInput": "Invalid request values. Please retry.",
+                "notAvailable": "Auto-renew controls are not available in this environment yet.",
+                "requestFailed": "The request failed. Please retry.",
+                "adminLocked": "This organization is admin-locked.",
+                "premiumRequired": "This action requires an active monthly package."
             }
         }
     },
@@ -996,12 +1051,37 @@
         "billingControlsBanner": "Billing controls are enabled for system admins. Changes are audited and should be used carefully.",
         "billingDefaults": {
             "title": "Billing Defaults (Platform)",
-            "description": "Configure trial defaults and monthly premium package defaults.",
+            "description": "Configure trial defaults, monthly package ladders, and top-up package prices.",
             "scopeNote": "These defaults are applied to newly created organizations.",
             "trialDaysLabel": "Default trial days",
             "trialCreditsLabel": "Default trial credits",
-            "packagePriceLabel": "Default monthly package price (TRY)",
-            "packageCreditsLabel": "Default monthly package credits",
+            "sections": {
+                "trial": "Trial defaults",
+                "plans": "Monthly package ladder (TRY / USD)",
+                "topups": "Top-up packages (TRY / USD)"
+            },
+            "planHeaders": {
+                "plan": "Plan",
+                "credits": "Credits",
+                "priceTry": "Price (TRY)",
+                "priceUsd": "Price (USD)"
+            },
+            "planLabels": {
+                "starter": "Starter",
+                "growth": "Growth",
+                "scale": "Scale"
+            },
+            "topupHeaders": {
+                "pack": "Top-up pack",
+                "credits": "Credits",
+                "priceTry": "Price (TRY)",
+                "priceUsd": "Price (USD)"
+            },
+            "topupLabels": {
+                "topup250": "Top-up 250",
+                "topup500": "Top-up 500",
+                "topup1000": "Top-up 1000"
+            },
             "reasonLabel": "Change reason",
             "reasonPlaceholder": "Why is this default changing?",
             "submit": "Save billing defaults",

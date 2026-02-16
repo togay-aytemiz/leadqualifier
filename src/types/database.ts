@@ -74,7 +74,23 @@ export interface PlatformBillingSettings {
     default_trial_days: number
     default_trial_credits: number
     default_package_price_try: number
+    default_package_price_usd: number
     default_package_credits: number
+    starter_plan_credits: number
+    starter_plan_price_try: number
+    starter_plan_price_usd: number
+    growth_plan_credits: number
+    growth_plan_price_try: number
+    growth_plan_price_usd: number
+    scale_plan_credits: number
+    scale_plan_price_try: number
+    scale_plan_price_usd: number
+    topup_250_price_try: number
+    topup_250_price_usd: number
+    topup_500_price_try: number
+    topup_500_price_usd: number
+    topup_1000_price_try: number
+    topup_1000_price_usd: number
     updated_by: string | null
     created_at: string
     updated_at: string

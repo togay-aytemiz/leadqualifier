@@ -7,6 +7,7 @@ import { LeadsTable } from '@/components/leads/LeadsTable'
 import { LeadSearch } from '@/components/leads/LeadSearch'
 import { LeadsEmptyState } from '@/components/leads/LeadsEmptyState'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 interface PageProps {
     searchParams: Promise<{ page?: string; sortBy?: string; sortOrder?: string; search?: string }>
@@ -36,6 +37,14 @@ export default async function LeadsPage({ searchParams }: PageProps) {
             </div>
         )
     }
+
+    await enforceWorkspaceAccessOrRedirect({
+        organizationId,
+        locale,
+        currentPath: '/leads',
+        supabase,
+        bypassLock: orgContext?.isSystemAdmin ?? false
+    })
 
     // Parse search params
     const params = await searchParams

@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 import AiSettingsClient from './AiSettingsClient'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function AiSettingsPage() {
     const supabase = await createClient()
@@ -25,6 +26,14 @@ export default async function AiSettingsPage() {
             </div>
         )
     }
+
+    await enforceWorkspaceAccessOrRedirect({
+        organizationId,
+        locale,
+        currentPath: '/settings/ai',
+        supabase,
+        bypassLock: orgContext?.isSystemAdmin ?? false
+    })
 
     const aiSettings = await getOrgAiSettings(organizationId, { supabase, locale })
 

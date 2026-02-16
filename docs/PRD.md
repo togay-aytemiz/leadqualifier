@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-16 (Inbox now surfaces WhatsApp reply-window state in context: far-right `reply available / reply unavailable` indicator beside summary, tooltip reason when blocked, and composer/send lock with short overlay message after the 24-hour window. MVP keeps template messaging out of scope and preserves `active_agent` when sending is blocked.)  
+> **Last Updated:** 2026-02-16 (Inbox now surfaces WhatsApp reply-window state in context: far-right `reply available / reply unavailable` indicator beside summary, tooltip reason when blocked, and composer/send lock with short overlay message after the 24-hour window. MVP keeps template messaging out of scope and preserves `active_agent` when sending is blocked. Pricing rollout is implemented with final Starter/Growth/Scale + top-up ladder decisions, safe monthly conversation-range copy in `/settings/plans`, and admin-configurable TRY/USD pricing controls in `/admin/billing`. Plans UI copy now follows end-user language, TR package names are localized, current monthly package is explicitly surfaced, top-up uses a single CTA + modal package selector, package-card CTA spacing/alignment is tightened, Scale baseline is updated to `999 TRY`, and the package section now includes a full-width custom-package CTA linking to `mailto:askqualy@gmail.com`. Premium organizations can now self-manage auto-renew in `/settings/plans` (turn off/on with period-end cancellation behavior) without admin support. Billing hard-lock now restricts locked tenants to `Settings > Plans` and `Settings > Billing` only, with workspace route redirects and inbox read/send lock. Plan-change flow now follows common SaaS behavior: upgrades apply immediately, downgrades are scheduled to the next billing period, and UI shows effective-date + target-package info.)  
 > **Status:** In Development
 
 ---
@@ -432,11 +432,12 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ### 5.9 Monetization & Subscription (Planned, Pre-Pilot)
 - **Pricing Strategy:**
-  - Define plan tiers, quota limits, overage policy, and annual discount policy for Turkish SMBs.
+  - Plan tiers and overage behavior are now locked for v1: `Starter/Growth/Scale` with `upgrade-first` positioning and burst-oriented top-up ladder.
+  - Annual discount policy is still pending (post-baseline decision).
   - Launch target is a low-entry starter band around ~USD 10 equivalent (localized to TRY) before premium tier expansion.
-  - Pricing calibration guide published (`docs/plans/2026-02-16-pricing-credit-strategy-guide.md`) with recommendation set: trial baseline `200` credits (next revision), starter package anchor `~USD 10` equivalent, and extra credits priced at a premium per-credit vs recurring package pricing.
+  - Pricing calibration guide published (`docs/plans/2026-02-16-pricing-credit-strategy-guide.md`) and finalized for website + product copy with safe monthly conversation ranges.
   - Lock v1 billing order as: trial -> recurring monthly premium package -> credit top-up overflow.
-  - Define v1 premium package controls: admin-managed monthly price (`X TL`) and included credits (`Y`).
+  - v1 package controls are admin-managed with TRY+USD values per tier (`Starter/Growth/Scale`) and per top-up pack (`250/500/1000`).
   - Lock v1 package policy: monthly included credits are non-rollover.
   - Finalize feature gates by plan (channels, AI limits, seats, and premium-only controls).
 - **Plan Purchase (Online Payment):**
@@ -455,8 +456,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - All manual billing actions must require reason + actor metadata and be audit logged.
 - **Trial Policy Decision (Required Gate):**
   - Trial model decision (pre-pilot): **trial-only** onboarding (no freemium tier at launch).
-  - Trial defaults are locked for implementation: `14 days` and `120.0 credits`.
-  - Next pricing-policy recommendation is to raise trial credits to `200` after explicit approval/migration; current live implementation baseline remains `120.0` until applied.
+  - Trial defaults are locked for implementation: `14 days` and `200.0 credits`.
   - Trial lock precedence is locked: system stops token-consuming features when **either** `time_expired` or `credit_exhausted` occurs first.
   - Admin trial-default controls update only future/new organizations.
   - Rollout migration backfills existing non-system-admin organizations into trial baseline before subscription enforcement.
@@ -575,11 +575,14 @@ MVP is successful when:
 - **Tenant Billing IA Split (Implementation v1):** `Settings > Plans` is the action surface for subscription/top-up/trial conversion status, while `Settings > Billing` remains the detailed usage + receipts/ledger surface.
 - **Tenant Billing IA Clarification (Implementation v1.1):** `Settings > Billing` is read-only and avoids duplicate purchase widgets; it keeps account snapshot context + immutable ledger + usage analytics, while all plan/purchase controls stay in `Settings > Plans`.
 - **Tenant Billing Copy Simplification (Implementation v1.2):** Billing and Plans naming/copy prioritize short decision-first language; Plans hides mock outcome selectors from user-facing UI, and Billing shows only account status, credit history, and core AI usage metrics.
+- **Self-Serve Renewal Control (Implementation v1.6):** `Settings > Plans` exposes user-facing auto-renew controls for active premium subscriptions. Turning it off means `cancel at period end` (membership remains active until the current cycle ends); turning it back on resumes automatic renewal.
+- **Downgrade Scheduling UX (Implementation v1.7):** `Settings > Plans` keeps upgrade CTA prominent on plan cards, while lower-tier changes are scheduled from plan management for period end. Users must see the pending target package and effective date.
 - **Monetization Rollout Order:** Finalize pricing strategy and trial model first, then implement checkout/payments and entitlement enforcement (avoid shipping payment flows before policy decisions are locked).
 - **Trial Go-To-Market Model (Pre-Pilot):** Start with trial-only onboarding (no freemium) to reduce ongoing abuse vectors and keep support/sales qualification focused.
 - **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
-- **Pricing & Credit Calibration Guide (Pre-Pilot):** `docs/plans/2026-02-16-pricing-credit-strategy-guide.md` is the policy reference for trial-credit calibration (`100/120/200/250/1000` comparison), model-cost math, and extra-credit pricing strategy.
-- **Trial Defaults (Locked v1):** Provision new organizations with `14 days` and `120.0 credits` by default.
+- **Pricing & Credit Calibration Guide (Pre-Pilot):** `docs/plans/2026-02-16-pricing-credit-strategy-guide.md` is the policy reference for trial-credit calibration (`100/120/200/250/1000` comparison), model-cost math, Lovable-like `upgrade-first` monetization structure (tier ladder + premium burst top-up), and customer-facing conversation-equivalent packaging ranges.
+- **Pricing Catalog Rollout (Implementation v1.5):** `/settings/plans` now shows final package/top-up ladder with safe monthly conversation ranges; locale determines displayed currency (`tr` -> TRY, `en` -> USD). System-admin manages both TRY/USD price points from `/admin/billing`.
+- **Trial Defaults (Locked v1):** Provision new organizations with `14 days` and `200.0 credits` by default.
 - **Trial Lock Precedence (Locked v1):** Enforce `first limit reached wins` between trial time and trial credits.
 - **Trial Default Scope:** Admin updates to default trial values apply to newly created organizations only.
 - **Subscription-First Conversion Rule (Locked v1):** Organizations locked by trial exhaustion must purchase a recurring monthly premium package before normal AI usage resumes.
@@ -597,6 +600,7 @@ MVP is successful when:
 - **Usage Card Compact Mode (Implementation v1.5):** Sidebar quick card should default to compact summary (`remaining credits + membership + decreasing progress`) and reveal package vs extra-credit breakdown only on chevron expand.
 - **Billing Snapshot Source (Implementation v1):** Tenant/admin visibility reads from `organization_billing_accounts` plus immutable `organization_credit_ledger` history; frontend derives progress/eligibility from a shared billing snapshot mapper to keep sidebar/mobile/settings/admin surfaces consistent.
 - **Runtime Entitlement Gate (Implementation v1):** Before token-consuming AI paths (shared inbound pipeline, Telegram webhook AI flow, simulator response generation, inbox summary/reasoning/manual lead-refresh), runtime resolves billing entitlement and exits early when usage is locked.
+- **Workspace Hard-Lock Access Rule (Implementation v1.7):** If entitlement is locked (`trial_exhausted`, `past_due`, `canceled`, `admin_locked`, or exhausted premium credits), tenant workspace routes are restricted to `Settings > Plans` and `Settings > Billing`; inbox conversation read/send actions are blocked server-side to prevent message visibility/reply bypass.
 - **TR Payment Provider Strategy (Locked v1):** Prioritize a TR-valid recurring provider (Iyzico first, PayTR alternative); use Stripe only with a supported non-TR entity/account model.
 - **WhatsApp Cost Modeling Baseline:** For Meta Cloud API MVP, treat inbound webhook traffic and in-window free-form replies as zero template fee; meter WhatsApp variable cost only when sending template messages (country/category-dependent).
 - **Platform Admin Read Models:** Use DB-backed pagination/search, aggregate RPC totals, and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
