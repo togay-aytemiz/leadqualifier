@@ -21,6 +21,7 @@ import {
     SETTINGS_MOBILE_BACK_EVENT,
     type SettingsNavItemId
 } from '@/components/settings/mobilePaneState'
+import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 
 interface SettingsResponsiveShellProps {
     pendingCount: number
@@ -37,6 +38,7 @@ interface SettingsNavItem {
     href?: string
     active?: boolean
     indicator?: boolean
+    locked?: boolean
     icon: ReactNode
 }
 
@@ -112,11 +114,21 @@ export function SettingsResponsiveShell({
             }
         ]
 
-        if (!billingOnlyMode) {
-            return fullNavItems
-        }
+        return fullNavItems.map((item) => {
+            const navState = resolveBillingLockedNavItem(
+                {
+                    id: item.id,
+                    href: item.href
+                },
+                billingOnlyMode
+            )
 
-        return fullNavItems.filter((item) => item.group === 'billing')
+            return {
+                ...item,
+                href: navState.href,
+                locked: navState.isLocked
+            }
+        })
     }, [activeItem, billingOnlyMode, locale, pendingCount, tSidebar])
     const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
 
@@ -173,6 +185,7 @@ export function SettingsResponsiveShell({
         if (!shouldEnableManualRoutePrefetch()) return
 
         const routes = navItems
+            .filter((item) => !item.locked)
             .map((item) => item.href)
             .filter((href): href is string => Boolean(href))
 
@@ -206,6 +219,8 @@ export function SettingsResponsiveShell({
                                 href={item.href}
                                 active={item.active}
                                 indicator={item.indicator}
+                                disabled={item.locked}
+                                disabledLabel={tSidebar('lockedLabel')}
                             />
                         ))}
                     </SidebarGroup>
@@ -220,6 +235,8 @@ export function SettingsResponsiveShell({
                                 label={item.label}
                                 href={item.href}
                                 active={item.active}
+                                disabled={item.locked}
+                                disabledLabel={tSidebar('lockedLabel')}
                             />
                         ))}
                     </SidebarGroup>
@@ -234,6 +251,8 @@ export function SettingsResponsiveShell({
                                 label={item.label}
                                 href={item.href}
                                 active={item.active}
+                                disabled={item.locked}
+                                disabledLabel={tSidebar('lockedLabel')}
                             />
                         ))}
                     </SidebarGroup>

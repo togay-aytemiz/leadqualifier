@@ -33,8 +33,6 @@ import {
     HiOutlineSparkles,
     HiMiniSquare3Stack3D,
     HiOutlineSquare3Stack3D,
-    HiMiniCreditCard,
-    HiOutlineCreditCard,
     HiMiniCog6Tooth,
     HiOutlineCog6Tooth,
 } from 'react-icons/hi2'
@@ -44,6 +42,7 @@ import {
     ArrowRightFromLine,
     Building2,
     ChevronDown,
+    Lock,
     LogOut,
     RotateCcw,
 } from 'lucide-react'
@@ -52,6 +51,7 @@ import {
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
+import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -585,32 +585,6 @@ export function MainSidebar({
         ],
         [tNav, tSidebar]
     )
-    const billingOnlySections = useMemo(
-        () => [
-            {
-                id: 'billing',
-                label: tSidebar('billingStatusLabel'),
-                items: [
-                    {
-                        id: 'settings-plans',
-                        href: '/settings/plans',
-                        label: tSidebar('billingPlansLink'),
-                        icon: HiOutlineCreditCard,
-                        activeIcon: HiMiniCreditCard,
-                    },
-                    {
-                        id: 'settings-billing',
-                        href: '/settings/billing',
-                        label: tSidebar('billingUsageLink'),
-                        icon: HiOutlineBanknotes,
-                        activeIcon: HiMiniBanknotes,
-                    },
-                ],
-            },
-        ],
-        [tSidebar]
-    )
-
     const adminSections = useMemo(() => {
         if (!isSystemAdmin) return []
 
@@ -676,8 +650,15 @@ export function MainSidebar({
     )
     const shouldRestrictToBilling = workspaceAccess.isLocked && !isSystemAdmin
     const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
+    const settingsNavState = resolveBillingLockedNavItem(
+        {
+            id: 'settings',
+            href: '/settings/ai'
+        },
+        shouldRestrictToBilling
+    )
     const navigationSections = canAccessTenantModules
-        ? (shouldRestrictToBilling ? billingOnlySections : [...sections, ...adminSections])
+        ? [...sections, ...adminSections]
         : adminSections
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
@@ -1054,10 +1035,10 @@ export function MainSidebar({
                 </div>
             )}
 
-            {canAccessTenantModules && !shouldRestrictToBilling && (
+            {canAccessTenantModules && (
                 <div className="px-3 pb-2">
                     <Link
-                        href="/settings/ai"
+                        href={settingsNavState.href ?? '/settings/ai'}
                         title={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                         aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                         className={cn(
@@ -1092,43 +1073,64 @@ export function MainSidebar({
                             </p>
                             <div className="space-y-1">
                                 {section.items.map(item => {
+                                    const navState = resolveBillingLockedNavItem(
+                                        {
+                                            id: item.id,
+                                            href: item.href
+                                        },
+                                        shouldRestrictToBilling
+                                    )
+                                    const itemHref = navState.href ?? item.href
+                                    const isLockedItem = navState.isLocked
                                     const isSettingsItem = item.id === 'settings'
                                     const isAdminRoot = item.id === 'admin-dashboard'
                                     const isActive = isSettingsItem
                                         ? pathWithoutLocale.startsWith('/settings')
                                         : isAdminRoot
                                             ? pathWithoutLocale === '/admin'
-                                            : pathWithoutLocale.startsWith(item.href)
+                                            : pathWithoutLocale.startsWith(itemHref)
                                     const Icon = isActive ? item.activeIcon : item.icon
                                     const showUnread = item.id === 'inbox' && hasUnread
                                     const showPending = item.id === 'settings' && hasPendingSuggestions
                                     const showIndicator = showUnread || showPending
-                                    return (
-                                        <Link
-                                            key={item.id}
-                                            href={item.href}
-                                            title={item.label}
-                                            aria-label={item.label}
-                                            className={cn(
-                                                'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
-                                                collapsed
-                                                    ? 'mx-auto h-11 w-11 justify-center gap-0'
-                                                    : 'w-full gap-3 px-3 py-2',
-                                                isActive
-                                                    ? 'bg-[#242A40] text-white shadow-sm'
-                                                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                                            )}
-                                        >
+                                    const itemLabel = isLockedItem
+                                        ? `${item.label} (${tSidebar('lockedLabel')})`
+                                        : item.label
+                                    const navItemClassName = cn(
+                                        'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
+                                        collapsed
+                                            ? 'mx-auto h-11 w-11 justify-center gap-0'
+                                            : 'w-full gap-3 px-3 py-2',
+                                        isActive
+                                            ? 'bg-[#242A40] text-white shadow-sm'
+                                            : isLockedItem
+                                                ? 'cursor-not-allowed bg-slate-100/80 text-slate-400'
+                                                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                                    )
+                                    const iconClassName = cn(
+                                        'shrink-0',
+                                        isActive
+                                            ? 'text-white'
+                                            : isLockedItem
+                                                ? 'text-slate-400'
+                                                : 'text-slate-500 group-hover:text-slate-900'
+                                    )
+                                    const lockIconClassName = isActive ? 'text-white/90' : 'text-slate-400'
+
+                                    const navItemContent = (
+                                        <>
                                             <span className="relative flex items-center">
                                                 <Icon
                                                     size={18}
-                                                    className={cn(
-                                                        'shrink-0',
-                                                        isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
-                                                    )}
+                                                    className={iconClassName}
                                                 />
                                                 {showIndicator && collapsed && (
                                                     <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
+                                                )}
+                                                {isLockedItem && collapsed && (
+                                                    <span className="absolute -bottom-1 -right-1 rounded-full border border-slate-200 bg-white p-[1px]">
+                                                        <Lock size={8} className={lockIconClassName} />
+                                                    </span>
                                                 )}
                                             </span>
                                             <span
@@ -1138,10 +1140,15 @@ export function MainSidebar({
                                                         ? 'w-0 translate-x-2 overflow-hidden opacity-0'
                                                         : 'opacity-100'
                                                 )}
-                                                >
-                                                    {item.label}
+                                            >
+                                                {item.label}
+                                            </span>
+                                            {isLockedItem && !collapsed && (
+                                                <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-white/80 p-1">
+                                                    <Lock size={11} className={lockIconClassName} />
                                                 </span>
-                                            {showIndicator && !collapsed && (
+                                            )}
+                                            {showIndicator && !collapsed && !isLockedItem && (
                                                 <span
                                                     className={cn(
                                                         'ml-auto h-2 w-2 rounded-full ring-2',
@@ -1149,6 +1156,34 @@ export function MainSidebar({
                                                     )}
                                                 />
                                             )}
+                                        </>
+                                    )
+
+                                    if (isLockedItem) {
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                disabled
+                                                title={itemLabel}
+                                                aria-label={itemLabel}
+                                                aria-disabled
+                                                className={navItemClassName}
+                                            >
+                                                {navItemContent}
+                                            </button>
+                                        )
+                                    }
+
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            href={itemHref}
+                                            title={item.label}
+                                            aria-label={item.label}
+                                            className={navItemClassName}
+                                        >
+                                            {navItemContent}
                                         </Link>
                                     )
                                 })}

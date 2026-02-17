@@ -147,8 +147,8 @@ export function TopupCheckoutCard({
                                             })}
                                         </p>
                                     </div>
-                                    <div className="flex w-24 shrink-0 items-center justify-end">
-                                        <p className="text-right text-2xl font-bold leading-none tabular-nums text-gray-900">
+                                    <div className="flex w-28 shrink-0 items-center justify-end">
+                                        <p className="text-right text-3xl font-extrabold leading-none tracking-tight tabular-nums text-gray-900">
                                             {formatCurrency.format(pack.localizedAmount)}
                                         </p>
                                     </div>

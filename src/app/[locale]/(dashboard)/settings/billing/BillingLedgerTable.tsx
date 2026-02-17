@@ -49,7 +49,15 @@ export function BillingLedgerTable({
     return (
         <div className="space-y-3">
             <div className="overflow-x-auto rounded-xl border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200 bg-white text-sm">
+                <table className="min-w-full table-fixed divide-y divide-gray-200 bg-white text-sm">
+                    <colgroup>
+                        <col className="w-[22%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[25%]" />
+                    </colgroup>
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">{columns.date}</th>

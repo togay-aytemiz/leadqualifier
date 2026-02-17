@@ -10,12 +10,11 @@ import {
     HiMiniSquare3Stack3D,
     HiMiniUser,
     HiOutlineChatBubbleBottomCenterText,
-    HiOutlineCreditCard,
     HiOutlineSparkles,
     HiOutlineSquare3Stack3D,
     HiOutlineUser
 } from 'react-icons/hi2'
-import { AlertCircle, Banknote, LogOut, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
+import { AlertCircle, LogOut, Lock, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
@@ -29,6 +28,7 @@ import {
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
+import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 
 interface NavItem {
     id: Exclude<MobileNavItemId, 'other'>
@@ -36,6 +36,7 @@ interface NavItem {
     label: string
     icon: ComponentType<{ size?: number }>
     activeIcon: ComponentType<{ size?: number }>
+    locked?: boolean
 }
 
 function formatCredits(value: number) {
@@ -71,13 +72,23 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         [billingSnapshot]
     )
     const shouldRestrictToBilling = workspaceAccess.isLocked
+    const settingsMenuNavState = resolveBillingLockedNavItem(
+        {
+            id: 'settings',
+            href: '/settings'
+        },
+        shouldRestrictToBilling
+    )
+    const simulatorMenuNavState = resolveBillingLockedNavItem(
+        {
+            id: 'simulator',
+            href: '/simulator'
+        },
+        shouldRestrictToBilling
+    )
     const navItems = useMemo<NavItem[]>(
         () => {
-            if (shouldRestrictToBilling) {
-                return []
-            }
-
-            return [
+            const defaultItems: NavItem[] = [
                 {
                     id: 'inbox',
                     href: '/inbox',
@@ -107,10 +118,26 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                     activeIcon: HiMiniSquare3Stack3D
                 }
             ]
+
+            return defaultItems.map((item) => {
+                const navState = resolveBillingLockedNavItem(
+                    {
+                        id: item.id,
+                        href: item.href
+                    },
+                    shouldRestrictToBilling
+                )
+
+                return {
+                    ...item,
+                    href: navState.href ?? item.href,
+                    locked: navState.isLocked
+                }
+            })
         },
         [shouldRestrictToBilling, tNav]
     )
-    const navGridColumnsClass = navItems.length > 0 ? 'grid-cols-5' : 'grid-cols-1'
+    const navGridColumnsClass = 'grid-cols-5'
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch()) return
@@ -338,9 +365,22 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                 )}
                             </Link>
                         )}
-                        {!shouldRestrictToBilling && (
+                        {simulatorMenuNavState.isLocked ? (
+                            <button
+                                type="button"
+                                disabled
+                                aria-label={`${tNav('simulator')} (${tSidebar('lockedLabel')})`}
+                                className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl bg-slate-100/80 px-3 py-2.5 text-left text-sm font-medium text-slate-400"
+                            >
+                                <Puzzle size={16} />
+                                <span>{tNav('simulator')}</span>
+                                <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-white p-1 text-slate-400">
+                                    <Lock size={10} />
+                                </span>
+                            </button>
+                        ) : (
                             <Link
-                                href="/simulator"
+                                href={simulatorMenuNavState.href ?? '/simulator'}
                                 onClick={() => setIsOtherOpen(false)}
                                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                             >
@@ -349,23 +389,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                             </Link>
                         )}
                         <Link
-                            href={shouldRestrictToBilling ? '/settings/plans' : '/settings'}
+                            href={settingsMenuNavState.href ?? '/settings'}
                             onClick={() => setIsOtherOpen(false)}
                             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                         >
-                            {shouldRestrictToBilling ? <HiOutlineCreditCard size={16} /> : <Settings size={16} />}
-                            {shouldRestrictToBilling ? tSidebar('billingPlansLink') : tNav('settings')}
+                            <Settings size={16} />
+                            {tNav('settings')}
                         </Link>
-                        {shouldRestrictToBilling && (
-                            <Link
-                                href="/settings/billing"
-                                onClick={() => setIsOtherOpen(false)}
-                                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                            >
-                                <Banknote size={16} />
-                                {tSidebar('billingUsageLink')}
-                            </Link>
-                        )}
                         <form action="/api/auth/signout" method="POST">
                             <button
                                 type="submit"
@@ -387,6 +417,28 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                     {navItems.map((item) => {
                         const isActive = activeItem === item.id
                         const Icon = isActive ? item.activeIcon : item.icon
+                        const itemLabel = item.locked
+                            ? `${item.label} (${tSidebar('lockedLabel')})`
+                            : item.label
+
+                        if (item.locked) {
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    disabled
+                                    title={itemLabel}
+                                    aria-label={itemLabel}
+                                    className="flex cursor-not-allowed flex-col items-center justify-center rounded-xl py-1.5 text-[11px] font-medium text-slate-400"
+                                >
+                                    <span className="mb-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+                                        <Icon size={18} />
+                                    </span>
+                                    {item.label}
+                                </button>
+                            )
+                        }
+
                         return (
                             <Link
                                 key={item.id}

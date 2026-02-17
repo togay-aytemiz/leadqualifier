@@ -13,6 +13,8 @@ export interface ActiveOrganizationSummary {
 export interface ActiveOrganizationContext {
     userId: string
     isSystemAdmin: boolean
+    userFullName?: string | null
+    userEmail?: string | null
     accessibleOrganizations: ActiveOrganizationSummary[]
     activeOrganizationId: string | null
     activeOrganization: ActiveOrganizationSummary | null
@@ -23,6 +25,8 @@ export interface ActiveOrganizationContext {
 interface UserContext {
     userId: string
     isSystemAdmin: boolean
+    userFullName: string | null
+    userEmail: string | null
 }
 
 export interface ResolveActiveOrganizationContextOptions {
@@ -66,13 +70,17 @@ async function getCurrentUserContext(supabaseOverride?: Awaited<ReturnType<typeo
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('is_system_admin')
+        .select('is_system_admin, full_name, email')
         .eq('id', user.id)
         .single()
 
     return {
         userId: user.id,
-        isSystemAdmin: Boolean(profile?.is_system_admin)
+        isSystemAdmin: Boolean(profile?.is_system_admin),
+        userFullName: typeof profile?.full_name === 'string' ? profile.full_name : null,
+        userEmail: typeof profile?.email === 'string'
+            ? profile.email
+            : (typeof user.email === 'string' ? user.email : null)
     }
 }
 
@@ -243,6 +251,8 @@ async function resolveActiveOrganizationContextWithSupabase(
         return {
             userId: userContext.userId,
             isSystemAdmin: userContext.isSystemAdmin,
+            userFullName: userContext.userFullName,
+            userEmail: userContext.userEmail,
             accessibleOrganizations: activeOrganization ? [activeOrganization] : [],
             activeOrganizationId: activeOrganization?.id ?? null,
             activeOrganization,
@@ -266,6 +276,8 @@ async function resolveActiveOrganizationContextWithSupabase(
     return {
         userId: userContext.userId,
         isSystemAdmin: userContext.isSystemAdmin,
+        userFullName: userContext.userFullName,
+        userEmail: userContext.userEmail,
         accessibleOrganizations: organizations,
         activeOrganizationId: activeOrganization?.id ?? null,
         activeOrganization,

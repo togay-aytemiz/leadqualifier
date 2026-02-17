@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import { ReactNode } from 'react'
 import Link from 'next/link'
+import { Lock } from 'lucide-react'
 
 // --- Sidebar Container ---
 interface SidebarProps {
@@ -68,17 +69,37 @@ interface SidebarItemProps {
     onClick?: () => void
     href?: string
     avatar?: string
+    disabled?: boolean
+    disabledLabel?: string
 }
 
-export function SidebarItem({ icon, iconColor, label, active, count, indicator, onClick, href, avatar }: SidebarItemProps) {
+export function SidebarItem({
+    icon,
+    iconColor,
+    label,
+    active,
+    count,
+    indicator,
+    onClick,
+    href,
+    avatar,
+    disabled = false,
+    disabledLabel
+}: SidebarItemProps) {
+    const resolvedLabel = disabled && disabledLabel
+        ? `${label} (${disabledLabel})`
+        : label
     const content = (
         <div
-            onClick={onClick}
+            onClick={disabled ? undefined : onClick}
+            aria-disabled={disabled ? true : undefined}
             className={cn(
-                "flex items-center justify-between px-3 py-2 rounded-md text-sm cursor-pointer transition-colors",
+                "flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors",
                 active
                     ? "bg-white border border-gray-200 shadow-sm font-medium text-gray-900"
-                    : "text-gray-600 hover:bg-gray-100/80"
+                    : disabled
+                        ? "bg-gray-100/70 text-gray-400 cursor-not-allowed"
+                        : "text-gray-600 hover:bg-gray-100/80 cursor-pointer"
             )}
         >
             <div className="flex items-center gap-2.5">
@@ -88,11 +109,16 @@ export function SidebarItem({ icon, iconColor, label, active, count, indicator, 
                         <img alt={label} className="h-full w-full object-cover" src={avatar} />
                     </div>
                 ) : icon ? (
-                    <div className={cn("", iconColor || "text-gray-400")}>{icon}</div>
+                    <div className={cn("", disabled ? "text-gray-400" : (iconColor || "text-gray-400"))}>{icon}</div>
                 ) : null}
                 <span>{label}</span>
             </div>
-            {indicator ? (
+            {disabled ? (
+                <span className="inline-flex items-center rounded-full border border-gray-200 bg-white p-1 text-gray-400">
+                    <Lock size={10} aria-hidden />
+                    <span className="sr-only">{resolvedLabel}</span>
+                </span>
+            ) : indicator ? (
                 <span className="h-2 w-2 rounded-full bg-[#242A40]" aria-hidden />
             ) : count !== undefined ? (
                 <span className="text-xs text-gray-400">{count}</span>
@@ -100,8 +126,12 @@ export function SidebarItem({ icon, iconColor, label, active, count, indicator, 
         </div>
     )
 
-    if (href) {
-        return <Link href={href}>{content}</Link>
+    if (href && !disabled) {
+        return (
+            <Link href={href} title={resolvedLabel} aria-label={resolvedLabel}>
+                {content}
+            </Link>
+        )
     }
 
     return content

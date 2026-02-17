@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Bot, LogOut } from 'lucide-react'
 import {
@@ -20,6 +20,8 @@ import {
 } from 'react-icons/hi2'
 
 import { useTranslations } from 'next-intl'
+import { useEffect } from 'react'
+import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 
 interface GlobalRailProps {
     userName?: string
@@ -27,6 +29,7 @@ interface GlobalRailProps {
 
 export function GlobalRail({ userName }: GlobalRailProps) {
     const pathname = usePathname()
+    const router = useRouter()
     const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
     const t = useTranslations('nav')
     const tc = useTranslations('common')
@@ -72,6 +75,23 @@ export function GlobalRail({ userName }: GlobalRailProps) {
     const isSettingsActive = pathWithoutLocale.startsWith('/settings')
     const SettingsIcon = isSettingsActive ? HiMiniCog6Tooth : HiOutlineCog6Tooth
 
+    useEffect(() => {
+        if (!shouldEnableManualRoutePrefetch()) return
+
+        const timeoutId = window.setTimeout(() => {
+            router.prefetch('/inbox')
+            router.prefetch('/leads')
+            router.prefetch('/simulator')
+            router.prefetch('/skills')
+            router.prefetch('/knowledge')
+            router.prefetch('/settings/channels')
+        }, 120)
+
+        return () => {
+            window.clearTimeout(timeoutId)
+        }
+    }, [router])
+
     return (
         <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 gap-6 shrink-0 h-screen">
             {/* Logo */}
@@ -88,7 +108,6 @@ export function GlobalRail({ userName }: GlobalRailProps) {
                         <Link
                             key={item.id}
                             href={item.href}
-                            prefetch={false}
                             className={cn(
                                 "h-10 w-full rounded-lg flex items-center justify-center cursor-pointer transition-colors",
                                 isActive

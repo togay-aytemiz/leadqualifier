@@ -259,6 +259,7 @@
         "billingUsageMenuLabel": "Usage details",
         "billingPlansLink": "Plans",
         "billingUsageLink": "Usage",
+        "lockedLabel": "Locked",
         "billingExpandDetails": "Show breakdown",
         "billingCollapseDetails": "Hide breakdown",
         "billingBreakdownPackage": "Package",
@@ -504,7 +505,8 @@
         "channels": "Channels",
         "billing": "Billing",
         "plans": "Plans",
-        "receipts": "Usage"
+        "receipts": "Usage",
+        "lockedLabel": "Locked"
     },
     "billingPlans": {
         "pageTitle": "Plans & Credits",

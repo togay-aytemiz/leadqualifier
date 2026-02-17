@@ -259,6 +259,7 @@
         "billingUsageMenuLabel": "Kullanım detayları",
         "billingPlansLink": "Planlar",
         "billingUsageLink": "Kullanım",
+        "lockedLabel": "Kilitli",
         "billingExpandDetails": "Kırılımı göster",
         "billingCollapseDetails": "Kırılımı gizle",
         "billingBreakdownPackage": "Paket",
@@ -504,7 +505,8 @@
         "channels": "Kanallar",
         "billing": "Faturalandırma",
         "plans": "Planlar",
-        "receipts": "Kullanım"
+        "receipts": "Kullanım",
+        "lockedLabel": "Kilitli"
     },
     "billingPlans": {
         "pageTitle": "Planlar ve Krediler",

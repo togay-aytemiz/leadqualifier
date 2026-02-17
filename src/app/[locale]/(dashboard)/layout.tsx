@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { MainSidebar } from '@/design'
 import { MobileBottomNav } from '@/design/MobileBottomNav'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
@@ -10,21 +9,13 @@ export default async function DashboardLayout({
     children: React.ReactNode
 }) {
     const orgContext = await resolveActiveOrganizationContext()
-    const supabase = await createClient()
-    const { data: profile } = orgContext?.userId
-        ? await supabase
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', orgContext.userId)
-            .maybeSingle()
-        : { data: null }
     const hasExplicitAdminOrganizationSelection = !(orgContext?.isSystemAdmin ?? false)
         || orgContext?.source === 'cookie'
     const sidebarOrganizationId = hasExplicitAdminOrganizationSelection
         ? (orgContext?.activeOrganizationId ?? null)
         : null
 
-    const userName = profile?.full_name || profile?.email || 'User'
+    const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
 
     return (
         <div className="flex h-screen w-full overflow-hidden bg-gray-50">

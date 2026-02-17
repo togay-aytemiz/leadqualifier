@@ -1,15 +1,17 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { login } from '@/lib/auth/actions'
-import { Link } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { Button } from '@/design'
 import { Eye, EyeOff } from 'lucide-react'
+import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 
 export function LoginForm() {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
+    const router = useRouter()
     const [showPassword, setShowPassword] = useState(false)
     const [state, formAction, pending] = useActionState(
         async (_prevState: { error?: string } | null, formData: FormData) => {
@@ -17,6 +19,22 @@ export function LoginForm() {
         },
         null
     )
+
+    useEffect(() => {
+        if (!shouldEnableManualRoutePrefetch()) return
+
+        const timeoutId = window.setTimeout(() => {
+            router.prefetch('/register')
+            router.prefetch('/forgot-password')
+            router.prefetch('/inbox')
+            router.prefetch('/skills')
+            router.prefetch('/settings/ai')
+        }, 120)
+
+        return () => {
+            window.clearTimeout(timeoutId)
+        }
+    }, [router])
 
     return (
         <div>
