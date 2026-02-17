@@ -9,17 +9,15 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode
 }) {
+    const orgContext = await resolveActiveOrganizationContext()
     const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', user?.id)
-        .single()
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const { data: profile } = orgContext?.userId
+        ? await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', orgContext.userId)
+            .maybeSingle()
+        : { data: null }
     const hasExplicitAdminOrganizationSelection = !(orgContext?.isSystemAdmin ?? false)
         || orgContext?.source === 'cookie'
     const sidebarOrganizationId = hasExplicitAdminOrganizationSelection

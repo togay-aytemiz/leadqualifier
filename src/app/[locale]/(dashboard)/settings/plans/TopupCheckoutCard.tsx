@@ -135,8 +135,8 @@ export function TopupCheckoutCard({
                                     onChange={() => setSelectedPackId(pack.id)}
                                     className="sr-only"
                                 />
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="min-w-0">
                                         <p className="text-sm font-semibold text-gray-900">
                                             {formatNumber.format(pack.credits)} {tPlans('creditsUnit')}
                                         </p>
@@ -147,9 +147,11 @@ export function TopupCheckoutCard({
                                             })}
                                         </p>
                                     </div>
-                                    <p className="text-sm font-semibold text-gray-900">
-                                        {formatCurrency.format(pack.localizedAmount)}
-                                    </p>
+                                    <div className="flex w-24 shrink-0 items-center justify-end">
+                                        <p className="text-right text-2xl font-bold leading-none tabular-nums text-gray-900">
+                                            {formatCurrency.format(pack.localizedAmount)}
+                                        </p>
+                                    </div>
                                 </div>
                             </label>
                         )

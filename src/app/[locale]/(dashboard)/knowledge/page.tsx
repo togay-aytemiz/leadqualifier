@@ -8,8 +8,6 @@ import { KnowledgeContainer } from './components/KnowledgeContainer'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 
-export const dynamic = 'force-dynamic'
-
 interface KnowledgePageProps {
     searchParams: Promise<{ collectionId?: string }>
 }
@@ -17,13 +15,22 @@ interface KnowledgePageProps {
 export default async function KnowledgeBasePage({ searchParams }: KnowledgePageProps) {
     const supabase = await createClient()
     const { collectionId } = await searchParams
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
     const organizationId = orgContext?.activeOrganizationId ?? null
 
-    // Fetch data in parallel
-    const [entries, allCollections] = await Promise.all([
+    const [entries, allCollections, offeringProfileResult, pendingSuggestions] = await Promise.all([
         getKnowledgeBaseEntries(collectionId, organizationId),
-        getCollections(organizationId)
+        getCollections(organizationId),
+        organizationId
+            ? supabase
+                .from('offering_profiles')
+                .select('ai_suggestions_enabled')
+                .eq('organization_id', organizationId)
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
+        organizationId
+            ? getPendingOfferingProfileSuggestionCount(organizationId)
+            : Promise.resolve(0)
     ])
 
     // Filter logic currently in action but good to double check or prepare collections
@@ -40,19 +47,7 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
         displayCollections = allCollections
     }
 
-    let aiSuggestionsEnabled = false
-    let pendingSuggestions = 0
-
-    if (organizationId) {
-        const { data: profile } = await supabase
-            .from('offering_profiles')
-            .select('ai_suggestions_enabled')
-            .eq('organization_id', organizationId)
-            .maybeSingle()
-
-        aiSuggestionsEnabled = profile?.ai_suggestions_enabled ?? false
-        pendingSuggestions = await getPendingOfferingProfileSuggestionCount(organizationId)
-    }
+    const aiSuggestionsEnabled = offeringProfileResult?.data?.ai_suggestions_enabled ?? false
 
     return (
         <KnowledgeContainer

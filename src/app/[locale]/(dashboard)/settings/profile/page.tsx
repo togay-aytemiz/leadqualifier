@@ -8,25 +8,22 @@ export default async function ProfileSettingsPage() {
     const supabase = await createClient()
     const locale = await getLocale()
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) return null
     await enforceWorkspaceAccessOrRedirect({
         organizationId: orgContext?.activeOrganizationId ?? null,
         locale,
         currentPath: '/settings/profile',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
     const { data: profile } = await supabase
         .from('profiles')
         .select('full_name, email')
-        .eq('id', user.id)
+        .eq('id', orgContext.userId)
         .single()
 
     const initialName = profile?.full_name ?? ''
-    const email = profile?.email ?? user.email ?? ''
+    const email = profile?.email ?? ''
     return <ProfileSettingsClient initialName={initialName} email={email} />
 }

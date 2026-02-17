@@ -18,15 +18,10 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
     const supabase = await createClient()
     const t = await getTranslations({ locale, namespace: 'simulator' })
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) {
         redirect('/login')
     }
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
 
     if (!orgContext?.activeOrganization) {
         return (
@@ -43,7 +38,6 @@ export default async function SimulatorPage({ params }: SimulatorPageProps) {
         organizationId: orgContext.activeOrganization.id,
         locale,
         currentPath: '/simulator',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

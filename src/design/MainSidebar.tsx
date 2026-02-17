@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { AiBotMode, OrganizationBillingAccount } from '@/types/database'
+import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
     buildOrganizationBillingSnapshot,
     type OrganizationBillingSnapshot
@@ -487,6 +488,8 @@ export function MainSidebar({
     }, [organizationId, refreshPendingSuggestions])
 
     useEffect(() => {
+        if (!shouldEnableManualRoutePrefetch()) return
+
         const routesToPrefetch = [
             '/inbox',
             '/leads',

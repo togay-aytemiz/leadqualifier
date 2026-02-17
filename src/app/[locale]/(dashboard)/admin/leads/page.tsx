@@ -15,11 +15,11 @@ interface AdminLeadsPageProps {
 
 export default async function AdminLeadsPage({ searchParams }: AdminLeadsPageProps) {
     const locale = await getLocale()
-    const { supabase } = await requireSystemAdmin(locale)
+    await requireSystemAdmin(locale)
     const tAdmin = await getTranslations('admin')
     const tCommon = await getTranslations('common')
 
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
     const activeOrganization = orgContext?.activeOrganization ?? null
 
     const params = await searchParams

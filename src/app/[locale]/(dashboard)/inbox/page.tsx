@@ -14,15 +14,10 @@ export default async function InboxPage() {
     const t = await getTranslations('inbox')
     const supabase = await createClient()
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) {
         redirect('/login')
     }
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
@@ -41,7 +36,6 @@ export default async function InboxPage() {
         organizationId,
         locale,
         currentPath: '/inbox',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

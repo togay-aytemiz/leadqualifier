@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
+import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
     HiOutlineBanknotes,
     HiOutlineBriefcase,
@@ -169,6 +170,8 @@ export function SettingsResponsiveShell({
     }, [navigateBackToSettings])
 
     useEffect(() => {
+        if (!shouldEnableManualRoutePrefetch()) return
+
         const routes = navItems
             .map((item) => item.href)
             .filter((href): href is string => Boolean(href))

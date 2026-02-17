@@ -30,7 +30,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     const { supabase } = await requireSystemAdmin(locale)
     const [summary, orgContext, search] = await Promise.all([
         getAdminDashboardSummary(supabase),
-        resolveActiveOrganizationContext(supabase),
+        resolveActiveOrganizationContext(),
         searchParams
     ])
 

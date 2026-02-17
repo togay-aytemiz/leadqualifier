@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- Added shared manual-prefetch policy helper + unit tests so dashboard navigation warmups can be environment-aware (`src/design/manual-prefetch.ts`, `src/design/manual-prefetch.test.ts`).
+- Added skills maintenance cache helper + unit tests to avoid repeating heavy embedding backfill checks for the same organization on every navigation (`src/lib/skills/maintenance-cache.ts`, `src/lib/skills/maintenance-cache.test.ts`).
 - Added iyzico-first billing integration execution plan document covering subscription checkout, payment-link top-up, webhook idempotency, and go-live verification (`docs/plans/2026-02-17-iyzico-billing-integration-implementation-plan.md`).
 - Added migration `00064_billing_region_and_scale_price_update.sql` to introduce organization-level `billing_region` (`TR`/`INTL`) and align default Scale TRY baseline to `949`.
 - Added organization settings billing-region controls (`TR` / `International`) so pricing currency can be managed independently from UI language (`src/app/[locale]/(dashboard)/settings/organization/page.tsx`, `src/app/[locale]/(dashboard)/settings/organization/OrganizationSettingsClient.tsx`, `src/lib/organizations/actions.ts`, `messages/en.json`, `messages/tr.json`).
@@ -144,6 +146,14 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed top-up modal option-row layout to improve scanability: right-side price text is now larger, vertically centered, and aligned in a fixed-width column across packs (`src/app/[locale]/(dashboard)/settings/plans/TopupCheckoutCard.tsx`).
+- Changed manual route warmup prefetch behavior to run only in production (desktop sidebar, settings shell, mobile bottom nav), which removes noisy persistent `Compiling...` churn in development navigation flows (`src/design/MainSidebar.tsx`, `src/components/settings/SettingsResponsiveShell.tsx`, `src/design/MobileBottomNav.tsx`).
+- Changed multiple dashboard routes to remove redundant page-level `supabase.auth.getUser()` lookups and rely on resolved organization context instead, reducing repeated server roundtrips during navigation (`src/app/[locale]/(dashboard)/inbox/page.tsx`, `src/app/[locale]/(dashboard)/skills/page.tsx`, `src/app/[locale]/(dashboard)/leads/page.tsx`, `src/app/[locale]/(dashboard)/simulator/page.tsx`, `src/app/[locale]/(dashboard)/settings/ai/page.tsx`, `src/app/[locale]/(dashboard)/settings/channels/page.tsx`, `src/app/[locale]/(dashboard)/settings/organization/page.tsx`, `src/app/[locale]/(dashboard)/settings/billing/page.tsx`, `src/app/[locale]/(dashboard)/settings/plans/page.tsx`).
+- Changed settings shell data loading to fetch pending-suggestion count and billing snapshot in parallel for lower settings-route TTFB (`src/app/[locale]/(dashboard)/settings/layout.tsx`).
+- Changed skills list loading so expensive embedding-maintenance backfill runs once per organization/runtime instead of every skills navigation (`src/lib/skills/actions.ts`, `src/lib/skills/maintenance-cache.ts`).
+- Changed active-organization context and billing snapshot server reads to request-level cached flows, reducing duplicate layout/page DB lookups during the same navigation request (`src/lib/organizations/active-context.ts`, `src/lib/billing/server.ts`).
+- Changed dashboard Skills and Knowledge routes to remove explicit `force-dynamic` flags and keep routing configuration minimal while preserving runtime dynamic behavior from auth/cookies (`src/app/[locale]/(dashboard)/skills/page.tsx`, `src/app/[locale]/(dashboard)/knowledge/page.tsx`).
+- Changed Knowledge page data fetching to run entries, collections, AI-suggestions toggle, and pending-count reads in a single parallel stage for faster warm loads (`src/app/[locale]/(dashboard)/knowledge/page.tsx`).
 - Changed Turkish package display labels to `Temel / Gelişmiş / Profesyonel` across tenant package cards and admin billing defaults tables (`messages/tr.json`).
 - Changed recurring package baseline from `Scale 999 TRY` to `Scale 949 TRY` across pricing fallbacks/defaults and tests (`src/lib/billing/pricing-catalog.ts`, `src/lib/billing/pricing-catalog.test.ts`, `src/lib/admin/billing-settings.ts`, `src/lib/admin/billing-settings.test.ts`, `supabase/migrations/00064_billing_region_and_scale_price_update.sql`).
 - Changed `/settings/plans` currency resolution from locale-based mapping to organization billing-region mapping (`TR` -> TRY, non-TR -> USD), while keeping UI language independent (`src/lib/billing/pricing-catalog.ts`, `src/app/[locale]/(dashboard)/settings/plans/page.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).

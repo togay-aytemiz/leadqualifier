@@ -1,19 +1,16 @@
 import { getLocale, getTranslations } from 'next-intl/server'
-import { createClient } from '@/lib/supabase/server'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function SettingsPage() {
-    const supabase = await createClient()
     const locale = await getLocale()
     const tSidebar = await getTranslations('Sidebar')
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
 
     await enforceWorkspaceAccessOrRedirect({
         organizationId: orgContext?.activeOrganizationId ?? null,
         locale,
         currentPath: '/settings',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

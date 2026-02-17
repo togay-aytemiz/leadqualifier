@@ -18,10 +18,8 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     const locale = await getLocale()
     const t = await getTranslations('leads')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) redirect(`/${locale}/login`)
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) redirect(`/${locale}/login`)
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
@@ -42,7 +40,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         organizationId,
         locale,
         currentPath: '/leads',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

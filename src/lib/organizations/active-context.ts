@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 
 export const ACTIVE_ORG_COOKIE = 'active_org_id'
@@ -193,7 +194,27 @@ export async function resolveActiveOrganizationContext(
     supabaseOverride?: Awaited<ReturnType<typeof createClient>>,
     options?: ResolveActiveOrganizationContextOptions
 ): Promise<ActiveOrganizationContext | null> {
-    const supabase = supabaseOverride ?? await createClient()
+    if (!supabaseOverride) {
+        const includeAccessibleOrganizations = options?.includeAccessibleOrganizations ?? null
+        return resolveActiveOrganizationContextCached(includeAccessibleOrganizations)
+    }
+
+    return resolveActiveOrganizationContextWithSupabase(supabaseOverride, options)
+}
+
+const resolveActiveOrganizationContextCached = cache(async (includeAccessibleOrganizations: boolean | null) => {
+    const supabase = await createClient()
+    const options = includeAccessibleOrganizations === null
+        ? undefined
+        : { includeAccessibleOrganizations }
+
+    return resolveActiveOrganizationContextWithSupabase(supabase, options)
+})
+
+async function resolveActiveOrganizationContextWithSupabase(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    options?: ResolveActiveOrganizationContextOptions
+): Promise<ActiveOrganizationContext | null> {
     const userContext = await getCurrentUserContext(supabase)
     if (!userContext) return null
     const cookieStore = await cookies()

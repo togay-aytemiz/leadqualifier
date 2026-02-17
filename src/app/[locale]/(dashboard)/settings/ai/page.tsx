@@ -10,10 +10,8 @@ export default async function AiSettingsPage() {
     const locale = await getLocale()
     const tAi = await getTranslations('aiSettings')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) return null
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
@@ -31,7 +29,6 @@ export default async function AiSettingsPage() {
         organizationId,
         locale,
         currentPath: '/settings/ai',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

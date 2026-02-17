@@ -185,10 +185,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     const tPlans = await getTranslations('billingPlans')
     const search = await searchParams
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) return null
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {

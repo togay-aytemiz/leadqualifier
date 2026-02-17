@@ -5,6 +5,7 @@ import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddi
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
 import { buildDefaultSystemSkills } from '@/lib/skills/default-system-skills'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
+import { shouldRunSkillsMaintenanceForOrganization } from '@/lib/skills/maintenance-cache'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import {
     appendOfferingProfileSuggestion,
@@ -20,11 +21,11 @@ type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 export async function getSkills(organizationId: string, search?: string, locale?: string): Promise<Skill[]> {
     const supabase = await createClient()
 
-    console.log(`getSkills called for org ${organizationId} with search: "${search}"`)
-
     if (!search?.trim()) {
         await ensureDefaultSystemSkills(supabase, organizationId, locale)
-        await ensureSkillEmbeddingsForOrg(supabase, organizationId)
+        if (shouldRunSkillsMaintenanceForOrganization(organizationId)) {
+            await ensureSkillEmbeddingsForOrg(supabase, organizationId)
+        }
     }
 
     let query = supabase
@@ -42,7 +43,6 @@ export async function getSkills(organizationId: string, search?: string, locale?
     }
 
     const { data, error } = await query
-    console.log(`getSkills found ${data?.length} results`)
 
     if (error) {
         console.error('getSkills error:', error)

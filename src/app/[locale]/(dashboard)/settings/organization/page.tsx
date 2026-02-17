@@ -10,10 +10,8 @@ export default async function OrganizationSettingsPage() {
     const locale = await getLocale()
     const tOrg = await getTranslations('organizationSettings')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) return null
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
@@ -31,7 +29,6 @@ export default async function OrganizationSettingsPage() {
         organizationId,
         locale,
         currentPath: '/settings/organization',
-        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

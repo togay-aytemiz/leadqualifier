@@ -19,6 +19,7 @@ import { AlertCircle, Banknote, LogOut, MoreHorizontal, Puzzle, Settings } from 
 
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
+import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import { createClient } from '@/lib/supabase/client'
 import type { OrganizationBillingAccount } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
@@ -112,6 +113,8 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const navGridColumnsClass = navItems.length > 0 ? 'grid-cols-5' : 'grid-cols-1'
 
     useEffect(() => {
+        if (!shouldEnableManualRoutePrefetch()) return
+
         const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings', '/settings/plans', '/settings/billing']
 
         const prefetchRoutes = () => {

@@ -7,8 +7,6 @@ import { resolveActiveOrganizationContext } from '@/lib/organizations/active-con
 import { getLocale, getTranslations } from 'next-intl/server'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
-export const dynamic = 'force-dynamic'
-
 interface SkillsPageProps {
     searchParams: Promise<{ q?: string }>
 }
@@ -20,15 +18,8 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
     const { q } = await searchParams
     const query = q || ''
 
-    console.log('SkillsPage search query:', query)
-
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return null
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) return null
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (organizationId) {
@@ -36,7 +27,6 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
             organizationId,
             locale,
             currentPath: '/skills',
-            supabase,
             bypassLock: orgContext?.isSystemAdmin ?? false
         })
     }

@@ -1,5 +1,6 @@
 'use server'
 
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import type {
     BillingCreditLedgerType,
@@ -37,8 +38,22 @@ export async function getOrganizationBillingSnapshot(
     organizationId: string,
     options?: { supabase?: SupabaseClient }
 ): Promise<OrganizationBillingSnapshot | null> {
-    const supabase = options?.supabase ?? await createClient()
+    if (!options?.supabase) {
+        return getOrganizationBillingSnapshotCached(organizationId)
+    }
 
+    return getOrganizationBillingSnapshotWithSupabase(options.supabase, organizationId)
+}
+
+const getOrganizationBillingSnapshotCached = cache(async (organizationId: string) => {
+    const supabase = await createClient()
+    return getOrganizationBillingSnapshotWithSupabase(supabase, organizationId)
+})
+
+async function getOrganizationBillingSnapshotWithSupabase(
+    supabase: SupabaseClient,
+    organizationId: string
+): Promise<OrganizationBillingSnapshot | null> {
     const { data, error } = await supabase
         .from('organization_billing_accounts')
         .select('*')

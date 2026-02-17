@@ -184,10 +184,8 @@ export default async function BillingSettingsPage() {
     const locale = await getLocale()
     const tBilling = await getTranslations('billingUsage')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const orgContext = await resolveActiveOrganizationContext(supabase)
+    const orgContext = await resolveActiveOrganizationContext()
+    if (!orgContext) return null
     const organizationId = orgContext?.activeOrganizationId ?? null
 
     if (!organizationId) {
