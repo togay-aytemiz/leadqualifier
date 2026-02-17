@@ -67,7 +67,7 @@ const FALLBACK_BILLING_DEFAULTS: AdminPlatformBillingDefaults = {
     growthPlanPriceTry: 649,
     growthPlanPriceUsd: 17.99,
     scalePlanCredits: 4000,
-    scalePlanPriceTry: 999,
+    scalePlanPriceTry: 949,
     scalePlanPriceUsd: 26.99,
     topup250PriceTry: 99,
     topup250PriceUsd: 2.99,

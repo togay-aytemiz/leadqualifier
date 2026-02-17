@@ -29,6 +29,7 @@ export interface BillingLedgerEntry {
     creditsDelta: number
     balanceAfter: number
     reason: string | null
+    metadata: unknown
     createdAt: string
 }
 
@@ -67,7 +68,7 @@ export async function getOrganizationBillingLedger(
 
     const { data, error } = await supabase
         .from('organization_credit_ledger')
-        .select('id, entry_type, credit_pool, credits_delta, balance_after, reason, created_at')
+        .select('id, entry_type, credit_pool, credits_delta, balance_after, reason, metadata, created_at')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(limit)
@@ -86,6 +87,7 @@ export async function getOrganizationBillingLedger(
         creditsDelta: Number(entry.credits_delta ?? 0),
         balanceAfter: Number(entry.balance_after ?? 0),
         reason: entry.reason,
+        metadata: entry.metadata,
         createdAt: entry.created_at
     }))
 }

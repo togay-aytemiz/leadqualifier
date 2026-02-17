@@ -1,10 +1,12 @@
 export type UserRole = 'owner' | 'admin' | 'member'
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type OrganizationBillingRegion = 'TR' | 'INTL'
 
 export interface Organization {
     id: string
     name: string
     slug: string
+    billing_region?: OrganizationBillingRegion
     created_at: string
     updated_at: string
 }

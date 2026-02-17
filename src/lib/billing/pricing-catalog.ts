@@ -5,6 +5,7 @@ type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 export type BillingPlanTierId = 'starter' | 'growth' | 'scale'
 export type BillingTopupPackId = 'topup_250' | 'topup_500' | 'topup_1000'
 export type BillingCurrency = 'TRY' | 'USD'
+export type BillingRegion = 'TR' | 'INTL'
 
 interface PlatformBillingPricingRow {
     default_trial_credits: number
@@ -72,7 +73,7 @@ const FALLBACK_CATALOG: BillingPricingCatalog = {
         {
             id: 'scale',
             credits: 4000,
-            priceTry: 999,
+            priceTry: 949,
             priceUsd: 26.99,
             conversationRange: { min: 360, max: 480 }
         }
@@ -189,18 +190,24 @@ function mapRowToCatalog(row: PlatformBillingPricingRow | null): BillingPricingC
     return catalog
 }
 
-export function resolveBillingCurrencyByLocale(locale: string): BillingCurrency {
-    return locale.startsWith('tr') ? 'TRY' : 'USD'
+function normalizeBillingRegion(value: string | null | undefined): BillingRegion {
+    const normalized = (value ?? '').trim().toUpperCase()
+    if (normalized === 'TR') return 'TR'
+    return 'INTL'
 }
 
-export function resolveLocalizedMoneyForLocale(
-    locale: string,
+export function resolveBillingCurrencyByRegion(region: string | null | undefined): BillingCurrency {
+    return normalizeBillingRegion(region) === 'TR' ? 'TRY' : 'USD'
+}
+
+export function resolveLocalizedMoneyForRegion(
+    region: string | null | undefined,
     prices: { priceTry: number; priceUsd: number }
 ): {
     currency: BillingCurrency
     amount: number
 } {
-    const currency = resolveBillingCurrencyByLocale(locale)
+    const currency = resolveBillingCurrencyByRegion(region)
     return {
         currency,
         amount: currency === 'TRY' ? prices.priceTry : prices.priceUsd

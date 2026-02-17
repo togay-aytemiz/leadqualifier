@@ -7,7 +7,7 @@ import { usePathname, useRouter as useLocaleRouter } from '@/i18n/navigation'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { transformPendingHrefForLocale } from '@/components/settings/localeHref'
-import { updateOrganizationName } from '@/lib/organizations/actions'
+import { updateOrganizationBillingRegion, updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
 import { RequiredIntakeFieldsSection } from '@/components/settings/RequiredIntakeFieldsSection'
@@ -27,6 +27,7 @@ import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesG
 
 interface OrganizationSettingsClientProps {
     initialName: string
+    initialBillingRegion: 'TR' | 'INTL'
     organizationId: string
     offeringProfile: OfferingProfile | null
     offeringProfileSuggestions: OfferingProfileSuggestion[]
@@ -34,6 +35,7 @@ interface OrganizationSettingsClientProps {
 
 export default function OrganizationSettingsClient({
     initialName,
+    initialBillingRegion,
     organizationId,
     offeringProfile,
     offeringProfileSuggestions: initialSuggestions
@@ -52,6 +54,7 @@ export default function OrganizationSettingsClient({
 
     const [baseline, setBaseline] = useState({
         name: initialName,
+        billingRegion: initialBillingRegion,
         locale,
         profileSummary: offeringProfile?.summary ?? '',
         manualProfileNote: offeringProfile?.manual_profile_note ?? '',
@@ -62,6 +65,7 @@ export default function OrganizationSettingsClient({
     })
 
     const [name, setName] = useState(initialName)
+    const [selectedBillingRegion, setSelectedBillingRegion] = useState<'TR' | 'INTL'>(initialBillingRegion)
     const [selectedLocale, setSelectedLocale] = useState<'en' | 'tr'>(locale)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
     const [manualProfileNote, setManualProfileNote] = useState(offeringProfile?.manual_profile_note ?? '')
@@ -94,6 +98,7 @@ export default function OrganizationSettingsClient({
     const isDirty = useMemo(() => {
         return (
             name !== baseline.name ||
+            selectedBillingRegion !== baseline.billingRegion ||
             selectedLocale !== baseline.locale ||
             profileSummary !== baseline.profileSummary ||
             manualProfileNote !== baseline.manualProfileNote ||
@@ -104,6 +109,7 @@ export default function OrganizationSettingsClient({
         )
     }, [
         name,
+        selectedBillingRegion,
         selectedLocale,
         profileSummary,
         manualProfileNote,
@@ -233,6 +239,9 @@ export default function OrganizationSettingsClient({
             if (name !== baseline.name) {
                 await updateOrganizationName(name)
             }
+            if (selectedBillingRegion !== baseline.billingRegion) {
+                await updateOrganizationBillingRegion(selectedBillingRegion)
+            }
 
             const effectiveSummary = offeringProfileAiEnabled
                 ? deriveSummaryFromApprovedSuggestions(suggestions, manualProfileNote)
@@ -264,6 +273,7 @@ export default function OrganizationSettingsClient({
 
             setBaseline({
                 name,
+                billingRegion: selectedBillingRegion,
                 locale: nextLocale,
                 profileSummary: effectiveSummary,
                 manualProfileNote,
@@ -350,6 +360,7 @@ export default function OrganizationSettingsClient({
 
     const handleDiscard = () => {
         setName(baseline.name)
+        setSelectedBillingRegion(baseline.billingRegion)
         setSelectedLocale(baseline.locale)
         setProfileSummary(baseline.profileSummary)
         setManualProfileNote(baseline.manualProfileNote)
@@ -430,6 +441,44 @@ export default function OrganizationSettingsClient({
                                         {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                                     </div>
                                     <span className="text-sm font-medium text-gray-900">{t('languageTurkish')}</span>
+                                </div>
+                            </button>
+                        </div>
+                    </SettingsSection>
+
+                    <SettingsSection title={t('billingRegionTitle')} description={t('billingRegionDescription')}>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedBillingRegion('TR')}
+                                className={`rounded-lg border p-4 text-left transition-colors ${selectedBillingRegion === 'TR'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedBillingRegion === 'TR' ? 'border-blue-500' : 'border-gray-300'
+                                        }`}>
+                                        {selectedBillingRegion === 'TR' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{t('billingRegionTurkey')}</span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSelectedBillingRegion('INTL')}
+                                className={`rounded-lg border p-4 text-left transition-colors ${selectedBillingRegion === 'INTL'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedBillingRegion === 'INTL' ? 'border-blue-500' : 'border-gray-300'
+                                        }`}>
+                                        {selectedBillingRegion === 'INTL' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{t('billingRegionInternational')}</span>
                                 </div>
                             </button>
                         </div>

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     getBillingPricingCatalog,
-    resolveBillingCurrencyByLocale,
+    resolveBillingCurrencyByRegion,
     resolveConversationRangeForCredits,
-    resolveLocalizedMoneyForLocale
+    resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
 
 interface PricingCatalogQueryResult {
@@ -51,6 +51,16 @@ describe('billing pricing catalog', () => {
             conversationRange: {
                 min: 90,
                 max: 120
+            }
+        })
+        expect(result.plans[2]).toMatchObject({
+            id: 'scale',
+            credits: 4000,
+            priceTry: 949,
+            priceUsd: 26.99,
+            conversationRange: {
+                min: 360,
+                max: 480
             }
         })
         expect(result.topups[2]).toMatchObject({
@@ -127,12 +137,14 @@ describe('billing pricing catalog', () => {
         })
     })
 
-    it('resolves locale currency and localized money values', () => {
-        expect(resolveBillingCurrencyByLocale('tr')).toBe('TRY')
-        expect(resolveBillingCurrencyByLocale('en')).toBe('USD')
-        expect(resolveBillingCurrencyByLocale('en-US')).toBe('USD')
+    it('resolves region currency and localized money values', () => {
+        expect(resolveBillingCurrencyByRegion('TR')).toBe('TRY')
+        expect(resolveBillingCurrencyByRegion('tr')).toBe('TRY')
+        expect(resolveBillingCurrencyByRegion('INTL')).toBe('USD')
+        expect(resolveBillingCurrencyByRegion('US')).toBe('USD')
+        expect(resolveBillingCurrencyByRegion('')).toBe('USD')
 
-        expect(resolveLocalizedMoneyForLocale('tr', {
+        expect(resolveLocalizedMoneyForRegion('TR', {
             priceTry: 349,
             priceUsd: 9.99
         })).toEqual({
@@ -140,7 +152,7 @@ describe('billing pricing catalog', () => {
             amount: 349
         })
 
-        expect(resolveLocalizedMoneyForLocale('en', {
+        expect(resolveLocalizedMoneyForRegion('INTL', {
             priceTry: 349,
             priceUsd: 9.99
         })).toEqual({

@@ -38,16 +38,19 @@ export default async function OrganizationSettingsPage() {
     const [{ data: organization }, offeringProfile, offeringProfileSuggestions] = await Promise.all([
         supabase
             .from('organizations')
-            .select('name')
+            .select('name, billing_region')
             .eq('id', organizationId)
             .single(),
         getOfferingProfile(organizationId),
         getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
     ])
 
+    const initialBillingRegion = organization?.billing_region === 'INTL' ? 'INTL' : 'TR'
+
     return (
         <OrganizationSettingsClient
             initialName={organization?.name ?? ''}
+            initialBillingRegion={initialBillingRegion}
             organizationId={organizationId}
             offeringProfile={offeringProfile}
             offeringProfileSuggestions={offeringProfileSuggestions}

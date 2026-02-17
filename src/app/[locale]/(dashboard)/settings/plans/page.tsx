@@ -9,8 +9,8 @@ import { getOrganizationBillingSnapshot } from '@/lib/billing/server'
 import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 import {
     getBillingPricingCatalog,
-    resolveBillingCurrencyByLocale,
-    resolveLocalizedMoneyForLocale
+    resolveBillingCurrencyByRegion,
+    resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
 import {
     simulateMockSubscriptionCheckout,
@@ -203,7 +203,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     }
 
     const snapshot = await getOrganizationBillingSnapshot(organizationId, { supabase })
-    const [pricingCatalog, paidTopupCreditsTotal, subscriptionRenewalState] = await Promise.all([
+    const [pricingCatalog, paidTopupCreditsTotal, subscriptionRenewalState, organizationRegionResult] = await Promise.all([
         getBillingPricingCatalog({
             supabase
         }),
@@ -211,10 +211,19 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         getSubscriptionRenewalState({
             organizationId,
             supabase
-        })
+        }),
+        supabase
+            .from('organizations')
+            .select('billing_region')
+            .eq('id', organizationId)
+            .maybeSingle()
     ])
 
-    const billingCurrency = resolveBillingCurrencyByLocale(locale)
+    if (organizationRegionResult.error) {
+        console.error('Failed to load organization billing region for plans page:', organizationRegionResult.error)
+    }
+    const organizationBillingRegion = organizationRegionResult.data?.billing_region ?? 'TR'
+    const billingCurrency = resolveBillingCurrencyByRegion(organizationBillingRegion)
     const formatNumber = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1
     })
@@ -233,7 +242,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     })
 
     const localizedPlanTiers = pricingCatalog.plans.map((plan) => {
-        const localizedMoney = resolveLocalizedMoneyForLocale(locale, {
+        const localizedMoney = resolveLocalizedMoneyForRegion(organizationBillingRegion, {
             priceTry: plan.priceTry,
             priceUsd: plan.priceUsd
         })
@@ -254,7 +263,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         unitPrice: plan.unitPrice
     }))
     const topupPacks: TopupPackOption[] = pricingCatalog.topups.map((pack) => {
-        const localizedMoney = resolveLocalizedMoneyForLocale(locale, {
+        const localizedMoney = resolveLocalizedMoneyForRegion(organizationBillingRegion, {
             priceTry: pack.priceTry,
             priceUsd: pack.priceUsd
         })

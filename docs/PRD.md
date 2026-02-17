@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-16 (Inbox now surfaces WhatsApp reply-window state in context: far-right `reply available / reply unavailable` indicator beside summary, tooltip reason when blocked, and composer/send lock with short overlay message after the 24-hour window. MVP keeps template messaging out of scope and preserves `active_agent` when sending is blocked. Pricing rollout is implemented with final Starter/Growth/Scale + top-up ladder decisions, safe monthly conversation-range copy in `/settings/plans`, and admin-configurable TRY/USD pricing controls in `/admin/billing`. Plans UI copy now follows end-user language, TR package names are localized, current monthly package is explicitly surfaced, top-up uses a single modal-based action, package-card CTA spacing/alignment is tightened, Scale baseline is updated to `999 TRY`, and the package section now includes a full-width custom-package CTA linking to `mailto:askqualy@gmail.com`. Premium organizations can now self-manage auto-renew in `/settings/plans` (turn off/on with period-end cancellation behavior) without admin support. Billing hard-lock now restricts locked tenants to `Settings > Plans` and `Settings > Billing` only, with workspace route redirects and inbox read/send lock. Plan-change flow now follows common SaaS behavior: upgrades apply immediately, downgrades are scheduled to the next billing period, and UI shows effective-date + target-package info through a modal-first subscription management surface plus separate cancellation confirmation modal. Active package economics are surfaced in the top current-package card while the subscription-management card remains action-focused, with consistent card typography and desktop CTA alignment across related billing cards.)  
+> **Last Updated:** 2026-02-17 (Inbox now surfaces WhatsApp reply-window state in context: far-right `reply available / reply unavailable` indicator beside summary, tooltip reason when blocked, and composer/send lock with short overlay message after the 24-hour window. MVP keeps template messaging out of scope and preserves `active_agent` when sending is blocked. Pricing rollout is implemented with final Starter/Growth/Scale + top-up ladder decisions, safe monthly conversation-range copy in `/settings/plans`, and admin-configurable TRY/USD pricing controls in `/admin/billing`. Plans UI copy now follows end-user language, TR package names are localized as `Temel/Gelişmiş/Profesyonel`, current monthly package is explicitly surfaced, top-up uses a single modal-based action, package-card CTA spacing/alignment is tightened, Scale baseline is updated to `949 TRY`, and the package section now includes a full-width custom-package CTA linking to `mailto:askqualy@gmail.com`. Pricing currency is now driven by organization billing region (not UI language): `TR` organizations see TRY, non-TR organizations see USD. Premium organizations can now self-manage auto-renew in `/settings/plans` (turn off/on with period-end cancellation behavior) without admin support. Billing hard-lock now restricts locked tenants to `Settings > Plans` and `Settings > Billing` only, with workspace route redirects and inbox read/send lock. Plan-change flow now follows common SaaS behavior: upgrades apply immediately, downgrades are scheduled to the next billing period, and UI shows effective-date + target-package info through a modal-first subscription management surface plus separate cancellation confirmation modal. Active package economics are surfaced in the top current-package card while the subscription-management card remains action-focused, with consistent card typography and desktop CTA alignment across related billing cards. `Settings > Usage` credit history now includes richer package/top-up change context by resolving ledger metadata and linked subscription/order details.)  
 > **Status:** In Development
 
 ---
@@ -438,6 +438,21 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Pricing calibration guide published (`docs/plans/2026-02-16-pricing-credit-strategy-guide.md`) and finalized for website + product copy with safe monthly conversation ranges.
   - Lock v1 billing order as: trial -> recurring monthly premium package -> credit top-up overflow.
   - v1 package controls are admin-managed with TRY+USD values per tier (`Starter/Growth/Scale`) and per top-up pack (`250/500/1000`).
+  - Current baseline package prices:
+
+    | Plan | TRY | USD |
+    |------|-----|-----|
+    | Starter | 349 | 9.99 |
+    | Growth | 649 | 17.99 |
+    | Scale | 949 | 26.99 |
+
+  - Current baseline extra-credit prices:
+
+    | Pack | TRY | USD |
+    |------|-----|-----|
+    | 250 credits | 99 | 2.99 |
+    | 500 credits | 189 | 5.49 |
+    | 1000 credits | 349 | 9.99 |
   - Lock v1 package policy: monthly included credits are non-rollover.
   - Finalize feature gates by plan (channels, AI limits, seats, and premium-only controls).
 - **Plan Purchase (Online Payment):**
@@ -446,6 +461,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Top-up is not available during trial.
   - Until provider integration is completed, run the same flow in mock mode with simulated `success` / `failed` outcomes for checkout QA.
   - Add payment webhook lifecycle handling (success, failure, renewal, cancellation, retry).
+  - Execution plan is documented in `docs/plans/2026-02-17-iyzico-billing-integration-implementation-plan.md` (iyzico-first rollout).
 - **Membership Lifecycle (Trial / Premium):**
   - Membership state model is defined as `trial_active`, `trial_exhausted`, `premium_active`, `past_due`, `canceled`, `admin_locked`.
   - Enforce entitlement checks in runtime + admin visibility using locked-state reasons (`trial_time_expired`, `trial_credits_exhausted`, `past_due`, `admin_locked`).
@@ -582,7 +598,9 @@ MVP is successful when:
 - **Trial Go-To-Market Model (Pre-Pilot):** Start with trial-only onboarding (no freemium) to reduce ongoing abuse vectors and keep support/sales qualification focused.
 - **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
 - **Pricing & Credit Calibration Guide (Pre-Pilot):** `docs/plans/2026-02-16-pricing-credit-strategy-guide.md` is the policy reference for trial-credit calibration (`100/120/200/250/1000` comparison), model-cost math, Lovable-like `upgrade-first` monetization structure (tier ladder + premium burst top-up), and customer-facing conversation-equivalent packaging ranges.
-- **Pricing Catalog Rollout (Implementation v1.5):** `/settings/plans` now shows final package/top-up ladder with safe monthly conversation ranges; locale determines displayed currency (`tr` -> TRY, `en` -> USD). System-admin manages both TRY/USD price points from `/admin/billing`.
+- **Pricing Catalog Rollout (Implementation v1.5):** `/settings/plans` now shows final package/top-up ladder with safe monthly conversation ranges; system-admin manages both TRY/USD price points from `/admin/billing`.
+- **Billing Region Currency Rule (Implementation v1.9):** Displayed package currency is resolved from organization billing region (`TR` -> TRY, non-TR -> USD), independent of UI language.
+- **TR Package Naming Rule (Implementation v1.10):** Turkish package labels are standardized as `Temel` (Starter), `Gelişmiş` (Growth), and `Profesyonel` (Scale) across tenant and admin billing surfaces.
 - **Trial Defaults (Locked v1):** Provision new organizations with `14 days` and `200.0 credits` by default.
 - **Trial Lock Precedence (Locked v1):** Enforce `first limit reached wins` between trial time and trial credits.
 - **Trial Default Scope:** Admin updates to default trial values apply to newly created organizations only.

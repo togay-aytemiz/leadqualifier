@@ -8,7 +8,7 @@ import {
     formatCreditAmount,
 } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
-import { getOrganizationBillingLedger } from '@/lib/billing/server'
+import { getOrganizationBillingLedger, type BillingLedgerEntry } from '@/lib/billing/server'
 import { BillingLedgerTable } from './BillingLedgerTable'
 
 function resolveLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
@@ -47,16 +47,124 @@ function resolveLedgerPoolLabel(tBilling: Awaited<ReturnType<typeof getTranslati
     }
 }
 
+interface LedgerSubscriptionLookupRow {
+    metadata: unknown
+}
+
+interface LedgerOrderLookupRow {
+    credits: number
+    amountTry: number
+    currency: string | null
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
+}
+
+function readString(record: Record<string, unknown> | null, key: string): string | null {
+    const value = record?.[key]
+    return typeof value === 'string' && value.trim().length > 0 ? value : null
+}
+
+function readNumber(record: Record<string, unknown> | null, key: string): number | null {
+    const value = record?.[key]
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatLedgerCurrency(locale: string, amount: number, currency: string | null) {
+    if (!Number.isFinite(amount)) return null
+    const normalizedCurrency = currency && currency.trim().length > 0 ? currency.trim().toUpperCase() : 'TRY'
+    try {
+        return new Intl.NumberFormat(locale, {
+            style: 'currency',
+            currency: normalizedCurrency,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        }).format(amount)
+    } catch {
+        return null
+    }
+}
+
 function resolveLedgerReasonLabel(
     tBilling: Awaited<ReturnType<typeof getTranslations>>,
-    reason: string | null
+    locale: string,
+    entry: BillingLedgerEntry,
+    subscriptions: Map<string, LedgerSubscriptionLookupRow>,
+    orders: Map<string, LedgerOrderLookupRow>
 ) {
-    if (!reason) return tBilling('ledger.reasonFallback')
-
-    const normalizedReason = reason.trim().toLowerCase()
+    const metadata = toRecord(entry.metadata)
+    const source = readString(metadata, 'source')
+    const subscriptionId = readString(metadata, 'subscription_id')
+    const orderId = readString(metadata, 'order_id')
+    const reason = entry.reason
+    const normalizedReason = reason?.trim().toLowerCase() ?? ''
 
     if (normalizedReason === 'ai usage debit') {
         return tBilling('ledger.reasonMap.aiUsageDebit')
+    }
+
+    if (entry.entryType === 'package_grant') {
+        const subscriptionMetadata = subscriptionId
+            ? toRecord(subscriptions.get(subscriptionId)?.metadata ?? null)
+            : null
+
+        const changeType = readString(subscriptionMetadata, 'change_type')
+        const monthlyCredits = readNumber(subscriptionMetadata, 'requested_monthly_credits')
+            ?? readNumber(subscriptionMetadata, 'monthly_credits')
+            ?? Math.max(0, entry.creditsDelta)
+        const monthlyPriceTry = readNumber(subscriptionMetadata, 'requested_monthly_price_try')
+            ?? readNumber(subscriptionMetadata, 'monthly_price_try')
+        const creditsLabel = formatCreditAmount(monthlyCredits, locale)
+        const priceLabel = formatLedgerCurrency(locale, monthlyPriceTry ?? Number.NaN, 'TRY') ?? '—'
+
+        if (changeType === 'upgrade') {
+            return tBilling('ledger.reasonMap.packageUpgradeDetailed', {
+                credits: creditsLabel,
+                price: priceLabel
+            })
+        }
+
+        if (changeType === 'start') {
+            return tBilling('ledger.reasonMap.packageStartDetailed', {
+                credits: creditsLabel,
+                price: priceLabel
+            })
+        }
+
+        if (source === 'admin_assign_premium') {
+            return tBilling('ledger.reasonMap.packageAssignedDetailed', {
+                credits: creditsLabel,
+                price: priceLabel
+            })
+        }
+
+        if (normalizedReason === 'mock subscription checkout success') {
+            return tBilling('ledger.reasonMap.packageUpdatedDetailed', {
+                credits: creditsLabel,
+                price: priceLabel
+            })
+        }
+    }
+
+    if (entry.entryType === 'purchase_credit') {
+        const order = orderId ? orders.get(orderId) : null
+        const creditsLabel = formatCreditAmount(
+            Number.isFinite(order?.credits ?? Number.NaN) ? (order?.credits as number) : Math.max(0, entry.creditsDelta),
+            locale
+        )
+        const amountLabel = order
+            ? formatLedgerCurrency(locale, order.amountTry, order.currency)
+            : null
+
+        if (amountLabel) {
+            return tBilling('ledger.reasonMap.topupAddedDetailed', {
+                credits: creditsLabel,
+                amount: amountLabel
+            })
+        }
     }
 
     if (normalizedReason === 'mock subscription checkout success') {
@@ -67,7 +175,8 @@ function resolveLedgerReasonLabel(
         return tBilling('ledger.reasonMap.mockTopupSuccess')
     }
 
-    return reason
+    if (reason) return reason
+    return tBilling('ledger.reasonFallback')
 }
 
 export default async function BillingSettingsPage() {
@@ -113,6 +222,62 @@ export default async function BillingSettingsPage() {
         year: 'numeric',
         timeZone: 'UTC'
     }).format(monthDate)
+    const relatedSubscriptionIds: string[] = []
+    const relatedOrderIds: string[] = []
+
+    for (const entry of billingLedger) {
+        const metadata = toRecord(entry.metadata)
+        const subscriptionId = readString(metadata, 'subscription_id')
+        const orderId = readString(metadata, 'order_id')
+
+        if (subscriptionId && !relatedSubscriptionIds.includes(subscriptionId)) {
+            relatedSubscriptionIds.push(subscriptionId)
+        }
+        if (orderId && !relatedOrderIds.includes(orderId)) {
+            relatedOrderIds.push(orderId)
+        }
+    }
+
+    const subscriptionsById = new Map<string, LedgerSubscriptionLookupRow>()
+    const ordersById = new Map<string, LedgerOrderLookupRow>()
+
+    if (relatedSubscriptionIds.length > 0) {
+        const { data, error } = await supabase
+            .from('organization_subscription_records')
+            .select('id, metadata')
+            .eq('organization_id', organizationId)
+            .in('id', relatedSubscriptionIds)
+
+        if (error) {
+            console.error('Failed to load billing subscription lookup rows:', error)
+        } else {
+            for (const row of data ?? []) {
+                subscriptionsById.set(row.id, {
+                    metadata: row.metadata
+                })
+            }
+        }
+    }
+
+    if (relatedOrderIds.length > 0) {
+        const { data, error } = await supabase
+            .from('credit_purchase_orders')
+            .select('id, credits, amount_try, currency')
+            .eq('organization_id', organizationId)
+            .in('id', relatedOrderIds)
+
+        if (error) {
+            console.error('Failed to load billing order lookup rows:', error)
+        } else {
+            for (const row of data ?? []) {
+                ordersById.set(row.id, {
+                    credits: Number(row.credits ?? 0),
+                    amountTry: Number(row.amount_try ?? 0),
+                    currency: row.currency
+                })
+            }
+        }
+    }
 
     const monthlyTotal = usage.monthly.totalTokens
     const totalTotal = usage.total.totalTokens
@@ -127,7 +292,13 @@ export default async function BillingSettingsPage() {
             poolLabel: resolveLedgerPoolLabel(tBilling, entry.creditPool),
             deltaLabel: `${isDebit ? '-' : '+'}${formatCreditAmount(Math.abs(entry.creditsDelta), locale)}`,
             balanceLabel: formatCreditAmount(entry.balanceAfter, locale),
-            reasonLabel: resolveLedgerReasonLabel(tBilling, entry.reason),
+            reasonLabel: resolveLedgerReasonLabel(
+                tBilling,
+                locale,
+                entry,
+                subscriptionsById,
+                ordersById
+            ),
             isDebit
         }
     })

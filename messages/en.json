@@ -763,7 +763,12 @@
             "reasonMap": {
                 "aiUsageDebit": "AI usage debit",
                 "mockSubscriptionSuccess": "Mock premium checkout success",
-                "mockTopupSuccess": "Mock extra credit checkout success"
+                "mockTopupSuccess": "Mock extra credit checkout success",
+                "packageStartDetailed": "Monthly package started: {credits} credits/month • {price}",
+                "packageUpgradeDetailed": "Monthly package upgraded: {credits} credits/month • {price}",
+                "packageUpdatedDetailed": "Monthly package updated: {credits} credits/month • {price}",
+                "packageAssignedDetailed": "Monthly package assigned: {credits} credits/month • {price}",
+                "topupAddedDetailed": "Top-up credits added: {credits} credits • {amount}"
             },
             "entryType": {
                 "trialGrant": "Trial grant",
@@ -907,6 +912,10 @@
         "languageDescription": "Select your preferred language for the interface.",
         "languageEnglish": "English",
         "languageTurkish": "Turkish (Türkçe)",
+        "billingRegionTitle": "Billing region",
+        "billingRegionDescription": "Select region for package currency. Turkey shows TRY, non-TR regions show USD.",
+        "billingRegionTurkey": "Turkey (TRY)",
+        "billingRegionInternational": "International (USD)",
         "aiControlTitle": "AI suggestions",
         "aiControlDescription": "When enabled, both the offering profile and required fields are generated and updated from AI suggestions.",
         "aiControlHelper": "Disable to edit everything manually.",

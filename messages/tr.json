@@ -119,7 +119,7 @@
         "canvasScenario3LeadSignal3": "Bütçe paylaşıldı.",
         "canvasScenario3LeadSignal4": "Yüksek niyetli kurumsal lead.",
         "canvasSequence1User": "Lazer paket fiyatlarını öğrenmek istiyorum",
-        "canvasSequence1Agent": "Harika eşleşme. Starter ve Pro paketlerimiz var. Bütçene göre en uygun olanı önereyim mi?",
+        "canvasSequence1Agent": "Harika eşleşme. Temel ve Profesyonel paketlerimiz var. Bütçene göre en uygun olanı önereyim mi?",
         "canvasSequence2User": "Bu hafta başlayabilir miyim?",
         "canvasSequence2Agent": "Evet. Bu hafta 3 müsait saatimiz var. Uygun gününü paylaş, hemen ayırtayım.",
         "canvasSequence3User": "İlk seans için kampanya var mı?",
@@ -547,9 +547,9 @@
             "currentPackageInactive": "Şu an aktif bir aylık paketiniz yok.",
             "assumption": "Aşağıdaki konuşma sayıları yaklaşık değerlerdir; müşteri mesaj uzunluğu ve konuşma akışına göre değişebilir.",
             "planNames": {
-                "starter": "Başlangıç",
-                "growth": "Büyüme",
-                "scale": "Kurumsal"
+                "starter": "Temel",
+                "growth": "Gelişmiş",
+                "scale": "Profesyonel"
             },
             "badges": {
                 "current": "Aktif paket",
@@ -763,7 +763,12 @@
             "reasonMap": {
                 "aiUsageDebit": "Yapay zeka kullanım düşümü",
                 "mockSubscriptionSuccess": "Mock premium ödeme başarılı",
-                "mockTopupSuccess": "Mock ek kredi ödeme başarılı"
+                "mockTopupSuccess": "Mock ek kredi ödeme başarılı",
+                "packageStartDetailed": "Aylık paket başlatıldı: {credits} kredi/ay • {price}",
+                "packageUpgradeDetailed": "Aylık paket yükseltildi: {credits} kredi/ay • {price}",
+                "packageUpdatedDetailed": "Aylık paket güncellendi: {credits} kredi/ay • {price}",
+                "packageAssignedDetailed": "Aylık paket tanımlandı: {credits} kredi/ay • {price}",
+                "topupAddedDetailed": "Ek kredi eklendi: {credits} kredi • {amount}"
             },
             "entryType": {
                 "trialGrant": "Ücretsiz deneme tanımı",
@@ -907,6 +912,10 @@
         "languageDescription": "Arayüz için tercih ettiğiniz dili seçin.",
         "languageEnglish": "İngilizce",
         "languageTurkish": "Türkçe",
+        "billingRegionTitle": "Faturalama bölgesi",
+        "billingRegionDescription": "Paket para birimi için bölge seçin. TR için TRY, TR dışı bölgeler için USD gösterilir.",
+        "billingRegionTurkey": "Türkiye (TRY)",
+        "billingRegionInternational": "Uluslararası (USD)",
         "aiControlTitle": "Yapay zeka önerileri",
         "aiControlDescription": "Açıkken hizmet profili ve gerekli bilgiler AI önerileriyle üretilir ve güncellenir.",
         "aiControlHelper": "Kapalıyken her şeyi manuel olarak düzenlersiniz.",
@@ -1098,9 +1107,9 @@
                 "priceUsd": "Fiyat (USD)"
             },
             "planLabels": {
-                "starter": "Starter",
-                "growth": "Growth",
-                "scale": "Scale"
+                "starter": "Temel",
+                "growth": "Gelişmiş",
+                "scale": "Profesyonel"
             },
             "topupHeaders": {
                 "pack": "Ek kredi paketi",
