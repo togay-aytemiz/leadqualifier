@@ -2,14 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
-import { getOrgAiUsageSummary } from '@/lib/ai/usage'
 import {
-    calculateAiCreditsFromTokens,
     formatCreditAmount,
+    getOrgCreditUsageSummary,
 } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getOrganizationBillingLedger, type BillingLedgerEntry } from '@/lib/billing/server'
 import { BillingLedgerTable } from './BillingLedgerTable'
+import { UsageBreakdownDetails } from './UsageBreakdownDetails'
 
 function resolveLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
     switch (value) {
@@ -200,10 +200,9 @@ export default async function BillingSettingsPage() {
     }
 
     const [usage, billingLedger] = await Promise.all([
-        getOrgAiUsageSummary(organizationId, { supabase }),
+        getOrgCreditUsageSummary(organizationId, { supabase }),
         getOrganizationBillingLedger(organizationId, { supabase, limit: 20 })
     ])
-    const formatNumber = new Intl.NumberFormat(locale)
     const formatDateTime = new Intl.DateTimeFormat(locale, {
         year: 'numeric',
         month: 'short',
@@ -212,13 +211,13 @@ export default async function BillingSettingsPage() {
         minute: '2-digit'
     })
     const [year, month] = usage.month.split('-').map(Number)
-    const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getUTCFullYear()
-    const safeMonth = Number.isFinite(month ?? Number.NaN) ? (month as number) : new Date().getUTCMonth() + 1
+    const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getFullYear()
+    const safeMonth = Number.isFinite(month ?? Number.NaN) ? (month as number) : new Date().getMonth() + 1
     const monthDate = new Date(Date.UTC(safeYear, safeMonth - 1, 1))
     const monthLabel = new Intl.DateTimeFormat(locale, {
         month: 'long',
         year: 'numeric',
-        timeZone: 'UTC'
+        timeZone: usage.timezone
     }).format(monthDate)
     const relatedSubscriptionIds: string[] = []
     const relatedOrderIds: string[] = []
@@ -277,10 +276,8 @@ export default async function BillingSettingsPage() {
         }
     }
 
-    const monthlyTotal = usage.monthly.totalTokens
-    const totalTotal = usage.total.totalTokens
-    const monthlyCredits = calculateAiCreditsFromTokens(usage.monthly)
-    const totalCredits = calculateAiCreditsFromTokens(usage.total)
+    const monthlyCredits = usage.monthly.credits
+    const totalCredits = usage.total.credits
     const ledgerRows = billingLedger.map((entry) => {
         const isDebit = entry.creditsDelta < 0
         return {
@@ -309,7 +306,8 @@ export default async function BillingSettingsPage() {
                 <div className="max-w-5xl space-y-6">
                     <SettingsSection
                         title={tBilling('title')}
-                        description={tBilling('utcNote')}
+                        description={tBilling('calendarNote')}
+                        descriptionAddon={<UsageBreakdownDetails usage={usage} />}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -319,29 +317,21 @@ export default async function BillingSettingsPage() {
                                     <span className="normal-case font-medium">{monthLabel}</span>
                                 </div>
                                 <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                    {formatNumber.format(monthlyTotal)}
-                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
-                                </p>
-                                <p className="mt-1 text-sm font-medium text-gray-700">
-                                    {tBilling('creditsLabel')}: {formatCreditAmount(monthlyCredits, locale)}
-                                    <span className="ml-1 text-xs text-gray-500">{tBilling('creditsUnit')}</span>
+                                    {formatCreditAmount(monthlyCredits, locale)}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('creditsUnit')}</span>
                                 </p>
                             </div>
 
                             <div className="rounded-xl border border-gray-200 bg-white p-4">
                                 <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
                                 <p className="mt-2 text-2xl font-semibold text-gray-900">
-                                    {formatNumber.format(totalTotal)}
-                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('tokensLabel')}</span>
-                                </p>
-                                <p className="mt-1 text-sm font-medium text-gray-700">
-                                    {tBilling('creditsLabel')}: {formatCreditAmount(totalCredits, locale)}
-                                    <span className="ml-1 text-xs text-gray-500">{tBilling('creditsUnit')}</span>
+                                    {formatCreditAmount(totalCredits, locale)}
+                                    <span className="ml-1 text-sm font-medium text-gray-400">{tBilling('creditsUnit')}</span>
                                 </p>
                             </div>
                         </div>
 
-                        {totalTotal === 0 && (
+                        {totalCredits === 0 && (
                             <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>
                         )}
                     </SettingsSection>

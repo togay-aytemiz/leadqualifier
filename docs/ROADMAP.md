@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-17 (Inbox now surfaces WhatsApp 24-hour reply-window state directly in the composer header: a right-aligned `reply available / reply unavailable` indicator with tooltip reason, plus composer lock + overlay when the window is closed. MVP keeps template messaging out of scope and preserves current `active_agent` state when the window expires. Pricing rollout is now implemented end-to-end: final Starter/Growth/Scale + top-up ladder decisions, safe monthly conversation-range copy in `/settings/plans`, organization-region-based TRY/USD rendering, and system-admin TRY/USD pricing controls in `/admin/billing` backed by migrations `00061_multicurrency_pricing_catalog.sql` and `00064_billing_region_and_scale_price_update.sql`. Plans UI copy was then simplified to user-friendly language (TR package names `Temel/Gelişmiş/Profesyonel` + explicit current package label), top-up UX was refined to a single modal-based action, package-card CTA spacing/alignment was tightened, Scale baseline price was updated to `949 TRY`, and a full-width custom-package CTA (`Daha fazla kredi mi lazım?`) was added with `mailto:askqualy@gmail.com`. `/settings/plans` now also includes self-serve subscription renewal controls (auto-renew on/off) so premium users can manually stop renewal at period end and re-enable it without admin support, backed by migration `00062_mock_subscription_renewal_controls.sql`. Billing hard-lock now enforces `Plans + Usage only` tenant access when trial/premium entitlement is locked, with route-level redirects and inbox read/send lock. Package-change UX now mirrors common SaaS behavior: direct downgrade CTA is hidden from tier cards, downgrades are scheduled for next cycle, and effective date is shown in plan management, backed by `00063_mock_checkout_schedule_downgrades.sql`. Premium plan changes are now managed from modal-first subscription UI (separate plan-management modal + separate cancellation confirmation modal), active package economics are shown in the top current-package card, card typography/CTA alignment is standardized across subscription/custom-package/one-time top-up cards, and `Settings > Usage` credit history now surfaces detailed package/top-up event context. A navigation performance pass now removes duplicate dashboard auth lookups, runs settings-layout reads in parallel, enables manual route warmup prefetch in development + production (with env opt-out), and short-circuits anonymous `/` entry directly to `/login` before org-context resolution. Top-up modal option rows now emphasize right-side price typography with vertical centering for quicker package scanning. System-admin default home routing now opens `/admin` when no explicit organization is selected instead of `/inbox`. Billing-locked navigation now keeps desktop/mobile main navigation and Settings inner navigation visible, while non-billing destinations are shown as locked/non-clickable. `Settings > Usage` credit ledger table now keeps stable column widths between collapsed and expanded (`Daha fazla göster`) states.)  
+> **Last Updated:** 2026-02-17 (Usage page now uses ledger-based credit totals as the single source of truth so `Settings > Plans` and `Settings > Usage` stay consistent. Monthly usage moved from UTC to calendar month (`Europe/Istanbul`), token-first card headlines were replaced with credit-only values, `Kullanım detayını gör` modal breakdown was restored with per-operation credit consumption, the details action is now `Detayı gör` with underlined dark-link styling, and the modal overlay/table layout is compacted for full-page focus.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -187,6 +187,7 @@
   - [x] Route prefetch warmups now run with a short delayed schedule (main sidebar, settings shell, mobile nav) to reduce active-interaction jank
   - [x] Manual navigation prefetch warmups now run in both development and production by default (with env opt-out) to reduce first-click route latency
   - [x] Billing-locked navigation now keeps desktop/mobile main menus and Settings inner menu structure visible; non-billing destinations render as locked/non-clickable while Settings stays accessible via Plans
+  - [x] Billing-locked workspace sidebar now forces bot status indicator to `Kapalı/Off` (instead of `Dinleyici/Shadow`) so lock state is communicated clearly
   - [x] Settings > Usage credit ledger table now keeps fixed column layout when toggling `Daha fazla göster / Daha az göster`
   - [x] Anonymous `/` entry now short-circuits to `/login` using Supabase auth-cookie detection before resolving organization context, reducing landing→app redirect delay
   - [x] Dashboard route fetch paths now remove redundant page-level `auth.getUser()` checks in favor of shared organization-context resolution to reduce repeated server roundtrips
@@ -279,15 +280,17 @@
 - [x] **AI Settings Prompt:** Locale-aware prompt default repair so TR UI shows Turkish prompt instructions
 - [x] **AI Settings Prompt:** Legacy EN default prompt variants also normalize to TR default in TR UI
 - [x] **Inbox UI:** Show configured bot name in chat labels
-- [x] **Usage & Billing:** Track monthly (UTC) + total AI token usage
-- [x] **Usage & Billing:** Breakdown by summary, messages, and lead extraction
-- [x] **Usage & Billing:** Include lead reasoning tokens under lead extraction totals in detailed breakdown
-- [x] **Usage & Billing UI:** Show the UTC month label in the monthly card header
-- [x] **Usage & Billing UI:** Place “Detayları gör” link under the UTC note
-- [x] **Usage & Billing UI:** Add message volume cards (AI-generated, operator-sent, inbound customer) for monthly UTC and all-time totals
-- [x] **Usage & Billing UI:** Add storage usage cards with total size plus Skills/Knowledge Base breakdown
-- [x] **Usage & Billing UI:** Show message breakdown metrics on separate rows per card for faster scanning
-- [x] **Usage & Billing UI:** Show token-derived AI credit usage preview next to monthly/all-time token totals
+- [x] **Usage & Billing:** Track monthly calendar-month + all-time AI credit usage using ledger debits (`organization_credit_ledger` / `usage_debit`)
+- [x] **Usage & Billing:** Keep Usage and Plans credit consumption consistent by reading the same debit source
+- [x] **Usage & Billing:** Include operation-level breakdown for router, RAG, fallback, summary, lead extraction, and lead reasoning
+- [x] **Usage & Billing UI:** Show calendar month label (`Europe/Istanbul`) in the monthly card header
+- [x] **Usage & Billing UI:** Show only credit values (`30,3 kredi`) in monthly/all-time cards
+- [x] **Usage & Billing UI:** Restore `Kullanım detayını gör` modal for per-operation credit visibility
+- [x] **Usage & Billing UI:** Replace technical operation names with user-friendly labels (`AI yanıtları`, `Konuşma özeti`, `Kişi çıkarımı`, `Doküman işleme`)
+- [x] **Usage & Billing UI:** Split document-processing credits (`hizmet profili`, `gerekli bilgiler`) from lead-extraction totals using usage metadata source mapping
+- [x] **Usage & Billing UI:** Show month period in usage-breakdown modal header as `Bu ay • <Ay YYYY>` (same pattern as summary card)
+- [x] **Usage & Billing UI:** Style `Detayı gör` action as black underlined link to match `Kullanımı gör` visual pattern in Plans
+- [x] **Usage & Billing UI:** Render usage details modal via full-page portal overlay and compact 3-column table (`İşlem / Bu ay / Toplam`) so labels do not repeat and credit values stay on one line
 - [x] **Settings UX:** Save buttons show a transient success state and clear dirty-state across settings pages
 - [x] **Settings UX:** Two-column sections, header save actions, dirty-state enablement, and unsaved-change confirmation
 - [x] **Settings UX:** Remove redundant current-value summaries above inputs

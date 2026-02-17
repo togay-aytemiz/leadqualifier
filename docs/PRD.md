@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-17 (Inbox now surfaces WhatsApp reply-window state in context: far-right `reply available / reply unavailable` indicator beside summary, tooltip reason when blocked, and composer/send lock with short overlay message after the 24-hour window. MVP keeps template messaging out of scope and preserves `active_agent` when sending is blocked. Pricing rollout is implemented with final Starter/Growth/Scale + top-up ladder decisions, safe monthly conversation-range copy in `/settings/plans`, and admin-configurable TRY/USD pricing controls in `/admin/billing`. Plans UI copy now follows end-user language, TR package names are localized as `Temel/Gelişmiş/Profesyonel`, current monthly package is explicitly surfaced, top-up uses a single modal-based action, package-card CTA spacing/alignment is tightened, Scale baseline is updated to `949 TRY`, and the package section now includes a full-width custom-package CTA linking to `mailto:askqualy@gmail.com`. Pricing currency is now driven by organization billing region (not UI language): `TR` organizations see TRY, non-TR organizations see USD. Premium organizations can now self-manage auto-renew in `/settings/plans` (turn off/on with period-end cancellation behavior) without admin support. Billing hard-lock now restricts locked tenants to `Settings > Plans` and `Settings > Billing` only, with workspace route redirects and inbox read/send lock. Plan-change flow now follows common SaaS behavior: upgrades apply immediately, downgrades are scheduled to the next billing period, and UI shows effective-date + target-package info through a modal-first subscription management surface plus separate cancellation confirmation modal. Active package economics are surfaced in the top current-package card while the subscription-management card remains action-focused, with consistent card typography and desktop CTA alignment across related billing cards. `Settings > Usage` credit history now includes richer package/top-up change context by resolving ledger metadata and linked subscription/order details. A navigation performance pass also reduced duplicate dashboard auth lookups, parallelized settings-shell data reads, enabled manual route warmup prefetch in development + production (with env opt-out), and added anonymous `/` short-circuit routing to `/login` before org-context resolution. Top-up selection modal option rows now prioritize right-side price visibility with larger text and centered vertical alignment. System-admin default home routing now opens `/admin` when no explicit organization is selected instead of `/inbox`. Billing-locked navigation now keeps desktop/mobile main navigation and Settings inner navigation visible, while non-billing destinations are shown as locked/non-clickable. `Settings > Usage` credit ledger columns now stay stable when toggling `Show more / Show less`.)  
+> **Last Updated:** 2026-02-17 (Usage reporting now follows calendar month (`Europe/Istanbul`) and uses `organization_credit_ledger` usage debits as the source of truth so `Settings > Plans` and `Settings > Usage` show consistent credit consumption. Usage cards are credit-only, the breakdown modal is restored with per-operation credit totals, the details entry is standardized as `Detayı gör / View details` with underlined dark-link styling, and the modal now uses a full-page portal overlay plus compact single-table breakdown layout.)  
 > **Status:** In Development
 
 ---
@@ -360,19 +360,18 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Required Fields has its own AI toggle and keeps manual + AI chips together.
 
 ### 5.7 Usage & Billing (Implemented)
-- Track org-level AI token usage (monthly UTC + total)
-- Includes production AI paths: router, RAG, fallback, summaries, lead extraction, and lead reasoning
-- Report usage breakdown by summary, messages (router/RAG/fallback), and lead extraction (including lead reasoning)
-- Monthly usage card surfaces the UTC month label (e.g., February 2026)
-- Usage details link appears under the UTC note in the Usage & Billing section
-- AI usage cards show a token-derived credit preview next to monthly/all-time token totals to visualize future credit billing impact.
-- Add monthly UTC + all-time message volume cards for:
-  - AI-generated messages (`sender_type='bot'`)
-  - Operator-sent messages (`sender_type='user'`)
-  - Customer inbound messages (`sender_type='contact'`)
-  - Display each metric on its own row inside the monthly/total cards for readability
-- Add storage usage cards showing total estimated content size and a Skills/Knowledge Base split
-- Every new token-consuming feature must log usage events
+- Usage totals are credit-based and sourced from `organization_credit_ledger` (`entry_type='usage_debit'`) so Usage and Plans surfaces stay consistent.
+- Monthly usage follows calendar month boundaries in `Europe/Istanbul` (not UTC month boundaries).
+- Usage cards show credit-only values (`X,X kredi` / `X.X credits`) for monthly and all-time totals.
+- The `Kullanım detayını gör / View usage details` modal is available again and shows per-operation credit consumption.
+- The usage details entry action is standardized to `Detayı gör / View details` and uses the same underlined dark-link visual pattern as Plans `Kullanımı gör`.
+- Usage details modal is rendered through `document.body` portal overlay so dim/backdrop covers the full app shell, not only billing content.
+- Usage breakdown content uses a compact 3-column table (`İşlem`, `Bu ay`, `Toplam`) to avoid repeating operation labels.
+- Detailed breakdown includes router, RAG, fallback, summary, lead extraction, and lead reasoning credit totals.
+- End-user labels in usage details are jargon-free and operation-focused: AI conversation replies, conversation summaries, lead extraction, and document processing.
+- Document-processing usage (service profile suggestion + required info extraction/follow-up) is shown separately by resolving usage metadata source.
+- Usage breakdown modal monthly column header uses explicit period label (`This month • <Month YYYY>`) to match the summary card context.
+- Every token-consuming AI feature must continue logging `organization_ai_usage`; billing debit ledger remains the source of truth for displayed credit consumption.
 
 ### 5.8 Platform Admin Workspace (Implemented v1, Read-Only)
 - **Searchable Organization Switcher (System Admin):**
@@ -535,6 +534,8 @@ MVP is successful when:
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
+- **Usage Source of Truth:** `Settings > Usage` credit totals are read from `organization_credit_ledger` usage-debit records (not token-to-credit previews) to stay consistent with plan consumption.
+- **Usage Month Window:** Usage monthly grouping uses calendar month in `Europe/Istanbul` to match business-facing monthly reporting expectations.
 - **Font Strategy (Initial):** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
 - **Font Update:** Adopt Plus Jakarta Sans via CSS `@import` for the main sidebar’s crisp visual language. This supersedes the system-font-only decision since we are not using Next.js font fetching in CI and accept the lightweight web font load.
 - **Sidebar UI Refinement:** Collapsed-state icon pills are centered and the expand/collapse toggle sits alongside the app name, using arrow-from-line icons for clarity.
@@ -624,6 +625,7 @@ MVP is successful when:
 - **Runtime Entitlement Gate (Implementation v1):** Before token-consuming AI paths (shared inbound pipeline, Telegram webhook AI flow, simulator response generation, inbox summary/reasoning/manual lead-refresh), runtime resolves billing entitlement and exits early when usage is locked.
 - **Workspace Hard-Lock Access Rule (Implementation v1.7):** If entitlement is locked (`trial_exhausted`, `past_due`, `canceled`, `admin_locked`, or exhausted premium credits), tenant workspace routes are restricted to `Settings > Plans` and `Settings > Billing`; inbox conversation read/send actions are blocked server-side to prevent message visibility/reply bypass.
 - **Workspace Hard-Lock Navigation UX (Implementation v1.8):** In locked mode, desktop/mobile main navigation and the Settings inner sidebar remain fully visible, but non-billing destinations are disabled with locked affordances. `Settings` stays the active entry and resolves to `Settings > Plans`.
+- **Workspace Hard-Lock Bot Status UX (Implementation v1.10):** In locked mode, main sidebar bot status is displayed as `Off/Kapalı` regardless of stored bot mode, so users do not see a misleading `Shadow/Dinleyici` state while replies are blocked by lock policy.
 - **Billing Ledger Table Layout Stability (Implementation v1.9):** `Settings > Usage` credit ledger uses fixed column sizing so collapsed and expanded row modes keep identical column widths.
 - **TR Payment Provider Strategy (Locked v1):** Prioritize a TR-valid recurring provider (Iyzico first, PayTR alternative); use Stripe only with a supported non-TR entity/account model.
 - **WhatsApp Cost Modeling Baseline:** For Meta Cloud API MVP, treat inbound webhook traffic and in-window free-form replies as zero template fee; meter WhatsApp variable cost only when sending template messages (country/category-dependent).

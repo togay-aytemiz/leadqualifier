@@ -52,6 +52,7 @@ import {
 } from '@/lib/billing/sidebar-progress'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
+import { resolveMainSidebarBotMode } from '@/design/main-sidebar-bot-mode'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -634,21 +635,25 @@ export function MainSidebar({
     }, [isSystemAdmin, tSidebar])
 
     const toggleLabel = collapsed ? tCommon('expandSidebar') : tCommon('collapseSidebar')
-    const botModeLabel = useMemo(() => {
-        if (botMode === 'shadow') return tSidebar('botStatusShadow')
-        if (botMode === 'off') return tSidebar('botStatusOff')
-        return tSidebar('botStatusActive')
-    }, [botMode, tSidebar])
-    const botModeDot = botMode === 'shadow'
-        ? 'bg-amber-500'
-        : botMode === 'off'
-            ? 'bg-red-500'
-            : 'bg-emerald-500'
     const workspaceAccess = useMemo(
         () => resolveWorkspaceAccessState(billingSnapshot),
         [billingSnapshot]
     )
     const shouldRestrictToBilling = workspaceAccess.isLocked && !isSystemAdmin
+    const effectiveBotMode = resolveMainSidebarBotMode({
+        botMode,
+        isWorkspaceLocked: shouldRestrictToBilling
+    })
+    const botModeLabel = useMemo(() => {
+        if (effectiveBotMode === 'shadow') return tSidebar('botStatusShadow')
+        if (effectiveBotMode === 'off') return tSidebar('botStatusOff')
+        return tSidebar('botStatusActive')
+    }, [effectiveBotMode, tSidebar])
+    const botModeDot = effectiveBotMode === 'shadow'
+        ? 'bg-amber-500'
+        : effectiveBotMode === 'off'
+            ? 'bg-red-500'
+            : 'bg-emerald-500'
     const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
     const settingsNavState = resolveBillingLockedNavItem(
         {

@@ -46,19 +46,67 @@ export interface AiTokenTotalsLike {
     outputTokens: number
 }
 
+export interface CreditUsageLedgerRow {
+    created_at: string
+    credits_delta: number | string
+    usage_id?: string | null
+    metadata: unknown
+}
+
+export interface CreditUsageBreakdown {
+    aiReplies: number
+    conversationSummary: number
+    leadExtraction: number
+    documentProcessing: number
+}
+
+export interface CreditUsageTotals {
+    credits: number
+    byCategory: Record<string, number>
+    breakdown: CreditUsageBreakdown
+    count: number
+}
+
+export interface CreditUsageSummary {
+    month: string
+    timezone: string
+    monthly: CreditUsageTotals
+    total: CreditUsageTotals
+}
+
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
 interface GetSummaryOptions {
     supabase?: SupabaseClient
 }
 
+interface BuildCreditUsageSummaryOptions {
+    now?: Date
+    timeZone?: string
+    categories?: string[]
+}
+
 const CREDIT_INPUT_TOKEN_WEIGHT = 1
 const CREDIT_OUTPUT_TOKEN_WEIGHT = 4
 const TOKENS_PER_CREDIT = 3000
+const DEFAULT_USAGE_TIMEZONE = 'Europe/Istanbul'
+const DEFAULT_USAGE_CATEGORIES = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning']
+const DOCUMENT_PROCESSING_SOURCES = new Set([
+    'offering_profile_suggestion',
+    'required_intake_fields',
+    'required_intake_followup'
+])
 
 function normalizeCount(value?: number | null) {
     if (!Number.isFinite(value ?? Number.NaN)) return 0
     return Math.max(0, Math.round(value ?? 0))
+}
+
+function normalizeCreditDelta(value?: number | string | null) {
+    if (!Number.isFinite(value ?? Number.NaN)) return 0
+    const parsed = Number(value ?? 0)
+    if (parsed >= 0) return 0
+    return Math.abs(parsed)
 }
 
 function getUtf8ByteSize(value: string | null | undefined) {
@@ -72,6 +120,255 @@ function getStringArrayByteSize(values: string[] | null | undefined) {
 
 function ceilToSingleDecimal(value: number) {
     return Math.ceil(value * 10) / 10
+}
+
+function roundToSingleDecimal(value: number) {
+    return Math.round(value * 10) / 10
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
+}
+
+function readString(record: Record<string, unknown> | null, key: string) {
+    const value = record?.[key]
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+function resolveMonthKeyForTimeZone(date: Date, timeZone: string) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit'
+    }).formatToParts(date)
+    const year = parts.find((part) => part.type === 'year')?.value ?? '1970'
+    const month = parts.find((part) => part.type === 'month')?.value ?? '01'
+    return `${year}-${month}`
+}
+
+function resolveUsageCategory(metadata: unknown) {
+    const record = toRecord(metadata)
+    const category = record?.category
+    return typeof category === 'string' && category.trim().length > 0
+        ? category.trim()
+        : 'unknown'
+}
+
+function resolveUsageSource(metadata: unknown) {
+    return readString(toRecord(metadata), 'source')
+}
+
+function buildCategoryTotals(categories: string[]) {
+    const totals: Record<string, number> = {}
+    for (const category of categories) {
+        totals[category] = 0
+    }
+    return totals
+}
+
+function buildBreakdownTotals(): CreditUsageBreakdown {
+    return {
+        aiReplies: 0,
+        conversationSummary: 0,
+        leadExtraction: 0,
+        documentProcessing: 0
+    }
+}
+
+function withRoundedBreakdown(totals: CreditUsageBreakdown): CreditUsageBreakdown {
+    return {
+        aiReplies: roundToSingleDecimal(totals.aiReplies),
+        conversationSummary: roundToSingleDecimal(totals.conversationSummary),
+        leadExtraction: roundToSingleDecimal(totals.leadExtraction),
+        documentProcessing: roundToSingleDecimal(totals.documentProcessing)
+    }
+}
+
+function addToBreakdown(options: {
+    totals: CreditUsageBreakdown
+    category: string
+    source: string | null
+    credits: number
+}) {
+    const { totals, category, source, credits } = options
+
+    if (category === 'router' || category === 'rag' || category === 'fallback') {
+        totals.aiReplies += credits
+        return
+    }
+
+    if (category === 'summary') {
+        totals.conversationSummary += credits
+        return
+    }
+
+    if (category === 'lead_extraction') {
+        if (source && DOCUMENT_PROCESSING_SOURCES.has(source)) {
+            totals.documentProcessing += credits
+            return
+        }
+
+        totals.leadExtraction += credits
+        return
+    }
+
+    if (category === 'lead_reasoning') {
+        totals.leadExtraction += credits
+    }
+}
+
+function withRoundedCategoryTotals(totals: Record<string, number>) {
+    const rounded: Record<string, number> = {}
+    for (const [category, value] of Object.entries(totals)) {
+        rounded[category] = roundToSingleDecimal(value)
+    }
+    return rounded
+}
+
+export function buildCreditUsageSummary(
+    rows: CreditUsageLedgerRow[],
+    options?: BuildCreditUsageSummaryOptions
+): CreditUsageSummary {
+    const timeZone = options?.timeZone ?? DEFAULT_USAGE_TIMEZONE
+    const now = options?.now ?? new Date()
+    const monthKey = resolveMonthKeyForTimeZone(now, timeZone)
+    const categories = options?.categories ?? DEFAULT_USAGE_CATEGORIES
+
+    const monthlyByCategory = buildCategoryTotals(categories)
+    const totalByCategory = buildCategoryTotals(categories)
+    const monthlyBreakdown = buildBreakdownTotals()
+    const totalBreakdown = buildBreakdownTotals()
+    let monthlyCredits = 0
+    let totalCredits = 0
+    let monthlyCount = 0
+    let totalCount = 0
+
+    for (const row of rows) {
+        const credits = normalizeCreditDelta(row.credits_delta)
+        if (credits <= 0) continue
+
+        const createdAt = new Date(row.created_at)
+        if (!Number.isFinite(createdAt.getTime())) continue
+
+        const category = resolveUsageCategory(row.metadata)
+        const source = resolveUsageSource(row.metadata)
+        if (!(category in totalByCategory)) {
+            totalByCategory[category] = 0
+        }
+
+        totalByCategory[category] = (totalByCategory[category] ?? 0) + credits
+        addToBreakdown({
+            totals: totalBreakdown,
+            category,
+            source,
+            credits
+        })
+        totalCredits += credits
+        totalCount += 1
+
+        if (resolveMonthKeyForTimeZone(createdAt, timeZone) === monthKey) {
+            if (!(category in monthlyByCategory)) {
+                monthlyByCategory[category] = 0
+            }
+
+            monthlyByCategory[category] = (monthlyByCategory[category] ?? 0) + credits
+            addToBreakdown({
+                totals: monthlyBreakdown,
+                category,
+                source,
+                credits
+            })
+            monthlyCredits += credits
+            monthlyCount += 1
+        }
+    }
+
+    return {
+        month: monthKey,
+        timezone: timeZone,
+        monthly: {
+            credits: roundToSingleDecimal(monthlyCredits),
+            byCategory: withRoundedCategoryTotals(monthlyByCategory),
+            breakdown: withRoundedBreakdown(monthlyBreakdown),
+            count: monthlyCount
+        },
+        total: {
+            credits: roundToSingleDecimal(totalCredits),
+            byCategory: withRoundedCategoryTotals(totalByCategory),
+            breakdown: withRoundedBreakdown(totalBreakdown),
+            count: totalCount
+        }
+    }
+}
+
+export async function getOrgCreditUsageSummary(
+    organizationId: string,
+    options?: GetSummaryOptions & {
+        now?: Date
+        timeZone?: string
+    }
+): Promise<CreditUsageSummary> {
+    const supabase = options?.supabase ?? await createClient()
+
+    const { data, error } = await supabase
+        .from('organization_credit_ledger')
+        .select('created_at, credits_delta, usage_id, metadata')
+        .eq('organization_id', organizationId)
+        .eq('entry_type', 'usage_debit')
+
+    if (error) {
+        console.error('Failed to load credit usage summary rows:', error)
+        return buildCreditUsageSummary([], {
+            now: options?.now,
+            timeZone: options?.timeZone
+        })
+    }
+
+    const ledgerRows = (data ?? []) as CreditUsageLedgerRow[]
+    const usageIds = Array.from(
+        new Set(
+            ledgerRows
+                .map((row) => row.usage_id)
+                .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        )
+    )
+    const usageMetadataById = new Map<string, unknown>()
+
+    if (usageIds.length > 0) {
+        const { data: usageRows, error: usageError } = await supabase
+            .from('organization_ai_usage')
+            .select('id, metadata')
+            .eq('organization_id', organizationId)
+            .in('id', usageIds)
+
+        if (usageError) {
+            console.error('Failed to load AI usage metadata for credit breakdown:', usageError)
+        } else {
+            for (const row of usageRows ?? []) {
+                usageMetadataById.set(row.id, row.metadata)
+            }
+        }
+    }
+
+    const normalizedRows = ledgerRows.map((row) => {
+        const ledgerMetadata = toRecord(row.metadata) ?? {}
+        const usageMetadata = row.usage_id ? toRecord(usageMetadataById.get(row.usage_id) ?? null) : null
+
+        return {
+            created_at: row.created_at,
+            credits_delta: row.credits_delta,
+            metadata: {
+                ...ledgerMetadata,
+                ...(usageMetadata ? { source: readString(usageMetadata, 'source') } : {})
+            }
+        } satisfies CreditUsageLedgerRow
+    })
+
+    return buildCreditUsageSummary(normalizedRows, {
+        now: options?.now,
+        timeZone: options?.timeZone
+    })
 }
 
 export function calculateAiCreditsFromTokens(totals: AiTokenTotalsLike) {
