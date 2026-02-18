@@ -345,3 +345,51 @@ export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string)
         }
     }
 }
+
+export async function hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers(params: {
+    userAccessToken: string
+    payload: unknown
+}) {
+    if (!isRecord(params.payload) || !Array.isArray(params.payload.data)) {
+        return params.payload
+    }
+
+    const nextItems: unknown[] = []
+
+    for (const item of params.payload.data) {
+        if (!isRecord(item)) {
+            nextItems.push(item)
+            continue
+        }
+
+        const businessAccountId = asString(item.id)
+        const phoneNumbersNode = isRecord(item.phone_numbers) ? item.phone_numbers : null
+        const hasPhoneNumbers = Boolean(phoneNumbersNode && Array.isArray(phoneNumbersNode.data) && phoneNumbersNode.data.length > 0)
+
+        if (!businessAccountId || hasPhoneNumbers) {
+            nextItems.push(item)
+            continue
+        }
+
+        const phoneNumbersUrl = new URL(`https://graph.facebook.com/v21.0/${businessAccountId}/phone_numbers`)
+        phoneNumbersUrl.searchParams.set('access_token', params.userAccessToken)
+        phoneNumbersUrl.searchParams.set('fields', 'id,display_phone_number,verified_name')
+
+        try {
+            const phoneNumbersPayload = await requestMetaGraph<MetaGraphListResponse>(phoneNumbersUrl)
+            nextItems.push({
+                ...item,
+                phone_numbers: {
+                    data: extractGraphDataItems(phoneNumbersPayload)
+                }
+            })
+        } catch {
+            nextItems.push(item)
+        }
+    }
+
+    return {
+        ...params.payload,
+        data: nextItems
+    }
+}

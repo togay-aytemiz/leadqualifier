@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings and switched `Settings > Plans` currency resolution to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`, with `Accept-Language` fallback when geo headers are unavailable. Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses.)  
+> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings and switched `Settings > Plans` currency resolution to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`, with `Accept-Language` fallback when geo headers are unavailable. Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, and surfaced popup OAuth outcomes directly on Channels UI.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -47,6 +47,8 @@
   - [x] WhatsApp OAuth candidate discovery falls back from `/me/whatsapp_business_accounts` to business-edge lookup (`/me/businesses` + owned/client WABA edges)
   - [x] WhatsApp OAuth now requests only WhatsApp scopes (`whatsapp_business_management`, `whatsapp_business_messaging`) to avoid `Invalid Scopes: business_management` failures on newer Meta apps
   - [x] WhatsApp OAuth candidate selection no longer requires WABA `name`; connect flow now succeeds when Graph returns `id + phone_numbers` without `name`
+  - [x] WhatsApp OAuth candidate hydration now fetches `/{waba_id}/phone_numbers` when nested `phone_numbers` is missing from WABA list responses
+  - [x] Channels page now shows OAuth popup result feedback (`success` / failure reason) instead of silently returning with no visible status
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook

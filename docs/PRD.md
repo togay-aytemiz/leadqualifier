@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing.)  
+> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, and surfaced popup OAuth outcomes in Channels UI.)  
 > **Status:** In Development
 
 ---
@@ -79,6 +79,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - WhatsApp OAuth candidate discovery supports fallback via `me/businesses` + business WABA edges when direct user node field access is unavailable in Graph.
 - WhatsApp OAuth scope request is limited to `whatsapp_business_management` + `whatsapp_business_messaging` (do not request `business_management` in the WhatsApp connect flow).
 - WhatsApp OAuth candidate resolution accepts WABA payloads without `name` as long as `id` + `phone_numbers` are present.
+- WhatsApp OAuth candidate discovery now hydrates missing nested phone data via `/{waba_id}/phone_numbers` before failing with missing assets.
+- Channels UI shows Meta OAuth popup result feedback (success/failure reason) on return, instead of silent close behavior.
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
@@ -726,6 +728,8 @@ MVP is successful when:
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
 - **WhatsApp OAuth Scope Baseline:** Default WhatsApp OAuth scopes to `whatsapp_business_management` and `whatsapp_business_messaging`; omit `business_management` to prevent invalid-scope popup failures on newly provisioned Meta apps.
 - **WhatsApp OAuth Candidate Parsing (Resilience):** Do not hard-require WABA `name` during connect; treat `id + phone_numbers` as sufficient to avoid false `missing_whatsapp_assets` failures.
+- **WhatsApp OAuth Phone-Number Hydration:** If WABA list responses omit nested `phone_numbers`, resolve `phone_number_id` through `/{waba_id}/phone_numbers` before returning missing-assets status.
+- **Meta OAuth UX Feedback:** Persist popup return status in URL (`meta_oauth*`) and surface localized success/failure messages in Channels UI for deterministic troubleshooting.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
 - **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.

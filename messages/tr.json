@@ -457,6 +457,27 @@
         "redirecting": "Yönlendiriliyor...",
         "connectWithMeta": "Meta ile Devam Et",
         "oauthConnectDescription": "Bu kanal bağlantısı için Meta'ya yönlendirileceksiniz. Onaydan sonra otomatik olarak buraya dönersiniz.",
+        "oauthStatus": {
+            "success": "{channel} başarıyla bağlandı.",
+            "cancelled": "Meta bağlantısı iptal edildi.",
+            "missingWhatsAppAssets": "Bu hesap için WhatsApp işletme telefon numarası bulunamadı. Meta Business varlıklarını ve izinleri kontrol edin.",
+            "missingInstagramAssets": "Bu kullanıcı için Instagram işletme hesabı bulunamadı. Sayfa ve Instagram bağlantısını kontrol edin.",
+            "orgMismatch": "Bağlantı oturumu uyuşmuyor. Lütfen Kanallar sayfasından tekrar deneyin.",
+            "forbidden": "Bu organizasyon için kanal bağlama yetkiniz yok.",
+            "missingMetaEnv": "Sunucudaki Meta uygulama ayarları eksik.",
+            "invalidState": "Meta bağlantı durumu geçersiz veya süresi dolmuş. Lütfen tekrar deneyin.",
+            "missingCode": "Meta yetki kodu döndürmedi. Lütfen tekrar deneyin.",
+            "connectFailed": "Meta bağlantısı başarısız: {reason}",
+            "genericFailure": "Meta bağlantısı tamamlanamadı."
+        },
+        "oauthErrors": {
+            "missingPermissions": "Bu uygulama/kullanıcı için gerekli Meta izinleri eksik.",
+            "invalidRedirectUri": "Redirect URI Meta uygulama ayarlarında izinli değil.",
+            "invalidOauthToken": "OAuth token değişimi başarısız oldu.",
+            "assetAccessDenied": "Kullanıcının gerekli business varlıklarına erişimi yok.",
+            "graphApiError": "Meta Graph API isteği başarısız oldu.",
+            "unknown": "Bilinmeyen hata."
+        },
         "connectBot": "Botu Bağla",
         "connectWhatsApp": "WhatsApp Bağla",
         "connectInstagram": "Instagram Bağla",

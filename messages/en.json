@@ -457,6 +457,27 @@
         "redirecting": "Redirecting...",
         "connectWithMeta": "Continue with Meta",
         "oauthConnectDescription": "You'll be redirected to Meta to authorize this channel connection. After approval, you'll return here automatically.",
+        "oauthStatus": {
+            "success": "{channel} connected successfully.",
+            "cancelled": "Meta connection was cancelled.",
+            "missingWhatsAppAssets": "No WhatsApp business phone number was found for this account. Check your Meta Business assets and permissions.",
+            "missingInstagramAssets": "No Instagram business account was found for this user. Check Page and Instagram linkage.",
+            "orgMismatch": "Connection session mismatch detected. Please retry from Channels.",
+            "forbidden": "You do not have permission to connect channels for this organization.",
+            "missingMetaEnv": "Meta app settings are incomplete on the server.",
+            "invalidState": "Meta connection state is invalid or expired. Please retry.",
+            "missingCode": "Meta did not return an authorization code. Please retry.",
+            "connectFailed": "Meta connection failed: {reason}",
+            "genericFailure": "Meta connection could not be completed."
+        },
+        "oauthErrors": {
+            "missingPermissions": "Missing required Meta permissions for this app/user.",
+            "invalidRedirectUri": "Redirect URI is not allowed in Meta app settings.",
+            "invalidOauthToken": "OAuth token exchange failed.",
+            "assetAccessDenied": "User does not have access to required business assets.",
+            "graphApiError": "Meta Graph API request failed.",
+            "unknown": "Unknown error."
+        },
         "connectBot": "Connect Bot",
         "connectWhatsApp": "Connect WhatsApp",
         "connectInstagram": "Connect Instagram",

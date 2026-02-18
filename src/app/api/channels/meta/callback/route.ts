@@ -8,6 +8,7 @@ import {
     exchangeMetaForLongLivedToken,
     fetchMetaInstagramPages,
     fetchMetaWhatsAppBusinessAccounts,
+    hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers,
     resolveMetaChannelsReturnPath,
     pickInstagramConnectionCandidate,
     pickWhatsAppConnectionCandidate
@@ -185,7 +186,14 @@ export async function GET(req: NextRequest) {
         }
 
         const wabaPayload = await fetchMetaWhatsAppBusinessAccounts(userAccessToken)
-        const candidate = pickWhatsAppConnectionCandidate(wabaPayload)
+        let candidate = pickWhatsAppConnectionCandidate(wabaPayload)
+        if (!candidate) {
+            const hydratedWabaPayload = await hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers({
+                userAccessToken,
+                payload: wabaPayload
+            })
+            candidate = pickWhatsAppConnectionCandidate(hydratedWabaPayload)
+        }
         if (!candidate) {
             return redirectToChannels(req, locale, 'missing_whatsapp_assets', state.channel, returnToPath, popup)
         }

@@ -72,6 +72,64 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
     }, [searchParams])
 
     useEffect(() => {
+        const status = searchParams.get('meta_oauth')
+        const channel = searchParams.get('channel')
+        const error = searchParams.get('meta_oauth_error')
+        const isMetaPopup = searchParams.get('meta_oauth_popup') === '1'
+
+        if (!status || isMetaPopup) return
+
+        const channelLabel = channel === 'instagram'
+            ? t('types.instagram')
+            : channel === 'whatsapp'
+                ? t('types.whatsapp')
+                : t('types.whatsapp')
+
+        const errorMessages = {
+            missing_permissions: t('oauthErrors.missingPermissions'),
+            invalid_redirect_uri: t('oauthErrors.invalidRedirectUri'),
+            invalid_oauth_token: t('oauthErrors.invalidOauthToken'),
+            asset_access_denied: t('oauthErrors.assetAccessDenied'),
+            graph_api_error: t('oauthErrors.graphApiError'),
+            unknown: t('oauthErrors.unknown')
+        } as const
+
+        const statusMessages = {
+            success: t('oauthStatus.success', { channel: channelLabel }),
+            oauth_cancelled: t('oauthStatus.cancelled'),
+            missing_whatsapp_assets: t('oauthStatus.missingWhatsAppAssets'),
+            missing_instagram_assets: t('oauthStatus.missingInstagramAssets'),
+            org_mismatch: t('oauthStatus.orgMismatch'),
+            forbidden: t('oauthStatus.forbidden'),
+            missing_meta_env: t('oauthStatus.missingMetaEnv'),
+            missing_state: t('oauthStatus.invalidState'),
+            invalid_state: t('oauthStatus.invalidState'),
+            missing_code: t('oauthStatus.missingCode')
+        } as const
+
+        const errorReason = error
+            ? (errorMessages[error as keyof typeof errorMessages] ?? errorMessages.unknown)
+            : errorMessages.unknown
+
+        const message = status === 'connect_failed'
+            ? t('oauthStatus.connectFailed', { reason: errorReason })
+            : statusMessages[status as keyof typeof statusMessages] || t('oauthStatus.genericFailure')
+
+        alert(message)
+
+        if (status === 'success') {
+            router.refresh()
+        }
+
+        const url = new URL(window.location.href)
+        url.searchParams.delete('meta_oauth')
+        url.searchParams.delete('channel')
+        url.searchParams.delete('meta_oauth_error')
+        url.searchParams.delete('meta_oauth_popup')
+        window.history.replaceState({}, '', url.toString())
+    }, [router, searchParams, t])
+
+    useEffect(() => {
         const onMessage = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return
             const payload = event.data as { source?: string, status?: string, channel?: string, error?: string | null } | null

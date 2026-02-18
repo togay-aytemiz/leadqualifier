@@ -5,6 +5,7 @@ import {
     decodeMetaOAuthState,
     encodeMetaOAuthState,
     fetchMetaWhatsAppBusinessAccounts,
+    hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers,
     getMetaOAuthScopes,
     resolveMetaChannelsReturnPath,
     pickInstagramConnectionCandidate,
@@ -233,5 +234,37 @@ describe('meta oauth helpers', () => {
         expect(fetchMock).toHaveBeenCalledTimes(4)
         expect((fetchMock.mock.calls[1]?.[0] as string) ?? '').toContain('/me/businesses')
         expect((fetchMock.mock.calls[2]?.[0] as string) ?? '').toContain('/biz-1/owned_whatsapp_business_accounts')
+    })
+
+    it('hydrates phone numbers when whatsapp account payload is missing nested phone data', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                data: [
+                    {
+                        id: 'phone-1',
+                        display_phone_number: '+90 555 111 22 33'
+                    }
+                ]
+            })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        const hydratedPayload = await hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers({
+            userAccessToken: 'token-1',
+            payload: {
+                data: [
+                    {
+                        id: 'waba-1',
+                        name: 'Leadqualifier WABA'
+                    }
+                ]
+            }
+        })
+
+        const candidate = pickWhatsAppConnectionCandidate(hydratedPayload)
+        expect(candidate?.phoneNumberId).toBe('phone-1')
+        expect((fetchMock.mock.calls[0]?.[0] as string) ?? '').toContain('/waba-1/phone_numbers')
     })
 })
