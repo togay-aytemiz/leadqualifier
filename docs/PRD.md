@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-17 (Usage reporting now follows calendar month (`Europe/Istanbul`) and uses `organization_credit_ledger` usage debits as the source of truth so `Settings > Plans` and `Settings > Usage` show consistent credit consumption. Usage cards are credit-only, the breakdown modal is restored with per-operation credit totals, the details entry is standardized as `Detayı gör / View details` with underlined dark-link styling, and the modal now uses a full-page portal overlay plus compact single-table breakdown layout.)  
+> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request.)  
 > **Status:** In Development
 
 ---
@@ -77,6 +77,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
 - Meta OAuth callback diagnostic hint (`meta_oauth_error`) is propagated from popup to main Channels URL for production support troubleshooting.
 - WhatsApp OAuth candidate discovery supports fallback via `me/businesses` + business WABA edges when direct user node field access is unavailable in Graph.
+- WhatsApp OAuth scope request is limited to `whatsapp_business_management` + `whatsapp_business_messaging` (do not request `business_management` in the WhatsApp connect flow).
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
@@ -530,7 +531,7 @@ MVP is successful when:
 
 ## Appendix: Tech Decisions ✅
 
-> Finalized: 2026-01-31 (updated with implementation decisions through 2026-02-17)
+> Finalized: 2026-01-31 (updated with implementation decisions through 2026-02-18)
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
@@ -603,7 +604,7 @@ MVP is successful when:
 - **Starter Pricing Posture (Pre-Pilot):** Keep first paid plan in low-entry territory (~USD 10 equivalent, TRY-localized) and shift expansion to credit top-ups/upper tiers after conversion baseline is validated.
 - **Pricing & Credit Calibration Guide (Pre-Pilot):** `docs/plans/2026-02-16-pricing-credit-strategy-guide.md` is the policy reference for trial-credit calibration (`100/120/200/250/1000` comparison), model-cost math, Lovable-like `upgrade-first` monetization structure (tier ladder + premium burst top-up), and customer-facing conversation-equivalent packaging ranges.
 - **Pricing Catalog Rollout (Implementation v1.5):** `/settings/plans` now shows final package/top-up ladder with safe monthly conversation ranges; system-admin manages both TRY/USD price points from `/admin/billing`.
-- **Billing Region Currency Rule (Implementation v1.9):** Displayed package currency is resolved from organization billing region (`TR` -> TRY, non-TR -> USD), independent of UI language.
+- **Automatic Currency Region Rule (Implementation v1.11):** Displayed package currency is resolved automatically from request-region signals (`x-vercel-ip-country`/`cf-ipcountry`; fallback `Accept-Language`), where `TR` -> `TRY` and non-TR -> `USD`; no manual region selector is shown in Organization settings.
 - **TR Package Naming Rule (Implementation v1.10):** Turkish package labels are standardized as `Temel` (Starter), `Gelişmiş` (Growth), and `Profesyonel` (Scale) across tenant and admin billing surfaces.
 - **Trial Defaults (Locked v1):** Provision new organizations with `14 days` and `200.0 credits` by default.
 - **Trial Lock Precedence (Locked v1):** Enforce `first limit reached wins` between trial time and trial credits.
@@ -722,6 +723,7 @@ MVP is successful when:
 - **Messenger Brand Icon:** Use `public/messenger.svg` for Facebook Messenger placeholder visuals in Channels settings.
 - **Meta Channel Onboarding (MVP):** Use Meta OAuth start/callback routes with signed state validation; do not require manual token entry in channel settings UI.
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
+- **WhatsApp OAuth Scope Baseline:** Default WhatsApp OAuth scopes to `whatsapp_business_management` and `whatsapp_business_messaging`; omit `business_management` to prevent invalid-scope popup failures on newly provisioned Meta apps.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
 - **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.
@@ -779,6 +781,8 @@ MVP is successful when:
 - **Static Hosting Fallback:** For Netlify-hosted SPA landing routes, include `public/_redirects` catch-all (`/* /index.html 200`) so direct visits to `/legal`, `/terms`, and `/privacy` do not return 404.
 - **Footer Navigation Strategy (Landing):** Keep footer focused on Product and Legal columns only; Product items should deep-link to homepage sections with smooth-scroll behavior (`/#features`, `/#pricing`, `/#how-it-works`).
 - **Testimonials Anchor Strategy (Landing):** Footer product scoring item should point to Success Stories via `/#testimonials` and use testimonials-oriented copy in TR/EN.
+- **Meta Data Deletion Compliance (Landing):** For Facebook/Meta App Review, publish a public `Data Deletion Instructions URL` page with explicit deletion steps, scope, SLA, and support channel; initial deletion scope is contact-level records, while full organization deletion remains out of MVP self-service scope.
+- **In-App Self-Service Deletion Scope (MVP):** `Settings > Organization` allows admins/owners to delete organization contact-level records after account-password confirmation in a modal; deletion removes conversations, cascaded messages/leads, and conversation-linked AI usage metadata rows.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|

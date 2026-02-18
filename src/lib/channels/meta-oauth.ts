@@ -93,7 +93,6 @@ function safeEqual(a: string, b: string) {
 export function getMetaOAuthScopes(channel: MetaChannelType) {
     if (channel === 'whatsapp') {
         return [
-            'business_management',
             'whatsapp_business_management',
             'whatsapp_business_messaging'
         ]

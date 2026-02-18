@@ -81,6 +81,16 @@ describe('meta oauth helpers', () => {
         }
     })
 
+    it('uses whatsapp-only scopes for whatsapp oauth', () => {
+        const scopes = getMetaOAuthScopes('whatsapp')
+
+        expect(scopes).toEqual([
+            'whatsapp_business_management',
+            'whatsapp_business_messaging'
+        ])
+        expect(scopes).not.toContain('business_management')
+    })
+
     it('picks instagram connection candidate from page accounts payload', () => {
         const candidate = pickInstagramConnectionCandidate({
             data: [

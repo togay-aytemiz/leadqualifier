@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { createPortal } from 'react-dom'
 import { isSettingsDetailPath, SETTINGS_MOBILE_BACK_EVENT } from '@/components/settings/mobilePaneState'
 
 // --- Button ---
@@ -388,9 +389,9 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     if (!isOpen) return null
 
-    return (
+    const content = (
         <div
-            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[1100] flex items-center justify-center p-4"
             onClick={(e) => e.stopPropagation()}
         >
             <div
@@ -409,6 +410,10 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             </div>
         </div>
     )
+
+    if (typeof document === 'undefined') return content
+
+    return createPortal(content, document.body)
 }
 
 // --- IconButton ---
@@ -521,8 +526,8 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
     if (!isOpen) return null
 
-    return (
-        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    const content = (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[1100] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-6 text-center space-y-4 animate-in zoom-in-95 duration-200">
                 <div className={cn("w-12 h-12 rounded-full flex items-center justify-center mx-auto", isDestructive ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600")}>
                     <TriangleAlert size={24} />
@@ -560,4 +565,8 @@ export function ConfirmDialog({
             </div>
         </div>
     )
+
+    if (typeof document === 'undefined') return content
+
+    return createPortal(content, document.body)
 }

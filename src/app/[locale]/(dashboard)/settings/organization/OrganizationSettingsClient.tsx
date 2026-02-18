@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePathname, useRouter as useLocaleRouter } from '@/i18n/navigation'
-import { Button, PageHeader } from '@/design'
+import { Button, Modal, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { transformPendingHrefForLocale } from '@/components/settings/localeHref'
-import { updateOrganizationBillingRegion, updateOrganizationName } from '@/lib/organizations/actions'
+import { deleteOrganizationDataSelfServe, type DeleteOrganizationDataResult, updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
 import { RequiredIntakeFieldsSection } from '@/components/settings/RequiredIntakeFieldsSection'
@@ -27,18 +27,18 @@ import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesG
 
 interface OrganizationSettingsClientProps {
     initialName: string
-    initialBillingRegion: 'TR' | 'INTL'
     organizationId: string
     offeringProfile: OfferingProfile | null
     offeringProfileSuggestions: OfferingProfileSuggestion[]
+    isReadOnly?: boolean
 }
 
 export default function OrganizationSettingsClient({
     initialName,
-    initialBillingRegion,
     organizationId,
     offeringProfile,
-    offeringProfileSuggestions: initialSuggestions
+    offeringProfileSuggestions: initialSuggestions,
+    isReadOnly = false
 }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
     const tUnsaved = useTranslations('unsavedChanges')
@@ -54,7 +54,6 @@ export default function OrganizationSettingsClient({
 
     const [baseline, setBaseline] = useState({
         name: initialName,
-        billingRegion: initialBillingRegion,
         locale,
         profileSummary: offeringProfile?.summary ?? '',
         manualProfileNote: offeringProfile?.manual_profile_note ?? '',
@@ -65,7 +64,6 @@ export default function OrganizationSettingsClient({
     })
 
     const [name, setName] = useState(initialName)
-    const [selectedBillingRegion, setSelectedBillingRegion] = useState<'TR' | 'INTL'>(initialBillingRegion)
     const [selectedLocale, setSelectedLocale] = useState<'en' | 'tr'>(locale)
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
     const [manualProfileNote, setManualProfileNote] = useState(offeringProfile?.manual_profile_note ?? '')
@@ -83,6 +81,12 @@ export default function OrganizationSettingsClient({
     const [saved, setSaved] = useState(false)
     const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
     const [localeSynced, setLocaleSynced] = useState(false)
+    const [deletionPassword, setDeletionPassword] = useState('')
+    const [deletionModalError, setDeletionModalError] = useState<string | null>(null)
+    const [deletionFeedback, setDeletionFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+    const [deletionResult, setDeletionResult] = useState<DeleteOrganizationDataResult | null>(null)
+    const [deletionModalOpen, setDeletionModalOpen] = useState(false)
+    const [isDeletingContactData, setIsDeletingContactData] = useState(false)
 
     const normalizedRequiredIntakeFields = useMemo(() => {
         return normalizeIntakeFields(requiredIntakeFields)
@@ -98,7 +102,6 @@ export default function OrganizationSettingsClient({
     const isDirty = useMemo(() => {
         return (
             name !== baseline.name ||
-            selectedBillingRegion !== baseline.billingRegion ||
             selectedLocale !== baseline.locale ||
             profileSummary !== baseline.profileSummary ||
             manualProfileNote !== baseline.manualProfileNote ||
@@ -109,7 +112,6 @@ export default function OrganizationSettingsClient({
         )
     }, [
         name,
-        selectedBillingRegion,
         selectedLocale,
         profileSummary,
         manualProfileNote,
@@ -239,9 +241,6 @@ export default function OrganizationSettingsClient({
             if (name !== baseline.name) {
                 await updateOrganizationName(name)
             }
-            if (selectedBillingRegion !== baseline.billingRegion) {
-                await updateOrganizationBillingRegion(selectedBillingRegion)
-            }
 
             const effectiveSummary = offeringProfileAiEnabled
                 ? deriveSummaryFromApprovedSuggestions(suggestions, manualProfileNote)
@@ -273,7 +272,6 @@ export default function OrganizationSettingsClient({
 
             setBaseline({
                 name,
-                billingRegion: selectedBillingRegion,
                 locale: nextLocale,
                 profileSummary: effectiveSummary,
                 manualProfileNote,
@@ -360,7 +358,6 @@ export default function OrganizationSettingsClient({
 
     const handleDiscard = () => {
         setName(baseline.name)
-        setSelectedBillingRegion(baseline.billingRegion)
         setSelectedLocale(baseline.locale)
         setProfileSummary(baseline.profileSummary)
         setManualProfileNote(baseline.manualProfileNote)
@@ -370,6 +367,69 @@ export default function OrganizationSettingsClient({
         setRequiredIntakeFieldsAi(baseline.requiredIntakeFieldsAi)
         setSaveError(null)
         setSaved(false)
+    }
+
+    const clearDeletionFeedback = () => {
+        setDeletionFeedback(null)
+        setDeletionResult(null)
+    }
+
+    const handleDeleteOrganizationDataRequest = () => {
+        if (isReadOnly) return
+        clearDeletionFeedback()
+        setDeletionPassword('')
+        setDeletionModalError(null)
+        setDeletionModalOpen(true)
+    }
+
+    const handleConfirmDeleteOrganizationData = async () => {
+        if (isReadOnly || isDeletingContactData) return
+        if (!deletionPassword.trim()) {
+            setDeletionModalError(t('dataDeletionMissingPassword'))
+            return
+        }
+
+        setIsDeletingContactData(true)
+        setDeletionModalError(null)
+        setDeletionFeedback(null)
+        setDeletionResult(null)
+
+        try {
+            const result = await deleteOrganizationDataSelfServe({
+                organizationId,
+                password: deletionPassword
+            })
+
+            setDeletionResult(result)
+
+            if (result.deletedConversations === 0) {
+                setDeletionFeedback({
+                    type: 'info',
+                    message: t('dataDeletionNoData')
+                })
+            } else {
+                setDeletionFeedback({
+                    type: 'success',
+                    message: t('dataDeletionSuccess', { count: result.deletedConversations })
+                })
+            }
+
+            setDeletionModalOpen(false)
+            setDeletionPassword('')
+        } catch (error) {
+            console.error('Failed to delete organization data', error)
+            const message = error instanceof Error ? error.message.trim() : ''
+            if (message === 'Invalid password') {
+                setDeletionModalError(t('dataDeletionInvalidPassword'))
+                return
+            }
+            setDeletionFeedback({
+                type: 'error',
+                message: message.length > 0 ? message : t('dataDeletionErrorGeneric')
+            })
+        } finally {
+            setIsDeletingContactData(false)
+        }
     }
 
     const transformPendingHref = (href: string) =>
@@ -446,44 +506,6 @@ export default function OrganizationSettingsClient({
                         </div>
                     </SettingsSection>
 
-                    <SettingsSection title={t('billingRegionTitle')} description={t('billingRegionDescription')}>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedBillingRegion('TR')}
-                                className={`rounded-lg border p-4 text-left transition-colors ${selectedBillingRegion === 'TR'
-                                    ? 'border-blue-500 bg-blue-50/50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedBillingRegion === 'TR' ? 'border-blue-500' : 'border-gray-300'
-                                        }`}>
-                                        {selectedBillingRegion === 'TR' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{t('billingRegionTurkey')}</span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setSelectedBillingRegion('INTL')}
-                                className={`rounded-lg border p-4 text-left transition-colors ${selectedBillingRegion === 'INTL'
-                                    ? 'border-blue-500 bg-blue-50/50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedBillingRegion === 'INTL' ? 'border-blue-500' : 'border-gray-300'
-                                        }`}>
-                                        {selectedBillingRegion === 'INTL' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{t('billingRegionInternational')}</span>
-                                </div>
-                            </button>
-                        </div>
-                    </SettingsSection>
-
                     <SettingsSection title={t('nameTitle')} description={t('nameDescription')}>
                         <input
                             type="text"
@@ -517,6 +539,54 @@ export default function OrganizationSettingsClient({
                         onFieldsChange={(fields) => setRequiredIntakeFields(normalizeIntakeFields(fields))}
                         onAiFieldsChange={setRequiredIntakeFieldsAi}
                     />
+
+                    <SettingsSection
+                        title={t('dataDeletionTitle')}
+                        description={t('dataDeletionDescription')}
+                        showBottomDivider={false}
+                    >
+                        <div className="space-y-4">
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                {t('dataDeletionWarning')}
+                            </div>
+
+                            {isReadOnly && (
+                                <p className="text-sm text-amber-700">{t('dataDeletionReadOnly')}</p>
+                            )}
+
+                            {deletionFeedback && (
+                                <p
+                                    className={
+                                        deletionFeedback.type === 'error'
+                                            ? 'text-sm text-red-600'
+                                            : deletionFeedback.type === 'success'
+                                                ? 'text-sm text-green-700'
+                                                : 'text-sm text-amber-700'
+                                    }
+                                >
+                                    {deletionFeedback.message}
+                                </p>
+                            )}
+
+                            {deletionResult && (
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
+                                    <p>{t('dataDeletionResultConversations', { count: deletionResult.deletedConversations })}</p>
+                                    <p>{t('dataDeletionResultAiUsage', { count: deletionResult.deletedAiUsageRows })}</p>
+                                </div>
+                            )}
+
+                            <div className="pt-1">
+                                <Button
+                                    type="button"
+                                    variant="danger"
+                                    onClick={handleDeleteOrganizationDataRequest}
+                                    disabled={isReadOnly || isDeletingContactData}
+                                >
+                                    {isDeletingContactData ? t('dataDeletionDeleting') : t('dataDeletionSubmit')}
+                                </Button>
+                            </div>
+                        </div>
+                    </SettingsSection>
                 </div>
             </div>
 
@@ -532,6 +602,77 @@ export default function OrganizationSettingsClient({
                 onDiscard={guard.handleDiscard}
                 onSave={guard.handleSave}
             />
+
+            <Modal
+                isOpen={deletionModalOpen}
+                onClose={() => {
+                    if (isDeletingContactData) return
+                    setDeletionModalOpen(false)
+                }}
+                title={t('dataDeletionModalTitle')}
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-gray-600">{t('dataDeletionModalDescription')}</p>
+
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                        <p className="text-sm font-semibold text-amber-900">{t('dataDeletionWhatWillBeDeletedTitle')}</p>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                            <li>{t('dataDeletionWhatWillBeDeletedConversations')}</li>
+                            <li>{t('dataDeletionWhatWillBeDeletedMessages')}</li>
+                            <li>{t('dataDeletionWhatWillBeDeletedLeads')}</li>
+                            <li>{t('dataDeletionWhatWillBeDeletedAiUsage')}</li>
+                        </ul>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            {t('dataDeletionPasswordLabel')}
+                        </label>
+                        <input
+                            type="password"
+                            value={deletionPassword}
+                            onChange={(event) => {
+                                setDeletionPassword(event.target.value)
+                                if (deletionModalError) setDeletionModalError(null)
+                            }}
+                            disabled={isDeletingContactData}
+                            autoFocus
+                            placeholder={t('dataDeletionPasswordPlaceholder')}
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                    </div>
+
+                    {deletionModalError && (
+                        <p className="text-sm text-red-600">{deletionModalError}</p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => setDeletionModalOpen(false)}
+                            disabled={isDeletingContactData}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+                        >
+                            {t('dataDeletionCancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmDeleteOrganizationData}
+                            disabled={isDeletingContactData}
+                            className="px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700"
+                        >
+                            {isDeletingContactData ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    {t('dataDeletionDeleting')}
+                                </>
+                            ) : (
+                                t('dataDeletionConfirmAction')
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </>
     )
 }

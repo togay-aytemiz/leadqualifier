@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
@@ -12,6 +13,7 @@ import {
     resolveBillingCurrencyByRegion,
     resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
+import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
 import {
     simulateMockSubscriptionCheckout,
     simulateMockTopupCheckout,
@@ -181,6 +183,7 @@ function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): 
 
 export default async function PlansSettingsPage({ searchParams }: PlansSettingsPageProps) {
     const supabase = await createClient()
+    const requestHeaders = await headers()
     const locale = await getLocale()
     const tPlans = await getTranslations('billingPlans')
     const search = await searchParams
@@ -201,7 +204,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     }
 
     const snapshot = await getOrganizationBillingSnapshot(organizationId, { supabase })
-    const [pricingCatalog, paidTopupCreditsTotal, subscriptionRenewalState, organizationRegionResult] = await Promise.all([
+    const [pricingCatalog, paidTopupCreditsTotal, subscriptionRenewalState] = await Promise.all([
         getBillingPricingCatalog({
             supabase
         }),
@@ -209,18 +212,10 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         getSubscriptionRenewalState({
             organizationId,
             supabase
-        }),
-        supabase
-            .from('organizations')
-            .select('billing_region')
-            .eq('id', organizationId)
-            .maybeSingle()
+        })
     ])
 
-    if (organizationRegionResult.error) {
-        console.error('Failed to load organization billing region for plans page:', organizationRegionResult.error)
-    }
-    const organizationBillingRegion = organizationRegionResult.data?.billing_region ?? 'TR'
+    const organizationBillingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
     const billingCurrency = resolveBillingCurrencyByRegion(organizationBillingRegion)
     const formatNumber = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1

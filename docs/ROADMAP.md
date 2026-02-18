@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-17 (Usage page now uses ledger-based credit totals as the single source of truth so `Settings > Plans` and `Settings > Usage` stay consistent. Monthly usage moved from UTC to calendar month (`Europe/Istanbul`), token-first card headlines were replaced with credit-only values, `Kullanım detayını gör` modal breakdown was restored with per-operation credit consumption, the details action is now `Detayı gör` with underlined dark-link styling, and the modal overlay/table layout is compacted for full-page focus.)  
+> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings and switched `Settings > Plans` currency resolution to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`, with `Accept-Language` fallback when geo headers are unavailable. Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -45,6 +45,7 @@
   - [x] OAuth host resolution hardened for Netlify custom-domain deployments (configured app URL + forwarded host fallback)
   - [x] Popup return flow now preserves `meta_oauth_error` for direct diagnosis on Channels URL
   - [x] WhatsApp OAuth candidate discovery falls back from `/me/whatsapp_business_accounts` to business-edge lookup (`/me/businesses` + owned/client WABA edges)
+  - [x] WhatsApp OAuth now requests only WhatsApp scopes (`whatsapp_business_management`, `whatsapp_business_messaging`) to avoid `Invalid Scopes: business_management` failures on newer Meta apps
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
@@ -305,6 +306,7 @@
 - [x] **AI Settings Matching:** Apply inclusive threshold semantics (`>=`) for Skill + KB similarity checks
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details
+- [x] **Organization Settings:** Add self-service organization contact-data deletion flow (`Settings > Organization`) with password-confirmed modal and irreversible delete confirmation
 - [x] **Auth UX Refresh**
   - [x] Sign In redesign (settings-aligned UI)
   - [x] Sign Up redesign (settings-aligned UI)
@@ -560,7 +562,7 @@
   - [x] Expand platform billing defaults for multi-currency pricing catalog (Starter/Growth/Scale + top-up 250/500/1000 in TRY/USD) and seed final baseline values via migration `00061_multicurrency_pricing_catalog.sql`
   - [x] Update Scale package baseline from `999 TRY` to `949 TRY` to keep plan ending consistency
   - [x] Overhaul `/settings/plans` with package ladder + top-up ladder, organization billing-region-based currency display (TR=TRY, non-TR=USD), and safe monthly conversation-range marketing copy
-  - [x] Add organization-level billing region setting in `/settings/organization` so pricing currency is independent from UI language
+  - [x] Replace manual billing-region selection in `/settings/organization` with automatic request-region currency resolution in `/settings/plans` (`TR` => `TRY`, non-TR => `USD`)
   - [x] Standardize Turkish package display names to `Temel / Gelişmiş / Profesyonel` across tenant plans and admin billing dictionaries
   - [x] Standardize `/admin` tables as full-width with horizontal overflow support
   - [x] Fix admin empty-state rendering on server routes by avoiding non-serializable icon component props across server-client boundaries
@@ -591,6 +593,7 @@
 - [x] Simplify footer information architecture by removing Resources/Company columns and keeping Product + Legal columns
 - [x] Route Product footer links to homepage sections with smooth auto-scroll (`features`, `pricing`, `how-it-works`)
 - [x] Repoint Product scoring item to testimonials section and update label copy to testimonials (`#testimonials`)
+- [x] Publish Facebook/Meta data-deletion instructions guide for landing implementation (`docs/FACEBOOK_DATA_DELETION_INSTRUCTIONS_GUIDE.md`)
 
 ---
 
