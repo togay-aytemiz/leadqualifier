@@ -35,6 +35,13 @@ export interface WhatsAppConnectionCandidate {
     displayPhoneNumber: string | null
 }
 
+function includeBusinessManagementForWhatsApp() {
+    const raw = process.env.META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT
+    if (!raw) return false
+    const normalized = raw.trim().toLowerCase()
+    return normalized === '1' || normalized === 'true' || normalized === 'yes'
+}
+
 function resolveLocaleChannelsPath(locale: string) {
     return locale === 'en' ? '/en/settings/channels' : '/settings/channels'
 }
@@ -92,10 +99,14 @@ function safeEqual(a: string, b: string) {
 
 export function getMetaOAuthScopes(channel: MetaChannelType) {
     if (channel === 'whatsapp') {
-        return [
+        const scopes = [
             'whatsapp_business_management',
             'whatsapp_business_messaging'
         ]
+        if (includeBusinessManagementForWhatsApp()) {
+            scopes.unshift('business_management')
+        }
+        return scopes
     }
 
     return [

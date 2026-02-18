@@ -14,6 +14,7 @@ import {
 
 describe('meta oauth helpers', () => {
     afterEach(() => {
+        delete process.env.META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT
         vi.restoreAllMocks()
     })
 
@@ -91,6 +92,17 @@ describe('meta oauth helpers', () => {
             'whatsapp_business_messaging'
         ])
         expect(scopes).not.toContain('business_management')
+    })
+
+    it('optionally includes business_management scope for whatsapp oauth via env toggle', () => {
+        process.env.META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT = '1'
+        const scopes = getMetaOAuthScopes('whatsapp')
+
+        expect(scopes).toEqual([
+            'business_management',
+            'whatsapp_business_management',
+            'whatsapp_business_messaging'
+        ])
     })
 
     it('picks instagram connection candidate from page accounts payload', () => {

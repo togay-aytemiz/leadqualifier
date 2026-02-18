@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings and switched `Settings > Plans` currency resolution to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`, with `Accept-Language` fallback when geo headers are unavailable. Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, and forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse.)  
+> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings and switched `Settings > Plans` currency resolution to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`, with `Accept-Language` fallback when geo headers are unavailable. Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse, and added env-based optional `business_management` scope toggle for accounts requiring `/me/businesses` fallback access.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -50,6 +50,7 @@
   - [x] WhatsApp OAuth candidate hydration now fetches `/{waba_id}/phone_numbers` when nested `phone_numbers` is missing from WABA list responses
   - [x] Channels page now shows OAuth popup result feedback (`success` / failure reason) instead of silently returning with no visible status
   - [x] Meta OAuth authorize URL now enforces permission re-consent (`auth_type=rerequest`) and Graph errors include endpoint path in server logs for faster permission debugging
+  - [x] WhatsApp OAuth supports env toggle `META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT=1` to include `business_management` when required by `/me/businesses` fallback on certain Meta app setups
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
