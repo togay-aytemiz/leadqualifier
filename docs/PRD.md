@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request.)  
+> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing.)  
 > **Status:** In Development
 
 ---
@@ -78,6 +78,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Meta OAuth callback diagnostic hint (`meta_oauth_error`) is propagated from popup to main Channels URL for production support troubleshooting.
 - WhatsApp OAuth candidate discovery supports fallback via `me/businesses` + business WABA edges when direct user node field access is unavailable in Graph.
 - WhatsApp OAuth scope request is limited to `whatsapp_business_management` + `whatsapp_business_messaging` (do not request `business_management` in the WhatsApp connect flow).
+- WhatsApp OAuth candidate resolution accepts WABA payloads without `name` as long as `id` + `phone_numbers` are present.
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
@@ -724,6 +725,7 @@ MVP is successful when:
 - **Meta Channel Onboarding (MVP):** Use Meta OAuth start/callback routes with signed state validation; do not require manual token entry in channel settings UI.
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
 - **WhatsApp OAuth Scope Baseline:** Default WhatsApp OAuth scopes to `whatsapp_business_management` and `whatsapp_business_messaging`; omit `business_management` to prevent invalid-scope popup failures on newly provisioned Meta apps.
+- **WhatsApp OAuth Candidate Parsing (Resilience):** Do not hard-require WABA `name` during connect; treat `id + phone_numbers` as sufficient to avoid false `missing_whatsapp_assets` failures.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
 - **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.

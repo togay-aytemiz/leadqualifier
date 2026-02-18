@@ -197,7 +197,7 @@ export function pickWhatsAppConnectionCandidate(payload: unknown): WhatsAppConne
             ? phoneNumbersNode.data
             : []
 
-        if (!businessAccountId || !businessAccountName) continue
+        if (!businessAccountId) continue
 
         for (const phone of phoneNumbers) {
             if (!isRecord(phone)) continue
@@ -207,7 +207,7 @@ export function pickWhatsAppConnectionCandidate(payload: unknown): WhatsAppConne
 
             return {
                 businessAccountId,
-                businessAccountName,
+                businessAccountName: businessAccountName || businessAccountId,
                 phoneNumberId,
                 displayPhoneNumber
             }

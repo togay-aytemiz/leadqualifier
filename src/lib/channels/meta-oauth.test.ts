@@ -141,6 +141,31 @@ describe('meta oauth helpers', () => {
         })
     })
 
+    it('picks whatsapp candidate even when business account name is missing', () => {
+        const candidate = pickWhatsAppConnectionCandidate({
+            data: [
+                {
+                    id: 'waba-1',
+                    phone_numbers: {
+                        data: [
+                            {
+                                id: 'phone-1',
+                                display_phone_number: '+90 555 111 22 33'
+                            }
+                        ]
+                    }
+                }
+            ]
+        })
+
+        expect(candidate).toEqual({
+            businessAccountId: 'waba-1',
+            businessAccountName: 'waba-1',
+            phoneNumberId: 'phone-1',
+            displayPhoneNumber: '+90 555 111 22 33'
+        })
+    })
+
     it('fetches whatsapp business accounts from direct /me endpoint when available', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
