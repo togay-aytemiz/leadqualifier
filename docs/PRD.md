@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, surfaced popup OAuth outcomes in Channels UI, enforced OAuth re-consent via `auth_type=rerequest`, and introduced env-based optional `business_management` scope inclusion for app setups that require `/me/businesses` access.)  
+> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, surfaced popup OAuth outcomes in Channels UI, enforced OAuth re-consent via `auth_type=rerequest`, introduced env-based optional `business_management` scope inclusion for app setups that require `/me/businesses` access, and restricted missing-permission fallback to `/me/businesses` only when that toggle is explicitly enabled.)  
 > **Status:** In Development
 
 ---
@@ -83,6 +83,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Channels UI shows Meta OAuth popup result feedback (success/failure reason) on return, instead of silent close behavior.
 - OAuth authorize URL requests explicit re-consent (`auth_type=rerequest`) to prevent stale/partial previous grants from being silently reused.
 - WhatsApp OAuth can optionally include `business_management` via `META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT=1` when Meta app setup requires `me/businesses` fallback access for WABA discovery.
+- On direct `me/whatsapp_business_accounts` missing-permission errors, fallback to `me/businesses` is attempted only when `META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT=1`; otherwise the direct-endpoint permission error is surfaced.
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
@@ -735,6 +736,7 @@ MVP is successful when:
 - **Meta OAuth Grant Refresh:** Include `auth_type=rerequest` in authorize URL so Meta re-prompts required permissions when earlier grants are missing/declined.
 - **Meta OAuth Error Diagnostics:** Include Graph endpoint path in thrown server errors to quickly identify which permission-protected edge is failing.
 - **WhatsApp OAuth Scope Toggle:** Keep WhatsApp default scope set minimal; enable optional `business_management` via env (`META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT=1`) for tenants/apps that require `me/businesses` fallback during WABA discovery.
+- **Missing-Permission Fallback Guard:** Do not auto-fallback from direct WABA endpoint to `me/businesses` on missing permission unless `business_management` scope toggle is enabled, avoiding invalid-scope dead loops on restricted app configurations.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
 - **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.

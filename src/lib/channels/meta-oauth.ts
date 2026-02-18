@@ -325,7 +325,10 @@ export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string)
     try {
         return await requestMetaGraph<unknown>(directUrl)
     } catch (directError) {
-        if (!isMissingWhatsAppBusinessAccountsFieldError(directError) && !isMissingPermissionError(directError)) {
+        const shouldFallbackForMissingField = isMissingWhatsAppBusinessAccountsFieldError(directError)
+        const shouldFallbackForMissingPermission = isMissingPermissionError(directError) && includeBusinessManagementForWhatsApp()
+
+        if (!shouldFallbackForMissingField && !shouldFallbackForMissingPermission) {
             throw directError
         }
 

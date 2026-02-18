@@ -250,6 +250,8 @@ describe('meta oauth helpers', () => {
     })
 
     it('falls back to business edges when direct whatsapp accounts endpoint returns missing permission', async () => {
+        process.env.META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT = '1'
+
         const fetchMock = vi.fn()
             .mockResolvedValueOnce({
                 ok: false,
@@ -297,6 +299,23 @@ describe('meta oauth helpers', () => {
         expect(payload.data.map((item) => item.id)).toEqual(['waba-1'])
         expect(fetchMock).toHaveBeenCalledTimes(4)
         expect((fetchMock.mock.calls[1]?.[0] as string) ?? '').toContain('/me/businesses')
+    })
+
+    it('does not fall back to /me/businesses on missing permission when business_management scope toggle is off', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 400,
+            json: async () => ({
+                error: {
+                    message: '(#100) Missing Permission'
+                }
+            })
+        })
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        await expect(fetchMetaWhatsAppBusinessAccounts('token-1')).rejects.toThrow('Missing Permission [/v21.0/me/whatsapp_business_accounts]')
+        expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 
     it('hydrates phone numbers when whatsapp account payload is missing nested phone data', async () => {
