@@ -153,6 +153,7 @@ export function buildMetaAuthorizeUrl(options: MetaAuthorizeUrlOptions) {
     url.searchParams.set('redirect_uri', options.redirectUri)
     url.searchParams.set('state', options.state)
     url.searchParams.set('response_type', 'code')
+    url.searchParams.set('auth_type', 'rerequest')
     url.searchParams.set('scope', getMetaOAuthScopes(options.channel).join(','))
     return url.toString()
 }
@@ -222,6 +223,11 @@ function isMissingWhatsAppBusinessAccountsFieldError(error: unknown) {
     return error.message.toLowerCase().includes('nonexisting field (whatsapp_business_accounts)')
 }
 
+function isMissingPermissionError(error: unknown) {
+    if (!(error instanceof Error) || !error.message) return false
+    return error.message.toLowerCase().includes('missing permission')
+}
+
 function extractGraphDataItems(payload: unknown) {
     if (!isRecord(payload) || !Array.isArray(payload.data)) return []
     return payload.data
@@ -248,7 +254,8 @@ async function requestMetaGraph<T>(url: URL): Promise<T> {
     })
     const payload = await response.json() as T & MetaGraphErrorResponse
     if (!response.ok) {
-        throw new Error(payload?.error?.message || `Meta Graph API request failed with status ${response.status}`)
+        const detail = payload?.error?.message || `Meta Graph API request failed with status ${response.status}`
+        throw new Error(`${detail} [${url.pathname}]`)
     }
     return payload
 }
@@ -307,7 +314,7 @@ export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string)
     try {
         return await requestMetaGraph<unknown>(directUrl)
     } catch (directError) {
-        if (!isMissingWhatsAppBusinessAccountsFieldError(directError)) {
+        if (!isMissingWhatsAppBusinessAccountsFieldError(directError) && !isMissingPermissionError(directError)) {
             throw directError
         }
 

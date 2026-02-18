@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, and surfaced popup OAuth outcomes in Channels UI.)  
+> **Last Updated:** 2026-02-18 (Removed manual billing-region selection from `Settings > Organization` and switched `Settings > Plans` currency display to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`. Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, surfaced popup OAuth outcomes in Channels UI, and enforced OAuth re-consent via `auth_type=rerequest`.)  
 > **Status:** In Development
 
 ---
@@ -81,6 +81,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - WhatsApp OAuth candidate resolution accepts WABA payloads without `name` as long as `id` + `phone_numbers` are present.
 - WhatsApp OAuth candidate discovery now hydrates missing nested phone data via `/{waba_id}/phone_numbers` before failing with missing assets.
 - Channels UI shows Meta OAuth popup result feedback (success/failure reason) on return, instead of silent close behavior.
+- OAuth authorize URL requests explicit re-consent (`auth_type=rerequest`) to prevent stale/partial previous grants from being silently reused.
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
@@ -730,6 +731,8 @@ MVP is successful when:
 - **WhatsApp OAuth Candidate Parsing (Resilience):** Do not hard-require WABA `name` during connect; treat `id + phone_numbers` as sufficient to avoid false `missing_whatsapp_assets` failures.
 - **WhatsApp OAuth Phone-Number Hydration:** If WABA list responses omit nested `phone_numbers`, resolve `phone_number_id` through `/{waba_id}/phone_numbers` before returning missing-assets status.
 - **Meta OAuth UX Feedback:** Persist popup return status in URL (`meta_oauth*`) and surface localized success/failure messages in Channels UI for deterministic troubleshooting.
+- **Meta OAuth Grant Refresh:** Include `auth_type=rerequest` in authorize URL so Meta re-prompts required permissions when earlier grants are missing/declined.
+- **Meta OAuth Error Diagnostics:** Include Graph endpoint path in thrown server errors to quickly identify which permission-protected edge is failing.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
 - **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.

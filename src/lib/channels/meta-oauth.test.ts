@@ -75,6 +75,7 @@ describe('meta oauth helpers', () => {
         expect(url).toContain('client_id=app-1')
         expect(url).toContain('state=state-1')
         expect(url).toContain('redirect_uri=')
+        expect(url).toContain('auth_type=rerequest')
 
         const scopes = getMetaOAuthScopes('instagram')
         for (const scope of scopes) {
@@ -234,6 +235,56 @@ describe('meta oauth helpers', () => {
         expect(fetchMock).toHaveBeenCalledTimes(4)
         expect((fetchMock.mock.calls[1]?.[0] as string) ?? '').toContain('/me/businesses')
         expect((fetchMock.mock.calls[2]?.[0] as string) ?? '').toContain('/biz-1/owned_whatsapp_business_accounts')
+    })
+
+    it('falls back to business edges when direct whatsapp accounts endpoint returns missing permission', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 400,
+                json: async () => ({
+                    error: {
+                        message: '(#100) Missing Permission'
+                    }
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [{ id: 'biz-1', name: 'Qualy Business' }]
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [
+                        {
+                            id: 'waba-1',
+                            phone_numbers: {
+                                data: [
+                                    { id: 'phone-1', display_phone_number: '+90 555 111 22 33' }
+                                ]
+                            }
+                        }
+                    ]
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 400,
+                json: async () => ({
+                    error: { message: '(#100) Unsupported get request.' }
+                })
+            })
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const payload = await fetchMetaWhatsAppBusinessAccounts('token-1') as { data: Array<{ id: string }> }
+        expect(payload.data.map((item) => item.id)).toEqual(['waba-1'])
+        expect(fetchMock).toHaveBeenCalledTimes(4)
+        expect((fetchMock.mock.calls[1]?.[0] as string) ?? '').toContain('/me/businesses')
     })
 
     it('hydrates phone numbers when whatsapp account payload is missing nested phone data', async () => {

@@ -153,6 +153,7 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed Meta OAuth authorize URL generation to include `auth_type=rerequest` so missing/declined grants are explicitly re-requested in popup reconnect flows, and improved Graph error diagnostics by appending endpoint path to callback errors for faster permission triage (`src/lib/channels/meta-oauth.ts`, `src/lib/channels/meta-oauth.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed WhatsApp OAuth discovery to hydrate missing nested phone-number data by calling `/{waba_id}/phone_numbers` when WABA list payloads are sparse, reducing false `missing_whatsapp_assets` failures (`src/lib/channels/meta-oauth.ts`, `src/app/api/channels/meta/callback/route.ts`, `src/lib/channels/meta-oauth.test.ts`).
 - Changed Channels OAuth popup return UX to show localized success/failure alerts (including mapped error reasons) and clear `meta_oauth*` query params after display, so reconnect failures are no longer silent (`src/components/channels/ChannelsList.tsx`, `messages/en.json`, `messages/tr.json`).
 - Changed WhatsApp OAuth candidate parsing to allow connection when Graph returns WABA entries without `name` (still requiring `id` + `phone_numbers`), preventing silent `missing_whatsapp_assets` outcomes in popup flow (`src/lib/channels/meta-oauth.ts`, `src/lib/channels/meta-oauth.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
