@@ -68,6 +68,15 @@ interface MetaGraphListResponse {
     data?: unknown[]
 }
 
+interface MetaDebugTokenResponse {
+    data?: {
+        granular_scopes?: Array<{
+            scope?: string
+            target_ids?: string[]
+        }>
+    }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -325,8 +334,9 @@ export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string)
     try {
         return await requestMetaGraph<unknown>(directUrl)
     } catch (directError) {
-        const shouldFallbackForMissingField = isMissingWhatsAppBusinessAccountsFieldError(directError)
-        const shouldFallbackForMissingPermission = isMissingPermissionError(directError) && includeBusinessManagementForWhatsApp()
+        const allowBusinessFallback = includeBusinessManagementForWhatsApp()
+        const shouldFallbackForMissingField = isMissingWhatsAppBusinessAccountsFieldError(directError) && allowBusinessFallback
+        const shouldFallbackForMissingPermission = isMissingPermissionError(directError) && allowBusinessFallback
 
         if (!shouldFallbackForMissingField && !shouldFallbackForMissingPermission) {
             throw directError
@@ -364,6 +374,51 @@ export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string)
         return {
             data: dedupeWhatsAppBusinessAccountItems(combinedAccounts)
         }
+    }
+}
+
+export async function fetchMetaWhatsAppBusinessAccountsFromDebugToken(params: {
+    userAccessToken: string
+    appId: string
+    appSecret: string
+}) {
+    const debugUrl = new URL('https://graph.facebook.com/debug_token')
+    debugUrl.searchParams.set('input_token', params.userAccessToken)
+    debugUrl.searchParams.set('access_token', `${params.appId}|${params.appSecret}`)
+
+    const debugPayload = await requestMetaGraph<MetaDebugTokenResponse>(debugUrl)
+    const granularScopes = Array.isArray(debugPayload.data?.granular_scopes)
+        ? debugPayload.data?.granular_scopes
+        : []
+
+    const targetIds = new Set<string>()
+    for (const granularScope of granularScopes) {
+        if (!granularScope || granularScope.scope !== 'whatsapp_business_management') continue
+        const ids = Array.isArray(granularScope.target_ids) ? granularScope.target_ids : []
+        for (const id of ids) {
+            const normalized = asString(id)
+            if (normalized) targetIds.add(normalized)
+        }
+    }
+
+    const accounts: unknown[] = []
+    for (const targetId of targetIds) {
+        const wabaUrl = new URL(`https://graph.facebook.com/v21.0/${targetId}`)
+        wabaUrl.searchParams.set('access_token', params.userAccessToken)
+        wabaUrl.searchParams.set('fields', 'id,name,phone_numbers{id,display_phone_number,verified_name}')
+
+        try {
+            const accountPayload = await requestMetaGraph<unknown>(wabaUrl)
+            if (isRecord(accountPayload)) {
+                accounts.push(accountPayload)
+            }
+        } catch {
+            // Skip non-WABA target ids and continue discovering remaining ids.
+        }
+    }
+
+    return {
+        data: dedupeWhatsAppBusinessAccountItems(accounts)
     }
 }
 

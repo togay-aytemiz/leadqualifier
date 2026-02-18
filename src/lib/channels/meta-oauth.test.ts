@@ -5,6 +5,7 @@ import {
     decodeMetaOAuthState,
     encodeMetaOAuthState,
     fetchMetaWhatsAppBusinessAccounts,
+    fetchMetaWhatsAppBusinessAccountsFromDebugToken,
     hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers,
     getMetaOAuthScopes,
     resolveMetaChannelsReturnPath,
@@ -203,6 +204,8 @@ describe('meta oauth helpers', () => {
     })
 
     it('falls back to business edges when /me/whatsapp_business_accounts is unavailable', async () => {
+        process.env.META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT = '1'
+
         const fetchMock = vi.fn()
             .mockResolvedValueOnce({
                 ok: false,
@@ -348,5 +351,53 @@ describe('meta oauth helpers', () => {
         const candidate = pickWhatsAppConnectionCandidate(hydratedPayload)
         expect(candidate?.phoneNumberId).toBe('phone-1')
         expect((fetchMock.mock.calls[0]?.[0] as string) ?? '').toContain('/waba-1/phone_numbers')
+    })
+
+    it('discovers whatsapp business accounts from debug token granular scopes', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: {
+                        granular_scopes: [
+                            {
+                                scope: 'whatsapp_business_management',
+                                target_ids: ['waba-1']
+                            }
+                        ]
+                    }
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    id: 'waba-1',
+                    name: 'Leadqualifier WABA',
+                    phone_numbers: {
+                        data: [
+                            {
+                                id: 'phone-1',
+                                display_phone_number: '+90 555 111 22 33'
+                            }
+                        ]
+                    }
+                })
+            })
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const payload = await fetchMetaWhatsAppBusinessAccountsFromDebugToken({
+            userAccessToken: 'token-1',
+            appId: 'app-1',
+            appSecret: 'secret-1'
+        })
+        const candidate = pickWhatsAppConnectionCandidate(payload)
+
+        expect(candidate?.businessAccountId).toBe('waba-1')
+        expect(candidate?.phoneNumberId).toBe('phone-1')
+        expect((fetchMock.mock.calls[0]?.[0] as string) ?? '').toContain('/debug_token')
+        expect((fetchMock.mock.calls[1]?.[0] as string) ?? '').toContain('/waba-1?')
     })
 })

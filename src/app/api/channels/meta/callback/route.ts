@@ -8,6 +8,7 @@ import {
     exchangeMetaForLongLivedToken,
     fetchMetaInstagramPages,
     fetchMetaWhatsAppBusinessAccounts,
+    fetchMetaWhatsAppBusinessAccountsFromDebugToken,
     hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers,
     resolveMetaChannelsReturnPath,
     pickInstagramConnectionCandidate,
@@ -185,16 +186,48 @@ export async function GET(req: NextRequest) {
             return redirectToChannels(req, locale, 'success', state.channel, returnToPath, popup)
         }
 
-        const wabaPayload = await fetchMetaWhatsAppBusinessAccounts(userAccessToken)
-        let candidate = pickWhatsAppConnectionCandidate(wabaPayload)
-        if (!candidate) {
-            const hydratedWabaPayload = await hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers({
-                userAccessToken,
-                payload: wabaPayload
-            })
-            candidate = pickWhatsAppConnectionCandidate(hydratedWabaPayload)
+        let candidate = null
+        let directWabaFetchError: unknown = null
+        let wabaPayload: unknown = null
+
+        try {
+            wabaPayload = await fetchMetaWhatsAppBusinessAccounts(userAccessToken)
+        } catch (error) {
+            directWabaFetchError = error
+            console.warn('Meta OAuth: direct WhatsApp account discovery failed; attempting debug-token fallback', error)
         }
+
+        if (wabaPayload) {
+            candidate = pickWhatsAppConnectionCandidate(wabaPayload)
+            if (!candidate) {
+                const hydratedWabaPayload = await hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers({
+                    userAccessToken,
+                    payload: wabaPayload
+                })
+                candidate = pickWhatsAppConnectionCandidate(hydratedWabaPayload)
+            }
+        }
+
         if (!candidate) {
+            try {
+                const debugTokenPayload = await fetchMetaWhatsAppBusinessAccountsFromDebugToken({
+                    userAccessToken,
+                    appId,
+                    appSecret
+                })
+                candidate = pickWhatsAppConnectionCandidate(debugTokenPayload)
+            } catch (debugFallbackError) {
+                if (directWabaFetchError) {
+                    throw directWabaFetchError
+                }
+                throw debugFallbackError
+            }
+        }
+
+        if (!candidate) {
+            if (directWabaFetchError) {
+                throw directWabaFetchError
+            }
             return redirectToChannels(req, locale, 'missing_whatsapp_assets', state.channel, returnToPath, popup)
         }
 
