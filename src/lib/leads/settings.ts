@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateInitialOfferingSuggestion } from '@/lib/leads/offering-profile'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
+import { normalizeServiceName } from '@/lib/leads/catalog'
+import { normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 
 function ensureNoError(error: { message?: string } | null, context: string) {
     if (!error) return
@@ -50,6 +52,7 @@ export async function updateOfferingProfileSummary(
     summary: string,
     manualProfileNote: string,
     aiSuggestionsEnabled: boolean,
+    serviceCatalogAiEnabled: boolean,
     requiredIntakeFieldsAiEnabled: boolean,
     aiSuggestionsLocale: string,
     requiredIntakeFields: string[],
@@ -70,6 +73,7 @@ export async function updateOfferingProfileSummary(
         summary,
         manual_profile_note: manualProfileNote,
         ai_suggestions_enabled: aiSuggestionsEnabled,
+        service_catalog_ai_enabled: serviceCatalogAiEnabled,
         required_intake_fields_ai_enabled: requiredIntakeFieldsAiEnabled,
         ai_suggestions_locale: aiSuggestionsLocale,
         required_intake_fields: requiredIntakeFields,
@@ -79,6 +83,18 @@ export async function updateOfferingProfileSummary(
     let { error } = await runUpdate(fullPayload)
 
     // Backward-compatible fallback for partially migrated databases.
+    if (error?.message?.includes('service_catalog_ai_enabled')) {
+        ({ error } = await runUpdate({
+            summary,
+            manual_profile_note: manualProfileNote,
+            ai_suggestions_enabled: aiSuggestionsEnabled,
+            required_intake_fields_ai_enabled: requiredIntakeFieldsAiEnabled,
+            ai_suggestions_locale: aiSuggestionsLocale,
+            required_intake_fields: requiredIntakeFields,
+            required_intake_fields_ai: requiredIntakeFieldsAi
+        }))
+    }
+
     if (error?.message?.includes('required_intake_fields_ai_enabled')) {
         ({ error } = await runUpdate({
             summary,
@@ -272,8 +288,179 @@ export async function getServiceCandidates(organizationId: string) {
         .from('service_candidates')
         .select('*')
         .eq('organization_id', organizationId)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'approved'])
         .order('created_at', { ascending: false })
     ensureNoError(error, 'Failed to read service candidates')
     return data ?? []
+}
+
+export async function getServiceCatalogItems(organizationId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('service_catalog')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+    ensureNoError(error, 'Failed to load service catalog')
+    return data ?? []
+}
+
+export async function syncServiceCatalogItems(
+    organizationId: string,
+    serviceNames: string[]
+) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const normalizedServiceNames = normalizeServiceCatalogNames(serviceNames)
+    const desiredByKey = new Map(
+        normalizedServiceNames.map((serviceName) => [normalizeServiceName(serviceName), serviceName] as const)
+    )
+
+    const { data: existingCatalog, error: existingCatalogError } = await supabase
+        .from('service_catalog')
+        .select('id, name, active')
+        .eq('organization_id', organizationId)
+    ensureNoError(existingCatalogError, 'Failed to read existing service catalog')
+
+    const rows = existingCatalog ?? []
+    const existingByKey = new Map(
+        rows.map((item: { id: string; name: string; active: boolean }) => [normalizeServiceName(item.name), item] as const)
+    )
+
+    const activateIds: string[] = []
+    const deactivateIds: string[] = []
+    const insertRows: Array<{ organization_id: string; name: string; aliases: string[]; active: boolean }> = []
+
+    for (const [key, label] of desiredByKey.entries()) {
+        const existing = existingByKey.get(key)
+        if (!existing) {
+            insertRows.push({
+                organization_id: organizationId,
+                name: label,
+                aliases: [],
+                active: true
+            })
+            continue
+        }
+
+        if (!existing.active) {
+            activateIds.push(existing.id)
+        }
+    }
+
+    for (const row of rows as Array<{ id: string; name: string; active: boolean }>) {
+        const key = normalizeServiceName(row.name)
+        if (row.active && !desiredByKey.has(key)) {
+            deactivateIds.push(row.id)
+        }
+    }
+
+    if (activateIds.length > 0) {
+        const { error } = await supabase
+            .from('service_catalog')
+            .update({ active: true })
+            .in('id', activateIds)
+        ensureNoError(error, 'Failed to activate service catalog items')
+    }
+
+    if (deactivateIds.length > 0) {
+        const { error } = await supabase
+            .from('service_catalog')
+            .update({ active: false })
+            .in('id', deactivateIds)
+        ensureNoError(error, 'Failed to deactivate service catalog items')
+    }
+
+    if (insertRows.length > 0) {
+        const { error } = await supabase
+            .from('service_catalog')
+            .insert(insertRows)
+        ensureNoError(error, 'Failed to insert service catalog items')
+    }
+}
+
+async function ensureServiceCatalogItemActive(options: {
+    organizationId: string
+    serviceName: string
+}) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const normalizedName = normalizeServiceName(options.serviceName)
+    if (!normalizedName) return
+
+    const { data: existingCatalog, error: existingCatalogError } = await supabase
+        .from('service_catalog')
+        .select('id, name, active')
+        .eq('organization_id', options.organizationId)
+    ensureNoError(existingCatalogError, 'Failed to read service catalog for candidate approval')
+
+    const existingMatch = (existingCatalog ?? []).find((item: { name: string }) =>
+        normalizeServiceName(item.name) === normalizedName
+    ) as { id: string; active: boolean } | undefined
+
+    if (!existingMatch) {
+        const { error } = await supabase
+            .from('service_catalog')
+            .insert({
+                organization_id: options.organizationId,
+                name: options.serviceName.trim(),
+                aliases: [],
+                active: true
+            })
+        ensureNoError(error, 'Failed to add approved service to catalog')
+        return
+    }
+
+    if (existingMatch.active) return
+
+    const { error } = await supabase
+        .from('service_catalog')
+        .update({ active: true })
+        .eq('id', existingMatch.id)
+    ensureNoError(error, 'Failed to reactivate approved service')
+}
+
+export async function reviewServiceCandidate(
+    organizationId: string,
+    candidateId: string,
+    status: 'approved' | 'rejected'
+) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    ensureNoError(authError, 'Failed to read auth user')
+    if (!user) throw new Error('Unauthorized')
+
+    const { data: candidate, error: candidateError } = await supabase
+        .from('service_candidates')
+        .select('id, proposed_name')
+        .eq('organization_id', organizationId)
+        .eq('id', candidateId)
+        .maybeSingle()
+    ensureNoError(candidateError, 'Failed to read service candidate')
+    if (!candidate) throw new Error('Service candidate not found')
+
+    const reviewedAt = new Date().toISOString()
+    const { error: reviewError } = await supabase
+        .from('service_candidates')
+        .update({
+            status,
+            reviewed_at: reviewedAt,
+            reviewed_by: user.id
+        })
+        .eq('organization_id', organizationId)
+        .eq('id', candidateId)
+    ensureNoError(reviewError, 'Failed to update service candidate status')
+
+    if (status === 'approved') {
+        await ensureServiceCatalogItemActive({
+            organizationId,
+            serviceName: candidate.proposed_name
+        })
+    }
+
+    return candidate
 }

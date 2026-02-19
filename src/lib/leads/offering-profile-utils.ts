@@ -26,6 +26,17 @@ function normalizeIntakeFieldKey(value: string) {
         .toLowerCase()
 }
 
+function normalizeServiceCatalogLabel(value: string) {
+    return value.trim().replace(/\s+/g, ' ')
+}
+
+function normalizeServiceCatalogKey(value: string) {
+    return normalizeServiceCatalogLabel(value)
+        .normalize('NFKD')
+        .replace(COMBINING_MARKS, '')
+        .toLowerCase()
+}
+
 export function normalizeIntakeFields(input: string[]) {
     const deduped: string[] = []
     const seen = new Set<string>()
@@ -34,6 +45,22 @@ export function normalizeIntakeFields(input: string[]) {
         const label = normalizeIntakeFieldLabel(item)
         if (!label) continue
         const key = normalizeIntakeFieldKey(label)
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        deduped.push(label)
+    }
+
+    return deduped
+}
+
+export function normalizeServiceCatalogNames(input: string[]) {
+    const deduped: string[] = []
+    const seen = new Set<string>()
+
+    for (const item of input) {
+        const label = normalizeServiceCatalogLabel(item)
+        if (!label) continue
+        const key = normalizeServiceCatalogKey(label)
         if (!key || seen.has(key)) continue
         seen.add(key)
         deduped.push(label)
@@ -145,6 +172,57 @@ export function parseRequiredIntakeFieldsPayload(raw: string) {
 
         if (typeof fields === 'string') {
             return normalizeIntakeFields([fields])
+        }
+    }
+
+    return null
+}
+
+export function parseServiceCandidatesPayload(raw: string) {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+
+    const stripped = stripJsonFence(trimmed)
+    const candidates = [
+        trimmed,
+        stripped,
+        ...extractFencedBlocks(trimmed),
+        extractFirstBalanced(stripped, '{', '}'),
+        extractFirstBalanced(stripped, '[', ']')
+    ].filter((item): item is string => Boolean(item))
+
+    const seen = new Set<string>()
+
+    for (const candidate of candidates) {
+        if (seen.has(candidate)) continue
+        seen.add(candidate)
+
+        const parsed = parseJsonCandidate(candidate)
+        if (!parsed) continue
+
+        if (Array.isArray(parsed)) {
+            return normalizeServiceCatalogNames(
+                parsed.filter((item): item is string => typeof item === 'string')
+            )
+        }
+
+        if (typeof parsed !== 'object') continue
+
+        const parsedObject = parsed as Record<string, unknown>
+        const services = parsedObject.services
+            ?? parsedObject.service_names
+            ?? parsedObject.serviceNames
+            ?? parsedObject.service_catalog
+            ?? parsedObject.serviceCatalog
+
+        if (Array.isArray(services)) {
+            return normalizeServiceCatalogNames(
+                services.filter((item): item is string => typeof item === 'string')
+            )
+        }
+
+        if (typeof services === 'string') {
+            return normalizeServiceCatalogNames([services])
         }
     }
 

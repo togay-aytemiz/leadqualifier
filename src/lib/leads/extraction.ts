@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
+import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
@@ -15,6 +15,31 @@ const LEAD_EXTRACTION_MAX_OUTPUT_TOKENS = 320
 const LEAD_EXTRACTION_MAX_CONTEXT_TURNS = 10
 const LEAD_EXTRACTION_MAX_MESSAGES_TO_LOAD = 20
 const LEAD_EXTRACTION_MAX_CUSTOMER_MESSAGES = 5
+const PROFILE_SERVICE_SIGNAL_TOKEN_MIN_LENGTH = 8
+const PROFILE_SERVICE_SIGNAL_STOPWORDS = new Set([
+    'hizmetleri',
+    'hizmetimiz',
+    'sunulanlar',
+    'saglamaktayiz',
+    'fotograf',
+    'cekimleri',
+    'cekimleri',
+    'cekim',
+    'çekim',
+    'cekimi',
+    'çekimi',
+    'randevu',
+    'fiyatlar',
+    'bilgileri',
+    'conditions',
+    'services',
+    'service',
+    'studio',
+    'shoot',
+    'photoshoot',
+    'appointment',
+    'packages'
+])
 
 function isLikelyTurkishText(value: string) {
     const text = (value ?? '').trim()
@@ -71,7 +96,7 @@ export function resolveLeadExtractionLocale(options?: {
 function buildExtractionSystemPrompt(responseLanguage: 'Turkish' | 'English') {
     return `Extract lead signals as JSON.
 Return ONLY valid JSON (no code fences, no extra text).
-Return keys: service_type, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
+Return keys: service_type, services, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
 intent_signals can include: decisive (explicit booking/appointment intent), urgent (ASAP/today/tomorrow), indecisive (unsure), far_future (months later/next season).
 Recent conversation turns are labeled as one of: customer, owner, assistant.
 Customer messages are labeled "customer:" and represent the latest 5 customer messages.
@@ -81,14 +106,18 @@ Do not treat owner/assistant statements as customer facts unless the customer cl
 Do not infer service_type solely from assistant replies; require customer confirmation.
 If the customer negates a service (e.g., "X istemiyorum"), do not output that service.
 If customer messages are only greeting/acknowledgement and contain no service clue, service_type must be null.
+services must be an array and can contain one or more services when customer asks about multiple services.
+If one service is detected, return one item in services.
+If no clear service is detected, return services as [] and service_type as null.
+service_type should be the primary service in services (usually the first one) or null.
 Score must be an integer from 0 to 10.
 Status must be one of: hot, warm, cold, ignored, undetermined.
 Use status=undetermined when customer information is not enough to qualify intent (for example only greeting/acknowledgement or short unclear turns).
 If non_business is true, set score to 0 and status to ignored.
-Use catalog names when possible for service_type.
-If catalog is empty, infer service_type from offering profile summary/suggestions only when customer messages include a service clue.
-If service_type matches a provided catalog name, keep that catalog name exactly as-is.
-If no catalog match exists, write inferred service_type in ${responseLanguage}.
+Use catalog names when possible for service_type and services.
+If catalog is empty, infer service_type and services from offering profile summary/suggestions only when customer messages include a service clue.
+If inferred service matches a provided catalog name, keep that catalog name exactly as-is.
+If no catalog match exists, write inferred service_type and services in ${responseLanguage}.
 When required intake fields are provided, fill required_intake_collected as an object that maps clearly collected field names to concise values.
 Only include fields clearly provided by the customer; otherwise omit them from the object.
 If none are collected, return required_intake_collected as {}.
@@ -107,6 +136,72 @@ function normalizeForMatch(value: string) {
         .trim()
 }
 
+function extractProfileServiceSignalTokens(value: string) {
+    const normalized = normalizeForMatch(value)
+    if (!normalized) return []
+
+    return normalized
+        .split(' ')
+        .map((token) => token.trim())
+        .filter((token) =>
+            token.length >= PROFILE_SERVICE_SIGNAL_TOKEN_MIN_LENGTH
+            && !PROFILE_SERVICE_SIGNAL_STOPWORDS.has(token)
+        )
+}
+
+function hasProfileServiceSignal(options: {
+    normalizedCustomerMessages: string[]
+    profileSummary?: string | null
+}) {
+    const profileSummary = (options.profileSummary ?? '').trim()
+    if (!profileSummary) return false
+
+    const signalTokens = new Set(extractProfileServiceSignalTokens(profileSummary))
+    if (signalTokens.size === 0) return false
+
+    return options.normalizedCustomerMessages.some((message) =>
+        Array.from(signalTokens).some((token) => message.includes(token))
+    )
+}
+
+function resolveCatalogCanonicalServiceType(options: {
+    serviceType: string | null | undefined
+    catalogItems?: ServiceCatalogCandidate[]
+}) {
+    const serviceType = (options.serviceType ?? '').trim()
+    if (!serviceType) return null
+
+    const normalizedServiceType = normalizeForMatch(serviceType)
+    if (!normalizedServiceType) return serviceType
+
+    for (const catalogItem of options.catalogItems ?? []) {
+        const catalogName = (catalogItem.name ?? '').trim()
+        if (!catalogName) continue
+
+        const normalizedCatalogName = normalizeForMatch(catalogName)
+        const aliases = (catalogItem.aliases ?? [])
+            .map((alias) => normalizeForMatch((alias ?? '').trim()))
+            .filter((alias) => alias.length >= 3)
+
+        const matchTerms = [
+            normalizedCatalogName.length >= 3 ? normalizedCatalogName : '',
+            ...aliases
+        ].filter(Boolean)
+
+        if (matchTerms.length === 0) continue
+
+        const hasCatalogMatch = matchTerms.some((term) =>
+            normalizedServiceType === term
+            || normalizedServiceType.includes(term)
+            || term.includes(normalizedServiceType)
+        )
+
+        if (hasCatalogMatch) return catalogName
+    }
+
+    return serviceType
+}
+
 function isGenericGreetingOnly(value: string) {
     const normalized = value.trim()
     if (!normalized) return true
@@ -122,6 +217,7 @@ export function shouldAcceptInferredServiceType(options: {
     serviceType: string | null | undefined
     customerMessages: string[]
     catalogItems?: ServiceCatalogCandidate[]
+    profileSummary?: string | null
 }) {
     const serviceType = (options.serviceType ?? '').trim()
     if (!serviceType) return false
@@ -161,11 +257,67 @@ export function shouldAcceptInferredServiceType(options: {
         aliases.forEach((alias) => serviceTerms.add(alias))
     }
 
-    if (serviceTerms.size === 0) return false
+    if (serviceTerms.size > 0) {
+        const hasDirectServiceMention = normalizedMessages.some((message) => {
+            return Array.from(serviceTerms).some((term) => message.includes(term))
+        })
+        if (hasDirectServiceMention) {
+            return true
+        }
+    }
 
-    return normalizedMessages.some((message) => {
-        return Array.from(serviceTerms).some((term) => message.includes(term))
+    return hasProfileServiceSignal({
+        normalizedCustomerMessages: normalizedMessages,
+        profileSummary: options.profileSummary
     })
+}
+
+export function resolvePersistedServiceType(options: {
+    serviceType: string | null | undefined
+    customerMessages: string[]
+    catalogItems?: ServiceCatalogCandidate[]
+    profileSummary?: string | null
+}) {
+    if (!shouldAcceptInferredServiceType(options)) return null
+    return resolveCatalogCanonicalServiceType({
+        serviceType: options.serviceType,
+        catalogItems: options.catalogItems
+    })
+}
+
+export function resolvePersistedServiceTypes(options: {
+    serviceType: string | null | undefined
+    services?: string[] | null
+    customerMessages: string[]
+    catalogItems?: ServiceCatalogCandidate[]
+    profileSummary?: string | null
+}) {
+    const rawCandidates = normalizeServiceCatalogNames([
+        ...(options.services ?? []),
+        ...(options.serviceType ? [options.serviceType] : [])
+    ])
+
+    if (rawCandidates.length === 0) return []
+
+    const persisted: string[] = []
+    const seen = new Set<string>()
+
+    for (const candidate of rawCandidates) {
+        const next = resolvePersistedServiceType({
+            serviceType: candidate,
+            customerMessages: options.customerMessages,
+            catalogItems: options.catalogItems,
+            profileSummary: options.profileSummary
+        })
+
+        if (!next) continue
+        const key = normalizeForMatch(next)
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        persisted.push(next)
+    }
+
+    return persisted
 }
 
 interface LeadExtractionMessageRecord {
@@ -365,6 +517,7 @@ function hasJsonKey(value: string, key: string) {
 
 export interface NormalizedLeadExtraction {
     service_type: string | null
+    services: string[]
     desired_date: string | null
     location: string | null
     budget_signals: string[]
@@ -381,6 +534,7 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return {
             service_type: null,
+            services: [],
             desired_date: null,
             location: null,
             budget_signals: [],
@@ -398,10 +552,23 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
     const nonBusiness = normalizeBoolean(payloadRecord.non_business)
     const score = nonBusiness ? 0 : normalizeScore(payloadRecord.score)
     const status = nonBusiness ? 'ignored' : normalizeStatus(payloadRecord.status)
+    const rawServiceType = typeof payloadRecord.service_type === 'string'
+        ? payloadRecord.service_type.trim() || null
+        : null
+    const rawServices = normalizeStringArray(
+        payloadRecord.services
+            ?? payloadRecord.service_types
+            ?? payloadRecord.serviceTypes
+    )
+    const normalizedServices = normalizeServiceCatalogNames(
+        rawServices.length > 0
+            ? rawServices
+            : (rawServiceType ? [rawServiceType] : [])
+    )
 
     return {
-        service_type:
-            typeof payloadRecord.service_type === 'string' ? payloadRecord.service_type.trim() || null : null,
+        service_type: rawServiceType ?? normalizedServices[0] ?? null,
+        services: normalizedServices,
         desired_date:
             typeof payloadRecord.desired_date === 'string' ? payloadRecord.desired_date.trim() || null : null,
         location: typeof payloadRecord.location === 'string' ? payloadRecord.location.trim() || null : null,
@@ -453,9 +620,14 @@ export function mergeExtractionWithExisting(
     const existingExtracted = normalizeExistingExtractedFields(existingLead?.extracted_fields)
     const existingCollected = normalizeCollectedFieldValues(existingExtracted.required_intake_collected)
     const incomingCollected = normalizeCollectedFieldValues(incoming.required_intake_collected)
+    const incomingServices = normalizeServiceCatalogNames([
+        ...incoming.services,
+        ...(incoming.service_type ? [incoming.service_type] : [])
+    ])
 
     return {
-        service_type: incoming.service_type,
+        service_type: incomingServices[0] ?? null,
+        services: incomingServices,
         desired_date: incoming.desired_date ?? normalizeOptionalString(existingExtracted.desired_date) ?? null,
         location: incoming.location ?? normalizeOptionalString(existingExtracted.location) ?? null,
         budget_signals: incoming.budget_signals.length > 0
@@ -515,6 +687,7 @@ export function normalizeUndeterminedLeadStatus(options: {
 
     const hasStructuredLeadSignals = Boolean(
         extracted.service_type
+        || extracted.services.length > 0
         || extracted.desired_date
         || extracted.location
         || extracted.budget_signals.length > 0
@@ -577,7 +750,20 @@ export async function runLeadExtraction(options: {
     if (!process.env.OPENAI_API_KEY) return
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const catalogList = (catalog ?? []).map((row: { name?: string | null }) => row.name ?? '').join(', ')
+    const catalogList = (catalog ?? []).length > 0
+        ? (catalog ?? [])
+            .map((row: { name?: string | null; aliases?: string[] | null }) => {
+                const name = (row.name ?? '').trim()
+                if (!name) return null
+                const aliases = (row.aliases ?? [])
+                    .map((alias) => alias.trim())
+                    .filter(Boolean)
+                if (aliases.length === 0) return `- ${name}`
+                return `- ${name} (aliases: ${aliases.join(', ')})`
+            })
+            .filter((item): item is string => Boolean(item))
+            .join('\n')
+        : 'none'
     const latestMessage = (options.latestMessage ?? '').trim()
     const { conversationTurns, customerMessages } = buildLeadExtractionConversationContext({
         messages: (messages ?? []) as LeadExtractionMessageRecord[],
@@ -613,7 +799,7 @@ export async function runLeadExtraction(options: {
     const userPrompt = [
         `Preferred response language: ${responseLanguage}`,
         `Offering profile:\n${profileText}`,
-        `Catalog:${catalogList}`,
+        `Catalog:\n${catalogList}`,
         `Required intake fields:\n${requiredIntakeBlock}`,
         `Recent conversation turns (latest ${conversationTurns.length}, oldest to newest):\n${conversationTurns.length > 0 ? conversationTurns.join('\n') : 'none'}`,
         'Customer messages (latest 5, oldest to newest):',
@@ -670,15 +856,18 @@ export async function runLeadExtraction(options: {
         addUsage(retry, strictPrompt, response)
     }
     let extracted = safeParseLeadExtraction(response)
-    if (!shouldAcceptInferredServiceType({
+    const persistedServiceTypes = resolvePersistedServiceTypes({
         serviceType: extracted.service_type,
+        services: extracted.services,
         customerMessages,
-        catalogItems: (catalog ?? []) as ServiceCatalogCandidate[]
-    })) {
-        extracted = {
-            ...extracted,
-            service_type: null
-        }
+        catalogItems: (catalog ?? []) as ServiceCatalogCandidate[],
+        profileSummary: profileText
+    })
+    const persistedPrimaryService = persistedServiceTypes[0] ?? null
+    extracted = {
+        ...extracted,
+        service_type: persistedPrimaryService,
+        services: persistedServiceTypes
     }
     extracted = normalizeUndeterminedLeadStatus({ extracted, customerMessages })
     const normalizedExtracted = mergeExtractionWithExisting(extracted, existingLead)
@@ -694,6 +883,7 @@ export async function runLeadExtraction(options: {
         non_business: normalizedExtracted.non_business,
         summary: normalizedExtracted.summary,
         extracted_fields: {
+            services: normalizedExtracted.services,
             desired_date: normalizedExtracted.desired_date,
             location: normalizedExtracted.location,
             budget_signals: normalizedExtracted.budget_signals,

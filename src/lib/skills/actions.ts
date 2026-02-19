@@ -8,9 +8,9 @@ import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 import { shouldRunSkillsMaintenanceForOrganization } from '@/lib/skills/maintenance-cache'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import {
+    appendServiceCatalogCandidates,
     appendOfferingProfileSuggestion,
-    appendRequiredIntakeFields,
-    proposeServiceCandidate
+    appendRequiredIntakeFields
 } from '@/lib/leads/offering-profile'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
@@ -85,11 +85,11 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
     const profileContent = `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`
 
     try {
-        await proposeServiceCandidate({
+        await appendServiceCatalogCandidates({
             organizationId: data.organization_id,
             sourceType: 'skill',
             sourceId: data.id,
-            name: data.title,
+            content: profileContent,
             supabase
         })
     } catch (error) {
@@ -154,11 +154,11 @@ export async function updateSkill(
         const profileContent = `${data.title}\n${(updates.trigger_examples ?? currentTriggers ?? []).join('\n')}\n${data.response_text}`
 
         try {
-            await proposeServiceCandidate({
+            await appendServiceCatalogCandidates({
                 organizationId: data.organization_id,
                 sourceType: 'skill',
                 sourceId: data.id,
-                name: data.title,
+                content: profileContent,
                 supabase
             })
         } catch (error) {

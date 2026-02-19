@@ -282,7 +282,7 @@ export async function getConversationLead(conversationId: string): Promise<Lead 
     return (data as Lead) ?? null
 }
 
-const SUMMARY_USER_LIMIT = 5
+const SUMMARY_USER_LIMIT = 3
 const SUMMARY_MAX_CHARS = 600
 
 type SummaryMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
@@ -355,11 +355,13 @@ export async function getConversationSummary(
     const contactMessages = (contactResult.data ?? []) as SummaryMessage[]
     const botMessage = (botResult.data ?? [])[0] as SummaryMessage | undefined
 
-    if (contactMessages.length < SUMMARY_USER_LIMIT || !botMessage) {
+    if (contactMessages.length < SUMMARY_USER_LIMIT) {
         return { ok: false, reason: 'insufficient_data' }
     }
 
-    const combined = [...contactMessages, botMessage]
+    const combined = botMessage
+        ? [...contactMessages, botMessage]
+        : [...contactMessages]
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
     const formattedMessages = formatSummaryMessages(combined, aiSettings.bot_name, locale)

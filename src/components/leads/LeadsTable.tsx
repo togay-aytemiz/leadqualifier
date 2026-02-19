@@ -37,6 +37,42 @@ const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info' | 
     undetermined: 'purple'
 }
 
+function normalizeServiceName(value: unknown): string | null {
+    if (typeof value !== 'string') return null
+    const normalized = value.trim()
+    return normalized || null
+}
+
+function getLeadServiceNames(lead: LeadWithConversation): string[] {
+    const extractedFields = lead.extracted_fields
+    const extractedServices = (
+        extractedFields
+        && typeof extractedFields === 'object'
+        && !Array.isArray(extractedFields)
+        && Array.isArray((extractedFields as Record<string, unknown>).services)
+            ? (extractedFields as Record<string, unknown>).services as unknown[]
+            : []
+    )
+        .map((service) => normalizeServiceName(service))
+        .filter((service): service is string => Boolean(service))
+
+    const fallbackService = normalizeServiceName(lead.service_type)
+    const combinedServices = fallbackService
+        ? [...extractedServices, fallbackService]
+        : extractedServices
+
+    const dedupedServices: string[] = []
+    const seen = new Set<string>()
+    for (const service of combinedServices) {
+        const normalizedKey = service.toLocaleLowerCase()
+        if (seen.has(normalizedKey)) continue
+        seen.add(normalizedKey)
+        dedupedServices.push(service)
+    }
+
+    return dedupedServices
+}
+
 // Summary Cell Component with Hover Popover
 const SummaryCell = ({ text }: { text: string }) => {
     const [open, setOpen] = useState(false)
@@ -175,6 +211,7 @@ export function LeadsTable({
             <div className="space-y-2 md:hidden">
                 {leads.map(lead => {
                     const mobileHints = getMobileRequiredFieldHints(lead, requiredFields)
+                    const serviceNames = getLeadServiceNames(lead)
 
                     return (
                         <button
@@ -214,9 +251,9 @@ export function LeadsTable({
                                         {statusLabels[lead.status] || lead.status}
                                     </Badge>
                                 </span>
-                                {lead.service_type ? (
+                                {serviceNames.length > 0 ? (
                                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
-                                        {lead.service_type}
+                                        {serviceNames.join(', ')}
                                     </span>
                                 ) : null}
                             </div>
@@ -261,73 +298,77 @@ export function LeadsTable({
                     </tr>
                 </thead>
                 <TableBody>
-                    {leads.map(lead => (
-                        <TableRow
-                            key={lead.id}
-                            onClick={() => handleRowClick(lead.conversation_id)}
-                        >
-                            {/* Name & Platform merged */}
-                            <TableCell>
-                                <div className="flex min-w-0 items-center gap-3">
-                                    <div className="shrink-0">
-                                        {getPlatformIcon(lead.conversation.platform)}
+                    {leads.map(lead => {
+                        const serviceNames = getLeadServiceNames(lead)
+
+                        return (
+                            <TableRow
+                                key={lead.id}
+                                onClick={() => handleRowClick(lead.conversation_id)}
+                            >
+                                {/* Name & Platform merged */}
+                                <TableCell>
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className="shrink-0">
+                                            {getPlatformIcon(lead.conversation.platform)}
+                                        </div>
+                                        <span className="max-w-[240px] truncate whitespace-nowrap font-medium text-gray-900">
+                                            {lead.conversation.contact_name}
+                                        </span>
                                     </div>
-                                    <span className="max-w-[240px] truncate whitespace-nowrap font-medium text-gray-900">
-                                        {lead.conversation.contact_name}
-                                    </span>
-                                </div>
-                            </TableCell>
+                                </TableCell>
 
-                            {/* Status */}
-                            <TableCell className="w-28">
-                                <span className="inline-block whitespace-nowrap">
-                                    <Badge variant={statusVariants[lead.status] || 'neutral'}>
-                                        {statusLabels[lead.status] || lead.status}
-                                    </Badge>
-                                </span>
-                            </TableCell>
-
-                            {/* Score */}
-                            <TableCell className="w-20">
-                                <span className="font-semibold text-gray-900">
-                                    {lead.total_score}
-                                </span>
-                            </TableCell>
-
-                            {/* Service */}
-                            <TableCell>
-                                <span className="text-gray-600">
-                                    {lead.service_type || '-'}
-                                </span>
-                            </TableCell>
-
-                            {/* Last Activity */}
-                            <TableCell className="w-32">
-                                <span className="text-gray-500 text-sm">
-                                    {formatDistanceToNow(new Date(lead.updated_at), {
-                                        addSuffix: true,
-                                        locale: dateLocale
-                                    })}
-                                </span>
-                            </TableCell>
-
-                            {/* Dynamic Required Fields */}
-                            {requiredFields.map(field => (
-                                <TableCell key={field}>
-                                    <span className="text-gray-600 text-sm">
-                                        {getExtractedFieldValue(lead, field)}
+                                {/* Status */}
+                                <TableCell className="w-28">
+                                    <span className="inline-block whitespace-nowrap">
+                                        <Badge variant={statusVariants[lead.status] || 'neutral'}>
+                                            {statusLabels[lead.status] || lead.status}
+                                        </Badge>
                                     </span>
                                 </TableCell>
-                            ))}
 
-                            {/* Summary with Tooltip */}
-                            <TableCell>
-                                <div className="text-gray-500 text-sm">
-                                    <SummaryCell text={lead.summary || ''} />
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    ))}
+                                {/* Score */}
+                                <TableCell className="w-20">
+                                    <span className="font-semibold text-gray-900">
+                                        {lead.total_score}
+                                    </span>
+                                </TableCell>
+
+                                {/* Service */}
+                                <TableCell>
+                                    <span className="text-gray-600">
+                                        {serviceNames.length > 0 ? serviceNames.join(', ') : '-'}
+                                    </span>
+                                </TableCell>
+
+                                {/* Last Activity */}
+                                <TableCell className="w-32">
+                                    <span className="text-gray-500 text-sm">
+                                        {formatDistanceToNow(new Date(lead.updated_at), {
+                                            addSuffix: true,
+                                            locale: dateLocale
+                                        })}
+                                    </span>
+                                </TableCell>
+
+                                {/* Dynamic Required Fields */}
+                                {requiredFields.map(field => (
+                                    <TableCell key={field}>
+                                        <span className="text-gray-600 text-sm">
+                                            {getExtractedFieldValue(lead, field)}
+                                        </span>
+                                    </TableCell>
+                                ))}
+
+                                {/* Summary with Tooltip */}
+                                <TableCell>
+                                    <div className="text-gray-500 text-sm">
+                                        <SummaryCell text={lead.summary || ''} />
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )
+                    })}
                 </TableBody>
             </DataTable>
 

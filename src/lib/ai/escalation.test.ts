@@ -20,7 +20,7 @@ describe('decideHumanEscalation', () => {
         })
     })
 
-    it('uses hot lead settings when score meets threshold', () => {
+    it('does not send assistant promise when hot lead action is notify_only', () => {
         const result = decideHumanEscalation({
             skillRequiresHumanHandover: false,
             leadScore: 7,
@@ -33,6 +33,24 @@ describe('decideHumanEscalation', () => {
             shouldEscalate: true,
             reason: 'hot_lead',
             action: 'notify_only',
+            noticeMode: null,
+            noticeMessage: null
+        })
+    })
+
+    it('keeps assistant promise when hot lead action is switch_to_operator', () => {
+        const result = decideHumanEscalation({
+            skillRequiresHumanHandover: false,
+            leadScore: 8,
+            hotLeadThreshold: 7,
+            hotLeadAction: 'switch_to_operator',
+            handoverMessage: 'Promise message'
+        })
+
+        expect(result).toEqual({
+            shouldEscalate: true,
+            reason: 'hot_lead',
+            action: 'switch_to_operator',
             noticeMode: 'assistant_promise',
             noticeMessage: 'Promise message'
         })

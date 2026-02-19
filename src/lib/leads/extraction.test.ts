@@ -3,6 +3,8 @@ import {
     buildLeadExtractionConversationContext,
     mergeExtractionWithExisting,
     normalizeUndeterminedLeadStatus,
+    resolvePersistedServiceType,
+    resolvePersistedServiceTypes,
     resolveLeadExtractionLocale,
     safeParseLeadExtraction,
     shouldAcceptInferredServiceType
@@ -21,6 +23,15 @@ describe('safeParseLeadExtraction', () => {
         const result = safeParseLeadExtraction('```json\n{"service_type":"Yenidoğan","intent_signals":["decisive"]}\n```')
         expect(result.service_type).toBe('Yenidoğan')
         expect(result.intent_signals).toEqual(['decisive'])
+    })
+
+    it('parses multi-service payload and keeps deduped services', () => {
+        const result = safeParseLeadExtraction('{"service_type":"Yenidoğan çekimi","services":["Yenidoğan çekimi","Hamile çekimi","hamile çekimi"]}')
+        expect(result.service_type).toBe('Yenidoğan çekimi')
+        expect(result.services).toEqual([
+            'Yenidoğan çekimi',
+            'Hamile çekimi'
+        ])
     })
 
     it('parses JSON when extra text surrounds the payload', () => {
@@ -74,6 +85,7 @@ describe('mergeExtractionWithExisting', () => {
         const merged = mergeExtractionWithExisting(
             {
                 service_type: null,
+                services: [],
                 desired_date: null,
                 location: null,
                 budget_signals: [],
@@ -87,8 +99,10 @@ describe('mergeExtractionWithExisting', () => {
             },
             {
                 service_type: 'Yenidoğan çekimi',
+                services: ['Yenidoğan çekimi'],
                 summary: 'Müşteri randevu istiyor.',
                 extracted_fields: {
+                    services: ['Yenidoğan çekimi'],
                     desired_date: '1 Mart',
                     location: 'Kadıköy',
                     budget_signals: ['15.000 TL'],
@@ -118,6 +132,7 @@ describe('mergeExtractionWithExisting', () => {
         const merged = mergeExtractionWithExisting(
             {
                 service_type: '1 yaş çekimi',
+                services: ['1 yaş çekimi'],
                 desired_date: '5 Nisan',
                 location: 'Üsküdar',
                 budget_signals: ['20.000 TL'],
@@ -133,8 +148,10 @@ describe('mergeExtractionWithExisting', () => {
             },
             {
                 service_type: 'Yenidoğan çekimi',
+                services: ['Yenidoğan çekimi'],
                 summary: 'Eski özet',
                 extracted_fields: {
+                    services: ['Yenidoğan çekimi'],
                     desired_date: '1 Mart',
                     required_intake_collected: {
                         Telefon: '05550000000',
@@ -223,6 +240,88 @@ describe('shouldAcceptInferredServiceType', () => {
             ]
         })
         expect(accept).toBe(true)
+    })
+
+    it('accepts service when customer matches profile-service signal but inferred service is another language', () => {
+        const accept = shouldAcceptInferredServiceType({
+            serviceType: 'Newborn photoshoot',
+            customerMessages: [
+                'Yenidoğan çekimi ile ilgili bilgi istiyorum',
+                'Randevu nasıl alabilirim?'
+            ],
+            catalogItems: [],
+            profileSummary: 'Yenidoğan fotoğraf çekim hizmeti sunan bir stüdyo.'
+        })
+        expect(accept).toBe(true)
+    })
+})
+
+describe('resolvePersistedServiceType', () => {
+    it('maps inferred alias value to canonical catalog service name', () => {
+        const serviceType = resolvePersistedServiceType({
+            serviceType: 'Newborn photoshoot',
+            customerMessages: ['Newborn photoshoot için fiyat alabilir miyim?'],
+            catalogItems: [
+                {
+                    name: 'Yenidoğan çekimi',
+                    aliases: ['newborn photoshoot', 'newborn shoot']
+                }
+            ]
+        })
+        expect(serviceType).toBe('Yenidoğan çekimi')
+    })
+
+    it('keeps inferred value when catalog is empty but profile signal confirms service', () => {
+        const serviceType = resolvePersistedServiceType({
+            serviceType: 'Newborn photoshoot',
+            customerMessages: ['Yenidoğan çekimi ile ilgili bilgi istiyorum'],
+            catalogItems: [],
+            profileSummary: 'Yenidoğan fotoğraf çekim hizmeti sunan bir stüdyo.'
+        })
+        expect(serviceType).toBe('Newborn photoshoot')
+    })
+
+    it('returns null when customer messages are greeting-only', () => {
+        const serviceType = resolvePersistedServiceType({
+            serviceType: 'Yenidoğan çekimi',
+            customerMessages: ['Merhaba']
+        })
+        expect(serviceType).toBeNull()
+    })
+})
+
+describe('resolvePersistedServiceTypes', () => {
+    it('maps multi-language aliases to canonical catalog names and dedupes', () => {
+        const services = resolvePersistedServiceTypes({
+            serviceType: 'Newborn photoshoot',
+            services: ['newborn shoot', 'Maternity photoshoot', 'hamile çekimi'],
+            customerMessages: ['Newborn shoot ve maternity photoshoot düşünüyorum.'],
+            catalogItems: [
+                {
+                    name: 'Yenidoğan çekimi',
+                    aliases: ['newborn photoshoot', 'newborn shoot']
+                },
+                {
+                    name: 'Hamile çekimi',
+                    aliases: ['maternity photoshoot', 'pregnancy shoot']
+                }
+            ]
+        })
+
+        expect(services).toEqual([
+            'Yenidoğan çekimi',
+            'Hamile çekimi'
+        ])
+    })
+
+    it('returns empty array when no customer service clue exists', () => {
+        const services = resolvePersistedServiceTypes({
+            serviceType: 'Yenidoğan çekimi',
+            services: ['Hamile çekimi'],
+            customerMessages: ['Merhaba']
+        })
+
+        expect(services).toEqual([])
     })
 })
 

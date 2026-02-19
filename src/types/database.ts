@@ -294,6 +294,7 @@ export interface OfferingProfile {
     manual_profile_note: string
     catalog_enabled: boolean
     ai_suggestions_enabled: boolean
+    service_catalog_ai_enabled: boolean
     required_intake_fields_ai_enabled: boolean
     ai_suggestions_locale: string
     required_intake_fields: string[]

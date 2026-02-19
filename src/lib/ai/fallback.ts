@@ -7,6 +7,7 @@ import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT, withBotNamePromp
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { buildRequiredIntakeFollowupGuidance } from '@/lib/ai/followup'
+import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
 import {
     buildConversationContinuityGuidance,
     type ConversationHistoryTurn,
@@ -21,12 +22,9 @@ const FALLBACK_TOPIC_LIMIT = 6
 const FALLBACK_MAX_OUTPUT_TOKENS = 320
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
-const TURKISH_HINTS = ['nedir', 'ne', 'nasıl', 'fiyat', 'randevu', 'iptal', 'iade', 'kampanya', 'paket', 'yardımcı']
-
-function isLikelyTurkish(message: string) {
-    const normalized = message.toLowerCase()
-    if (/[çğıöşü]/i.test(normalized)) return true
-    return TURKISH_HINTS.some((hint) => normalized.includes(hint))
+function resolveFallbackLanguage(message: string, preferredLanguage?: MvpResponseLanguage) {
+    if (preferredLanguage === 'tr' || preferredLanguage === 'en') return preferredLanguage
+    return resolveMvpResponseLanguage(message)
 }
 
 function formatTopicList(topics: string[]) {
@@ -76,12 +74,11 @@ async function getFallbackTopics(
     return topics
 }
 
-function renderStrictFallback(text: string, topics: string[], message: string) {
+function renderStrictFallback(text: string, topics: string[], language: MvpResponseLanguage) {
     const fallbackText = text?.trim() || DEFAULT_STRICT_FALLBACK_TEXT
-    const isTurkish = isLikelyTurkish(message)
     const fallbackTopics = topics.length > 0
         ? formatTopicList(topics)
-        : formatTopicList(isTurkish ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
+        : formatTopicList(language === 'tr' ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
 
     if (fallbackText.includes('{topics}')) {
         return fallbackText.replace('{topics}', fallbackTopics)
@@ -94,6 +91,7 @@ async function renderFlexibleFallback(
     prompt: string,
     topics: string[],
     message: string,
+    language: MvpResponseLanguage,
     botName: string,
     followupGuidance: string | null,
     options: {
@@ -110,13 +108,14 @@ async function renderFlexibleFallback(
     }
 ): Promise<string> {
     if (!process.env.OPENAI_API_KEY) {
-        return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, message)
+        return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, language)
     }
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const languageName = language === 'tr' ? 'Turkish' : 'English'
     const topicsList = topics.length > 0
         ? formatTopicList(topics)
-        : formatTopicList(isLikelyTurkish(message) ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
+        : formatTopicList(language === 'tr' ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
 
     const basePrompt = withBotNamePrompt(prompt || DEFAULT_FLEXIBLE_PROMPT, botName)
     const continuityGuidance = buildConversationContinuityGuidance({
@@ -125,9 +124,10 @@ async function renderFlexibleFallback(
     })
     const topicGuidance = `When you need to guide the user, stay within these available business topics: ${topicsList}.
 If the request is outside scope, politely redirect to the most relevant available topics.`
+    const languageGuidance = `Reply language policy (MVP): use ${languageName} only. If the message is not Turkish, use English.`
     const systemPrompt = followupGuidance
-        ? `${basePrompt}\n\n${topicGuidance}\n\n${continuityGuidance}\n\n${followupGuidance}`
-        : `${basePrompt}\n\n${topicGuidance}\n\n${continuityGuidance}`
+        ? `${basePrompt}\n\n${languageGuidance}\n\n${topicGuidance}\n\n${continuityGuidance}\n\n${followupGuidance}`
+        : `${basePrompt}\n\n${languageGuidance}\n\n${topicGuidance}\n\n${continuityGuidance}`
     const historyMessages = toOpenAiConversationMessages(options.conversationHistory ?? [], message, 10)
 
     try {
@@ -179,12 +179,13 @@ If the request is outside scope, politely redirect to the most relevant availabl
         console.error('Flexible fallback failed:', error)
     }
 
-    return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, message)
+    return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, language)
 }
 
 export async function buildFallbackResponse(options: {
     organizationId: string
     message: string
+    preferredLanguage?: MvpResponseLanguage
     requiredIntakeFields?: string[]
     recentCustomerMessages?: string[]
     recentAssistantMessages?: string[]
@@ -201,6 +202,7 @@ export async function buildFallbackResponse(options: {
     const supabase = options.supabase ?? await createClient()
     const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, { supabase })
     const topics = await getFallbackTopics(supabase, options.organizationId, FALLBACK_TOPIC_LIMIT)
+    const language = resolveFallbackLanguage(options.message, options.preferredLanguage)
     const followupGuidance = buildRequiredIntakeFollowupGuidance(
         options.requiredIntakeFields ?? [],
         options.recentCustomerMessages ?? [],
@@ -211,6 +213,7 @@ export async function buildFallbackResponse(options: {
         aiSettings.prompt,
         topics,
         options.message,
+        language,
         aiSettings.bot_name,
         followupGuidance,
         {

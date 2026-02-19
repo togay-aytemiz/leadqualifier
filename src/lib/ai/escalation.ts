@@ -60,11 +60,13 @@ export function decideHumanEscalation(options: DecideHumanEscalationOptions): Hu
         return noEscalation()
     }
 
+    const shouldSendAssistantPromise = options.hotLeadAction === 'switch_to_operator'
+
     return {
         shouldEscalate: true,
         reason: 'hot_lead',
         action: options.hotLeadAction,
-        noticeMode: 'assistant_promise',
-        noticeMessage: message
+        noticeMode: shouldSendAssistantPromise ? 'assistant_promise' : null,
+        noticeMessage: shouldSendAssistantPromise ? message : null
     }
 }

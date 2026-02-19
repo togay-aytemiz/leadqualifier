@@ -20,6 +20,7 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
+import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -38,15 +39,10 @@ export interface InboundAiPipelineInput {
     logPrefix: string
 }
 
-function isLikelyTurkishMessage(value: string) {
-    const text = (value ?? '').trim()
-    if (!text) return true
-    if (/[ığüşöçİĞÜŞÖÇ]/.test(text)) return true
-    return /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet)\b/i.test(text)
-}
-
 export async function processInboundAiPipeline(options: InboundAiPipelineInput) {
     const orgId = options.organizationId
+    const responseLanguage = resolveMvpResponseLanguage(options.text)
+    const responseLanguageName = resolveMvpResponseLanguageName(options.text)
     const aiSettings = await getOrgAiSettings(orgId, { supabase: options.supabase })
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
@@ -211,7 +207,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     }
 
     const applyEscalationAfterReply = async (args: { skillRequiresHumanHandover: boolean }) => {
-        const handoverMessage = isLikelyTurkishMessage(options.text)
+        const handoverMessage = responseLanguage === 'tr'
             ? aiSettings.hot_lead_handover_message_tr
             : aiSettings.hot_lead_handover_message_en
         const escalation = decideHumanEscalation({
@@ -400,7 +396,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
 Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
-Keep the answer concise and friendly (in Turkish or English depending on user).
+Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
+Keep the answer concise and friendly.
 Continue naturally from recent conversation turns without restarting.
 
 Context:
@@ -465,6 +462,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     const fallbackText = await buildFallbackResponse({
         organizationId: orgId,
         message: options.text,
+        preferredLanguage: responseLanguage,
         requiredIntakeFields,
         recentCustomerMessages: customerHistoryForFollowup,
         recentAssistantMessages: assistantHistoryForFollowup,

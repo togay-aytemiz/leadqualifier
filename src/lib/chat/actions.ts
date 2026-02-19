@@ -15,18 +15,12 @@ import {
 } from '@/lib/ai/conversation'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
+import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
-function isLikelyTurkishMessage(value: string) {
-    const text = (value ?? '').trim()
-    if (!text) return true
-    if (/[ığüşöçİĞÜŞÖÇ]/.test(text)) return true
-    return /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet)\b/i.test(text)
-}
-
 function buildLockedSimulatorMessage(lockReason: string | null, inputMessage: string) {
-    const tr = isLikelyTurkishMessage(inputMessage)
+    const tr = resolveMvpResponseLanguage(inputMessage) === 'tr'
 
     if (lockReason === 'trial_time_expired' || lockReason === 'trial_credits_exhausted' || lockReason === 'subscription_required') {
         return tr
@@ -100,6 +94,8 @@ export async function simulateChat(
     threshold?: number,
     history: ConversationTurn[] = []
 ): Promise<SimulationResponse> {
+    const responseLanguage = resolveMvpResponseLanguage(message)
+    const responseLanguageName = resolveMvpResponseLanguageName(message)
     let totalInputTokens = 0
     let totalOutputTokens = 0
     let routerInputTokens = 0
@@ -267,6 +263,7 @@ export async function simulateChat(
 
 Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
+Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
 Keep the answer concise and friendly.
 Continue naturally from recent conversation turns without restarting.
 
@@ -334,6 +331,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     const fallbackResponse = await buildFallbackResponse({
         organizationId,
         message,
+        preferredLanguage: responseLanguage,
         requiredIntakeFields,
         recentCustomerMessages: customerHistory,
         recentAssistantMessages: assistantHistory,

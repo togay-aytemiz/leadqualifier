@@ -3,6 +3,8 @@ import {
     filterMissingIntakeFields,
     mergeIntakeFields,
     normalizeIntakeFields,
+    normalizeServiceCatalogNames,
+    parseServiceCandidatesPayload,
     parseRequiredIntakeFieldsPayload
 } from '@/lib/leads/offering-profile-utils'
 
@@ -26,6 +28,19 @@ describe('mergeIntakeFields', () => {
 
     it('prevents duplicates even when casing differs', () => {
         expect(mergeIntakeFields(['Telefon'], ['telefon', 'Bölge'])).toEqual(['Telefon', 'Bölge'])
+    })
+})
+
+describe('normalizeServiceCatalogNames', () => {
+    it('dedupes, trims, and drops empty service names', () => {
+        expect(normalizeServiceCatalogNames(['  Newborn  ', 'newborn', '', '  '])).toEqual(['Newborn'])
+    })
+
+    it('dedupes case-insensitively and keeps first label', () => {
+        expect(normalizeServiceCatalogNames(['Yenidoğan çekimi', 'yenidogan cekimi', 'Aile Çekimi'])).toEqual([
+            'Yenidoğan çekimi',
+            'Aile Çekimi'
+        ])
     })
 })
 
@@ -54,5 +69,40 @@ describe('parseRequiredIntakeFieldsPayload', () => {
 
     it('returns null for invalid payload', () => {
         expect(parseRequiredIntakeFieldsPayload('nope')).toBeNull()
+    })
+})
+
+describe('parseServiceCandidatesPayload', () => {
+    it('parses object payload with services array', () => {
+        expect(parseServiceCandidatesPayload('{"services":["Yenidoğan çekimi"," yenidoğan çekimi ","Hamile çekimi"]}')).toEqual([
+            'Yenidoğan çekimi',
+            'Hamile çekimi'
+        ])
+    })
+
+    it('parses serviceNames alias key and dedupes values', () => {
+        expect(parseServiceCandidatesPayload('{"serviceNames":["newborn shoot","Newborn Shoot","Maternity"]}')).toEqual([
+            'newborn shoot',
+            'Maternity'
+        ])
+    })
+
+    it('parses array payload directly', () => {
+        expect(parseServiceCandidatesPayload('["Aile çekimi","1 yaş çekimi"]')).toEqual([
+            'Aile çekimi',
+            '1 yaş çekimi'
+        ])
+    })
+
+    it('parses fenced JSON payloads', () => {
+        const payload = 'Sonuç:\n```json\n{"services":["Yenidoğan","Hamile"]}\n```'
+        expect(parseServiceCandidatesPayload(payload)).toEqual([
+            'Yenidoğan',
+            'Hamile'
+        ])
+    })
+
+    it('returns null for invalid payload', () => {
+        expect(parseServiceCandidatesPayload('not-json')).toBeNull()
     })
 })

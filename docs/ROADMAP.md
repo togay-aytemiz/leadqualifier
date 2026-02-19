@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-19 (Fixed premium-plan AI usage debit trigger enum-cast regression (`42804`) that blocked `organization_ai_usage` inserts and kept Inbox `Total AI credits` at `0.0` despite AI replies. Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings, persisted `organizations.billing_region` automatically from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency rendering to organization-level billing region as source-of-truth (request headers only fallback for missing legacy values). Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse, and added env-based optional `business_management` scope toggle for accounts requiring `/me/businesses` fallback access. Fallback now uses `/me/businesses` on `Missing Permission` only when that toggle is enabled, preventing unavoidable invalid-scope loops on apps where `business_management` is unsupported. Added callback-level `debug_token` fallback so WABA discovery can proceed even when direct `/me/whatsapp_business_accounts` fails with permission errors. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files.)  
+> **Last Updated:** 2026-02-19 (Fixed premium-plan AI usage debit trigger enum-cast regression (`42804`) that blocked `organization_ai_usage` inserts and kept Inbox `Total AI credits` at `0.0` despite AI replies. Fixed hot-lead `notify_only` escalation behavior to stop sending customer-facing handover promise messages when no operator switch occurs. Fixed cross-language lead service inference gap so `service_type` is accepted when customer wording matches approved profile/service signals even if model output uses another language (for example, `Newborn photoshoot` vs `Yenidoğan çekimi`). Added canonical service persistence so alias-language matches are stored as the approved catalog service name. Added multi-service lead extraction support (`services[]` + primary `service_type`) so one or many requested services can be captured per conversation. Enforced MVP reply language policy in production/simulator AI replies (`Turkish` if customer message is Turkish, otherwise `English`). Added Organization Settings Service List UI with AI service-generation toggle, direct auto-add behavior (no approve/reject queue), and AI-tagged service chips. Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings, persisted `organizations.billing_region` automatically from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency rendering to organization-level billing region as source-of-truth (request headers only fallback for missing legacy values). Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse, and added env-based optional `business_management` scope toggle for accounts requiring `/me/businesses` fallback access. Fallback now uses `/me/businesses` on `Missing Permission` only when that toggle is enabled, preventing unavoidable invalid-scope loops on apps where `business_management` is unsupported. Added callback-level `debug_token` fallback so WABA discovery can proceed even when direct `/me/whatsapp_business_accounts` fails with permission errors. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files. Updated Leads service rendering to show AI-extracted multi-service values (`extracted_fields.services`) with `service_type` fallback. Updated Inbox active assistant banner spacing/typography structure to match inactive banner style while preserving existing color tones. Added a dental-clinic Knowledge Base extraction QA fixture with expected `Hizmet Profili`, `Gerekli Bilgiler`, and `Hizmet listesi` reference outputs.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -138,6 +138,7 @@
   - [x] Unread indicators in sidebar + conversation list
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)
+  - [x] Conversation summary minimum-message threshold updated to `3` customer messages (bot message optional)
   - [x] Closing and reopening summary panel now regenerates summary without requiring manual refresh
   - [x] WhatsApp conversations now show a far-right 24-hour reply-window indicator (`reply available / reply unavailable`) next to the summary control with tooltip reason when blocked
   - [x] Inbox composer now disables manual send for WhatsApp when the 24-hour free-form window is closed, shows a short lock overlay message, and keeps `active_agent` unchanged
@@ -154,6 +155,7 @@
   - [x] Reduced vertical gap between the "Konuşma Özeti" row and the assistant banner in composer area
   - [x] "Konuşma Özeti" action now uses a glowing gradient AI sparkles icon (filled style) plus an inline chevron toggle beside the label
   - [x] Shadow/Off bot modes now show compact inactive-state banner copy (single-line title + short body) in composer area
+  - [x] Active bot assistant banner now follows the same spacing/typography layout as inactive banner (color palette unchanged)
   - [x] Conversation switch now shows loading skeletons until selected-thread messages load, preventing avatar-first stale content flashes
   - [x] Lead status chips now sync after manual lead refresh and realtime lead events, including `ignored` (`Yok sayıldı`) and `undetermined` (`Belirsiz`)
 - [x] **Refactoring**
@@ -264,6 +266,7 @@
   - [x] Router responses now enforce a max output token cap for predictable cost
   - [x] Fallback/RAG responses now enforce max output token caps for predictable cost
   - [x] Shared inbound webhook RAG generation path (`src/lib/channels/inbound-ai-pipeline.ts`) now sets explicit `max_tokens`
+  - [x] Enforce MVP reply-language rule in RAG/fallback/simulator prompts: Turkish only for Turkish customer messages, otherwise English only
 - [x] **Bot Mode (Org-Level)**
   - [x] Active / Shadow / Off (Simulator excluded)
   - [x] AI Settings selector + sidebar status indicator
@@ -279,6 +282,7 @@
   - [x] Centralized escalation policy with precedence: skill override > hot lead score
   - [x] Locale-aware handover message repair so TR UI no longer displays EN default text
   - [x] `notify_only` hot-lead behavior now keeps AI replies active based on `active_agent` state (stale assignee no longer blocks bot replies)
+  - [x] `notify_only` hot-lead behavior no longer sends customer-facing handover promise; handover message is only emitted when escalation switches to operator (or skill-triggered forced handover)
 - [x] **Default System Guardrail Skills (MVP)**
   - [x] Human support request skill (`requires_human_handover=true`)
   - [x] Complaint / dissatisfaction skill (`requires_human_handover=true`)
@@ -307,6 +311,7 @@
 - [x] **Settings UX:** Align settings column widths and remove duplicate field labels for cleaner alignment
 - [x] **Settings UX:** Refresh settings sidebar icons with bubbles/circle-user icons
 - [x] **Settings UX:** Settings page headers now match sidebar item labels (AI + Organization)
+- [x] **Organization Settings UX:** Move language selector near the bottom (above data deletion) and switch locale buttons to content-hug sizing
 - [x] **Settings IA:** Removed dedicated General settings entry; language selector moved under Organization settings and `/settings/general` now redirects to `/settings/organization`
 - [x] **AI Settings UI:** Compact bot mode/escalation selection cards (smaller title, radio, and padding)
 - [x] **AI Settings UI:** Downsize selection card title text to section-title scale and reduce description font one step
@@ -399,7 +404,10 @@
   - [x] Knowledge Base banner copy updated to “Hizmet profili önerileri hazır” and spaced from header
 - [x] **Service Catalog (Hybrid)**
   - [x] Auto-propose services from Skills/KB
-  - [x] Admin approval workflow
+  - [x] Direct auto-add workflow (no manual approve/reject queue)
+  - [x] Organization Settings Service List section (manual chips + AI toggle + AI-tag badges)
+  - [x] Turkish UI terminology update: `Servis listesi` -> `Hizmet listesi`
+  - [x] AI service-candidate extraction now parses Skill/Knowledge content for multiple service names (not title-only)
 - [x] **Non-Business Classification**
   - [x] Detect personal/non-business chats
   - [x] Skip lead extraction and scoring when flagged
@@ -423,6 +431,9 @@
   - [x] `service_type` is intentionally not carry-forward merged; when current extraction has no service clue, service stays empty (`null`)
   - [x] Keep lead summary aligned to the current extraction window (avoid stale summary carry-over when omitted)
   - [x] Reject `service_type` inference on greeting-only/no-service-clue customer messages (prevents profile-only service hallucination)
+  - [x] Accept `service_type` when customer wording matches profile service signals even if inferred service text is in another language (prevents false `Unknown` on bilingual extraction output)
+  - [x] Canonicalize accepted `service_type` to approved catalog service name when alias-language matches exist (keeps extraction output consistent with org catalog/UI language)
+  - [x] Extract and persist `services[]` (one or more) and keep `service_type` as primary canonical service for backward compatibility
   - [x] Force greeting-only conversations to `undetermined` even when model emits `non_business=true` (keeps `ignored` scoped to true non-business threads)
   - [x] Resolve extraction language with precedence: explicit preferred locale, then organization locale, then message-language heuristics
 - [x] **Lead Scoring**
@@ -446,6 +457,7 @@
   - [x] Mobile leads list now uses compact card rows with reduced spacing while preserving the existing desktop table layout
   - [x] Desktop leads table keeps status chips on a single line and truncates long contact names to a single line
   - [x] Required-intake values shown in Inbox "Important info" are now rendered consistently in Leads table/mobile rows via shared resolver logic
+  - [x] Leads service column/cards now render AI-extracted `services[]` values from `extracted_fields.services` (fallback to `service_type` for legacy rows)
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
 
@@ -611,6 +623,7 @@
 - [x] Stabilize test + lint + build quality gates after troubleshooting sweep
 - [x] Remove `no-explicit-any` debt in critical modules (AI, Inbox, Knowledge Base, Leads, Channels, shared types)
 - [x] Document executable Phase 9 closure plan (`docs/plans/2026-02-10-phase-9-testing-qa-implementation-plan.md`)
+- [x] Add non-photography Knowledge Base extraction QA fixture for dental-clinic domain validation (`docs/kb-fixtures/2026-02-dis-klinigi-kb-cikartim-test-fixture.md`)
 - [x] Unit tests for core logic
 - [x] Integration tests for WhatsApp flow
 - [x] E2E tests for admin panel

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-19 (Fixed premium-plan AI usage debit trigger enum-cast regression (`42804`) that blocked `organization_ai_usage` inserts and left Inbox conversation credit totals at `0.0` despite AI replies. Removed manual billing-region selection from `Settings > Organization`, persisted `organizations.billing_region` from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency display to organization-level region as source-of-truth (request fallback only for missing legacy values). Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, surfaced popup OAuth outcomes in Channels UI, enforced OAuth re-consent via `auth_type=rerequest`, introduced env-based optional `business_management` scope inclusion for app setups that require `/me/businesses` access, restricted missing-permission fallback to `/me/businesses` only when that toggle is explicitly enabled, and added callback-level `debug_token` fallback for permission-constrained direct-edge discovery failures. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files.)  
+> **Last Updated:** 2026-02-19 (Fixed premium-plan AI usage debit trigger enum-cast regression (`42804`) that blocked `organization_ai_usage` inserts and left Inbox conversation credit totals at `0.0` despite AI replies. Fixed hot-lead `notify_only` escalation so it no longer sends a customer-facing handover promise when no operator switch is performed. Fixed cross-language service inference drop where extraction could leave `service_type` empty (`Unknown`) when customer intent was Turkish but model output was English. Added catalog-canonical `service_type` persistence for alias-language matches and enforced MVP reply-language policy (`Turkish` for Turkish customer messages, otherwise `English`) across inbound + simulator RAG/fallback flows. Added multi-service extraction output (`services[]`) while preserving primary `service_type` for backward compatibility. Added `Settings > Organization` Service List section with AI generation toggle, direct auto-add behavior (no approve/reject queue), and AI-tagged service chips. Added AI service-candidate extraction from Skill/Knowledge content so service-list suggestions are generated contextually (not title-only). Removed manual billing-region selection from `Settings > Organization`, persisted `organizations.billing_region` from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency display to organization-level region as source-of-truth (request fallback only for missing legacy values). Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, surfaced popup OAuth outcomes in Channels UI, enforced OAuth re-consent via `auth_type=rerequest`, introduced env-based optional `business_management` scope inclusion for app setups that require `/me/businesses` access, restricted missing-permission fallback to `/me/businesses` only when that toggle is explicitly enabled, and added callback-level `debug_token` fallback for permission-constrained direct-edge discovery failures. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files. Updated Leads page service rendering to show AI-extracted `services[]` values with legacy `service_type` fallback. Updated Inbox active assistant banner typography/spacing to match inactive banner layout while preserving current tone colors. Added a dental-clinic Knowledge Base extraction QA fixture with expected output references for `Hizmet Profili`, `Gerekli Bilgiler`, and `Hizmet listesi` validation.)  
 > **Status:** In Development
 
 ---
@@ -72,6 +72,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Rules:**
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
+- MVP reply language policy: if customer message is Turkish, reply in Turkish; otherwise reply in English.
 - WhatsApp and Instagram MVP support text messages only and send replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
 - Meta OAuth channel connect starts in a separate popup and returns success/error status to the existing Channels page context (main app tab remains stable)
 - Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
@@ -176,6 +177,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Inbox lead header shows an "Updating" indicator while extraction is in progress.
 - "Updated" timestamp remains visible while the updating indicator is shown.
 - `service_type` must match an approved service in the org catalog (derived from Skills/KB + admin approval) when a catalog is enabled.
+- Extraction should also return `services` as an array of one or more requested services; `service_type` remains the primary/canonical selection for compatibility.
 - If no catalog is enabled, use the org's Offering Profile (service scope summary) to infer fit/intent; `service_type` may remain empty.
 - Service type inference prioritizes customer messages, ignores assistant-only suggestions, and respects explicit negations.
 - Lead score and status are produced directly by the LLM using the latest 5 customer messages as grounding context, while recent role-labeled turns (`customer`, `owner`, `assistant`) are provided to disambiguate short confirmations (for example, "evet").
@@ -185,6 +187,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Lead extraction context includes both approved AI suggestions and the persistent manual profile note from Organization Settings.
 - Organization Settings now uses separate AI toggles per section:
   - Offering Profile: AI off shows manual textarea, AI on shows suggestions workflow.
+  - Service List: AI toggle controls service-candidate generation from Skills/KB; suggested services are auto-added directly and AI-origin services are tagged in the list.
+  - Turkish UI wording for this section is standardized as `Hizmet listesi` (instead of `Servis listesi`).
   - Required Fields: AI toggle controls AI-tagged required-field suggestions independently.
   - KB “Review/İncele” CTA deep-links into Organization Settings and auto-expands the Offering Profile AI Suggestions accordion.
   - Pending suggestion visibility is shown both on the accordion header and inside the accordion content/tabs.
@@ -199,11 +203,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Lead extraction applies merge-on-update persistence for collected required fields; `service_type` is not carry-forward merged when latest extraction has no service clue, and `summary` is always tied to the current extraction window (latest 5 customer messages) to prevent stale status-summary mismatch.
 - Lead extraction output language is locale-aware (TR/EN): summary and extracted detail values follow customer/locale signal instead of defaulting to English.
 - Service inference guard: when recent customer turns are generic greetings/acknowledgements without a clear service clue, extraction must keep `service_type = null` (do not infer solely from profile text).
+- Cross-language service acceptance: when recent customer turns contain a concrete service clue that aligns with approved profile/service signals, keep inferred `service_type` even if model output language differs from customer text (for example, customer TR + inferred EN).
+- Service canonicalization: when inferred service matches catalog aliases in another language, persist `service_type` as the approved catalog `name` (catalog/UI language source of truth).
 - Insufficient-information conversations (e.g., greeting-only/unclear short turns with no qualifying signals) are marked as `undetermined`.
 - Greeting-only turns are normalized to `undetermined` even if raw model output marks `non_business=true`, preventing false `ignored` statuses on first-contact hellos.
 - Extraction locale precedence is deterministic: explicit preferred locale (UI/manual refresh) > organization locale > customer-message language heuristics.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
 - Leads list required-field columns/cards use the same required-intake resolver as Inbox details so `required_intake_collected` values stay consistent across both surfaces.
+- Leads service column/cards show AI-extracted `services[]` values from `extracted_fields.services`; if empty, UI falls back to `service_type`.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
 - Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
 - Non-business conversations are excluded from lead scoring and marked as `ignored` (not `undetermined`).
@@ -237,10 +244,10 @@ Customer Message → Skill Match? → Yes → Skill Response
 - `switch_to_operator`: lock conversation to operator (`active_agent='operator'`)
 
 **Bot Message (Handover):**
-- Escalation appends a handover message after AI response.
+- Handover message is appended only when escalation switches the conversation to operator (`switch_to_operator`) or when a skill forces handover.
 - Handover message is locale-aware (TR/EN in AI Settings; UI locale selects which message is edited/shown).
 - Legacy/default mismatch repair ensures TR UI does not show EN default handover text.
-- `notify_only` does not suppress subsequent AI replies; only `switch_to_operator` toggles runtime AI silence via `active_agent`.
+- `notify_only` keeps AI active and does not emit a customer-facing handover promise; only `switch_to_operator` toggles runtime AI silence via `active_agent`.
 
 **Skill Override Rule (validated):**
 - Skill-triggered handover always uses `switch_to_operator` + `assistant_promise`.
@@ -360,6 +367,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Customer bubbles are explicitly labeled (`Müşteri` / `Customer`) to clarify that shown messages are incoming customer text in the simulation.
 - Organization: company name and future org-level defaults
 - Organization settings include interface language selection (TR/EN); dedicated General settings is hidden from navigation and legacy `/settings/general` redirects to `/settings/organization`.
+- Organization settings language selector is positioned near the lower section (just above data deletion) and locale option buttons use content-hug sizing.
 - Mobile Settings navigation now opens with a dedicated settings list page first, then transitions to selected detail pages with an explicit back action.
 - Mobile Settings back action uses client-side route transition (not full-page refresh) to keep mobile flow stable.
 - Desktop Settings keeps the inner settings sidebar persistent across sub-route navigation; only the detail pane content swaps and shows loading states.
@@ -544,6 +552,10 @@ MVP is successful when:
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
 - **Usage Source of Truth:** `Settings > Usage` credit totals are read from `organization_credit_ledger` usage-debit records (not token-to-credit previews) to stay consistent with plan consumption.
 - **Premium Usage Debit Trigger Safety (Implementation v1.13):** `handle_ai_usage_credit_debit` must cast premium-branch `credit_pool` CASE outputs to `billing_credit_pool_type` enum to avoid `42804` insert failures that would silently stop `organization_ai_usage` writes and conversation credit accumulation.
+- **Notify-Only Escalation UX Safety (Implementation v1.13):** Hot-lead `notify_only` must not send customer-facing handover promise text; assistant promise messaging is reserved for operator-switch escalations (including skill-forced handovers).
+- **Cross-Language Service Inference Safety (Implementation v1.13):** `service_type` acceptance must include profile-signal matching from customer turns so bilingual extraction output (customer TR, inferred EN) does not drop valid service intent to `Unknown`.
+- **Catalog Canonical Service Persistence (Implementation v1.14):** If inferred `service_type` matches catalog aliases, persist the catalog `name` as canonical value so lead service reporting follows approved org service labels.
+- **MVP Reply Language Safety (Implementation v1.14):** RAG/fallback reply prompts must enforce `Turkish` for Turkish customer messages, otherwise `English`, to keep outbound response language aligned with customer input.
 - **Usage Month Window:** Usage monthly grouping uses calendar month in `Europe/Istanbul` to match business-facing monthly reporting expectations.
 - **Font Strategy (Initial):** Use system fonts in the app shell to avoid build-time Google Fonts fetches in CI.
 - **Font Update:** Adopt Plus Jakarta Sans as a self-hosted local font (`public/fonts/plus-jakarta-sans`) and remove Google Fonts CSS `@import` to avoid runtime external font fetching.
@@ -586,6 +598,7 @@ MVP is successful when:
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
+- **Knowledge Base QA Fixture Strategy (Implementation v1.15):** Keep domain-specific KB fixture documents with explicit expected extraction outputs (`Hizmet Profili`, `Gerekli Bilgiler`, `Hizmet listesi`) so non-regression checks can be run manually on real content samples; first fixture path is `docs/kb-fixtures/2026-02-dis-klinigi-kb-cikartim-test-fixture.md`.
 - **Chunk Overlap Alignment:** Overlap prefers paragraph/sentence boundaries and drops overlap when it would exceed max tokens.
 - **i18n Enforcement:** Automated checks for hardcoded UI strings and EN/TR key parity wired into lint.
 - **Billing Terminology (TR):** All user-facing Turkish billing/paywall copy uses `Ücretsiz deneme` wording instead of `Trial`.
@@ -688,11 +701,13 @@ MVP is successful when:
 - **Inbox Lead Payload Normalization:** Normalize nested one-to-one `leads` relation payloads to a stable array shape during conversation-list reads so chip rendering is consistent after page reloads.
 - **Inbox Realtime Auth Sync:** Bootstrap realtime auth from session, fall back to `refreshSession()` when missing, and re-apply tokens on auth state changes to avoid stale subscriptions.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
+- **Inbox Summary Threshold:** Enable summary when there are at least `3` customer messages; bot message is optional.
 - **Inbox Summary Reopen Behavior:** Closing and re-opening the summary panel should trigger a fresh summary generation (without requiring manual refresh).
 - **Inbox WhatsApp Replyability UX (MVP):** For WhatsApp conversations, show a far-right status indicator (`reply available` / `reply unavailable`) on the summary row; when blocked, show reason via tooltip and lock composer/send with a short overlay notice.
 - **Inbox Agent-State Rule (MVP):** WhatsApp 24-hour send lock must not mutate `active_agent`; conversation control state remains unchanged.
 - **Inbox Scroll-to-Latest CTA:** Show an animated jump-to-latest button only when chat is away from bottom; anchor it on the composer divider with subtle gray styling.
 - **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
+- **Inbox Assistant Banner Style Parity:** Active assistant banner should use the same spacing/icon/text hierarchy as inactive banner for visual consistency (keep existing active/inactive colors unchanged).
 - **Inbox List Header Surface:** Keep the Inbox conversation-list header on the same surface tone as the list column (non-white) for consistent sidebar visuals across dashboard modules.
 - **Inbox Conversation Switch Loading:** Track selected-thread id separately from loaded-thread id and render skeletons during switches so avatar/details do not update against stale previous-thread messages.
 - **Mobile Inbox Flow:** On mobile, keep Inbox as app-style single-pane navigation (`list -> conversation`), with an explicit back action and a header details toggle for compact contact/lead visibility.
@@ -766,7 +781,10 @@ MVP is successful when:
 - **Lead Scoring Transparency:** Weight decisive booking intent higher (+3), add keyword fallback for intent signals, and expose on-demand score reasoning grounded in extracted inputs.
 - **Lead Score UX:** Reasoning copy respects the active UI locale and uses localized status labels.
 - **Required-Info Display Parity:** Lead list required-field rows/cards must reuse the Inbox required-intake resolver so `required_intake_collected` and fallback values stay consistent across both views.
-- **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and require admin approval before the service can be used in extraction.
+- **Service Catalog (Hybrid):** Auto-propose services from Skills/KB and add them directly to the active service list when Service List AI mode is enabled.
+- **Service Candidate Generation (AI):** When Service List AI mode is enabled, extract one or more candidate services from Skill/Knowledge content and auto-apply them without manual review queue.
+- **Multi-Service Extraction:** Lead extraction can capture one or many services in `services[]`; all accepted values are canonicalized to the approved service catalog names when aliases/language variants match.
+- **Service List UI (MVP):** Organization Settings includes an editable service-chip list (manual add/remove), per-org AI service-generation toggle, and AI-origin tags (no approve/reject actions).
 - **Offering Profile (Catalog Optional):** Maintain an editable service scope summary used when a catalog is absent or incomplete; AI suggestions are generated from Skills/KB in org language using a hybrid format (intro + up to 5 bullets), start pending, can propose updates to existing approved suggestions, and only approved suggestions are used for extraction.
 - **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.
 - **Offering Profile Context:** Suggestion generation includes the manual summary plus approved/rejected suggestion history for better alignment.

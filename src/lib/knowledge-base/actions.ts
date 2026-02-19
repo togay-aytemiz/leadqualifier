@@ -4,9 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { chunkText } from '@/lib/knowledge-base/chunking'
 import {
+    appendServiceCatalogCandidates,
     appendOfferingProfileSuggestion,
-    appendRequiredIntakeFields,
-    proposeServiceCandidate
+    appendRequiredIntakeFields
 } from '@/lib/leads/offering-profile'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
@@ -251,11 +251,11 @@ export async function processKnowledgeDocument(
         const profileContent = buildProfileContextContent(finalDoc.title, finalDoc.content)
 
         try {
-            await proposeServiceCandidate({
+            await appendServiceCatalogCandidates({
                 organizationId: finalDoc.organization_id,
                 sourceType: 'knowledge',
                 sourceId: finalDoc.id,
-                name: finalDoc.title,
+                content: profileContent,
                 supabase
             })
         } catch (error) {

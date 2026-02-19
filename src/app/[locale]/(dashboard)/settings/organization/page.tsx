@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { getLocale, getTranslations } from 'next-intl/server'
 import OrganizationSettingsClient from './OrganizationSettingsClient'
-import { getOfferingProfile, getOfferingProfileSuggestions } from '@/lib/leads/settings'
+import {
+    getOfferingProfile,
+    getOfferingProfileSuggestions,
+    getServiceCandidates,
+    getServiceCatalogItems
+} from '@/lib/leads/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
@@ -32,14 +37,22 @@ export default async function OrganizationSettingsPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const [{ data: organization }, offeringProfile, offeringProfileSuggestions] = await Promise.all([
+    const [
+        { data: organization },
+        offeringProfile,
+        offeringProfileSuggestions,
+        serviceCatalogItems,
+        serviceCandidates
+    ] = await Promise.all([
         supabase
             .from('organizations')
             .select('name')
             .eq('id', organizationId)
             .single(),
         getOfferingProfile(organizationId),
-        getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true })
+        getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true }),
+        getServiceCatalogItems(organizationId),
+        getServiceCandidates(organizationId)
     ])
 
     return (
@@ -48,6 +61,8 @@ export default async function OrganizationSettingsPage() {
             organizationId={organizationId}
             offeringProfile={offeringProfile}
             offeringProfileSuggestions={offeringProfileSuggestions}
+            serviceCatalogItems={serviceCatalogItems}
+            serviceCandidates={serviceCandidates}
             isReadOnly={orgContext?.readOnlyTenantMode ?? false}
         />
     )

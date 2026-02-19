@@ -939,8 +939,7 @@ export function InboxContainer({
     const isComposerDisabled = isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked
     const canSend = !!input.trim() && !isSending && !isComposerDisabled
     const contactMessageCount = visibleMessages.filter(m => m.sender_type === 'contact').length
-    const hasBotMessage = visibleMessages.some(m => m.sender_type === 'bot')
-    const canSummarize = contactMessageCount >= 5 && hasBotMessage
+    const canSummarize = contactMessageCount >= 3
     const summaryHeaderDisabled = !canSummarize
     const summaryRefreshDisabled = !canSummarize || summaryStatus === 'loading'
     const showSummaryRefresh = isSummaryOpen && (summaryStatus === 'success' || summaryStatus === 'error')
@@ -1344,37 +1343,33 @@ export function InboxContainer({
 
                             {assistantBanner && (
                                 <div
-                                    className={`mb-3 rounded-xl flex items-center ${
+                                    className={`mb-3 rounded-xl flex items-center gap-2 border px-3 py-2 ${
                                         assistantBanner.tone === 'inactive'
-                                            ? 'gap-2 border border-slate-200 bg-slate-50 px-3 py-2'
-                                            : 'gap-3 border border-yellow-200 bg-yellow-50 px-4 py-3'
+                                            ? 'border-slate-200 bg-slate-50'
+                                            : 'border-yellow-200 bg-yellow-50'
                                     }`}
                                 >
                                     <div
-                                        className={`${assistantBanner.tone === 'inactive' ? 'h-8 w-8' : 'h-9 w-9'} rounded-full border flex items-center justify-center shrink-0 ${
+                                        className={`h-8 w-8 rounded-full border flex items-center justify-center shrink-0 ${
                                             assistantBanner.tone === 'inactive'
                                                 ? 'bg-slate-100 border-slate-200 text-slate-600'
                                                 : 'bg-yellow-100 border-yellow-200 text-yellow-700'
                                         }`}
                                     >
-                                        <Bot size={assistantBanner.tone === 'inactive' ? 16 : 18} />
+                                        <Bot size={16} />
                                     </div>
                                     <div
                                         className={`min-w-0 ${
                                             assistantBanner.tone === 'inactive' ? 'text-slate-800' : 'text-yellow-900'
                                         }`}
                                     >
-                                        {assistantBanner.tone === 'inactive' ? (
-                                            <>
-                                                <p className="text-base font-semibold leading-5 whitespace-nowrap">{t(assistantBanner.titleKey)}</p>
-                                                <p className="text-xs leading-4 text-slate-700">{t(assistantBanner.bodyKey)}</p>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="font-semibold">{t(assistantBanner.titleKey)}</span>
-                                                <span className="ml-1 text-yellow-800">{t(assistantBanner.bodyKey)}</span>
-                                            </>
-                                        )}
+                                        <p className="text-base font-semibold leading-5 whitespace-nowrap">{t(assistantBanner.titleKey)}</p>
+                                        <p className={`text-xs leading-4 ${
+                                            assistantBanner.tone === 'inactive' ? 'text-slate-700' : 'text-yellow-800'
+                                        }`}
+                                        >
+                                            {t(assistantBanner.bodyKey)}
+                                        </p>
                                     </div>
                                 </div>
                             )}

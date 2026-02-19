@@ -9,6 +9,8 @@ import {
     filterMissingIntakeFields,
     mergeIntakeFields,
     normalizeIntakeFields,
+    normalizeServiceCatalogNames,
+    parseServiceCandidatesPayload,
     parseRequiredIntakeFieldsPayload,
     parseSuggestionPayload
 } from '@/lib/leads/offering-profile-utils'
@@ -77,6 +79,15 @@ Do not repeat existing fields.
 Keep each field short (1 to 4 words), customer-facing, and specific.
 Avoid generic fields like "other details".
 Return ONLY JSON in this format: { "required_fields": string[] }`
+
+const buildServiceCatalogCandidatesPrompt = (language: string) => `You extract service names from business content.
+Write service names in ${language}.
+Use only explicit service offerings in the provided content.
+Do not include policies, prices, schedules, or generic headings.
+Do not repeat existing catalog services.
+Return 1 to 12 service names when present.
+If no clear service is found, return an empty array.
+Return ONLY JSON in this format: { "services": string[] }`
 
 async function recordSuggestionUsage(options: {
     organizationId: string
@@ -147,6 +158,43 @@ async function recordRequiredFieldsUsage(options: {
             outputTokens,
             totalTokens: promptTokens + outputTokens,
             metadata: { source: 'required_intake_fields', source_type: sourceType },
+            supabase
+        })
+    }
+}
+
+async function recordServiceCatalogCandidatesUsage(options: {
+    organizationId: string
+    supabase: SupabaseClientLike
+    systemPrompt: string
+    userPrompt: string
+    response: string
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null
+    sourceType: 'skill' | 'knowledge'
+}) {
+    const { organizationId, supabase, systemPrompt, userPrompt, response, usage, sourceType } = options
+    if (usage) {
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_extraction',
+            model: 'gpt-4o-mini',
+            inputTokens: usage.prompt_tokens ?? 0,
+            outputTokens: usage.completion_tokens ?? 0,
+            totalTokens: usage.total_tokens ?? 0,
+            metadata: { source: 'service_catalog_candidates', source_type: sourceType },
+            supabase
+        })
+    } else {
+        const promptTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(userPrompt)
+        const outputTokens = estimateTokenCount(response)
+        await recordAiUsage({
+            organizationId,
+            category: 'lead_extraction',
+            model: 'gpt-4o-mini',
+            inputTokens: promptTokens,
+            outputTokens,
+            totalTokens: promptTokens + outputTokens,
+            metadata: { source: 'service_catalog_candidates', source_type: sourceType },
             supabase
         })
     }
@@ -396,6 +444,97 @@ export async function appendRequiredIntakeFields(options: {
     return missingFields
 }
 
+export async function appendServiceCatalogCandidates(options: {
+    organizationId: string
+    sourceType: 'skill' | 'knowledge'
+    sourceId?: string | null
+    content: string
+    supabase?: SupabaseClientLike
+}) {
+    const supabase = options.supabase ?? await createClient()
+
+    const { data: profile } = await supabase
+        .from('offering_profiles')
+        .select('catalog_enabled, service_catalog_ai_enabled, ai_suggestions_locale')
+        .eq('organization_id', options.organizationId)
+        .maybeSingle()
+
+    if (!profile) return []
+    if (profile.catalog_enabled === false) return []
+    if (profile.service_catalog_ai_enabled === false) return []
+    if (!process.env.OPENAI_API_KEY) return []
+
+    const locale = profile.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
+    const language = resolveSuggestionLanguage(locale)
+    const systemPrompt = buildServiceCatalogCandidatesPrompt(language)
+
+    const [{ data: catalogRows }, { data: pendingRows }] = await Promise.all([
+        supabase
+            .from('service_catalog')
+            .select('name')
+            .eq('organization_id', options.organizationId),
+        supabase
+            .from('service_candidates')
+            .select('proposed_name')
+            .eq('organization_id', options.organizationId)
+            .in('status', ['pending', 'approved'])
+    ])
+
+    const existingServices = normalizeServiceCatalogNames([
+        ...(catalogRows ?? []).map((row: { name?: string | null }) => row.name ?? ''),
+        ...(pendingRows ?? []).map((row: { proposed_name?: string | null }) => row.proposed_name ?? '')
+    ])
+
+    const existingBlock = existingServices.length > 0
+        ? existingServices.map((service) => `- ${service}`).join('\n')
+        : 'none'
+
+    const userPrompt = `New content:\n${options.content}\n\nExisting services:\n${existingBlock}`
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 220,
+        response_format: { type: 'json_object' },
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ]
+    })
+
+    const response = completion.choices[0]?.message?.content?.trim()
+    if (!response) return []
+
+    await recordServiceCatalogCandidatesUsage({
+        organizationId: options.organizationId,
+        supabase,
+        systemPrompt,
+        userPrompt,
+        response,
+        usage: completion.usage,
+        sourceType: options.sourceType
+    })
+
+    const parsedServices = parseServiceCandidatesPayload(response)
+    if (!parsedServices || parsedServices.length === 0) return []
+
+    const newServices = parsedServices.filter((service) => isNewCandidate(service, existingServices))
+    if (newServices.length === 0) return []
+
+    for (const service of newServices) {
+        await proposeServiceCandidate({
+            organizationId: options.organizationId,
+            sourceType: options.sourceType,
+            sourceId: options.sourceId ?? null,
+            name: service,
+            supabase
+        })
+    }
+
+    return newServices
+}
+
 export async function generateInitialOfferingSuggestion(options: {
     organizationId: string
     skipExistingCheck?: boolean
@@ -458,6 +597,55 @@ export async function generateInitialOfferingSuggestion(options: {
     })
 }
 
+async function ensureServiceCatalogItemActive(options: {
+    organizationId: string
+    name: string
+    supabase: SupabaseClientLike
+}) {
+    const normalizedName = normalizeServiceName(options.name)
+    if (!normalizedName) return
+
+    const { data: existingCatalog, error: existingCatalogError } = await options.supabase
+        .from('service_catalog')
+        .select('id, name, active')
+        .eq('organization_id', options.organizationId)
+
+    if (existingCatalogError) {
+        throw new Error(`Failed to read service catalog for auto-add: ${existingCatalogError.message}`)
+    }
+
+    const existingMatch = (existingCatalog ?? []).find((item: { name?: string | null }) =>
+        normalizeServiceName(item.name ?? '') === normalizedName
+    ) as { id: string; active: boolean } | undefined
+
+    if (!existingMatch) {
+        const { error: insertError } = await options.supabase
+            .from('service_catalog')
+            .insert({
+                organization_id: options.organizationId,
+                name: options.name.trim(),
+                aliases: [],
+                active: true
+            })
+
+        if (insertError) {
+            throw new Error(`Failed to auto-add service catalog item: ${insertError.message}`)
+        }
+        return
+    }
+
+    if (existingMatch.active) return
+
+    const { error: activateError } = await options.supabase
+        .from('service_catalog')
+        .update({ active: true })
+        .eq('id', existingMatch.id)
+
+    if (activateError) {
+        throw new Error(`Failed to reactivate service catalog item: ${activateError.message}`)
+    }
+}
+
 export async function proposeServiceCandidate(options: {
     organizationId: string
     sourceType: 'skill' | 'knowledge'
@@ -471,11 +659,12 @@ export async function proposeServiceCandidate(options: {
 
     const { data: profile } = await supabase
         .from('offering_profiles')
-        .select('catalog_enabled')
+        .select('catalog_enabled, service_catalog_ai_enabled')
         .eq('organization_id', options.organizationId)
         .maybeSingle()
 
     if (profile && profile.catalog_enabled === false) return
+    if (profile && profile.service_catalog_ai_enabled === false) return
 
     const { data: existingCatalog } = await supabase
         .from('service_catalog')
@@ -486,7 +675,7 @@ export async function proposeServiceCandidate(options: {
         .from('service_candidates')
         .select('proposed_name')
         .eq('organization_id', options.organizationId)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'approved'])
 
     const existing = [
         ...(existingCatalog ?? []).map((row: { name?: string | null }) => row.name ?? ''),
@@ -495,11 +684,24 @@ export async function proposeServiceCandidate(options: {
 
     if (!isNewCandidate(options.name, existing)) return
 
-    await supabase.from('service_candidates').insert({
+    const reviewedAt = new Date().toISOString()
+    const { error: candidateError } = await supabase.from('service_candidates').insert({
         organization_id: options.organizationId,
         source_type: options.sourceType,
         source_id: options.sourceId ?? null,
         proposed_name: options.name,
-        status: 'pending'
+        status: 'approved',
+        reviewed_at: reviewedAt,
+        reviewed_by: null
+    })
+
+    if (candidateError) {
+        throw new Error(`Failed to auto-approve service candidate: ${candidateError.message}`)
+    }
+
+    await ensureServiceCatalogItemActive({
+        organizationId: options.organizationId,
+        name: options.name,
+        supabase
     })
 }

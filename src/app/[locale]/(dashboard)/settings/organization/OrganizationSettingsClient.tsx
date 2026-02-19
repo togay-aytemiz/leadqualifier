@@ -8,20 +8,22 @@ import { Button, Modal, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { transformPendingHrefForLocale } from '@/components/settings/localeHref'
 import { deleteOrganizationDataSelfServe, type DeleteOrganizationDataResult, updateOrganizationName } from '@/lib/organizations/actions'
-import type { OfferingProfile, OfferingProfileSuggestion } from '@/types/database'
+import type { OfferingProfile, OfferingProfileSuggestion, ServiceCandidate, ServiceCatalogItem } from '@/types/database'
 import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
 import { RequiredIntakeFieldsSection } from '@/components/settings/RequiredIntakeFieldsSection'
+import { ServiceCatalogSection } from '@/components/settings/ServiceCatalogSection'
 import {
     archiveOfferingProfileSuggestion,
     generateOfferingProfileSuggestions,
     getOfferingProfileSuggestions,
+    syncServiceCatalogItems,
     syncOfferingProfileSummary,
     updateOfferingProfileLocaleForUser,
     updateOfferingProfileSuggestionStatus,
     updateOfferingProfileSummary
 } from '@/lib/leads/settings'
 import { mergeOfferingProfileItems, serializeOfferingProfileItems } from '@/lib/leads/offering-profile-content'
-import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
+import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 
@@ -30,6 +32,8 @@ interface OrganizationSettingsClientProps {
     organizationId: string
     offeringProfile: OfferingProfile | null
     offeringProfileSuggestions: OfferingProfileSuggestion[]
+    serviceCatalogItems: ServiceCatalogItem[]
+    serviceCandidates: ServiceCandidate[]
     isReadOnly?: boolean
 }
 
@@ -38,6 +42,8 @@ export default function OrganizationSettingsClient({
     organizationId,
     offeringProfile,
     offeringProfileSuggestions: initialSuggestions,
+    serviceCatalogItems: initialServiceCatalogItemsData,
+    serviceCandidates: initialServiceCandidatesData,
     isReadOnly = false
 }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
@@ -51,6 +57,9 @@ export default function OrganizationSettingsClient({
     const autoOpenOfferingSuggestions = searchParams.get('focus') === 'offering-suggestions'
     const initialRequiredFields = normalizeIntakeFields(offeringProfile?.required_intake_fields ?? [])
     const initialRequiredFieldsAi = normalizeIntakeFields(offeringProfile?.required_intake_fields_ai ?? [])
+    const initialServiceCatalogItems = normalizeServiceCatalogNames(
+        (initialServiceCatalogItemsData ?? []).map((item) => item.name)
+    )
 
     const [baseline, setBaseline] = useState({
         name: initialName,
@@ -58,9 +67,11 @@ export default function OrganizationSettingsClient({
         profileSummary: offeringProfile?.summary ?? '',
         manualProfileNote: offeringProfile?.manual_profile_note ?? '',
         offeringProfileAiEnabled: offeringProfile?.ai_suggestions_enabled ?? false,
+        serviceCatalogAiEnabled: offeringProfile?.service_catalog_ai_enabled ?? true,
         requiredIntakeFieldsAiEnabled: offeringProfile?.required_intake_fields_ai_enabled ?? true,
         requiredIntakeFields: initialRequiredFields,
-        requiredIntakeFieldsAi: initialRequiredFieldsAi
+        requiredIntakeFieldsAi: initialRequiredFieldsAi,
+        serviceCatalogItems: initialServiceCatalogItems
     })
 
     const [name, setName] = useState(initialName)
@@ -68,9 +79,14 @@ export default function OrganizationSettingsClient({
     const [profileSummary, setProfileSummary] = useState(offeringProfile?.summary ?? '')
     const [manualProfileNote, setManualProfileNote] = useState(offeringProfile?.manual_profile_note ?? '')
     const [offeringProfileAiEnabled, setOfferingProfileAiEnabled] = useState(offeringProfile?.ai_suggestions_enabled ?? false)
+    const [serviceCatalogAiEnabled, setServiceCatalogAiEnabled] = useState(offeringProfile?.service_catalog_ai_enabled ?? true)
     const [requiredIntakeFieldsAiEnabled, setRequiredIntakeFieldsAiEnabled] = useState(offeringProfile?.required_intake_fields_ai_enabled ?? true)
     const [requiredIntakeFields, setRequiredIntakeFields] = useState(initialRequiredFields)
     const [requiredIntakeFieldsAi, setRequiredIntakeFieldsAi] = useState(initialRequiredFieldsAi)
+    const [serviceCatalogItems, setServiceCatalogItems] = useState(initialServiceCatalogItems)
+    const [serviceCandidates, setServiceCandidates] = useState(
+        initialServiceCandidatesData.map((item) => ({ ...item, status: item.status ?? 'pending' }))
+    )
     const [suggestions, setSuggestions] = useState(() => initialSuggestions.map((item) => ({
         ...item,
         status: item.status ?? 'pending'
@@ -99,6 +115,18 @@ export default function OrganizationSettingsClient({
         )
     }, [normalizedRequiredIntakeFields, requiredIntakeFieldsAi])
 
+    const normalizedServiceCatalogItems = useMemo(() => {
+        return normalizeServiceCatalogNames(serviceCatalogItems)
+    }, [serviceCatalogItems])
+
+    const approvedAiServiceNames = useMemo(() => {
+        return normalizeServiceCatalogNames(
+            serviceCandidates
+                .filter((candidate) => candidate.status !== 'rejected')
+                .map((candidate) => candidate.proposed_name)
+        )
+    }, [serviceCandidates])
+
     const isDirty = useMemo(() => {
         return (
             name !== baseline.name ||
@@ -106,9 +134,11 @@ export default function OrganizationSettingsClient({
             profileSummary !== baseline.profileSummary ||
             manualProfileNote !== baseline.manualProfileNote ||
             offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
+            serviceCatalogAiEnabled !== baseline.serviceCatalogAiEnabled ||
             requiredIntakeFieldsAiEnabled !== baseline.requiredIntakeFieldsAiEnabled ||
             normalizedRequiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
-            normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|')
+            normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|') ||
+            normalizedServiceCatalogItems.join('|') !== baseline.serviceCatalogItems.join('|')
         )
     }, [
         name,
@@ -116,9 +146,11 @@ export default function OrganizationSettingsClient({
         profileSummary,
         manualProfileNote,
         offeringProfileAiEnabled,
+        serviceCatalogAiEnabled,
         requiredIntakeFieldsAiEnabled,
         normalizedRequiredIntakeFields,
         normalizedRequiredIntakeFieldsAi,
+        normalizedServiceCatalogItems,
         baseline
     ])
 
@@ -126,6 +158,7 @@ export default function OrganizationSettingsClient({
         const nextSummary = offeringProfile?.summary ?? ''
         const nextManualProfileNote = offeringProfile?.manual_profile_note ?? ''
         const nextOfferingProfileAiEnabled = offeringProfile?.ai_suggestions_enabled ?? false
+        const nextServiceCatalogAiEnabled = offeringProfile?.service_catalog_ai_enabled ?? true
         const nextRequiredIntakeFieldsAiEnabled = offeringProfile?.required_intake_fields_ai_enabled ?? true
         const nextRequiredFields = normalizeIntakeFields(offeringProfile?.required_intake_fields ?? [])
         const nextRequiredFieldsAi = normalizeIntakeFields(offeringProfile?.required_intake_fields_ai ?? [])
@@ -133,6 +166,7 @@ export default function OrganizationSettingsClient({
         setProfileSummary(nextSummary)
         setManualProfileNote(nextManualProfileNote)
         setOfferingProfileAiEnabled(nextOfferingProfileAiEnabled)
+        setServiceCatalogAiEnabled(nextServiceCatalogAiEnabled)
         setRequiredIntakeFieldsAiEnabled(nextRequiredIntakeFieldsAiEnabled)
         setRequiredIntakeFields(nextRequiredFields)
         setRequiredIntakeFieldsAi(nextRequiredFieldsAi)
@@ -141,6 +175,7 @@ export default function OrganizationSettingsClient({
             profileSummary: nextSummary,
             manualProfileNote: nextManualProfileNote,
             offeringProfileAiEnabled: nextOfferingProfileAiEnabled,
+            serviceCatalogAiEnabled: nextServiceCatalogAiEnabled,
             requiredIntakeFieldsAiEnabled: nextRequiredIntakeFieldsAiEnabled,
             requiredIntakeFields: nextRequiredFields,
             requiredIntakeFieldsAi: nextRequiredFieldsAi
@@ -154,6 +189,26 @@ export default function OrganizationSettingsClient({
             status: item.status ?? 'pending'
         })))
     }, [initialSuggestions])
+
+    useEffect(() => {
+        const nextServices = normalizeServiceCatalogNames(
+            (initialServiceCatalogItemsData ?? []).map((item) => item.name)
+        )
+        setServiceCatalogItems(nextServices)
+        setBaseline((prev) => ({
+            ...prev,
+            serviceCatalogItems: nextServices
+        }))
+    }, [initialServiceCatalogItemsData])
+
+    useEffect(() => {
+        setServiceCandidates(
+            initialServiceCandidatesData.map((item) => ({
+                ...item,
+                status: item.status ?? 'pending'
+            }))
+        )
+    }, [initialServiceCandidatesData])
 
     useEffect(() => {
         setSelectedLocale(locale)
@@ -245,11 +300,14 @@ export default function OrganizationSettingsClient({
             const effectiveSummary = offeringProfileAiEnabled
                 ? deriveSummaryFromApprovedSuggestions(suggestions, manualProfileNote)
                 : profileSummary
+            const serviceCatalogChanged = normalizedServiceCatalogItems.join('|') !== baseline.serviceCatalogItems.join('|')
+            const serviceCatalogAiSettingChanged = serviceCatalogAiEnabled !== baseline.serviceCatalogAiEnabled
 
             if (
                 effectiveSummary !== baseline.profileSummary ||
                 manualProfileNote !== baseline.manualProfileNote ||
                 offeringProfileAiEnabled !== baseline.offeringProfileAiEnabled ||
+                serviceCatalogAiSettingChanged ||
                 requiredIntakeFieldsAiEnabled !== baseline.requiredIntakeFieldsAiEnabled ||
                 normalizedRequiredIntakeFields.join('|') !== baseline.requiredIntakeFields.join('|') ||
                 normalizedRequiredIntakeFieldsAi.join('|') !== baseline.requiredIntakeFieldsAi.join('|')
@@ -259,6 +317,7 @@ export default function OrganizationSettingsClient({
                     effectiveSummary,
                     manualProfileNote,
                     offeringProfileAiEnabled,
+                    serviceCatalogAiEnabled,
                     requiredIntakeFieldsAiEnabled,
                     nextLocale,
                     normalizedRequiredIntakeFields,
@@ -266,6 +325,10 @@ export default function OrganizationSettingsClient({
                     { generateInitialSuggestion: offeringProfileAiEnabled && !baseline.offeringProfileAiEnabled }
                 )
                 await refreshSuggestions(nextLocale)
+            }
+
+            if (serviceCatalogChanged) {
+                await syncServiceCatalogItems(organizationId, normalizedServiceCatalogItems)
             }
 
             setProfileSummary(effectiveSummary)
@@ -276,9 +339,11 @@ export default function OrganizationSettingsClient({
                 profileSummary: effectiveSummary,
                 manualProfileNote,
                 offeringProfileAiEnabled,
+                serviceCatalogAiEnabled,
                 requiredIntakeFieldsAiEnabled,
                 requiredIntakeFields: normalizedRequiredIntakeFields,
-                requiredIntakeFieldsAi: normalizedRequiredIntakeFieldsAi
+                requiredIntakeFieldsAi: normalizedRequiredIntakeFieldsAi,
+                serviceCatalogItems: normalizedServiceCatalogItems
             })
             setSaved(true)
 
@@ -295,6 +360,7 @@ export default function OrganizationSettingsClient({
             if (
                 message.includes('required_intake_fields') ||
                 message.includes('ai_suggestions_enabled') ||
+                message.includes('service_catalog_ai_enabled') ||
                 message.includes('offering_profiles')
             ) {
                 setSaveError(t('saveErrorMigration'))
@@ -362,9 +428,11 @@ export default function OrganizationSettingsClient({
         setProfileSummary(baseline.profileSummary)
         setManualProfileNote(baseline.manualProfileNote)
         setOfferingProfileAiEnabled(baseline.offeringProfileAiEnabled)
+        setServiceCatalogAiEnabled(baseline.serviceCatalogAiEnabled)
         setRequiredIntakeFieldsAiEnabled(baseline.requiredIntakeFieldsAiEnabled)
         setRequiredIntakeFields(baseline.requiredIntakeFields)
         setRequiredIntakeFieldsAi(baseline.requiredIntakeFieldsAi)
+        setServiceCatalogItems(baseline.serviceCatalogItems)
         setSaveError(null)
         setSaved(false)
     }
@@ -468,44 +536,6 @@ export default function OrganizationSettingsClient({
                 </div>
 
                 <div className="max-w-5xl">
-                    <SettingsSection title={t('languageTitle')} description={t('languageDescription')}>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedLocale('en')}
-                                className={`rounded-lg border p-4 text-left transition-colors ${selectedLocale === 'en'
-                                    ? 'border-blue-500 bg-blue-50/50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
-                                        }`}>
-                                        {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{t('languageEnglish')}</span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setSelectedLocale('tr')}
-                                className={`rounded-lg border p-4 text-left transition-colors ${selectedLocale === 'tr'
-                                    ? 'border-blue-500 bg-blue-50/50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
-                                        }`}>
-                                        {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{t('languageTurkish')}</span>
-                                </div>
-                            </button>
-                        </div>
-                    </SettingsSection>
-
                     <SettingsSection title={t('nameTitle')} description={t('nameDescription')}>
                         <input
                             type="text"
@@ -531,6 +561,14 @@ export default function OrganizationSettingsClient({
                         isGeneratingSuggestions={isGeneratingSuggestions}
                     />
 
+                    <ServiceCatalogSection
+                        services={normalizedServiceCatalogItems}
+                        aiServices={approvedAiServiceNames}
+                        aiSuggestionsEnabled={serviceCatalogAiEnabled}
+                        onAiSuggestionsEnabledChange={setServiceCatalogAiEnabled}
+                        onServicesChange={(services) => setServiceCatalogItems(normalizeServiceCatalogNames(services))}
+                    />
+
                     <RequiredIntakeFieldsSection
                         fields={requiredIntakeFields}
                         aiFields={normalizedRequiredIntakeFieldsAi}
@@ -539,6 +577,40 @@ export default function OrganizationSettingsClient({
                         onFieldsChange={(fields) => setRequiredIntakeFields(normalizeIntakeFields(fields))}
                         onAiFieldsChange={setRequiredIntakeFieldsAi}
                     />
+
+                    <SettingsSection title={t('languageTitle')} description={t('languageDescription')}>
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedLocale('en')}
+                                className={`inline-flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${selectedLocale === 'en'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
+                                    }`}>
+                                    {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">{t('languageEnglish')}</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setSelectedLocale('tr')}
+                                className={`inline-flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${selectedLocale === 'tr'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
+                                    }`}>
+                                    {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">{t('languageTurkish')}</span>
+                            </button>
+                        </div>
+                    </SettingsSection>
 
                     <SettingsSection
                         title={t('dataDeletionTitle')}

@@ -239,7 +239,18 @@ function createConversation(overrides: Record<string, unknown> = {}) {
     }
 }
 
-function buildInput(supabase: unknown, sendOutbound: ReturnType<typeof vi.fn>) {
+function buildInput(
+    supabase: unknown,
+    sendOutbound: ReturnType<typeof vi.fn>,
+    overrides: Partial<ReturnType<typeof buildInputBase>> = {}
+) {
+    return {
+        ...buildInputBase(supabase, sendOutbound),
+        ...overrides
+    }
+}
+
+function buildInputBase(supabase: unknown, sendOutbound: ReturnType<typeof vi.fn>) {
     return {
         supabase: supabase as never,
         organizationId: 'org-1',
@@ -485,7 +496,43 @@ describe('processInboundAiPipeline guardrails', () => {
                 max_tokens: 320
             })
         )
+        const ragRequest = openAiCreateMock.mock.calls[0]?.[0] as { messages?: Array<{ role: string; content: string }> } | undefined
+        const systemPrompt = ragRequest?.messages?.find((item) => item.role === 'system')?.content ?? ''
+        expect(systemPrompt).toContain('Reply language policy (MVP): use Turkish only.')
         expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('passes English preference to fallback when inbound message is not Turkish', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'How can I book an appointment?' })
+        )
+
+        expect(buildFallbackResponseMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                message: 'How can I book an appointment?',
+                preferredLanguage: 'en'
+            })
+        )
+        expect(sendOutbound).toHaveBeenCalledWith('Fallback response')
     })
 })

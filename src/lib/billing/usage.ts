@@ -93,6 +93,7 @@ const DEFAULT_USAGE_TIMEZONE = 'Europe/Istanbul'
 const DEFAULT_USAGE_CATEGORIES = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning']
 const DOCUMENT_PROCESSING_SOURCES = new Set([
     'offering_profile_suggestion',
+    'service_catalog_candidates',
     'required_intake_fields',
     'required_intake_followup'
 ])

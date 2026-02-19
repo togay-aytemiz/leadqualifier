@@ -21,16 +21,10 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
+import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 import { v4 as uuidv4 } from 'uuid'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
-
-function isLikelyTurkishMessage(value: string) {
-    const text = (value ?? '').trim()
-    if (!text) return true
-    if (/[ığüşöçİĞÜŞÖÇ]/.test(text)) return true
-    return /\b(merhaba|selam|fiyat|randevu|teşekkür|lütfen|yarın|bugün|müsait|kampanya|hizmet)\b/i.test(text)
-}
 
 export async function POST(req: NextRequest) {
     const headerSecret = req.headers.get('x-telegram-bot-api-secret-token')
@@ -53,6 +47,8 @@ export async function POST(req: NextRequest) {
 
     const { chat, text, from } = update.message
     const chatId = chat.id.toString()
+    const responseLanguage = resolveMvpResponseLanguage(text)
+    const responseLanguageName = resolveMvpResponseLanguageName(text)
 
     console.log('Telegram Webhook: Processing message', {
         chatId,
@@ -216,7 +212,7 @@ export async function POST(req: NextRequest) {
             organizationId: orgId,
             conversationId: conversation.id,
             latestMessage: text,
-            preferredLocale: isLikelyTurkishMessage(text) ? 'tr' : 'en',
+            preferredLocale: responseLanguage,
             supabase,
             source: 'telegram'
         })
@@ -261,7 +257,7 @@ export async function POST(req: NextRequest) {
     }
 
     const applyEscalationAfterReply = async (options: { skillRequiresHumanHandover: boolean }) => {
-        const handoverMessage = isLikelyTurkishMessage(text)
+        const handoverMessage = responseLanguage === 'tr'
             ? aiSettings.hot_lead_handover_message_tr
             : aiSettings.hot_lead_handover_message_en
         const escalation = decideHumanEscalation({
@@ -463,7 +459,8 @@ export async function POST(req: NextRequest) {
 
 Answer the user's question based strictly on the provided context below.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
-Keep the answer concise and friendly (in Turkish or English depending on user).
+Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
+Keep the answer concise and friendly.
 Continue naturally from recent conversation turns without restarting.
 
 Context:
@@ -535,6 +532,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
         const fallbackText = await buildFallbackResponse({
             organizationId: orgId,
             message: text,
+            preferredLanguage: responseLanguage,
             requiredIntakeFields,
             recentCustomerMessages: customerHistoryForFollowup,
             recentAssistantMessages: assistantHistoryForFollowup,
