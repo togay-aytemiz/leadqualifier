@@ -334,6 +334,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+- Fixed premium-plan AI usage logging breakage where `organization_ai_usage` inserts failed with Postgres `42804` (`credit_pool` enum mismatch) in the debit trigger; premium AI replies now write usage rows again so Inbox `Total AI credits` accumulates correctly (`supabase/migrations/00067_fix_usage_debit_credit_pool_cast.sql`).
 - Fixed trial-exhausted lock UX regression where sidebars collapsed into usage-only navigation; locked workspaces now keep menu context visible and disable restricted routes instead of hiding them (`src/design/MainSidebar.tsx`, `src/design/MobileBottomNav.tsx`, `src/components/settings/SettingsResponsiveShell.tsx`).
 - Fixed WhatsApp manual-send policy gap by adding server-side 24-hour free-form window validation in `sendMessage`, preventing API send attempts when the reply window is closed or inbound customer message is missing (`src/lib/inbox/actions.ts`).
 - Fixed premium extra-credit checkout being blocked (`topup_not_allowed`) on environments still running the legacy DB top-up rule by adding a compatibility fallback in `simulateMockTopupCheckout` that validates premium membership and completes the mock top-up flow via service-role writes (`src/lib/billing/mock-checkout.ts`, `src/lib/billing/mock-checkout.test.ts`).
