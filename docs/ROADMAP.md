@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings and switched `Settings > Plans` currency resolution to automatic request-region detection: Turkey (`TR`) => `TRY`, non-TR => `USD`, with `Accept-Language` fallback when geo headers are unavailable. Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse, and added env-based optional `business_management` scope toggle for accounts requiring `/me/businesses` fallback access. Fallback now uses `/me/businesses` on `Missing Permission` only when that toggle is enabled, preventing unavoidable invalid-scope loops on apps where `business_management` is unsupported. Added callback-level `debug_token` fallback so WABA discovery can proceed even when direct `/me/whatsapp_business_accounts` fails with permission errors.)  
+> **Last Updated:** 2026-02-18 (Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings, persisted `organizations.billing_region` automatically from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency rendering to organization-level billing region as source-of-truth (request headers only fallback for missing legacy values). Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse, and added env-based optional `business_management` scope toggle for accounts requiring `/me/businesses` fallback access. Fallback now uses `/me/businesses` on `Missing Permission` only when that toggle is enabled, preventing unavoidable invalid-scope loops on apps where `business_management` is unsupported. Added callback-level `debug_token` fallback so WABA discovery can proceed even when direct `/me/whatsapp_business_accounts` fails with permission errors. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -15,6 +15,7 @@
 - [x] Codify agent workflow rules (always provide commit message)
 - [x] Add subagent-driven-development skill for plan execution workflow
 - [x] Use system fonts in app shell to avoid CI font-fetch issues
+- [x] Self-host Plus Jakarta Sans from local project assets (`public/fonts/plus-jakarta-sans`) and remove runtime Google Fonts import
 
 ---
 
@@ -569,7 +570,7 @@
   - [x] Expand platform billing defaults for multi-currency pricing catalog (Starter/Growth/Scale + top-up 250/500/1000 in TRY/USD) and seed final baseline values via migration `00061_multicurrency_pricing_catalog.sql`
   - [x] Update Scale package baseline from `999 TRY` to `949 TRY` to keep plan ending consistency
   - [x] Overhaul `/settings/plans` with package ladder + top-up ladder, organization billing-region-based currency display (TR=TRY, non-TR=USD), and safe monthly conversation-range marketing copy
-  - [x] Replace manual billing-region selection in `/settings/organization` with automatic request-region currency resolution in `/settings/plans` (`TR` => `TRY`, non-TR => `USD`)
+  - [x] Replace manual billing-region selection in `/settings/organization` with automatic signup-time billing-region persistence on organization (`organizations.billing_region`) and use that persisted value as `/settings/plans` currency source (`TR` => `TRY`, non-TR => `USD`)
   - [x] Standardize Turkish package display names to `Temel / Gelişmiş / Profesyonel` across tenant plans and admin billing dictionaries
   - [x] Standardize `/admin` tables as full-width with horizontal overflow support
   - [x] Fix admin empty-state rendering on server routes by avoiding non-serializable icon component props across server-client boundaries

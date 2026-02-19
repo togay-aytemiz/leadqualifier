@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBillingRegionByCountry, resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
+import {
+    normalizeBillingRegion,
+    resolveBillingRegionByCountry,
+    resolveBillingRegionForOrganization,
+    resolveBillingRegionFromRequestHeaders
+} from '@/lib/billing/request-region'
 
 function createHeaders(values: Record<string, string>): Headers {
     const headers = new Headers()
@@ -10,6 +15,14 @@ function createHeaders(values: Record<string, string>): Headers {
 }
 
 describe('billing request region resolver', () => {
+    it('normalizes only supported billing regions', () => {
+        expect(normalizeBillingRegion('TR')).toBe('TR')
+        expect(normalizeBillingRegion('intl')).toBe('INTL')
+        expect(normalizeBillingRegion('US')).toBeNull()
+        expect(normalizeBillingRegion('')).toBeNull()
+        expect(normalizeBillingRegion(null)).toBeNull()
+    })
+
     it('maps TR country code to TR region', () => {
         expect(resolveBillingRegionByCountry('TR')).toBe('TR')
         expect(resolveBillingRegionByCountry('tr')).toBe('TR')
@@ -42,5 +55,37 @@ describe('billing request region resolver', () => {
 
     it('defaults to INTL when no signal exists', () => {
         expect(resolveBillingRegionFromRequestHeaders(createHeaders({}))).toBe('INTL')
+    })
+
+    it('prefers persisted organization billing region over request signal', () => {
+        expect(resolveBillingRegionForOrganization({
+            organizationBillingRegion: 'TR',
+            headers: createHeaders({
+                'x-vercel-ip-country': 'US'
+            })
+        })).toBe('TR')
+
+        expect(resolveBillingRegionForOrganization({
+            organizationBillingRegion: 'INTL',
+            headers: createHeaders({
+                'x-vercel-ip-country': 'TR'
+            })
+        })).toBe('INTL')
+    })
+
+    it('falls back to request signal when persisted organization region is missing', () => {
+        expect(resolveBillingRegionForOrganization({
+            organizationBillingRegion: null,
+            headers: createHeaders({
+                'x-vercel-ip-country': 'TR'
+            })
+        })).toBe('TR')
+
+        expect(resolveBillingRegionForOrganization({
+            organizationBillingRegion: '',
+            headers: createHeaders({
+                'x-vercel-ip-country': 'US'
+            })
+        })).toBe('INTL')
     })
 })

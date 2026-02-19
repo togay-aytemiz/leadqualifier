@@ -1,6 +1,7 @@
 # Pricing & Credit Strategy Guide (Pre-Pilot)
 
 > **Date:** 2026-02-16  
+> **Last Updated:** 2026-02-18 (Scale baseline aligned to `949 TRY`; TRY/USD price tables expanded)  
 > **Status:** Finalized baseline (website-ready, implemented in app/admin on 2026-02-16)  
 > **Owner:** Product + Billing
 
@@ -210,11 +211,11 @@ Rationale:
 
 ## 7.2 Recurring plans (upgrade-first ladder)
 
-| Plan | Monthly Price (TRY) | Included Credits | Unit Price (TRY/credit) |
-|---|---:|---:|---:|
-| Starter | 349 | 1000 | 0.349 |
-| Growth | 649 | 2000 | 0.325 |
-| Scale | 999 | 4000 | 0.250 |
+| Plan | Monthly Price (TRY) | Monthly Price (USD) | Included Credits | Unit Price (TRY/credit) | Unit Price (USD/credit) |
+|---|---:|---:|---:|---:|---:|
+| Starter | 349 | 9.99 | 1000 | 0.349 | 0.010 |
+| Growth | 649 | 17.99 | 2000 | 0.325 | 0.009 |
+| Scale | 949 | 26.99 | 4000 | 0.237 | 0.007 |
 
 Design intent:
 
@@ -237,11 +238,11 @@ This keeps billing predictable and avoids accidental over-crediting.
 
 Top-up packs (one-time):
 
-| Pack | Price (TRY) | Unit Price (TRY/credit) |
-|---|---:|---:|
-| 250 credits | 99 | 0.396 |
-| 500 credits | 189 | 0.378 |
-| 1000 credits | 349 | 0.349 |
+| Pack | Price (TRY) | Price (USD) | Unit Price (TRY/credit) | Unit Price (USD/credit) |
+|---|---:|---:|---:|---:|
+| 250 credits | 99 | 2.99 | 0.396 | 0.012 |
+| 500 credits | 189 | 5.49 | 0.378 | 0.011 |
+| 1000 credits | 349 | 9.99 | 0.349 | 0.010 |
 
 Positioning:
 
@@ -274,7 +275,7 @@ Assumption for conversion: `1 USD = 35 TRY` (illustrative only).
 - `1000 credits` cost: `$0.45`
 - Starter (`349 TRY`): gross margin vs model COGS `~95.5%`
 - Growth (`649 TRY`): gross margin vs model COGS `~95.1%`
-- Scale (`999 TRY`): gross margin vs model COGS `~93.7%`
+- Scale (`949 TRY`): gross margin vs model COGS `~93.4%`
 - Top-up 1000 (`349 TRY`): gross margin vs model COGS `~95.5%`
 
 ### 8.2 Safety multipliers (to include retries, embeddings, infra, noise)
@@ -283,7 +284,7 @@ At `5x` effective COGS:
 
 - Starter gross margin: `~77.4%`
 - Growth gross margin: `~75.7%`
-- Scale gross margin: `~68.5%`
+- Scale gross margin: `~66.8%`
 - Top-up 1000 gross margin: `~77.4%`
 
 Conclusion: margins stay healthy even with conservative multipliers; pricing should optimize for conversion and usage behavior.
@@ -321,9 +322,9 @@ After rollout, review monthly:
 ## 11. Final Decision (Website + Product UI)
 
 - **Trial:** `14 days` and `200 credits` (time OR credits lock, whichever is reached first)
-- **Recurring plans:** `Starter 349 TRY`, `Growth 649 TRY`, `Scale 999 TRY`
+- **Recurring plans:** `Starter 349 TRY / 9.99 USD`, `Growth 649 TRY / 17.99 USD`, `Scale 949 TRY / 26.99 USD`
 - **Monthly included credits:** `1000 / 2000 / 4000`
-- **Top-up packs:** `250 -> 99 TRY`, `500 -> 189 TRY`, `1000 -> 349 TRY`
+- **Top-up packs:** `250 -> 99 TRY / 2.99 USD`, `500 -> 189 TRY / 5.49 USD`, `1000 -> 349 TRY / 9.99 USD`
 - **Behavior:** `upgrade-first`, top-up as temporary burst insurance
 
 Safe marketing copy for website and in-app package cards:
@@ -385,14 +386,14 @@ Two views:
 1. **Raw model COGS only** (token cost only)
 2. **5x safety COGS** (token cost multiplied by 5 to include retries/infra/noise)
 
-| Package | Price (TRY) | Credits | Raw COGS (TRY) | Raw Profit (TRY) | Raw Margin | 5x COGS (TRY) | 5x Profit (TRY) | 5x Margin |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Starter | 349 | 1000 | 15.75 | 333.25 | 95.5% | 78.75 | 270.25 | 77.4% |
-| Growth | 649 | 2000 | 31.50 | 617.50 | 95.1% | 157.50 | 491.50 | 75.7% |
-| Scale | 999 | 4000 | 63.00 | 936.00 | 93.7% | 315.00 | 684.00 | 68.5% |
-| Top-up 250 | 99 | 250 | 3.94 | 95.06 | 96.0% | 19.69 | 79.31 | 80.1% |
-| Top-up 500 | 189 | 500 | 7.88 | 181.13 | 95.8% | 39.38 | 149.63 | 79.2% |
-| Top-up 1000 | 349 | 1000 | 15.75 | 333.25 | 95.5% | 78.75 | 270.25 | 77.4% |
+| Package | Price (TRY) | Price (USD) | Credits | Raw COGS (TRY) | Raw Profit (TRY) | Raw Margin | 5x COGS (TRY) | 5x Profit (TRY) | 5x Margin |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Starter | 349 | 9.99 | 1000 | 15.75 | 333.25 | 95.5% | 78.75 | 270.25 | 77.4% |
+| Growth | 649 | 17.99 | 2000 | 31.50 | 617.50 | 95.1% | 157.50 | 491.50 | 75.7% |
+| Scale | 949 | 26.99 | 4000 | 63.00 | 886.00 | 93.4% | 315.00 | 634.00 | 66.8% |
+| Top-up 250 | 99 | 2.99 | 250 | 3.94 | 95.06 | 96.0% | 19.69 | 79.31 | 80.1% |
+| Top-up 500 | 189 | 5.49 | 500 | 7.88 | 181.13 | 95.8% | 39.38 | 149.63 | 79.2% |
+| Top-up 1000 | 349 | 9.99 | 1000 | 15.75 | 333.25 | 95.5% | 78.75 | 270.25 | 77.4% |
 
 Interpretation:
 

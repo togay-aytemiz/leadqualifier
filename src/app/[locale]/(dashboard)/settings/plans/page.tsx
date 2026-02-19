@@ -13,7 +13,11 @@ import {
     resolveBillingCurrencyByRegion,
     resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
-import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
+import {
+    normalizeBillingRegion,
+    resolveBillingRegionForOrganization,
+    resolveBillingRegionFromRequestHeaders
+} from '@/lib/billing/request-region'
 import {
     simulateMockSubscriptionCheckout,
     simulateMockTopupCheckout,
@@ -203,8 +207,19 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         )
     }
 
-    const snapshot = await getOrganizationBillingSnapshot(organizationId, { supabase })
-    const [pricingCatalog, paidTopupCreditsTotal, subscriptionRenewalState] = await Promise.all([
+    const [
+        { data: organizationRecord, error: organizationError },
+        snapshot,
+        pricingCatalog,
+        paidTopupCreditsTotal,
+        subscriptionRenewalState
+    ] = await Promise.all([
+        supabase
+            .from('organizations')
+            .select('billing_region')
+            .eq('id', organizationId)
+            .maybeSingle(),
+        getOrganizationBillingSnapshot(organizationId, { supabase }),
         getBillingPricingCatalog({
             supabase
         }),
@@ -215,7 +230,30 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         })
     ])
 
-    const organizationBillingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
+    if (organizationError) {
+        console.error('Failed to load organization billing region for plans page:', organizationError)
+    }
+
+    const requestBillingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
+    const organizationBillingRegion = resolveBillingRegionForOrganization({
+        organizationBillingRegion: organizationRecord?.billing_region,
+        headers: requestHeaders
+    })
+
+    if (!normalizeBillingRegion(organizationRecord?.billing_region)) {
+        const { error: billingRegionUpdateError } = await supabase
+            .from('organizations')
+            .update({
+                billing_region: requestBillingRegion,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', organizationId)
+
+        if (billingRegionUpdateError) {
+            console.error('Failed to persist organization billing region from request signals:', billingRegionUpdateError)
+        }
+    }
+
     const billingCurrency = resolveBillingCurrencyByRegion(organizationBillingRegion)
     const formatNumber = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1

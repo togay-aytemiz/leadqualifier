@@ -7,6 +7,13 @@ const COUNTRY_HEADER_KEYS = [
     'x-geo-country'
 ] as const
 
+export function normalizeBillingRegion(value: string | null | undefined): BillingRegion | null {
+    const normalized = (value ?? '').trim().toUpperCase()
+    if (normalized === 'TR') return 'TR'
+    if (normalized === 'INTL') return 'INTL'
+    return null
+}
+
 function normalizeCountryCode(value: string | null | undefined): string | null {
     const normalized = (value ?? '').trim().toUpperCase()
     if (!normalized) return null
@@ -45,4 +52,12 @@ export function resolveBillingRegionFromRequestHeaders(headers: Pick<Headers, 'g
     }
 
     return resolveBillingRegionByCountry(resolveCountryFromAcceptLanguage(headers.get('accept-language')))
+}
+
+export function resolveBillingRegionForOrganization(options: {
+    organizationBillingRegion: string | null | undefined
+    headers: Pick<Headers, 'get'>
+}): BillingRegion {
+    return normalizeBillingRegion(options.organizationBillingRegion)
+        ?? resolveBillingRegionFromRequestHeaders(options.headers)
 }

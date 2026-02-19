@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -24,8 +26,10 @@ export async function login(formData: FormData) {
 
 export async function register(formData: FormData) {
     const supabase = await createClient()
+    const requestHeaders = await headers()
 
     const { email, password, fullName, companyName } = normalizeRegisterFormData(formData)
+    const billingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
 
     const { error } = await supabase.auth.signUp({
         email,
@@ -34,6 +38,7 @@ export async function register(formData: FormData) {
             data: {
                 full_name: fullName,
                 company_name: companyName,
+                billing_region: billingRegion,
             },
         },
     })
