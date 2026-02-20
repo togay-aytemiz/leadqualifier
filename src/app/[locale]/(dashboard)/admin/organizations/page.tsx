@@ -62,6 +62,20 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
         month: 'short',
         day: 'numeric'
     })
+    const currencyFormatters = new Map<'TRY' | 'USD', Intl.NumberFormat>()
+    const formatPaidFee = (amount: number, currency: 'TRY' | 'USD') => {
+        let formatter = currencyFormatters.get(currency)
+        if (!formatter) {
+            formatter = new Intl.NumberFormat(locale, {
+                style: 'currency',
+                currency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            })
+            currencyFormatters.set(currency, formatter)
+        }
+        return formatter.format(amount)
+    }
 
     const from = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1
     const to = result.total === 0 ? 0 : from + organizations.length - 1
@@ -127,7 +141,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                         {organizations.length === 0 ? (
                             <tbody>
                                 <tr>
-                                    <td colSpan={12} className="px-6 py-12 text-center">
+                                    <td colSpan={13} className="px-6 py-12 text-center">
                                         <div className="mx-auto flex max-w-md flex-col items-center">
                                             <Building2 className="mb-3 text-gray-300" size={40} />
                                             <p className="text-lg font-medium text-gray-900">
@@ -151,6 +165,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                     tAdmin('organizations.columns.skills'),
                                     tAdmin('organizations.columns.knowledge'),
                                     tAdmin('organizations.columns.premium'),
+                                    tAdmin('organizations.columns.paidFee'),
                                     tAdmin('organizations.columns.plan'),
                                     tAdmin('organizations.columns.trial'),
                                     tAdmin('organizations.columns.created'),
@@ -184,6 +199,15 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                                 <Badge variant={resolveMembershipBadgeVariant(org.billing.membershipState)}>
                                                     {resolveMembershipLabel(tAdmin, org.billing)}
                                                 </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {org.paidFee.amount !== null && org.paidFee.currency ? (
+                                                    <span className="text-sm font-medium text-gray-700">
+                                                        {formatPaidFee(org.paidFee.amount, org.paidFee.currency)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400">{tAdmin('status.notAvailable')}</span>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="space-y-1 text-right">

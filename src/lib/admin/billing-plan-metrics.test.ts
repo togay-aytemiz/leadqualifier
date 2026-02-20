@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
     resolveMonthlySubscriptionAmountTry,
+    resolveMonthlyTotalPaymentAmountTry,
     resolveTopupDebitFromUsageMetadata,
     resolveTopupUsageDebit
 } from '@/lib/admin/billing-plan-metrics'
@@ -24,6 +25,13 @@ describe('billing plan metrics helpers', () => {
         const metadata: Json = { requested_monthly_price_try: 'invalid' }
 
         expect(resolveMonthlySubscriptionAmountTry(metadata)).toBe(0)
+    })
+
+    it('sums monthly subscription and top-up payment totals', () => {
+        expect(resolveMonthlyTotalPaymentAmountTry({
+            monthlySubscriptionAmountTry: 649,
+            monthlyTopupAmountTry: 189
+        })).toBe(838)
     })
 
     it('resolves topup debit from mixed usage metadata', () => {

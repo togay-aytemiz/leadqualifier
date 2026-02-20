@@ -25,6 +25,15 @@ export function resolveMonthlySubscriptionAmountTry(metadata: Json): number {
     return readMetadataNumber(metadata, 'monthly_price_try')
 }
 
+export function resolveMonthlyTotalPaymentAmountTry(input: {
+    monthlySubscriptionAmountTry: number
+    monthlyTopupAmountTry: number
+}) {
+    const monthlySubscriptionAmountTry = Math.max(0, readNumericValue(input.monthlySubscriptionAmountTry))
+    const monthlyTopupAmountTry = Math.max(0, readNumericValue(input.monthlyTopupAmountTry))
+    return monthlySubscriptionAmountTry + monthlyTopupAmountTry
+}
+
 export function resolveTopupDebitFromUsageMetadata(metadata: Json): number {
     return readMetadataNumber(metadata, 'topup_debit')
 }

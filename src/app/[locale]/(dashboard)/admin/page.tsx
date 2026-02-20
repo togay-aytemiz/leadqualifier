@@ -8,6 +8,7 @@ import {
     getAdminDashboardSummary,
     getAdminUsageMetricsSummary
 } from '@/lib/admin/read-models'
+import { resolveMonthlyTotalPaymentAmountTry } from '@/lib/admin/billing-plan-metrics'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getLeads } from '@/lib/leads/list-actions'
 import { resolveAdminDashboardOrganizationContext } from '@/lib/admin/dashboard-context'
@@ -192,6 +193,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     ]
     const billingDetailCards = [
         {
+            key: 'monthlyTotalAmountTry',
+            title: t('planMetrics.monthlyTotalAmount'),
+            value: currencyFormatter.format(resolveMonthlyTotalPaymentAmountTry({
+                monthlySubscriptionAmountTry: billingPlanMetrics.monthlySubscriptionAmountTry,
+                monthlyTopupAmountTry: billingPlanMetrics.monthlyTopupAmountTry
+            }))
+        },
+        {
             key: 'monthlySubscriptionAmountTry',
             title: t('planMetrics.monthlySubscriptionAmount'),
             value: currencyFormatter.format(billingPlanMetrics.monthlySubscriptionAmountTry)
@@ -282,7 +291,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             <p className="text-sm text-gray-500">{t('planMetrics.description')}</p>
                             <p className="mt-1 text-xs text-gray-500">{billingScopeText}</p>
                         </div>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
                             {billingDetailCards.map((card) => (
                                 <div key={card.key} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                                     <p className="text-xs font-medium text-gray-500">{card.title}</p>

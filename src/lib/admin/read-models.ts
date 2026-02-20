@@ -12,6 +12,10 @@ import {
     resolveTopupUsageDebit
 } from '@/lib/admin/billing-plan-metrics'
 import {
+    resolveAdminOrganizationPaidFee,
+    type AdminOrganizationPaidFee
+} from '@/lib/admin/organization-paid-fee'
+import {
     ADMIN_METRIC_PERIOD_ALL,
     resolveAdminMetricPeriodKey,
     resolveAdminMetricPeriodRange
@@ -32,6 +36,7 @@ export interface AdminOrganizationSummary {
     totalMessageCount: number
     totalTokenCount: number
     billing: AdminBillingSnapshot
+    paidFee: AdminOrganizationPaidFee
 }
 
 export interface AdminBillingSnapshot {
@@ -191,6 +196,7 @@ interface OrganizationRow {
     id: string
     name: string
     slug: string
+    billing_region: string | null
     created_at: string
 }
 
@@ -212,6 +218,12 @@ interface MembershipRow {
 interface TokenUsageRow {
     organization_id: string
     total_tokens: number | null
+}
+
+interface SubscriptionRecordMetadataRow {
+    organization_id: string
+    metadata: Json
+    created_at: string
 }
 
 const EMPTY_BILLING_SNAPSHOT: AdminBillingSnapshot = {
@@ -361,10 +373,41 @@ async function getBillingByOrganization(
     return billingByOrganization
 }
 
+async function getLatestSubscriptionMetadataByOrganization(
+    supabase: SupabaseClient,
+    organizationIds: string[]
+): Promise<Map<string, Json>> {
+    if (organizationIds.length === 0) return new Map()
+
+    const subscriptionMetadataByOrganization = new Map<string, Json>()
+
+    for (const organizationIdBatch of chunkValues(organizationIds, 100)) {
+        const { data, error } = await supabase
+            .from('organization_subscription_records')
+            .select('organization_id, metadata, created_at')
+            .in('organization_id', organizationIdBatch)
+            .in('status', ['active', 'past_due', 'canceled'])
+            .order('created_at', { ascending: false })
+
+        if (error) {
+            console.error('Failed to load subscription metadata for organization batch:', error)
+            continue
+        }
+
+        const rows = (data ?? []) as SubscriptionRecordMetadataRow[]
+        for (const row of rows) {
+            if (subscriptionMetadataByOrganization.has(row.organization_id)) continue
+            subscriptionMetadataByOrganization.set(row.organization_id, row.metadata)
+        }
+    }
+
+    return subscriptionMetadataByOrganization
+}
+
 async function getOrganizations(supabase: SupabaseClient): Promise<OrganizationRow[]> {
     const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug, created_at')
+        .select('id, name, slug, billing_region, created_at')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -682,7 +725,7 @@ async function getOrganizationsByIds(
     for (const organizationIdBatch of chunkValues(organizationIds, 100)) {
         const { data, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, created_at')
+            .select('id, name, slug, billing_region, created_at')
             .in('id', organizationIdBatch)
 
         if (error) {
@@ -831,17 +874,27 @@ async function buildOrganizationSummariesFromRows(
 
     const organizationIds = organizations.map((organization) => organization.id)
 
-    const [memberCounts, skillCounts, knowledgeCounts, messageCounts, tokenTotals, billingByOrganization] = await Promise.all([
+    const [
+        memberCounts,
+        skillCounts,
+        knowledgeCounts,
+        messageCounts,
+        tokenTotals,
+        billingByOrganization,
+        subscriptionMetadataByOrganization
+    ] = await Promise.all([
         getCountByOrganization(supabase, organizationIds, 'organization_members'),
         getCountByOrganization(supabase, organizationIds, 'skills'),
         getCountByOrganization(supabase, organizationIds, 'knowledge_documents'),
         getCountByOrganization(supabase, organizationIds, 'messages'),
         getTokenTotalsByOrganization(supabase, organizationIds),
-        getBillingByOrganization(supabase, organizationIds)
+        getBillingByOrganization(supabase, organizationIds),
+        getLatestSubscriptionMetadataByOrganization(supabase, organizationIds)
     ])
 
     return organizations.map((organization) => {
         const memberCount = getCount(memberCounts, organization.id)
+        const billing = billingByOrganization.get(organization.id) ?? EMPTY_BILLING_SNAPSHOT
 
         return {
             id: organization.id,
@@ -854,7 +907,11 @@ async function buildOrganizationSummariesFromRows(
             knowledgeDocumentCount: getCount(knowledgeCounts, organization.id),
             totalMessageCount: getCount(messageCounts, organization.id),
             totalTokenCount: getCount(tokenTotals, organization.id),
-            billing: billingByOrganization.get(organization.id) ?? EMPTY_BILLING_SNAPSHOT
+            billing,
+            paidFee: resolveAdminOrganizationPaidFee({
+                metadata: subscriptionMetadataByOrganization.get(organization.id) ?? null,
+                organizationBillingRegion: organization.billing_region
+            })
         }
     })
 }
@@ -902,7 +959,7 @@ async function getOrganizationPageRows(
 
     let rowsQuery = supabase
         .from('organizations')
-        .select('id, name, slug, created_at')
+        .select('id, name, slug, billing_region, created_at')
         .order('created_at', { ascending: false })
         .range(from, to)
 

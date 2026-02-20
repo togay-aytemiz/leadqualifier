@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-19 (Fixed premium-plan AI usage debit trigger enum-cast regression (`42804`) that blocked `organization_ai_usage` inserts and left Inbox conversation credit totals at `0.0` despite AI replies. Fixed hot-lead `notify_only` escalation so it no longer sends a customer-facing handover promise when no operator switch is performed. Fixed cross-language service inference drop where extraction could leave `service_type` empty (`Unknown`) when customer intent was Turkish but model output was English. Added catalog-canonical `service_type` persistence for alias-language matches and enforced MVP reply-language policy (`Turkish` for Turkish customer messages, otherwise `English`) across inbound + simulator RAG/fallback flows. Added multi-service extraction output (`services[]`) while preserving primary `service_type` for backward compatibility. Added `Settings > Organization` Service List section with AI generation toggle, direct auto-add behavior (no approve/reject queue), and AI-tagged service chips. Added AI service-candidate extraction from Skill/Knowledge content so service-list suggestions are generated contextually (not title-only). Removed manual billing-region selection from `Settings > Organization`, persisted `organizations.billing_region` from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency display to organization-level region as source-of-truth (request fallback only for missing legacy values). Added in-app self-service contact-level data deletion flow in `Settings > Organization`. Hardened WhatsApp OAuth scope defaults for newly rotated Meta app credentials by removing unsupported `business_management` request. Updated WhatsApp OAuth candidate parsing to tolerate Graph payloads where WABA `name` is missing, added WABA phone-number edge hydration fallback, surfaced popup OAuth outcomes in Channels UI, enforced OAuth re-consent via `auth_type=rerequest`, introduced env-based optional `business_management` scope inclusion for app setups that require `/me/businesses` access, restricted missing-permission fallback to `/me/businesses` only when that toggle is explicitly enabled, and added callback-level `debug_token` fallback for permission-constrained direct-edge discovery failures. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files. Updated Leads page service rendering to show AI-extracted `services[]` values with legacy `service_type` fallback. Updated Inbox active assistant banner typography/spacing to match inactive banner layout while preserving current tone colors. Added a dental-clinic Knowledge Base extraction QA fixture with expected output references for `Hizmet Profili`, `Gerekli Bilgiler`, and `Hizmet listesi` validation.)  
+> **Last Updated:** 2026-02-20 (Lowered AI QA Lab fixture minimum from 200 to 150 lines, kept Quick/Regression at 100k token budget, retained generator retry diagnostics for failed runs, added run-insert fallback for legacy 200-line DB constraints, tightened QA generator prompts/validation for random-sector and lead-qualification coverage, increased scenario density with 3-6 turn bounds, added QA run credit-usage visibility, decoupled QA execution from tenant org/skills via synthetic KB-only responder flow, increased generator max output tokens to reduce JSON truncation failures, refined Judge pricing-groundedness rules to avoid false positives when KB lacks numeric pricing, and refined engagement-question rules to penalize only repetitive/context-breaking follow-ups.)  
 > **Status:** In Development
 
 ---
@@ -404,6 +404,7 @@ Customer Message → Skill Match? → Yes → Skill Response
     - total token usage
     - total skills count
     - knowledge base count
+    - paid fee with original billing currency (`TRY`/`USD`) from latest subscription metadata
     - premium status (placeholder)
     - plan status/cycle (placeholder)
     - trial status (placeholder)
@@ -427,6 +428,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Message/token/credit cards support period filtering with a shared selector: `All Time` or a specific UTC month.
   - Credit totals are derived from `organization_ai_usage` token usage with the same weighted credit-cost formula used in billing (`compute_credit_cost` parity), so dashboard values align with per-organization usage views.
   - Dashboard includes a monthly billing metrics block for plan/top-up flow:
+    - monthly total payment amount (TRY) = monthly plan + monthly top-up payment,
     - monthly plan payment amount (TRY),
     - monthly plan transaction count,
     - monthly top-up payment amount (TRY),
@@ -499,6 +501,46 @@ Customer Message → Skill Match? → Yes → Skill Response
     - disposable email / VOIP / device-fingerprint risk checks
     - signup velocity throttling + cooldown windows
     - suspicious-signup review flow and admin override audit trail
+
+### 5.10 AI QA Lab (Implemented v1.2, Manual Trigger + Auto Background Worker)
+- A dedicated Admin `AI QA Lab` surface (`/admin/qa-lab`) will run simulator-only quality tests before rollout decisions.
+- **Implementation status (v1.2):** `Admin > AI QA Lab` can manually trigger `Quick` / `Regression` runs with a single CTA, enqueue immutable run snapshots in `qa_runs`, and execute runs via queue-worker lifecycle (`queued` -> `running` -> `completed` / `failed` / `budget_stopped`) with automatic background worker kick-off to reduce UI timeout risk without exposing manual worker controls.
+- Runs are manually triggered and immutable (`run_id` snapshot with config/context hash and full artifacts).
+- QA findings are advisory only: there is no automatic patch/apply path from QA output into the live assistant stack without explicit human review/approval.
+- Test cases are not hardcoded:
+  - `Generator` LLM creates KB fixtures, scenario blueprints, and customer turns from QA-internal synthetic organization context (not tenant data).
+  - Each generated KB fixture must be at least `150` lines.
+  - Fixture quality mix is intentionally noisy:
+    - `Quick`: `20% clean / 50% semi-noisy / 30% messy`
+    - `Regression`: `10% clean / 40% semi-noisy / 50% messy`
+- `Responder` is QA-local and skill-free: it uses only generated KB fixture context and fallback behavior (no tenant skill catalog, no tenant KB docs).
+- QA responder engagement behavior is conditional: one contextual follow-up question is allowed, but repeated menu-like prompts on consecutive turns are disallowed.
+- `Judge` LLM is separate from generator and must output evidence-backed findings plus remediation guidance.
+- Judge pricing-groundedness rule: if KB/ground-truth does not contain numeric pricing, assistant must not be penalized for refusing exact price; only fabricated price claims are penalized.
+- Judge engagement rule: do not penalize a single contextual engagement question; penalize only excessive/repetitive/context-breaking follow-up prompting.
+- Run presets:
+  - `Quick`: 20 scenarios, 3-6 turns each (preset max 6), hard token budget `100k`
+  - `Regression`: 36 scenarios, 3-6 turns each (preset max 6), hard token budget `100k`
+- Generator execution retries failed generation attempts (up to 3) and stores attempt-level diagnostics (`finish_reason`, token usage, output snippets, validation error) in failure reports to speed up root-cause analysis.
+- Generator max output budget is tuned to avoid JSON truncation at fixture/scenario density targets (current cap: `6400` output tokens).
+- Score model:
+  - Groundedness `40%`
+  - Extraction accuracy `35%`
+  - Conversation quality `25%` (includes continuity checks)
+- Release gate:
+  - Any `critical` finding => `FAIL_CRITICAL`
+- Critical findings cover:
+  - KB-external/contradictory factual claims
+  - materially wrong customer guidance
+  - safety/policy-risk violations
+- Reports are findings-first, include full-text evidence per finding, and include prioritized `Top 5` action recommendations (with fix target, effort, and confidence).
+- Run detail reports now also include an automatic **pipeline improvement action set** normalized from Judge `findings + top_actions` (priority, source, impact, rationale, evidence, target layer, effort) for implementation planning.
+- Generator output now follows explicit sequence: `KB fixture` creation first, then KB-derived setup (`offering profile summary`, `service catalog`, `required intake fields`), then scenario generation.
+- Scenario generation now enforces mixed lead conditions: `hot/warm/cold` temperatures and `cooperative/partial/resistant` information-sharing behavior to test both strong lead capture and weak/casual conversation paths.
+- QA conversation execution carries forward per-turn conversation history and uses the same history discipline as production-like assistant turns, while keeping the factual context strictly limited to generated fixture content.
+- Run details expose the full QA artifact chain for manual review: generated KB fixture text (all lines), ground-truth extraction references, derived setup outputs, executed multi-turn conversations, Judge findings, and Judge-derived pipeline action set.
+- KB fixture visibility uses compact UI by default (preview-first card) and opens full fixture text in a modal on demand to keep detail pages readable.
+- Run details now include a **sequential pipeline self-check** (`pass/warn/fail`) across fixed stages (`KB fixture -> derived setup -> scenario generation -> conversation execution -> judge evaluation`) so the system can self-validate ordered execution quality.
 
 ---
 
@@ -652,6 +694,8 @@ MVP is successful when:
 - **TR Payment Provider Strategy (Locked v1):** Prioritize a TR-valid recurring provider (Iyzico first, PayTR alternative); use Stripe only with a supported non-TR entity/account model.
 - **WhatsApp Cost Modeling Baseline:** For Meta Cloud API MVP, treat inbound webhook traffic and in-window free-form replies as zero template fee; meter WhatsApp variable cost only when sending template messages (country/category-dependent).
 - **Platform Admin Read Models:** Use DB-backed pagination/search, aggregate RPC totals, and batched org metrics; avoid in-memory filtering, full-table scans, and N+1 fan-out for admin org/user list-detail pages.
+- **Admin Organization Paid Fee Source (Implementation v1.15):** `/admin/organizations` resolves `Paid Fee` from the latest `organization_subscription_records.metadata` per org and renders original billing currency (`TRY`/`USD`) without cross-currency conversion.
+- **Admin Dashboard Monthly Total Payment (Implementation v1.15):** `/admin` plan-metrics section exposes `Total Monthly Payment (TRY)` as `monthlySubscriptionAmountTry + monthlyTopupAmountTry` for the current admin scope.
 - **Platform Admin Lead Monitoring:** Expose read-only recent leads on `/admin` and a dedicated `/admin/leads` list, both scoped by the active organization switcher context.
 - **Admin Totals Fallback Logging:** When dashboard totals RPC is unavailable, degrade to fallback aggregates with non-error logging to avoid noisy runtime overlays during expected fallback paths.
 - **System Admin Org Discovery Fallback:** If all-organizations query is unavailable, derive accessible organization context from membership-linked organizations.
@@ -808,6 +852,8 @@ MVP is successful when:
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 - **Quality Gate Discipline:** Keep lint free of errors (warnings tracked separately), avoid explicit `any` in core product modules, and require green `test` + `build` before closing iterations.
 - **Phase 9 QA Strategy (Implemented):** Phase 9 now runs Vitest-based core/unit + WhatsApp webhook integration coverage, Playwright admin smoke E2E, and a reproducible message-handling load baseline (`autocannon`) via `npm run test:unit:core`, `npm run test:integration:whatsapp`, `npm run test:e2e:admin`, and `npm run test:load:messages`.
+- **AI QA Lab Strategy (Implemented v1.4):** Manual admin-triggered, simulator-only, two-model (`Generator` + `Judge`) QA loop with non-hardcoded scenario generation, 150+ line noisy KB fixtures, full-text evidence logging, findings-first reports, and critical-fail release gate. Current implementation includes queue-first run launch with automatic background worker execution, lifecycle persistence (`queued/running/completed/failed/budget_stopped`), full artifact-chain visibility in run details, Judge-to-pipeline action-set reporting, generator retry diagnostics, increased Quick preset token budget (`100k`), and QA-local responder execution that is tenant-independent (`synthetic context`, `no skill layer`, `generated KB + fallback only`).
+- **AI QA Generator Retry Decision (Implemented v1.3):** Generator stage retries failed attempts up to `3` times with explicit retry feedback and stores per-attempt diagnostics (`finish_reason`, usage, output snippets, validation error) in `report.error.details` for failed runs.
 - **Next.js Interceptor Convention:** Use `src/proxy.ts` (not `src/middleware.ts`) for locale interception on Next.js 16+.
 - **Placeholder Source Transparency:** Keep non-MVP Knowledge source options visible in New Content menu but mark inactive options (including PDF upload) with a `Coming Soon` badge.
 - **Inbox Query Resilience:** When nested relational conversation reads fail, fall back to flat per-table conversation/message/lead/assignee reads so Inbox does not incorrectly show an empty state.

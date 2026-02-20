@@ -14,6 +14,9 @@ export interface Organization {
 export type AiMode = 'strict' | 'flexible'
 export type AiBotMode = 'active' | 'shadow' | 'off'
 export type HumanEscalationAction = 'notify_only' | 'switch_to_operator'
+export type QaLabRunPreset = 'quick' | 'regression'
+export type QaLabRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'budget_stopped'
+export type QaLabRunResult = 'pending' | 'fail_critical' | 'pass_with_findings' | 'pass_clean'
 
 export interface OrganizationAiSettings {
     organization_id: string
@@ -41,6 +44,31 @@ export interface OrganizationAiUsage {
     total_tokens: number
     metadata: Json
     created_at: string
+}
+
+export interface QaLabRun {
+    id: string
+    organization_id: string
+    requested_by: string
+    preset: QaLabRunPreset
+    status: QaLabRunStatus
+    result: QaLabRunResult
+    source: 'manual_admin'
+    surface: 'simulator'
+    token_budget: number
+    scenario_count: number
+    max_turns_per_scenario: number
+    fixture_min_lines: number
+    fixture_style_mix: Json
+    generator_model: string
+    judge_model: string
+    run_config_hash: string
+    run_config_snapshot: Json
+    report: Json
+    started_at: string | null
+    finished_at: string | null
+    created_at: string
+    updated_at: string
 }
 
 export type BillingMembershipState =
@@ -426,6 +454,11 @@ export interface Database {
                 Row: OrganizationAiUsage
                 Insert: Omit<OrganizationAiUsage, 'id' | 'created_at'>
                 Update: Partial<Omit<OrganizationAiUsage, 'id' | 'organization_id' | 'created_at'>>
+            }
+            qa_runs: {
+                Row: QaLabRun
+                Insert: Omit<QaLabRun, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<QaLabRun, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
             }
             platform_billing_settings: {
                 Row: PlatformBillingSettings

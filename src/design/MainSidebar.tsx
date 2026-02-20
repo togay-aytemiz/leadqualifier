@@ -35,6 +35,8 @@ import {
     HiOutlineSquare3Stack3D,
     HiMiniCog6Tooth,
     HiOutlineCog6Tooth,
+    HiMiniBeaker,
+    HiOutlineBeaker,
 } from 'react-icons/hi2'
 import {
     AlertCircle,
@@ -507,7 +509,7 @@ export function MainSidebar({
         ]
 
         if (isSystemAdmin) {
-            routesToPrefetch.push('/admin', '/admin/billing', '/admin/organizations', '/admin/leads', '/admin/users')
+            routesToPrefetch.push('/admin', '/admin/billing', '/admin/organizations', '/admin/leads', '/admin/users', '/admin/qa-lab')
         }
 
         const uniqueRoutes = Array.from(new Set(routesToPrefetch))
@@ -628,6 +630,13 @@ export function MainSidebar({
                         label: tSidebar('adminUsers'),
                         icon: HiOutlineUsers,
                         activeIcon: HiMiniUsers,
+                    },
+                    {
+                        id: 'admin-qa-lab',
+                        href: '/admin/qa-lab',
+                        label: tSidebar('adminQaLab'),
+                        icon: HiOutlineBeaker,
+                        activeIcon: HiMiniBeaker,
                     },
                 ],
             }

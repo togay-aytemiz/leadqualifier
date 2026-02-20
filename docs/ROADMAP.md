@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-19 (Fixed premium-plan AI usage debit trigger enum-cast regression (`42804`) that blocked `organization_ai_usage` inserts and kept Inbox `Total AI credits` at `0.0` despite AI replies. Fixed hot-lead `notify_only` escalation behavior to stop sending customer-facing handover promise messages when no operator switch occurs. Fixed cross-language lead service inference gap so `service_type` is accepted when customer wording matches approved profile/service signals even if model output uses another language (for example, `Newborn photoshoot` vs `Yenidoğan çekimi`). Added canonical service persistence so alias-language matches are stored as the approved catalog service name. Added multi-service lead extraction support (`services[]` + primary `service_type`) so one or many requested services can be captured per conversation. Enforced MVP reply language policy in production/simulator AI replies (`Turkish` if customer message is Turkish, otherwise `English`). Added Organization Settings Service List UI with AI service-generation toggle, direct auto-add behavior (no approve/reject queue), and AI-tagged service chips. Removed manual `Faturalama bölgesi / Billing region` selection from Organization settings, persisted `organizations.billing_region` automatically from signup request-region signals (`TR` => `TRY`, non-TR => `USD`), and switched `Settings > Plans` currency rendering to organization-level billing region as source-of-truth (request headers only fallback for missing legacy values). Added self-service contact-level data deletion flow in `Settings > Organization` with permanent-delete confirmation and backend cleanup for conversation-linked records. Hardened WhatsApp Meta OAuth scope set for new app credentials by removing unsupported `business_management` request on WhatsApp connect. Made WhatsApp OAuth asset selection tolerant to missing WABA `name` field in Graph responses, added phone-number edge hydration fallback for sparse WABA payloads, surfaced popup OAuth outcomes directly on Channels UI, forced OAuth permission re-request (`auth_type=rerequest`) to avoid stale grant reuse, and added env-based optional `business_management` scope toggle for accounts requiring `/me/businesses` fallback access. Fallback now uses `/me/businesses` on `Missing Permission` only when that toggle is enabled, preventing unavoidable invalid-scope loops on apps where `business_management` is unsupported. Added callback-level `debug_token` fallback so WABA discovery can proceed even when direct `/me/whatsapp_business_accounts` fails with permission errors. Synced pricing-credit strategy guide tables with Scale `949 TRY` baseline and explicit TRY/USD price values. Replaced Google Fonts Plus Jakarta Sans import with local self-hosted font files. Updated Leads service rendering to show AI-extracted multi-service values (`extracted_fields.services`) with `service_type` fallback. Updated Inbox active assistant banner spacing/typography structure to match inactive banner style while preserving existing color tones. Added a dental-clinic Knowledge Base extraction QA fixture with expected `Hizmet Profili`, `Gerekli Bilgiler`, and `Hizmet listesi` reference outputs.)  
+> **Last Updated:** 2026-02-20 (Lowered AI QA Lab fixture minimum to 150 lines, kept Quick/Regression token budgets at 100k, hardened generator execution with retry diagnostics, added legacy DB constraint compatibility for run queue inserts, updated generator quality rules for random-sector/lead-qualification fixtures, raised scenario density with 3-6 turn bounds, added QA run credit-usage visibility, decoupled QA execution from tenant org/skills via synthetic KB-only responder flow, increased generator max output tokens to reduce JSON truncation failures, refined Judge pricing-groundedness rule to avoid false positives when KB has no numeric price, and refined engagement-question rules to penalize only repetitive/context-breaking follow-ups.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -513,6 +513,8 @@
   - [x] Manual billing actions (system-admin): extend trial, adjust credits, assign/cancel premium with required reason
 - [ ] Usage analytics per org
   - [x] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
+  - [x] Admin organization table now shows current paid subscription fee with original billing currency (`TRY`/`USD`)
+  - [x] Admin dashboard plan metrics now shows `Toplam Aylık Ödeme / Total Monthly Payment` (monthly plan + monthly extra-credit payment)
   - [x] Add premium/trial status visibility and plan cycle/status visibility (integrated with membership + credit snapshot read model)
   - [x] Add search + pagination for admin organization and user lists
   - [x] Compute admin dashboard stat cards via DB-side aggregate RPC (avoid full org summary scan on dashboard load)
@@ -624,6 +626,25 @@
 - [x] Remove `no-explicit-any` debt in critical modules (AI, Inbox, Knowledge Base, Leads, Channels, shared types)
 - [x] Document executable Phase 9 closure plan (`docs/plans/2026-02-10-phase-9-testing-qa-implementation-plan.md`)
 - [x] Add non-photography Knowledge Base extraction QA fixture for dental-clinic domain validation (`docs/kb-fixtures/2026-02-dis-klinigi-kb-cikartim-test-fixture.md`)
+- [x] Publish manual simulator-only AI QA Lab design for LLM-generated, multi-turn closed-loop evaluation (`docs/plans/2026-02-19-ai-qa-lab-llm-closed-loop-design.md`)
+- [x] Implement admin `AI QA Lab` manual run queue + immutable run snapshot persistence (`qa_runs` migration, `Settings > QA Lab` page, server actions)
+- [x] Implement runtime executor lifecycle (`queued -> running -> completed/failed`) with immutable artifact/report writes
+- [x] Implement two-model QA flow (`Generator` + `Judge`) with QA-local responder execution (synthetic KB + fallback, no tenant skill/org dependency)
+- [x] Implement run preset configuration surface (`Quick`, `Regression`) with hard token budgets (`100k`, `100k`) in run snapshots
+- [x] Implement runtime budget-stop behavior (`BUDGET_STOPPED`) during scenario execution
+- [x] Expose AI QA Lab in Admin navigation for system-admin workflow (`/admin/qa-lab`)
+- [x] Standardize Admin AI QA Lab headers with consistent `Back/Geri` breadcrumb behavior
+- [x] Move QA run launch to queue-first async flow with automatic background worker execution (no manual worker button in UI) to reduce timeout risk and keep trigger UX simple
+- [x] Add Judge output normalization into a pipeline improvement action set section on QA run details
+- [x] Extend generator flow to produce sequential QA assets (`KB fixture -> derived setup -> scenario mix`) with hot/warm/cold + info-sharing variants for realistic lead-quality coverage
+- [x] Expand QA run details to show full artifact chain (`KB fixture lines`, `ground truth references`, `derived setup`, `conversations`, `findings`) for manual QA review
+- [x] Align AI QA Lab list/detail headers and layout with admin full-width page standard (`PageHeader` + left breadcrumb + full-width content)
+- [x] Keep KB artifact UI compact with preview-first card and full-text modal viewer (no long inline KB block)
+- [x] Add run-level sequential pipeline self-check block (`pass/warn/fail`) to validate KB -> setup -> scenario -> execution -> judge order
+- [x] Harden QA generator execution with retry attempts and persisted attempt-level diagnostics on failure (`error.details.stage=generator`)
+- [x] Lower QA fixture minimum-line requirement from `200` to `150` for run presets and DB validation
+- [x] Refine Judge pricing-groundedness rule: if KB has no numeric pricing, no penalty for withholding exact price; penalize only fabricated pricing claims
+- [x] Refine QA engagement-question policy: allow contextual single follow-up, penalize only repetitive/menu-like consecutive prompts
 - [x] Unit tests for core logic
 - [x] Integration tests for WhatsApp flow
 - [x] E2E tests for admin panel
