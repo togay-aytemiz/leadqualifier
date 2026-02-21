@@ -11,7 +11,7 @@ describe('qa lab presets', () => {
         const quick = getQaLabPresetConfig('quick')
 
         expect(quick.id).toBe('quick')
-        expect(quick.scenarioCount).toBe(20)
+        expect(quick.scenarioCount).toBe(15)
         expect(quick.maxTurnsPerScenario).toBe(6)
         expect(quick.maxTokenBudget).toBe(100_000)
         expect(quick.fixtureMinLines).toBe(150)
@@ -24,7 +24,7 @@ describe('qa lab presets', () => {
         const regression = getQaLabPresetConfig('regression')
 
         expect(regression.id).toBe('regression')
-        expect(regression.scenarioCount).toBe(36)
+        expect(regression.scenarioCount).toBe(15)
         expect(regression.maxTurnsPerScenario).toBe(6)
         expect(regression.maxTokenBudget).toBe(100_000)
         expect(regression.fixtureMinLines).toBe(150)

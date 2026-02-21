@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-20 (Lowered AI QA Lab fixture minimum to 150 lines, kept Quick/Regression token budgets at 100k, hardened generator execution with retry diagnostics, added legacy DB constraint compatibility for run queue inserts, updated generator quality rules for random-sector/lead-qualification fixtures, raised scenario density with 3-6 turn bounds, added QA run credit-usage visibility, decoupled QA execution from tenant org/skills via synthetic KB-only responder flow, increased generator max output tokens to reduce JSON truncation failures, refined Judge pricing-groundedness rule to avoid false positives when KB has no numeric price, and refined engagement-question rules to penalize only repetitive/context-breaking follow-ups.)  
+> **Last Updated:** 2026-02-20 (Lowered AI QA Lab fixture minimum to 150 lines, kept Quick/Regression token budgets at 100k, hardened generator execution with retry diagnostics, added legacy DB constraint compatibility for run queue inserts, updated generator quality rules for random-sector/lead-qualification fixtures, raised scenario density with 3-6 turn bounds, added QA run credit-usage visibility, decoupled QA execution from tenant org/skills via synthetic KB-only responder flow, increased generator max output tokens to reduce JSON truncation failures, refined Judge pricing-groundedness rule to avoid false positives when KB has no numeric price, refined engagement-question rules to penalize only repetitive/context-breaking follow-ups, added per-run USD cost estimation from input/output token usage, added intake-fulfillment/handoff-readiness coverage metrics to QA execution/judging/detail UI, de-prioritized communication-preference as a mandatory intake field, tightened generator semantic-diversity/fallback-line validation, added auto-stabilization for low-diversity fixture outputs before final quality validation, added question-aware customer-turn adaptation so QA scenario turns follow the assistant’s prior clarification context, hardened QA turn coherence with urgency-aware intake semantics/service-catalog-aware customer adaptation/contradiction filtering/deeper turn distribution/citation-strict Judge evidence rules, added sector-agnostic semantic intake fulfillment + responder blocked-field re-ask guard + inferable-field Judge penalties, added Judge consistency guards (strict-score retry + citation-attribute mismatch filtering), fixed intake asked-coverage false negatives for natural question phrasing with asked/fulfilled contradiction normalization, enforced per-scenario Judge assessments with case-level fallback coverage plus run-detail visibility, stabilized Judge JSON reliability with dynamic output-token scaling + invalid-JSON recovery retry, and capped QA preset scenario count to 15 for run stability.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -645,6 +645,22 @@
 - [x] Lower QA fixture minimum-line requirement from `200` to `150` for run presets and DB validation
 - [x] Refine Judge pricing-groundedness rule: if KB has no numeric pricing, no penalty for withholding exact price; penalize only fabricated pricing claims
 - [x] Refine QA engagement-question policy: allow contextual single follow-up, penalize only repetitive/menu-like consecutive prompts
+- [x] Add per-run USD cost estimation (`gpt-4o-mini` input/cache/output rates) to QA run report/list/detail surfaces
+- [x] Add intake-fulfillment coverage analysis (required field asked/fulfilled/missing) and handoff-readiness signals to QA report, judge payload, pipeline checks, and run detail UI
+- [x] Remove communication-preference from mandatory QA intake expectation (replace with better coordination signals) and penalize only repetitive asks
+- [x] Tighten QA generator quality gate for semantic fixture diversity and excessive fallback-line artifacts
+- [x] Add generator fixture auto-stabilization pass to repair low-diversity outputs before final quality gate failure
+- [x] Adapt simulated customer turns to previous assistant clarifications (answer-or-boundary behavior) so execution transcripts remain context-coherent
+- [x] Make simulated customer adaptation sector-aware via generated service catalog (remove education-specific fallback replies in non-education sectors)
+- [x] Add history-aware contradiction filter for synthetic customer budget statements (avoid cross-turn budget drift when not explicitly re-asked)
+- [x] Normalize urgency-like required fields (`Acil Durum` etc.) to actionable urgency intake and extend coverage matching with natural urgency language
+- [x] Enforce deeper scenario-turn distribution in Quick/Regression generation (meaningful share of scenarios reach 4+ turns within 3-6 bounds)
+- [x] Tighten Judge evidence discipline: each finding must include scenario/turn citation formatting before high-confidence reporting
+- [x] Add sector-agnostic semantic intake fulfillment inference and responder blocked-field re-ask guard (fulfilled/deferred), and update Judge to penalize re-asking inferable provided fields
+- [x] Add Judge consistency guards: retry suspiciously low judge scores with strict 0-100 scale and drop findings whose cited scenario attributes contradict finding text
+- [x] Fix intake asked-coverage false negatives for natural question phrasing (e.g., "öğrenebilir miyim") and normalize asked/fulfilled contradictions (`asked=0` with high fulfillment)
+- [x] Enforce per-scenario Judge assessments (answer quality, logic, groundedness) with fallback completion for omitted cases and expose results in run detail UI
+- [x] Stabilize Judge JSON reliability via dynamic output-token scaling by scenario count + invalid-JSON recovery retry; cap QA preset scenario count to `15`
 - [x] Unit tests for core logic
 - [x] Integration tests for WhatsApp flow
 - [x] E2E tests for admin panel

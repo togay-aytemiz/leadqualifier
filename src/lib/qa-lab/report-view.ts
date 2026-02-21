@@ -1,6 +1,11 @@
 export interface QaLabRunBudgetView {
     limitTokens: number | null
     consumedTokens: number | null
+    consumedInputTokens: number | null
+    consumedInputCachedTokens: number | null
+    consumedOutputTokens: number | null
+    consumedCredits: number | null
+    estimatedCostUsd: number | null
     remainingTokens: number | null
     exhausted: boolean | null
 }
@@ -31,6 +36,19 @@ export interface QaLabRunTopActionView {
     effort: string
 }
 
+export interface QaLabRunScenarioAssessmentView {
+    caseId: string
+    assistantSuccess: 'pass' | 'warn' | 'fail'
+    answerQualityScore: number | null
+    logicScore: number | null
+    groundednessScore: number | null
+    summary: string
+    strengths: string[]
+    issues: string[]
+    confidence: number | null
+    source: 'judge' | 'fallback'
+}
+
 export interface QaLabRunTurnView {
     turnIndex: number | null
     customerMessage: string
@@ -46,6 +64,41 @@ export interface QaLabRunCaseView {
     leadTemperature: string
     informationSharing: string
     turns: QaLabRunTurnView[]
+}
+
+export interface QaLabRunIntakeCoverageTotalsView {
+    caseCount: number
+    readyCaseCount: number
+    warnCaseCount: number
+    failCaseCount: number
+    averageAskedCoverage: number
+    averageFulfillmentCoverage: number
+    hotCooperativeCaseCount: number
+    hotCooperativeReadyCount: number
+}
+
+export interface QaLabRunIntakeCoverageCaseView {
+    caseId: string
+    title: string
+    leadTemperature: string
+    informationSharing: string
+    requiredFieldsTotal: number
+    askedFieldsCount: number
+    fulfilledFieldsCount: number
+    askedCoverage: number
+    fulfillmentCoverage: number
+    handoffReadiness: 'pass' | 'warn' | 'fail'
+    missingFields: string[]
+}
+
+export interface QaLabRunIntakeCoverageView {
+    requiredFields: string[]
+    totals: QaLabRunIntakeCoverageTotalsView
+    byCase: QaLabRunIntakeCoverageCaseView[]
+    topMissingFields: Array<{
+        field: string
+        count: number
+    }>
 }
 
 export interface QaLabRunKbFixtureView {
@@ -96,9 +149,11 @@ export interface QaLabRunReportView {
     groundTruth: QaLabRunGroundTruthView
     derivedSetup: QaLabRunDerivedSetupView
     scenarioMix: QaLabRunScenarioMixView
+    intakeCoverage: QaLabRunIntakeCoverageView
     pipelineChecks: QaLabRunPipelineChecksView
     findings: QaLabRunFindingView[]
     topActions: QaLabRunTopActionView[]
+    scenarioAssessments: QaLabRunScenarioAssessmentView[]
     cases: QaLabRunCaseView[]
     judgeSkippedReason: string | null
 }
@@ -137,6 +192,16 @@ function toPipelineStatus(value: unknown): 'pass' | 'warn' | 'fail' {
     return 'warn'
 }
 
+function toIntakeReadiness(value: unknown): 'pass' | 'warn' | 'fail' {
+    if (value === 'pass' || value === 'warn' || value === 'fail') return value
+    return 'warn'
+}
+
+function toScenarioAssessmentSource(value: unknown): 'judge' | 'fallback' {
+    if (value === 'judge' || value === 'fallback') return value
+    return 'judge'
+}
+
 export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
     const reportRecord = toRecord(report)
     const budgetRecord = toRecord(reportRecord.budget)
@@ -152,7 +217,14 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
     const executionRecord = toRecord(reportRecord.execution)
     const rawFindings = Array.isArray(judgeRecord.findings) ? judgeRecord.findings : []
     const rawTopActions = Array.isArray(judgeRecord.top_actions) ? judgeRecord.top_actions : []
+    const rawScenarioAssessments = Array.isArray(judgeRecord.scenario_assessments)
+        ? judgeRecord.scenario_assessments
+        : []
     const rawCases = Array.isArray(executionRecord.cases) ? executionRecord.cases : []
+    const intakeCoverageRecord = toRecord(executionRecord.intake_coverage)
+    const intakeCoverageTotalsRecord = toRecord(intakeCoverageRecord.totals)
+    const rawIntakeCoverageByCase = Array.isArray(intakeCoverageRecord.by_case) ? intakeCoverageRecord.by_case : []
+    const rawTopMissingFields = Array.isArray(intakeCoverageRecord.top_missing_fields) ? intakeCoverageRecord.top_missing_fields : []
     const rawPipelineSteps = Array.isArray(pipelineChecksRecord.steps) ? pipelineChecksRecord.steps : []
     const fixtureLines = toStringArray(generatorRecord.fixture_lines)
 
@@ -186,6 +258,24 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
             } satisfies QaLabRunTopActionView
         })
 
+    const scenarioAssessments = rawScenarioAssessments
+        .map((rawAssessment) => {
+            const assessment = toRecord(rawAssessment)
+            return {
+                caseId: toString(assessment.case_id, '-'),
+                assistantSuccess: toIntakeReadiness(assessment.assistant_success),
+                answerQualityScore: toNumber(assessment.answer_quality_score),
+                logicScore: toNumber(assessment.logic_score),
+                groundednessScore: toNumber(assessment.groundedness_score),
+                summary: toString(assessment.summary, '-'),
+                strengths: toStringArray(assessment.strengths),
+                issues: toStringArray(assessment.issues),
+                confidence: toNumber(assessment.confidence),
+                source: toScenarioAssessmentSource(assessment.source)
+            } satisfies QaLabRunScenarioAssessmentView
+        })
+        .filter((assessment) => assessment.caseId !== '-')
+
     const cases = rawCases
         .map((rawCase) => {
             const caseRecord = toRecord(rawCase)
@@ -212,6 +302,34 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
             } satisfies QaLabRunCaseView
         })
 
+    const intakeCoverageByCase = rawIntakeCoverageByCase
+        .map((rawCaseCoverage) => {
+            const caseCoverageRecord = toRecord(rawCaseCoverage)
+            return {
+                caseId: toString(caseCoverageRecord.case_id, '-'),
+                title: toString(caseCoverageRecord.title, '-'),
+                leadTemperature: toString(caseCoverageRecord.lead_temperature, 'warm'),
+                informationSharing: toString(caseCoverageRecord.information_sharing, 'partial'),
+                requiredFieldsTotal: toNumber(caseCoverageRecord.required_fields_total) ?? 0,
+                askedFieldsCount: toNumber(caseCoverageRecord.asked_fields_count) ?? 0,
+                fulfilledFieldsCount: toNumber(caseCoverageRecord.fulfilled_fields_count) ?? 0,
+                askedCoverage: toNumber(caseCoverageRecord.asked_coverage) ?? 0,
+                fulfillmentCoverage: toNumber(caseCoverageRecord.fulfillment_coverage) ?? 0,
+                handoffReadiness: toIntakeReadiness(caseCoverageRecord.handoff_readiness),
+                missingFields: toStringArray(caseCoverageRecord.missing_fields)
+            } satisfies QaLabRunIntakeCoverageCaseView
+        })
+
+    const topMissingFields = rawTopMissingFields
+        .map((rawItem) => {
+            const itemRecord = toRecord(rawItem)
+            return {
+                field: toString(itemRecord.field, '-'),
+                count: toNumber(itemRecord.count) ?? 0
+            }
+        })
+        .filter((item) => item.field !== '-')
+
     const pipelineSteps = rawPipelineSteps
         .map((rawStep) => {
             const step = toRecord(rawStep)
@@ -227,6 +345,11 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
         budget: {
             limitTokens: toNumber(budgetRecord.limit_tokens),
             consumedTokens: toNumber(budgetRecord.consumed_tokens),
+            consumedInputTokens: toNumber(budgetRecord.consumed_input_tokens),
+            consumedInputCachedTokens: toNumber(budgetRecord.consumed_input_cached_tokens),
+            consumedOutputTokens: toNumber(budgetRecord.consumed_output_tokens),
+            consumedCredits: toNumber(budgetRecord.consumed_credits),
+            estimatedCostUsd: toNumber(budgetRecord.estimated_cost_usd),
             remainingTokens: toNumber(budgetRecord.remaining_tokens),
             exhausted: toBoolean(budgetRecord.exhausted)
         },
@@ -263,6 +386,21 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
             partial: toNumber(scenarioMixInformationSharing.partial),
             resistant: toNumber(scenarioMixInformationSharing.resistant)
         },
+        intakeCoverage: {
+            requiredFields: toStringArray(intakeCoverageRecord.required_fields),
+            totals: {
+                caseCount: toNumber(intakeCoverageTotalsRecord.case_count) ?? 0,
+                readyCaseCount: toNumber(intakeCoverageTotalsRecord.ready_case_count) ?? 0,
+                warnCaseCount: toNumber(intakeCoverageTotalsRecord.warn_case_count) ?? 0,
+                failCaseCount: toNumber(intakeCoverageTotalsRecord.fail_case_count) ?? 0,
+                averageAskedCoverage: toNumber(intakeCoverageTotalsRecord.average_asked_coverage) ?? 0,
+                averageFulfillmentCoverage: toNumber(intakeCoverageTotalsRecord.average_fulfillment_coverage) ?? 0,
+                hotCooperativeCaseCount: toNumber(intakeCoverageTotalsRecord.hot_cooperative_case_count) ?? 0,
+                hotCooperativeReadyCount: toNumber(intakeCoverageTotalsRecord.hot_cooperative_ready_count) ?? 0
+            },
+            byCase: intakeCoverageByCase,
+            topMissingFields
+        },
         pipelineChecks: {
             overall: toPipelineStatus(pipelineChecksRecord.overall),
             steps: pipelineSteps
@@ -270,6 +408,7 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
         summary: toString(judgeRecord.summary, ''),
         findings,
         topActions,
+        scenarioAssessments,
         cases,
         judgeSkippedReason: toString(judgeRecord.skipped_reason, '') || null
     }

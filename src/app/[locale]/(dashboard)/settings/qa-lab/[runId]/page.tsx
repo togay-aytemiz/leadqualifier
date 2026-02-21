@@ -7,6 +7,7 @@ import { Link } from '@/i18n/navigation'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { buildQaLabPipelineActionSet } from '@/lib/qa-lab/action-set'
+import { calculateQaLabRunUsdCost } from '@/lib/qa-lab/cost'
 import {
     parseQaLabRunReportView,
     type QaLabRunFindingView
@@ -79,6 +80,19 @@ function getPipelineStatusBadgeClass(status: 'pass' | 'warn' | 'fail') {
     }
 }
 
+function getIntakeReadinessBadgeClass(status: 'pass' | 'warn' | 'fail') {
+    switch (status) {
+    case 'pass':
+        return 'bg-emerald-100 text-emerald-700'
+    case 'warn':
+        return 'bg-amber-100 text-amber-800'
+    case 'fail':
+        return 'bg-red-100 text-red-700'
+    default:
+        return 'bg-slate-100 text-slate-700'
+    }
+}
+
 function formatDateTime(value: string | null, locale: string) {
     if (!value) return '-'
     const date = new Date(value)
@@ -93,6 +107,21 @@ function formatDateTime(value: string | null, locale: string) {
 function formatNumber(value: number | null, locale: string) {
     if (typeof value !== 'number') return '-'
     return value.toLocaleString(locale)
+}
+
+function formatUsd(value: number | null, locale: string) {
+    if (typeof value !== 'number') return '-'
+    return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: value < 1 ? 4 : 2,
+        maximumFractionDigits: value < 1 ? 4 : 2
+    }).format(value)
+}
+
+function formatPercent(value: number | null) {
+    if (typeof value !== 'number') return '-'
+    return `${Math.round(value * 100)}%`
 }
 
 export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageProps) {
@@ -161,6 +190,28 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
 
     const report = parseQaLabRunReportView(run.report)
     const pipelineActionSet = buildQaLabPipelineActionSet(run.report)
+    const intakeCoverageByCase = new Map(
+        report.intakeCoverage.byCase.map((item) => [item.caseId, item] as const)
+    )
+    const caseTitleById = new Map(
+        report.cases.map((item) => [item.caseId, item.title] as const)
+    )
+    const estimatedCostUsd = (() => {
+        if (typeof report.budget.estimatedCostUsd === 'number') {
+            return report.budget.estimatedCostUsd
+        }
+        if (
+            typeof report.budget.consumedInputTokens === 'number'
+            && typeof report.budget.consumedOutputTokens === 'number'
+        ) {
+            return calculateQaLabRunUsdCost({
+                inputTokens: report.budget.consumedInputTokens,
+                outputTokens: report.budget.consumedOutputTokens,
+                cachedInputTokens: report.budget.consumedInputCachedTokens ?? 0
+            })
+        }
+        return null
+    })()
 
     return (
         <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
@@ -244,6 +295,12 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
                             <div>
                                 <p className="text-gray-500">{tQaLab('details.fields.tokensRemaining')}</p>
                                 <p className="mt-1">{formatNumber(report.budget.remainingTokens, locale)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500" title={tQaLab('costFormulaTooltip')}>
+                                    {tQaLab('details.fields.estimatedCostUsd')}
+                                </p>
+                                <p className="mt-1">{formatUsd(estimatedCostUsd, locale)}</p>
                             </div>
                         </div>
 
@@ -371,6 +428,58 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
                     </div>
 
                     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <h2 className="text-base font-semibold text-gray-900">{tQaLab('details.intakeCoverageTitle')}</h2>
+                        <p className="mt-1 text-sm text-gray-500">{tQaLab('details.intakeCoverageDescription')}</p>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 text-sm text-gray-700 sm:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.intakeCoverageFields.required')}</p>
+                                <p className="mt-1">{formatNumber(report.intakeCoverage.requiredFields.length, locale)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.intakeCoverageFields.avgAsked')}</p>
+                                <p className="mt-1">{formatPercent(report.intakeCoverage.totals.averageAskedCoverage)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.intakeCoverageFields.avgFulfilled')}</p>
+                                <p className="mt-1">{formatPercent(report.intakeCoverage.totals.averageFulfillmentCoverage)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.intakeCoverageFields.hotCooperativeReadiness')}</p>
+                                <p className="mt-1">
+                                    {report.intakeCoverage.totals.hotCooperativeCaseCount > 0
+                                        ? formatPercent(
+                                            report.intakeCoverage.totals.hotCooperativeReadyCount
+                                            / report.intakeCoverage.totals.hotCooperativeCaseCount
+                                        )
+                                        : '-'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-gray-600 sm:grid-cols-3">
+                            <p>{tQaLab('details.intakeCoverageFields.readyCases')}: {formatNumber(report.intakeCoverage.totals.readyCaseCount, locale)}</p>
+                            <p>{tQaLab('details.intakeCoverageFields.warnCases')}: {formatNumber(report.intakeCoverage.totals.warnCaseCount, locale)}</p>
+                            <p>{tQaLab('details.intakeCoverageFields.failCases')}: {formatNumber(report.intakeCoverage.totals.failCaseCount, locale)}</p>
+                        </div>
+
+                        <div className="mt-4">
+                            <p className="text-sm font-medium text-gray-900">{tQaLab('details.intakeCoverageTopMissingTitle')}</p>
+                            {report.intakeCoverage.topMissingFields.length === 0 ? (
+                                <p className="mt-2 text-sm text-gray-500">{tQaLab('details.intakeCoverageEmpty')}</p>
+                            ) : (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {report.intakeCoverage.topMissingFields.map((item, index) => (
+                                        <span key={`${item.field}-${index}`} className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                                            {item.field} ({item.count})
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-base font-semibold text-gray-900">{tQaLab('details.pipelineChecksTitle')}</h2>
                             <span
@@ -442,6 +551,61 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
                             <p className="mt-3 text-xs text-amber-700">
                                 {tQaLab('details.judgeSkippedPrefix')} {report.judgeSkippedReason}
                             </p>
+                        )}
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <h2 className="text-base font-semibold text-gray-900">{tQaLab('details.scenarioAssessmentsTitle')}</h2>
+                        <p className="mt-1 text-sm text-gray-500">{tQaLab('details.scenarioAssessmentsDescription')}</p>
+                        {report.scenarioAssessments.length === 0 ? (
+                            <p className="mt-3 text-sm text-gray-500">{tQaLab('details.scenarioAssessmentsEmpty')}</p>
+                        ) : (
+                            <div className="mt-4 space-y-3">
+                                {report.scenarioAssessments.map((assessment, index) => {
+                                    const caseTitle = caseTitleById.get(assessment.caseId) ?? assessment.caseId
+                                    return (
+                                        <div key={`${assessment.caseId}-${index}`} className="rounded-lg border border-gray-200 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {caseTitle} ({assessment.caseId})
+                                                </p>
+                                                <span
+                                                    className={cn(
+                                                        'inline-flex rounded-full px-2 py-1 text-xs font-medium',
+                                                        getPipelineStatusBadgeClass(assessment.assistantSuccess)
+                                                    )}
+                                                >
+                                                    {tQaLab(`details.pipelineStatus.${assessment.assistantSuccess}`)}
+                                                </span>
+                                            </div>
+                                            <p className="mt-2 text-xs text-gray-600">
+                                                {tQaLab('details.scenarioAssessmentSourceLabel')}: {tQaLab(`details.scenarioAssessmentSource.${assessment.source}`)}
+                                            </p>
+                                            <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-gray-700 sm:grid-cols-3">
+                                                <p>{tQaLab('details.scenarioAssessmentFields.answerQuality')}: {formatNumber(assessment.answerQualityScore, locale)}</p>
+                                                <p>{tQaLab('details.scenarioAssessmentFields.logic')}: {formatNumber(assessment.logicScore, locale)}</p>
+                                                <p>{tQaLab('details.scenarioAssessmentFields.groundedness')}: {formatNumber(assessment.groundednessScore, locale)}</p>
+                                            </div>
+                                            <p className="mt-2 text-sm text-gray-700">
+                                                <span className="font-medium">{tQaLab('details.scenarioAssessmentSummaryLabel')}:</span>{' '}
+                                                {assessment.summary}
+                                            </p>
+                                            {assessment.strengths.length > 0 && (
+                                                <p className="mt-2 text-xs text-emerald-700">
+                                                    <span className="font-medium">{tQaLab('details.scenarioAssessmentStrengthsLabel')}:</span>{' '}
+                                                    {assessment.strengths.join(', ')}
+                                                </p>
+                                            )}
+                                            {assessment.issues.length > 0 && (
+                                                <p className="mt-1 text-xs text-amber-700">
+                                                    <span className="font-medium">{tQaLab('details.scenarioAssessmentIssuesLabel')}:</span>{' '}
+                                                    {assessment.issues.join(', ')}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         )}
                     </div>
 
@@ -582,6 +746,29 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
                             <div className="mt-4 space-y-4">
                                 {report.cases.map((caseItem, caseIndex) => (
                                     <div key={`${caseItem.caseId}-${caseIndex}`} className="rounded-lg border border-gray-200 p-3">
+                                        {(() => {
+                                            const caseCoverage = intakeCoverageByCase.get(caseItem.caseId)
+                                            if (!caseCoverage) return null
+                                            return (
+                                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-100 bg-gray-50 p-2">
+                                                    <span
+                                                        className={cn(
+                                                            'inline-flex rounded-full px-2 py-1 text-xs font-medium',
+                                                            getIntakeReadinessBadgeClass(caseCoverage.handoffReadiness)
+                                                        )}
+                                                    >
+                                                        {tQaLab(`details.pipelineStatus.${caseCoverage.handoffReadiness}`)}
+                                                    </span>
+                                                    <span className="text-xs text-gray-600">
+                                                        {tQaLab('details.intakeCoverageCaseSummary', {
+                                                            fulfilled: caseCoverage.fulfilledFieldsCount,
+                                                            required: caseCoverage.requiredFieldsTotal
+                                                        })}{' '}
+                                                        ({formatPercent(caseCoverage.fulfillmentCoverage)})
+                                                    </span>
+                                                </div>
+                                            )
+                                        })()}
                                         <p className="text-sm font-semibold text-gray-900">
                                             {caseItem.title} ({caseItem.caseId})
                                         </p>
@@ -597,6 +784,15 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
                                         <p className="mt-1 text-xs text-gray-600">
                                             {tQaLab('details.caseInfoSharingLabel')}: {caseItem.informationSharing}
                                         </p>
+                                        {(() => {
+                                            const caseCoverage = intakeCoverageByCase.get(caseItem.caseId)
+                                            if (!caseCoverage || caseCoverage.missingFields.length === 0) return null
+                                            return (
+                                                <p className="mt-1 text-xs text-amber-700">
+                                                    {tQaLab('details.intakeCoverageMissingLabel')}: {caseCoverage.missingFields.join(', ')}
+                                                </p>
+                                            )
+                                        })()}
 
                                         <div className="mt-3 space-y-3">
                                             {caseItem.turns.map((turn, turnIndex) => (

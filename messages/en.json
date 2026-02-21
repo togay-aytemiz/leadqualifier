@@ -931,8 +931,10 @@
         "usageSummaryTitle": "Total usage (shown runs)",
         "usageSummaryCredits": "Credits: {value}",
         "usageSummaryTokens": "Tokens: {value}",
+        "usageSummaryCost": "Cost (USD): {value}",
         "usageSummaryEmpty": "No measurable usage yet.",
         "usageSummaryTooltip": "Averages are calculated from shown runs.\nAverage per run: {perRun} credits/run\nAverage per scenario: {perScenario} credits/scenario\nAverage per turn: {perTurn} credits/turn\nScenario: one synthetic customer conversation case.\nTurn: one customer message and one assistant response step.",
+        "costFormulaTooltip": "Estimated with gpt-4o-mini pricing: input $0.15/M, cached input $0.075/M, output $0.60/M tokens.",
         "emptyRuns": "No runs yet. Start a Quick run to generate the first report shell.",
         "columns": {
             "runId": "Run ID",
@@ -944,16 +946,17 @@
             "tokenBudget": "Budget",
             "tokensUsed": "Tokens used",
             "creditsUsed": "Credits used",
+            "costUsd": "Cost (USD)",
             "createdAt": "Created"
         },
         "presets": {
             "quick": {
                 "title": "Quick",
-                "description": "20 scenarios, 6 turns per scenario, 100k token cap."
+                "description": "15 scenarios, 6 turns per scenario, 100k token cap."
             },
             "regression": {
                 "title": "Regression",
-                "description": "36 scenarios, 6 turns per scenario, 100k token cap."
+                "description": "15 scenarios, 6 turns per scenario, 100k token cap."
             }
         },
         "status": {
@@ -989,7 +992,8 @@
                 "judgeModel": "Judge model",
                 "tokenBudget": "Token budget",
                 "tokensUsed": "Tokens used",
-                "tokensRemaining": "Tokens remaining"
+                "tokensRemaining": "Tokens remaining",
+                "estimatedCostUsd": "Estimated cost (USD)"
             },
             "budgetStoppedNotice": "Token budget was exhausted before all steps completed.",
             "scoreTitle": "Judge score summary",
@@ -1009,6 +1013,22 @@
                 "weightedTotal": "Weighted total"
             },
             "judgeSkippedPrefix": "Judge skipped:",
+            "scenarioAssessmentsTitle": "Scenario-level judge assessments",
+            "scenarioAssessmentsDescription": "Each scenario is evaluated in isolation for answer quality, logic flow, and groundedness.",
+            "scenarioAssessmentsEmpty": "No scenario-level assessments were produced.",
+            "scenarioAssessmentSourceLabel": "Source",
+            "scenarioAssessmentSource": {
+                "judge": "Judge output",
+                "fallback": "Pipeline fallback"
+            },
+            "scenarioAssessmentFields": {
+                "answerQuality": "Answer quality",
+                "logic": "Logic flow",
+                "groundedness": "Groundedness"
+            },
+            "scenarioAssessmentSummaryLabel": "Assessment summary",
+            "scenarioAssessmentStrengthsLabel": "Strengths",
+            "scenarioAssessmentIssuesLabel": "Issues",
             "topActionsTitle": "Judge top actions",
             "emptyTopActions": "No top actions were produced.",
             "actionMeta": "Layer: {layer} • Effort: {effort}",
@@ -1060,6 +1080,21 @@
             "generatedSetupTitle": "Generated extraction setup",
             "generatedSetupServiceCatalog": "Derived service catalog",
             "generatedSetupRequiredFields": "Derived required intake fields",
+            "intakeCoverageTitle": "Intake fulfillment coverage",
+            "intakeCoverageDescription": "Tracks whether required lead info is collected for both AI response quality and human handoff readiness.",
+            "intakeCoverageTopMissingTitle": "Most-missing required fields",
+            "intakeCoverageEmpty": "No missing-field signal yet.",
+            "intakeCoverageCaseSummary": "Fulfilled fields: {fulfilled}/{required}",
+            "intakeCoverageMissingLabel": "Missing required fields",
+            "intakeCoverageFields": {
+                "required": "Required fields",
+                "avgAsked": "Average asked coverage",
+                "avgFulfilled": "Average fulfilled coverage",
+                "hotCooperativeReadiness": "Hot+cooperative readiness",
+                "readyCases": "Ready cases",
+                "warnCases": "Warn cases",
+                "failCases": "Fail cases"
+            },
             "scenarioMix": {
                 "hot": "Hot scenarios",
                 "warm": "Warm scenarios",

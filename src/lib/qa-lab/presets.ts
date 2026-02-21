@@ -18,7 +18,7 @@ export interface QaLabPresetConfig {
 const QA_LAB_PRESET_MAP: Record<QaLabPreset, QaLabPresetConfig> = {
     quick: {
         id: 'quick',
-        scenarioCount: 20,
+        scenarioCount: 15,
         maxTurnsPerScenario: 6,
         maxTokenBudget: 100_000,
         fixtureMinLines: 150,
@@ -30,7 +30,7 @@ const QA_LAB_PRESET_MAP: Record<QaLabPreset, QaLabPresetConfig> = {
     },
     regression: {
         id: 'regression',
-        scenarioCount: 36,
+        scenarioCount: 15,
         maxTurnsPerScenario: 6,
         maxTokenBudget: 100_000,
         fixtureMinLines: 150,

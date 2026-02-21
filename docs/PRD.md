@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-20 (Lowered AI QA Lab fixture minimum from 200 to 150 lines, kept Quick/Regression at 100k token budget, retained generator retry diagnostics for failed runs, added run-insert fallback for legacy 200-line DB constraints, tightened QA generator prompts/validation for random-sector and lead-qualification coverage, increased scenario density with 3-6 turn bounds, added QA run credit-usage visibility, decoupled QA execution from tenant org/skills via synthetic KB-only responder flow, increased generator max output tokens to reduce JSON truncation failures, refined Judge pricing-groundedness rules to avoid false positives when KB lacks numeric pricing, and refined engagement-question rules to penalize only repetitive/context-breaking follow-ups.)  
+> **Last Updated:** 2026-02-20 (Lowered AI QA Lab fixture minimum from 200 to 150 lines, kept Quick/Regression at 100k token budget, retained generator retry diagnostics for failed runs, added run-insert fallback for legacy 200-line DB constraints, tightened QA generator prompts/validation for random-sector and lead-qualification coverage, increased scenario density with 3-6 turn bounds, added QA run credit-usage visibility, decoupled QA execution from tenant org/skills via synthetic KB-only responder flow, increased generator max output tokens to reduce JSON truncation failures, refined Judge pricing-groundedness rules to avoid false positives when KB lacks numeric pricing, refined engagement-question rules to penalize only repetitive/context-breaking follow-ups, added per-run USD cost estimation from input/output tokens, added intake-fulfillment/handoff-readiness coverage analysis to QA execution/judging, de-prioritized communication-preference as mandatory intake signal, tightened fixture semantic-diversity/fallback-line quality gates, added fixture auto-stabilization to reduce generator false-fail loops, added question-aware customer-turn adaptation for assistant-following scenario coherence, hardened QA reliability with urgency-aware intake normalization/history-based contradiction filtering/service-catalog-aware customer adaptation/deeper turn distribution/citation-strict Judge evidence formatting, added sector-agnostic semantic intake fulfillment + responder blocked-field re-ask guard + inferable-field Judge penalties, added Judge consistency guards (strict-score retry + citation-attribute mismatch filtering), fixed intake asked-coverage false negatives for natural question phrasing with asked/fulfilled contradiction normalization, enforced per-scenario Judge assessments with fallback completion for omitted cases, added dynamic Judge output-token scaling with invalid-JSON recovery retry, and capped preset scenario count to 15 for run stability.)  
 > **Status:** In Development
 
 ---
@@ -519,10 +519,20 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Judge pricing-groundedness rule: if KB/ground-truth does not contain numeric pricing, assistant must not be penalized for refusing exact price; only fabricated price claims are penalized.
 - Judge engagement rule: do not penalize a single contextual engagement question; penalize only excessive/repetitive/context-breaking follow-up prompting.
 - Run presets:
-  - `Quick`: 20 scenarios, 3-6 turns each (preset max 6), hard token budget `100k`
-  - `Regression`: 36 scenarios, 3-6 turns each (preset max 6), hard token budget `100k`
+  - `Quick`: 15 scenarios, 3-6 turns each (preset max 6), hard token budget `100k`
+  - `Regression`: 15 scenarios, 3-6 turns each (preset max 6), hard token budget `100k`
 - Generator execution retries failed generation attempts (up to 3) and stores attempt-level diagnostics (`finish_reason`, token usage, output snippets, validation error) in failure reports to speed up root-cause analysis.
 - Generator max output budget is tuned to avoid JSON truncation at fixture/scenario density targets (current cap: `6400` output tokens).
+- Run budget output includes estimated USD cost from token split using `gpt-4o-mini` rates (`input $0.15/M`, `cached input $0.075/M`, `output $0.60/M`) and surfaces this in run list/detail.
+- QA execution computes required-intake coverage per scenario (`asked`, `fulfilled`, `missing`) and a handoff-readiness status (`pass`/`warn`/`fail`) so results can be trusted before any live-assistant behavior changes.
+- QA simulated assistant now receives required/missing intake context from conversation history and is instructed to avoid re-asking fulfilled fields while collecting high-impact missing fields for both AI response quality and human takeover.
+- Intake fulfillment analysis now includes a sector-agnostic semantic rule: when a field was asked and the next customer turn provides a plausible contextual value, the field can be counted as fulfilled even without exact keyword echo.
+- QA responder now applies a final blocked-field guard: questions that re-ask `fulfilled` or `deferred` intake fields are stripped from final assistant output.
+- Intake asked-coverage detection now recognizes more natural question patterns (e.g., "öğrenebilir miyim", "olur mu"), reducing false `asked=0` outcomes.
+- When required fields are fulfilled but asked detection is zero (customer proactively provides complete data), asked-coverage is normalized to avoid contradictory readiness signals.
+- Communication preference is no longer treated as a mandatory intake requirement in QA Lab; if generated, it is normalized to a more actionable coordination signal (suitable callback time window).
+- Generator quality validation now rejects fixtures with low semantic diversity or excessive fallback-line artifacts, preventing repetitive synthetic KBs that distort assistant behavior quality.
+- When generator output is structurally valid but low in fixture semantic diversity, QA Lab applies an internal fixture auto-stabilization pass before final validation to improve run continuity without lowering quality thresholds.
 - Score model:
   - Groundedness `40%`
   - Extraction accuracy `35%`
@@ -538,6 +548,18 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Generator output now follows explicit sequence: `KB fixture` creation first, then KB-derived setup (`offering profile summary`, `service catalog`, `required intake fields`), then scenario generation.
 - Scenario generation now enforces mixed lead conditions: `hot/warm/cold` temperatures and `cooperative/partial/resistant` information-sharing behavior to test both strong lead capture and weak/casual conversation paths.
 - QA conversation execution carries forward per-turn conversation history and uses the same history discipline as production-like assistant turns, while keeping the factual context strictly limited to generated fixture content.
+- QA execution now context-adapts synthetic customer turns against the previous assistant question: when the customer turn drifts, it injects a coherent answer (or a single boundary statement for resistant behavior) to keep transcripts logically consistent.
+- QA customer-turn adaptation is domain-aware: service-detail supplements are derived from generated service catalog instead of hardcoded sector phrases, reducing cross-sector drift.
+- QA execution now applies history-aware contradiction filtering for synthetic customer turns (for example budget mismatch across consecutive turns when budget was not re-asked), preventing artificial inconsistency loops.
+- Urgency-like required fields are normalized to actionable urgency intake semantics and coverage analysis recognizes natural urgency language (for example “hızlı başlamak”, “en kısa sürede”).
+- Generator scenario normalization enforces a deeper turn distribution so a meaningful share of scenarios reaches 4+ turns (while keeping the 3-6 hard bounds).
+- Judge evidence quality is stricter: findings should include scenario/turn citations for high-confidence reporting.
+- Judge intake rule now treats inferable next-turn answers as collected and penalizes re-asking those inferable/already-provided fields.
+- Judge consistency guard now validates finding text against cited scenario attributes (hot/warm/cold, cooperative/partial/resistant); mismatched findings are dropped.
+- Judge scoring consistency guard retries evaluation with strict `0-100` score-scale instructions when score is suspiciously low against healthy intake metrics.
+- Judge now returns scenario-level assessments for every executed case (`assistant_success`, `answer_quality_score`, `logic_score`, `groundedness_score`) so each conversation is judged in isolation.
+- If Judge omits any scenario-level assessment, QA pipeline fills missing cases with explicit fallback assessments and marks source as `fallback` for transparency.
+- Judge output budget now scales with scenario count and automatically retries once in strict mode if initial Judge output is invalid JSON, reducing `judge_skipped_reason=invalid_judge_json` runs.
 - Run details expose the full QA artifact chain for manual review: generated KB fixture text (all lines), ground-truth extraction references, derived setup outputs, executed multi-turn conversations, Judge findings, and Judge-derived pipeline action set.
 - KB fixture visibility uses compact UI by default (preview-first card) and opens full fixture text in a modal on demand to keep detail pages readable.
 - Run details now include a **sequential pipeline self-check** (`pass/warn/fail`) across fixed stages (`KB fixture -> derived setup -> scenario generation -> conversation execution -> judge evaluation`) so the system can self-validate ordered execution quality.

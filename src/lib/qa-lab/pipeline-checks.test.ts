@@ -46,4 +46,33 @@ describe('buildQaLabPipelineChecks', () => {
         expect(result.steps[3]?.status).toBe('fail')
         expect(result.steps[4]?.status).toBe('warn')
     })
+
+    it('warns conversation execution step when intake fulfillment coverage is weak', () => {
+        const result = buildQaLabPipelineChecks({
+            fixtureLineCount: 200,
+            fixtureMinLines: 150,
+            derivedSetup: {
+                offeringProfileSummary: 'Psikolojik danismanlik',
+                serviceCatalogCount: 3,
+                requiredIntakeFieldCount: 5
+            },
+            scenarioCountTarget: 20,
+            scenarioCountGenerated: 20,
+            executedCaseCount: 20,
+            intakeCoverage: {
+                caseCount: 20,
+                readyCaseCount: 4,
+                warnCaseCount: 6,
+                failCaseCount: 10,
+                averageFulfillmentCoverage: 0.22,
+                hotCooperativeCaseCount: 8,
+                hotCooperativeReadyCount: 2
+            },
+            judgeSkippedReason: null
+        })
+
+        expect(result.overall).toBe('warn')
+        expect(result.steps[3]?.status).toBe('warn')
+        expect(result.steps[3]?.note).toContain('intake')
+    })
 })

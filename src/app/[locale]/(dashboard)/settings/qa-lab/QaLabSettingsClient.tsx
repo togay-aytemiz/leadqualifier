@@ -19,6 +19,7 @@ import {
     calculateUsageCreditCost,
     estimateUsageCreditCostFromTotalTokens
 } from '@/lib/billing/credit-cost'
+import { calculateQaLabRunUsdCost } from '@/lib/qa-lab/cost'
 import type { QaLabRun, QaLabRunResult, QaLabRunStatus } from '@/types/database'
 
 interface QaLabSettingsClientProps {
@@ -92,8 +93,10 @@ function readRunReportMetrics(report: QaLabRun['report']) {
         return {
             consumedTokens: null,
             consumedInputTokens: null,
+            consumedInputCachedTokens: null,
             consumedOutputTokens: null,
             creditsUsed: null,
+            estimatedCostUsd: null,
             scenarioCountForAverage: null,
             turnCountForAverage: null,
             weightedScore: null,
@@ -129,6 +132,9 @@ function readRunReportMetrics(report: QaLabRun['report']) {
     const consumedInputTokens = typeof budget.consumed_input_tokens === 'number'
         ? budget.consumed_input_tokens
         : null
+    const consumedInputCachedTokens = typeof budget.consumed_input_cached_tokens === 'number'
+        ? budget.consumed_input_cached_tokens
+        : null
     const consumedOutputTokens = typeof budget.consumed_output_tokens === 'number'
         ? budget.consumed_output_tokens
         : null
@@ -156,12 +162,31 @@ function readRunReportMetrics(report: QaLabRun['report']) {
         }
         return null
     })()
+    const estimatedCostUsd = (() => {
+        if (typeof budget.estimated_cost_usd === 'number') {
+            return budget.estimated_cost_usd
+        }
+        if (typeof consumedInputTokens === 'number' && typeof consumedOutputTokens === 'number') {
+            return calculateQaLabRunUsdCost({
+                inputTokens: consumedInputTokens,
+                outputTokens: consumedOutputTokens,
+                cachedInputTokens: (
+                    typeof consumedInputCachedTokens === 'number'
+                        ? consumedInputCachedTokens
+                        : 0
+                )
+            })
+        }
+        return null
+    })()
 
     return {
         consumedTokens,
         consumedInputTokens,
+        consumedInputCachedTokens,
         consumedOutputTokens,
         creditsUsed,
+        estimatedCostUsd,
         scenarioCountForAverage,
         turnCountForAverage,
         weightedScore,
@@ -212,11 +237,17 @@ export default function QaLabSettingsClient({
         if (typeof row.metrics.consumedTokens === 'number') {
             summary.totalTokens += row.metrics.consumedTokens
         }
+        if (typeof row.metrics.estimatedCostUsd === 'number') {
+            summary.totalCostUsd += row.metrics.estimatedCostUsd
+            summary.runsWithCost += 1
+        }
         return summary
     }, {
         totalCredits: 0,
         totalTokens: 0,
+        totalCostUsd: 0,
         runsWithCredits: 0,
+        runsWithCost: 0,
         totalScenarios: 0,
         totalTurns: 0
     })
@@ -224,6 +255,12 @@ export default function QaLabSettingsClient({
         minimumFractionDigits: 1,
         maximumFractionDigits: 1
     })
+    const formatUsd = (value: number) => new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: value < 1 ? 4 : 2,
+        maximumFractionDigits: value < 1 ? 4 : 2
+    }).format(value)
     const summaryTooltip = tQaLab('usageSummaryTooltip', {
         perRun: formatCredits(
             usageSummary.runsWithCredits > 0
@@ -398,6 +435,7 @@ export default function QaLabSettingsClient({
                                     </span>
                                     <span>{tQaLab('usageSummaryCredits', { value: formatCredits(usageSummary.totalCredits) })}</span>
                                     <span>{tQaLab('usageSummaryTokens', { value: usageSummary.totalTokens.toLocaleString(locale) })}</span>
+                                    <span>{tQaLab('usageSummaryCost', { value: formatUsd(usageSummary.totalCostUsd) })}</span>
                                     <span
                                         className="inline-flex cursor-help items-center text-gray-500"
                                         title={summaryTooltip}
@@ -432,6 +470,14 @@ export default function QaLabSettingsClient({
                                                     title={summaryTooltip}
                                                 >
                                                     {tQaLab('columns.creditsUsed')}
+                                                </span>
+                                            </th>
+                                            <th className="px-2 py-2">
+                                                <span
+                                                    className="cursor-help underline decoration-dotted underline-offset-2"
+                                                    title={tQaLab('costFormulaTooltip')}
+                                                >
+                                                    {tQaLab('columns.costUsd')}
                                                 </span>
                                             </th>
                                             <th className="px-2 py-2">{tQaLab('columns.createdAt')}</th>
@@ -493,6 +539,11 @@ export default function QaLabSettingsClient({
                                                 <td className="px-2 py-3">
                                                     {typeof metrics.creditsUsed === 'number'
                                                         ? formatCredits(metrics.creditsUsed)
+                                                        : '-'}
+                                                </td>
+                                                <td className="px-2 py-3">
+                                                    {typeof metrics.estimatedCostUsd === 'number'
+                                                        ? formatUsd(metrics.estimatedCostUsd)
                                                         : '-'}
                                                 </td>
                                                 <td className="px-2 py-3 text-gray-500">

@@ -44,6 +44,29 @@ describe('parseQaLabRunReportView', () => {
                 }
             },
             execution: {
+                intake_coverage: {
+                    totals: {
+                        case_count: 1,
+                        average_fulfillment_coverage: 0.66,
+                        ready_case_count: 1,
+                        warn_case_count: 0,
+                        fail_case_count: 0
+                    },
+                    top_missing_fields: [
+                        {
+                            field: 'Iletisim tercihi',
+                            count: 2
+                        }
+                    ],
+                    by_case: [
+                        {
+                            case_id: 'S1',
+                            handoff_readiness: 'pass',
+                            fulfilled_fields_count: 2,
+                            missing_fields: ['Iletisim tercihi']
+                        }
+                    ]
+                },
                 cases: [
                     {
                         case_id: 'S1',
@@ -98,6 +121,20 @@ describe('parseQaLabRunReportView', () => {
                         expected_impact: 'Lead kalitesi artar',
                         effort: 'low'
                     }
+                ],
+                scenario_assessments: [
+                    {
+                        case_id: 'S1',
+                        assistant_success: 'pass',
+                        answer_quality_score: 84,
+                        logic_score: 82,
+                        groundedness_score: 89,
+                        summary: 'Yanıtlar tutarlı ve hedefe uygun.',
+                        strengths: ['Hedef odaklı ilerleme'],
+                        issues: ['Bazı yanıtlar uzun'],
+                        confidence: 0.78,
+                        source: 'judge'
+                    }
                 ]
             }
         })
@@ -112,8 +149,16 @@ describe('parseQaLabRunReportView', () => {
         expect(parsed.pipelineChecks.steps[0]?.id).toBe('kb_fixture')
         expect(parsed.cases[0]?.leadTemperature).toBe('hot')
         expect(parsed.cases[0]?.turns[0]?.assistantResponse).toBe('Saat 14:00 boş.')
+        expect(parsed.intakeCoverage.totals.caseCount).toBe(1)
+        expect(parsed.intakeCoverage.totals.averageFulfillmentCoverage).toBe(0.66)
+        expect(parsed.intakeCoverage.topMissingFields[0]?.field).toBe('Iletisim tercihi')
+        expect(parsed.intakeCoverage.byCase[0]?.handoffReadiness).toBe('pass')
         expect(parsed.findings).toHaveLength(1)
         expect(parsed.topActions).toHaveLength(1)
+        expect(parsed.scenarioAssessments).toHaveLength(1)
+        expect(parsed.scenarioAssessments[0]?.caseId).toBe('S1')
+        expect(parsed.scenarioAssessments[0]?.assistantSuccess).toBe('pass')
+        expect(parsed.scenarioAssessments[0]?.source).toBe('judge')
     })
 
     it('returns safe defaults for malformed input', () => {
@@ -124,8 +169,10 @@ describe('parseQaLabRunReportView', () => {
         expect(parsed.kbFixture.lines).toEqual([])
         expect(parsed.groundTruth.canonicalServices).toEqual([])
         expect(parsed.pipelineChecks.steps).toEqual([])
+        expect(parsed.intakeCoverage.byCase).toEqual([])
         expect(parsed.cases).toEqual([])
         expect(parsed.findings).toEqual([])
         expect(parsed.topActions).toEqual([])
+        expect(parsed.scenarioAssessments).toEqual([])
     })
 })

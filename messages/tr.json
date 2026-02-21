@@ -931,8 +931,10 @@
         "usageSummaryTitle": "Toplam kullanım (listelenen run'lar)",
         "usageSummaryCredits": "Kredi: {value}",
         "usageSummaryTokens": "Token: {value}",
+        "usageSummaryCost": "Maliyet (USD): {value}",
         "usageSummaryEmpty": "Ölçülebilir kullanım henüz yok.",
         "usageSummaryTooltip": "Ortalamalar listelenen run'lar üzerinden hesaplanır.\nRun başına ortalama: {perRun} kredi/run\nSenaryo başına ortalama: {perScenario} kredi/senaryo\nTur başına ortalama: {perTurn} kredi/tur\nSenaryo: sentetik tek bir müşteri konuşma vakasıdır.\nTur: bir müşteri mesajı ve buna verilen asistan yanıtı adımıdır.",
+        "costFormulaTooltip": "gpt-4o-mini fiyatına göre tahmini hesap: input $0.15/M, cache input $0.075/M, output $0.60/M token.",
         "emptyRuns": "Henüz run yok. İlk rapor iskeletini oluşturmak için Quick run başlatın.",
         "columns": {
             "runId": "Run ID",
@@ -944,16 +946,17 @@
             "tokenBudget": "Bütçe",
             "tokensUsed": "Kullanılan token",
             "creditsUsed": "Kullanılan kredi",
+            "costUsd": "Maliyet (USD)",
             "createdAt": "Oluşturulma"
         },
         "presets": {
             "quick": {
                 "title": "Quick",
-                "description": "20 senaryo, senaryo başına 6 tur, 100k token üst sınırı."
+                "description": "15 senaryo, senaryo başına 6 tur, 100k token üst sınırı."
             },
             "regression": {
                 "title": "Regression",
-                "description": "36 senaryo, senaryo başına 6 tur, 100k token üst sınırı."
+                "description": "15 senaryo, senaryo başına 6 tur, 100k token üst sınırı."
             }
         },
         "status": {
@@ -989,7 +992,8 @@
                 "judgeModel": "Judge modeli",
                 "tokenBudget": "Token bütçesi",
                 "tokensUsed": "Kullanılan token",
-                "tokensRemaining": "Kalan token"
+                "tokensRemaining": "Kalan token",
+                "estimatedCostUsd": "Tahmini maliyet (USD)"
             },
             "budgetStoppedNotice": "Token bütçesi tüm adımlar tamamlanmadan tükendi.",
             "scoreTitle": "Judge skor özeti",
@@ -1009,6 +1013,22 @@
                 "weightedTotal": "Ağırlıklı toplam"
             },
             "judgeSkippedPrefix": "Judge atlandı:",
+            "scenarioAssessmentsTitle": "Senaryo bazlı Judge değerlendirmesi",
+            "scenarioAssessmentsDescription": "Her senaryo kendi içinde yanıt kalitesi, mantık akışı ve groundedness açısından ayrı değerlendirilir.",
+            "scenarioAssessmentsEmpty": "Senaryo bazlı değerlendirme üretilmedi.",
+            "scenarioAssessmentSourceLabel": "Kaynak",
+            "scenarioAssessmentSource": {
+                "judge": "Judge çıktısı",
+                "fallback": "Pipeline fallback"
+            },
+            "scenarioAssessmentFields": {
+                "answerQuality": "Yanıt kalitesi",
+                "logic": "Mantık akışı",
+                "groundedness": "Groundedness"
+            },
+            "scenarioAssessmentSummaryLabel": "Değerlendirme özeti",
+            "scenarioAssessmentStrengthsLabel": "Güçlü yönler",
+            "scenarioAssessmentIssuesLabel": "Sorunlar",
             "topActionsTitle": "Judge öncelikli aksiyonlar",
             "emptyTopActions": "Top action üretilmedi.",
             "actionMeta": "Katman: {layer} • Efor: {effort}",
@@ -1060,6 +1080,21 @@
             "generatedSetupTitle": "Üretilen çıkarım seti",
             "generatedSetupServiceCatalog": "Türetilen hizmet listesi",
             "generatedSetupRequiredFields": "Türetilen önemli bilgiler",
+            "intakeCoverageTitle": "Eksik bilgi tamamlama kapsamı",
+            "intakeCoverageDescription": "Gerekli lead bilgilerinin hem AI yanıt kalitesi hem de insan devralma hazırlığı için ne kadar toplandığını izler.",
+            "intakeCoverageTopMissingTitle": "En sık eksik kalan gerekli alanlar",
+            "intakeCoverageEmpty": "Henüz eksik alan sinyali yok.",
+            "intakeCoverageCaseSummary": "Tamamlanan alan: {fulfilled}/{required}",
+            "intakeCoverageMissingLabel": "Eksik gerekli alanlar",
+            "intakeCoverageFields": {
+                "required": "Gerekli alan sayısı",
+                "avgAsked": "Ortalama sorma kapsamı",
+                "avgFulfilled": "Ortalama tamamlanma kapsamı",
+                "hotCooperativeReadiness": "Sıcak+iş birlikçi hazırlık",
+                "readyCases": "Hazır vaka",
+                "warnCases": "Uyarı vaka",
+                "failCases": "Başarısız vaka"
+            },
             "scenarioMix": {
                 "hot": "Sıcak senaryo",
                 "warm": "Ilık senaryo",
