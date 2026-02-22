@@ -5,11 +5,14 @@ import {
     buildExecutionErrorReport,
     calculateJudgeTargetOutputTokens,
     createGeneratorRetryUserPrompt,
+    ensureActiveMissingFieldQuestion,
+    enforceFieldNamedClarificationQuestion,
     expandFixtureLinesToMinimum,
     filterJudgeFindingsByCitationConsistency,
     normalizeJudgeScenarioAssessmentsForExecutedCases,
     normalizeRequiredIntakeFieldsForQaLab,
     QaLabExecutionError,
+    sanitizeAssistantResponseForTruncation,
     shouldRetryJudgeForScoreAnomaly,
     stripBlockedFieldQuestionsFromAssistantResponse,
     stabilizeGeneratorOutputForQuality,
@@ -71,7 +74,8 @@ describe('qa lab executor helpers', () => {
         const expanded = expandFixtureLinesToMinimum([], 5)
 
         expect(expanded.length).toBe(5)
-        expect(expanded[0]).toContain('Fixture fallback line')
+        expect(expanded[0]).not.toContain('Fixture fallback line')
+        expect(expanded.some((line) => /fixture fallback line/i.test(line))).toBe(false)
     })
 
     it('rejects generic support-heavy generator outputs', () => {
@@ -349,6 +353,18 @@ describe('qa lab executor helpers', () => {
         expect(normalized).not.toContain('Acil Durum')
     })
 
+    it('drops callback-time requirement when timeline field already exists', () => {
+        const normalized = normalizeRequiredIntakeFieldsForQaLab([
+            'Proje Zaman Çizelgesi',
+            'Geri Dönüş Zaman Aralığı',
+            'Proje Bütçesi'
+        ])
+
+        expect(normalized).toContain('Proje Zaman Çizelgesi')
+        expect(normalized).toContain('Proje Bütçesi')
+        expect(normalized).not.toContain('Geri Dönüş Zaman Aralığı')
+    })
+
     it('supplements customer turn with required-field answer when previous assistant asks it', () => {
         const adapted = adaptQaLabCustomerTurnToAssistantContext({
             message: 'Bütçemiz aylık 1000 TL civarında. Hangi seçenekler var?',
@@ -448,6 +464,54 @@ describe('qa lab executor helpers', () => {
         expect(unchanged).toBe('Harika. Randevu için uygun saat aralığınız nedir?')
     })
 
+    it('replaces generic clarification questions with field-named follow-up', () => {
+        const refined = enforceFieldNamedClarificationQuestion({
+            response: 'Harika, devam edelim. Bu bilgiyi paylaşabilir misiniz?',
+            activeMissingFields: ['Öğrenci Yaşı']
+        })
+
+        expect(refined).toContain('Öğrenci Yaşı bilgisini paylaşabilir misiniz?')
+        expect(refined).not.toContain('Bu bilgiyi paylaşabilir misiniz?')
+    })
+
+    it('keeps assistant response unchanged when question already names a missing field', () => {
+        const unchanged = enforceFieldNamedClarificationQuestion({
+            response: 'Harika. Bütçe aralığınızı paylaşabilir misiniz?',
+            activeMissingFields: ['Bütçe']
+        })
+
+        expect(unchanged).toBe('Harika. Bütçe aralığınızı paylaşabilir misiniz?')
+    })
+
+    it('appends one explicit active missing-field question when none exists', () => {
+        const patched = ensureActiveMissingFieldQuestion({
+            response: 'Süreç adımlarını özetleyebilirim.',
+            activeMissingFields: ['Proje aciliyet seviyesi'],
+            userMessage: 'Önce süreci öğrenmek istiyorum.'
+        })
+
+        expect(patched).toContain('Proje aciliyet seviyesi bilgisini paylaşabilir misiniz?')
+    })
+
+    it('does not append missing-field question when user explicitly refuses sharing', () => {
+        const unchanged = ensureActiveMissingFieldQuestion({
+            response: 'Anladım, mevcut bilgilerle devam edebiliriz.',
+            activeMissingFields: ['Proje aciliyet seviyesi'],
+            userMessage: 'Bu detayı paylaşmak istemiyorum.'
+        })
+
+        expect(unchanged).toBe('Anladım, mevcut bilgilerle devam edebiliriz.')
+    })
+
+    it('removes likely truncated numbered-list tails from assistant response', () => {
+        const sanitized = sanitizeAssistantResponseForTruncation(
+            'Hizmetlerimiz: 1. Web geliştirme 2. Mobil geliştirme 3. Danışmanlık 4. Proje yönetimi 5. Bakım 6.'
+        )
+
+        expect(sanitized.endsWith('6.')).toBe(false)
+        expect(sanitized).toContain('Detayları ihtiyacınıza göre netleştirebiliriz.')
+    })
+
     it('drops findings when cited scenario attributes conflict with finding rationale', () => {
         const filtered = filterJudgeFindingsByCitationConsistency({
             findings: [
@@ -481,9 +545,24 @@ describe('qa lab executor helpers', () => {
                     lead_temperature: 'hot',
                     information_sharing: 'cooperative',
                     executed_turns: [
-                        { turn_index: 1, customer_message: 'x', assistant_response: 'y', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
-                        { turn_index: 2, customer_message: 'x', assistant_response: 'y', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
-                        { turn_index: 3, customer_message: 'x', assistant_response: 'y', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                        {
+                            turn_index: 1,
+                            customer_message: 'Bütçemiz 5000 TL civarında.',
+                            assistant_response: 'Teşekkürler, not aldım.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Bu hafta başlayabiliriz.',
+                            assistant_response: 'Uygunluk için zamanlama netleştirelim.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 3,
+                            customer_message: 'Fiyatı netleştirelim.',
+                            assistant_response: 'Bütçe aralığınızı tekrar paylaşabilir misiniz?',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        }
                     ]
                 },
                 {
@@ -502,6 +581,49 @@ describe('qa lab executor helpers', () => {
 
         expect(filtered).toHaveLength(1)
         expect(filtered[0]?.violated_rule).toBe('Re-asking already provided intake details')
+    })
+
+    it('drops repetitive-question findings when cited turn does not actually re-ask provided data', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'minor',
+                    violated_rule: 'Re-asking already provided intake details',
+                    evidence: '[scenario_id=scenario_1, turn=2]',
+                    rationale: 'Assistant repeated budget question after the customer had already shared it.',
+                    suggested_fix: 'Track collected fields.',
+                    target_layer: 'pipeline',
+                    effort: 'low',
+                    confidence: 0.7
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Scenario 1',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Uygunluk ve hizmet detaylarını merak ediyorum.',
+                            assistant_response: 'Zamanlama ve kapsamı konuşabiliriz.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Bu hafta içi müsaitlik bakıyorum.',
+                            assistant_response: 'Bütçe aralığınızı paylaşabilir misiniz?',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
     })
 
     it('flags suspiciously low judge score for strict-score retry when intake quality is healthy', () => {
@@ -681,6 +803,48 @@ describe('qa lab executor helpers', () => {
             groundedness_score: 0,
             confidence: 1
         })
+    })
+
+    it('downgrades strict fail to warn for cold-resistant scenarios with mostly sufficient intake coverage', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_1',
+                    assistant_success: 'fail',
+                    answer_quality_score: 55,
+                    logic_score: 50,
+                    groundedness_score: 70,
+                    summary: 'Failed due to one missing field.',
+                    strengths: ['Basic service info provided'],
+                    issues: ['Missing one intake field'],
+                    confidence: 0.75
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Cold resistant case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'cold',
+                    information_sharing: 'resistant',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Detay vermek istemiyorum.', assistant_response: 'Temel bilgi verebilirim.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Bütçem 4000 TL.', assistant_response: 'Teşekkürler, not aldım.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_1',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 0.75,
+                    fulfillmentCoverage: 0.75
+                }
+            ]
+        })
+
+        expect(assessments[0]?.assistant_success).toBe('warn')
     })
 
     it('includes execution metadata in report for qa execution errors', () => {

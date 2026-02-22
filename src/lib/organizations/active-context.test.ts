@@ -173,4 +173,64 @@ describe('resolveActiveOrganizationContext', () => {
         expect(context?.accessibleOrganizations).toHaveLength(2)
         expect((organizationListBuilder.order as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('name', { ascending: true })
     })
+
+    it('excludes AI QA LAB from system admin accessible organizations', async () => {
+        const profileBuilder = createQueryBuilder({
+            singleResult: {
+                data: {
+                    is_system_admin: true
+                },
+                error: null
+            }
+        })
+        const organizationListBuilder = createQueryBuilder({
+            orderResult: {
+                data: [
+                    {
+                        id: 'org-a',
+                        name: 'Alpha',
+                        slug: 'alpha'
+                    },
+                    {
+                        id: 'org-qa',
+                        name: 'AI QA LAB',
+                        slug: 'ai-qa-lab'
+                    },
+                    {
+                        id: 'org-b',
+                        name: 'Beta',
+                        slug: 'beta'
+                    }
+                ],
+                error: null
+            }
+        })
+        const supabaseMock = createSupabaseMock({
+            profiles: [profileBuilder],
+            organizations: [organizationListBuilder]
+        })
+
+        cookiesMock.mockResolvedValue({
+            get: vi.fn(() => undefined)
+        })
+
+        const context = await resolveActiveOrganizationContext(supabaseMock as never, {
+            includeAccessibleOrganizations: true
+        })
+
+        expect(context).not.toBeNull()
+        expect(context?.accessibleOrganizations).toEqual([
+            {
+                id: 'org-a',
+                name: 'Alpha',
+                slug: 'alpha'
+            },
+            {
+                id: 'org-b',
+                name: 'Beta',
+                slug: 'beta'
+            }
+        ])
+        expect(context?.activeOrganizationId).toBe('org-a')
+    })
 })

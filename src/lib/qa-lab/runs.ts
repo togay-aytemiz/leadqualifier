@@ -322,6 +322,10 @@ export async function executeQaLabRun(
     return executeQaLabRunById(normalizedRunId, { supabase })
 }
 
+export async function executeQaLabRunForAdmin(runId: string) {
+    return executeQaLabRun(runId, { allowSystemAdmin: true })
+}
+
 export async function createAndExecuteQaLabRun(
     presetInput: QaLabRunPreset | string,
     options?: { allowSystemAdmin?: boolean }

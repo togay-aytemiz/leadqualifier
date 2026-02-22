@@ -211,6 +211,27 @@ const QA_LAB_URGENCY_FIELD_PATTERNS = [
     /priority/i
 ]
 
+const QA_LAB_GENERIC_CLARIFICATION_QUESTION_PATTERNS = [
+    /\bbu bilgi/i,
+    /\bbu detayi/i,
+    /\bbu detayı/i,
+    /\bbu konuda\b/i,
+    /\bpaylasabilir misiniz\b/i,
+    /\bpaylaşabilir misiniz\b/i,
+    /\bbelirtebilir misiniz\b/i
+]
+
+const REASK_FINDING_PATTERNS = [
+    /\bre-?ask/i,
+    /\brepeat/i,
+    /\brepetitive/i,
+    /\balready provided/i,
+    /\btekrar\b/i,
+    /\byeniden\b/i,
+    /\bayn[iı]\s+bilgi\b/i,
+    /\bm[ıi]ssing budget inquiry\b/i
+]
+
 type QaLabScenarioTemperature = 'hot' | 'warm' | 'cold'
 type QaLabScenarioInformationSharing = 'cooperative' | 'partial' | 'resistant'
 
@@ -877,6 +898,25 @@ function buildFixtureQualityStats(fixtureLines: string[]): QaLabFixtureQualitySt
     }
 }
 
+function sanitizeGeneratedFixtureLines(lines: string[]) {
+    const unique: string[] = []
+    const seen = new Set<string>()
+
+    for (const rawLine of lines) {
+        const normalizedWhitespace = rawLine.replace(/\s+/g, ' ').trim()
+        if (!normalizedWhitespace) continue
+        if (GENERATOR_FALLBACK_LINE_PATTERN.test(normalizedWhitespace)) continue
+        if (matchesAnyPattern(normalizedWhitespace, GENERATOR_PLACEHOLDER_PATTERNS)) continue
+
+        const key = normalizeForDiversity(normalizedWhitespace)
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        unique.push(normalizedWhitespace)
+    }
+
+    return unique
+}
+
 function takeUniqueNonEmpty(values: string[], limit: number) {
     const unique: string[] = []
     for (const value of values) {
@@ -931,6 +971,8 @@ function buildDiverseFixtureLines(input: {
     const pushLine = (value: string) => {
         const trimmed = value.replace(/\s+/g, ' ').trim()
         if (!trimmed) return
+        if (GENERATOR_FALLBACK_LINE_PATTERN.test(trimmed)) return
+        if (matchesAnyPattern(trimmed, GENERATOR_PLACEHOLDER_PATTERNS)) return
         const key = normalizeFixtureLineForSemanticDiversity(trimmed)
         if (!key || semanticKeys.has(key)) return
         semanticKeys.add(key)
@@ -1003,25 +1045,38 @@ export function stabilizeGeneratorOutputForQuality(
     generated: QaLabGeneratorOutput,
     run: QaLabRun
 ) {
-    const stats = buildFixtureQualityStats(generated.kb_fixture.lines)
+    const sanitizedFixtureLines = sanitizeGeneratedFixtureLines(generated.kb_fixture.lines)
+    const baseFixtureLines = sanitizedFixtureLines.length >= run.fixture_min_lines
+        ? sanitizedFixtureLines
+        : expandFixtureLinesToMinimum(sanitizedFixtureLines, run.fixture_min_lines)
+
+    const sanitizedGenerated: QaLabGeneratorOutput = {
+        ...generated,
+        kb_fixture: {
+            ...generated.kb_fixture,
+            lines: baseFixtureLines
+        }
+    }
+
+    const stats = buildFixtureQualityStats(sanitizedGenerated.kb_fixture.lines)
     const needsStabilization = (
         stats.fallbackLineRatio > 0.08
         || stats.semanticDiversityRatio < 0.3
     )
 
     if (!needsStabilization) {
-        return generated
+        return sanitizedGenerated
     }
 
     const stabilizedLines = buildDiverseFixtureLines({
-        generated,
+        generated: sanitizedGenerated,
         minimumLines: run.fixture_min_lines
     })
 
     return {
-        ...generated,
+        ...sanitizedGenerated,
         kb_fixture: {
-            ...generated.kb_fixture,
+            ...sanitizedGenerated.kb_fixture,
             lines: stabilizedLines
         }
     } satisfies QaLabGeneratorOutput
@@ -1045,6 +1100,12 @@ function isUrgencyLikeField(value: string) {
     return QA_LAB_URGENCY_FIELD_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
+function isCallbackTimeLikeField(value: string) {
+    const normalized = value.trim()
+    if (!normalized) return false
+    return /(geri donus|geri dönüş|callback|geri arama|geri aranma|geri donus zamani|geri dönüş zamanı)/i.test(normalized)
+}
+
 export function normalizeRequiredIntakeFieldsForQaLab(fields: string[]) {
     const cleaned = fields
         .map((field) => field.trim())
@@ -1052,7 +1113,8 @@ export function normalizeRequiredIntakeFieldsForQaLab(fields: string[]) {
 
     const normalized: string[] = []
     let hadContactPreference = false
-    let hasTimelineField = cleaned.some((field) => isTimelineLikeField(field))
+    let hasTimelineField = false
+    let callbackFieldSeen = false
 
     for (const field of cleaned) {
         if (isContactPreferenceField(field)) {
@@ -1062,14 +1124,20 @@ export function normalizeRequiredIntakeFieldsForQaLab(fields: string[]) {
         const normalizedField = isUrgencyLikeField(field)
             ? QA_LAB_URGENCY_REPLACEMENT_FIELD
             : field
+        if (isTimelineLikeField(normalizedField)) {
+            hasTimelineField = true
+        }
+        if (isCallbackTimeLikeField(normalizedField)) {
+            callbackFieldSeen = true
+            continue
+        }
         if (!normalized.includes(normalizedField)) {
             normalized.push(normalizedField)
         }
     }
 
-    if (hadContactPreference && !hasTimelineField) {
+    if ((hadContactPreference || callbackFieldSeen) && !hasTimelineField) {
         normalized.push(QA_LAB_CONTACT_PREFERENCE_REPLACEMENT_FIELD)
-        hasTimelineField = true
     }
 
     return normalized
@@ -1200,17 +1268,15 @@ export function createGeneratorRetryUserPrompt(
 
 export function expandFixtureLinesToMinimum(lines: string[], minimumLines: number) {
     const target = Math.max(0, Math.floor(minimumLines))
-    const normalizedBase = lines
-        .map((line) => line.replace(/\s+/g, ' ').trim())
-        .filter(Boolean)
+    const normalizedBase = sanitizeGeneratedFixtureLines(lines)
 
     const seeds = normalizedBase.length > 0
         ? normalizedBase
         : [
-            'Fixture fallback line: Hizmet talebi için müşteri ihtiyacı netleştirilir.',
-            'Fixture fallback line: Uygunluk için tarih ve saat tercihi sorulur.',
-            'Fixture fallback line: Fiyat aralığı hizmet kapsamına göre paylaşılır.',
-            'Fixture fallback line: İlk görüşmede gerekli temel bilgiler toplanır.'
+            'Hizmet talebinde müşteri ihtiyacı netleştirilir.',
+            'Uygunluk için tarih ve saat tercihi sorulur.',
+            'Fiyat aralığı hizmet kapsamına göre paylaşılır.',
+            'İlk görüşmede gerekli temel bilgiler toplanır.'
         ]
 
     const expanded = [...normalizedBase]
@@ -1236,7 +1302,12 @@ export function expandFixtureLinesToMinimum(lines: string[], minimumLines: numbe
     }
 
     while (expanded.length < target) {
-        expanded.push(`Fixture fallback line ${expanded.length + 1}: Detay için ek bilgi alınır.`)
+        const sequence = expanded.length + 1
+        const seed = seeds[(sequence - 1) % seeds.length] ?? 'Hizmet kapsamı görüşmede netleştirilir.'
+        const suffix = QA_LAB_FIXTURE_EXPANSION_SUFFIXES[
+            (sequence - 1) % QA_LAB_FIXTURE_EXPANSION_SUFFIXES.length
+        ] ?? 'Bilgi doğrulaması sonrası süreç ilerletilir.'
+        expanded.push(`${seed.replace(/[.!?]+$/g, '')}. ${suffix}`.replace(/\s+/g, ' ').trim())
     }
 
     return expanded.slice(0, target)
@@ -1542,9 +1613,10 @@ function normalizeGeneratorOutput(raw: Record<string, unknown>, run: QaLabRun): 
             : {}
     )
     const rawFixtureLines = normalizeStringArray(kbFixtureRecord.lines, 5000)
-    const fixtureLines = rawFixtureLines.length >= run.fixture_min_lines
-        ? rawFixtureLines
-        : expandFixtureLinesToMinimum(rawFixtureLines, run.fixture_min_lines)
+    const sanitizedFixtureLines = sanitizeGeneratedFixtureLines(rawFixtureLines)
+    const fixtureLines = sanitizedFixtureLines.length >= run.fixture_min_lines
+        ? sanitizedFixtureLines
+        : expandFixtureLinesToMinimum(sanitizedFixtureLines, run.fixture_min_lines)
 
     const groundTruthRaw = raw.ground_truth
     const groundTruthRecord = (
@@ -1673,6 +1745,41 @@ function normalizeJudgeScenarioSuccess(
     return fallback
 }
 
+function calibrateJudgeScenarioSuccessByCaseContext(input: {
+    status: 'pass' | 'warn' | 'fail'
+    caseItem: QaLabExecutedCase
+    coverage?: Pick<QaLabIntakeCoverageCaseResult, 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
+    issues: string[]
+}) {
+    if (input.status !== 'fail') return input.status
+
+    const caseIsColdResistant = (
+        input.caseItem.lead_temperature === 'cold'
+        && input.caseItem.information_sharing === 'resistant'
+    )
+    if (!caseIsColdResistant) return input.status
+
+    const hasHighRiskIssue = input.issues.some((issue) => {
+        const text = normalizeForFieldMatching(issue)
+        return /(hallucin|uydur|fabricat|contradict|yanlis|yanlış|unsafe|risk|policy|kb disi|kb dışı)/i.test(text)
+    })
+    if (hasHighRiskIssue) return input.status
+
+    const handoffReadiness = input.coverage?.handoffReadiness ?? 'warn'
+    const askedCoverage = typeof input.coverage?.askedCoverage === 'number'
+        ? input.coverage.askedCoverage
+        : 0
+    const fulfillmentCoverage = typeof input.coverage?.fulfillmentCoverage === 'number'
+        ? input.coverage.fulfillmentCoverage
+        : 0
+
+    if (handoffReadiness === 'fail') return input.status
+    if (askedCoverage < 0.5) return input.status
+    if (fulfillmentCoverage < 0.7) return input.status
+
+    return 'warn'
+}
+
 function getScenarioScoreBaseline(status: 'pass' | 'warn' | 'fail') {
     if (status === 'pass') return 82
     if (status === 'fail') return 42
@@ -1735,10 +1842,24 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
 
         const coverage = coverageByCaseId.get(caseId)
         const fallbackStatus = normalizeJudgeScenarioSuccess(coverage?.handoffReadiness, 'warn')
-        const status = normalizeJudgeScenarioSuccess(entry.assistant_success, fallbackStatus)
-        const baseline = getScenarioScoreBaseline(status)
+        const caseItem = caseById.get(caseId)
+        if (!caseItem) continue
         const strengths = normalizeStringArray(entry.strengths, 8)
         const issues = normalizeStringArray(entry.issues, 8)
+        const rawStatus = normalizeJudgeScenarioSuccess(entry.assistant_success, fallbackStatus)
+        const status = calibrateJudgeScenarioSuccessByCaseContext({
+            status: rawStatus,
+            caseItem,
+            coverage: coverage
+                ? {
+                    handoffReadiness: coverage.handoffReadiness,
+                    askedCoverage: coverage.askedCoverage,
+                    fulfillmentCoverage: coverage.fulfillmentCoverage
+                }
+                : undefined,
+            issues
+        })
+        const baseline = getScenarioScoreBaseline(status)
         const summary = trimText(
             entry.summary,
             'Judge provided scenario-level evaluation without explicit summary.'
@@ -1849,6 +1970,32 @@ export function filterJudgeFindingsByCitationConsistency(input: {
     const caseById = new Map(input.executedCases.map((caseItem) => [caseItem.case_id, caseItem]))
     const filtered: QaLabJudgeFinding[] = []
 
+    const supportsRepeatedQuestionClaim = (params: {
+        finding: QaLabJudgeFinding
+        caseItem: QaLabExecutedCase
+        citation: QaLabJudgeFindingCitation
+    }) => {
+        const citedTurn = params.caseItem.executed_turns[params.citation.turnIndex - 1]
+        if (!citedTurn) return false
+
+        const assistantMessage = citedTurn.assistant_response ?? ''
+        if (!hasQuestionIntent(assistantMessage)) return false
+
+        const findingText = `${params.finding.violated_rule} ${params.finding.rationale}`
+        const findingCategory = detectIntakeFieldCategory(findingText)
+        const assistantCategory = detectAssistantQuestionCategory(assistantMessage)
+        const targetCategory = assistantCategory !== 'generic'
+            ? assistantCategory
+            : (findingCategory !== 'generic' ? findingCategory : null)
+
+        if (!targetCategory) return true
+
+        const turnsUpToCitation = params.caseItem.executed_turns.slice(0, params.citation.turnIndex)
+        return turnsUpToCitation.some((turn) => (
+            isCustomerAnsweringCategory(turn.customer_message, targetCategory)
+        ))
+    }
+
     for (const finding of input.findings) {
         const citations = parseJudgeFindingCitations(finding.evidence)
         if (citations.length === 0) continue
@@ -1906,6 +2053,25 @@ export function filterJudgeFindingsByCitationConsistency(input: {
             || hasPartialMismatch
         ) {
             continue
+        }
+
+        const contextTextWithEvidence = normalizeForFieldMatching(
+            `${finding.violated_rule} ${finding.rationale} ${finding.evidence}`
+        )
+        const looksLikeReaskFinding = REASK_FINDING_PATTERNS.some((pattern) => (
+            pattern.test(contextTextWithEvidence)
+        ))
+        if (looksLikeReaskFinding) {
+            const hasValidReaskCitation = resolved.some((item) => (
+                supportsRepeatedQuestionClaim({
+                    finding,
+                    caseItem: item.caseItem,
+                    citation: item.citation
+                })
+            ))
+            if (!hasValidReaskCitation) {
+                continue
+            }
         }
 
         filtered.push(finding)
@@ -2491,6 +2657,108 @@ function splitIntoSentenceLikeChunks(message: string) {
         .filter(Boolean)
 }
 
+function responseMentionsAnyField(response: string, fields: string[]) {
+    return fields.some((field) => messageContainsKeywords(
+        response,
+        getIntakeFieldKeywords(field).keywords
+    ))
+}
+
+function isGenericClarificationChunk(chunk: string) {
+    if (!hasQuestionIntent(chunk)) return false
+    return QA_LAB_GENERIC_CLARIFICATION_QUESTION_PATTERNS.some((pattern) => pattern.test(chunk))
+}
+
+export function enforceFieldNamedClarificationQuestion(input: {
+    response: string
+    activeMissingFields: string[]
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+
+    const activeMissingFields = Array.from(new Set(
+        input.activeMissingFields
+            .map((field) => field.trim())
+            .filter(Boolean)
+    ))
+    if (activeMissingFields.length === 0) return response
+    if (!hasQuestionIntent(response)) return response
+    if (responseMentionsAnyField(response, activeMissingFields)) return response
+
+    const targetField = activeMissingFields[0] ?? ''
+    if (!targetField) return response
+
+    const explicitQuestion = `${targetField} bilgisini paylaşabilir misiniz?`
+    const chunks = splitIntoSentenceLikeChunks(response)
+    let replaced = false
+
+    const refined = chunks.map((chunk) => {
+        if (!isGenericClarificationChunk(chunk)) return chunk
+        replaced = true
+        return explicitQuestion
+    })
+
+    if (!replaced) return response
+    return refined.join(' ').replace(/\s+/g, ' ').trim()
+}
+
+export function ensureActiveMissingFieldQuestion(input: {
+    response: string
+    activeMissingFields: string[]
+    userMessage: string
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+
+    const activeMissingFields = Array.from(new Set(
+        input.activeMissingFields
+            .map((field) => field.trim())
+            .filter(Boolean)
+    ))
+    if (activeMissingFields.length === 0) return response
+    if (hasRefusalSignal(input.userMessage)) return response
+    if (hasQuestionIntent(response)) return response
+
+    const targetField = activeMissingFields[0] ?? ''
+    if (!targetField) return response
+    const explicitQuestion = `${targetField} bilgisini paylaşabilir misiniz?`
+    if (response.includes(explicitQuestion)) return response
+
+    const separator = /[.!?]$/.test(response) ? ' ' : '. '
+    return `${response}${separator}${explicitQuestion}`
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+export function sanitizeAssistantResponseForTruncation(response: string) {
+    const normalizedResponse = response.trim()
+    if (!normalizedResponse) return normalizedResponse
+
+    const hasLikelyList = /\b1\.\s*/.test(normalizedResponse) && /\b2\.\s*/.test(normalizedResponse)
+    if (!hasLikelyList) return normalizedResponse
+
+    const hasTruncatedTail = /\b\d+\.\s*$/.test(normalizedResponse) || /[:;]\s*$/.test(normalizedResponse)
+    if (!hasTruncatedTail) return normalizedResponse
+
+    let sanitized = normalizedResponse
+        .replace(/\b\d+\.\s*$/, '')
+        .replace(/[:;]\s*$/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    if (!sanitized) {
+        return 'Detayları ihtiyacınıza göre netleştirebiliriz.'
+    }
+
+    if (!/[.!?]$/.test(sanitized)) {
+        sanitized = `${sanitized}.`
+    }
+    if (!/detayları ihtiyacınıza göre netleştirebiliriz\.$/i.test(sanitized)) {
+        sanitized = `${sanitized} Detayları ihtiyacınıza göre netleştirebiliriz.`
+    }
+    return sanitized.replace(/\s+/g, ' ').trim()
+}
+
 export function stripBlockedFieldQuestionsFromAssistantResponse(input: {
     response: string
     blockedFields: string[]
@@ -2543,6 +2811,9 @@ If KB_CONTEXT is insufficient for the user's request:
 Do not redirect to human support or transfer-to-team style replies unless user explicitly asks for a human.
 Keep continuity with conversation history and avoid resetting context.
 Reply language policy (MVP): use ${responseLanguageName} only.
+Style policy:
+- Keep replies concise (max 3 short sentences, ideally <= 90 words).
+- Avoid long numbered lists; if list is necessary, keep it to at most 3 items.
 Intake fulfillment policy:
 - Prioritize required intake collection needed for actionable next step and human handoff readiness.
 - Do not re-ask already provided details from conversation history.
@@ -2555,6 +2826,7 @@ Intake fulfillment policy:
 - NEVER ask any field listed in DEFERRED_INTAKE_FIELDS.
 - Treat semantically inferable customer answers as collected; exact keyword repetition is not required.
 - If only deferred fields remain, move forward with available context instead of pushing intake loops.
+- If you ask a missing field, name that field explicitly (e.g., "Bütçe aralığınızı paylaşır mısınız?"), avoid vague "Bu bilgiyi paylaşır mısınız?" prompts.
 Engagement-question policy:
 - A single engagement question is allowed when the current user need is answered and the next intent is unclear.
 - Do NOT append menu-like suggestions on every turn (e.g., repeating multiple service options each reply).
@@ -2605,8 +2877,18 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
         response: responseRaw,
         blockedFields: blockedReaskFields
     })
+    const fieldNamedResponseRaw = enforceFieldNamedClarificationQuestion({
+        response: guardedResponseRaw,
+        activeMissingFields: intakeProgress.activeMissingFields
+    })
+    const withMissingFieldQuestionRaw = ensureActiveMissingFieldQuestion({
+        response: fieldNamedResponseRaw,
+        activeMissingFields: intakeProgress.activeMissingFields,
+        userMessage: input.message
+    })
+    const sanitizedResponseRaw = sanitizeAssistantResponseForTruncation(withMissingFieldQuestionRaw)
     const response = trimText(
-        guardedResponseRaw,
+        sanitizedResponseRaw,
         responseLanguage === 'tr'
             ? 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?'
             : 'I could not find a clear detail yet. Could you share a bit more context?'

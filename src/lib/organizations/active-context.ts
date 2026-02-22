@@ -49,6 +49,9 @@ interface MembershipWithOrganization {
         | null
 }
 
+const EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_NAMES = new Set(['ai qa lab'])
+const EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_SLUGS = new Set(['ai-qa-lab'])
+
 function isActiveOrganizationSummary(value: unknown): value is ActiveOrganizationSummary {
     if (typeof value !== 'object' || value === null) return false
 
@@ -58,6 +61,19 @@ function isActiveOrganizationSummary(value: unknown): value is ActiveOrganizatio
         typeof candidate.name === 'string' &&
         typeof candidate.slug === 'string'
     )
+}
+
+function isExcludedForSystemAdminOrganizationList(organization: ActiveOrganizationSummary) {
+    return (
+        EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_NAMES.has(organization.name.trim().toLowerCase()) ||
+        EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_SLUGS.has(organization.slug.trim().toLowerCase())
+    )
+}
+
+function filterExcludedSystemAdminOrganizations(
+    organizations: ActiveOrganizationSummary[]
+): ActiveOrganizationSummary[] {
+    return organizations.filter((organization) => !isExcludedForSystemAdminOrganizationList(organization))
 }
 
 async function getCurrentUserContext(supabaseOverride?: Awaited<ReturnType<typeof createClient>>): Promise<UserContext | null> {
@@ -137,7 +153,10 @@ async function getOrganizationById(
         return null
     }
 
-    return isActiveOrganizationSummary(data) ? data : null
+    if (!isActiveOrganizationSummary(data)) return null
+    if (isExcludedForSystemAdminOrganizationList(data)) return null
+
+    return data
 }
 
 async function getFirstOrganization(
@@ -147,15 +166,15 @@ async function getFirstOrganization(
         .from('organizations')
         .select('id, name, slug')
         .order('name', { ascending: true })
-        .limit(1)
-        .maybeSingle()
+        .limit(20)
 
     if (error) {
         console.warn('Failed to resolve fallback organization for system admin:', error)
         return null
     }
 
-    return isActiveOrganizationSummary(data) ? data : null
+    const organizations = (data ?? []).filter(isActiveOrganizationSummary)
+    return filterExcludedSystemAdminOrganizations(organizations)[0] ?? null
 }
 
 async function getAccessibleOrganizationsForContext(
@@ -170,7 +189,7 @@ async function getAccessibleOrganizationsForContext(
 
         const organizations = (organizationsData ?? []).filter(isActiveOrganizationSummary)
         if (!error && organizations.length > 0) {
-            return organizations
+            return filterExcludedSystemAdminOrganizations(organizations)
         }
 
         if (error) {
@@ -178,7 +197,7 @@ async function getAccessibleOrganizationsForContext(
         }
 
         const membershipOrganizations = await getOrganizationsFromMemberships(supabase, userContext.userId)
-        return membershipOrganizations
+        return filterExcludedSystemAdminOrganizations(membershipOrganizations)
     }
 
     return getOrganizationsFromMemberships(supabase, userContext.userId)
@@ -238,7 +257,9 @@ async function resolveActiveOrganizationContextWithSupabase(
         if (!cookieOrganization) {
             fallbackOrganization = await getFirstOrganization(supabase)
             if (!fallbackOrganization) {
-                const fallbackOrganizations = await getOrganizationsFromMemberships(supabase, userContext.userId)
+                const fallbackOrganizations = filterExcludedSystemAdminOrganizations(
+                    await getOrganizationsFromMemberships(supabase, userContext.userId)
+                )
                 fallbackOrganization = fallbackOrganizations[0] ?? null
             }
         }

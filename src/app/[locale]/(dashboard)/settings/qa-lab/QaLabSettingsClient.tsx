@@ -12,8 +12,8 @@ import type { QaLabPreset, QaLabPresetConfig } from '@/lib/qa-lab/presets'
 import {
     createAndQueueQaLabRun,
     createAndQueueQaLabRunForAdmin,
-    runQaLabQueueWorkerBatch,
-    runQaLabQueueWorkerBatchForAdmin
+    executeQaLabRun,
+    executeQaLabRunForAdmin
 } from '@/lib/qa-lab/runs'
 import {
     calculateUsageCreditCost,
@@ -287,18 +287,17 @@ export default function QaLabSettingsClient({
 
         startTransition(async () => {
             try {
-                if (adminMode) {
-                    await createAndQueueQaLabRunForAdmin(presetId)
-                } else {
-                    await createAndQueueQaLabRun(presetId)
-                }
+                const createdRun = adminMode
+                    ? await createAndQueueQaLabRunForAdmin(presetId)
+                    : await createAndQueueQaLabRun(presetId)
+
                 setFeedback({
                     type: 'success',
                     message: tQaLab('enqueueRunSuccess')
                 })
                 void (adminMode
-                    ? runQaLabQueueWorkerBatchForAdmin(1)
-                    : runQaLabQueueWorkerBatch(1)
+                    ? executeQaLabRunForAdmin(createdRun.id)
+                    : executeQaLabRun(createdRun.id)
                 ).then(() => {
                     router.refresh()
                 }).catch((error) => {
