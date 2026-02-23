@@ -441,7 +441,7 @@ function hasTimelineSignal(text: string) {
     )
 }
 
-function hasUrgencySignal(text: string) {
+function hasUrgencyMentionSignal(text: string) {
     if (!text) return false
     return (
         text.includes('acil')
@@ -456,6 +456,35 @@ function hasUrgencySignal(text: string) {
         || text.includes('asap')
         || text.includes('en kisa')
         || text.includes('en kısa')
+    )
+}
+
+function hasUrgencyValueSignal(text: string) {
+    if (!text) return false
+
+    const hasExplicitLevel = (
+        /(oncelik|öncelik|aciliyet)\s*(seviyesi|duzeyi|düzeyi)?\s*(yuksek|yüksek|orta|dusuk|düşük)/i.test(text)
+        || /(yuksek|yüksek|orta|dusuk|düşük)\s*(oncelik|öncelik|aciliyet)/i.test(text)
+    )
+    if (hasExplicitLevel) return true
+
+    const hasStrongUrgencyIntent = (
+        /(cok acil|çok acil|acilen|hemen|asap|en kisa surede|en kısa sürede|hizli.*basla|hızlı.*başla|onceligimiz yuksek|önceliğimiz yüksek|beklemek istemiyorum|mumkunse hemen|mümkünse hemen)/i.test(text)
+    )
+    if (hasStrongUrgencyIntent) return true
+
+    const hasIntentVerb = /(istiyorum|gerekiyor|olmasi lazim|olmalı|tercih ediyoruz|onceligimiz|önceliğimiz)/i.test(text)
+    if (hasIntentVerb && /(acil|aciliyet|oncelik|öncelik|hizli|hızlı)/i.test(text)) {
+        return true
+    }
+
+    if (hasQuestionIntent(text) && !/(hizli.*basla|hızlı.*başla|en kisa sure|en kısa süre|acilen|hemen)/i.test(text)) {
+        return false
+    }
+
+    return (
+        /(aciliyetimiz|onceligimiz|önceliğimiz|oncelik seviyemiz|öncelik seviyemiz|aciliyet seviyesi)/i.test(text)
+        || (hasUrgencyMentionSignal(text) && !hasQuestionIntent(text))
     )
 }
 
@@ -572,7 +601,7 @@ function hasLikelyInformativeSemanticReply(text: string) {
     if (
         hasBudgetSignal(text)
         || hasTimelineSignal(text)
-        || hasUrgencySignal(text)
+        || hasUrgencyMentionSignal(text)
         || hasServiceSignal(text)
         || hasContactSignal(text)
         || hasFrequencySignal(text)
@@ -604,7 +633,7 @@ function canUseBroadSemanticFallbackForMatcher(matcher: QaLabFieldMatcher) {
 function hasCategorySignal(text: string, categories: Set<QaLabIntakeCategory>) {
     if (categories.has('budget') && hasBudgetSignal(text)) return true
     if (categories.has('timeline') && hasTimelineSignal(text)) return true
-    if (categories.has('urgency') && hasUrgencySignal(text)) return true
+    if (categories.has('urgency') && hasUrgencyValueSignal(text)) return true
     if (categories.has('contact') && hasContactSignal(text)) return true
     if (categories.has('business_size') && hasBusinessSizeSignal(text)) return true
     if (categories.has('callback_time') && hasCallbackTimeSignal(text)) return true
@@ -715,7 +744,9 @@ export function analyzeQaLabIntakeCoverage(input: {
                     if (explicitRefusal) {
                         continue
                     }
-                    const directMatch = textContainsAny(customerText, state.matcher.keywords)
+                    const directMatch = state.matcher.categories.has('urgency')
+                        ? hasUrgencyValueSignal(customerText)
+                        : textContainsAny(customerText, state.matcher.keywords)
                     const categoryMatch = hasCategorySignal(customerText, state.matcher.categories)
                     const typeLikeSemanticMatch = hasTypeLikeSemanticFulfillment({
                         field: state.matcher.field,

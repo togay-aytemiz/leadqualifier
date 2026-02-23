@@ -138,6 +138,36 @@ describe('analyzeQaLabIntakeCoverage', () => {
         expect(coverage.byCase[0]?.missingFields).toEqual([])
     })
 
+    it('does not mark urgency as fulfilled when customer only asks meta-priority question', () => {
+        const coverage = analyzeQaLabIntakeCoverage({
+            requiredIntakeFields: ['Proje aciliyet seviyesi'],
+            cases: [
+                {
+                    case_id: 'scenario_urgency_meta',
+                    title: 'Oncelik sorusu ama deger yok',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Merhaba, sureci netlestirmek istiyorum.',
+                            assistant_response: 'Projenin oncelik seviyesini paylasir misiniz?'
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Onceligi belirlemek icin sizce hangi bilgi daha kritik?',
+                            assistant_response: 'Anladim, once kapsamdan baslayalim.'
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(coverage.byCase[0]?.askedFieldsCount).toBe(1)
+        expect(coverage.byCase[0]?.fulfilledFieldsCount).toBe(0)
+        expect(coverage.byCase[0]?.missingFields).toContain('Proje aciliyet seviyesi')
+    })
+
     it('detects service-detail fulfillment from sector-agnostic project/service language', () => {
         const coverage = analyzeQaLabIntakeCoverage({
             requiredIntakeFields: ['Hizmet Detayları'],
