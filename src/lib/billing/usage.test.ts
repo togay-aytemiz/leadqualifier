@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
     buildCreditUsageSummary,
     buildMessageUsageTotals,
     calculateAiCreditsFromTokens,
     calculateKnowledgeStorageBytes,
     calculateSkillStorageBytes,
+    getOrgCreditUsageSummary,
     formatCreditAmount,
     formatStorageSize
 } from './usage'
@@ -183,4 +184,158 @@ describe('billing usage helpers', () => {
         expect(summary.monthly.breakdown.leadExtraction).toBeCloseTo(0.3, 5)
         expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(0.7, 5)
     })
+
+    it('loads all usage debit ledger rows beyond Supabase default 1000-row page', async () => {
+        const organizationId = 'org_1'
+        const ledgerRows = Array.from({ length: 1205 }, (_, index) => ({
+            organization_id: organizationId,
+            entry_type: 'usage_debit',
+            created_at: new Date(Date.UTC(2026, 1, 1, 0, index)).toISOString(),
+            credits_delta: -0.1,
+            usage_id: `usage_${index + 1}`,
+            metadata: { category: 'router' }
+        }))
+        const usageRows = ledgerRows.map((row) => ({
+            id: row.usage_id,
+            organization_id: organizationId,
+            metadata: { source: 'whatsapp' }
+        }))
+        const supabase = createUsageSummarySupabaseMock({
+            ledgerRows,
+            usageRows
+        })
+
+        const summary = await getOrgCreditUsageSummary(organizationId, {
+            supabase: supabase as never,
+            now: new Date('2026-02-15T09:00:00.000Z'),
+            timeZone: 'Europe/Istanbul'
+        })
+
+        expect(summary.month).toBe('2026-02')
+        expect(summary.monthly.credits).toBeCloseTo(120.5, 5)
+        expect(summary.total.credits).toBeCloseTo(120.5, 5)
+        expect(summary.monthly.count).toBe(1205)
+        expect(summary.total.count).toBe(1205)
+    })
 })
+
+interface UsageSummarySupabaseRow {
+    organization_id: string
+    entry_type?: string
+    created_at?: string
+    credits_delta?: number
+    usage_id?: string
+    metadata?: unknown
+    id?: string
+}
+
+function createUsageSummarySupabaseMock(options: {
+    ledgerRows: UsageSummarySupabaseRow[]
+    usageRows: UsageSummarySupabaseRow[]
+}) {
+    const ledgerQuery = createLedgerQueryMock(options.ledgerRows)
+    const usageInMock = vi.fn(async (_column: string, values: string[]) => {
+        const idSet = new Set(values)
+        return {
+            data: options.usageRows
+                .filter((row) => row.organization_id === ledgerQuery.getOrganizationFilter())
+                .filter((row) => typeof row.id === 'string' && idSet.has(row.id))
+                .map((row) => ({
+                    id: row.id,
+                    metadata: row.metadata ?? {}
+                })),
+            error: null
+        }
+    })
+    const usageEqMock = vi.fn((_column: string, value: string) => {
+        ledgerQuery.setOrganizationFilter(value)
+        return {
+            in: usageInMock
+        }
+    })
+    const usageSelectMock = vi.fn(() => ({
+        eq: usageEqMock
+    }))
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'organization_credit_ledger') return ledgerQuery.query
+        if (table === 'organization_ai_usage') {
+            return {
+                select: usageSelectMock
+            }
+        }
+
+        throw new Error(`Unexpected table: ${table}`)
+    })
+
+    return {
+        from: fromMock
+    }
+}
+
+function createLedgerQueryMock(rows: UsageSummarySupabaseRow[]) {
+    let organizationFilter = ''
+    let entryTypeFilter = ''
+    let orderedByCreatedAt = false
+    let orderAscending = true
+
+    const getFilteredRows = () => rows
+        .filter((row) => !organizationFilter || row.organization_id === organizationFilter)
+        .filter((row) => !entryTypeFilter || row.entry_type === entryTypeFilter)
+        .slice()
+        .sort((left, right) => {
+            if (!orderedByCreatedAt) return 0
+            const leftMs = new Date(left.created_at ?? '').getTime()
+            const rightMs = new Date(right.created_at ?? '').getTime()
+            return orderAscending ? leftMs - rightMs : rightMs - leftMs
+        })
+
+    const buildRows = (rangeStart: number, rangeEnd: number) => getFilteredRows()
+        .slice(rangeStart, rangeEnd + 1)
+        .map((row) => ({
+            created_at: row.created_at ?? '',
+            credits_delta: row.credits_delta ?? 0,
+            usage_id: row.usage_id ?? null,
+            metadata: row.metadata ?? {}
+        }))
+
+    const rangeMock = vi.fn(async (from: number, to: number) => ({
+        data: buildRows(from, to),
+        error: null
+    }))
+    const orderMock = vi.fn((column: string, options?: { ascending?: boolean }) => {
+        orderedByCreatedAt = column === 'created_at'
+        orderAscending = options?.ascending !== false
+        return query
+    })
+    const eqMock = vi.fn((column: string, value: string) => {
+        if (column === 'organization_id') organizationFilter = value
+        if (column === 'entry_type') entryTypeFilter = value
+        return query
+    })
+    const selectMock = vi.fn(() => query)
+
+    const query = {
+        select: selectMock,
+        eq: eqMock,
+        order: orderMock,
+        range: rangeMock,
+        then: (resolve: (value: { data: Array<{
+            created_at: string
+            credits_delta: number
+            usage_id: string | null
+            metadata: unknown
+        }>; error: null }) => unknown) => resolve({
+            data: buildRows(0, 999),
+            error: null
+        })
+    }
+
+    return {
+        query,
+        setOrganizationFilter: (value: string) => {
+            organizationFilter = value
+        },
+        getOrganizationFilter: () => organizationFilter
+    }
+}

@@ -91,6 +91,8 @@ const CREDIT_OUTPUT_TOKEN_WEIGHT = 4
 const TOKENS_PER_CREDIT = 3000
 const DEFAULT_USAGE_TIMEZONE = 'Europe/Istanbul'
 const DEFAULT_USAGE_CATEGORIES = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning']
+const CREDIT_USAGE_LEDGER_PAGE_SIZE = 1000
+const USAGE_METADATA_BATCH_SIZE = 200
 const DOCUMENT_PROCESSING_SOURCES = new Set([
     'offering_profile_suggestion',
     'service_catalog_candidates',
@@ -227,6 +229,83 @@ function withRoundedCategoryTotals(totals: Record<string, number>) {
     return rounded
 }
 
+function splitIntoChunks<T>(values: T[], chunkSize: number) {
+    if (!Number.isFinite(chunkSize) || chunkSize <= 0) return [values]
+
+    const chunks: T[][] = []
+    for (let index = 0; index < values.length; index += chunkSize) {
+        chunks.push(values.slice(index, index + chunkSize))
+    }
+    return chunks
+}
+
+async function loadAllUsageDebitLedgerRows(
+    supabase: SupabaseClient,
+    organizationId: string
+): Promise<CreditUsageLedgerRow[] | null> {
+    const rows: CreditUsageLedgerRow[] = []
+    let from = 0
+
+    while (true) {
+        const to = from + CREDIT_USAGE_LEDGER_PAGE_SIZE - 1
+        const { data, error } = await supabase
+            .from('organization_credit_ledger')
+            .select('created_at, credits_delta, usage_id, metadata')
+            .eq('organization_id', organizationId)
+            .eq('entry_type', 'usage_debit')
+            .order('created_at', { ascending: true })
+            .range(from, to)
+
+        if (error) {
+            console.error('Failed to load credit usage summary rows:', error)
+            return null
+        }
+
+        const pageRows = (data ?? []) as CreditUsageLedgerRow[]
+        rows.push(...pageRows)
+
+        if (pageRows.length < CREDIT_USAGE_LEDGER_PAGE_SIZE) {
+            break
+        }
+
+        from += CREDIT_USAGE_LEDGER_PAGE_SIZE
+    }
+
+    return rows
+}
+
+interface UsageMetadataLookupRow {
+    id: string
+    metadata: unknown
+}
+
+async function loadUsageMetadataByIds(options: {
+    supabase: SupabaseClient
+    organizationId: string
+    usageIds: string[]
+}) {
+    const usageMetadataById = new Map<string, unknown>()
+
+    for (const usageIdChunk of splitIntoChunks(options.usageIds, USAGE_METADATA_BATCH_SIZE)) {
+        const { data, error } = await options.supabase
+            .from('organization_ai_usage')
+            .select('id, metadata')
+            .eq('organization_id', options.organizationId)
+            .in('id', usageIdChunk)
+
+        if (error) {
+            console.error('Failed to load AI usage metadata for credit breakdown:', error)
+            continue
+        }
+
+        for (const row of (data ?? []) as UsageMetadataLookupRow[]) {
+            usageMetadataById.set(row.id, row.metadata)
+        }
+    }
+
+    return usageMetadataById
+}
+
 export function buildCreditUsageSummary(
     rows: CreditUsageLedgerRow[],
     options?: BuildCreditUsageSummaryOptions
@@ -312,21 +391,14 @@ export async function getOrgCreditUsageSummary(
 ): Promise<CreditUsageSummary> {
     const supabase = options?.supabase ?? await createClient()
 
-    const { data, error } = await supabase
-        .from('organization_credit_ledger')
-        .select('created_at, credits_delta, usage_id, metadata')
-        .eq('organization_id', organizationId)
-        .eq('entry_type', 'usage_debit')
-
-    if (error) {
-        console.error('Failed to load credit usage summary rows:', error)
+    const ledgerRows = await loadAllUsageDebitLedgerRows(supabase, organizationId)
+    if (!ledgerRows) {
         return buildCreditUsageSummary([], {
             now: options?.now,
             timeZone: options?.timeZone
         })
     }
 
-    const ledgerRows = (data ?? []) as CreditUsageLedgerRow[]
     const usageIds = Array.from(
         new Set(
             ledgerRows
@@ -334,23 +406,13 @@ export async function getOrgCreditUsageSummary(
                 .filter((id): id is string => typeof id === 'string' && id.length > 0)
         )
     )
-    const usageMetadataById = new Map<string, unknown>()
-
-    if (usageIds.length > 0) {
-        const { data: usageRows, error: usageError } = await supabase
-            .from('organization_ai_usage')
-            .select('id, metadata')
-            .eq('organization_id', organizationId)
-            .in('id', usageIds)
-
-        if (usageError) {
-            console.error('Failed to load AI usage metadata for credit breakdown:', usageError)
-        } else {
-            for (const row of usageRows ?? []) {
-                usageMetadataById.set(row.id, row.metadata)
-            }
-        }
-    }
+    const usageMetadataById = usageIds.length > 0
+        ? await loadUsageMetadataByIds({
+            supabase,
+            organizationId,
+            usageIds
+        })
+        : new Map<string, unknown>()
 
     const normalizedRows = ledgerRows.map((row) => {
         const ledgerMetadata = toRecord(row.metadata) ?? {}
