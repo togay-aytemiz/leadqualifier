@@ -30,6 +30,17 @@ describe('qa lab evaluator helpers', () => {
         expect(result).toBe('pass_clean')
     })
 
+    it('returns pass_with_findings when findings are empty but scenario assessments include warn/fail', () => {
+        const result = computeQaLabRunResult([], {
+            scenarioAssessments: [
+                { assistant_success: 'pass' },
+                { assistant_success: 'warn' }
+            ]
+        })
+
+        expect(result).toBe('pass_with_findings')
+    })
+
     it('caps weighted score between 0 and 100', () => {
         expect(toWeightedQaLabScore({
             groundedness: 120,

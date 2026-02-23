@@ -12,6 +12,10 @@ export interface QaLabFindingLike {
     severity?: string | null
 }
 
+export interface QaLabScenarioAssessmentLike {
+    assistant_success?: string | null
+}
+
 function clampScore(value: number) {
     if (!Number.isFinite(value)) return 0
     return Math.min(100, Math.max(0, Math.round(value)))
@@ -29,10 +33,20 @@ export function toWeightedQaLabScore(input: QaLabScoreInput): number {
     )
 }
 
-export function computeQaLabRunResult(findings: QaLabFindingLike[]): QaLabRunResult {
+export function computeQaLabRunResult(
+    findings: QaLabFindingLike[],
+    options?: {
+        scenarioAssessments?: QaLabScenarioAssessmentLike[]
+    }
+): QaLabRunResult {
     const hasCritical = findings.some((finding) => finding.severity === 'critical')
     if (hasCritical) return 'fail_critical'
     if (findings.length > 0) return 'pass_with_findings'
+    const hasNonPassScenario = (options?.scenarioAssessments ?? []).some((assessment) => (
+        assessment.assistant_success === 'warn'
+        || assessment.assistant_success === 'fail'
+    ))
+    if (hasNonPassScenario) return 'pass_with_findings'
     return 'pass_clean'
 }
 

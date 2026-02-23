@@ -12,6 +12,8 @@ import {
     normalizeJudgeScenarioAssessmentsForExecutedCases,
     normalizeRequiredIntakeFieldsForQaLab,
     QaLabExecutionError,
+    refineQaLabGenericUnknownResponse,
+    resolveQaLabScenarioRequiredIntakeFields,
     sanitizeAssistantResponseForTruncation,
     shouldRetryJudgeForScoreAnomaly,
     stripBlockedFieldQuestionsFromAssistantResponse,
@@ -353,6 +355,116 @@ describe('qa lab executor helpers', () => {
         expect(normalized).not.toContain('Acil Durum')
     })
 
+    it('uses empty per-scenario required fields for policy/procedure scenarios (sector-agnostic)', () => {
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_policy',
+                title: 'İptal Prosedürü',
+                goal: 'İptal prosedürü hakkında bilgi almak',
+                customer_profile: 'Müşteri',
+                lead_temperature: 'cold',
+                information_sharing: 'resistant',
+                turns: [
+                    { customer: 'İptal için kaç saat önce bildirim yapmalıyım?' }
+                ]
+            },
+            generated: {
+                kb_fixture: {
+                    title: 'Örnek',
+                    lines: ['Ders iptali 24 saat önce bildirilmelidir.']
+                },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: ['Öğrencinin yaşı', 'Bütçe']
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: ['Öğrencinin yaşı', 'Bütçe'],
+                    critical_policy_facts: ['Ders iptali 24 saat önce bildirilmelidir.'],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields: ['Öğrencinin yaşı', 'Bütçe', 'Zaman dilimi']
+        })
+
+        expect(resolved.requestMode).toBe('policy_or_procedure')
+        expect(resolved.requiredFields).toEqual([])
+    })
+
+    it('keeps explicit general-information scenarios in general_information mode even if title/goal mention services', () => {
+        const defaultRequiredFields = ['Bütçe', 'Zaman dilimi', 'İhtiyaç duyulan hizmet']
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_general_info',
+                title: 'Veteriner Hizmetleri Hakkında Genel Bilgi',
+                goal: 'Klinik hizmetleri hakkında genel bilgi almak',
+                customer_profile: 'Detay vermek istemeyen müşteri',
+                lead_temperature: 'cold',
+                information_sharing: 'resistant',
+                turns: [
+                    { customer: 'Verebileceğiniz hizmetler hakkında genel bilgi almak istiyorum.' }
+                ]
+            },
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['Genel muayene ve aşılama hizmetleri sunulur.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Genel muayene', 'Aşılama'],
+                    required_intake_fields: defaultRequiredFields
+                },
+                ground_truth: {
+                    canonical_services: ['Genel muayene', 'Aşılama'],
+                    required_intake_fields: defaultRequiredFields,
+                    critical_policy_facts: [],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields
+        })
+
+        expect(resolved.requestMode).toBe('general_information')
+        expect(resolved.requiredFields).toEqual(defaultRequiredFields)
+    })
+
+    it('keeps default per-scenario required fields for lead qualification scenarios', () => {
+        const defaultRequiredFields = ['Bütçe', 'Zaman dilimi', 'İhtiyaç duyulan hizmet']
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_qual',
+                title: 'Fiyat ve Uygunluk',
+                goal: 'Fiyat ve uygunluk hakkında bilgi almak',
+                customer_profile: 'Müşteri',
+                lead_temperature: 'warm',
+                information_sharing: 'partial',
+                turns: [
+                    { customer: 'Fiyat aralığınız nedir, bu hafta başlayabilir miyiz?' }
+                ]
+            },
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['Fiyatlar kapsama göre değişir.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields,
+                    critical_policy_facts: ['İlk görüşme ücretsizdir.'],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields
+        })
+
+        expect(resolved.requestMode).toBe('lead_qualification')
+        expect(resolved.requiredFields).toEqual(defaultRequiredFields)
+    })
+
     it('drops callback-time requirement when timeline field already exists', () => {
         const normalized = normalizeRequiredIntakeFieldsForQaLab([
             'Proje Zaman Çizelgesi',
@@ -399,6 +511,19 @@ describe('qa lab executor helpers', () => {
         })
 
         expect(adapted).toContain('Web Geliştirme ve Mobil Uygulama Geliştirme odaklı bir çözüm arıyoruz.')
+    })
+
+    it('supplements service detail when assistant asks with domain-specific wording', () => {
+        const adapted = adaptQaLabCustomerTurnToAssistantContext({
+            message: 'Ne zaman başlayabiliriz?',
+            previousAssistantMessage: 'Örneğin, web geliştirme, mobil uygulama geliştirme veya başka bir alan mı?',
+            requiredFields: ['Hizmet Detayları', 'Proje Bütçesi'],
+            informationSharing: 'cooperative',
+            serviceCatalog: ['Web Geliştirme', 'Mobil Uygulama Geliştirme']
+        })
+
+        expect(adapted).toContain('Web Geliştirme ve Mobil Uygulama Geliştirme odaklı bir çözüm arıyoruz.')
+        expect(adapted).toContain('Ne zaman başlayabiliriz?')
     })
 
     it('prevents contradictory budget injection when previous question is not about budget', () => {
@@ -470,7 +595,7 @@ describe('qa lab executor helpers', () => {
             activeMissingFields: ['Öğrenci Yaşı']
         })
 
-        expect(refined).toContain('Öğrenci Yaşı bilgisini paylaşabilir misiniz?')
+        expect(refined).toContain('İlgili kişinin yaş aralığını paylaşabilir misiniz?')
         expect(refined).not.toContain('Bu bilgiyi paylaşabilir misiniz?')
     })
 
@@ -490,7 +615,7 @@ describe('qa lab executor helpers', () => {
             userMessage: 'Önce süreci öğrenmek istiyorum.'
         })
 
-        expect(patched).toContain('Proje aciliyet seviyesi bilgisini paylaşabilir misiniz?')
+        expect(patched).toContain('Öncelik seviyenizi paylaşabilir misiniz?')
     })
 
     it('does not append missing-field question when user explicitly refuses sharing', () => {
@@ -503,6 +628,17 @@ describe('qa lab executor helpers', () => {
         expect(unchanged).toBe('Anladım, mevcut bilgilerle devam edebiliriz.')
     })
 
+    it('does not append missing-field question when intake follow-up is disabled for current turn mode', () => {
+        const unchanged = ensureActiveMissingFieldQuestion({
+            response: 'İptal prosedürünü özetleyebilirim.',
+            activeMissingFields: ['Bütçe'],
+            userMessage: 'İptal için kaç saat önce bildirim yapmalıyım?',
+            allowAppend: false
+        })
+
+        expect(unchanged).toBe('İptal prosedürünü özetleyebilirim.')
+    })
+
     it('removes likely truncated numbered-list tails from assistant response', () => {
         const sanitized = sanitizeAssistantResponseForTruncation(
             'Hizmetlerimiz: 1. Web geliştirme 2. Mobil geliştirme 3. Danışmanlık 4. Proje yönetimi 5. Bakım 6.'
@@ -510,6 +646,35 @@ describe('qa lab executor helpers', () => {
 
         expect(sanitized.endsWith('6.')).toBe(false)
         expect(sanitized).toContain('Detayları ihtiyacınıza göre netleştirebiliriz.')
+    })
+
+    it('rewrites generic unknown response into actionable lead-qualification response', () => {
+        const refined = refineQaLabGenericUnknownResponse({
+            response: 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Ne zaman başlayabiliriz?',
+            activeMissingFields: ['Hizmet Detayları'],
+            fallbackTopics: ['hizmet kapsamı', 'zamanlama']
+        })
+
+        expect(refined).toContain('Bu konuda kesin bir detay paylaşamıyorum.')
+        expect(refined).toContain('İhtiyaç duyduğunuz hizmet veya konuyu netleştirebilir misiniz?')
+    })
+
+    it('avoids pressure question when user explicitly refuses detail sharing', () => {
+        const refined = refineQaLabGenericUnknownResponse({
+            response: 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Bu detayı paylaşmak istemiyorum.',
+            activeMissingFields: ['Hizmet Detayları'],
+            fallbackTopics: ['hizmet kapsamı', 'zamanlama']
+        })
+
+        expect(refined).toContain('kesin bir detay paylaşamıyorum')
+        expect(refined).toContain('hizmet kapsamı veya zamanlama')
+        expect(refined).not.toContain('netleştirebilir misiniz?')
     })
 
     it('drops findings when cited scenario attributes conflict with finding rationale', () => {
@@ -619,6 +784,84 @@ describe('qa lab executor helpers', () => {
                             token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
                         }
                     ]
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
+    })
+
+    it('drops missing-field findings when cited cases have no matching missing field in intake coverage', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'major',
+                    violated_rule: 'Missing required intake fields in warm scenarios',
+                    evidence: '[scenario_id=scenario_1, turn=2]',
+                    rationale: 'Assistant failed to collect age information.',
+                    suggested_fix: 'Ask the age field.',
+                    target_layer: 'pipeline',
+                    effort: 'medium',
+                    confidence: 0.8
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Warm coaching',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Merhaba', assistant_response: 'Yaş bilgisi alabilir miyim?', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Yaş bilgisini şu an paylaşmak istemiyorum.', assistant_response: 'Anladım, seans süresi 1 saattir.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_1',
+                    missingFields: []
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
+    })
+
+    it('drops missing-field findings when quoted field name contradicts cited case coverage', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'major',
+                    violated_rule: 'Missing required intake fields in hot scenarios',
+                    evidence: '[scenario_id=scenario_1, turn=2]',
+                    rationale: "Assistant failed to collect 'Hayvan türü'.",
+                    suggested_fix: "Collect 'Hayvan türü' before handoff.",
+                    target_layer: 'pipeline',
+                    effort: 'medium',
+                    confidence: 0.8
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Veteriner vaka',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'hot',
+                    information_sharing: 'cooperative',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Merhaba, köpeğim için bilgi almak istiyorum.', assistant_response: 'Bütçe paylaşır mısınız?', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Bütçem 10.000 TL civarı.', assistant_response: 'Anladım.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_1',
+                    missingFields: ['Proje aciliyet seviyesi']
                 }
             ]
         })
@@ -845,6 +1088,93 @@ describe('qa lab executor helpers', () => {
         })
 
         expect(assessments[0]?.assistant_success).toBe('warn')
+    })
+
+    it('removes false missing-field issues from scenario assessments when intake coverage shows no missing field', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_1',
+                    assistant_success: 'warn',
+                    answer_quality_score: 78,
+                    logic_score: 75,
+                    groundedness_score: 85,
+                    summary: 'Missed critical age information, but provided useful context.',
+                    strengths: ['Good context'],
+                    issues: ['Failed to collect age information.'],
+                    confidence: 0.7
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Warm case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'x', assistant_response: 'y', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_1',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 1,
+                    fulfillmentCoverage: 1,
+                    missingFields: []
+                }
+            ]
+        })
+
+        expect(assessments[0]?.issues).toEqual([])
+        expect(assessments[0]?.assistant_success).toBe('pass')
+        expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('consistency')
+    })
+
+    it('normalizes mismatched quoted missing-field summary to coverage-backed missing fields', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_1',
+                    assistant_success: 'warn',
+                    answer_quality_score: 74,
+                    logic_score: 72,
+                    groundedness_score: 80,
+                    summary: "Missing 'Hayvan türü' impacts readiness.",
+                    strengths: ['Clear tone'],
+                    issues: ['Missing key intake field'],
+                    confidence: 0.7
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Veteriner vaka',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'hot',
+                    information_sharing: 'cooperative',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'x', assistant_response: 'y', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_1',
+                    handoffReadiness: 'warn',
+                    askedCoverage: 1,
+                    fulfillmentCoverage: 0.8,
+                    missingFields: ['Proje aciliyet seviyesi']
+                }
+            ]
+        })
+
+        expect(assessments[0]?.summary).toContain('Proje aciliyet seviyesi')
+        expect(assessments[0]?.summary).not.toContain('Hayvan türü')
     })
 
     it('includes execution metadata in report for qa execution errors', () => {

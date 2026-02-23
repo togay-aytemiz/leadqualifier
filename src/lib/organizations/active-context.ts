@@ -64,9 +64,20 @@ function isActiveOrganizationSummary(value: unknown): value is ActiveOrganizatio
 }
 
 function isExcludedForSystemAdminOrganizationList(organization: ActiveOrganizationSummary) {
+    const normalizedName = organization.name
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+    const normalizedSlug = organization.slug
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, '-')
+
     return (
-        EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_NAMES.has(organization.name.trim().toLowerCase()) ||
-        EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_SLUGS.has(organization.slug.trim().toLowerCase())
+        EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_NAMES.has(normalizedName) ||
+        EXCLUDED_SYSTEM_ADMIN_ORGANIZATION_SLUGS.has(normalizedSlug) ||
+        normalizedName.includes('qa lab') ||
+        normalizedSlug.includes('qa-lab')
     )
 }
 

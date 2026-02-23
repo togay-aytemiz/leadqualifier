@@ -12,6 +12,7 @@ import {
 import {
     analyzeQaLabIntakeCoverage,
     type QaLabIntakeCoverageCaseResult,
+    type QaLabIntakeReadiness,
     type QaLabIntakeCoverageTurnInput
 } from '@/lib/qa-lab/intake-coverage'
 import { buildQaLabPipelineChecks } from '@/lib/qa-lab/pipeline-checks'
@@ -232,6 +233,65 @@ const REASK_FINDING_PATTERNS = [
     /\bm[ıi]ssing budget inquiry\b/i
 ]
 
+const MISSING_FIELD_CLAIM_PATTERNS = [
+    /\bmiss/i,
+    /\beksik/i,
+    /\bcollect/i,
+    /\btopla/i,
+    /\btoplama/i,
+    /\brequired intake/i,
+    /\bintake field/i,
+    /\bdid not ask/i,
+    /\bdidn'?t ask/i,
+    /\bnot ask/i,
+    /\bask for/i,
+    /\bsormad/i,
+    /\bsormuyor/i
+]
+
+const QA_LAB_GENERIC_UNKNOWN_RESPONSE_PATTERNS = [
+    /\bnet bilgi bulamadim\b/i,
+    /\bbu konuda net bilgi bulamadim\b/i,
+    /\bi could not find a clear detail\b/i,
+    /\bcould you share a bit more context\b/i
+]
+
+const QA_LAB_TYPE_LIKE_FIELD_PATTERNS = [
+    /\btur\b/i,
+    /\bturu\b/i,
+    /\bcins\b/i,
+    /\bcinsi\b/i,
+    /\btip\b/i,
+    /\btipi\b/i,
+    /\bspecies\b/i,
+    /\bbreed\b/i,
+    /\bkategori\b/i,
+    /\bcategory\b/i,
+    /\bsegment\b/i
+] as const
+
+const QA_LAB_GENERIC_TYPE_SIGNAL_STEMS = new Set([
+    'butce',
+    'fiyat',
+    'ucret',
+    'zaman',
+    'tarih',
+    'saat',
+    'oncelik',
+    'aciliyet',
+    'hizmet',
+    'konu',
+    'talep',
+    'proje',
+    'randevu',
+    'bilgi',
+    'detay',
+    'genel',
+    'yaklasim',
+    'cozum',
+    'ihtiyac'
+])
+
 type QaLabScenarioTemperature = 'hot' | 'warm' | 'cold'
 type QaLabScenarioInformationSharing = 'cooperative' | 'partial' | 'resistant'
 
@@ -286,6 +346,8 @@ interface QaLabExecutedCase {
     customer_profile: string
     lead_temperature: QaLabScenarioTemperature
     information_sharing: QaLabScenarioInformationSharing
+    request_mode?: QaLabResponderRequestMode
+    effective_required_intake_fields?: string[]
     executed_turns: QaLabExecutedTurn[]
 }
 
@@ -604,14 +666,128 @@ function tokenizeForFieldMatching(value: string) {
         .filter((token) => token.length >= 3)
 }
 
+function normalizeLooseFieldTokenStem(token: string) {
+    let stem = token.trim()
+    if (!stem) return stem
+
+    const suffixes = [
+        'siniz', 'yiz', 'yim',
+        'imiz', 'umuz', 'iniz', 'unuz',
+        'leri', 'lari',
+        'nin', 'nun',
+        'den', 'dan',
+        'ler', 'lar',
+        'de', 'da',
+        'im', 'um', 'am', 'em',
+        'in', 'un', 'an', 'en',
+        'i', 'u', 'a', 'e',
+        'm'
+    ]
+
+    for (const suffix of suffixes) {
+        if (stem.length <= suffix.length + 2) continue
+        if (stem.endsWith(suffix)) {
+            stem = stem.slice(0, -suffix.length)
+            break
+        }
+    }
+
+    return stem
+}
+
+function looseFieldTokenMatch(left: string, right: string) {
+    const a = normalizeLooseFieldTokenStem(left)
+    const b = normalizeLooseFieldTokenStem(right)
+    if (!a || !b) return false
+    if (a === b) return true
+
+    if (a.length >= 4 && b.length >= 4) {
+        let prefix = 0
+        const max = Math.min(a.length, b.length)
+        while (prefix < max && a[prefix] === b[prefix]) prefix += 1
+        if (prefix >= 4) return true
+
+        const consonantSofteningMatch = (
+            ((a.endsWith('g') && b.endsWith('k')) || (a.endsWith('k') && b.endsWith('g')))
+            && a.slice(0, -1) === b.slice(0, -1)
+        )
+        if (consonantSofteningMatch) return true
+    }
+
+    return false
+}
+
+function isTypeLikeIntakeField(field: string) {
+    const normalized = normalizeForFieldMatching(field)
+    if (!normalized) return false
+    return QA_LAB_TYPE_LIKE_FIELD_PATTERNS.some((pattern) => pattern.test(normalized))
+}
+
+function extractTypeLikeCandidateStemsFromMessage(value: string) {
+    const normalized = normalizeForFieldMatching(value)
+    if (!normalized) return []
+
+    const candidates = new Set<string>()
+
+    for (const match of normalized.matchAll(/\b([a-z]{3,})(?:im|um|am|em|m)\s+icin\b/g)) {
+        const stem = normalizeLooseFieldTokenStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    for (const match of normalized.matchAll(/\b([a-z]{4,})(?:yim|yiz)\b/g)) {
+        const stem = normalizeLooseFieldTokenStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    for (const match of normalized.matchAll(/\bmy\s+([a-z]{3,})\b/g)) {
+        const stem = normalizeLooseFieldTokenStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    for (const match of normalized.matchAll(/\b(?:i am|we are)\s+(?:a|an)?\s*([a-z]{3,})\b/g)) {
+        const stem = normalizeLooseFieldTokenStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    return Array.from(candidates)
+}
+
+function hasTypeLikeEntitySemanticAnswerSignal(input: {
+    message: string
+    field: string
+}) {
+    if (!isTypeLikeIntakeField(input.field)) return false
+    const normalized = normalizeForFieldMatching(input.message)
+    if (!normalized) return false
+    if (hasRefusalSignal(normalized)) return false
+    if (hasQuestionIntent(input.message) && tokenizeForFieldMatching(input.message).length <= 8) return false
+
+    const fieldStemSet = new Set(
+        tokenizeForFieldMatching(input.field)
+            .map((token) => normalizeLooseFieldTokenStem(token))
+            .filter((token) => token.length >= 3)
+    )
+
+    return extractTypeLikeCandidateStemsFromMessage(input.message).some((candidate) => {
+        if (candidate.length < 3) return false
+        if (QA_LAB_GENERIC_TYPE_SIGNAL_STEMS.has(candidate)) return false
+        for (const fieldStem of fieldStemSet) {
+            if (looseFieldTokenMatch(candidate, fieldStem)) {
+                return false
+            }
+        }
+        return true
+    })
+}
+
 function detectIntakeFieldCategory(field: string): QaLabIntakeFieldCategory {
     const normalized = normalizeForFieldMatching(field)
     if (/(yas|yaş|age|sinif|sınıf)/i.test(normalized)) return 'age'
     if (/(butce|bütçe|fiyat|ucret|ücret|price|cost)/i.test(normalized)) return 'budget'
     if (/(acil|aciliyet|urgent|urgency|oncelik|priority|hizli|hızlı)/i.test(normalized)) return 'urgency'
-    if (/(zaman|tarih|saat|uygunluk|timeline|availability|program)/i.test(normalized)) return 'timeline'
-    if (/(ders turu|ders türü|ders|konu|hizmet|service|kapsam)/i.test(normalized)) return 'service'
-    if (/(isletme buyuklugu|işletme büyüklüğü|calisan|çalışan|team size|employee)/i.test(normalized)) return 'business_size'
+    if (/(zaman|tarih|saat|uygunluk|timeline|timing|availability|program)/i.test(normalized)) return 'timeline'
+    if (/(ders turu|ders türü|ders|konu|hizmet|service|kapsam|paket|cozum|çözüm|proje|uygulama|gelistirme|geliştirme|entegrasyon|danismanlik|danışmanlık)/i.test(normalized)) return 'service'
+    if (/(isletme buyuklugu|işletme büyüklüğü|isletme|işletme|business size|company size|team size|employee|calisan|çalışan|personel)/i.test(normalized)) return 'business_size'
     if (/(geri donus|geri dönüş|callback|time window|zaman araligi|zaman aralığı)/i.test(normalized)) return 'callback_time'
     return 'generic'
 }
@@ -637,17 +813,35 @@ function getIntakeFieldKeywords(field: string) {
         }
     }
     if (category === 'timeline' || category === 'callback_time') {
-        for (const keyword of ['zaman', 'saat', 'tarih', 'hafta', 'ay', 'uygun', 'program', 'randevu']) {
+        for (const keyword of ['zaman', 'saat', 'tarih', 'hafta', 'ay', 'uygun', 'program', 'randevu', 'timing']) {
             keywordSet.add(keyword)
         }
     }
     if (category === 'service') {
-        for (const keyword of ['ders', 'konu', 'hizmet', 'service', 'matematik', 'fen']) {
+        for (const keyword of [
+            'ders',
+            'konu',
+            'hizmet',
+            'service',
+            'matematik',
+            'fen',
+            'kapsam',
+            'paket',
+            'cozum',
+            'çözüm',
+            'gelistirme',
+            'geliştirme',
+            'uygulama',
+            'proje',
+            'entegrasyon',
+            'danismanlik',
+            'danışmanlık'
+        ]) {
             keywordSet.add(keyword)
         }
     }
     if (category === 'business_size') {
-        for (const keyword of ['isletme', 'işletme', 'calisan', 'çalışan', 'kobi', 'buyukluk', 'büyüklük']) {
+        for (const keyword of ['isletme', 'işletme', 'calisan', 'çalışan', 'kobi', 'buyukluk', 'büyüklük', 'business', 'company', 'size', 'personel']) {
             keywordSet.add(keyword)
         }
     }
@@ -683,7 +877,7 @@ function isCustomerAnsweringCategory(value: string, category: QaLabIntakeFieldCa
     if (category === 'timeline') {
         return (
             /\b\d{1,2}[:.]\d{2}\b/.test(normalized)
-            || /(hafta|ay|yarin|yarın|bugun|bugün|saat|tarih|pazartesi|salı|sali|carsamba|çarşamba|uygunluk|randevu)/i.test(normalized)
+            || /(hafta|ay|yarin|yarın|bugun|bugün|saat|tarih|timing|pazartesi|salı|sali|carsamba|çarşamba|uygunluk|randevu)/i.test(normalized)
         )
     }
     if (category === 'urgency') {
@@ -694,7 +888,7 @@ function isCustomerAnsweringCategory(value: string, category: QaLabIntakeFieldCa
     }
     if (category === 'business_size') {
         return (
-            /(kucuk|küçük|orta|buyuk|büyük|calisan|çalışan|kisiyiz|kişiyiz|ekip|personel|isletme|işletme|şube)/i.test(normalized)
+            /(kucuk|küçük|orta|buyuk|büyük|calisan|çalışan|kisiyiz|kişiyiz|ekip|personel|isletme|işletme|şube|business size|company size)/i.test(normalized)
             || /\b\d+\s*(calisan|çalışan|kisi|kişi|personel)\b/i.test(normalized)
         )
     }
@@ -722,6 +916,12 @@ function hasQuestionIntent(value: string) {
         || normalized.includes('nedir')
         || normalized.includes('could you')
     )
+}
+
+function isMissingFieldClaimText(value: string) {
+    const normalized = normalizeForFieldMatching(value)
+    if (!normalized) return false
+    return MISSING_FIELD_CLAIM_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
 function messageContainsKeywords(value: string, keywords: string[]) {
@@ -754,7 +954,7 @@ function isCustomerAnsweringField(value: string, field: string) {
     if (category === 'timeline' || category === 'callback_time') {
         return (
             keywordMatch
-            || /(hafta|ay|yarin|yarın|bugun|bugün|saat|tarih|pazartesi|salı|sali|carsamba|çarşamba)/i.test(normalized)
+            || /(hafta|ay|yarin|yarın|bugun|bugün|saat|tarih|timing|pazartesi|salı|sali|carsamba|çarşamba)/i.test(normalized)
         )
     }
     if (category === 'urgency') {
@@ -767,7 +967,11 @@ function isCustomerAnsweringField(value: string, field: string) {
         return keywordMatch || /(hizmet|service|paket|konu|kapsam|modul|modül|proje|uygulama|gelistirme|geliştirme)/i.test(normalized)
     }
     if (category === 'business_size') {
-        return keywordMatch || /(kucuk|küçük|orta|buyuk|büyük|calisan|çalışan|kisiyiz|kişiyiz)/i.test(normalized)
+        return keywordMatch || /(kucuk|küçük|orta|buyuk|büyük|calisan|çalışan|kisiyiz|kişiyiz|business size|company size|personel)/i.test(normalized)
+    }
+
+    if (hasTypeLikeEntitySemanticAnswerSignal({ message: value, field })) {
+        return true
     }
 
     return keywordMatch
@@ -811,8 +1015,11 @@ function didCustomerAnswerField(input: {
     field: string
     wasAskedInPreviousTurn: boolean
 }) {
+    if (isCustomerRefusingField(input.customerMessage, input.field)) return false
     if (isCustomerAnsweringField(input.customerMessage, input.field)) return true
     if (!input.wasAskedInPreviousTurn) return false
+    if (detectIntakeFieldCategory(input.field) !== 'generic') return false
+    if (isTypeLikeIntakeField(input.field)) return false
     return hasLikelyInformativeSemanticReply(input.customerMessage)
 }
 
@@ -824,12 +1031,170 @@ function detectAssistantQuestionCategory(message: string): QaLabIntakeFieldCateg
     if (/(geri donus|geri dönüş|callback|hangi saatte donelim|hangi saatte dönelim|hangi saat arayal|ne zaman arayal)/i.test(normalized)) return 'callback_time'
     if (/(acil|aciliyet|urgent|urgency|oncelik|priority|ne kadar acil|ne kadar hızlı|ne kadar hizli)/i.test(normalized)) return 'urgency'
     if (/(butce|bütçe|fiyat|ucret|ücret|price|cost)/i.test(normalized)) return 'budget'
-    if (/(tarih|saat|uygunluk|randevu|timeline|availability|hangi gun|hangi gün|ne zaman)/i.test(normalized)) return 'timeline'
-    if (/(hizmet|service|ders|konu|kapsam|hangi hizmet|hangi ders|hangi konu)/i.test(normalized)) return 'service'
-    if (/(isletme|işletme|calisan|çalışan|ekip|personel|team size|kac kisi|kaç kişi)/i.test(normalized)) return 'business_size'
+    if (/(tarih|saat|uygunluk|randevu|timeline|timing|availability|hangi gun|hangi gün|ne zaman)/i.test(normalized)) return 'timeline'
+    if (/(hizmet|service|ders|konu|kapsam|paket|cozum|çözüm|proje|uygulama|gelistirme|geliştirme|entegrasyon|danismanlik|danışmanlık|hangi hizmet|hangi ders|hangi konu)/i.test(normalized)) return 'service'
+    if (/(isletme|işletme|calisan|çalışan|ekip|personel|team size|business size|company size|kac kisi|kaç kişi)/i.test(normalized)) return 'business_size'
     if (/(yas|yaş|sinif|sınıf|ogrenci|öğrenci|kac yas|kaç yaş)/i.test(normalized)) return 'age'
 
     return 'generic'
+}
+
+type QaLabResponderRequestMode = 'lead_qualification' | 'policy_or_procedure' | 'general_information'
+
+function tokenOverlapCount(left: string, right: string) {
+    const leftTokens = new Set(tokenizeForFieldMatching(left))
+    if (leftTokens.size === 0) return 0
+    let overlap = 0
+    for (const token of tokenizeForFieldMatching(right)) {
+        if (leftTokens.has(token)) overlap += 1
+    }
+    return overlap
+}
+
+function detectQaLabResponderRequestMode(input: {
+    message: string
+    generated: QaLabGeneratorOutput
+}) : QaLabResponderRequestMode {
+    const normalized = normalizeForFieldMatching(input.message)
+    if (!normalized) return 'general_information'
+
+    if (/(iptal|iade|refund|cancell|prosedur|prosedür|policy|politika|kural|kosul|koşul|gizlilik|privacy|sikayet|şikayet|ceza|bildirim)/i.test(normalized)) {
+        return 'policy_or_procedure'
+    }
+
+    const matchesCriticalPolicyFact = (input.generated.ground_truth.critical_policy_facts ?? [])
+        .some((fact) => tokenOverlapCount(input.message, fact) >= 2)
+    if (matchesCriticalPolicyFact) {
+        return 'policy_or_procedure'
+    }
+
+    const hasExplicitGeneralInfoIntent = (
+        /(genel bilgi|genel bir bilgi|sadece genel|hakkinda bilgi|hakkında bilgi|bilgi almak istiyorum|bilgi almak|bilgi istiyorum|yaklasim|yaklaşım|ozetle|özetle)/i.test(normalized)
+    )
+    const hasHardQualificationSignal = (
+        /(fiyat|butce|bütçe|teklif|uygunluk|randevu|ne zaman|tarih|saat|acil|aciliyet|basla|başla|paket|timeline|availability)/i.test(normalized)
+        || /(hangi hizmet|hangi ders|hangi konu|hangi paket)/i.test(normalized)
+    )
+    if (hasExplicitGeneralInfoIntent && !hasHardQualificationSignal) {
+        return 'general_information'
+    }
+
+    if (/(fiyat|butce|bütçe|teklif|kapsam|ders|uygunluk|zaman|tarih|ne zaman|acil|aciliyet|basla|başla|paket|surec|süreç)/i.test(normalized) || /(hangi hizmet|hangi ders|hangi konu|hangi paket)/i.test(normalized)) {
+        return 'lead_qualification'
+    }
+
+    return 'general_information'
+}
+
+function getQaLabFieldQuestionLabel(field: string) {
+    const category = detectIntakeFieldCategory(field)
+    switch (category) {
+    case 'age':
+        return 'İlgili kişinin yaş aralığı'
+    case 'budget':
+        return 'Bütçe aralığı'
+    case 'timeline':
+        return 'Uygun zamanlama'
+    case 'urgency':
+        return 'Öncelik seviyesi'
+    case 'service':
+        return 'İhtiyaç duyulan hizmet/konu'
+    case 'business_size':
+        return 'İşletme/ekip ölçeği'
+    case 'callback_time':
+        return 'Uygun geri dönüş zaman aralığı'
+    default:
+        return field.trim() || 'Gerekli bilgi'
+    }
+}
+
+function buildExplicitIntakeFieldQuestion(field: string) {
+    const category = detectIntakeFieldCategory(field)
+    switch (category) {
+    case 'age':
+        return 'İlgili kişinin yaş aralığını paylaşabilir misiniz?'
+    case 'budget':
+        return 'Bütçe aralığınızı paylaşabilir misiniz?'
+    case 'timeline':
+        return 'Uygun zamanlama aralığınızı paylaşabilir misiniz?'
+    case 'urgency':
+        return 'Öncelik seviyenizi paylaşabilir misiniz?'
+    case 'service':
+        return 'İhtiyaç duyduğunuz hizmet veya konuyu netleştirebilir misiniz?'
+    case 'business_size':
+        return 'İşletme veya ekip ölçeğinizi paylaşabilir misiniz?'
+    case 'callback_time':
+        return 'Uygun geri dönüş zaman aralığınızı paylaşabilir misiniz?'
+    default:
+        return `${getQaLabFieldQuestionLabel(field)} bilgisini paylaşabilir misiniz?`
+    }
+}
+
+function scoreMissingFieldPriority(input: {
+    field: string
+    currentUserMessage: string
+    requestMode: QaLabResponderRequestMode
+}) {
+    const category = detectIntakeFieldCategory(input.field)
+    const normalizedUser = normalizeForFieldMatching(input.currentUserMessage)
+    let score = 0
+
+    if (input.requestMode === 'policy_or_procedure') {
+        if (category === 'age') score -= 6
+        if (category === 'service') score -= 3
+        if (category === 'budget') score -= 3
+        if (category === 'timeline') score -= 2
+    }
+
+    const categoryByUserIntent = (() => {
+        if (/(fiyat|butce|bütçe|ucret|ücret|price|cost)/i.test(normalizedUser)) return 'budget'
+        if (/(ne zaman|tarih|saat|uygunluk|takvim|program)/i.test(normalizedUser)) return 'timeline'
+        if (/(acil|aciliyet|oncelik|öncelik|urgent)/i.test(normalizedUser)) return 'urgency'
+        if (/(hizmet|konu|kapsam|hangi ders|hangi hizmet|service)/i.test(normalizedUser)) return 'service'
+        return null
+    })()
+    if (categoryByUserIntent && category === categoryByUserIntent) {
+        score += 6
+    }
+
+    const basePriority: Record<QaLabIntakeFieldCategory, number> = {
+        budget: 5,
+        timeline: 4,
+        service: 3,
+        urgency: 2,
+        business_size: 1,
+        age: 0,
+        callback_time: -1,
+        generic: -2
+    }
+    score += basePriority[category] ?? 0
+
+    return score
+}
+
+export function resolveQaLabScenarioRequiredIntakeFields(input: {
+    scenario: QaLabGeneratorScenario
+    generated: QaLabGeneratorOutput
+    defaultRequiredFields: string[]
+}) {
+    const firstCustomerTurn = input.scenario.turns[0]?.customer ?? ''
+    const mode = detectQaLabResponderRequestMode({
+        message: `${input.scenario.title} ${input.scenario.goal} ${firstCustomerTurn}`.trim(),
+        generated: input.generated
+    })
+
+    if (mode !== 'policy_or_procedure') {
+        return {
+            requestMode: mode,
+            requiredFields: input.defaultRequiredFields
+        } as const
+    }
+
+    // For policy/procedure requests, do not force generic lead-qualification intake.
+    return {
+        requestMode: mode,
+        requiredFields: [] as string[]
+    } as const
 }
 
 function normalizeFixtureLineForSemanticDiversity(value: string) {
@@ -1773,6 +2138,15 @@ function calibrateJudgeScenarioSuccessByCaseContext(input: {
         ? input.coverage.fulfillmentCoverage
         : 0
 
+    if (
+        input.caseItem.request_mode === 'general_information'
+        && handoffReadiness === 'pass'
+        && askedCoverage >= 0.75
+        && fulfillmentCoverage >= 0.5
+    ) {
+        return 'warn'
+    }
+
     if (handoffReadiness === 'fail') return input.status
     if (askedCoverage < 0.5) return input.status
     if (fulfillmentCoverage < 0.7) return input.status
@@ -1820,10 +2194,160 @@ function buildFallbackJudgeScenarioAssessment(input: {
     }
 }
 
+function extractQuotedFieldMentions(text: string) {
+    if (!text.trim()) return []
+    const mentions = new Set<string>()
+
+    for (const match of text.matchAll(/["'“”‘’]([^"'“”‘’]{2,80})["'“”‘’]/g)) {
+        const value = trimText(match[1], '')
+        if (!value) continue
+        mentions.add(value)
+    }
+
+    return Array.from(mentions)
+}
+
+function normalizeFieldLabelForConsistency(value: string) {
+    return normalizeForFieldMatching(value).replace(/\s+/g, ' ').trim()
+}
+
+function missingFieldSetForConsistency(missingFields?: string[]) {
+    return new Set(
+        (missingFields ?? [])
+            .map((field) => normalizeFieldLabelForConsistency(field))
+            .filter(Boolean)
+    )
+}
+
+function filterJudgeScenarioIssuesByCoverage(input: {
+    issues: string[]
+    coverage?: { missingFields?: string[] }
+}) {
+    if (!input.coverage) return input.issues
+    const missingFields = input.coverage.missingFields ?? []
+    const missingFieldSet = missingFieldSetForConsistency(missingFields)
+    if (missingFields.length === 0) {
+        return input.issues.filter((issue) => {
+            const normalized = normalizeForFieldMatching(issue)
+            const category = detectIntakeFieldCategory(normalized)
+            const looksLikeMissingClaim = isMissingFieldClaimText(normalized)
+            const namedMentions = extractQuotedFieldMentions(issue)
+            if (looksLikeMissingClaim && namedMentions.length > 0) {
+                return false
+            }
+            if (!looksLikeMissingClaim || category === 'generic') return true
+            return false
+        })
+    }
+
+    return input.issues.filter((issue) => {
+        const normalized = normalizeForFieldMatching(issue)
+        const category = detectIntakeFieldCategory(normalized)
+        const looksLikeMissingClaim = isMissingFieldClaimText(normalized)
+        const looksLikeReaskClaim = REASK_FINDING_PATTERNS.some((pattern) => pattern.test(normalized))
+        const namedMentions = extractQuotedFieldMentions(issue)
+        if (looksLikeMissingClaim && namedMentions.length > 0) {
+            return namedMentions.some((field) => missingFieldSet.has(normalizeFieldLabelForConsistency(field)))
+        }
+        if (looksLikeReaskClaim && category !== 'generic') {
+            const categoryStillMissing = missingFields.some((field) => (
+                detectIntakeFieldCategory(field) === category
+            ))
+            if (categoryStillMissing) return false
+        }
+        if (!looksLikeMissingClaim || category === 'generic') return true
+        return missingFields.some((field) => detectIntakeFieldCategory(field) === category)
+    })
+}
+
+function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
+    summary: string
+    status: 'pass' | 'warn' | 'fail'
+    issues: string[]
+    coverage?: { handoffReadiness: QaLabIntakeReadiness, missingFields?: string[] }
+}): { summary: string, status: 'pass' | 'warn' | 'fail' } {
+    if (!input.coverage) return { summary: input.summary, status: input.status }
+
+    const normalizedSummary = normalizeForFieldMatching(input.summary)
+    const looksLikeMissingFieldSummary = isMissingFieldClaimText(normalizedSummary)
+    const namedMentions = extractQuotedFieldMentions(input.summary)
+    const missingFields = input.coverage.missingFields ?? []
+    const missingFieldSet = missingFieldSetForConsistency(missingFields)
+    const summaryCategory = detectIntakeFieldCategory(normalizedSummary)
+
+    if (looksLikeMissingFieldSummary && namedMentions.length > 0) {
+        const allNamedFieldsContradictCoverage = namedMentions.every((field) => (
+            !missingFieldSet.has(normalizeFieldLabelForConsistency(field))
+        ))
+        if (allNamedFieldsContradictCoverage) {
+            if (missingFields.length > 0) {
+                const normalizedFieldList = missingFields
+                    .slice(0, 3)
+                    .map((field) => `'${field}'`)
+                    .join(', ')
+                return {
+                    status: input.status === 'pass' ? 'warn' : input.status,
+                    summary: `Scenario-level missing-field summary was normalized by intake-coverage consistency check (coverage missing: ${normalizedFieldList}).`
+                }
+            }
+
+            return {
+                status: input.status === 'fail' ? 'warn' : 'pass',
+                summary: 'Scenario-level missing-field warning was cleared by intake-coverage consistency check.'
+            }
+        }
+    }
+
+    if (looksLikeMissingFieldSummary && summaryCategory !== 'generic') {
+        const coverageHasSameCategoryMissingField = missingFields.some((field) => (
+            detectIntakeFieldCategory(field) === summaryCategory
+        ))
+        if (!coverageHasSameCategoryMissingField) {
+            if (missingFields.length > 0) {
+                const normalizedFieldList = missingFields
+                    .slice(0, 3)
+                    .map((field) => `'${field}'`)
+                    .join(', ')
+                return {
+                    status: input.coverage.handoffReadiness === 'pass' && input.issues.length === 0 ? 'pass' : input.status,
+                    summary: `Scenario-level missing-field summary was normalized by intake-coverage consistency check (coverage missing: ${normalizedFieldList}).`
+                }
+            }
+
+            return {
+                status: input.coverage.handoffReadiness === 'pass' && input.issues.length === 0
+                    ? (input.status === 'fail' ? 'warn' : 'pass')
+                    : input.status,
+                summary: input.coverage.handoffReadiness === 'pass'
+                    ? 'Scenario-level missing-field warning was cleared by intake-coverage consistency check.'
+                    : 'Scenario-level missing-field claim was cleared by intake-coverage consistency check; warning status was retained for non-missing-field quality signals.'
+            }
+        }
+    }
+
+    if (input.coverage.handoffReadiness !== 'pass') return { summary: input.summary, status: input.status }
+    if (input.issues.length > 0) return { summary: input.summary, status: input.status }
+    if (REASK_FINDING_PATTERNS.some((pattern) => pattern.test(normalizedSummary))) {
+        return {
+            status: 'pass',
+            summary: 'Scenario-level repetitive-question warning was cleared by intake-coverage consistency check.'
+        }
+    }
+    if (!looksLikeMissingFieldSummary) return { summary: input.summary, status: input.status }
+
+    return {
+        status: input.status === 'fail' ? 'warn' : 'pass',
+        summary: 'Scenario-level missing-field warning was cleared by intake-coverage consistency check.'
+    }
+}
+
 export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
     raw: unknown
     executedCases: QaLabExecutedCase[]
-    intakeCoverageByCase: Array<Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>>
+    intakeCoverageByCase: Array<
+        Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
+        & { missingFields?: string[] }
+    >
 }): QaLabJudgeScenarioAssessment[] {
     if (input.executedCases.length === 0) return []
 
@@ -1845,9 +2369,17 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
         const caseItem = caseById.get(caseId)
         if (!caseItem) continue
         const strengths = normalizeStringArray(entry.strengths, 8)
-        const issues = normalizeStringArray(entry.issues, 8)
+        const rawIssues = normalizeStringArray(entry.issues, 8)
+        const issues = filterJudgeScenarioIssuesByCoverage({
+            issues: rawIssues,
+            coverage: coverage
+                ? {
+                    missingFields: coverage.missingFields
+                }
+                : undefined
+        })
         const rawStatus = normalizeJudgeScenarioSuccess(entry.assistant_success, fallbackStatus)
-        const status = calibrateJudgeScenarioSuccessByCaseContext({
+        const calibratedStatus = calibrateJudgeScenarioSuccessByCaseContext({
             status: rawStatus,
             caseItem,
             coverage: coverage
@@ -1859,11 +2391,24 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
                 : undefined,
             issues
         })
-        const baseline = getScenarioScoreBaseline(status)
-        const summary = trimText(
+        const baseline = getScenarioScoreBaseline(calibratedStatus)
+        const summaryRaw = trimText(
             entry.summary,
             'Judge provided scenario-level evaluation without explicit summary.'
         )
+        const summaryNormalized = normalizeJudgeScenarioSummaryAgainstCoverage({
+            summary: summaryRaw,
+            status: calibratedStatus,
+            issues,
+            coverage: coverage
+                ? {
+                    handoffReadiness: coverage.handoffReadiness,
+                    missingFields: coverage.missingFields
+                }
+                : undefined
+        })
+        const status = summaryNormalized.status
+        const summary = summaryNormalized.summary
 
         normalizedByCaseId.set(caseId, {
             case_id: caseId,
@@ -1899,7 +2444,10 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
 
 function normalizeJudgeResult(raw: Record<string, unknown>, options: {
     executedCases: QaLabExecutedCase[]
-    intakeCoverageByCase: Array<Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>>
+    intakeCoverageByCase: Array<
+        Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
+        & { missingFields?: string[] }
+    >
 }): QaLabJudgeResult {
     const scoreRaw = (
         raw.score_breakdown && typeof raw.score_breakdown === 'object' && !Array.isArray(raw.score_breakdown)
@@ -1964,10 +2512,14 @@ function findingMentionsPattern(input: {
 export function filterJudgeFindingsByCitationConsistency(input: {
     findings: QaLabJudgeFinding[]
     executedCases: QaLabExecutedCase[]
+    intakeCoverageByCase?: Array<Pick<QaLabIntakeCoverageCaseResult, 'caseId'> & { missingFields?: string[] }>
 }) {
     if (input.findings.length === 0) return input.findings
 
     const caseById = new Map(input.executedCases.map((caseItem) => [caseItem.case_id, caseItem]))
+    const intakeCoverageByCaseId = new Map(
+        (input.intakeCoverageByCase ?? []).map((item) => [item.caseId, item] as const)
+    )
     const filtered: QaLabJudgeFinding[] = []
 
     const supportsRepeatedQuestionClaim = (params: {
@@ -1984,9 +2536,9 @@ export function filterJudgeFindingsByCitationConsistency(input: {
         const findingText = `${params.finding.violated_rule} ${params.finding.rationale}`
         const findingCategory = detectIntakeFieldCategory(findingText)
         const assistantCategory = detectAssistantQuestionCategory(assistantMessage)
-        const targetCategory = assistantCategory !== 'generic'
-            ? assistantCategory
-            : (findingCategory !== 'generic' ? findingCategory : null)
+        const targetCategory = findingCategory !== 'generic'
+            ? findingCategory
+            : (assistantCategory !== 'generic' ? assistantCategory : null)
 
         if (!targetCategory) return true
 
@@ -2058,6 +2610,52 @@ export function filterJudgeFindingsByCitationConsistency(input: {
         const contextTextWithEvidence = normalizeForFieldMatching(
             `${finding.violated_rule} ${finding.rationale} ${finding.evidence}`
         )
+        const findingCategory = detectIntakeFieldCategory(contextTextWithEvidence)
+        const looksLikeMissingFieldFinding = isMissingFieldClaimText(contextTextWithEvidence)
+        if (looksLikeMissingFieldFinding && findingCategory !== 'generic' && resolved.length > 0) {
+            const allCitedCasesContradictMissingClaim = resolved.every((item) => {
+                const coverage = intakeCoverageByCaseId.get(item.caseItem.case_id)
+                if (!coverage) return false
+                return !(coverage.missingFields ?? []).some((field) => (
+                    detectIntakeFieldCategory(field) === findingCategory
+                ))
+            })
+            if (allCitedCasesContradictMissingClaim) {
+                continue
+            }
+        }
+
+        if (looksLikeMissingFieldFinding && resolved.length > 0) {
+            const namedFieldMentions = extractQuotedFieldMentions(
+                `${finding.violated_rule} ${finding.rationale} ${finding.evidence}`
+            )
+            if (namedFieldMentions.length > 0) {
+                const normalizedMentionSet = new Set(
+                    namedFieldMentions
+                        .map((field) => normalizeFieldLabelForConsistency(field))
+                        .filter(Boolean)
+                )
+
+                const allCitedCasesContradictNamedFieldClaim = resolved.every((item) => {
+                    const coverage = intakeCoverageByCaseId.get(item.caseItem.case_id)
+                    if (!coverage) return false
+                    const coverageMissingSet = missingFieldSetForConsistency(coverage.missingFields)
+
+                    for (const mentionedField of normalizedMentionSet) {
+                        if (coverageMissingSet.has(mentionedField)) {
+                            return false
+                        }
+                    }
+
+                    return true
+                })
+
+                if (allCitedCasesContradictNamedFieldClaim) {
+                    continue
+                }
+            }
+        }
+
         const looksLikeReaskFinding = REASK_FINDING_PATTERNS.some((pattern) => (
             pattern.test(contextTextWithEvidence)
         ))
@@ -2367,11 +2965,16 @@ function buildQaLabIntakeProgress(input: {
     generated: QaLabGeneratorOutput
     history: ConversationTurn[]
     currentUserMessage: string
+    requiredFieldsOverride?: string[]
 }) {
     const requiredFields = (
-        input.generated.derived_setup.required_intake_fields.length > 0
-            ? input.generated.derived_setup.required_intake_fields
-            : input.generated.ground_truth.required_intake_fields
+        Array.isArray(input.requiredFieldsOverride)
+            ? input.requiredFieldsOverride.filter((field) => field.trim().length > 0)
+            : (
+                input.generated.derived_setup.required_intake_fields.length > 0
+                    ? input.generated.derived_setup.required_intake_fields
+                    : input.generated.ground_truth.required_intake_fields
+            )
     )
 
     const turns: QaLabIntakeCoverageTurnInput[] = []
@@ -2416,6 +3019,10 @@ function buildQaLabIntakeProgress(input: {
         turns
     })
     const lastAssistantMessage = getLatestAssistantMessage(input.history)
+    const requestMode = detectQaLabResponderRequestMode({
+        message: input.currentUserMessage,
+        generated: input.generated
+    })
 
     const deferredFields = fieldStates
         .filter((state) => {
@@ -2440,6 +3047,17 @@ function buildQaLabIntakeProgress(input: {
 
     const activeMissingFields = (caseCoverage?.missingFields ?? requiredFields)
         .filter((field) => !deferredFields.includes(field))
+        .sort((left, right) => (
+            scoreMissingFieldPriority({
+                field: right,
+                currentUserMessage: input.currentUserMessage,
+                requestMode
+            }) - scoreMissingFieldPriority({
+                field: left,
+                currentUserMessage: input.currentUserMessage,
+                requestMode
+            })
+        ))
 
     return {
         requiredFields,
@@ -2447,7 +3065,8 @@ function buildQaLabIntakeProgress(input: {
         activeMissingFields,
         deferredFields,
         fulfilledCount: caseCoverage?.fulfilledFieldsCount ?? 0,
-        requiredTotal: caseCoverage?.requiredFieldsTotal ?? requiredFields.length
+        requiredTotal: caseCoverage?.requiredFieldsTotal ?? requiredFields.length,
+        requestMode
     }
 }
 
@@ -2688,7 +3307,7 @@ export function enforceFieldNamedClarificationQuestion(input: {
     const targetField = activeMissingFields[0] ?? ''
     if (!targetField) return response
 
-    const explicitQuestion = `${targetField} bilgisini paylaşabilir misiniz?`
+    const explicitQuestion = buildExplicitIntakeFieldQuestion(targetField)
     const chunks = splitIntoSentenceLikeChunks(response)
     let replaced = false
 
@@ -2706,6 +3325,7 @@ export function ensureActiveMissingFieldQuestion(input: {
     response: string
     activeMissingFields: string[]
     userMessage: string
+    allowAppend?: boolean
 }) {
     const response = input.response.trim()
     if (!response) return response
@@ -2716,12 +3336,13 @@ export function ensureActiveMissingFieldQuestion(input: {
             .filter(Boolean)
     ))
     if (activeMissingFields.length === 0) return response
+    if (input.allowAppend === false) return response
     if (hasRefusalSignal(input.userMessage)) return response
     if (hasQuestionIntent(response)) return response
 
     const targetField = activeMissingFields[0] ?? ''
     if (!targetField) return response
-    const explicitQuestion = `${targetField} bilgisini paylaşabilir misiniz?`
+    const explicitQuestion = buildExplicitIntakeFieldQuestion(targetField)
     if (response.includes(explicitQuestion)) return response
 
     const separator = /[.!?]$/.test(response) ? ' ' : '. '
@@ -2759,6 +3380,67 @@ export function sanitizeAssistantResponseForTruncation(response: string) {
     return sanitized.replace(/\s+/g, ' ').trim()
 }
 
+function looksLikeGenericUnknownResponse(response: string) {
+    const normalized = normalizeForFieldMatching(response)
+    if (!normalized) return false
+    return QA_LAB_GENERIC_UNKNOWN_RESPONSE_PATTERNS.some((pattern) => (
+        pattern.test(normalized) || pattern.test(response)
+    ))
+}
+
+function buildFallbackTopicsHint(topics: string[], language: 'tr' | 'en') {
+    const normalizedTopics = topics
+        .map((topic) => topic.trim())
+        .filter(Boolean)
+        .slice(0, 2)
+    if (normalizedTopics.length === 0) return ''
+    if (normalizedTopics.length === 1) return normalizedTopics[0] ?? ''
+    return language === 'tr'
+        ? `${normalizedTopics[0]} veya ${normalizedTopics[1]}`
+        : `${normalizedTopics[0]} or ${normalizedTopics[1]}`
+}
+
+export function refineQaLabGenericUnknownResponse(input: {
+    response: string
+    responseLanguage: 'tr' | 'en'
+    requestMode: QaLabResponderRequestMode
+    userMessage: string
+    activeMissingFields: string[]
+    fallbackTopics: string[]
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+    if (!looksLikeGenericUnknownResponse(response)) return response
+
+    const shouldAskMissingField = (
+        input.requestMode === 'lead_qualification'
+        && input.activeMissingFields.length > 0
+        && !hasRefusalSignal(input.userMessage)
+    )
+
+    if (shouldAskMissingField) {
+        const targetField = input.activeMissingFields[0] ?? ''
+        if (!targetField) return response
+        const explicitQuestion = input.responseLanguage === 'tr'
+            ? buildExplicitIntakeFieldQuestion(targetField)
+            : `Could you share ${targetField.toLowerCase()}?`
+        return input.responseLanguage === 'tr'
+            ? `Bu konuda kesin bir detay paylaşamıyorum. Mevcut bilgilerle ilerleyebiliriz. ${explicitQuestion}`
+            : `I cannot share a precise detail yet. We can continue with the current context. ${explicitQuestion}`
+    }
+
+    const topicsHint = buildFallbackTopicsHint(input.fallbackTopics, input.responseLanguage)
+    if (!topicsHint) {
+        return input.responseLanguage === 'tr'
+            ? 'Bu konuda kesin bir detay paylaşamıyorum. Mevcut bilgilerle devam edebiliriz.'
+            : 'I cannot share a precise detail yet. We can continue with the current context.'
+    }
+
+    return input.responseLanguage === 'tr'
+        ? `Bu konuda kesin bir detay paylaşamıyorum. Mevcut bilgilerle devam edebiliriz; isterseniz ${topicsHint} tarafını açabilirim.`
+        : `I cannot share a precise detail yet. We can continue with current context; we can focus on ${topicsHint} next.`
+}
+
 export function stripBlockedFieldQuestionsFromAssistantResponse(input: {
     response: string
     blockedFields: string[]
@@ -2783,12 +3465,24 @@ export function stripBlockedFieldQuestionsFromAssistantResponse(input: {
     return filtered.join(' ').replace(/\s+/g, ' ').trim()
 }
 
+function shouldForceIntakeFollowupQuestion(input: {
+    userMessage: string
+    requestMode: QaLabResponderRequestMode
+    activeMissingFields: string[]
+}) {
+    if (input.activeMissingFields.length === 0) return false
+    if (input.requestMode !== 'lead_qualification') return false
+    if (hasRefusalSignal(input.userMessage)) return false
+    return true
+}
+
 async function generateQaLabAssistantResponse(input: {
     openai: OpenAI
     run: QaLabRun
     generated: QaLabGeneratorOutput
     message: string
     history: ConversationTurn[]
+    requiredFieldsOverride?: string[]
 }) {
     const responseLanguage = resolveMvpResponseLanguage(input.message)
     const responseLanguageName = resolveMvpResponseLanguageName(input.message)
@@ -2798,12 +3492,15 @@ async function generateQaLabAssistantResponse(input: {
     const intakeProgress = buildQaLabIntakeProgress({
         generated: input.generated,
         history: input.history,
-        currentUserMessage: input.message
+        currentUserMessage: input.message,
+        requiredFieldsOverride: input.requiredFieldsOverride
     })
+    const requestMode = intakeProgress.requestMode
     const systemPrompt = `You are the AI QA Lab simulated assistant.
 This simulation is synthetic and must NOT use any organization-specific skill catalog.
 Use only the KB_CONTEXT below for factual claims.
 Use conversation history as source of already collected customer data.
+CURRENT_REQUEST_MODE: ${requestMode}
 If KB_CONTEXT is insufficient for the user's request:
 - say that exact detail is not available yet,
 - ask one clarifying question,
@@ -2818,6 +3515,7 @@ Intake fulfillment policy:
 - Prioritize required intake collection needed for actionable next step and human handoff readiness.
 - Do not re-ask already provided details from conversation history.
 - If user asks a direct question, answer it first (grounded), then ask at most one missing required field if still needed.
+- If CURRENT_REQUEST_MODE is policy_or_procedure, prioritize answering the policy/procedure question from KB facts and avoid pushing lead-qualification intake unless strictly necessary.
 - Communication preference is not a mandatory intake field in QA Lab.
 - Prefer high-impact missing fields first: budget, timeline/availability, scope/topic, urgency/business profile.
 - Never insist on the same field after user ignores or refuses it once.
@@ -2835,6 +3533,9 @@ Engagement-question policy:
 
 KB_CONTEXT:
 ${kbContext.lines.map((line, index) => `${index + 1}. ${line}`).join('\n')}
+
+CRITICAL_POLICY_FACTS:
+${input.generated.ground_truth.critical_policy_facts.map((fact, index) => `${index + 1}. ${fact}`).join('\n') || '-'}
 
 FALLBACK_TOPICS:
 ${fallbackTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
@@ -2884,11 +3585,24 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
     const withMissingFieldQuestionRaw = ensureActiveMissingFieldQuestion({
         response: fieldNamedResponseRaw,
         activeMissingFields: intakeProgress.activeMissingFields,
-        userMessage: input.message
+        userMessage: input.message,
+        allowAppend: shouldForceIntakeFollowupQuestion({
+            userMessage: input.message,
+            requestMode,
+            activeMissingFields: intakeProgress.activeMissingFields
+        })
     })
     const sanitizedResponseRaw = sanitizeAssistantResponseForTruncation(withMissingFieldQuestionRaw)
+    const fallbackAdjustedResponseRaw = refineQaLabGenericUnknownResponse({
+        response: sanitizedResponseRaw,
+        responseLanguage,
+        requestMode,
+        userMessage: input.message,
+        activeMissingFields: intakeProgress.activeMissingFields,
+        fallbackTopics
+    })
     const response = trimText(
-        sanitizedResponseRaw,
+        fallbackAdjustedResponseRaw,
         responseLanguage === 'tr'
             ? 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?'
             : 'I could not find a clear detail yet. Could you share a bit more context?'
@@ -2993,6 +3707,8 @@ Treat broken sequence as quality debt:
 Use scenario attributes:
 - In hot/cooperative scenarios, missing key intake questions should reduce extraction_accuracy.
 - In cold/resistant scenarios, overly aggressive repeated questioning should reduce conversation_quality.
+- Use each executed case's request_mode and effective_required_intake_fields as the primary per-scenario intake expectation.
+- If request_mode is policy_or_procedure, do not penalize the assistant for skipping unrelated lead-qualification intake fields.
 Judge should reward balanced, natural lead progression instead of rigid form-like interrogation.
 Intake-fulfillment rule:
 - Prioritize required intake fields needed for actionable next-step and human handoff readiness.
@@ -3301,6 +4017,11 @@ export async function executeQaLabRunById(
             if (budgetStopped) break
             const scenario = generated.scenarios[caseIndex]
             if (!scenario) continue
+            const scenarioIntakePolicy = resolveQaLabScenarioRequiredIntakeFields({
+                scenario,
+                generated,
+                defaultRequiredFields: qaRequiredIntakeFields
+            })
             const history: ConversationTurn[] = []
             const executedTurns: QaLabExecutedTurn[] = []
 
@@ -3314,7 +4035,7 @@ export async function executeQaLabRunById(
                 const customerMessage = adaptQaLabCustomerTurnToAssistantContext({
                     message: scenarioCustomerMessage,
                     previousAssistantMessage: getLatestAssistantMessage(history),
-                    requiredFields: qaRequiredIntakeFields,
+                    requiredFields: scenarioIntakePolicy.requiredFields,
                     informationSharing: scenario.information_sharing,
                     serviceCatalog: qaServiceCatalog,
                     history
@@ -3326,7 +4047,8 @@ export async function executeQaLabRunById(
                     run,
                     generated,
                     message: customerMessage,
-                    history
+                    history,
+                    requiredFieldsOverride: scenarioIntakePolicy.requiredFields
                 })
 
                 const completionUsage = {
@@ -3369,6 +4091,8 @@ export async function executeQaLabRunById(
                 customer_profile: scenario.customer_profile,
                 lead_temperature: scenario.lead_temperature,
                 information_sharing: scenario.information_sharing,
+                request_mode: scenarioIntakePolicy.requestMode,
+                effective_required_intake_fields: scenarioIntakePolicy.requiredFields,
                 executed_turns: executedTurns
             })
         }
@@ -3379,7 +4103,10 @@ export async function executeQaLabRunById(
                     ? generated.derived_setup.required_intake_fields
                     : generated.ground_truth.required_intake_fields
             ),
-            cases: executedCases
+            cases: executedCases.map((caseItem) => ({
+                ...caseItem,
+                required_intake_fields: caseItem.effective_required_intake_fields
+            }))
         })
 
         let judgeResult: QaLabJudgeResult = {
@@ -3512,7 +4239,8 @@ export async function executeQaLabRunById(
 
                 const filteredFindings = filterJudgeFindingsByCitationConsistency({
                     findings: judgeResult.findings,
-                    executedCases
+                    executedCases,
+                    intakeCoverageByCase: intakeCoverage.byCase
                 })
                 const droppedFindingCount = judgeResult.findings.length - filteredFindings.length
                 if (droppedFindingCount > 0) {
@@ -3545,7 +4273,8 @@ export async function executeQaLabRunById(
                     if (retryJudgePass.judgeResult) {
                         const retryFilteredFindings = filterJudgeFindingsByCitationConsistency({
                             findings: retryJudgePass.judgeResult.findings,
-                            executedCases
+                            executedCases,
+                            intakeCoverageByCase: intakeCoverage.byCase
                         })
                         const retryDroppedCount = retryJudgePass.judgeResult.findings.length - retryFilteredFindings.length
                         if (retryDroppedCount > 0) {
@@ -3570,7 +4299,9 @@ export async function executeQaLabRunById(
 
         const findings = judgeResult.findings
         const runResult = findings.length > 0 || judgeResult.summary
-            ? computeQaLabRunResult(findings)
+            ? computeQaLabRunResult(findings, {
+                scenarioAssessments: judgeResult.scenario_assessments
+            })
             : 'pending'
         const finalStatus: QaLabRunStatus = budgetStopped ? 'budget_stopped' : 'completed'
         const pipelineChecks = buildQaLabPipelineChecks({

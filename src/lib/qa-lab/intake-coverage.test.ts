@@ -138,6 +138,36 @@ describe('analyzeQaLabIntakeCoverage', () => {
         expect(coverage.byCase[0]?.missingFields).toEqual([])
     })
 
+    it('detects service-detail fulfillment from sector-agnostic project/service language', () => {
+        const coverage = analyzeQaLabIntakeCoverage({
+            requiredIntakeFields: ['Hizmet Detayları'],
+            cases: [
+                {
+                    case_id: 'scenario_service_1',
+                    title: 'Yazılım Projesi',
+                    lead_temperature: 'warm',
+                    information_sharing: 'cooperative',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Merhaba, bilgi almak istiyorum.',
+                            assistant_response: 'Hangi hizmete odaklanmak istiyorsunuz?'
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Web geliştirme ve mobil uygulama tarafında destek arıyoruz.',
+                            assistant_response: 'Teşekkürler, not aldım.'
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(coverage.byCase[0]?.askedFieldsCount).toBe(1)
+        expect(coverage.byCase[0]?.fulfilledFieldsCount).toBe(1)
+        expect(coverage.byCase[0]?.missingFields).toEqual([])
+    })
+
     it('infers sector-agnostic semantic fulfillment when customer replies contextually after asked field', () => {
         const coverage = analyzeQaLabIntakeCoverage({
             requiredIntakeFields: ['Talep baglami'],
@@ -168,6 +198,47 @@ describe('analyzeQaLabIntakeCoverage', () => {
         expect(coverage.byCase[0]?.missingFields).toEqual([])
     })
 
+    it('infers type-like field fulfillment from sector-agnostic entity cues', () => {
+        const coverage = analyzeQaLabIntakeCoverage({
+            requiredIntakeFields: ['Hayvan türü', 'İşletme türü'],
+            cases: [
+                {
+                    case_id: 'scenario_type_1',
+                    title: 'Köpek Aşısı Randevusu',
+                    goal: 'Köpeği için aşı randevusu almak',
+                    lead_temperature: 'hot',
+                    information_sharing: 'cooperative',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Merhaba, köpeğim için aşı randevusu almak istiyorum.',
+                            assistant_response: 'Bütçe aralığınızı paylaşabilir misiniz?'
+                        }
+                    ]
+                },
+                {
+                    case_id: 'scenario_type_2',
+                    title: 'Web Geliştirme Hizmeti',
+                    goal: 'İşletmesi için hizmet almak',
+                    lead_temperature: 'warm',
+                    information_sharing: 'cooperative',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Merhaba, freelance yazılımcıyım ve destek almak istiyorum.',
+                            assistant_response: 'İşletme türünüzü paylaşabilir misiniz?'
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(coverage.byCase[0]?.fulfilledFieldsCount).toBeGreaterThanOrEqual(1)
+        expect(coverage.byCase[0]?.missingFields).not.toContain('Hayvan türü')
+        expect(coverage.byCase[1]?.fulfilledFieldsCount).toBeGreaterThanOrEqual(1)
+        expect(coverage.byCase[1]?.missingFields).not.toContain('İşletme türü')
+    })
+
     it('does not infer fulfillment from deflection replies', () => {
         const coverage = analyzeQaLabIntakeCoverage({
             requiredIntakeFields: ['Talep baglami'],
@@ -196,6 +267,35 @@ describe('analyzeQaLabIntakeCoverage', () => {
         expect(coverage.byCase[0]?.askedFieldsCount).toBe(1)
         expect(coverage.byCase[0]?.fulfilledFieldsCount).toBe(0)
         expect(coverage.byCase[0]?.missingFields).toContain('Talep baglami')
+    })
+
+    it('does not mark field as fulfilled when customer explicitly refuses that same field', () => {
+        const coverage = analyzeQaLabIntakeCoverage({
+            requiredIntakeFields: ['Öğrencinin yaşı'],
+            cases: [
+                {
+                    case_id: 'scenario_6b',
+                    title: 'Alan bazli reddetme',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Merhaba',
+                            assistant_response: 'Öğrencinin yaşını paylaşabilir misiniz?'
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Yaş bilgisini şu an paylaşmak istemiyorum.',
+                            assistant_response: 'Anladım, mevcut bilgilerle devam edelim.'
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(coverage.byCase[0]?.fulfilledFieldsCount).toBe(0)
+        expect(coverage.byCase[0]?.missingFields).toContain('Öğrencinin yaşı')
     })
 
     it('detects question intent for natural phrasing like "ogrenebilir miyim"', () => {
@@ -249,6 +349,32 @@ describe('analyzeQaLabIntakeCoverage', () => {
 
         expect(coverage.byCase[0]?.fulfilledFieldsCount).toBe(2)
         expect(coverage.byCase[0]?.askedFieldsCount).toBe(2)
+        expect(coverage.byCase[0]?.handoffReadiness).toBe('pass')
+    })
+
+    it('supports case-level required field overrides for policy/procedure scenarios', () => {
+        const coverage = analyzeQaLabIntakeCoverage({
+            requiredIntakeFields: ['Öğrencinin yaşı', 'Bütçe', 'Zaman dilimi'],
+            cases: [
+                {
+                    case_id: 'scenario_policy',
+                    title: 'İptal politikası',
+                    lead_temperature: 'cold',
+                    information_sharing: 'resistant',
+                    required_intake_fields: [],
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Ders iptali için kaç saat önce bildirim yapmalıyım?',
+                            assistant_response: 'Genel olarak 24 saat önce bildirim istenir.'
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(coverage.byCase[0]?.requiredFieldsTotal).toBe(0)
+        expect(coverage.byCase[0]?.missingFields).toEqual([])
         expect(coverage.byCase[0]?.handoffReadiness).toBe('pass')
     })
 })

@@ -12,8 +12,10 @@ export interface QaLabIntakeCoverageTurnInput {
 export interface QaLabIntakeCoverageCaseInput {
     case_id: string
     title?: string
+    goal?: string
     lead_temperature?: QaLabScenarioTemperature
     information_sharing?: QaLabScenarioInformationSharing
+    required_intake_fields?: string[]
     executed_turns?: QaLabIntakeCoverageTurnInput[]
 }
 
@@ -56,6 +58,8 @@ type QaLabIntakeCategory =
     | 'urgency'
     | 'contact'
     | 'service'
+    | 'business_size'
+    | 'callback_time'
     | 'frequency'
     | 'level'
     | 'goal'
@@ -85,6 +89,41 @@ const STOPWORDS = new Set([
     'tercih'
 ])
 
+const TYPE_LIKE_FIELD_PATTERNS = [
+    /\btur\b/i,
+    /\bturu\b/i,
+    /\bcins\b/i,
+    /\bcinsi\b/i,
+    /\btip\b/i,
+    /\btipi\b/i,
+    /\bspecies\b/i,
+    /\bbreed\b/i,
+    /\bkategori\b/i,
+    /\bcategory\b/i,
+    /\bsegment\b/i
+] as const
+
+const GENERIC_TYPE_SIGNAL_STEMS = new Set([
+    'butce',
+    'fiyat',
+    'ucret',
+    'zaman',
+    'tarih',
+    'saat',
+    'oncelik',
+    'aciliyet',
+    'hizmet',
+    'konu',
+    'talep',
+    'proje',
+    'randevu',
+    'bilgi',
+    'detay',
+    'genel',
+    'yaklasim',
+    'cozum'
+])
+
 const SOFT_DEFLECTION_PATTERNS = [
     /paylaşmak istemiyorum/i,
     /paylasmak istemiyorum/i,
@@ -111,8 +150,8 @@ const CATEGORY_RULES: Array<{
     },
     {
         category: 'timeline',
-        triggers: ['tarih', 'zaman', 'takvim', 'date', 'timeline', 'randevu', 'uygunluk', 'schedule'],
-        keywords: ['tarih', 'zaman', 'takvim', 'date', 'timeline', 'randevu', 'uygun', 'schedule', 'hafta', 'ay', 'yarin', 'yarın']
+        triggers: ['tarih', 'zaman', 'takvim', 'date', 'timeline', 'timing', 'randevu', 'uygunluk', 'schedule'],
+        keywords: ['tarih', 'zaman', 'takvim', 'date', 'timeline', 'timing', 'randevu', 'uygun', 'schedule', 'hafta', 'ay', 'yarin', 'yarın']
     },
     {
         category: 'urgency',
@@ -128,6 +167,16 @@ const CATEGORY_RULES: Array<{
         category: 'service',
         triggers: ['hizmet', 'ders', 'konu', 'talep', 'ihtiyac', 'ihtiyaç', 'service', 'subject', 'need'],
         keywords: ['hizmet', 'ders', 'konu', 'talep', 'ihtiyac', 'ihtiyaç', 'service', 'subject', 'need', 'kapsam']
+    },
+    {
+        category: 'business_size',
+        triggers: ['isletme', 'işletme', 'company', 'business size', 'team size', 'employee', 'calisan', 'çalışan', 'firma', 'organizasyon'],
+        keywords: ['isletme', 'işletme', 'company', 'business', 'size', 'team', 'employee', 'calisan', 'çalışan', 'personel', 'firma', 'organizasyon', 'kobi']
+    },
+    {
+        category: 'callback_time',
+        triggers: ['geri donus', 'geri dönüş', 'callback', 'time window'],
+        keywords: ['geri donus', 'geri dönüş', 'callback', 'time window', 'uygun saat', 'hangi saat', 'mesai']
     },
     {
         category: 'frequency',
@@ -155,6 +204,11 @@ function normalizeText(value: string) {
     return value
         .toLowerCase()
         .replace(/ı/g, 'i')
+        .replace(/ç/g, 'c')
+        .replace(/ğ/g, 'g')
+        .replace(/ö/g, 'o')
+        .replace(/ş/g, 's')
+        .replace(/ü/g, 'u')
         .replace(/[^\p{L}\p{N}\s@$.₺:+-]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim()
@@ -172,6 +226,136 @@ function tokenize(value: string) {
 function normalizeRatio(value: number) {
     if (!Number.isFinite(value)) return 0
     return Math.max(0, Math.min(1, Number(value.toFixed(2))))
+}
+
+function normalizeLooseStem(token: string) {
+    let stem = token.trim()
+    if (!stem) return stem
+
+    const suffixes = [
+        'siniz', 'siniz', 'siniz', 'siniz',
+        'yiz', 'yim',
+        'imiz', 'umuz', 'umuz', 'umuz',
+        'iniz', 'unuz', 'unuz', 'unuz',
+        'leri', 'lari',
+        'nin', 'nin', 'nun', 'nun',
+        'den', 'dan',
+        'ler', 'lar',
+        'de', 'da',
+        'im', 'um', 'am', 'em',
+        'in', 'un', 'an', 'en',
+        'i', 'u', 'a', 'e',
+        'm'
+    ]
+
+    for (const suffix of suffixes) {
+        if (stem.length <= suffix.length + 2) continue
+        if (stem.endsWith(suffix)) {
+            stem = stem.slice(0, -suffix.length)
+            break
+        }
+    }
+
+    return stem
+}
+
+function looseTokenMatch(left: string, right: string) {
+    const a = normalizeLooseStem(left)
+    const b = normalizeLooseStem(right)
+    if (!a || !b) return false
+    if (a === b) return true
+
+    if (a.length >= 4 && b.length >= 4) {
+        let prefix = 0
+        const max = Math.min(a.length, b.length)
+        while (prefix < max && a[prefix] === b[prefix]) prefix += 1
+        if (prefix >= 4) return true
+
+        const consonantSofteningMatch = (
+            ((a.endsWith('g') && b.endsWith('k')) || (a.endsWith('k') && b.endsWith('g')))
+            && a.slice(0, -1) === b.slice(0, -1)
+        )
+        if (consonantSofteningMatch) return true
+    }
+
+    return false
+}
+
+function hasTypeLikeFieldSignal(field: string) {
+    const normalized = normalizeText(field)
+    if (!normalized) return false
+    return TYPE_LIKE_FIELD_PATTERNS.some((pattern) => pattern.test(normalized))
+}
+
+function extractTypeLikeCandidateStems(text: string) {
+    const normalized = normalizeText(text)
+    if (!normalized) return []
+
+    const candidates = new Set<string>()
+
+    for (const match of normalized.matchAll(/\b([a-z]{3,})(?:im|um|am|em|m)\s+icin\b/g)) {
+        const stem = normalizeLooseStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    for (const match of normalized.matchAll(/\b([a-z]{4,})(?:yim|yiz)\b/g)) {
+        const stem = normalizeLooseStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    for (const match of normalized.matchAll(/\bmy\s+([a-z]{3,})\b/g)) {
+        const stem = normalizeLooseStem(match[1] ?? '')
+        if (stem) candidates.add(stem)
+    }
+
+    return Array.from(candidates)
+}
+
+function buildCaseContextTokens(caseItem: QaLabIntakeCoverageCaseInput) {
+    const combined = `${toSafeString(caseItem.title)} ${toSafeString(caseItem.goal)}`
+    return tokenize(combined).filter((token) => (
+        token.length >= 4
+        && !GENERIC_TYPE_SIGNAL_STEMS.has(normalizeLooseStem(token))
+    ))
+}
+
+function hasTypeLikeSemanticFulfillment(input: {
+    field: string
+    fieldKeywords: string[]
+    customerMessage: string
+    caseContextTokens: string[]
+}) {
+    if (!hasTypeLikeFieldSignal(input.field)) return false
+    const normalizedMessage = normalizeText(input.customerMessage)
+    if (!normalizedMessage) return false
+    if (hasSoftDeflectionSignal(normalizedMessage)) return false
+    if (hasQuestionIntent(input.customerMessage) && tokenize(input.customerMessage).length <= 8) return false
+
+    const fieldTokenStems = new Set(
+        input.fieldKeywords
+            .map((token) => normalizeLooseStem(token))
+            .filter((token) => token.length >= 3)
+    )
+    const candidates = extractTypeLikeCandidateStems(input.customerMessage)
+
+    const hasDistinctCandidate = candidates.some((candidate) => {
+        if (candidate.length < 3) return false
+        if (GENERIC_TYPE_SIGNAL_STEMS.has(candidate)) return false
+        for (const fieldStem of fieldTokenStems) {
+            if (looseTokenMatch(candidate, fieldStem)) {
+                return false
+            }
+        }
+        return true
+    })
+    if (hasDistinctCandidate) return true
+
+    const customerTokens = tokenize(input.customerMessage)
+    if (customerTokens.length === 0 || input.caseContextTokens.length === 0) return false
+
+    return customerTokens.some((customerToken) => (
+        input.caseContextTokens.some((contextToken) => looseTokenMatch(customerToken, contextToken))
+    ))
 }
 
 function normalizeCaseTemperature(value: unknown): QaLabScenarioTemperature {
@@ -248,6 +432,7 @@ function hasTimelineSignal(text: string) {
     if (!text) return false
     return (
         /\b\d{1,2}[./-]\d{1,2}\b/.test(text)
+        || text.includes('timing')
         || text.includes('yarin')
         || text.includes('yarın')
         || text.includes('hafta')
@@ -286,6 +471,33 @@ function hasContactSignal(text: string) {
     )
 }
 
+function hasBusinessSizeSignal(text: string) {
+    if (!text) return false
+    return (
+        text.includes('isletme')
+        || text.includes('işletme')
+        || text.includes('company')
+        || text.includes('business size')
+        || text.includes('team size')
+        || text.includes('calisan')
+        || text.includes('çalışan')
+        || text.includes('personel')
+        || /\b\d+\s*(calisan|çalışan|personel|kisi|kişi|employee)\b/.test(text)
+    )
+}
+
+function hasCallbackTimeSignal(text: string) {
+    if (!text) return false
+    return (
+        text.includes('geri donus')
+        || text.includes('geri dönüş')
+        || text.includes('callback')
+        || text.includes('mesai')
+        || text.includes('uygun saat')
+        || /\b\d{1,2}[:.]\d{2}\b/.test(text)
+    )
+}
+
 function hasFrequencySignal(text: string) {
     if (!text) return false
     return (
@@ -321,9 +533,36 @@ function hasGoalSignal(text: string) {
     )
 }
 
+function hasServiceSignal(text: string) {
+    if (!text) return false
+    return (
+        text.includes('hizmet')
+        || text.includes('service')
+        || text.includes('kapsam')
+        || text.includes('paket')
+        || text.includes('konu')
+        || text.includes('cozum')
+        || text.includes('çözüm')
+        || text.includes('proje')
+        || text.includes('uygulama')
+        || text.includes('gelistirme')
+        || text.includes('geliştirme')
+        || text.includes('entegrasyon')
+        || text.includes('danismanlik')
+        || text.includes('danışmanlık')
+        || text.includes('ders')
+    )
+}
+
 function hasSoftDeflectionSignal(text: string) {
     if (!text) return false
     return SOFT_DEFLECTION_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+function hasExplicitRefusalAroundKeyword(text: string, keywords: string[]) {
+    if (!text || keywords.length === 0) return false
+    if (!hasSoftDeflectionSignal(text)) return false
+    return textContainsAny(text, keywords)
 }
 
 function hasLikelyInformativeSemanticReply(text: string) {
@@ -334,6 +573,7 @@ function hasLikelyInformativeSemanticReply(text: string) {
         hasBudgetSignal(text)
         || hasTimelineSignal(text)
         || hasUrgencySignal(text)
+        || hasServiceSignal(text)
         || hasContactSignal(text)
         || hasFrequencySignal(text)
         || hasLevelSignal(text)
@@ -355,15 +595,23 @@ function hasLikelyInformativeSemanticReply(text: string) {
     return true
 }
 
+function canUseBroadSemanticFallbackForMatcher(matcher: QaLabFieldMatcher) {
+    if (matcher.categories.size > 0) return false
+    if (hasTypeLikeFieldSignal(matcher.field)) return false
+    return true
+}
+
 function hasCategorySignal(text: string, categories: Set<QaLabIntakeCategory>) {
     if (categories.has('budget') && hasBudgetSignal(text)) return true
     if (categories.has('timeline') && hasTimelineSignal(text)) return true
     if (categories.has('urgency') && hasUrgencySignal(text)) return true
     if (categories.has('contact') && hasContactSignal(text)) return true
+    if (categories.has('business_size') && hasBusinessSizeSignal(text)) return true
+    if (categories.has('callback_time') && hasCallbackTimeSignal(text)) return true
     if (categories.has('frequency') && hasFrequencySignal(text)) return true
     if (categories.has('level') && hasLevelSignal(text)) return true
     if (categories.has('goal') && hasGoalSignal(text)) return true
-    if (categories.has('service') && text.includes('ders')) return true
+    if (categories.has('service') && hasServiceSignal(text)) return true
     return false
 }
 
@@ -416,7 +664,6 @@ export function analyzeQaLabIntakeCoverage(input: {
         .map((field) => toSafeString(field))
         .filter(Boolean)
 
-    const matchers = requiredFields.map(buildFieldMatcher)
     const byCase: QaLabIntakeCoverageCaseResult[] = []
     const missingFieldCounter = new Map<string, number>()
     const channelContext = input.channelContext ?? 'unknown'
@@ -424,6 +671,15 @@ export function analyzeQaLabIntakeCoverage(input: {
     for (const caseItem of input.cases) {
         const leadTemperature = normalizeCaseTemperature(caseItem.lead_temperature)
         const informationSharing = normalizeCaseSharing(caseItem.information_sharing)
+        const caseRequiredFields = (
+            Array.isArray(caseItem.required_intake_fields)
+                ? caseItem.required_intake_fields
+                    .map((field) => toSafeString(field))
+                    .filter(Boolean)
+                : requiredFields
+        )
+        const matchers = caseRequiredFields.map(buildFieldMatcher)
+        const caseContextTokens = buildCaseContextTokens(caseItem)
         const states = matchers.map((matcher) => ({
             matcher,
             asked: false,
@@ -452,20 +708,35 @@ export function analyzeQaLabIntakeCoverage(input: {
 
             for (const state of states) {
                 if (!state.fulfilled) {
+                    const explicitRefusal = hasExplicitRefusalAroundKeyword(
+                        customerText,
+                        state.matcher.keywords
+                    )
+                    if (explicitRefusal) {
+                        continue
+                    }
                     const directMatch = textContainsAny(customerText, state.matcher.keywords)
                     const categoryMatch = hasCategorySignal(customerText, state.matcher.categories)
-                    if (directMatch || categoryMatch) {
+                    const typeLikeSemanticMatch = hasTypeLikeSemanticFulfillment({
+                        field: state.matcher.field,
+                        fieldKeywords: state.matcher.keywords,
+                        customerMessage: customerText,
+                        caseContextTokens
+                    })
+                    if (directMatch || categoryMatch || typeLikeSemanticMatch) {
                         state.fulfilled = true
                     }
                 }
             }
 
             if (hasLikelyInformativeSemanticReply(customerText)) {
-                const semanticCandidate = states.find((state) => (
-                    !state.fulfilled && state.awaitingResponseFromAssistantAsk
+                const semanticCandidates = states.filter((state) => (
+                    !state.fulfilled
+                    && state.awaitingResponseFromAssistantAsk
+                    && canUseBroadSemanticFallbackForMatcher(state.matcher)
                 ))
-                if (semanticCandidate) {
-                    semanticCandidate.fulfilled = true
+                if (semanticCandidates.length === 1) {
+                    semanticCandidates[0]!.fulfilled = true
                 }
             }
 

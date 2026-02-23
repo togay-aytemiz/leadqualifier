@@ -243,6 +243,8 @@ const EMPTY_BILLING_SNAPSHOT: AdminBillingSnapshot = {
 }
 
 const EMPTY_COUNT_MAP = new Map<string, number>()
+const EXCLUDED_ADMIN_ORGANIZATION_NAMES = new Set(['ai qa lab'])
+const EXCLUDED_ADMIN_ORGANIZATION_SLUGS = new Set(['ai-qa-lab'])
 
 function toNonNegativeInteger(value: unknown): number {
     const normalized = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value)
@@ -254,6 +256,40 @@ function toNonNegativeNumber(value: unknown): number {
     const normalized = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     if (!Number.isFinite(normalized)) return 0
     return Math.max(0, normalized)
+}
+
+function isExcludedAdminOrganizationCandidate(candidate: { name: string | null; slug: string | null }) {
+    const normalizedName = (candidate.name ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+    const normalizedSlug = (candidate.slug ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, '-')
+
+    return (
+        EXCLUDED_ADMIN_ORGANIZATION_NAMES.has(normalizedName) ||
+        EXCLUDED_ADMIN_ORGANIZATION_SLUGS.has(normalizedSlug) ||
+        normalizedName.includes('qa lab') ||
+        normalizedSlug.includes('qa-lab')
+    )
+}
+
+function subtractNonNegativeInt(total: number, excluded: number) {
+    return Math.max(0, Math.floor(total) - Math.max(0, Math.floor(excluded)))
+}
+
+function subtractNonNegativeTenths(total: number, excluded: number) {
+    return Math.max(0, Math.round((total - excluded) * 10) / 10)
+}
+
+function sumCountMapValues(counts: Map<string, number>) {
+    let total = 0
+    for (const value of counts.values()) {
+        total += toNonNegativeInteger(value)
+    }
+    return total
 }
 
 function chunkValues<T>(values: T[], chunkSize: number): T[][] {
@@ -408,6 +444,8 @@ async function getOrganizations(supabase: SupabaseClient): Promise<OrganizationR
     const { data, error } = await supabase
         .from('organizations')
         .select('id, name, slug, billing_region, created_at')
+        .neq('slug', 'ai-qa-lab')
+        .neq('name', 'AI QA LAB')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -415,7 +453,12 @@ async function getOrganizations(supabase: SupabaseClient): Promise<OrganizationR
         return []
     }
 
-    return (data ?? []) as OrganizationRow[]
+    return ((data ?? []) as OrganizationRow[]).filter((row) => (
+        !isExcludedAdminOrganizationCandidate({
+            name: row.name,
+            slug: row.slug
+        })
+    ))
 }
 
 async function getProfiles(supabase: SupabaseClient): Promise<ProfileRow[]> {
@@ -430,6 +473,27 @@ async function getProfiles(supabase: SupabaseClient): Promise<ProfileRow[]> {
     }
 
     return (data ?? []) as ProfileRow[]
+}
+
+async function getExcludedAdminOrganizationIds(supabase: SupabaseClient): Promise<string[]> {
+    const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name, slug')
+
+    if (error) {
+        console.error('Failed to load internal admin-excluded organizations:', error)
+        return []
+    }
+
+    const rows = (data ?? []) as Array<{
+        id: string
+        name: string | null
+        slug: string | null
+    }>
+
+    return rows
+        .filter((row) => typeof row.id === 'string' && isExcludedAdminOrganizationCandidate(row))
+        .map((row) => row.id)
 }
 
 async function getTableCount(
@@ -457,15 +521,22 @@ async function getMessageCountForRange(
     supabase: SupabaseClient,
     options: {
         organizationId?: string
+        organizationIds?: string[]
         dateRange?: AdminUsageDateRange | null
     }
 ): Promise<number> {
+    if (options.organizationIds && options.organizationIds.length === 0) {
+        return 0
+    }
+
     let query = supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
 
     if (options.organizationId) {
         query = query.eq('organization_id', options.organizationId)
+    } else if (options.organizationIds && options.organizationIds.length > 0) {
+        query = query.in('organization_id', options.organizationIds)
     }
 
     if (options.dateRange) {
@@ -487,9 +558,17 @@ async function getUsageTotalsForRange(
     supabase: SupabaseClient,
     options: {
         organizationId?: string
+        organizationIds?: string[]
         dateRange?: AdminUsageDateRange | null
     }
 ) {
+    if (options.organizationIds && options.organizationIds.length === 0) {
+        return {
+            totalTokenCount: 0,
+            totalCreditUsage: 0
+        }
+    }
+
     const pageSize = 1000
     let offset = 0
     let totalTokenCount = 0
@@ -504,6 +583,8 @@ async function getUsageTotalsForRange(
 
         if (options.organizationId) {
             query = query.eq('organization_id', options.organizationId)
+        } else if (options.organizationIds && options.organizationIds.length > 0) {
+            query = query.in('organization_id', options.organizationIds)
         }
 
         if (options.dateRange) {
@@ -576,6 +657,39 @@ export async function getAdminUsageMetricsSummary(
     const periodKey = resolveAdminMetricPeriodKey(options.periodKey)
     const dateRange = resolveAdminMetricPeriodRange(periodKey)
     const organizationId = options.organizationId ?? undefined
+
+    if (!organizationId) {
+        const excludedOrganizationIds = await getExcludedAdminOrganizationIds(supabase)
+
+        if (excludedOrganizationIds.length > 0) {
+            const [allMessageCount, allUsageTotals, excludedMessageCount, excludedUsageTotals] = await Promise.all([
+                getMessageCountForRange(supabase, { dateRange }),
+                getUsageTotalsForRange(supabase, { dateRange }),
+                getMessageCountForRange(supabase, {
+                    organizationIds: excludedOrganizationIds,
+                    dateRange
+                }),
+                getUsageTotalsForRange(supabase, {
+                    organizationIds: excludedOrganizationIds,
+                    dateRange
+                })
+            ])
+
+            return {
+                periodKey,
+                isAllTime: periodKey === ADMIN_METRIC_PERIOD_ALL,
+                messageCount: subtractNonNegativeInt(allMessageCount, excludedMessageCount),
+                totalTokenCount: subtractNonNegativeInt(
+                    allUsageTotals.totalTokenCount,
+                    excludedUsageTotals.totalTokenCount
+                ),
+                totalCreditUsage: subtractNonNegativeTenths(
+                    allUsageTotals.totalCreditUsage,
+                    excludedUsageTotals.totalCreditUsage
+                )
+            }
+        }
+    }
 
     const [messageCount, usageTotals] = await Promise.all([
         getMessageCountForRange(supabase, {
@@ -733,7 +847,14 @@ async function getOrganizationsByIds(
             continue
         }
 
-        rows.push(...((data ?? []) as OrganizationRow[]))
+        const batchRows = ((data ?? []) as OrganizationRow[]).filter((row) => (
+            !isExcludedAdminOrganizationCandidate({
+                name: row.name,
+                slug: row.slug
+            })
+        ))
+
+        rows.push(...batchRows)
     }
 
     return rows
@@ -934,6 +1055,8 @@ async function getOrganizationPageRows(
     let countQuery = supabase
         .from('organizations')
         .select('id', { count: 'exact', head: true })
+        .neq('slug', 'ai-qa-lab')
+        .neq('name', 'AI QA LAB')
 
     if (normalizedSearch) {
         countQuery = countQuery.or(`name.ilike.%${normalizedSearch}%,slug.ilike.%${normalizedSearch}%`)
@@ -960,6 +1083,8 @@ async function getOrganizationPageRows(
     let rowsQuery = supabase
         .from('organizations')
         .select('id, name, slug, billing_region, created_at')
+        .neq('slug', 'ai-qa-lab')
+        .neq('name', 'AI QA LAB')
         .order('created_at', { ascending: false })
         .range(from, to)
 
@@ -1091,32 +1216,50 @@ async function buildUserSummariesFromProfiles(
 async function getAdminDashboardSummaryFallback(
     supabase: SupabaseClient
 ): Promise<AdminDashboardSummary> {
+    const excludedOrganizationIds = await getExcludedAdminOrganizationIds(supabase)
     const [
-        organizationCount,
+        organizationCountRaw,
         userCount,
-        skillCount,
-        knowledgeDocumentCount,
-        messageCount,
-        totalTokenCount,
-        totalCreditUsage
+        skillCountRaw,
+        knowledgeDocumentCountRaw,
+        usageSummary
     ] = await Promise.all([
         getTableCount(supabase, 'organizations'),
         getTableCount(supabase, 'profiles'),
         getTableCount(supabase, 'skills'),
         getTableCount(supabase, 'knowledge_documents'),
-        getTableCount(supabase, 'messages'),
-        getGlobalTokenTotalFallback(supabase),
-        getGlobalCreditUsageFallback(supabase)
+        getAdminUsageMetricsSummary({
+            organizationId: null,
+            periodKey: ADMIN_METRIC_PERIOD_ALL
+        }, supabase)
     ])
+
+    let organizationCount = organizationCountRaw
+    let skillCount = skillCountRaw
+    let knowledgeDocumentCount = knowledgeDocumentCountRaw
+
+    if (excludedOrganizationIds.length > 0) {
+        const [excludedSkillCounts, excludedKnowledgeCounts] = await Promise.all([
+            getCountByOrganization(supabase, excludedOrganizationIds, 'skills'),
+            getCountByOrganization(supabase, excludedOrganizationIds, 'knowledge_documents')
+        ])
+
+        organizationCount = subtractNonNegativeInt(organizationCountRaw, excludedOrganizationIds.length)
+        skillCount = subtractNonNegativeInt(skillCountRaw, sumCountMapValues(excludedSkillCounts))
+        knowledgeDocumentCount = subtractNonNegativeInt(
+            knowledgeDocumentCountRaw,
+            sumCountMapValues(excludedKnowledgeCounts)
+        )
+    }
 
     return {
         organizationCount,
         userCount,
         skillCount,
         knowledgeDocumentCount,
-        messageCount,
-        totalTokenCount,
-        totalCreditUsage
+        messageCount: usageSummary.messageCount,
+        totalTokenCount: usageSummary.totalTokenCount,
+        totalCreditUsage: usageSummary.totalCreditUsage
     }
 }
 
@@ -1125,11 +1268,15 @@ export async function getAdminDashboardSummary(
 ): Promise<AdminDashboardSummary> {
     const supabase = supabaseOverride ?? await createClient()
 
-    const [{ data, error }, totalCreditUsage] = await Promise.all([
+    const [{ data, error }, usageSummary, excludedOrganizationIds] = await Promise.all([
         supabase
             .rpc('get_admin_dashboard_totals')
             .maybeSingle(),
-        getGlobalCreditUsageFallback(supabase)
+        getAdminUsageMetricsSummary({
+            organizationId: null,
+            periodKey: ADMIN_METRIC_PERIOD_ALL
+        }, supabase),
+        getExcludedAdminOrganizationIds(supabase)
     ])
 
     if (error || !data) {
@@ -1152,14 +1299,32 @@ export async function getAdminDashboardSummary(
         total_token_count?: unknown
     }
 
+    let organizationCount = toNonNegativeInteger(row.organization_count)
+    let skillCount = toNonNegativeInteger(row.skill_count)
+    let knowledgeDocumentCount = toNonNegativeInteger(row.knowledge_document_count)
+
+    if (excludedOrganizationIds.length > 0) {
+        const [excludedSkillCounts, excludedKnowledgeCounts] = await Promise.all([
+            getCountByOrganization(supabase, excludedOrganizationIds, 'skills'),
+            getCountByOrganization(supabase, excludedOrganizationIds, 'knowledge_documents')
+        ])
+
+        organizationCount = subtractNonNegativeInt(organizationCount, excludedOrganizationIds.length)
+        skillCount = subtractNonNegativeInt(skillCount, sumCountMapValues(excludedSkillCounts))
+        knowledgeDocumentCount = subtractNonNegativeInt(
+            knowledgeDocumentCount,
+            sumCountMapValues(excludedKnowledgeCounts)
+        )
+    }
+
     return {
-        organizationCount: toNonNegativeInteger(row.organization_count),
+        organizationCount,
         userCount: toNonNegativeInteger(row.user_count),
-        skillCount: toNonNegativeInteger(row.skill_count),
-        knowledgeDocumentCount: toNonNegativeInteger(row.knowledge_document_count),
-        messageCount: toNonNegativeInteger(row.message_count),
-        totalTokenCount: toNonNegativeInteger(row.total_token_count),
-        totalCreditUsage
+        skillCount,
+        knowledgeDocumentCount,
+        messageCount: usageSummary.messageCount,
+        totalTokenCount: usageSummary.totalTokenCount,
+        totalCreditUsage: usageSummary.totalCreditUsage
     }
 }
 

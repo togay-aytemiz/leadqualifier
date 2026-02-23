@@ -193,8 +193,8 @@ describe('resolveActiveOrganizationContext', () => {
                     },
                     {
                         id: 'org-qa',
-                        name: 'AI QA LAB',
-                        slug: 'ai-qa-lab'
+                        name: 'AI QA Lab (Internal)',
+                        slug: 'qualy-ai-qa-lab-internal'
                     },
                     {
                         id: 'org-b',
