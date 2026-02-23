@@ -7,7 +7,9 @@ import {
     createGeneratorRetryUserPrompt,
     enrichAssistantResponseWhenLowInformation,
     ensureActiveMissingFieldQuestion,
+    ensureDirectQuestionStartsWithAnswer,
     ensureHotCooperativeCriticalFieldQuestion,
+    ensureLeadQualificationClosureQuestion,
     enforceGeneralInformationBaselineResponse,
     enforceFieldNamedClarificationQuestion,
     expandFixtureLinesToMinimum,
@@ -886,6 +888,19 @@ describe('qa lab executor helpers', () => {
         expect(reordered).toContain('Bütçe aralığınızı paylaşabilir misiniz?')
     })
 
+    it('prepends grounded answer when direct-question response starts with intake question only', () => {
+        const patched = ensureDirectQuestionStartsWithAnswer({
+            response: 'Bütçe aralığınızı paylaşabilir misiniz?',
+            userMessage: 'Ne zaman başlayabilirsiniz?',
+            responseLanguage: 'tr',
+            kbContextLines: ['Başlangıç planı uygunluk netleşince kısa sürede oluşturulur.'],
+            fallbackTopics: ['başlangıç planı']
+        })
+
+        expect(patched.startsWith('Başlangıç planı uygunluk netleşince kısa sürede oluşturulur.')).toBe(true)
+        expect(patched).toContain('Bütçe aralığınızı paylaşabilir misiniz?')
+    })
+
     it('adds detail and next-step when response is low-information for direct question', () => {
         const enriched = enrichAssistantResponseWhenLowInformation({
             response: 'Fiyatlar kapsamına göre değişir.',
@@ -897,7 +912,7 @@ describe('qa lab executor helpers', () => {
             fallbackTopics: ['başlangıç planı', 'hizmet kapsamı']
         })
 
-        expect(enriched).toContain('Ek bilgi:')
+        expect(enriched).toContain('Başlangıç süreleri yoğunluğa göre genellikle 1-2 hafta içinde planlanır.')
         expect(enriched).toContain('Öncelik seviyenizi paylaşabilir misiniz')
     })
 
@@ -1009,6 +1024,37 @@ describe('qa lab executor helpers', () => {
         })
 
         expect(unchanged).toBe('İptal prosedürünü özetleyebilirim.')
+    })
+
+    it('enforces single explicit closure question with mini summary in lead-qualification mode', () => {
+        const patched = ensureLeadQualificationClosureQuestion({
+            response: 'Elbette yardımcı olurum. İsterseniz başka bir konuda da bilgi verebilirim?',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Buna göre ilk adım ne olsun?',
+            followupMissingFields: ['Proje aciliyet seviyesi'],
+            requiredFields: ['Bütçe', 'Başlangıç tarihi', 'Hizmet detayları', 'Proje aciliyet seviyesi'],
+            missingFields: ['Proje aciliyet seviyesi']
+        })
+
+        expect(patched).toContain('Şu ana kadar')
+        expect(patched).toContain('Öncelik seviyenizi paylaşabilir misiniz')
+        expect(patched.endsWith('Öncelik seviyenizi paylaşabilir misiniz (yüksek / orta / düşük)?')).toBe(true)
+        expect(patched).not.toContain('başka bir konuda da bilgi verebilirim?')
+    })
+
+    it('keeps response unchanged when closure question would pressure after explicit refusal', () => {
+        const unchanged = ensureLeadQualificationClosureQuestion({
+            response: 'Anladım, mevcut bilgilerle ilerleyebiliriz.',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Bu detayı paylaşmak istemiyorum.',
+            followupMissingFields: ['Proje aciliyet seviyesi'],
+            requiredFields: ['Bütçe', 'Proje aciliyet seviyesi'],
+            missingFields: ['Proje aciliyet seviyesi']
+        })
+
+        expect(unchanged).toBe('Anladım, mevcut bilgilerle ilerleyebiliriz.')
     })
 
     it('removes likely truncated numbered-list tails from assistant response', () => {

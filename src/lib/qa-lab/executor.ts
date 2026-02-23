@@ -3544,28 +3544,37 @@ function buildQaLabIntakeProgress(input: {
         ? 'lead_qualification'
         : detectedRequestMode
 
-    const deferredFields = fieldStates
+    const missingFields = caseCoverage?.missingFields ?? requiredFields
+
+    const fieldStateMeta = fieldStates.map((state) => {
+        const askedLastTurn = (
+            Boolean(lastAssistantMessage)
+            && isAssistantAskingField(lastAssistantMessage, state.field)
+            && !didCustomerAnswerField({
+                customerMessage: input.currentUserMessage,
+                field: state.field,
+                wasAskedInPreviousTurn: true
+            })
+        )
+        return {
+            ...state,
+            askedLastTurn
+        }
+    })
+
+    const deferredFields = fieldStateMeta
         .filter((state) => {
             const missing = state.respondedCount === 0
             if (!missing) return false
             if (state.refused) return true
-            if (state.ignoredCount >= 1) return true
-
-            const askedLastTurn = (
-                Boolean(lastAssistantMessage)
-                && isAssistantAskingField(lastAssistantMessage, state.field)
-                && !didCustomerAnswerField({
-                    customerMessage: input.currentUserMessage,
-                    field: state.field,
-                    wasAskedInPreviousTurn: true
-                })
-            )
-
-            return askedLastTurn
+            if (state.askedLastTurn) return true
+            // First ignore is retryable in a later turn; repeated ignores are deferred.
+            if (state.ignoredCount >= 2) return true
+            return false
         })
         .map((state) => state.field)
 
-    const activeMissingFields = (caseCoverage?.missingFields ?? requiredFields)
+    const activeMissingFields = missingFields
         .filter((field) => !deferredFields.includes(field))
         .sort((left, right) => (
             scoreMissingFieldPriority({
@@ -3579,10 +3588,50 @@ function buildQaLabIntakeProgress(input: {
             })
         ))
 
+    const retryableDeferredFields = missingFields
+        .filter((field) => {
+            const state = fieldStateMeta.find((item) => item.field === field)
+            if (!state) return false
+            return (
+                state.respondedCount === 0
+                && !state.refused
+                && !state.askedLastTurn
+                && state.ignoredCount === 1
+            )
+        })
+        .sort((left, right) => (
+            scoreMissingFieldPriority({
+                field: right,
+                currentUserMessage: input.currentUserMessage,
+                requestMode
+            }) - scoreMissingFieldPriority({
+                field: left,
+                currentUserMessage: input.currentUserMessage,
+                requestMode
+            })
+        ))
+
+    const followupMissingFields = Array.from(new Set([
+        ...activeMissingFields,
+        ...retryableDeferredFields
+    ])).sort((left, right) => (
+        scoreMissingFieldPriority({
+            field: right,
+            currentUserMessage: input.currentUserMessage,
+            requestMode
+        }) - scoreMissingFieldPriority({
+            field: left,
+            currentUserMessage: input.currentUserMessage,
+            requestMode
+        })
+    ))
+
     return {
         requiredFields,
-        missingFields: caseCoverage?.missingFields ?? requiredFields,
+        missingFields,
         activeMissingFields,
+        retryableDeferredFields,
+        followupMissingFields,
         deferredFields,
         fulfilledCount: caseCoverage?.fulfilledFieldsCount ?? 0,
         requiredTotal: caseCoverage?.requiredFieldsTotal ?? requiredFields.length,
@@ -4122,6 +4171,7 @@ function pickBestKbDetailForResponse(input: {
     userMessage: string
     kbContextLines: string[]
     fallbackTopics: string[]
+    responseLanguage: 'tr' | 'en'
 }) {
     const lines = input.kbContextLines
         .map((line) => line.trim())
@@ -4137,9 +4187,11 @@ function pickBestKbDetailForResponse(input: {
         if (candidate) return normalizeDetailSnippet(candidate)
     }
 
-    const topicHint = buildFallbackTopicsHint(input.fallbackTopics, 'tr')
+    const topicHint = buildFallbackTopicsHint(input.fallbackTopics, input.responseLanguage)
     if (!topicHint) return ''
-    return ensureSentenceEnding(`${topicHint} tarafında farklı seçenekler sunuyoruz`)
+    return input.responseLanguage === 'tr'
+        ? ensureSentenceEnding(`${topicHint} tarafında farklı seçenekler sunuyoruz`)
+        : ensureSentenceEnding(`We provide different options around ${topicHint}`)
 }
 
 function isEchoLikeAssistantResponse(input: {
@@ -4188,7 +4240,8 @@ export function enrichAssistantResponseWhenLowInformation(input: {
     const detail = pickBestKbDetailForResponse({
         userMessage: input.userMessage,
         kbContextLines: input.kbContextLines,
-        fallbackTopics: input.fallbackTopics
+        fallbackTopics: input.fallbackTopics,
+        responseLanguage: input.responseLanguage
     })
     const hasDetailAlready = detail
         ? normalizeForFieldMatching(response).includes(normalizeForFieldMatching(detail))
@@ -4209,9 +4262,8 @@ export function enrichAssistantResponseWhenLowInformation(input: {
 
     let enriched = response
     if (detail && !hasDetailAlready) {
-        const detailPrefix = input.responseLanguage === 'tr' ? 'Ek bilgi' : 'Additional detail'
         const separator = /[.!?]$/.test(enriched) ? ' ' : '. '
-        enriched = `${enriched}${separator}${detailPrefix}: ${detail}`
+        enriched = `${enriched}${separator}${detail}`
     }
     if (nextStep && !hasQuestionIntent(enriched)) {
         const separator = /[.!?]$/.test(enriched) ? ' ' : '. '
@@ -4447,6 +4499,127 @@ export function moveAnswerChunkFirstForDirectQuestion(input: {
     return reordered.join(' ').replace(/\s+/g, ' ').trim()
 }
 
+function toLowerFieldLabel(label: string) {
+    const trimmed = label.trim()
+    if (!trimmed) return trimmed
+    const [first, ...rest] = Array.from(trimmed)
+    return `${first.toLocaleLowerCase('tr-TR')}${rest.join('')}`
+}
+
+function buildFulfilledFieldsMiniSummary(input: {
+    requiredFields: string[]
+    missingFields: string[]
+    responseLanguage: 'tr' | 'en'
+}) {
+    const fulfilledFields = input.requiredFields
+        .filter((field) => !input.missingFields.includes(field))
+        .slice(0, 2)
+    if (fulfilledFields.length === 0) return ''
+
+    const labels = fulfilledFields.map((field) => (
+        toLowerFieldLabel(getQaLabFieldQuestionLabel(field))
+    ))
+    const joined = labels.join(input.responseLanguage === 'tr' ? ' ve ' : ' and ')
+    return input.responseLanguage === 'tr'
+        ? ensureSentenceEnding(`Şu ana kadar ${joined} bilgisini not aldım`)
+        : ensureSentenceEnding(`So far, I have noted ${joined}`)
+}
+
+export function ensureDirectQuestionStartsWithAnswer(input: {
+    response: string
+    userMessage: string
+    responseLanguage: 'tr' | 'en'
+    kbContextLines: string[]
+    fallbackTopics: string[]
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+    if (!hasQuestionIntent(input.userMessage)) return response
+
+    const chunks = splitIntoSentenceLikeChunks(response)
+    const firstChunk = chunks[0] ?? ''
+    if (!firstChunk || !hasQuestionIntent(firstChunk)) return response
+
+    const detail = pickBestKbDetailForResponse({
+        userMessage: input.userMessage,
+        kbContextLines: input.kbContextLines,
+        fallbackTopics: input.fallbackTopics,
+        responseLanguage: input.responseLanguage
+    })
+    const fallbackAnswer = input.responseLanguage === 'tr'
+        ? 'Mevcut bilgilerle kısa bir çerçeve paylaşabilirim.'
+        : 'I can share a concise overview with the available context.'
+    const answerChunk = detail || fallbackAnswer
+    if (!answerChunk) return response
+
+    const normalizedAnswer = normalizeForFieldMatching(answerChunk)
+    const responseAlreadyHasAnswer = chunks.some((chunk, index) => (
+        index > 0
+        && !hasQuestionIntent(chunk)
+        && normalizeForFieldMatching(chunk).includes(normalizedAnswer)
+    ))
+    if (responseAlreadyHasAnswer) return response
+
+    return `${ensureSentenceEnding(answerChunk)} ${response}`.replace(/\s+/g, ' ').trim()
+}
+
+export function ensureLeadQualificationClosureQuestion(input: {
+    response: string
+    responseLanguage: 'tr' | 'en'
+    requestMode: QaLabResponderRequestMode
+    userMessage: string
+    followupMissingFields: string[]
+    requiredFields: string[]
+    missingFields: string[]
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+    if (input.requestMode !== 'lead_qualification') return response
+    if (hasRefusalSignal(input.userMessage)) return response
+
+    const followupMissingFields = Array.from(new Set(
+        input.followupMissingFields
+            .map((field) => field.trim())
+            .filter(Boolean)
+    ))
+    if (followupMissingFields.length === 0) return response
+
+    const targetField = followupMissingFields[0] ?? ''
+    if (!targetField) return response
+    const explicitQuestion = buildExplicitIntakeFieldQuestion(targetField)
+    if (!explicitQuestion) return response
+
+    const chunks = splitIntoSentenceLikeChunks(response)
+    const questionChunks = chunks.filter((chunk) => hasQuestionIntent(chunk))
+    const hasTargetQuestion = questionChunks.some((chunk) => isAssistantAskingField(chunk, targetField))
+    const summarySentence = buildFulfilledFieldsMiniSummary({
+        requiredFields: input.requiredFields,
+        missingFields: input.missingFields,
+        responseLanguage: input.responseLanguage
+    })
+
+    if (hasTargetQuestion && questionChunks.length === 1) {
+        if (!summarySentence) return response
+        if (normalizeForFieldMatching(response).includes(normalizeForFieldMatching(summarySentence))) {
+            return response
+        }
+        return `${summarySentence} ${response}`.replace(/\s+/g, ' ').trim()
+    }
+
+    const nonQuestionChunks = chunks.filter((chunk) => !hasQuestionIntent(chunk))
+    const base = nonQuestionChunks.join(' ').replace(/\s+/g, ' ').trim()
+    const baseWithSummary = (() => {
+        if (!summarySentence) return base
+        if (!base) return summarySentence
+        const normalizedBase = normalizeForFieldMatching(base)
+        if (normalizedBase.includes(normalizeForFieldMatching(summarySentence))) return base
+        return `${summarySentence} ${base}`.replace(/\s+/g, ' ').trim()
+    })()
+
+    if (!baseWithSummary) return explicitQuestion
+    return `${baseWithSummary} ${explicitQuestion}`.replace(/\s+/g, ' ').trim()
+}
+
 function messageProvidesAnyRequiredField(input: {
     message: string
     requiredFields: string[]
@@ -4559,6 +4732,11 @@ async function generateQaLabAssistantResponse(input: {
         requiredFieldsOverride: input.requiredFieldsOverride
     })
     const requestMode = intakeProgress.requestMode
+    const followupMissingFields = (
+        intakeProgress.followupMissingFields.length > 0
+            ? intakeProgress.followupMissingFields
+            : intakeProgress.activeMissingFields
+    )
     const systemPrompt = `You are the AI QA Lab simulated assistant.
 This simulation is synthetic and must NOT use any organization-specific skill catalog.
 Use KB_CONTEXT and CRITICAL_POLICY_FACTS below for factual claims.
@@ -4584,9 +4762,11 @@ Intake fulfillment policy:
 - Communication preference is not a mandatory intake field in QA Lab.
 - Prefer high-impact missing fields first: budget, timeline/availability, scope/topic, urgency/business profile.
 - In hot + cooperative conversations, by turn 3 prioritize collecting missing service scope or urgency (at least one).
-- Never insist on the same field after user ignores or refuses it once.
+- If user explicitly refuses a field, do not insist again in later turns.
+- If user ignores a field once, at most one later re-try is allowed with different wording; then defer.
+- When lead-qualification still has follow-up missing fields and user did not refuse, close the turn with one explicit field-named question.
 - If a field is deferred by user behavior, continue with available information and avoid pressure.
-- Ask at most one clarification per turn and only from ACTIVE_MISSING_INTAKE_FIELDS.
+- Ask at most one clarification per turn and only from FOLLOWUP_MISSING_INTAKE_FIELDS.
 - NEVER ask any field listed in DEFERRED_INTAKE_FIELDS.
 - Treat semantically inferable customer answers as collected; exact keyword repetition is not required.
 - If only deferred fields remain, move forward with available context instead of pushing intake loops.
@@ -4619,6 +4799,9 @@ ${intakeProgress.missingFields.map((field, index) => `${index + 1}. ${field}`).j
 ACTIVE_MISSING_INTAKE_FIELDS:
 ${intakeProgress.activeMissingFields.map((field, index) => `${index + 1}. ${field}`).join('\n') || '-'}
 
+FOLLOWUP_MISSING_INTAKE_FIELDS:
+${intakeProgress.followupMissingFields.map((field, index) => `${index + 1}. ${field}`).join('\n') || '-'}
+
 DEFERRED_INTAKE_FIELDS:
 ${intakeProgress.deferredFields.map((field, index) => `${index + 1}. ${field}`).join('\n') || '-'}
 
@@ -4650,16 +4833,16 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
     })
     const fieldNamedResponseRaw = enforceFieldNamedClarificationQuestion({
         response: guardedResponseRaw,
-        activeMissingFields: intakeProgress.activeMissingFields
+        activeMissingFields: followupMissingFields
     })
     const withMissingFieldQuestionRaw = ensureActiveMissingFieldQuestion({
         response: fieldNamedResponseRaw,
-        activeMissingFields: intakeProgress.activeMissingFields,
+        activeMissingFields: followupMissingFields,
         userMessage: input.message,
         allowAppend: shouldForceIntakeFollowupQuestion({
             userMessage: input.message,
             requestMode,
-            activeMissingFields: intakeProgress.activeMissingFields,
+            activeMissingFields: followupMissingFields,
             history: input.history
         })
     })
@@ -4692,12 +4875,19 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
         response: stopContactTrimmedResponseRaw,
         userMessage: input.message
     })
-    const chatFirstRedirectResponseRaw = sanitizeExternalContactRedirectResponse({
+    const answerFirstGuaranteedResponseRaw = ensureDirectQuestionStartsWithAnswer({
         response: answerFirstResponseRaw,
+        userMessage: input.message,
+        responseLanguage,
+        kbContextLines: kbContext.lines,
+        fallbackTopics
+    })
+    const chatFirstRedirectResponseRaw = sanitizeExternalContactRedirectResponse({
+        response: answerFirstGuaranteedResponseRaw,
         responseLanguage,
         requestMode,
         userMessage: input.message,
-        activeMissingFields: intakeProgress.activeMissingFields
+        activeMissingFields: followupMissingFields
     })
     const sanitizedResponseRaw = sanitizeAssistantResponseForTruncation(chatFirstRedirectResponseRaw)
     const fallbackAdjustedResponseRaw = refineQaLabGenericUnknownResponse({
@@ -4705,7 +4895,7 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
         responseLanguage,
         requestMode,
         userMessage: input.message,
-        activeMissingFields: intakeProgress.activeMissingFields,
+        activeMissingFields: followupMissingFields,
         fallbackTopics
     })
     const generalInfoBaselineResponseRaw = enforceGeneralInformationBaselineResponse({
@@ -4720,25 +4910,37 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
         userMessage: input.message,
         responseLanguage,
         requestMode,
-        activeMissingFields: intakeProgress.activeMissingFields,
+        activeMissingFields: followupMissingFields,
         kbContextLines: kbContext.lines,
         fallbackTopics
     })
-    const noProgressAdjustedResponseRaw = shouldUseNoProgressNextStepResponse({
+    const shouldUseNoProgressResponse = shouldUseNoProgressNextStepResponse({
         history: input.history,
         currentUserMessage: input.message,
         requestMode,
         requiredFields: intakeProgress.requiredFields,
-        activeMissingFields: intakeProgress.activeMissingFields
+        activeMissingFields: followupMissingFields
     })
+    const noProgressAdjustedResponseRaw = shouldUseNoProgressResponse
         ? buildNoProgressNextStepResponse({
             responseLanguage,
-            activeMissingFields: intakeProgress.activeMissingFields,
+            activeMissingFields: followupMissingFields,
             fallbackTopics
         })
         : enrichedLowInfoResponseRaw
+    const closureAlignedResponseRaw = shouldUseNoProgressResponse
+        ? noProgressAdjustedResponseRaw
+        : ensureLeadQualificationClosureQuestion({
+            response: noProgressAdjustedResponseRaw,
+            responseLanguage,
+            requestMode,
+            userMessage: input.message,
+            followupMissingFields,
+            requiredFields: intakeProgress.requiredFields,
+            missingFields: intakeProgress.missingFields
+        })
     const response = trimText(
-        noProgressAdjustedResponseRaw,
+        closureAlignedResponseRaw,
         responseLanguage === 'tr'
             ? 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?'
             : 'I could not find a clear detail yet. Could you share a bit more context?'
