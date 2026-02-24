@@ -22,6 +22,7 @@ import {
     refineQaLabGenericUnknownResponse,
     resolveQaLabScenarioRequiredIntakeFields,
     sanitizeExternalContactRedirectResponse,
+    sanitizeAssistantResponseSurfaceArtifacts,
     sanitizeAssistantResponseForTruncation,
     shouldRetryJudgeForScoreAnomaly,
     shouldUseNoProgressNextStepResponse,
@@ -216,12 +217,12 @@ describe('qa lab executor helpers', () => {
                     {
                         id: 'S2',
                         title: 'Hizmet kapsami',
-                        goal: 'Hangi terapi turunun uygun oldugunu belirle',
+                        goal: 'Hangi terapi turunun uygun oldugunu ve baslangic uygunlugunu belirle',
                         customer_profile: 'Arastirma asamasinda',
                         lead_temperature: 'warm',
                         information_sharing: 'partial',
                         turns: [
-                            { customer: 'Online hizmet var mi, sureci anlatir misiniz?' },
+                            { customer: 'Online hizmet var mi, gelecek hafta baslayabilir miyiz?' },
                             { customer: 'Hafta sonu mumkunse devam etmek isterim.' }
                         ]
                     },
@@ -234,7 +235,7 @@ describe('qa lab executor helpers', () => {
                         information_sharing: 'resistant',
                         turns: [
                             { customer: 'Net tarih veremiyorum ama destek almak istiyorum.' },
-                            { customer: 'Once genel fiyat araligini ogrenmek isterim.' }
+                            { customer: 'Once genel fiyat araligini ogrenmek isterim, butcem 4-5 bin TL olabilir.' }
                         ]
                     }
                 ]
@@ -394,6 +395,273 @@ describe('qa lab executor helpers', () => {
         expect(qualityError).toContain('resistant case')
     })
 
+    it('rejects scenarios when actionable lead-intent coverage is below minimum ratio', () => {
+        const qualityError = validateGeneratorOutputQuality(
+            {
+                kb_fixture: {
+                    title: 'Nova Diyet',
+                    lines: [
+                        'Bireysel danışmanlık ve online seans seçenekleri sunulur.',
+                        'Fiyatlandırma kapsam ve seans sıklığına göre değişir.',
+                        'İlk değerlendirme sonrası plan oluşturulur.',
+                        'Randevu uygunluğu haftalık takvime göre belirlenir.',
+                        'Hizmet akışında net ihtiyaç analizi yapılır.',
+                        'Eksik bilgi tek netleştirme sorusuyla tamamlanır.'
+                    ]
+                },
+                ground_truth: {
+                    canonical_services: ['Bireysel diyet danışmanlığı', 'Online danışmanlık', 'Grup seansları'],
+                    required_intake_fields: ['Bütçe', 'Zaman Çizelgesi', 'Hizmet Detayları', 'Proje aciliyet seviyesi'],
+                    critical_policy_facts: ['Fiyatlar kapsam ve süreye göre değişir.'],
+                    disallowed_fabricated_claims: ['Kesin kilo verme garantisi']
+                },
+                derived_setup: {
+                    offering_profile_summary: 'Diyet ve beslenme danışmanlığı',
+                    service_catalog: ['Bireysel diyet danışmanlığı', 'Online danışmanlık', 'Grup seansları'],
+                    required_intake_fields: ['Bütçe', 'Zaman Çizelgesi', 'Hizmet Detayları', 'Proje aciliyet seviyesi']
+                },
+                scenarios: [
+                    {
+                        id: 'S1',
+                        title: 'Genel bilgi 1',
+                        goal: 'Hizmetler hakkında genel bilgi almak',
+                        customer_profile: 'Araştırma',
+                        lead_temperature: 'warm',
+                        information_sharing: 'partial',
+                        turns: [{ customer: 'Hizmetleriniz hakkında genel bilgi alabilir miyim?' }, { customer: 'Süreç nasıl ilerliyor?' }, { customer: 'Teşekkürler.' }]
+                    },
+                    {
+                        id: 'S2',
+                        title: 'Genel bilgi 2',
+                        goal: 'Online hizmet modeli hakkında bilgi almak',
+                        customer_profile: 'Araştırma',
+                        lead_temperature: 'cold',
+                        information_sharing: 'resistant',
+                        turns: [{ customer: 'Online modeliniz nasıl çalışıyor?' }, { customer: 'Sadece genel çerçeve istiyorum.' }, { customer: 'Tamamdır.' }]
+                    },
+                    {
+                        id: 'S3',
+                        title: 'Genel bilgi 3',
+                        goal: 'Seans sıklığı hakkında bilgi almak',
+                        customer_profile: 'Araştırma',
+                        lead_temperature: 'warm',
+                        information_sharing: 'cooperative',
+                        turns: [{ customer: 'Seanslar haftada kaç kez oluyor?' }, { customer: 'Genel bilgi yeterli.' }, { customer: 'Teşekkürler.' }]
+                    },
+                    {
+                        id: 'S4',
+                        title: 'Genel bilgi 4',
+                        goal: 'Danışmanlık yaklaşımı hakkında bilgi almak',
+                        customer_profile: 'Araştırma',
+                        lead_temperature: 'hot',
+                        information_sharing: 'cooperative',
+                        turns: [{ customer: 'Danışmanlık yaklaşımınız nedir?' }, { customer: 'Detayları sonra konuşalım.' }, { customer: 'Tamam.' }]
+                    },
+                    {
+                        id: 'S5',
+                        title: 'Aksiyonel lead',
+                        goal: 'Fiyat ve başlangıç tarihi netleştirme',
+                        customer_profile: 'Karara yakın',
+                        lead_temperature: 'hot',
+                        information_sharing: 'cooperative',
+                        turns: [{ customer: 'Fiyat aralığınız nedir ve ne zaman başlayabiliriz?' }, { customer: 'Bütçem 8.000 TL civarı.' }, { customer: 'Bu hafta başlanabilir mi?' }]
+                    }
+                ]
+            },
+            {
+                fixture_min_lines: 6,
+                scenario_count: 5
+            } as unknown as Parameters<typeof validateGeneratorOutputQuality>[1]
+        )
+
+        expect(qualityError).toContain('actionable lead qualification coverage')
+    })
+
+    it('stabilizes low-actionable scenario sets to satisfy lead-intent coverage', () => {
+        const runConfig = {
+            fixture_min_lines: 12,
+            scenario_count: 5
+        } as unknown as Parameters<typeof stabilizeGeneratorOutputForQuality>[1]
+
+        const generated = {
+            kb_fixture: {
+                title: 'Atlas Muhasebe',
+                lines: [
+                    'Atlas Muhasebe KOBİlere vergi danışmanlığı sunar.',
+                    'Bordro ve raporlama süreçleri işletme ihtiyacına göre planlanır.',
+                    'Fiyatlandırma kapsam ve iş yüküne göre değişir.',
+                    'İlk görüşmede mevcut durum analizi yapılır.',
+                    'Risk ve bağımlılık başlıkları ayrı ayrı değerlendirilir.',
+                    'Hizmet adımları net aksiyon planıyla ilerletilir.',
+                    'Teklif öncesi minimum bilgi seti toplanır.',
+                    'Eksik bilgi tek soru ile netleştirilir.',
+                    'Uygunluk ve başlangıç tarihi ayrı doğrulanır.',
+                    'Kapsam değişirse fiyat aralığı güncellenir.',
+                    'Destek modeli aylık veya proje bazlı olabilir.',
+                    'Müşteri hedefi netleşince sonraki adım planlanır.'
+                ]
+            },
+            ground_truth: {
+                canonical_services: ['Vergi danışmanlığı', 'Bordro yönetimi', 'Finansal raporlama'],
+                required_intake_fields: ['Hizmet kapsamı', 'Bütçe', 'Zamanlama'],
+                critical_policy_facts: ['Fiyatlandırma kapsam ve iş yüküne göre değişir.'],
+                disallowed_fabricated_claims: ['Kesin vergi avantajı garantisi']
+            },
+            derived_setup: {
+                offering_profile_summary: 'Muhasebe ve mali danışmanlık',
+                service_catalog: ['Vergi danışmanlığı', 'Bordro yönetimi', 'Finansal raporlama'],
+                required_intake_fields: ['Hizmet kapsamı', 'Bütçe', 'Zamanlama']
+            },
+            scenarios: [
+                {
+                    id: 'S1',
+                    title: 'Genel bilgi',
+                    goal: 'Süreci genel hatlarıyla öğrenmek',
+                    customer_profile: 'Araştırma aşamasında',
+                    lead_temperature: 'hot' as const,
+                    information_sharing: 'cooperative' as const,
+                    turns: [
+                        { customer: 'Hizmet modelinizi genel olarak anlatabilir misiniz?' },
+                        { customer: 'Süreç adımlarını anlamak istiyorum.' },
+                        { customer: 'Teşekkürler.' }
+                    ]
+                },
+                {
+                    id: 'S2',
+                    title: 'Bilgilendirme',
+                    goal: 'Hizmet yaklaşımını anlamak',
+                    customer_profile: 'Araştırma aşamasında',
+                    lead_temperature: 'warm' as const,
+                    information_sharing: 'partial' as const,
+                    turns: [
+                        { customer: 'Vergi danışmanlığında yaklaşımınız nedir?' },
+                        { customer: 'Genel bir akış bilgisi yeterli.' },
+                        { customer: 'Detayı sonra konuşabiliriz.' }
+                    ]
+                },
+                {
+                    id: 'S3',
+                    title: 'Dirençli araştırma',
+                    goal: 'Ön bilgi almak',
+                    customer_profile: 'Detay paylaşmayan müşteri',
+                    lead_temperature: 'cold' as const,
+                    information_sharing: 'resistant' as const,
+                    turns: [
+                        { customer: 'Şimdilik sadece genel bilgi almak için yazdım.' },
+                        { customer: 'Detay vermeden önce yaklaşımınızı öğrenmek istiyorum.' },
+                        { customer: 'Teşekkürler.' }
+                    ]
+                },
+                {
+                    id: 'S4',
+                    title: 'Hizmet kapsamı',
+                    goal: 'Kapsam başlıklarını görmek',
+                    customer_profile: 'Araştırma aşamasında',
+                    lead_temperature: 'warm' as const,
+                    information_sharing: 'cooperative' as const,
+                    turns: [
+                        { customer: 'Hangi hizmet başlıklarında destek veriyorsunuz?' },
+                        { customer: 'Önce genel çerçeveyi görmek istiyorum.' },
+                        { customer: 'Tamamdır.' }
+                    ]
+                },
+                {
+                    id: 'S5',
+                    title: 'Destek modeli',
+                    goal: 'Aylık hizmet formatını öğrenmek',
+                    customer_profile: 'Araştırma aşamasında',
+                    lead_temperature: 'hot' as const,
+                    information_sharing: 'partial' as const,
+                    turns: [
+                        { customer: 'Aylık destek modeliniz nasıl çalışıyor?' },
+                        { customer: 'Süreç hakkında genel bilgi rica ederim.' },
+                        { customer: 'Sonra tekrar yazarım.' }
+                    ]
+                }
+            ]
+        }
+
+        const beforeError = validateGeneratorOutputQuality(
+            generated,
+            runConfig as unknown as Parameters<typeof validateGeneratorOutputQuality>[1]
+        )
+        const stabilized = stabilizeGeneratorOutputForQuality(
+            generated,
+            runConfig
+        )
+        const afterError = validateGeneratorOutputQuality(
+            stabilized,
+            runConfig as unknown as Parameters<typeof validateGeneratorOutputQuality>[1]
+        )
+
+        expect(beforeError).toContain('actionable lead qualification coverage')
+        expect(afterError).toBeNull()
+    })
+
+    it('rejects scenarios when opening utterances are semantically repetitive', () => {
+        const qualityError = validateGeneratorOutputQuality(
+            {
+                kb_fixture: {
+                    title: 'Atlas Klinik',
+                    lines: [
+                        'Klinik hizmetleri kişiye özel planlanır.',
+                        'Fiyatlar kapsam ve süreye göre değişir.',
+                        'Online ve yüz yüze seçenekler mevcuttur.',
+                        'İlk görüşmede hedef ve kapsam netleştirilir.',
+                        'Randevu planlaması uygunluk bazlı yapılır.',
+                        'Eksik bilgi adım adım tamamlanır.'
+                    ]
+                },
+                ground_truth: {
+                    canonical_services: ['Bireysel destek', 'Online destek', 'Grup seansı'],
+                    required_intake_fields: ['Bütçe', 'Zaman Çizelgesi', 'Hizmet Detayları'],
+                    critical_policy_facts: ['Fiyatlar kapsam ve süreye göre değişir.'],
+                    disallowed_fabricated_claims: ['Garantili sonuç']
+                },
+                derived_setup: {
+                    offering_profile_summary: 'Klinik danışmanlık',
+                    service_catalog: ['Bireysel destek', 'Online destek', 'Grup seansı'],
+                    required_intake_fields: ['Bütçe', 'Zaman Çizelgesi', 'Hizmet Detayları']
+                },
+                scenarios: [
+                    {
+                        id: 'S1',
+                        title: 'Tekrar 1',
+                        goal: 'Fiyat ve başlangıç planı',
+                        customer_profile: 'Lead',
+                        lead_temperature: 'hot',
+                        information_sharing: 'cooperative',
+                        turns: [{ customer: 'Merhaba, fiyat bilgisi alabilir miyim?' }, { customer: 'Bütçem 10.000 TL.' }, { customer: 'Bu hafta başlayalım.' }]
+                    },
+                    {
+                        id: 'S2',
+                        title: 'Tekrar 2',
+                        goal: 'Fiyat ve başlangıç planı',
+                        customer_profile: 'Lead',
+                        lead_temperature: 'warm',
+                        information_sharing: 'partial',
+                        turns: [{ customer: 'Selam, fiyat bilgisi alabilir miyim?' }, { customer: 'Bütçem 8.000 TL.' }, { customer: 'Müsaitlik var mı?' }]
+                    },
+                    {
+                        id: 'S3',
+                        title: 'Tekrar 3',
+                        goal: 'Fiyat ve başlangıç planı',
+                        customer_profile: 'Lead',
+                        lead_temperature: 'cold',
+                        information_sharing: 'resistant',
+                        turns: [{ customer: 'Merhaba, fiyat bilgisi alabilir miyim?' }, { customer: 'Şimdilik detay vermek istemiyorum.' }, { customer: 'Genel bilgi yeterli.' }]
+                    }
+                ]
+            },
+            {
+                fixture_min_lines: 6,
+                scenario_count: 3
+            } as unknown as Parameters<typeof validateGeneratorOutputQuality>[1]
+        )
+
+        expect(qualityError).toContain('opening semantic diversity')
+    })
+
     it('rejects fixture outputs dominated by templated fallback-style lines', () => {
         const baseLines = [
             'Atlas Merkez kobi muhasebe hizmeti sunar.',
@@ -479,19 +747,86 @@ describe('qa lab executor helpers', () => {
                     service_catalog: ['Ozel ders', 'Egitim koclugu'],
                     required_intake_fields: ['Butce', 'Hedef konu', 'Iletisim tercihleri']
                 },
-                scenarios: Array.from({ length: 6 }).map((_, index) => ({
-                    id: `S${index + 1}`,
-                    title: `Senaryo ${index + 1}`,
-                    goal: 'Lead qualification',
-                    customer_profile: 'Veli',
-                    lead_temperature: index % 2 === 0 ? 'hot' : 'warm',
-                    information_sharing: 'cooperative',
-                    turns: [
-                        { customer: 'Fiyat ve uygunluk bilgisi istiyorum.' },
-                        { customer: 'Butcem kisitli, ne onerirsiniz?' },
-                        { customer: 'Hizli baslamak istiyorum.' }
-                    ]
-                }))
+                scenarios: [
+                    {
+                        id: 'S1',
+                        title: 'Fiyat ve başlangıç',
+                        goal: 'Fiyat ve başlangıç uygunluğu',
+                        customer_profile: 'Veli',
+                        lead_temperature: 'hot',
+                        information_sharing: 'cooperative',
+                        turns: [
+                            { customer: 'Bu hafta özel ders için fiyat alabilir miyim?' },
+                            { customer: 'Bütçem 6-8 bin TL aralığında.' },
+                            { customer: 'Mümkünse hızlı başlamak istiyorum.' }
+                        ]
+                    },
+                    {
+                        id: 'S2',
+                        title: 'Online ders planı',
+                        goal: 'Online ders için zamanlama netleştirme',
+                        customer_profile: 'Veli',
+                        lead_temperature: 'warm',
+                        information_sharing: 'partial',
+                        turns: [
+                            { customer: 'Online ders için uygun saatleri öğrenebilir miyim?' },
+                            { customer: 'Hafta sonu başlamak daha iyi olur.' },
+                            { customer: 'Bütçeyi sonra netleştirelim.' }
+                        ]
+                    },
+                    {
+                        id: 'S3',
+                        title: 'Dirençli araştırma',
+                        goal: 'Genel yaklaşım sonrası olası başlangıç',
+                        customer_profile: 'Veli',
+                        lead_temperature: 'cold',
+                        information_sharing: 'resistant',
+                        turns: [
+                            { customer: 'Detay vermeden önce genel yol haritasını öğrenmek istiyorum.' },
+                            { customer: 'Şimdilik sadece başlangıç süresi ve fiyat aralığı önemli.' },
+                            { customer: 'Müsaitlik olursa sonra netleştiririm.' }
+                        ]
+                    },
+                    {
+                        id: 'S4',
+                        title: 'Konu seçimi',
+                        goal: 'Hizmet kapsamı ve hedef ders konusu',
+                        customer_profile: 'Veli',
+                        lead_temperature: 'warm',
+                        information_sharing: 'cooperative',
+                        turns: [
+                            { customer: 'Matematik için hangi paket uygun olur?' },
+                            { customer: 'Haftada iki ders düşünüyorum.' },
+                            { customer: 'Fiyatı buna göre paylaşır mısınız?' }
+                        ]
+                    },
+                    {
+                        id: 'S5',
+                        title: 'Kısa vadeli talep',
+                        goal: 'Acil başlangıç ve bütçe uyumu',
+                        customer_profile: 'Veli',
+                        lead_temperature: 'hot',
+                        information_sharing: 'partial',
+                        turns: [
+                            { customer: 'Sınava az kaldı, mümkünse bu hafta ders ayarlayalım.' },
+                            { customer: 'Bütçem 7 bin TL civarında.' },
+                            { customer: 'Uygun öğretmen var mı?' }
+                        ]
+                    },
+                    {
+                        id: 'S6',
+                        title: 'Takvim netleştirme',
+                        goal: 'Randevu ve başlangıç tarihi netleştirme',
+                        customer_profile: 'Veli',
+                        lead_temperature: 'cold',
+                        information_sharing: 'cooperative',
+                        turns: [
+                            { customer: 'Önümüzdeki ay için ders planı çıkarabilir miyiz?' },
+                            { customer: 'Fiyat aralığını da görmek istiyorum.' },
+                            { customer: 'Uygunluk olursa hemen kayıt olabilirim.' }
+                        ]
+                    }
+                ]
             },
             {
                 fixture_min_lines: 30,
@@ -635,6 +970,155 @@ describe('qa lab executor helpers', () => {
         expect(resolved.requiredFields).toEqual(defaultRequiredFields)
     })
 
+    it('treats special-request style intake fields as soft optional for lead qualification', () => {
+        const defaultRequiredFields = ['Hizmet Türü', 'Bütçe', 'Randevu Tarihi', 'Özel İstekler']
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_soft_optional',
+                title: 'Talep ve Uygunluk',
+                goal: 'Uygun hizmet ve tarih bilgisi almak',
+                customer_profile: 'Müşteri',
+                lead_temperature: 'warm',
+                information_sharing: 'partial',
+                turns: [
+                    { customer: 'Fiyat aralığınız nedir, bu hafta için uygunluk var mı?' }
+                ]
+            },
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['Fiyatlar kapsama göre değişir.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields,
+                    critical_policy_facts: [],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields
+        })
+
+        expect(resolved.requestMode).toBe('lead_qualification')
+        expect(resolved.requiredFields).toEqual(['Hizmet Türü', 'Bütçe', 'Randevu Tarihi'])
+        expect(resolved.requiredFields).not.toContain('Özel İstekler')
+    })
+
+    it('uses dynamic minimum required intake set for short (3-turn) lead scenarios', () => {
+        const defaultRequiredFields = ['Hizmet Türü', 'Bütçe', 'Zamanlama', 'Randevu Tarihi', 'Özel İstekler']
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_dynamic_min',
+                title: 'Hızlı Karar',
+                goal: 'Kısa konuşmada karar verebilmek için teklif almak',
+                customer_profile: 'Müşteri',
+                lead_temperature: 'hot',
+                information_sharing: 'cooperative',
+                turns: [
+                    { customer: 'Fiyat aralığınız nedir, bu hafta başlayabilir miyiz?' },
+                    { customer: 'Uygun günleri de paylaşır mısınız?' },
+                    { customer: 'Netleşirse hızlıca ilerleyelim.' }
+                ]
+            },
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['Hizmet detayları kapsamla belirlenir.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields,
+                    critical_policy_facts: [],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields
+        })
+
+        expect(resolved.requestMode).toBe('lead_qualification')
+        expect(resolved.requiredFields.length).toBe(3)
+        expect(resolved.requiredFields).toContain('Bütçe')
+        expect(resolved.requiredFields).not.toContain('Özel İstekler')
+    })
+
+    it('keeps lead-qualification mode when customer asks actionable pricing despite policy-fact overlap', () => {
+        const defaultRequiredFields = ['Bütçe', 'Zaman dilimi', 'İhtiyaç duyulan hizmet']
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_overlap',
+                title: 'Politika Notu Olan Senaryo',
+                goal: 'Müşteri talebini netleştirmek',
+                customer_profile: 'Müşteri',
+                lead_temperature: 'warm',
+                information_sharing: 'partial',
+                turns: [
+                    { customer: 'Fiyat aralığınız nedir ve bu hafta başlayabilir miyiz?' }
+                ]
+            },
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['İptal bildirimleri 24 saat önce alınır.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields,
+                    critical_policy_facts: ['İptal bildirimleri 24 saat önce alınır.'],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields
+        })
+
+        expect(resolved.requestMode).toBe('lead_qualification')
+        expect(resolved.requiredFields).toEqual(defaultRequiredFields)
+    })
+
+    it('keeps policy mode when message has explicit policy intent even with commercial keywords', () => {
+        const defaultRequiredFields = ['Bütçe', 'Zaman dilimi', 'İhtiyaç duyulan hizmet']
+        const resolved = resolveQaLabScenarioRequiredIntakeFields({
+            scenario: {
+                id: 'scenario_policy_explicit',
+                title: 'İptal Koşulları',
+                goal: 'İptal şartlarını öğrenmek',
+                customer_profile: 'Müşteri',
+                lead_temperature: 'cold',
+                information_sharing: 'resistant',
+                turns: [
+                    { customer: 'İptal koşullarınız nedir, ücret iadesi yapıyor musunuz?' }
+                ]
+            },
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['İptal için 24 saat önce bildirim gerekir.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: defaultRequiredFields,
+                    critical_policy_facts: ['İptal için 24 saat önce bildirim gerekir.'],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof resolveQaLabScenarioRequiredIntakeFields>[0]['generated'],
+            defaultRequiredFields
+        })
+
+        expect(resolved.requestMode).toBe('policy_or_procedure')
+        expect(resolved.requiredFields).toEqual([])
+    })
+
     it('promotes scenario mode from general-information to lead-qualification when turn intent becomes actionable', () => {
         const promoted = promoteQaLabScenarioRequestMode({
             currentMode: 'general_information',
@@ -662,6 +1146,67 @@ describe('qa lab executor helpers', () => {
 
         expect(promoted.requestMode).toBe('lead_qualification')
         expect(promoted.requiredFields).toEqual(['Bütçe', 'Hizmet Detayları', 'Zaman Çizelgesi'])
+    })
+
+    it('promotes policy-mode scenario to lead-qualification when current turn has explicit lead intent', () => {
+        const promoted = promoteQaLabScenarioRequestMode({
+            currentMode: 'policy_or_procedure',
+            currentRequiredFields: [],
+            defaultRequiredFields: ['Bütçe', 'Hizmet Detayları', 'Zaman Çizelgesi'],
+            scenarioTitle: 'İptal Koşulları',
+            scenarioGoal: 'Politika detaylarını öğrenmek',
+            customerMessage: 'Tamam, peki fiyat aralığınız ve bu hafta uygunluk durumunuz nedir?',
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['İptal için 24 saat önce bildirim gerekir.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: ['Bütçe', 'Hizmet Detayları', 'Zaman Çizelgesi']
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: ['Bütçe', 'Hizmet Detayları', 'Zaman Çizelgesi'],
+                    critical_policy_facts: ['İptal için 24 saat önce bildirim gerekir.'],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof promoteQaLabScenarioRequestMode>[0]['generated']
+        })
+
+        expect(promoted.requestMode).toBe('lead_qualification')
+        expect(promoted.requiredFields).toEqual(['Bütçe', 'Hizmet Detayları', 'Zaman Çizelgesi'])
+    })
+
+    it('applies short-scenario dynamic required-field policy on lead-mode promotion', () => {
+        const promoted = promoteQaLabScenarioRequestMode({
+            currentMode: 'general_information',
+            currentRequiredFields: [],
+            defaultRequiredFields: ['Hizmet Türü', 'Bütçe', 'Zamanlama', 'Randevu Tarihi', 'Özel İstekler'],
+            scenarioTitle: 'Hızlı Teklif',
+            scenarioGoal: 'Kısa akışta teklif ve uygunluk netleştirmek',
+            scenarioTurnCount: 3,
+            customerMessage: 'Fiyat aralığınız nedir, bu hafta başlayabilir miyiz?',
+            generated: {
+                kb_fixture: { title: 'Örnek', lines: ['Fiyatlar kapsama göre değişir.'] },
+                derived_setup: {
+                    offering_profile_summary: 'Örnek işletme',
+                    service_catalog: ['Hizmet'],
+                    required_intake_fields: ['Hizmet Türü', 'Bütçe', 'Zamanlama', 'Randevu Tarihi', 'Özel İstekler']
+                },
+                ground_truth: {
+                    canonical_services: ['Hizmet'],
+                    required_intake_fields: ['Hizmet Türü', 'Bütçe', 'Zamanlama', 'Randevu Tarihi', 'Özel İstekler'],
+                    critical_policy_facts: [],
+                    disallowed_fabricated_claims: []
+                },
+                scenarios: []
+            } as unknown as Parameters<typeof promoteQaLabScenarioRequestMode>[0]['generated']
+        })
+
+        expect(promoted.requestMode).toBe('lead_qualification')
+        expect(promoted.requiredFields.length).toBe(3)
+        expect(promoted.requiredFields).toContain('Bütçe')
+        expect(promoted.requiredFields).not.toContain('Özel İstekler')
     })
 
     it('drops callback-time requirement when timeline field already exists', () => {
@@ -832,6 +1377,21 @@ describe('qa lab executor helpers', () => {
         expect(sanitized).toContain('Uygun zamanlama aralığınızı paylaşabilir misiniz?')
         expect(sanitized).not.toContain('web sitemizi')
         expect(sanitized).not.toContain('telefonla')
+    })
+
+    it('sanitizes phone-number/contact-details redirect variants into in-chat continuation', () => {
+        const sanitized = sanitizeExternalContactRedirectResponse({
+            response: 'Detaylar için telefon numaramızdan bize ulaşabilirsiniz. İletişim bilgilerinizi paylaşın, sizi arayalım.',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Bu hafta uygunluk ve fiyat öğrenmek istiyorum.',
+            activeMissingFields: ['Bütçe']
+        })
+
+        expect(sanitized).toContain('Buradan devam edebiliriz.')
+        expect(sanitized).toContain('Bütçe aralığınızı paylaşabilir misiniz?')
+        expect(sanitized.toLowerCase()).not.toContain('telefon numaramız')
+        expect(sanitized.toLowerCase()).not.toContain('iletişim bilgilerinizi paylaşın')
     })
 
     it('strips intake questions in non-qualification request modes', () => {
@@ -1032,9 +1592,19 @@ describe('qa lab executor helpers', () => {
             responseLanguage: 'tr',
             requestMode: 'lead_qualification',
             userMessage: 'Buna göre ilk adım ne olsun?',
+            currentUserMessage: 'Buna göre ilk adım ne olsun?',
+            history: [
+                { role: 'user', content: 'Bütçem 12.000 TL civarında.' },
+                { role: 'assistant', content: 'Teşekkürler, not aldım.' }
+            ],
             followupMissingFields: ['Proje aciliyet seviyesi'],
             requiredFields: ['Bütçe', 'Başlangıç tarihi', 'Hizmet detayları', 'Proje aciliyet seviyesi'],
-            missingFields: ['Proje aciliyet seviyesi']
+            missingFields: ['Proje aciliyet seviyesi'],
+            scenarioContext: {
+                leadTemperature: 'warm',
+                informationSharing: 'cooperative',
+                turnIndex: 4
+            }
         })
 
         expect(patched).toContain('Şu ana kadar')
@@ -1049,12 +1619,59 @@ describe('qa lab executor helpers', () => {
             responseLanguage: 'tr',
             requestMode: 'lead_qualification',
             userMessage: 'Bu detayı paylaşmak istemiyorum.',
+            currentUserMessage: 'Bu detayı paylaşmak istemiyorum.',
+            history: [
+                { role: 'user', content: 'Fiyatlarınızı öğrenmek istiyorum.' },
+                { role: 'assistant', content: 'Kapsamı paylaşabilir misiniz?' }
+            ],
             followupMissingFields: ['Proje aciliyet seviyesi'],
             requiredFields: ['Bütçe', 'Proje aciliyet seviyesi'],
-            missingFields: ['Proje aciliyet seviyesi']
+            missingFields: ['Proje aciliyet seviyesi'],
+            scenarioContext: {
+                leadTemperature: 'warm',
+                informationSharing: 'cooperative',
+                turnIndex: 3
+            }
         })
 
         expect(unchanged).toBe('Anladım, mevcut bilgilerle ilerleyebiliriz.')
+    })
+
+    it('humanizes snake_case field labels in explicit intake follow-up questions', () => {
+        const patched = ensureActiveMissingFieldQuestion({
+            response: 'Süreci genel hatlarıyla paylaşabilirim.',
+            activeMissingFields: ['etkinlik_tipi'],
+            userMessage: 'Fiyat bilgisi alabilir miyim?'
+        })
+
+        expect(patched).toContain('etkinlik tipi bilgisini paylaşabilir misiniz?')
+        expect(patched).not.toContain('etkinlik_tipi')
+    })
+
+    it('normalizes resistant pricing turns to one soft critical-field ask without pressure', () => {
+        const patched = ensureLeadQualificationClosureQuestion({
+            response: 'Şu ana kadar bütçe aralığı ve ihtiyaç duyulan hizmet/konu bilgisini not aldım.',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Fiyatlarınızı öğrenmek yeterli.',
+            currentUserMessage: 'Fiyatlarınızı öğrenmek yeterli.',
+            history: [
+                { role: 'user', content: 'Sadece bilgi almak istiyorum.' },
+                { role: 'assistant', content: 'Etkinlik türünüzü paylaşır mısınız?' }
+            ],
+            followupMissingFields: ['etkinlik_tipi', 'çekim_tarihi'],
+            requiredFields: ['etkinlik_tipi', 'çekim_tarihi', 'bütçe'],
+            missingFields: ['etkinlik_tipi', 'çekim_tarihi'],
+            scenarioContext: {
+                leadTemperature: 'cold',
+                informationSharing: 'resistant',
+                turnIndex: 3
+            }
+        })
+
+        expect(patched).toContain('Fiyatlandırma, seçilen kapsam ve iş yüküne göre netleşir.')
+        expect(patched).toContain('Uygunsanız sadece')
+        expect(patched).toContain('Paylaşmak istemezseniz mevcut bilgilerle genel çerçevede devam edebiliriz.')
     })
 
     it('removes likely truncated numbered-list tails from assistant response', () => {
@@ -1064,6 +1681,17 @@ describe('qa lab executor helpers', () => {
 
         expect(sanitized.endsWith('6.')).toBe(false)
         expect(sanitized).toContain('Detayları ihtiyacınıza göre netleştirebiliriz.')
+    })
+
+    it('normalizes numeric and punctuation spacing artifacts in assistant response surface text', () => {
+        const sanitized = sanitizeAssistantResponseSurfaceArtifacts(
+            'Bütçeniz 12. 000 TL ve aceleniz olmadığını not aldım. ( Örneğin, bireysel danışmanlık ).'
+        )
+
+        expect(sanitized).toContain('12.000 TL')
+        expect(sanitized).toContain('(Örneğin, bireysel danışmanlık).')
+        expect(sanitized).not.toContain('12. 000')
+        expect(sanitized).not.toContain('( Örneğin')
     })
 
     it('rewrites generic unknown response into actionable lead-qualification response', () => {
@@ -1093,6 +1721,21 @@ describe('qa lab executor helpers', () => {
         expect(refined).toContain('kesin bir detay paylaşamıyorum')
         expect(refined).toContain('hizmet kapsamı veya zamanlama')
         expect(refined).not.toContain('netleştirebilir misiniz?')
+    })
+
+    it('replaces generic unknown response with grounded KB detail when available', () => {
+        const refined = refineQaLabGenericUnknownResponse({
+            response: 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?',
+            responseLanguage: 'tr',
+            requestMode: 'lead_qualification',
+            userMessage: 'Bütçem 12.000 TL civarında, ne zaman başlayabiliriz?',
+            activeMissingFields: [],
+            fallbackTopics: ['hizmet kapsamı'],
+            kbContextLines: ['Başlangıç planı uygunluk ve kapsam netleştiğinde kısa sürede oluşturulur.']
+        })
+
+        expect(refined).toContain('Başlangıç planı uygunluk ve kapsam netleştiğinde kısa sürede oluşturulur.')
+        expect(refined).not.toContain('net bilgi bulamadım')
     })
 
     it('drops findings when cited scenario attributes conflict with finding rationale', () => {
@@ -1376,6 +2019,131 @@ describe('qa lab executor helpers', () => {
         expect(filtered).toHaveLength(0)
     })
 
+    it('drops insufficient follow-up inquiry findings when transcript already includes same-field ask', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'minor',
+                    violated_rule: 'Insufficient follow-up on budget inquiries.',
+                    evidence: '[scenario_id=scenario_1, turn=3]',
+                    rationale: 'The assistant did not effectively follow up on the budget field.',
+                    suggested_fix: 'Ask budget earlier and follow up clearly.',
+                    target_layer: 'pipeline',
+                    effort: 'low',
+                    confidence: 0.6
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'Warm case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'cooperative',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Merhaba', assistant_response: 'Bütçe aralığınızı paylaşır mısınız?', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Bütçem 10.000 TL civarında.', assistant_response: 'Teşekkürler, not aldım.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 3, customer_message: 'Devam edelim.', assistant_response: 'Uygunluk için zaman aralığı paylaşabilir misiniz?', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
+    })
+
+    it('drops missing-field findings when the only missing field was asked on the final turn', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'minor',
+                    violated_rule: "Missing 'Proje aciliyet seviyesi'",
+                    evidence: '[scenario_id=scenario_12, turn=3]',
+                    rationale: "Assistant did not collect 'Proje aciliyet seviyesi'.",
+                    suggested_fix: 'Collect urgency before close.',
+                    target_layer: 'pipeline',
+                    effort: 'low',
+                    confidence: 0.62
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_12',
+                    title: 'Final turn ask case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    request_mode: 'lead_qualification',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Fiyat alabilir miyim?', assistant_response: 'Fiyat kapsam ve süreye göre değişir.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Bütçem 7.000 TL.', assistant_response: 'Teşekkürler, not aldım.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 3, customer_message: 'Seçenekler nedir?', assistant_response: 'Öncelik seviyenizi paylaşabilir misiniz (yüksek / orta / düşük)?', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_12',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 0.75,
+                    fulfillmentCoverage: 0.75,
+                    missingFields: ['Proje aciliyet seviyesi']
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
+    })
+
+    it('drops finding when cited scenario summary explicitly says missing-field claim was cleared', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'minor',
+                    violated_rule: 'Insufficient follow-up on budget inquiries.',
+                    evidence: '[scenario_id=scenario_1, turn=2]',
+                    rationale: 'The assistant did not effectively follow up on the budget field.',
+                    suggested_fix: 'Ask budget clearly.',
+                    target_layer: 'pipeline',
+                    effort: 'low',
+                    confidence: 0.6
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_1',
+                    title: 'General info case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'cold',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Merhaba, genel bilgi almak istiyorum.', assistant_response: 'Elbette, kapsam ve süreç hakkında bilgi verebilirim.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Tamamdır.', assistant_response: 'İhtiyacınıza göre ilerleyebiliriz.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            scenarioAssessments: [
+                {
+                    case_id: 'scenario_1',
+                    assistant_success: 'pass',
+                    answer_quality_score: 78,
+                    logic_score: 80,
+                    groundedness_score: 82,
+                    summary: 'Scenario-level missing-field warning was cleared by intake-coverage consistency check.',
+                    strengths: ['Relevant answer'],
+                    issues: [],
+                    confidence: 0.7,
+                    source: 'judge'
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
+    })
+
     it('drops generic missing-intake findings when cited case already has sufficient intake progress', () => {
         const filtered = filterJudgeFindingsByCitationConsistency({
             findings: [
@@ -1413,6 +2181,65 @@ describe('qa lab executor helpers', () => {
                     askedCoverage: 0.5,
                     fulfillmentCoverage: 0.5,
                     missingFields: ['Çekim Tarihi', 'Çekim Yeri']
+                }
+            ]
+        })
+
+        expect(filtered).toHaveLength(0)
+    })
+
+    it('drops proactive-questioning findings for cold-resistant general-information cases when context is already sufficient', () => {
+        const filtered = filterJudgeFindingsByCitationConsistency({
+            findings: [
+                {
+                    severity: 'minor',
+                    violated_rule: 'Conversation quality - lack of proactive questioning',
+                    evidence: '[scenario_id=scenario_9, turn=3]',
+                    rationale: 'Failed to engage effectively due to cold lead.',
+                    suggested_fix: 'Ask more proactive follow-up questions.',
+                    target_layer: 'pipeline',
+                    effort: 'low',
+                    confidence: 0.6
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_9',
+                    title: 'Cold resistant info case',
+                    goal: 'General information',
+                    customer_profile: 'Resistant customer',
+                    lead_temperature: 'cold',
+                    information_sharing: 'resistant',
+                    request_mode: 'general_information',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Yazılım geliştirme süreciniz nasıl ilerliyor?',
+                            assistant_response: 'Süreç önce ihtiyaç analizi ve kapsam netliği ile başlar.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Detay vermek istemiyorum.',
+                            assistant_response: 'Sorun değil, genel çerçevede ilerleyebiliriz; fiyatlar kapsam ve iş yüküne göre değişir.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 3,
+                            customer_message: 'Şimdilik bu kadar.',
+                            assistant_response: 'İsterseniz minimum başlangıç paketi ve olası takvim aralığını paylaşabilirim.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_9',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 0.5,
+                    fulfillmentCoverage: 0.5,
+                    missingFields: ['Proje Başlangıç Tarihi']
                 }
             ]
         })
@@ -1780,6 +2607,53 @@ describe('qa lab executor helpers', () => {
         expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('did-not-ask claim was cleared')
     })
 
+    it('softens final-turn missing-field penalties when assistant asked remaining field on the last turn', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_12',
+                    assistant_success: 'warn',
+                    answer_quality_score: 76,
+                    logic_score: 74,
+                    groundedness_score: 80,
+                    summary: "Discussed pricing but missed 'Proje aciliyet seviyesi'.",
+                    strengths: ['Pricing basis was explained'],
+                    issues: ["Missing 'Proje aciliyet seviyesi'"],
+                    confidence: 0.72
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_12',
+                    title: 'Final turn ask case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    request_mode: 'lead_qualification',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Fiyatlar nedir?', assistant_response: 'Fiyatlar kapsam ve süreye göre değişir.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 2, customer_message: 'Bütçem 300 TL civarı.', assistant_response: 'Bütçenizi not aldım.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+                        { turn_index: 3, customer_message: 'Tamam, seçenekler nedir?', assistant_response: 'Öncelik seviyenizi paylaşabilir misiniz (yüksek / orta / düşük)?', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_12',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 0.75,
+                    fulfillmentCoverage: 0.75,
+                    missingFields: ['Proje aciliyet seviyesi']
+                }
+            ]
+        })
+
+        expect(assessments[0]?.issues).toEqual([])
+        expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('softened')
+        expect(assessments[0]?.assistant_success).toBe('pass')
+    })
+
     it('clears generic missing-intake issues for general-information scenarios when coverage is sufficient', () => {
         const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
             raw: [
@@ -1825,6 +2699,262 @@ describe('qa lab executor helpers', () => {
         expect(assessments[0]?.issues).toEqual([])
         expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('consistency')
         expect(assessments[0]?.assistant_success).toBe('warn')
+    })
+
+    it('clears proactive-questioning warnings for cold-resistant general-information scenarios with sufficient coverage', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_9',
+                    assistant_success: 'warn',
+                    answer_quality_score: 68,
+                    logic_score: 66,
+                    groundedness_score: 76,
+                    summary: 'Failed to engage effectively due to cold lead.',
+                    strengths: ['Grounded tone'],
+                    issues: ['Lack of proactive questioning'],
+                    confidence: 0.8
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_9',
+                    title: 'Cold resistant info case',
+                    goal: 'Genel bilgi almak.',
+                    customer_profile: 'Resistant customer',
+                    lead_temperature: 'cold',
+                    information_sharing: 'resistant',
+                    request_mode: 'general_information',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Merhaba, yazılım geliştirme süreci hakkında bilgi almak istiyorum.',
+                            assistant_response: 'Yazılım geliştirme sürecimiz ihtiyaç analizi ve kapsam netliği ile başlar.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Detay vermek istemiyorum.',
+                            assistant_response: 'Sorun değil, genel çerçevede ilerleyebiliriz; fiyatlar kapsam ve iş yüküne göre değişir.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 3,
+                            customer_message: 'Şimdilik bu kadar.',
+                            assistant_response: 'İsterseniz minimum başlangıç paketi ve olası takvim aralığını paylaşabilirim.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_9',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 0.5,
+                    fulfillmentCoverage: 0.5,
+                    missingFields: ['Proje Başlangıç Tarihi']
+                }
+            ]
+        })
+
+        expect(assessments[0]?.assistant_success).toBe('pass')
+        expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('proactive-questioning warning was cleared')
+        expect(assessments[0]?.issues).toEqual([])
+    })
+
+    it('removes stale missing-field issues when summary says the claim was cleared by consistency', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_10',
+                    assistant_success: 'warn',
+                    answer_quality_score: 70,
+                    logic_score: 68,
+                    groundedness_score: 80,
+                    summary: 'Scenario-level missing-field warning was cleared by intake-coverage consistency check.',
+                    strengths: ['Grounded response'],
+                    issues: ['Missing budget inquiry.', 'Tone can be slightly shorter.'],
+                    confidence: 0.7
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_10',
+                    title: 'Consistency clear case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    request_mode: 'lead_qualification',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Fiyat bilgisi istiyorum.', assistant_response: 'Fiyatlar kapsam ve süreye göre değişir.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_10',
+                    handoffReadiness: 'warn',
+                    askedCoverage: 0.6,
+                    fulfillmentCoverage: 0.5,
+                    missingFields: ['Bütçe']
+                }
+            ]
+        })
+
+        expect(assessments[0]?.summary).toContain('cleared by intake-coverage consistency check')
+        expect(assessments[0]?.issues).toEqual(['Tone can be slightly shorter.'])
+    })
+
+    it('removes stale repetitive-question issues when summary says repetitive warning was cleared', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_11',
+                    assistant_success: 'warn',
+                    answer_quality_score: 72,
+                    logic_score: 70,
+                    groundedness_score: 84,
+                    summary: 'Scenario-level repetitive-question warning was cleared by intake-coverage consistency check.',
+                    strengths: ['Polite tone'],
+                    issues: ['Repetitive questioning observed.', 'Response could be more concise.'],
+                    confidence: 0.72
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_11',
+                    title: 'Repetition clear case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'warm',
+                    information_sharing: 'cooperative',
+                    request_mode: 'lead_qualification',
+                    executed_turns: [
+                        { turn_index: 1, customer_message: 'Hizmet detayını öğrenmek istiyorum.', assistant_response: 'Elbette, kapsamı paylaşabilirim.', token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_11',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 0.9,
+                    fulfillmentCoverage: 0.85,
+                    missingFields: []
+                }
+            ]
+        })
+
+        expect(assessments[0]?.issues).toEqual(['Response could be more concise.'])
+    })
+
+    it('clears pricing-detail false positives when KB has no concrete numeric pricing and assistant gives pricing basis', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_12',
+                    assistant_success: 'warn',
+                    answer_quality_score: 58,
+                    logic_score: 60,
+                    groundedness_score: 72,
+                    summary: 'Did not provide concrete pricing information.',
+                    strengths: ['Acknowledged customer inquiry'],
+                    issues: ['Failed to provide pricing details'],
+                    confidence: 0.8
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_12',
+                    title: 'General pricing query',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'cold',
+                    information_sharing: 'resistant',
+                    request_mode: 'general_information',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Fiyat aralığınız nedir?',
+                            assistant_response: 'Fiyatlandırma hizmetin kapsamı, iş yükü ve süreye göre değişir.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_12',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 1,
+                    fulfillmentCoverage: 1,
+                    missingFields: []
+                }
+            ],
+            hasConcretePricingFacts: false
+        })
+
+        expect(assessments[0]?.assistant_success).toBe('pass')
+        expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('pricing-detail warning was cleared')
+        expect(assessments[0]?.issues).toEqual([])
+    })
+
+    it('clears missed-budget did-not-ask summaries when transcript already includes budget question', () => {
+        const assessments = normalizeJudgeScenarioAssessmentsForExecutedCases({
+            raw: [
+                {
+                    case_id: 'scenario_13',
+                    assistant_success: 'warn',
+                    answer_quality_score: 70,
+                    logic_score: 74,
+                    groundedness_score: 80,
+                    summary: 'Good initial response but missed budget inquiry.',
+                    strengths: ['Clear explanation'],
+                    issues: ['Failed to ask for budget'],
+                    confidence: 0.7
+                }
+            ],
+            executedCases: [
+                {
+                    case_id: 'scenario_13',
+                    title: 'Budget asked case',
+                    goal: 'Goal',
+                    customer_profile: 'Profile',
+                    lead_temperature: 'hot',
+                    information_sharing: 'cooperative',
+                    request_mode: 'lead_qualification',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Fiyat bilgisi istiyorum.',
+                            assistant_response: 'Bütçe aralığınızı paylaşabilir misiniz?',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Bütçem 5000 TL civarında.',
+                            assistant_response: 'Teşekkürler, not aldım.',
+                            token_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 }
+                        }
+                    ]
+                }
+            ],
+            intakeCoverageByCase: [
+                {
+                    caseId: 'scenario_13',
+                    handoffReadiness: 'pass',
+                    askedCoverage: 1,
+                    fulfillmentCoverage: 1,
+                    missingFields: []
+                }
+            ]
+        })
+
+        expect(assessments[0]?.assistant_success).toBe('pass')
+        expect((assessments[0]?.summary ?? '').toLowerCase()).toContain('did-not-ask claim was cleared')
+        expect(assessments[0]?.issues).toEqual([])
     })
 
     it('normalizes mismatched quoted missing-field summary to coverage-backed missing fields', () => {

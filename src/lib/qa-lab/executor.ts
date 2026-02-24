@@ -51,6 +51,10 @@ const QA_LAB_MIN_SCENARIO_TURNS = 3
 const QA_LAB_MAX_SCENARIO_TURNS = 6
 const QA_LAB_MIN_SCENARIO_COUNT_PER_TEMPERATURE = 1
 const QA_LAB_MIN_RESISTANT_SCENARIO_COUNT = 1
+const QA_LAB_MIN_ACTIONABLE_LEAD_SCENARIO_RATIO = 0.4
+const QA_LAB_MIN_OPENING_SEMANTIC_UNIQUENESS_RATIO = 0.7
+const QA_LAB_MIN_GOAL_SEMANTIC_UNIQUENESS_RATIO = 0.65
+const QA_LAB_MAX_SEMANTIC_DUPLICATE_CLUSTER_SIZE = 2
 const QA_LAB_CONTACT_PREFERENCE_REPLACEMENT_FIELD = 'Uygun geri dönüş zaman aralığı'
 const QA_LAB_URGENCY_REPLACEMENT_FIELD = 'Proje aciliyet seviyesi'
 const QA_LAB_MIN_DEEP_SCENARIO_TURNS = 4
@@ -121,22 +125,26 @@ const GENERATOR_SUPPORT_HEAVY_PATTERNS = [
     /şikayet/i
 ]
 
-const GENERATOR_LEAD_QUALIFICATION_PATTERNS = [
-    /fiyat/i,
-    /ücret/i,
-    /bütçe/i,
-    /randevu/i,
-    /tarih/i,
-    /paket/i,
-    /hizmet/i,
-    /kapsam/i,
-    /price/i,
-    /budget/i,
-    /appointment/i,
-    /date/i,
-    /package/i,
-    /service/i,
-    /timeline/i
+const GENERATOR_ACTIONABLE_LEAD_PATTERNS = [
+    /\bfiyat\b/i,
+    /\bücret\b/i,
+    /\bbütçe\b/i,
+    /\bteklif\b/i,
+    /\brandevu\b/i,
+    /\buygunluk\b/i,
+    /\bavailability\b/i,
+    /\bappointment\b/i,
+    /\btimeline\b/i,
+    /\bne zaman\b/i,
+    /\btarih\b/i,
+    /\bbasla\b/i,
+    /\bbaşla\b/i,
+    /\bbook\b/i,
+    /\bstart\b/i,
+    /\bgorusmek istiyorum\b/i,
+    /\bgörüşmek istiyorum\b/i,
+    /\bdanismanlik almak istiyorum\b/i,
+    /\bdanışmanlık almak istiyorum\b/i
 ]
 
 const GENERATOR_PLACEHOLDER_PATTERNS = [
@@ -197,6 +205,38 @@ const QA_LAB_DIVERSITY_ACTION_PHRASES = [
     'devam kararı için açık kriterler tanımlanır',
     'human handoff özeti hazırlanır'
 ] as const
+const QA_LAB_ACTIONABLE_SCENARIO_GOAL_TEMPLATES = [
+    '{service} için fiyat aralığı ve başlangıç planını netleştirmek',
+    '{service} talebi için teklif kapsamı ve uygunluk penceresini belirlemek',
+    '{service} hizmetinde bütçe-zaman uyumunu doğrulamak',
+    '{service} sürecinde hızlı başlangıç için gerekli bilgileri toplamak',
+    '{service} için kısa listede net teklif çıkarabilecek verileri toplamak',
+    '{service} hizmetinde karar için gerekli fiyat ve takvim bilgisini netleştirmek'
+] as const
+const QA_LAB_ACTIONABLE_SCENARIO_OPENING_TEMPLATES = [
+    'Merhaba, {service} için fiyat aralığı ve bu hafta uygunluk bilgisi alabilir miyim?',
+    'Selam, {service} talebimiz için bütçe aralığına göre hangi paket uygun olur?',
+    'Bu {service} için ne zaman başlayabiliriz, ortalama teklif aralığınız nedir?',
+    '{service} hizmeti için hızlıca ilerlemek istiyorum, ilk adım ve fiyat çerçevesi nedir?',
+    '{service} için kısa bir teklif görmek istiyorum, takvim ve bütçe tarafını paylaşır mısınız?',
+    '{service} talebinde bu ay içinde başlangıç ve maliyet aralığını netleştirebilir miyiz?'
+] as const
+const QA_LAB_ACTIONABLE_SCENARIO_FOLLOWUP_TEMPLATES = [
+    'Yaklaşık bütçe aralığımızı paylaşabilirim, bu bilgiyle net paket önerebilir misiniz?',
+    'Takvim tarafında esneğiz, en erken uygun başlangıç tarihi hangisi olur?',
+    'Kapsamı daraltırsak fiyatı hangi seviyeye çekebiliriz?',
+    'Hızlı karar vermek istiyoruz; kesin teklif için hangi iki bilgi kritik?',
+    'Önceliğimiz bu ay başlamak, buna göre uygun seçenekleri sıralar mısınız?',
+    'Bütçe ve başlangıç tarihini netleştirirsek bugün içinde next-step çıkarabilir miyiz?'
+] as const
+const QA_LAB_ACTIONABLE_RESISTANT_FOLLOWUP_TEMPLATES = [
+    'Detayları şimdi paylaşamam ama genel fiyat aralığı ve başlangıç süresini duymak istiyorum.',
+    'Önce ortalama bütçe bandını paylaşın, ardından kapsamı netleştirebilirim.',
+    'Kişisel bilgi vermeden önce sadece teklif aralığı ve takvim netliğini öğrenmek istiyorum.',
+    'Henüz tüm detaylar net değil; minimum başlanabilir paket ve en erken zaman nedir?',
+    'Şimdilik genel bir teklif bandı yeterli, uygunluk olursa devam ederiz.',
+    'Önce maliyet çerçevesini görelim, sonra kapsamı birlikte netleştirelim.'
+] as const
 
 const QA_LAB_CONTACT_PREFERENCE_FIELD_PATTERNS = [
     /iletişim tercih/i,
@@ -227,6 +267,17 @@ const QA_LAB_URGENCY_FIELD_PATTERNS = [
     /priority/i
 ]
 
+const QA_LAB_SOFT_OPTIONAL_INTAKE_FIELD_PATTERNS = [
+    /(ozel|özel)\s*(istek|talep|not)/i,
+    /(ek|ilave|extra|additional)\s*(istek|talep|not|request|note)/i,
+    /(special|custom)\s*(request|requests|note|notes|preference|preferences)/i,
+    /(diger|diğer|other)\s*(istek|talep|not|request|requests)/i,
+    /(tercih|preference)\s*(notu|notlari|notları|notes?)?/i
+]
+const QA_LAB_SHORT_LEAD_SCENARIO_TURN_THRESHOLD = 3
+const QA_LAB_SHORT_LEAD_MIN_REQUIRED_FIELDS = 2
+const QA_LAB_SHORT_LEAD_MAX_REQUIRED_FIELDS = 3
+
 const QA_LAB_GENERIC_CLARIFICATION_QUESTION_PATTERNS = [
     /\bbu bilgi/i,
     /\bbu detayi/i,
@@ -254,6 +305,8 @@ const MISSING_FIELD_CLAIM_PATTERNS = [
     /\bcollect/i,
     /\btopla/i,
     /\btoplama/i,
+    /\bfollow(?:-|\s)?up\b/i,
+    /\binquir(?:y|ies)\b/i,
     /\brequired intake/i,
     /\bintake field/i,
     /\bdid not ask/i,
@@ -268,6 +321,11 @@ const MISSING_FIELD_DID_NOT_ASK_PATTERNS = [
     /\bdid not ask/i,
     /\bdidn'?t ask/i,
     /\bfail(?:ed)? to ask/i,
+    /\bdid not [a-zçğıöşü\s]{0,40}follow(?:-|\s)?up\b/i,
+    /\binsufficient [a-zçğıöşü\s]{0,40}follow(?:-|\s)?up\b/i,
+    /\bno [a-zçğıöşü\s]{0,40}follow(?:-|\s)?up\b/i,
+    /\bmissing [a-zçğıöşü\s]{0,40}follow(?:-|\s)?up\b/i,
+    /\bmiss(?:ed|ing)? [a-zçğıöşü\s]{0,40}(?:inquiry|question|ask)\b/i,
     /\bnot ask/i,
     /\bno [a-zçğıöşü\s]{0,40}inquiry\b/i,
     /\bmissing [a-zçğıöşü\s]{0,40}inquiry\b/i,
@@ -283,6 +341,26 @@ const QA_LAB_GENERIC_UNKNOWN_RESPONSE_PATTERNS = [
     /\bi could not find a clear detail\b/i,
     /\bcould you share a bit more context\b/i
 ]
+
+const QA_LAB_PRICING_DETAIL_CLAIM_PATTERNS = [
+    /\bconcrete pricing\b/i,
+    /\bpricing details?\b/i,
+    /\bfailed to provide pricing\b/i,
+    /\bdid not provide pricing\b/i,
+    /\bexact price\b/i,
+    /\bnumeric price\b/i,
+    /\bfiyat\b.{0,40}\b(ver|paylas|paylaş|net|detay)\b/i,
+    /\bücret\b.{0,40}\b(ver|paylas|paylaş|net|detay)\b/i
+]
+const QA_LAB_PROACTIVE_QUESTIONING_CLAIM_PATTERNS = [
+    /\black of proactive questioning\b/i,
+    /\binsufficient proactive questioning\b/i,
+    /\bnot proactive enough\b/i,
+    /\bfailed to engage effectively\b/i,
+    /\byetersiz proaktif\b/i,
+    /\bproaktif soru\b/i,
+    /\betkili sekilde.*soru\b/i
+] as const
 
 const QA_LAB_LOW_INFORMATION_RESPONSE_PATTERNS = [
     /^(bu|bunun|this|that|it)\b.{0,120}\b(onemli|önemli|yardimci|yardımcı|gerekli|helpful|important)\b/i,
@@ -305,15 +383,135 @@ const QA_LAB_EXTERNAL_CONTACT_REDIRECT_PATTERNS = [
     /\bweb sitemizi\b/i,
     /\bweb sitemiz\b/i,
     /\btelefonla\b/i,
+    /\btelefon numaram[ıi]z\b/i,
+    /\btelefon numaras[ıi]\b/i,
     /\biletisim[ea] gec/i,
     /\biletişim[ea] geç/i,
+    /\biletisim bilgiler(?:imizi|inizi)\b/i,
+    /\biletişim bilgiler(?:imizi|inizi)\b/i,
+    /\biletisim bilgilerinizi paylas/i,
+    /\biletişim bilgilerinizi paylaş/i,
+    /\bbize ulas/i,
+    /\bbize ulaş/i,
     /\bbizi aray/i,
     /\bdo[ ]?ğrudan\b/i,
     /\bour website\b/i,
     /\bvisit (our )?website\b/i,
     /\bcall us\b/i,
+    /\bour phone (number|line)\b/i,
+    /\breach us\b/i,
     /\bcontact us\b/i
 ] as const
+
+const QA_LAB_POLICY_REQUEST_CUE_PATTERNS = [
+    /\biptal\b/i,
+    /\biade\b/i,
+    /\brefund\b/i,
+    /\bcancell/i,
+    /\bprosedur\b/i,
+    /\bprosedür\b/i,
+    /\bpolicy\b/i,
+    /\bpolitika\b/i,
+    /\bkural\b/i,
+    /\bkosul\b/i,
+    /\bkoşul\b/i,
+    /\bgizlilik\b/i,
+    /\bprivacy\b/i,
+    /\bsikayet\b/i,
+    /\bşikayet\b/i,
+    /\bceza\b/i,
+    /\bbildirim\b/i,
+    /\bkvkk\b/i,
+    /\bgdpr\b/i
+] as const
+
+const QA_LAB_POLICY_FOLLOW_UP_CUE_PATTERNS = [
+    /\bsart\b/i,
+    /\bşart\b/i,
+    /\bkosul\b/i,
+    /\bkoşul\b/i,
+    /\bprosedur\b/i,
+    /\bprosedür\b/i,
+    /\bkural\b/i,
+    /\bmadde\b/i,
+    /\bne kadar sure\b/i,
+    /\bne kadar süre\b/i,
+    /\bkac saat once\b/i,
+    /\bkaç saat önce\b/i,
+    /\bbildirim suresi\b/i,
+    /\bbildirim süresi\b/i
+] as const
+
+const QA_LAB_GENERAL_INFO_INTENT_PATTERNS = [
+    /\bgenel bilgi\b/i,
+    /\bgenel bir bilgi\b/i,
+    /\bsadece genel\b/i,
+    /\bhakkinda bilgi\b/i,
+    /\bhakkında bilgi\b/i,
+    /\bbilgi almak istiyorum\b/i,
+    /\bbilgi almak\b/i,
+    /\bbilgi istiyorum\b/i,
+    /\byaklasim\b/i,
+    /\byaklaşım\b/i,
+    /\bozetle\b/i,
+    /\bözetle\b/i
+] as const
+
+const QA_LAB_LEAD_QUALIFICATION_SIGNAL_PATTERNS = [
+    /\bfiyat\b/i,
+    /\bbutce\b/i,
+    /\bbütçe\b/i,
+    /\bteklif\b/i,
+    /\bkapsam\b/i,
+    /\bders\b/i,
+    /\buygunluk\b/i,
+    /\bzaman\b/i,
+    /\btarih\b/i,
+    /\bne zaman\b/i,
+    /\bacil\b/i,
+    /\baciliyet\b/i,
+    /\bbasla\b/i,
+    /\bbaşla\b/i,
+    /\bpaket\b/i,
+    /\bsurec\b/i,
+    /\bsüreç\b/i,
+    /\btimeline\b/i,
+    /\bavailability\b/i,
+    /\brandevu\b/i,
+    /\bgorusmek istiyorum\b/i,
+    /\bgörüşmek istiyorum\b/i,
+    /\bdanismanlik almak istiyorum\b/i,
+    /\bdanışmanlık almak istiyorum\b/i,
+    /\brandevu almak\b/i,
+    /\bhangi hizmet\b/i,
+    /\bhangi ders\b/i,
+    /\bhangi konu\b/i,
+    /\bhangi paket\b/i
+] as const
+
+const QA_LAB_SCENARIO_SEMANTIC_STOPWORDS = new Set([
+    'merhaba',
+    'selam',
+    'lutfen',
+    'lütfen',
+    'hakkinda',
+    'hakkında',
+    'bilgi',
+    'almak',
+    'istiyorum',
+    'isterim',
+    'verebilir',
+    'misiniz',
+    'mısınız',
+    'var',
+    'mi',
+    'miyim',
+    'sadece',
+    'genel',
+    'konuda',
+    'icin',
+    'için'
+])
 
 const QA_LAB_TYPE_LIKE_FIELD_PATTERNS = [
     /\btur\b/i,
@@ -965,6 +1163,12 @@ function hasUrgencyValueSignal(value: string) {
     const normalized = normalizeForFieldMatching(value)
     if (!normalized) return false
 
+    const hasBalancedUrgencyIntent = (
+        /(acelesi yok|acelem yok|acil degil|acil değil|hemen olmasina gerek yok|hemen olmasına gerek yok|aciliyet dusuk|aciliyet düşük|oncelik dusuk|öncelik düşük)/i.test(normalized)
+        && /(bir an once|bir an önce|yakinda|yakında|mümkün oldugunca erken|mümkün olduğunca erken|baslamak istiyorum|başlamak istiyorum|ilerlemek istiyorum)/i.test(normalized)
+    )
+    if (hasBalancedUrgencyIntent) return true
+
     const hasExplicitLevel = (
         /(oncelik|öncelik|aciliyet)\s*(seviyesi|duzeyi|düzeyi)?\s*(yuksek|yüksek|orta|dusuk|düşük)/i.test(normalized)
         || /(yuksek|yüksek|orta|dusuk|düşük)\s*(oncelik|öncelik|aciliyet)/i.test(normalized)
@@ -1014,6 +1218,18 @@ function isMissingFieldClaimText(value: string) {
     const normalized = normalizeForFieldMatching(value)
     if (!normalized) return false
     return MISSING_FIELD_CLAIM_PATTERNS.some((pattern) => pattern.test(normalized))
+}
+
+function isPricingDetailClaimText(value: string) {
+    const normalized = normalizeForFieldMatching(value)
+    if (!normalized) return false
+    return QA_LAB_PRICING_DETAIL_CLAIM_PATTERNS.some((pattern) => pattern.test(normalized))
+}
+
+function isProactiveQuestioningClaimText(value: string) {
+    const normalized = normalizeForFieldMatching(value)
+    if (!normalized) return false
+    return QA_LAB_PROACTIVE_QUESTIONING_CLAIM_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
 function hasStopContactSignal(value: string) {
@@ -1176,6 +1392,22 @@ function isLowInformationAssistantResponse(input: {
     return shortAndDisconnected
 }
 
+function hasQaLabPolicyRequestCue(value: string) {
+    return QA_LAB_POLICY_REQUEST_CUE_PATTERNS.some((pattern) => pattern.test(value))
+}
+
+function hasQaLabPolicyFollowUpCue(value: string) {
+    return QA_LAB_POLICY_FOLLOW_UP_CUE_PATTERNS.some((pattern) => pattern.test(value))
+}
+
+function hasQaLabGeneralInformationIntent(value: string) {
+    return QA_LAB_GENERAL_INFO_INTENT_PATTERNS.some((pattern) => pattern.test(value))
+}
+
+function hasQaLabLeadQualificationSignal(value: string) {
+    return QA_LAB_LEAD_QUALIFICATION_SIGNAL_PATTERNS.some((pattern) => pattern.test(value))
+}
+
 function detectQaLabResponderRequestMode(input: {
     message: string
     generated: QaLabGeneratorOutput
@@ -1183,29 +1415,25 @@ function detectQaLabResponderRequestMode(input: {
     const normalized = normalizeForFieldMatching(input.message)
     if (!normalized) return 'general_information'
 
-    if (/(iptal|iade|refund|cancell|prosedur|prosedür|policy|politika|kural|kosul|koşul|gizlilik|privacy|sikayet|şikayet|ceza|bildirim)/i.test(normalized)) {
+    const hasExplicitPolicyCue = hasQaLabPolicyRequestCue(normalized)
+    if (hasExplicitPolicyCue) {
         return 'policy_or_procedure'
+    }
+
+    // Lead-intent signals should not be hijacked by incidental overlap with policy facts.
+    if (hasQaLabLeadQualificationSignal(normalized)) {
+        return 'lead_qualification'
+    }
+
+    const hasExplicitGeneralInfoIntent = hasQaLabGeneralInformationIntent(normalized)
+    if (hasExplicitGeneralInfoIntent) {
+        return 'general_information'
     }
 
     const matchesCriticalPolicyFact = (input.generated.ground_truth.critical_policy_facts ?? [])
         .some((fact) => tokenOverlapCount(input.message, fact) >= 2)
-    if (matchesCriticalPolicyFact) {
+    if (matchesCriticalPolicyFact && hasQaLabPolicyFollowUpCue(normalized)) {
         return 'policy_or_procedure'
-    }
-
-    const hasExplicitGeneralInfoIntent = (
-        /(genel bilgi|genel bir bilgi|sadece genel|hakkinda bilgi|hakkında bilgi|bilgi almak istiyorum|bilgi almak|bilgi istiyorum|yaklasim|yaklaşım|ozetle|özetle)/i.test(normalized)
-    )
-    const hasHardQualificationSignal = (
-        /(fiyat|butce|bütçe|teklif|uygunluk|randevu|ne zaman|tarih|saat|acil|aciliyet|basla|başla|paket|timeline|availability)/i.test(normalized)
-        || /(hangi hizmet|hangi ders|hangi konu|hangi paket)/i.test(normalized)
-    )
-    if (hasExplicitGeneralInfoIntent && !hasHardQualificationSignal) {
-        return 'general_information'
-    }
-
-    if (/(fiyat|butce|bütçe|teklif|kapsam|ders|uygunluk|zaman|tarih|ne zaman|acil|aciliyet|basla|başla|paket|surec|süreç)/i.test(normalized) || /(hangi hizmet|hangi ders|hangi konu|hangi paket)/i.test(normalized)) {
-        return 'lead_qualification'
     }
 
     return 'general_information'
@@ -1217,13 +1445,47 @@ export function promoteQaLabScenarioRequestMode(input: {
     defaultRequiredFields: string[]
     scenarioTitle: string
     scenarioGoal: string
+    scenarioTurnCount?: number
     customerMessage: string
     generated: QaLabGeneratorOutput
 }) {
+    const leadIntentText = `${input.scenarioTitle} ${input.scenarioGoal} ${input.customerMessage}`.trim()
+
     if (input.currentMode === 'lead_qualification') {
         return {
             requestMode: input.currentMode,
-            requiredFields: input.currentRequiredFields
+            requiredFields: input.currentRequiredFields.filter((field) => !isSoftOptionalIntakeField(field))
+        } as const
+    }
+
+    const turnOnlyMode = detectQaLabResponderRequestMode({
+        message: input.customerMessage,
+        generated: input.generated
+    })
+    if (turnOnlyMode === 'lead_qualification') {
+        return {
+            requestMode: 'lead_qualification' as const,
+            requiredFields: resolveLeadQualificationRequiredFields({
+                defaultRequiredFields: input.defaultRequiredFields,
+                scenarioTurnCount: input.scenarioTurnCount,
+                leadIntentText
+            })
+        } as const
+    }
+
+    const shouldForceLeadPromotion = (
+        input.currentRequiredFields.length === 0
+        && hasQaLabLeadQualificationSignal(input.customerMessage)
+        && !hasQaLabPolicyRequestCue(input.customerMessage)
+    )
+    if (shouldForceLeadPromotion) {
+        return {
+            requestMode: 'lead_qualification' as const,
+            requiredFields: resolveLeadQualificationRequiredFields({
+                defaultRequiredFields: input.defaultRequiredFields,
+                scenarioTurnCount: input.scenarioTurnCount,
+                leadIntentText
+            })
         } as const
     }
 
@@ -1240,11 +1502,16 @@ export function promoteQaLabScenarioRequestMode(input: {
 
     return {
         requestMode: 'lead_qualification' as const,
-        requiredFields: input.defaultRequiredFields
+        requiredFields: resolveLeadQualificationRequiredFields({
+            defaultRequiredFields: input.defaultRequiredFields,
+            scenarioTurnCount: input.scenarioTurnCount,
+            leadIntentText
+        })
     } as const
 }
 
 function getQaLabFieldQuestionLabel(field: string) {
+    const normalizedField = toHumanReadableFieldLabel(field)
     const category = detectIntakeFieldCategory(field)
     switch (category) {
     case 'age':
@@ -1262,7 +1529,7 @@ function getQaLabFieldQuestionLabel(field: string) {
     case 'callback_time':
         return 'Uygun geri dönüş zaman aralığı'
     default:
-        return field.trim() || 'Gerekli bilgi'
+        return normalizedField || 'Gerekli bilgi'
     }
 }
 
@@ -1330,6 +1597,87 @@ function scoreMissingFieldPriority(input: {
     return score
 }
 
+function isSoftOptionalIntakeField(field: string) {
+    const normalized = normalizeForFieldMatching(field)
+    if (!normalized) return false
+    return QA_LAB_SOFT_OPTIONAL_INTAKE_FIELD_PATTERNS.some((pattern) => pattern.test(normalized))
+}
+
+function detectLeadIntentCategoriesFromText(value: string) {
+    const normalized = normalizeForFieldMatching(value)
+    const categories = new Set<QaLabIntakeFieldCategory>()
+    if (!normalized) return categories
+
+    if (/(fiyat|price|ucret|ücret|butce|bütçe|teklif|cost|budget|ne kadar)/i.test(normalized)) {
+        categories.add('budget')
+    }
+    if (/(ne zaman|tarih|saat|uygunluk|timeline|timing|availability|randevu|takvim|schedule|hafta|ay|program)/i.test(normalized)) {
+        categories.add('timeline')
+    }
+    if (/(acil|aciliyet|urgent|urgency|oncelik|öncelik|hizli|hızlı|asap|hemen)/i.test(normalized)) {
+        categories.add('urgency')
+    }
+    if (/(hizmet|service|konu|kapsam|paket|ders|proje|uygulama|entegrasyon|danismanlik|danışmanlık)/i.test(normalized)) {
+        categories.add('service')
+    }
+    if (/(isletme|işletme|ekip|team|company|business|calisan|çalışan|personel|employee)/i.test(normalized)) {
+        categories.add('business_size')
+    }
+    return categories
+}
+
+function resolveLeadQualificationRequiredFields(input: {
+    defaultRequiredFields: string[]
+    scenarioTurnCount?: number
+    leadIntentText?: string
+}) {
+    const cleanedRequiredFields = takeUniqueNonEmpty(input.defaultRequiredFields, 32)
+        .filter((field) => !isSoftOptionalIntakeField(field))
+
+    if (cleanedRequiredFields.length === 0) return [] as string[]
+
+    const scenarioTurnCount = clampInt(input.scenarioTurnCount ?? 0, 0, QA_LAB_MAX_SCENARIO_TURNS, 0)
+    const shouldUseDynamicMinimum = (
+        scenarioTurnCount > 0
+        && scenarioTurnCount <= QA_LAB_SHORT_LEAD_SCENARIO_TURN_THRESHOLD
+        && cleanedRequiredFields.length > QA_LAB_SHORT_LEAD_MAX_REQUIRED_FIELDS
+    )
+    if (!shouldUseDynamicMinimum) {
+        return cleanedRequiredFields
+    }
+
+    const leadIntentText = input.leadIntentText ?? ''
+    const intentCategories = detectLeadIntentCategoriesFromText(leadIntentText)
+    const dynamicMinimum = Math.max(
+        QA_LAB_SHORT_LEAD_MIN_REQUIRED_FIELDS,
+        Math.min(
+            QA_LAB_SHORT_LEAD_MAX_REQUIRED_FIELDS,
+            intentCategories.size + 1
+        )
+    )
+
+    const prioritized = [...cleanedRequiredFields].sort((left, right) => {
+        const priorityDelta = scoreMissingFieldPriority({
+            field: right,
+            currentUserMessage: leadIntentText,
+            requestMode: 'lead_qualification'
+        }) - scoreMissingFieldPriority({
+            field: left,
+            currentUserMessage: leadIntentText,
+            requestMode: 'lead_qualification'
+        })
+        if (priorityDelta !== 0) return priorityDelta
+
+        const leftCategory = detectIntakeFieldCategory(left)
+        const rightCategory = detectIntakeFieldCategory(right)
+        if (leftCategory === 'generic' && rightCategory !== 'generic') return 1
+        if (rightCategory === 'generic' && leftCategory !== 'generic') return -1
+        return left.localeCompare(right, 'tr-TR')
+    })
+
+    return prioritized.slice(0, Math.min(dynamicMinimum, prioritized.length))
+}
+
 export function resolveQaLabScenarioRequiredIntakeFields(input: {
     scenario: QaLabGeneratorScenario
     generated: QaLabGeneratorOutput
@@ -1337,14 +1685,18 @@ export function resolveQaLabScenarioRequiredIntakeFields(input: {
 }) {
     const firstCustomerTurn = input.scenario.turns[0]?.customer ?? ''
     const mode = detectQaLabResponderRequestMode({
-        message: `${input.scenario.title} ${input.scenario.goal} ${firstCustomerTurn}`.trim(),
+        message: firstCustomerTurn,
         generated: input.generated
     })
 
     if (mode === 'lead_qualification') {
         return {
             requestMode: mode,
-            requiredFields: input.defaultRequiredFields
+            requiredFields: resolveLeadQualificationRequiredFields({
+                defaultRequiredFields: input.defaultRequiredFields,
+                scenarioTurnCount: input.scenario.turns.length,
+                leadIntentText: `${input.scenario.title} ${input.scenario.goal} ${firstCustomerTurn}`.trim()
+            })
         } as const
     }
 
@@ -1642,26 +1994,33 @@ export function stabilizeGeneratorOutputForQuality(
             lines: baseFixtureLines
         }
     }
+    const scenarioStabilizedGenerated: QaLabGeneratorOutput = {
+        ...sanitizedGenerated,
+        scenarios: stabilizeGeneratorScenariosForActionableCoverage({
+            generated: sanitizedGenerated,
+            run
+        })
+    }
 
-    const stats = buildFixtureQualityStats(sanitizedGenerated.kb_fixture.lines)
+    const stats = buildFixtureQualityStats(scenarioStabilizedGenerated.kb_fixture.lines)
     const needsStabilization = (
         stats.fallbackLineRatio > 0.08
         || stats.semanticDiversityRatio < 0.3
     )
 
     if (!needsStabilization) {
-        return sanitizedGenerated
+        return scenarioStabilizedGenerated
     }
 
     const stabilizedLines = buildDiverseFixtureLines({
-        generated: sanitizedGenerated,
+        generated: scenarioStabilizedGenerated,
         minimumLines: run.fixture_min_lines
     })
 
     return {
-        ...sanitizedGenerated,
+        ...scenarioStabilizedGenerated,
         kb_fixture: {
-            ...sanitizedGenerated.kb_fixture,
+            ...scenarioStabilizedGenerated.kb_fixture,
             lines: stabilizedLines
         }
     } satisfies QaLabGeneratorOutput
@@ -1733,6 +2092,172 @@ function getScenarioText(scenario: QaLabGeneratorScenario) {
     return `${scenario.title} ${scenario.goal} ${scenario.customer_profile} ${turns}`.trim()
 }
 
+function normalizeScenarioSemanticKey(value: string) {
+    const tokens = tokenizeForFieldMatching(value)
+        .map((token) => normalizeLooseFieldTokenStem(token))
+        .filter((token) => token.length >= 3 && !QA_LAB_SCENARIO_SEMANTIC_STOPWORDS.has(token))
+
+    if (tokens.length === 0) {
+        return normalizeForFieldMatching(value)
+    }
+
+    return tokens.slice(0, 12).join(' ')
+}
+
+function buildSemanticDuplicationStats(values: string[]) {
+    const keyCount = new Map<string, number>()
+    for (const value of values) {
+        const key = normalizeScenarioSemanticKey(value)
+        if (!key) continue
+        keyCount.set(key, (keyCount.get(key) ?? 0) + 1)
+    }
+
+    const uniqueCount = keyCount.size
+    const total = values.length
+    const uniquenessRatio = total > 0 ? uniqueCount / total : 1
+    const maxClusterSize = Array.from(keyCount.values()).reduce((max, count) => (
+        count > max ? count : max
+    ), 0)
+
+    return {
+        total,
+        uniqueCount,
+        uniquenessRatio,
+        maxClusterSize
+    }
+}
+
+function isActionableLeadScenario(scenario: QaLabGeneratorScenario) {
+    const firstTurn = scenario.turns[0]?.customer ?? ''
+    const leadIntentText = `${scenario.goal} ${firstTurn}`.trim()
+    return matchesAnyPattern(leadIntentText, GENERATOR_ACTIONABLE_LEAD_PATTERNS)
+}
+
+function calculateMinimumActionableLeadScenarioCount(run: QaLabRun) {
+    return Math.max(
+        2,
+        Math.ceil(run.scenario_count * QA_LAB_MIN_ACTIONABLE_LEAD_SCENARIO_RATIO)
+    )
+}
+
+function buildActionableScenarioText(template: string, serviceLabel: string) {
+    const safeService = serviceLabel.trim() || 'hizmet'
+    return template.replaceAll('{service}', safeService)
+}
+
+function pickServiceLabelForScenarioRewrite(input: {
+    generated: QaLabGeneratorOutput
+    scenarioIndex: number
+}) {
+    const uniqueServices = Array.from(new Set([
+        ...input.generated.derived_setup.service_catalog,
+        ...input.generated.ground_truth.canonical_services
+    ]
+        .map((service) => service.trim())
+        .filter(Boolean)))
+
+    if (uniqueServices.length === 0) {
+        return 'hizmet'
+    }
+
+    return uniqueServices[input.scenarioIndex % uniqueServices.length] ?? uniqueServices[0] ?? 'hizmet'
+}
+
+function rewriteScenarioAsActionableLead(input: {
+    scenario: QaLabGeneratorScenario
+    generated: QaLabGeneratorOutput
+    scenarioIndex: number
+    rewriteIndex: number
+}) {
+    const scenario = input.scenario
+    const serviceLabel = pickServiceLabelForScenarioRewrite({
+        generated: input.generated,
+        scenarioIndex: input.scenarioIndex
+    })
+
+    const goalTemplate = QA_LAB_ACTIONABLE_SCENARIO_GOAL_TEMPLATES[
+        input.rewriteIndex % QA_LAB_ACTIONABLE_SCENARIO_GOAL_TEMPLATES.length
+    ] ?? QA_LAB_ACTIONABLE_SCENARIO_GOAL_TEMPLATES[0] ?? '{service} için teklif ve uygunluk netleştirmek'
+    const openingTemplate = QA_LAB_ACTIONABLE_SCENARIO_OPENING_TEMPLATES[
+        input.rewriteIndex % QA_LAB_ACTIONABLE_SCENARIO_OPENING_TEMPLATES.length
+    ] ?? QA_LAB_ACTIONABLE_SCENARIO_OPENING_TEMPLATES[0] ?? 'Merhaba, {service} için fiyat ve uygunluk alabilir miyim?'
+    const followupPool = scenario.information_sharing === 'resistant'
+        ? QA_LAB_ACTIONABLE_RESISTANT_FOLLOWUP_TEMPLATES
+        : QA_LAB_ACTIONABLE_SCENARIO_FOLLOWUP_TEMPLATES
+    const followupTemplate = followupPool[
+        input.rewriteIndex % followupPool.length
+    ] ?? followupPool[0] ?? 'Buna göre bütçe ve takvim bilgisini netleştirip ilerleyebilir miyiz?'
+
+    const turns = scenario.turns.length > 0
+        ? scenario.turns.map((turn) => ({ customer: turn.customer }))
+        : FALLBACK_SCENARIO_MESSAGES.map((customer) => ({ customer }))
+
+    turns[0] = {
+        customer: buildActionableScenarioText(openingTemplate, serviceLabel)
+    }
+
+    if (turns.length >= 2) {
+        turns[1] = {
+            customer: buildActionableScenarioText(followupTemplate, serviceLabel)
+        }
+    }
+
+    return {
+        ...scenario,
+        goal: buildActionableScenarioText(goalTemplate, serviceLabel),
+        turns
+    } satisfies QaLabGeneratorScenario
+}
+
+function stabilizeGeneratorScenariosForActionableCoverage(input: {
+    generated: QaLabGeneratorOutput
+    run: QaLabRun
+}) {
+    const scenarios = input.generated.scenarios.map((scenario) => ({
+        ...scenario,
+        turns: scenario.turns.map((turn) => ({ customer: turn.customer }))
+    }))
+    const minimumActionableLeadScenarios = calculateMinimumActionableLeadScenarioCount(input.run)
+    let actionableLeadScenarioCount = scenarios.filter((scenario) => isActionableLeadScenario(scenario)).length
+
+    if (actionableLeadScenarioCount >= minimumActionableLeadScenarios) {
+        return scenarios
+    }
+
+    const candidateIndices = scenarios
+        .map((scenario, index) => ({ scenario, index }))
+        .filter(({ scenario }) => !isActionableLeadScenario(scenario))
+        .sort((left, right) => {
+            const scoreScenario = (scenario: QaLabGeneratorScenario) => {
+                let score = 0
+                if (scenario.lead_temperature === 'hot') score += 4
+                if (scenario.lead_temperature === 'warm') score += 2
+                if (scenario.information_sharing === 'cooperative') score += 2
+                if (scenario.information_sharing === 'partial') score += 1
+                return score
+            }
+            return scoreScenario(right.scenario) - scoreScenario(left.scenario)
+        })
+
+    let rewriteIndex = 0
+    for (const candidate of candidateIndices) {
+        if (actionableLeadScenarioCount >= minimumActionableLeadScenarios) {
+            break
+        }
+
+        scenarios[candidate.index] = rewriteScenarioAsActionableLead({
+            scenario: candidate.scenario,
+            generated: input.generated,
+            scenarioIndex: candidate.index,
+            rewriteIndex
+        })
+        actionableLeadScenarioCount += 1
+        rewriteIndex += 1
+    }
+
+    return scenarios
+}
+
 export function validateGeneratorOutputQuality(
     generated: QaLabGeneratorOutput,
     run: QaLabRun
@@ -1785,12 +2310,32 @@ export function validateGeneratorOutputQuality(
         return `Generator scenarios are support-heavy (${supportScenarioCount}/${scenarios.length}); include more lead qualification flows.`
     }
 
-    const minLeadQualificationScenarios = Math.max(2, Math.ceil(run.scenario_count * 0.6))
+    const minLeadQualificationScenarios = calculateMinimumActionableLeadScenarioCount(run)
     const leadQualificationScenarioCount = scenarios.filter((scenario) => (
-        matchesAnyPattern(getScenarioText(scenario), GENERATOR_LEAD_QUALIFICATION_PATTERNS)
+        isActionableLeadScenario(scenario)
     )).length
     if (leadQualificationScenarioCount < minLeadQualificationScenarios) {
-        return `Generator scenarios lack lead qualification coverage (${leadQualificationScenarioCount}/${scenarios.length}).`
+        return `Generator scenarios lack actionable lead qualification coverage (${leadQualificationScenarioCount}/${scenarios.length}).`
+    }
+
+    const openingStats = buildSemanticDuplicationStats(
+        scenarios.map((scenario) => scenario.turns[0]?.customer ?? '')
+    )
+    if (openingStats.uniquenessRatio < QA_LAB_MIN_OPENING_SEMANTIC_UNIQUENESS_RATIO) {
+        return `Generator scenario opening semantic diversity is too low (${openingStats.uniqueCount}/${openingStats.total}).`
+    }
+    if (openingStats.maxClusterSize > QA_LAB_MAX_SEMANTIC_DUPLICATE_CLUSTER_SIZE) {
+        return `Generator scenario openings repeat too much (max duplicate cluster ${openingStats.maxClusterSize}).`
+    }
+
+    const goalStats = buildSemanticDuplicationStats(
+        scenarios.map((scenario) => scenario.goal)
+    )
+    if (goalStats.uniquenessRatio < QA_LAB_MIN_GOAL_SEMANTIC_UNIQUENESS_RATIO) {
+        return `Generator scenario goal semantic diversity is too low (${goalStats.uniqueCount}/${goalStats.total}).`
+    }
+    if (goalStats.maxClusterSize > QA_LAB_MAX_SEMANTIC_DUPLICATE_CLUSTER_SIZE) {
+        return `Generator scenario goals repeat too much (max duplicate cluster ${goalStats.maxClusterSize}).`
     }
 
     const scenarioMix = buildScenarioMixSummary(scenarios)
@@ -1867,6 +2412,19 @@ export function createGeneratorRetryUserPrompt(
         retryHints.push(
             '- Scenario mix must include hot, warm, and cold lead temperatures.',
             '- Include at least one resistant information-sharing scenario.'
+        )
+    }
+
+    if (
+        previousError.toLowerCase().includes('actionable lead qualification coverage')
+        || previousError.toLowerCase().includes('opening semantic diversity')
+        || previousError.toLowerCase().includes('goal semantic diversity')
+        || previousError.toLowerCase().includes('repeat too much')
+    ) {
+        retryHints.push(
+            '- At least 40% of scenarios must be actionable lead-qualification flows (price/budget/availability/booking/start).',
+            '- Avoid template-like repeated scenario openings and goals.',
+            '- Keep opening and goal semantics diverse across scenarios.'
         )
     }
 
@@ -2477,8 +3035,113 @@ function missingFieldSetForConsistency(missingFields?: string[]) {
     )
 }
 
+function hasConcreteNumericPricingFact(facts: string[]) {
+    return facts.some((fact) => (
+        /\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?\s*(tl|₺|usd|\$|eur|€|bin|k)\b/i.test(fact)
+        || /\b(tl|₺|usd|\$|eur|€)\s*\d\b/i.test(fact)
+        || /\b\d{2,}\s*[-–]\s*\d{2,}\s*(tl|₺|usd|\$|eur|€)?\b/i.test(fact)
+    ))
+}
+
+function caseShowsPricingBasisGuidance(caseItem: QaLabExecutedCase) {
+    return caseItem.executed_turns.some((turn) => {
+        const assistant = turn.assistant_response ?? ''
+        return hasPricingBasisSignal(assistant)
+    })
+}
+
+function shouldClearPricingDetailClaimByContext(input: {
+    text: string
+    caseItem: QaLabExecutedCase
+    hasConcretePricingFacts: boolean
+}) {
+    if (input.hasConcretePricingFacts) return false
+    if (!isPricingDetailClaimText(input.text)) return false
+    if (!caseShowsPricingBasisGuidance(input.caseItem)) return false
+    return true
+}
+
+function shouldClearProactiveQuestioningClaimByContext(input: {
+    text: string
+    caseItem?: QaLabExecutedCase
+    coverage?: Pick<QaLabIntakeCoverageCaseResult, 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
+}) {
+    const caseItem = input.caseItem
+    if (!caseItem) return false
+    if (!isProactiveQuestioningClaimText(input.text)) return false
+    if (caseItem.lead_temperature !== 'cold') return false
+    if (caseItem.information_sharing !== 'resistant') return false
+    if (caseItem.request_mode !== 'general_information') return false
+
+    const handoffReadiness = input.coverage?.handoffReadiness ?? 'warn'
+    const askedCoverage = typeof input.coverage?.askedCoverage === 'number'
+        ? input.coverage.askedCoverage
+        : 0
+    const fulfillmentCoverage = typeof input.coverage?.fulfillmentCoverage === 'number'
+        ? input.coverage.fulfillmentCoverage
+        : 0
+
+    if (handoffReadiness === 'fail') return false
+    if (askedCoverage < 0.45 && fulfillmentCoverage < 0.25) return false
+    return true
+}
+
+function getFinalAssistantMessage(caseItem?: QaLabExecutedCase) {
+    if (!caseItem) return ''
+    const lastTurn = caseItem.executed_turns[caseItem.executed_turns.length - 1]
+    return lastTurn?.assistant_response?.trim() ?? ''
+}
+
+function issueShouldBeClearedByFinalTurnPendingAsk(input: {
+    issue: string
+    caseItem?: QaLabExecutedCase
+    missingFields?: string[]
+}) {
+    if (!input.caseItem) return false
+    const missingFields = input.missingFields ?? []
+    if (missingFields.length === 0) return false
+
+    const normalizedIssue = normalizeForFieldMatching(input.issue)
+    if (!isMissingFieldClaimText(normalizedIssue)) return false
+
+    const finalAssistant = getFinalAssistantMessage(input.caseItem)
+    if (!finalAssistant) return false
+
+    const missingFieldSet = missingFieldSetForConsistency(missingFields)
+    const namedMentions = extractQuotedFieldMentions(input.issue)
+    if (namedMentions.length > 0) {
+        const relevantMentions = namedMentions.filter((field) => (
+            missingFieldSet.has(normalizeFieldLabelForConsistency(field))
+        ))
+        if (relevantMentions.length === 0) return false
+        return relevantMentions.every((field) => isAssistantAskingField(finalAssistant, field))
+    }
+
+    const category = detectIntakeFieldCategory(normalizedIssue)
+    if (category === 'generic') return false
+    const categoryMissingFields = missingFields.filter((field) => (
+        detectIntakeFieldCategory(field) === category
+    ))
+    if (categoryMissingFields.length === 0) return false
+    return categoryMissingFields.every((field) => isAssistantAskingField(finalAssistant, field))
+}
+
+function allMissingFieldsArePendingAfterFinalAsk(input: {
+    caseItem?: QaLabExecutedCase
+    missingFields?: string[]
+}) {
+    if (!input.caseItem) return false
+    const missingFields = input.missingFields ?? []
+    if (missingFields.length === 0) return false
+
+    const finalAssistant = getFinalAssistantMessage(input.caseItem)
+    if (!finalAssistant) return false
+    return missingFields.every((field) => isAssistantAskingField(finalAssistant, field))
+}
+
 function filterJudgeScenarioIssuesByCoverage(input: {
     issues: string[]
+    caseItem?: QaLabExecutedCase
     coverage?: { missingFields?: string[] }
 }) {
     if (!input.coverage) return input.issues
@@ -2504,6 +3167,13 @@ function filterJudgeScenarioIssuesByCoverage(input: {
         const looksLikeMissingClaim = isMissingFieldClaimText(normalized)
         const looksLikeReaskClaim = REASK_FINDING_PATTERNS.some((pattern) => pattern.test(normalized))
         const namedMentions = extractQuotedFieldMentions(issue)
+        if (issueShouldBeClearedByFinalTurnPendingAsk({
+            issue,
+            caseItem: input.caseItem,
+            missingFields
+        })) {
+            return false
+        }
         if (looksLikeMissingClaim && namedMentions.length > 0) {
             return namedMentions.some((field) => missingFieldSet.has(normalizeFieldLabelForConsistency(field)))
         }
@@ -2587,7 +3257,12 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
     status: 'pass' | 'warn' | 'fail'
     issues: string[]
     caseItem?: QaLabExecutedCase
-    coverage?: { handoffReadiness: QaLabIntakeReadiness, missingFields?: string[] }
+    coverage?: {
+        handoffReadiness: QaLabIntakeReadiness
+        askedCoverage?: number
+        fulfillmentCoverage?: number
+        missingFields?: string[]
+    }
 }): { summary: string, status: 'pass' | 'warn' | 'fail' } {
     if (!input.coverage) return { summary: input.summary, status: input.status }
 
@@ -2597,6 +3272,25 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
     const missingFields = input.coverage.missingFields ?? []
     const missingFieldSet = missingFieldSetForConsistency(missingFields)
     const summaryCategory = detectIntakeFieldCategory(normalizedSummary)
+
+    if (
+        shouldClearProactiveQuestioningClaimByContext({
+            text: input.summary,
+            caseItem: input.caseItem,
+            coverage: {
+                handoffReadiness: input.coverage.handoffReadiness,
+                askedCoverage: input.coverage.askedCoverage,
+                fulfillmentCoverage: input.coverage.fulfillmentCoverage
+            }
+        })
+    ) {
+        return {
+            status: input.coverage.handoffReadiness === 'pass' && input.issues.length === 0
+                ? 'pass'
+                : (input.status === 'fail' ? 'warn' : input.status),
+            summary: 'Scenario-level proactive-questioning warning was cleared by cold-resistant context normalization.'
+        }
+    }
 
     if (
         input.caseItem
@@ -2668,6 +3362,22 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
         }
     }
 
+    if (
+        input.caseItem
+        && looksLikeMissingFieldSummary
+        && allMissingFieldsArePendingAfterFinalAsk({
+            caseItem: input.caseItem,
+            missingFields
+        })
+    ) {
+        return {
+            status: input.coverage.handoffReadiness === 'pass' && input.issues.length === 0
+                ? 'pass'
+                : (input.status === 'fail' ? 'warn' : input.status),
+            summary: 'Scenario-level missing-field warning was softened: assistant asked remaining field(s) on the final turn and customer had no follow-up turn.'
+        }
+    }
+
     if (input.coverage.handoffReadiness !== 'pass') return { summary: input.summary, status: input.status }
     if (input.issues.length > 0) return { summary: input.summary, status: input.status }
     if (REASK_FINDING_PATTERNS.some((pattern) => pattern.test(normalizedSummary))) {
@@ -2682,6 +3392,49 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
         status: input.status === 'fail' ? 'warn' : 'pass',
         summary: 'Scenario-level missing-field warning was cleared by intake-coverage consistency check.'
     }
+}
+
+function normalizeJudgeScenarioIssuesAgainstSummaryConsistency(input: {
+    issues: string[]
+    summary: string
+}) {
+    if (input.issues.length === 0) return input.issues
+
+    const normalizedSummary = normalizeForFieldMatching(input.summary)
+    if (!normalizedSummary) return input.issues
+
+    const clearsDidNotAskClaim = /did-not-ask claim was cleared by transcript consistency check/i.test(normalizedSummary)
+    const clearsMissingFieldClaim = /missing-field\b.{0,80}\bwas cleared by intake-coverage consistency check/i.test(normalizedSummary)
+    const softensFinalTurnPendingMissing = /missing-field warning was softened: assistant asked remaining field\(s\) on the final turn/i.test(normalizedSummary)
+    const clearsRepetitiveQuestionClaim = /repetitive-question warning was cleared by intake-coverage consistency check/i.test(normalizedSummary)
+    const clearsPricingClaim = /pricing-detail warning was cleared by kb pricing consistency check/i.test(normalizedSummary)
+    const clearsProactiveQuestioningClaim = /proactive-questioning warning was cleared by cold-resistant context normalization/i.test(normalizedSummary)
+
+    if (!clearsDidNotAskClaim && !clearsMissingFieldClaim && !softensFinalTurnPendingMissing && !clearsRepetitiveQuestionClaim && !clearsPricingClaim && !clearsProactiveQuestioningClaim) {
+        return input.issues
+    }
+
+    return input.issues.filter((issue) => {
+        const normalizedIssue = normalizeForFieldMatching(issue)
+        if (!normalizedIssue) return false
+
+        if (clearsDidNotAskClaim && isDidNotAskClaimText(normalizedIssue)) {
+            return false
+        }
+        if ((clearsMissingFieldClaim || softensFinalTurnPendingMissing) && isMissingFieldClaimText(normalizedIssue)) {
+            return false
+        }
+        if (clearsRepetitiveQuestionClaim && REASK_FINDING_PATTERNS.some((pattern) => pattern.test(normalizedIssue))) {
+            return false
+        }
+        if (clearsPricingClaim && isPricingDetailClaimText(normalizedIssue)) {
+            return false
+        }
+        if (clearsProactiveQuestioningClaim && isProactiveQuestioningClaimText(normalizedIssue)) {
+            return false
+        }
+        return true
+    })
 }
 
 function getLowInformationAssistantTurnIndexes(caseItem: QaLabExecutedCase) {
@@ -2705,6 +3458,7 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
         Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
         & { missingFields?: string[] }
     >
+    hasConcretePricingFacts?: boolean
 }): QaLabJudgeScenarioAssessment[] {
     if (input.executedCases.length === 0) return []
 
@@ -2729,6 +3483,7 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
         const rawIssues = normalizeStringArray(entry.issues, 8)
         let issues = filterJudgeScenarioIssuesByCoverage({
             issues: rawIssues,
+            caseItem,
             coverage: coverage
                 ? {
                     missingFields: coverage.missingFields
@@ -2754,6 +3509,26 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
                 caseItem
             })
         })
+        issues = issues.filter((issue) => (
+            !shouldClearPricingDetailClaimByContext({
+                text: issue,
+                caseItem,
+                hasConcretePricingFacts: Boolean(input.hasConcretePricingFacts)
+            })
+        ))
+        issues = issues.filter((issue) => (
+            !shouldClearProactiveQuestioningClaimByContext({
+                text: issue,
+                caseItem,
+                coverage: coverage
+                    ? {
+                        handoffReadiness: coverage.handoffReadiness,
+                        askedCoverage: coverage.askedCoverage,
+                        fulfillmentCoverage: coverage.fulfillmentCoverage
+                    }
+                    : undefined
+            })
+        ))
         const lowInformationTurnIndexes = getLowInformationAssistantTurnIndexes(caseItem)
         if (lowInformationTurnIndexes.length > 0) {
             const lowInfoIssue = lowInformationTurnIndexes.length === 1
@@ -2792,12 +3567,28 @@ export function normalizeJudgeScenarioAssessmentsForExecutedCases(input: {
             coverage: coverage
                 ? {
                     handoffReadiness: coverage.handoffReadiness,
+                    askedCoverage: coverage.askedCoverage,
+                    fulfillmentCoverage: coverage.fulfillmentCoverage,
                     missingFields: coverage.missingFields
                 }
                 : undefined
         })
         let status = summaryNormalized.status
         let summary = summaryNormalized.summary
+        if (shouldClearPricingDetailClaimByContext({
+            text: summary,
+            caseItem,
+            hasConcretePricingFacts: Boolean(input.hasConcretePricingFacts)
+        })) {
+            status = issues.length === 0
+                ? (status === 'fail' ? 'warn' : 'pass')
+                : (status === 'fail' ? 'warn' : status)
+            summary = 'Scenario-level pricing-detail warning was cleared by KB pricing consistency check (KB has no concrete numeric price).'
+        }
+        issues = normalizeJudgeScenarioIssuesAgainstSummaryConsistency({
+            issues,
+            summary
+        })
         if (lowInformationTurnIndexes.length > 0 && status === 'pass') {
             status = 'warn'
         }
@@ -2849,6 +3640,7 @@ function normalizeJudgeResult(raw: Record<string, unknown>, options: {
         Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
         & { missingFields?: string[] }
     >
+    hasConcretePricingFacts: boolean
 }): QaLabJudgeResult {
     const scoreRaw = (
         raw.score_breakdown && typeof raw.score_breakdown === 'object' && !Array.isArray(raw.score_breakdown)
@@ -2879,7 +3671,8 @@ function normalizeJudgeResult(raw: Record<string, unknown>, options: {
         scenario_assessments: normalizeJudgeScenarioAssessmentsForExecutedCases({
             raw: raw.scenario_assessments,
             executedCases: options.executedCases,
-            intakeCoverageByCase: options.intakeCoverageByCase
+            intakeCoverageByCase: options.intakeCoverageByCase,
+            hasConcretePricingFacts: options.hasConcretePricingFacts
         })
     }
 }
@@ -2910,9 +3703,34 @@ function findingMentionsPattern(input: {
     return input.patterns.some((pattern) => pattern.test(input.text))
 }
 
+function doesScenarioSummaryClearFindingClaim(input: {
+    summary: string
+    findingText: string
+}) {
+    const normalizedSummary = normalizeForFieldMatching(input.summary)
+    if (!normalizedSummary) return false
+
+    const normalizedFindingText = normalizeForFieldMatching(input.findingText)
+    if (!normalizedFindingText) return false
+
+    const clearsDidNotAskClaim = /did-not-ask claim was cleared by transcript consistency check/i.test(normalizedSummary)
+    const clearsMissingFieldClaim = /missing-field\b.{0,80}\bwas cleared by intake-coverage consistency check/i.test(normalizedSummary)
+    const clearsRepetitiveQuestionClaim = /repetitive-question warning was cleared by intake-coverage consistency check/i.test(normalizedSummary)
+    const clearsPricingClaim = /pricing-detail warning was cleared by kb pricing consistency check/i.test(normalizedSummary)
+    const clearsProactiveQuestioningClaim = /proactive-questioning warning was cleared by cold-resistant context normalization/i.test(normalizedSummary)
+
+    if (clearsDidNotAskClaim && isDidNotAskClaimText(normalizedFindingText)) return true
+    if (clearsMissingFieldClaim && isMissingFieldClaimText(normalizedFindingText)) return true
+    if (clearsRepetitiveQuestionClaim && REASK_FINDING_PATTERNS.some((pattern) => pattern.test(normalizedFindingText))) return true
+    if (clearsPricingClaim && isPricingDetailClaimText(normalizedFindingText)) return true
+    if (clearsProactiveQuestioningClaim && isProactiveQuestioningClaimText(normalizedFindingText)) return true
+    return false
+}
+
 export function filterJudgeFindingsByCitationConsistency(input: {
     findings: QaLabJudgeFinding[]
     executedCases: QaLabExecutedCase[]
+    scenarioAssessments?: QaLabJudgeScenarioAssessment[]
     intakeCoverageByCase?: Array<
         Pick<QaLabIntakeCoverageCaseResult, 'caseId' | 'handoffReadiness' | 'askedCoverage' | 'fulfillmentCoverage'>
         & { missingFields?: string[] }
@@ -2921,6 +3739,9 @@ export function filterJudgeFindingsByCitationConsistency(input: {
     if (input.findings.length === 0) return input.findings
 
     const caseById = new Map(input.executedCases.map((caseItem) => [caseItem.case_id, caseItem]))
+    const scenarioAssessmentByCaseId = new Map(
+        (input.scenarioAssessments ?? []).map((assessment) => [assessment.case_id, assessment] as const)
+    )
     const intakeCoverageByCaseId = new Map(
         (input.intakeCoverageByCase ?? []).map((item) => [item.caseId, item] as const)
     )
@@ -3058,6 +3879,20 @@ export function filterJudgeFindingsByCitationConsistency(input: {
         const contextTextWithEvidence = normalizeForFieldMatching(
             `${finding.violated_rule} ${finding.rationale} ${finding.evidence}`
         )
+        if (resolved.length > 0) {
+            const allCitedScenariosClearClaim = resolved.every((item) => {
+                const assessment = scenarioAssessmentByCaseId.get(item.caseItem.case_id)
+                if (!assessment) return false
+                return doesScenarioSummaryClearFindingClaim({
+                    summary: assessment.summary,
+                    findingText: contextTextWithEvidence
+                })
+            })
+            if (allCitedScenariosClearClaim) {
+                continue
+            }
+        }
+
         const findingCategory = detectIntakeFieldCategory(contextTextWithEvidence)
         const looksLikeMissingFieldFinding = isMissingFieldClaimText(contextTextWithEvidence)
         const looksLikeDidNotAskClaim = (
@@ -3073,6 +3908,21 @@ export function filterJudgeFindingsByCitationConsistency(input: {
                 })
             ))
             if (allCitationsShowAssistantActuallyAsked) {
+                continue
+            }
+        }
+
+        if (looksLikeMissingFieldFinding && resolved.length > 0) {
+            const allCitationsAreFinalTurnPending = resolved.every((item) => {
+                const coverage = intakeCoverageByCaseId.get(item.caseItem.case_id)
+                if (!coverage) return false
+                return issueShouldBeClearedByFinalTurnPendingAsk({
+                    issue: contextTextWithEvidence,
+                    caseItem: item.caseItem,
+                    missingFields: coverage.missingFields
+                })
+            })
+            if (allCitationsAreFinalTurnPending) {
                 continue
             }
         }
@@ -3137,6 +3987,26 @@ export function filterJudgeFindingsByCitationConsistency(input: {
                 if (allCitedCasesContradictNamedFieldClaim) {
                     continue
                 }
+            }
+        }
+
+        if (isProactiveQuestioningClaimText(contextTextWithEvidence) && resolved.length > 0) {
+            const allCitedCasesAllowProactiveClear = resolved.every((item) => {
+                const coverage = intakeCoverageByCaseId.get(item.caseItem.case_id)
+                return shouldClearProactiveQuestioningClaimByContext({
+                    text: contextTextWithEvidence,
+                    caseItem: item.caseItem,
+                    coverage: coverage
+                        ? {
+                            handoffReadiness: coverage.handoffReadiness,
+                            askedCoverage: coverage.askedCoverage,
+                            fulfillmentCoverage: coverage.fulfillmentCoverage
+                        }
+                        : undefined
+                })
+            })
+            if (allCitedCasesAllowProactiveClear) {
+                continue
             }
         }
 
@@ -3233,7 +4103,7 @@ function formatGeneratorUserPrompt(options: {
             },
             scenario_distribution_rules: {
                 max_support_or_handoff_ratio: 0.35,
-                min_lead_qualification_ratio: 0.6
+                min_lead_qualification_ratio: QA_LAB_MIN_ACTIONABLE_LEAD_SCENARIO_RATIO
             },
             hard_turn_bounds: {
                 min_turns_per_scenario: QA_LAB_MIN_SCENARIO_TURNS,
@@ -3302,7 +4172,8 @@ Rules:
 - Scenario mix must include hot, warm, and cold temperatures.
 - Include at least one resistant scenario where customer avoids giving full lead info.
 - Complaint/privacy/handoff-only scenarios must stay minority (max 35%).
-- Lead qualification scenarios must be majority (min 60%).
+- Actionable lead-qualification scenarios must be at least 40% (price/budget/availability/booking/start intent).
+- Avoid repetitive scenario templates: opening customer utterances and goals must stay semantically diverse.
 - Do not generate filler artifacts like [varyant], tekrar notu, ??, or "not 1:" style placeholders.
 - Do not output markdown fences.`
 
@@ -3959,6 +4830,19 @@ export function sanitizeAssistantResponseForTruncation(response: string) {
     return sanitized.replace(/\s+/g, ' ').trim()
 }
 
+export function sanitizeAssistantResponseSurfaceArtifacts(response: string) {
+    const normalized = response.trim()
+    if (!normalized) return normalized
+
+    return normalized
+        .replace(/(\d)\.\s+(?=\d{3}\b)/g, '$1.')
+        .replace(/\s+([,.;!?])/g, '$1')
+        .replace(/\(\s+/g, '(')
+        .replace(/\s+\)/g, ')')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
 function looksLikeGenericUnknownResponse(response: string) {
     const normalized = normalizeForFieldMatching(response)
     if (!normalized) return false
@@ -4037,10 +4921,18 @@ export function refineQaLabGenericUnknownResponse(input: {
     userMessage: string
     activeMissingFields: string[]
     fallbackTopics: string[]
+    kbContextLines?: string[]
 }) {
     const response = input.response.trim()
     if (!response) return response
     if (!looksLikeGenericUnknownResponse(response)) return response
+
+    const kbDetail = pickBestKbDetailForResponse({
+        userMessage: input.userMessage,
+        kbContextLines: input.kbContextLines ?? [],
+        fallbackTopics: input.fallbackTopics,
+        responseLanguage: input.responseLanguage
+    })
 
     const shouldAskMissingField = (
         input.requestMode === 'lead_qualification'
@@ -4054,9 +4946,20 @@ export function refineQaLabGenericUnknownResponse(input: {
         const explicitQuestion = input.responseLanguage === 'tr'
             ? buildExplicitIntakeFieldQuestion(targetField)
             : `Could you share ${targetField.toLowerCase()}?`
+        if (kbDetail) {
+            return `${kbDetail} ${
+                input.responseLanguage === 'tr'
+                    ? `Buradan devam edebiliriz. ${explicitQuestion}`
+                    : `We can continue here. ${explicitQuestion}`
+            }`.replace(/\s+/g, ' ').trim()
+        }
         return input.responseLanguage === 'tr'
             ? `Bu konuda kesin bir detay paylaşamıyorum. Mevcut bilgilerle ilerleyebiliriz. ${explicitQuestion}`
             : `I cannot share a precise detail yet. We can continue with the current context. ${explicitQuestion}`
+    }
+
+    if (kbDetail) {
+        return kbDetail
     }
 
     const topicsHint = buildFallbackTopicsHint(input.fallbackTopics, input.responseLanguage)
@@ -4499,6 +5402,85 @@ export function moveAnswerChunkFirstForDirectQuestion(input: {
     return reordered.join(' ').replace(/\s+/g, ' ').trim()
 }
 
+function hasPricingInquirySignal(value: string) {
+    const normalized = normalizeForFieldMatching(value)
+    if (!normalized) return false
+    return /(fiyat|price|ucret|ücret|butce|bütçe|teklif|ne kadar)/i.test(normalized)
+}
+
+function toHumanReadableFieldLabel(field: string) {
+    return field
+        .trim()
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+}
+
+function hasExplicitFieldEvidenceInMessage(input: {
+    message: string
+    field: string
+}) {
+    const message = input.message.trim()
+    if (!message) return false
+    if (hasRefusalSignal(message)) return false
+
+    const normalizedMessage = normalizeForFieldMatching(message)
+    const category = detectIntakeFieldCategory(input.field)
+
+    if (category === 'age') {
+        return (
+            /(yas|yaş|sinif|sınıf|ogrenci|öğrenci)/i.test(normalizedMessage)
+            && /\b([4-9]|1[0-9]|2[0-5])\b/.test(normalizedMessage)
+        )
+    }
+    if (category === 'budget') {
+        return /(\d[\d.,]*)\s*(tl|₺|usd|\$|eur|bin)/i.test(message)
+    }
+    if (category === 'timeline' || category === 'callback_time') {
+        return (
+            /\b\d{1,2}[:.]\d{2}\b/.test(message)
+            || /(tarih|saat|hafta|ay|yarin|yarın|bugun|bugün|pazartesi|salı|sali|çarşamba|carsamba|persembe|perşembe|cuma|cumartesi|pazar)/i.test(normalizedMessage)
+        )
+    }
+    if (category === 'urgency') {
+        return hasUrgencyValueSignal(message)
+    }
+    if (category === 'business_size') {
+        return (
+            /\b\d+\s*(calisan|çalışan|kisi|kişi|personel)\b/i.test(normalizedMessage)
+            || /(kucuk|küçük|orta|buyuk|büyük)\s*(isletme|işletme|ekip)/i.test(normalizedMessage)
+        )
+    }
+
+    // Service/generic fields are intentionally excluded from explicit-summary evidence
+    // to avoid claiming unverified values in resistant conversations.
+    return false
+}
+
+function collectExplicitlyFulfilledFields(input: {
+    requiredFields: string[]
+    missingFields: string[]
+    history: ConversationTurn[]
+    currentUserMessage: string
+}) {
+    const fulfilledFields = input.requiredFields.filter((field) => !input.missingFields.includes(field))
+    if (fulfilledFields.length === 0) return [] as string[]
+
+    const userMessages = [
+        ...input.history
+            .filter((turn) => turn.role === 'user')
+            .map((turn) => turn.content.trim())
+            .filter(Boolean),
+        input.currentUserMessage.trim()
+    ].filter(Boolean)
+
+    return fulfilledFields.filter((field) => (
+        userMessages.some((message) => hasExplicitFieldEvidenceInMessage({
+            message,
+            field
+        }))
+    ))
+}
+
 function toLowerFieldLabel(label: string) {
     const trimmed = label.trim()
     if (!trimmed) return trimmed
@@ -4507,13 +5489,10 @@ function toLowerFieldLabel(label: string) {
 }
 
 function buildFulfilledFieldsMiniSummary(input: {
-    requiredFields: string[]
-    missingFields: string[]
+    fulfilledFields: string[]
     responseLanguage: 'tr' | 'en'
 }) {
-    const fulfilledFields = input.requiredFields
-        .filter((field) => !input.missingFields.includes(field))
-        .slice(0, 2)
+    const fulfilledFields = input.fulfilledFields.slice(0, 2)
     if (fulfilledFields.length === 0) return ''
 
     const labels = fulfilledFields.map((field) => (
@@ -4568,14 +5547,20 @@ export function ensureLeadQualificationClosureQuestion(input: {
     responseLanguage: 'tr' | 'en'
     requestMode: QaLabResponderRequestMode
     userMessage: string
+    currentUserMessage: string
+    history: ConversationTurn[]
     followupMissingFields: string[]
     requiredFields: string[]
     missingFields: string[]
+    scenarioContext?: {
+        leadTemperature?: QaLabScenarioTemperature
+        informationSharing?: QaLabScenarioInformationSharing
+        turnIndex?: number
+    }
 }) {
     const response = input.response.trim()
     if (!response) return response
     if (input.requestMode !== 'lead_qualification') return response
-    if (hasRefusalSignal(input.userMessage)) return response
 
     const followupMissingFields = Array.from(new Set(
         input.followupMissingFields
@@ -4583,6 +5568,36 @@ export function ensureLeadQualificationClosureQuestion(input: {
             .filter(Boolean)
     ))
     if (followupMissingFields.length === 0) return response
+
+    const resistantPricingMode = (
+        input.scenarioContext?.informationSharing === 'resistant'
+        && hasPricingInquirySignal(input.userMessage)
+    )
+    if (resistantPricingMode) {
+        const prioritizedField = followupMissingFields.find((field) => (
+            detectIntakeFieldCategory(field) !== 'callback_time'
+        )) ?? followupMissingFields[0] ?? ''
+        const pricingSentence = input.responseLanguage === 'tr'
+            ? 'Fiyatlandırma, seçilen kapsam ve iş yüküne göre netleşir.'
+            : 'Pricing is finalized based on selected scope and workload.'
+
+        if (!prioritizedField || hasRefusalSignal(input.userMessage)) {
+            return input.responseLanguage === 'tr'
+                ? `${pricingSentence} Paylaşmak istemezseniz mevcut bilgilerle genel çerçevede devam edebiliriz.`
+                : `${pricingSentence} If you prefer not to share details, we can continue with a general overview.`
+        }
+
+        const fieldLabel = toLowerFieldLabel(getQaLabFieldQuestionLabel(prioritizedField))
+        const softQuestion = input.responseLanguage === 'tr'
+            ? `Uygunsanız sadece ${fieldLabel} paylaşabilir misiniz?`
+            : `If suitable, could you share only ${fieldLabel}?`
+        const noPressure = input.responseLanguage === 'tr'
+            ? 'Paylaşmak istemezseniz mevcut bilgilerle genel çerçevede devam edebiliriz.'
+            : 'If you prefer not to share, we can continue with a general overview.'
+        return `${pricingSentence} ${softQuestion} ${noPressure}`.replace(/\s+/g, ' ').trim()
+    }
+
+    if (hasRefusalSignal(input.userMessage)) return response
 
     const targetField = followupMissingFields[0] ?? ''
     if (!targetField) return response
@@ -4592,9 +5607,14 @@ export function ensureLeadQualificationClosureQuestion(input: {
     const chunks = splitIntoSentenceLikeChunks(response)
     const questionChunks = chunks.filter((chunk) => hasQuestionIntent(chunk))
     const hasTargetQuestion = questionChunks.some((chunk) => isAssistantAskingField(chunk, targetField))
-    const summarySentence = buildFulfilledFieldsMiniSummary({
+    const explicitlyFulfilledFields = collectExplicitlyFulfilledFields({
         requiredFields: input.requiredFields,
         missingFields: input.missingFields,
+        history: input.history,
+        currentUserMessage: input.currentUserMessage
+    })
+    const summarySentence = buildFulfilledFieldsMiniSummary({
+        fulfilledFields: explicitlyFulfilledFields,
         responseLanguage: input.responseLanguage
     })
 
@@ -4896,7 +5916,8 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
         requestMode,
         userMessage: input.message,
         activeMissingFields: followupMissingFields,
-        fallbackTopics
+        fallbackTopics,
+        kbContextLines: kbContext.lines
     })
     const generalInfoBaselineResponseRaw = enforceGeneralInformationBaselineResponse({
         response: fallbackAdjustedResponseRaw,
@@ -4935,12 +5956,16 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
             responseLanguage,
             requestMode,
             userMessage: input.message,
+            currentUserMessage: input.message,
+            history: input.history,
             followupMissingFields,
             requiredFields: intakeProgress.requiredFields,
-            missingFields: intakeProgress.missingFields
+            missingFields: intakeProgress.missingFields,
+            scenarioContext: input.scenarioContext
         })
+    const surfaceSanitizedResponseRaw = sanitizeAssistantResponseSurfaceArtifacts(closureAlignedResponseRaw)
     const response = trimText(
-        closureAlignedResponseRaw,
+        surfaceSanitizedResponseRaw,
         responseLanguage === 'tr'
             ? 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?'
             : 'I could not find a clear detail yet. Could you share a bit more context?'
@@ -5048,6 +6073,7 @@ Use scenario attributes:
 - In cold/resistant scenarios, overly aggressive repeated questioning should reduce conversation_quality.
 - Use each executed case's request_mode and effective_required_intake_fields as the primary per-scenario intake expectation.
 - If request_mode is policy_or_procedure or general_information, do not penalize the assistant for skipping unrelated lead-qualification intake fields.
+- In cold/resistant + general_information scenarios, do not penalize lack of extra proactive questioning when assistant stays grounded and non-pushy.
 Judge should reward balanced, natural lead progression instead of rigid form-like interrogation.
 Intake-fulfillment rule:
 - Prioritize required intake fields needed for actionable next-step and human handoff readiness.
@@ -5379,6 +6405,7 @@ export async function executeQaLabRunById(
                     defaultRequiredFields: qaRequiredIntakeFields,
                     scenarioTitle: scenario.title,
                     scenarioGoal: scenario.goal,
+                    scenarioTurnCount: scenario.turns.length,
                     customerMessage: scenarioCustomerMessage,
                     generated
                 })
@@ -5556,7 +6583,11 @@ export async function executeQaLabRunById(
             return {
                 judgeResult: normalizeJudgeResult(judgeJson, {
                     executedCases,
-                    intakeCoverageByCase: intakeCoverage.byCase
+                    intakeCoverageByCase: intakeCoverage.byCase,
+                    hasConcretePricingFacts: hasConcreteNumericPricingFact([
+                        ...generated.ground_truth.critical_policy_facts,
+                        ...generated.kb_fixture.lines
+                    ])
                 }),
                 skippedReason: null
             }
@@ -5597,6 +6628,7 @@ export async function executeQaLabRunById(
                 const filteredFindings = filterJudgeFindingsByCitationConsistency({
                     findings: judgeResult.findings,
                     executedCases,
+                    scenarioAssessments: judgeResult.scenario_assessments,
                     intakeCoverageByCase: intakeCoverage.byCase
                 })
                 const droppedFindingCount = judgeResult.findings.length - filteredFindings.length
@@ -5631,6 +6663,7 @@ export async function executeQaLabRunById(
                         const retryFilteredFindings = filterJudgeFindingsByCitationConsistency({
                             findings: retryJudgePass.judgeResult.findings,
                             executedCases,
+                            scenarioAssessments: retryJudgePass.judgeResult.scenario_assessments,
                             intakeCoverageByCase: intakeCoverage.byCase
                         })
                         const retryDroppedCount = retryJudgePass.judgeResult.findings.length - retryFilteredFindings.length

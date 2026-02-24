@@ -462,6 +462,12 @@ function hasUrgencyMentionSignal(text: string) {
 function hasUrgencyValueSignal(text: string) {
     if (!text) return false
 
+    const hasBalancedUrgencyIntent = (
+        /(acelesi yok|acelem yok|acil degil|acil değil|hemen olmasina gerek yok|hemen olmasına gerek yok|aciliyet dusuk|aciliyet düşük|oncelik dusuk|öncelik düşük)/i.test(text)
+        && /(bir an once|bir an önce|yakinda|yakında|mümkün oldugunca erken|mümkün olduğunca erken|baslamak istiyorum|başlamak istiyorum|ilerlemek istiyorum)/i.test(text)
+    )
+    if (hasBalancedUrgencyIntent) return true
+
     const hasExplicitLevel = (
         /(oncelik|öncelik|aciliyet)\s*(seviyesi|duzeyi|düzeyi)?\s*(yuksek|yüksek|orta|dusuk|düşük)/i.test(text)
         || /(yuksek|yüksek|orta|dusuk|düşük)\s*(oncelik|öncelik|aciliyet)/i.test(text)

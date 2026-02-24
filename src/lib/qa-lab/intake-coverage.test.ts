@@ -168,6 +168,36 @@ describe('analyzeQaLabIntakeCoverage', () => {
         expect(coverage.byCase[0]?.missingFields).toContain('Proje aciliyet seviyesi')
     })
 
+    it('marks urgency fulfilled for balanced urgency phrasing (not urgent but wants to start soon)', () => {
+        const coverage = analyzeQaLabIntakeCoverage({
+            requiredIntakeFields: ['Proje aciliyet seviyesi'],
+            cases: [
+                {
+                    case_id: 'scenario_urgency_balanced',
+                    title: 'Dengeli aciliyet',
+                    lead_temperature: 'warm',
+                    information_sharing: 'partial',
+                    executed_turns: [
+                        {
+                            turn_index: 1,
+                            customer_message: 'Fiyat bilgisi almak istiyorum.',
+                            assistant_response: 'Öncelik seviyenizi paylaşabilir misiniz (yüksek / orta / düşük)?'
+                        },
+                        {
+                            turn_index: 2,
+                            customer_message: 'Acelesi yok ama bir an once baslamak istiyorum.',
+                            assistant_response: 'Anladım, buna göre planlayabiliriz.'
+                        }
+                    ]
+                }
+            ]
+        })
+
+        expect(coverage.byCase[0]?.askedFieldsCount).toBe(1)
+        expect(coverage.byCase[0]?.fulfilledFieldsCount).toBe(1)
+        expect(coverage.byCase[0]?.missingFields).toEqual([])
+    })
+
     it('detects service-detail fulfillment from sector-agnostic project/service language', () => {
         const coverage = analyzeQaLabIntakeCoverage({
             requiredIntakeFields: ['Hizmet Detayları'],
