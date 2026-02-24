@@ -5,6 +5,12 @@ import { parseQaLabRunReportView } from '@/lib/qa-lab/report-view'
 describe('parseQaLabRunReportView', () => {
     it('parses kb fixture, extraction setup, and execution details', () => {
         const parsed = parseQaLabRunReportView({
+            qa_assistant_profile: {
+                assistant_id: 'qa_lab_simulated_assistant',
+                profile_version: 'v2',
+                isolation: 'qa_lab_only',
+                auto_port_to_live: false
+            },
             budget: {
                 limit_tokens: 50000,
                 consumed_tokens: 13200,
@@ -147,6 +153,10 @@ describe('parseQaLabRunReportView', () => {
         expect(parsed.scenarioMix.hot).toBe(1)
         expect(parsed.pipelineChecks.overall).toBe('pass')
         expect(parsed.pipelineChecks.steps[0]?.id).toBe('kb_fixture')
+        expect(parsed.qaAssistantProfile.assistantId).toBe('qa_lab_simulated_assistant')
+        expect(parsed.qaAssistantProfile.profileVersion).toBe('v2')
+        expect(parsed.qaAssistantProfile.isolation).toBe('qa_lab_only')
+        expect(parsed.qaAssistantProfile.autoPortToLive).toBe(false)
         expect(parsed.cases[0]?.leadTemperature).toBe('hot')
         expect(parsed.cases[0]?.turns[0]?.assistantResponse).toBe('Saat 14:00 boş.')
         expect(parsed.intakeCoverage.totals.caseCount).toBe(1)
@@ -164,6 +174,10 @@ describe('parseQaLabRunReportView', () => {
     it('returns safe defaults for malformed input', () => {
         const parsed = parseQaLabRunReportView(null)
 
+        expect(parsed.qaAssistantProfile.assistantId).toBe('-')
+        expect(parsed.qaAssistantProfile.profileVersion).toBe('-')
+        expect(parsed.qaAssistantProfile.isolation).toBe('-')
+        expect(parsed.qaAssistantProfile.autoPortToLive).toBe(null)
         expect(parsed.kbFixture.title).toBe('-')
         expect(parsed.kbFixture.lineCount).toBe(0)
         expect(parsed.kbFixture.lines).toEqual([])

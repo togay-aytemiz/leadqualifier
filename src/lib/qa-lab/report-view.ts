@@ -141,7 +141,15 @@ export interface QaLabRunPipelineChecksView {
     steps: QaLabRunPipelineCheckStepView[]
 }
 
+export interface QaLabAssistantProfileView {
+    assistantId: string
+    profileVersion: string
+    isolation: string
+    autoPortToLive: boolean | null
+}
+
 export interface QaLabRunReportView {
+    qaAssistantProfile: QaLabAssistantProfileView
     budget: QaLabRunBudgetView
     score: QaLabRunScoreView
     summary: string
@@ -204,6 +212,7 @@ function toScenarioAssessmentSource(value: unknown): 'judge' | 'fallback' {
 
 export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
     const reportRecord = toRecord(report)
+    const qaAssistantProfileRecord = toRecord(reportRecord.qa_assistant_profile)
     const budgetRecord = toRecord(reportRecord.budget)
     const pipelineChecksRecord = toRecord(reportRecord.pipeline_checks)
     const judgeRecord = toRecord(reportRecord.judge)
@@ -342,6 +351,12 @@ export function parseQaLabRunReportView(report: unknown): QaLabRunReportView {
         })
 
     return {
+        qaAssistantProfile: {
+            assistantId: toString(qaAssistantProfileRecord.assistant_id, '-'),
+            profileVersion: toString(qaAssistantProfileRecord.profile_version, '-'),
+            isolation: toString(qaAssistantProfileRecord.isolation, '-'),
+            autoPortToLive: toBoolean(qaAssistantProfileRecord.auto_port_to_live)
+        },
         budget: {
             limitTokens: toNumber(budgetRecord.limit_tokens),
             consumedTokens: toNumber(budgetRecord.consumed_tokens),

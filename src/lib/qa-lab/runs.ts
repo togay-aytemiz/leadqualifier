@@ -11,6 +11,7 @@ import type { Json, QaLabRun, QaLabRunPreset, UserRole } from '@/types/database'
 import { getQaLabPresetConfig, isQaLabPreset } from '@/lib/qa-lab/presets'
 import { executeQaLabRunById } from '@/lib/qa-lab/executor'
 import { getCompatFixtureMinLinesForInsert } from '@/lib/qa-lab/run-insert-compat'
+import { canAccessQaLab } from '@/lib/qa-lab/access'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
@@ -57,10 +58,6 @@ function clampWorkerBatchSize(value: number | undefined): number {
         return DEFAULT_WORKER_BATCH_SIZE
     }
     return Math.min(MAX_WORKER_BATCH_SIZE, Math.max(1, Math.floor(numeric)))
-}
-
-function canStartQaLabRunForRole(role: UserRole | null | undefined) {
-    return role === 'owner' || role === 'admin'
 }
 
 function resolveQaLabModelNames() {
@@ -124,6 +121,12 @@ async function assertQaLabRunWriteAccess(
         if (!options?.allowSystemAdmin) {
             throw new Error('Read-only impersonation mode')
         }
+        if (!canAccessQaLab({
+            userEmail: activeOrgContext.userEmail,
+            isSystemAdmin: true
+        })) {
+            throw new Error('Forbidden')
+        }
         return {
             userId,
             organizationId: activeOrganizationId
@@ -138,7 +141,10 @@ async function assertQaLabRunWriteAccess(
         throw new Error('No organization membership found')
     }
 
-    if (!canStartQaLabRunForRole(membership.role)) {
+    if (!canAccessQaLab({
+        userEmail: activeOrgContext.userEmail,
+        userRole: membership.role
+    })) {
         throw new Error('Forbidden')
     }
 
@@ -402,7 +408,7 @@ function buildWorkerErrorReport(error: unknown): Json {
         : 'Unknown queue worker error'
 
     return {
-        version: 'v1',
+        version: 'v2',
         worker_error: {
             message
         },

@@ -145,19 +145,24 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)
     const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
-    const entitlement = await resolveOrganizationUsageEntitlement(orgId, {
-        supabase: options.supabase
-    })
+    const ensureUsageAllowed = async (stage: string) => {
+        const entitlement = await resolveOrganizationUsageEntitlement(orgId, {
+            supabase: options.supabase
+        })
 
-    if (!entitlement.isUsageAllowed) {
+        if (entitlement.isUsageAllowed) return true
+
         console.info(`${options.logPrefix}: Billing usage locked`, {
             organization_id: orgId,
             conversation_id: conversation.id,
             membership_state: entitlement.membershipState,
-            lock_reason: entitlement.lockReason
+            lock_reason: entitlement.lockReason,
+            stage
         })
-        return
+        return false
     }
+
+    if (!await ensureUsageAllowed('initial')) return
 
     const shouldRunLeadExtraction = resolveLeadExtractionAllowance({
         botMode,
@@ -187,6 +192,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             leadScoreForEscalation = leadForEscalation.total_score
         }
     }
+
+    if (!await ensureUsageAllowed('before_skill_matching')) return
 
     if (operatorActive || !allowReplies) return
 
@@ -374,6 +381,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             }
         )
 
+        if (!await ensureUsageAllowed('before_router')) return
         const decision = await decideKnowledgeBaseRoute(options.text, history)
         if (decision.usage) {
             await recordAiUsage({
@@ -409,6 +417,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 }
 
                 const noAnswerToken = 'NO_ANSWER'
+                if (!await ensureUsageAllowed('before_rag_completion')) return
                 const { default: OpenAI } = await import('openai')
                 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -492,9 +501,14 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             }
         }
     } catch (error) {
+        if (error instanceof Error && error.message.includes('Failed to record AI usage')) {
+            console.error(`${options.logPrefix}: AI usage recording failed, skipping further AI calls`, error)
+            return
+        }
         console.error(`${options.logPrefix}: RAG error`, error)
     }
 
+    if (!await ensureUsageAllowed('before_fallback')) return
     const fallbackText = await buildFallbackResponse({
         organizationId: orgId,
         message: options.text,

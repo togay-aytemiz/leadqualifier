@@ -11,6 +11,7 @@ import {
 } from '@/lib/ai/prompts'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import {
     analyzeRequiredIntakeState,
     buildRequiredIntakeFollowupGuidance,
@@ -275,6 +276,17 @@ export async function buildFallbackResponse(options: {
         recentAssistantMessages: options.recentAssistantMessages ?? [],
         leadSnapshot: options.leadSnapshot ?? null
     })
+    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+    if (!entitlement.isUsageAllowed) {
+        return renderStrictFallback(
+            '',
+            topics,
+            language,
+            options.message,
+            requiredIntakeAnalysis
+        )
+    }
+
     let groundedKnowledgeContext = options.knowledgeContext?.trim() ?? ''
     if (!groundedKnowledgeContext) {
         try {

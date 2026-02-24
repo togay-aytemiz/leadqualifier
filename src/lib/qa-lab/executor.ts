@@ -44,7 +44,7 @@ const QA_LAB_RESPONDER_MAX_KB_LINES = 24
 const MODEL_TEMPERATURE = 0.3
 const MAX_FINDINGS = 60
 const MAX_TOP_ACTIONS = 5
-const REPORT_VERSION = 'v1'
+const REPORT_VERSION = 'v2'
 const QA_LAB_ASSISTANT_PROFILE = {
     assistant_id: 'qa_lab_simulated_assistant',
     profile_version: 'v2',

@@ -80,7 +80,12 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
     if (!data) throw new Error('Failed to create skill')
 
     // Generate and store embeddings for trigger examples
-    await generateAndStoreEmbeddings(data.id, data.title, skill.trigger_examples)
+    await generateAndStoreEmbeddings(
+        data.id,
+        data.organization_id,
+        data.title,
+        skill.trigger_examples
+    )
 
     const profileContent = `${data.title}\n${skill.trigger_examples.join('\n')}\n${data.response_text}`
 
@@ -146,7 +151,12 @@ export async function updateSkill(
         // Generate new embeddings
         const nextTitle = updates.title ?? data.title
         const nextTriggers = updates.trigger_examples ?? currentTriggers ?? data.trigger_examples
-        await generateAndStoreEmbeddings(skillId, nextTitle, nextTriggers)
+        await generateAndStoreEmbeddings(
+            skillId,
+            data.organization_id,
+            nextTitle,
+            nextTriggers
+        )
     }
 
     const shouldPropose = Boolean(updates.title || updates.response_text || updates.trigger_examples)
@@ -234,7 +244,7 @@ async function ensureDefaultSystemSkills(
     const { data, error: insertError } = await supabase
         .from('skills')
         .insert(defaultSkills)
-        .select('id, title, trigger_examples')
+        .select('id, organization_id, title, trigger_examples')
 
     if (insertError) {
         console.error('Failed to seed default system skills:', insertError)
@@ -243,7 +253,12 @@ async function ensureDefaultSystemSkills(
 
     await Promise.all(
         (data ?? []).map((skill) =>
-            generateAndStoreEmbeddings(skill.id, skill.title, skill.trigger_examples ?? [])
+            generateAndStoreEmbeddings(
+                skill.id,
+                skill.organization_id,
+                skill.title,
+                skill.trigger_examples ?? []
+            )
         )
     )
 }
@@ -254,7 +269,7 @@ async function ensureSkillEmbeddingsForOrg(
 ): Promise<void> {
     const { data: skills, error: skillsError } = await supabase
         .from('skills')
-        .select('id, title, trigger_examples')
+        .select('id, organization_id, title, trigger_examples')
         .eq('organization_id', organizationId)
 
     if (skillsError) {
@@ -294,21 +309,38 @@ async function ensureSkillEmbeddingsForOrg(
             console.error('Failed to clear stale skill embeddings before backfill:', error)
             continue
         }
-        await generateAndStoreEmbeddings(skill.id, skill.title, skill.trigger_examples ?? [])
+        await generateAndStoreEmbeddings(
+            skill.id,
+            skill.organization_id,
+            skill.title,
+            skill.trigger_examples ?? []
+        )
     }
 }
 
 /**
  * Generate embeddings for trigger examples and store in database
  */
-async function generateAndStoreEmbeddings(skillId: string, title: string, triggerExamples: string[]): Promise<void> {
+async function generateAndStoreEmbeddings(
+    skillId: string,
+    organizationId: string,
+    title: string,
+    triggerExamples: string[]
+): Promise<void> {
     const embeddingTexts = buildSkillEmbeddingTexts(title, triggerExamples)
     if (embeddingTexts.length === 0) return
 
     const supabase = await createClient()
 
     // Generate embeddings for title + trigger texts.
-    const embeddings = await generateEmbeddings(embeddingTexts)
+    const embeddings = await generateEmbeddings(embeddingTexts, {
+        organizationId,
+        supabase,
+        usageMetadata: {
+            source: 'skill_index_embedding',
+            skill_id: skillId
+        }
+    })
 
     // Prepare rows for insertion
     const rows = embeddingTexts.map((trigger, i) => ({
@@ -339,7 +371,13 @@ export async function matchSkills(
     const supabase = customSupabase || await createClient()
 
     // Generate embedding for the query
-    const [queryEmbedding] = await generateEmbeddings([query])
+    const [queryEmbedding] = await generateEmbeddings([query], {
+        organizationId,
+        supabase,
+        usageMetadata: {
+            source: 'skill_query_embedding'
+        }
+    })
     if (!queryEmbedding) return []
 
     // Call the match_skills function

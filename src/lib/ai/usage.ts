@@ -2,7 +2,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 
-export type AiUsageCategory = 'router' | 'rag' | 'fallback' | 'summary' | 'lead_extraction' | 'lead_reasoning'
+export type AiUsageCategory =
+    | 'router'
+    | 'rag'
+    | 'fallback'
+    | 'summary'
+    | 'lead_extraction'
+    | 'lead_reasoning'
+    | 'embedding'
 
 export interface AiUsageTotals {
     inputTokens: number
@@ -74,9 +81,15 @@ export async function recordAiUsage({
 
         if (error) {
             console.error('Failed to record AI usage:', error)
+            throw new Error('Failed to record AI usage')
         }
     } catch (error) {
+        if (error instanceof Error && error.message === 'Failed to record AI usage') {
+            throw error
+        }
         console.error('Failed to record AI usage:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        throw new Error(`Failed to record AI usage: ${errorMessage}`)
     }
 }
 
@@ -124,7 +137,7 @@ export async function getOrgAiUsageSummary(
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
     const monthKey = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`
-    const categories: string[] = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning']
+    const categories: string[] = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning', 'embedding']
 
     const [monthlyResult, totalResult] = await Promise.all([
         supabase

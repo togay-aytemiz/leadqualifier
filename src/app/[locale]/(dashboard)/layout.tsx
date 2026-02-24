@@ -1,6 +1,7 @@
 import { MainSidebar } from '@/design'
 import { MobileBottomNav } from '@/design/MobileBottomNav'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { TabTitleSync } from '@/components/common/TabTitleSync'
 
 export default async function DashboardLayout({
@@ -14,6 +15,10 @@ export default async function DashboardLayout({
     const sidebarOrganizationId = hasExplicitAdminOrganizationSelection
         ? (orgContext?.activeOrganizationId ?? null)
         : null
+    const canAccessQaLabAdmin = canAccessQaLab({
+        userEmail: orgContext?.userEmail,
+        isSystemAdmin: orgContext?.isSystemAdmin ?? false
+    })
 
     const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
 
@@ -27,6 +32,7 @@ export default async function DashboardLayout({
                     organizations={orgContext?.accessibleOrganizations ?? []}
                     activeOrganizationId={sidebarOrganizationId}
                     readOnlyTenantMode={orgContext?.readOnlyTenantMode ?? false}
+                    canAccessQaLabAdmin={canAccessQaLabAdmin}
                 />
             </div>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">

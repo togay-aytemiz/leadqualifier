@@ -3044,6 +3044,7 @@ describe('qa lab executor helpers', () => {
         const errorRecord = toRecord(reportRecord.error)
         const detailsRecord = toRecord(errorRecord.details)
 
+        expect(reportRecord.version).toBe('v2')
         expect(qaAssistantProfile.assistant_id).toBe('qa_lab_simulated_assistant')
         expect(qaAssistantProfile.profile_version).toBe('v2')
         expect(qaAssistantProfile.auto_port_to_live).toBe(false)

@@ -21,6 +21,10 @@ import {
     resolveAdminMetricPeriodRange
 } from '@/lib/admin/dashboard-metric-period'
 import { summarizeUsageMetricRows } from '@/lib/admin/dashboard-usage-metrics'
+import {
+    getCountByOrganization as loadCountByOrganization,
+    getTokenTotalsByOrganization as loadTokenTotalsByOrganization
+} from '@/lib/admin/organization-metrics'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -215,11 +219,6 @@ interface MembershipRow {
     created_at: string
 }
 
-interface TokenUsageRow {
-    organization_id: string
-    total_tokens: number | null
-}
-
 interface SubscriptionRecordMetadataRow {
     organization_id: string
     metadata: Json
@@ -308,28 +307,7 @@ async function getCountByOrganization(
     tableName: 'organization_members' | 'skills' | 'knowledge_documents' | 'messages'
 ): Promise<Map<string, number>> {
     if (organizationIds.length === 0) return EMPTY_COUNT_MAP
-
-    const counts = new Map<string, number>()
-
-    for (const organizationIdBatch of chunkValues(organizationIds, 100)) {
-        const { data, error } = await supabase
-            .from(tableName)
-            .select('organization_id')
-            .in('organization_id', organizationIdBatch)
-
-        if (error) {
-            console.error(`Failed to count ${tableName} for organization batch:`, error)
-            continue
-        }
-
-        const rows = (data ?? []) as Array<{ organization_id: string }>
-        for (const row of rows) {
-            const current = counts.get(row.organization_id) ?? 0
-            counts.set(row.organization_id, current + 1)
-        }
-    }
-
-    return counts
+    return loadCountByOrganization(supabase, organizationIds, tableName)
 }
 
 async function getTokenTotalsByOrganization(
@@ -337,28 +315,7 @@ async function getTokenTotalsByOrganization(
     organizationIds: string[]
 ): Promise<Map<string, number>> {
     if (organizationIds.length === 0) return EMPTY_COUNT_MAP
-
-    const totals = new Map<string, number>()
-
-    for (const organizationIdBatch of chunkValues(organizationIds, 100)) {
-        const { data, error } = await supabase
-            .from('organization_ai_usage')
-            .select('organization_id, total_tokens')
-            .in('organization_id', organizationIdBatch)
-
-        if (error) {
-            console.error('Failed to load token usage for organization batch:', error)
-            continue
-        }
-
-        const rows = (data ?? []) as TokenUsageRow[]
-        for (const row of rows) {
-            const current = totals.get(row.organization_id) ?? 0
-            totals.set(row.organization_id, current + (row.total_tokens ?? 0))
-        }
-    }
-
-    return totals
+    return loadTokenTotalsByOrganization(supabase, organizationIds)
 }
 
 function mapBillingRowToAdminSnapshot(row: OrganizationBillingAccount): AdminBillingSnapshot {

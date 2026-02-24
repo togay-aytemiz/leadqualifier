@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
@@ -747,6 +748,17 @@ export async function runLeadExtraction(options: {
             .maybeSingle()
     ])
 
+    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+    if (!entitlement.isUsageAllowed) {
+        console.info('Lead extraction skipped due to billing lock', {
+            organization_id: options.organizationId,
+            conversation_id: options.conversationId,
+            membership_state: entitlement.membershipState,
+            lock_reason: entitlement.lockReason
+        })
+        return
+    }
+
     if (!process.env.OPENAI_API_KEY) return
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -841,6 +853,17 @@ export async function runLeadExtraction(options: {
     addUsage(completion, userPrompt, response)
 
     if (!hasJsonKey(response, 'score') || !hasJsonKey(response, 'status') || !hasJsonKey(response, 'summary')) {
+        const retryEntitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+        if (!retryEntitlement.isUsageAllowed) {
+            console.info('Lead extraction retry skipped due to billing lock', {
+                organization_id: options.organizationId,
+                conversation_id: options.conversationId,
+                membership_state: retryEntitlement.membershipState,
+                lock_reason: retryEntitlement.lockReason
+            })
+            return
+        }
+
         const strictPrompt = `${userPrompt}\n\nReturn JSON with all required keys including summary, score, and status.`
         const retry = await openai.chat.completions.create({
             model: 'gpt-4o-mini',

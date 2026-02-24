@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
@@ -627,6 +628,11 @@ export async function generateRequiredIntakeFollowup(options: {
     }
 
     if (!process.env.OPENAI_API_KEY) {
+        return { missingFields: [], followupQuestion: null }
+    }
+
+    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+    if (!entitlement.isUsageAllowed) {
         return { missingFields: [], followupQuestion: null }
     }
 

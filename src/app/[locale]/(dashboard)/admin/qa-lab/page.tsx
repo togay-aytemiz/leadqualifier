@@ -1,7 +1,9 @@
 import { getLocale, getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 
 import QaLabSettingsClient from '@/app/[locale]/(dashboard)/settings/qa-lab/QaLabSettingsClient'
 import { QA_LAB_PRESETS } from '@/lib/qa-lab/presets'
+import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { listQaLabRuns } from '@/lib/qa-lab/runs'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
@@ -13,6 +15,13 @@ export default async function AdminQaLabPage() {
 
     const orgContext = await resolveActiveOrganizationContext()
     if (!orgContext) return null
+
+    if (!canAccessQaLab({
+        userEmail: orgContext.userEmail,
+        isSystemAdmin: orgContext.isSystemAdmin
+    })) {
+        redirect(`/${locale}/admin`)
+    }
 
     const organizationId = orgContext.activeOrganizationId
     if (!organizationId) {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+    analyzeRequiredIntakeStateMock,
     buildRagContextMock,
     buildFallbackResponseMock,
     decideHumanEscalationMock,
@@ -17,6 +18,7 @@ const {
     runLeadExtractionMock,
     searchKnowledgeBaseMock
 } = vi.hoisted(() => ({
+    analyzeRequiredIntakeStateMock: vi.fn(),
     buildRagContextMock: vi.fn(),
     buildFallbackResponseMock: vi.fn(),
     decideHumanEscalationMock: vi.fn(),
@@ -50,7 +52,8 @@ vi.mock('openai', () => ({
 
 vi.mock('@/lib/ai/followup', () => ({
     getRequiredIntakeFields: getRequiredIntakeFieldsMock,
-    buildRequiredIntakeFollowupGuidance: vi.fn(() => '')
+    buildRequiredIntakeFollowupGuidance: vi.fn(() => ''),
+    analyzeRequiredIntakeState: analyzeRequiredIntakeStateMock
 }))
 
 vi.mock('@/lib/knowledge-base/router', () => ({
@@ -286,6 +289,19 @@ describe('processInboundAiPipeline guardrails', () => {
             bot_name: null
         })
         getRequiredIntakeFieldsMock.mockResolvedValue([])
+        analyzeRequiredIntakeStateMock.mockReturnValue({
+            requestMode: 'lead_qualification',
+            requiredFields: [],
+            effectiveRequiredFields: [],
+            collectedFields: [],
+            blockedReaskFields: [],
+            missingFields: [],
+            dynamicMinimumCount: 0,
+            isShortConversation: false,
+            latestRefusal: false,
+            noProgressStreak: false,
+            suppressIntakeQuestions: false
+        })
         resolveBotModeActionMock.mockReturnValue({ allowReplies: true })
         resolveOrganizationUsageEntitlementMock.mockResolvedValue({
             isUsageAllowed: true,

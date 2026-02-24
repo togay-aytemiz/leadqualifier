@@ -400,7 +400,13 @@ export async function searchKnowledgeBase(
     let data: KnowledgeSearchResult[] | null = null
 
     try {
-        const embedding = await generateEmbedding(query)
+        const embedding = await generateEmbedding(query, {
+            organizationId,
+            supabase,
+            usageMetadata: {
+                source: 'knowledge_search_query_embedding'
+            }
+        })
         const { data: result, error } = await supabase.rpc('match_knowledge_chunks', {
             query_embedding: formatEmbeddingForPgvector(embedding),
             match_threshold: threshold,
@@ -629,7 +635,17 @@ async function buildAndStoreChunks(
     const chunks = chunkText(content)
     if (chunks.length === 0) return
 
-    const embeddings = await generateEmbeddings(chunks.map((chunk) => chunk.content))
+    const embeddings = await generateEmbeddings(
+        chunks.map((chunk) => chunk.content),
+        {
+            organizationId,
+            supabase,
+            usageMetadata: {
+                source: 'knowledge_chunk_index_embedding',
+                document_id: documentId
+            }
+        }
+    )
 
     const rows = chunks.map((chunk, index) => ({
         document_id: documentId,

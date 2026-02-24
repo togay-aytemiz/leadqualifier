@@ -152,6 +152,20 @@ export async function POST(req: NextRequest) {
         console.log('Telegram Webhook: Found existing conversation', conversation.id)
     }
 
+    const telegramMessageId = String(update.message.message_id)
+    const dedupeFilter = 'metadata->>telegram_message_id'
+    const { data: existingInboundData } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq(dedupeFilter, telegramMessageId)
+        .maybeSingle()
+
+    if ((existingInboundData as { id?: string } | null)?.id) {
+        console.log('Telegram Webhook: Duplicate inbound detected, skipping')
+        return NextResponse.json({ ok: true })
+    }
+
     // 4. Save Incoming Message
     const { error: msgError } = await supabase.from('messages').insert({
         id: uuidv4(),
@@ -159,7 +173,7 @@ export async function POST(req: NextRequest) {
         organization_id: orgId,
         sender_type: 'contact',
         content: text,
-        metadata: { telegram_message_id: update.message.message_id }
+        metadata: { telegram_message_id: telegramMessageId }
     })
 
     if (msgError) {
@@ -194,14 +208,21 @@ export async function POST(req: NextRequest) {
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)
     const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
-    const entitlement = await resolveOrganizationUsageEntitlement(orgId, { supabase })
-    if (!entitlement.isUsageAllowed) {
+    const ensureUsageAllowed = async (stage: string) => {
+        const entitlement = await resolveOrganizationUsageEntitlement(orgId, { supabase })
+        if (entitlement.isUsageAllowed) return true
+
         console.info('Telegram Webhook: Billing usage locked, skipping AI processing', {
             organization_id: orgId,
             conversation_id: conversation.id,
             membership_state: entitlement.membershipState,
-            lock_reason: entitlement.lockReason
+            lock_reason: entitlement.lockReason,
+            stage
         })
+        return false
+    }
+
+    if (!await ensureUsageAllowed('initial')) {
         return NextResponse.json({ ok: true })
     }
 
@@ -233,6 +254,10 @@ export async function POST(req: NextRequest) {
         } else if (typeof leadForEscalation?.total_score === 'number') {
             leadScoreForEscalation = leadForEscalation.total_score
         }
+    }
+
+    if (!await ensureUsageAllowed('before_skill_matching')) {
+        return NextResponse.json({ ok: true })
     }
 
     if (operatorActive || !allowReplies) {
@@ -435,6 +460,9 @@ export async function POST(req: NextRequest) {
                 }
             )
 
+            if (!await ensureUsageAllowed('before_router')) {
+                return NextResponse.json({ ok: true })
+            }
             const decision = await decideKnowledgeBaseRoute(text, history)
             if (decision.usage) {
                 await recordAiUsage({
@@ -472,6 +500,9 @@ export async function POST(req: NextRequest) {
                     }
 
                     const noAnswerToken = 'NO_ANSWER'
+                    if (!await ensureUsageAllowed('before_rag_completion')) {
+                        return NextResponse.json({ ok: true })
+                    }
                     const { default: OpenAI } = await import('openai')
                     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -560,10 +591,17 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 console.log('Telegram Webhook: KB routing declined', { reason: decision.reason })
             }
         } catch (error) {
+            if (error instanceof Error && error.message.includes('Failed to record AI usage')) {
+                console.error('Telegram Webhook: AI usage recording failed, skipping further AI calls', error)
+                return NextResponse.json({ ok: true })
+            }
             console.error('Telegram Webhook: RAG error', error)
         }
 
         // 8. Final Fallback (No Skill, No Knowledge)
+        if (!await ensureUsageAllowed('before_fallback')) {
+            return NextResponse.json({ ok: true })
+        }
         console.log('Telegram Webhook: No knowledge match, sending fallback')
         const fallbackText = await buildFallbackResponse({
             organizationId: orgId,

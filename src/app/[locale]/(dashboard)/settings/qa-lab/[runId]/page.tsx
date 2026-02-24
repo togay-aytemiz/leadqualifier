@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 
 import { PageHeader } from '@/design'
@@ -12,7 +13,8 @@ import {
     parseQaLabRunReportView,
     type QaLabRunFindingView
 } from '@/lib/qa-lab/report-view'
-import { getQaLabRunById } from '@/lib/qa-lab/runs'
+import { canAccessQaLab } from '@/lib/qa-lab/access'
+import { getCurrentUserQaLabRole, getQaLabRunById } from '@/lib/qa-lab/runs'
 import { cn } from '@/lib/utils'
 import type { QaLabRunResult, QaLabRunStatus } from '@/types/database'
 
@@ -156,6 +158,15 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
+    const userRole = await getCurrentUserQaLabRole(organizationId)
+    if (!canAccessQaLab({
+        userEmail: orgContext.userEmail,
+        userRole,
+        isSystemAdmin: orgContext.isSystemAdmin
+    })) {
+        redirect(`/${locale}/inbox`)
+    }
+
     const run = await getQaLabRunById(runId, organizationId)
     if (!run) {
         return (
@@ -212,6 +223,11 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
         }
         return null
     })()
+    const qaAssistantAutoPortToLiveLabel = report.qaAssistantProfile.autoPortToLive === null
+        ? '-'
+        : report.qaAssistantProfile.autoPortToLive
+            ? tCommon('enabled')
+            : tCommon('disabled')
 
     return (
         <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
@@ -283,6 +299,22 @@ export default async function QaLabRunDetailPage({ params }: QaLabRunDetailPageP
                             <div>
                                 <p className="text-gray-500">{tQaLab('details.fields.judgeModel')}</p>
                                 <p className="mt-1 break-all">{run.judge_model}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.fields.qaAssistantId')}</p>
+                                <p className="mt-1 break-all">{report.qaAssistantProfile.assistantId}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.fields.qaAssistantProfileVersion')}</p>
+                                <p className="mt-1 break-all">{report.qaAssistantProfile.profileVersion}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.fields.qaAssistantIsolation')}</p>
+                                <p className="mt-1 break-all">{report.qaAssistantProfile.isolation}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">{tQaLab('details.fields.qaAssistantAutoPortToLive')}</p>
+                                <p className="mt-1">{qaAssistantAutoPortToLiveLabel}</p>
                             </div>
                             <div>
                                 <p className="text-gray-500">{tQaLab('details.fields.tokenBudget')}</p>

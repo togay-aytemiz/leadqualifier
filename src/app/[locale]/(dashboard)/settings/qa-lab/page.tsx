@@ -1,4 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
@@ -7,6 +8,7 @@ import {
     getCurrentUserQaLabRole,
     listQaLabRuns
 } from '@/lib/qa-lab/runs'
+import { canAccessQaLab } from '@/lib/qa-lab/access'
 import QaLabSettingsClient from './QaLabSettingsClient'
 
 export default async function QaLabSettingsPage() {
@@ -37,11 +39,18 @@ export default async function QaLabSettingsPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const [runs, userRole] = await Promise.all([
-        listQaLabRuns(organizationId, { limit: 30 }),
-        getCurrentUserQaLabRole(organizationId)
-    ])
-    const canStartRuns = userRole === 'owner' || userRole === 'admin'
+    const userRole = await getCurrentUserQaLabRole(organizationId)
+    const canAccess = canAccessQaLab({
+        userEmail: orgContext.userEmail,
+        userRole,
+        isSystemAdmin: orgContext.isSystemAdmin
+    })
+    if (!canAccess) {
+        redirect(`/${locale}/inbox`)
+    }
+
+    const runs = await listQaLabRuns(organizationId, { limit: 30 })
+    const canStartRuns = userRole === 'admin'
 
     return (
         <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">

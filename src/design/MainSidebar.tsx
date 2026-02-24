@@ -114,6 +114,7 @@ interface MainSidebarProps {
     organizations?: ActiveOrganizationSummary[]
     activeOrganizationId?: string | null
     readOnlyTenantMode?: boolean
+    canAccessQaLabAdmin?: boolean
 }
 
 export function MainSidebar({
@@ -121,7 +122,8 @@ export function MainSidebar({
     isSystemAdmin = false,
     organizations = [],
     activeOrganizationId = null,
-    readOnlyTenantMode = false
+    readOnlyTenantMode = false,
+    canAccessQaLabAdmin = false
 }: MainSidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
@@ -509,7 +511,10 @@ export function MainSidebar({
         ]
 
         if (isSystemAdmin) {
-            routesToPrefetch.push('/admin', '/admin/billing', '/admin/organizations', '/admin/leads', '/admin/users', '/admin/qa-lab')
+            routesToPrefetch.push('/admin', '/admin/billing', '/admin/organizations', '/admin/leads', '/admin/users')
+            if (canAccessQaLabAdmin) {
+                routesToPrefetch.push('/admin/qa-lab')
+            }
         }
 
         const uniqueRoutes = Array.from(new Set(routesToPrefetch))
@@ -521,7 +526,7 @@ export function MainSidebar({
 
         const timeoutId = setTimeout(prefetchRoutes, 250)
         return () => clearTimeout(timeoutId)
-    }, [isSystemAdmin, localePrefix, router])
+    }, [canAccessQaLabAdmin, isSystemAdmin, localePrefix, router])
 
     const sections = useMemo(
         () => [
@@ -591,57 +596,62 @@ export function MainSidebar({
     const adminSections = useMemo(() => {
         if (!isSystemAdmin) return []
 
+        const adminItems = [
+            {
+                id: 'admin-dashboard',
+                href: '/admin',
+                label: tSidebar('adminDashboard'),
+                icon: HiOutlineSquares2X2,
+                activeIcon: HiMiniSquares2X2,
+            },
+            {
+                id: 'admin-organizations',
+                href: '/admin/organizations',
+                label: tSidebar('adminOrganizations'),
+                icon: HiOutlineBuildingOffice2,
+                activeIcon: HiMiniBuildingOffice2,
+            },
+            {
+                id: 'admin-billing',
+                href: '/admin/billing',
+                label: tSidebar('adminBilling'),
+                icon: HiOutlineBanknotes,
+                activeIcon: HiMiniBanknotes,
+            },
+            {
+                id: 'admin-leads',
+                href: '/admin/leads',
+                label: tSidebar('adminLeads'),
+                icon: HiOutlineUser,
+                activeIcon: HiMiniUser,
+            },
+            {
+                id: 'admin-users',
+                href: '/admin/users',
+                label: tSidebar('adminUsers'),
+                icon: HiOutlineUsers,
+                activeIcon: HiMiniUsers,
+            },
+        ]
+
+        if (canAccessQaLabAdmin) {
+            adminItems.push({
+                id: 'admin-qa-lab',
+                href: '/admin/qa-lab',
+                label: tSidebar('adminQaLab'),
+                icon: HiOutlineBeaker,
+                activeIcon: HiMiniBeaker,
+            })
+        }
+
         return [
             {
                 id: 'admin',
                 label: tSidebar('adminSection'),
-                items: [
-                    {
-                        id: 'admin-dashboard',
-                        href: '/admin',
-                        label: tSidebar('adminDashboard'),
-                        icon: HiOutlineSquares2X2,
-                        activeIcon: HiMiniSquares2X2,
-                    },
-                    {
-                        id: 'admin-organizations',
-                        href: '/admin/organizations',
-                        label: tSidebar('adminOrganizations'),
-                        icon: HiOutlineBuildingOffice2,
-                        activeIcon: HiMiniBuildingOffice2,
-                    },
-                    {
-                        id: 'admin-billing',
-                        href: '/admin/billing',
-                        label: tSidebar('adminBilling'),
-                        icon: HiOutlineBanknotes,
-                        activeIcon: HiMiniBanknotes,
-                    },
-                    {
-                        id: 'admin-leads',
-                        href: '/admin/leads',
-                        label: tSidebar('adminLeads'),
-                        icon: HiOutlineUser,
-                        activeIcon: HiMiniUser,
-                    },
-                    {
-                        id: 'admin-users',
-                        href: '/admin/users',
-                        label: tSidebar('adminUsers'),
-                        icon: HiOutlineUsers,
-                        activeIcon: HiMiniUsers,
-                    },
-                    {
-                        id: 'admin-qa-lab',
-                        href: '/admin/qa-lab',
-                        label: tSidebar('adminQaLab'),
-                        icon: HiOutlineBeaker,
-                        activeIcon: HiMiniBeaker,
-                    },
-                ],
+                items: adminItems,
             }
         ]
-    }, [isSystemAdmin, tSidebar])
+    }, [canAccessQaLabAdmin, isSystemAdmin, tSidebar])
 
     const toggleLabel = collapsed ? tCommon('expandSidebar') : tCommon('collapseSidebar')
     const workspaceAccess = useMemo(

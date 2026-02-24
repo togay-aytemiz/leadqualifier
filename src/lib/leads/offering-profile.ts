@@ -4,6 +4,7 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeServiceName, isNewCandidate } from '@/lib/leads/catalog'
 import {
     filterMissingIntakeFields,
@@ -88,6 +89,26 @@ Do not repeat existing catalog services.
 Return 1 to 12 service names when present.
 If no clear service is found, return an empty array.
 Return ONLY JSON in this format: { "services": string[] }`
+
+async function isOrganizationUsageAllowed(options: {
+    organizationId: string
+    supabase: SupabaseClientLike
+    source: 'offering_profile_suggestion' | 'required_intake_fields' | 'service_catalog_candidates'
+}) {
+    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, {
+        supabase: options.supabase
+    })
+
+    if (entitlement.isUsageAllowed) return true
+
+    console.info('Offering profile AI skipped due to billing lock', {
+        organization_id: options.organizationId,
+        source: options.source,
+        membership_state: entitlement.membershipState,
+        lock_reason: entitlement.lockReason
+    })
+    return false
+}
 
 async function recordSuggestionUsage(options: {
     organizationId: string
@@ -216,6 +237,14 @@ async function createSuggestion(options: {
 
     if (!profile?.ai_suggestions_enabled) return null
 
+    if (!await isOrganizationUsageAllowed({
+        organizationId: options.organizationId,
+        supabase,
+        source: 'offering_profile_suggestion'
+    })) {
+        return null
+    }
+
     if (!process.env.OPENAI_API_KEY) return null
 
     const locale = profile?.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
@@ -292,6 +321,14 @@ async function createSuggestion(options: {
     let parsed = parseSuggestionPayload(response)
     if (!parsed) return null
     if (!hasValidHybridFormat(parsed.suggestion, labels)) {
+        if (!await isOrganizationUsageAllowed({
+            organizationId: options.organizationId,
+            supabase,
+            source: 'offering_profile_suggestion'
+        })) {
+            return null
+        }
+
         const repairSystemPrompt = buildRepairSystemPrompt(language, labelsText)
         const repairUserPrompt = `New content:\n${options.content}\n\n${summaryBlock}\n\n${approvedBlock}\n\n${rejectedBlock}\n\nDraft:\n${parsed.suggestion}`
         const repairCompletion = await openai.chat.completions.create({
@@ -366,6 +403,13 @@ export async function appendRequiredIntakeFields(options: {
 
     if (!profile) return []
     if (profile.required_intake_fields_ai_enabled === false) return []
+    if (!await isOrganizationUsageAllowed({
+        organizationId: options.organizationId,
+        supabase,
+        source: 'required_intake_fields'
+    })) {
+        return []
+    }
     if (!process.env.OPENAI_API_KEY) return []
 
     const existingFields = normalizeIntakeFields(profile.required_intake_fields ?? [])
@@ -462,6 +506,13 @@ export async function appendServiceCatalogCandidates(options: {
     if (!profile) return []
     if (profile.catalog_enabled === false) return []
     if (profile.service_catalog_ai_enabled === false) return []
+    if (!await isOrganizationUsageAllowed({
+        organizationId: options.organizationId,
+        supabase,
+        source: 'service_catalog_candidates'
+    })) {
+        return []
+    }
     if (!process.env.OPENAI_API_KEY) return []
 
     const locale = profile.ai_suggestions_locale ?? DEFAULT_SUGGESTION_LOCALE
