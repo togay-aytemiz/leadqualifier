@@ -3,11 +3,21 @@
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { getOrgAiSettings } from '@/lib/ai/settings'
-import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_STRICT_FALLBACK_TEXT, withBotNamePrompt } from '@/lib/ai/prompts'
+import {
+    DEFAULT_FLEXIBLE_PROMPT,
+    DEFAULT_STRICT_FALLBACK_TEXT,
+    DEFAULT_STRICT_FALLBACK_TEXT_EN,
+    withBotNamePrompt
+} from '@/lib/ai/prompts'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { buildRequiredIntakeFollowupGuidance } from '@/lib/ai/followup'
+import {
+    analyzeRequiredIntakeState,
+    buildRequiredIntakeFollowupGuidance,
+    type RequiredIntakeStateAnalysis
+} from '@/lib/ai/followup'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
+import { applyLiveAssistantResponseGuards } from '@/lib/ai/response-guards'
 import {
     buildConversationContinuityGuidance,
     type ConversationHistoryTurn,
@@ -20,6 +30,9 @@ const FALLBACK_TOPICS_TR = ['fiyatlar', 'randevu', 'iptal/iade', 'hizmetler']
 const FALLBACK_TOPICS_EN = ['pricing', 'appointments', 'cancellations/refunds', 'services']
 const FALLBACK_TOPIC_LIMIT = 6
 const FALLBACK_MAX_OUTPUT_TOKENS = 320
+const FALLBACK_KB_HINT_THRESHOLD = 0.12
+const FALLBACK_KB_HINT_LIMIT = 3
+const FALLBACK_KB_HINT_MAX_CHARS = 1500
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
 function resolveFallbackLanguage(message: string, preferredLanguage?: MvpResponseLanguage) {
@@ -29,6 +42,13 @@ function resolveFallbackLanguage(message: string, preferredLanguage?: MvpRespons
 
 function formatTopicList(topics: string[]) {
     return topics.map((topic) => topic.trim()).filter(Boolean).join(', ')
+}
+
+function normalizeKnowledgeContextHint(rawContext: string) {
+    return rawContext
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, FALLBACK_KB_HINT_MAX_CHARS)
 }
 
 async function getFallbackTopics(
@@ -74,17 +94,43 @@ async function getFallbackTopics(
     return topics
 }
 
-function renderStrictFallback(text: string, topics: string[], language: MvpResponseLanguage) {
-    const fallbackText = text?.trim() || DEFAULT_STRICT_FALLBACK_TEXT
+function renderStrictFallback(
+    text: string,
+    topics: string[],
+    language: MvpResponseLanguage,
+    userMessage: string,
+    intakeAnalysis?: RequiredIntakeStateAnalysis | null
+) {
+    const languageDefault = language === 'tr'
+        ? DEFAULT_STRICT_FALLBACK_TEXT
+        : DEFAULT_STRICT_FALLBACK_TEXT_EN
+    const fallbackText = text?.trim() || languageDefault
     const fallbackTopics = topics.length > 0
         ? formatTopicList(topics)
         : formatTopicList(language === 'tr' ? FALLBACK_TOPICS_TR : FALLBACK_TOPICS_EN)
 
     if (fallbackText.includes('{topics}')) {
-        return fallbackText.replace('{topics}', fallbackTopics)
+        const rendered = fallbackText.replace('{topics}', fallbackTopics)
+        return applyLiveAssistantResponseGuards({
+            response: rendered,
+            userMessage,
+            responseLanguage: language,
+            recentAssistantMessages: [],
+            blockedReaskFields: intakeAnalysis?.blockedReaskFields ?? [],
+            suppressIntakeQuestions: intakeAnalysis?.suppressIntakeQuestions ?? false,
+            noProgressLoopBreak: intakeAnalysis?.noProgressStreak ?? false
+        })
     }
 
-    return fallbackText
+    return applyLiveAssistantResponseGuards({
+        response: fallbackText,
+        userMessage,
+        responseLanguage: language,
+        recentAssistantMessages: [],
+        blockedReaskFields: intakeAnalysis?.blockedReaskFields ?? [],
+        suppressIntakeQuestions: intakeAnalysis?.suppressIntakeQuestions ?? false,
+        noProgressLoopBreak: intakeAnalysis?.noProgressStreak ?? false
+    })
 }
 
 async function renderFlexibleFallback(
@@ -105,10 +151,12 @@ async function renderFlexibleFallback(
             service_type?: string | null
             extracted_fields?: Record<string, unknown> | null
         } | null
+        intakeAnalysis?: RequiredIntakeStateAnalysis | null
+        knowledgeContext?: string | null
     }
 ): Promise<string> {
     if (!process.env.OPENAI_API_KEY) {
-        return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, language)
+        return renderStrictFallback('', topics, language, message, options.intakeAnalysis)
     }
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -125,9 +173,14 @@ async function renderFlexibleFallback(
     const topicGuidance = `When you need to guide the user, stay within these available business topics: ${topicsList}.
 If the request is outside scope, politely redirect to the most relevant available topics.`
     const languageGuidance = `Reply language policy (MVP): use ${languageName} only. If the message is not Turkish, use English.`
+    const groundedKnowledgeGuidance = options.knowledgeContext?.trim()
+        ? `If relevant to the user's request, prefer grounded details from this context and avoid generic fallback phrasing:
+${options.knowledgeContext.trim()}
+If the request is still outside this context, state that clearly and offer one concise next step.`
+        : ''
     const systemPrompt = followupGuidance
-        ? `${basePrompt}\n\n${languageGuidance}\n\n${topicGuidance}\n\n${continuityGuidance}\n\n${followupGuidance}`
-        : `${basePrompt}\n\n${languageGuidance}\n\n${topicGuidance}\n\n${continuityGuidance}`
+        ? `${basePrompt}\n\n${languageGuidance}\n\n${topicGuidance}${groundedKnowledgeGuidance ? `\n\n${groundedKnowledgeGuidance}` : ''}\n\n${continuityGuidance}\n\n${followupGuidance}`
+        : `${basePrompt}\n\n${languageGuidance}\n\n${topicGuidance}${groundedKnowledgeGuidance ? `\n\n${groundedKnowledgeGuidance}` : ''}\n\n${continuityGuidance}`
     const historyMessages = toOpenAiConversationMessages(options.conversationHistory ?? [], message, 10)
 
     try {
@@ -146,6 +199,17 @@ If the request is outside scope, politely redirect to the most relevant availabl
         const polishedResponse = response
             ? stripRepeatedGreeting(response, options.recentAssistantMessages ?? [])
             : ''
+        const guardedResponse = polishedResponse
+            ? applyLiveAssistantResponseGuards({
+                response: polishedResponse,
+                userMessage: message,
+                responseLanguage: language,
+                recentAssistantMessages: options.recentAssistantMessages ?? [],
+                blockedReaskFields: options.intakeAnalysis?.blockedReaskFields ?? [],
+                suppressIntakeQuestions: options.intakeAnalysis?.suppressIntakeQuestions ?? false,
+                noProgressLoopBreak: options.intakeAnalysis?.noProgressStreak ?? false
+            })
+            : ''
         const historyTokenCount = historyMessages.reduce(
             (total, item) => total + estimateTokenCount(item.content),
             0
@@ -158,8 +222,8 @@ If the request is outside scope, politely redirect to the most relevant availabl
             }
             : {
                 inputTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message),
-                outputTokens: estimateTokenCount(polishedResponse ?? ''),
-                totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message) + estimateTokenCount(polishedResponse ?? '')
+                outputTokens: estimateTokenCount(guardedResponse ?? ''),
+                totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message) + estimateTokenCount(guardedResponse ?? '')
             }
 
         if (options.trackUsage !== false) {
@@ -174,12 +238,12 @@ If the request is outside scope, politely redirect to the most relevant availabl
                 supabase: options.supabase
             })
         }
-        if (polishedResponse) return polishedResponse
+        if (guardedResponse) return guardedResponse
     } catch (error) {
         console.error('Flexible fallback failed:', error)
     }
 
-    return renderStrictFallback(DEFAULT_STRICT_FALLBACK_TEXT, topics, language)
+    return renderStrictFallback('', topics, language, message, options.intakeAnalysis)
 }
 
 export async function buildFallbackResponse(options: {
@@ -198,15 +262,51 @@ export async function buildFallbackResponse(options: {
     supabase?: SupabaseClientLike
     trackUsage?: boolean
     usageMetadata?: Record<string, unknown>
+    requiredIntakeAnalysis?: RequiredIntakeStateAnalysis
+    knowledgeContext?: string | null
 }) {
     const supabase = options.supabase ?? await createClient()
     const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, { supabase })
     const topics = await getFallbackTopics(supabase, options.organizationId, FALLBACK_TOPIC_LIMIT)
     const language = resolveFallbackLanguage(options.message, options.preferredLanguage)
+    const requiredIntakeAnalysis = options.requiredIntakeAnalysis ?? analyzeRequiredIntakeState({
+        requiredFields: options.requiredIntakeFields ?? [],
+        recentCustomerMessages: options.recentCustomerMessages ?? [],
+        recentAssistantMessages: options.recentAssistantMessages ?? [],
+        leadSnapshot: options.leadSnapshot ?? null
+    })
+    let groundedKnowledgeContext = options.knowledgeContext?.trim() ?? ''
+    if (!groundedKnowledgeContext) {
+        try {
+            const [{ searchKnowledgeBase }, { buildRagContext }] = await Promise.all([
+                import('@/lib/knowledge-base/actions'),
+                import('@/lib/knowledge-base/rag')
+            ])
+            const hintResults = await searchKnowledgeBase(
+                options.message,
+                options.organizationId,
+                FALLBACK_KB_HINT_THRESHOLD,
+                FALLBACK_KB_HINT_LIMIT,
+                { supabase }
+            )
+            if (hintResults && hintResults.length > 0) {
+                const { context } = buildRagContext(hintResults)
+                if (context?.trim()) {
+                    groundedKnowledgeContext = normalizeKnowledgeContextHint(context)
+                }
+            }
+        } catch (error) {
+            console.warn('Fallback knowledge hint lookup failed:', error)
+        }
+    }
     const followupGuidance = buildRequiredIntakeFollowupGuidance(
         options.requiredIntakeFields ?? [],
         options.recentCustomerMessages ?? [],
-        options.recentAssistantMessages ?? []
+        options.recentAssistantMessages ?? [],
+        {
+            analysis: requiredIntakeAnalysis,
+            leadSnapshot: options.leadSnapshot ?? null
+        }
     )
 
     return renderFlexibleFallback(
@@ -223,7 +323,9 @@ export async function buildFallbackResponse(options: {
             usageMetadata: options.usageMetadata,
             conversationHistory: options.conversationHistory,
             recentAssistantMessages: options.recentAssistantMessages,
-            leadSnapshot: options.leadSnapshot
+            leadSnapshot: options.leadSnapshot,
+            intakeAnalysis: requiredIntakeAnalysis,
+            knowledgeContext: groundedKnowledgeContext || null
         }
     )
 }

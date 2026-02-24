@@ -3283,8 +3283,8 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
             caseItem: input.caseItem,
             coverage: {
                 handoffReadiness: input.coverage.handoffReadiness,
-                askedCoverage: input.coverage.askedCoverage,
-                fulfillmentCoverage: input.coverage.fulfillmentCoverage
+                askedCoverage: input.coverage.askedCoverage ?? 0,
+                fulfillmentCoverage: input.coverage.fulfillmentCoverage ?? 0
             }
         })
     ) {
@@ -5596,6 +5596,7 @@ function toLowerFieldLabel(label: string) {
     const trimmed = label.trim()
     if (!trimmed) return trimmed
     const [first, ...rest] = Array.from(trimmed)
+    if (!first) return trimmed
     return `${first.toLocaleLowerCase('tr-TR')}${rest.join('')}`
 }
 

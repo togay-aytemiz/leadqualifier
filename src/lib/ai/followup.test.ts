@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    analyzeRequiredIntakeState,
     appendFollowupQuestion,
     buildRequiredIntakeFollowupGuidance,
     parseRequiredIntakeFollowupPayload
@@ -58,5 +59,71 @@ describe('buildRequiredIntakeFollowupGuidance', () => {
         expect(guidance).toContain('Recent assistant replies')
         expect(guidance).toContain('Merhaba, size nasıl yardımcı olabilirim?')
         expect(guidance).toContain('Elbette yardımcı olurum.')
+    })
+
+    it('suppresses intake forcing on policy/procedure request mode', () => {
+        const guidance = buildRequiredIntakeFollowupGuidance(
+            ['Bütçe', 'Zamanlama'],
+            ['Randevumu iptal etmek istiyorum.']
+        )
+
+        expect(guidance).toContain('Current request mode: policy/procedure')
+        expect(guidance).toContain('Do NOT force lead-intake collection questions')
+    })
+
+    it('adds refusal/no-progress guardrails for repeated resistance turns', () => {
+        const guidance = buildRequiredIntakeFollowupGuidance(
+            ['Bütçe'],
+            ['Bu detayı paylaşmak istemiyorum.', 'Şimdilik bilmiyorum.']
+        )
+
+        expect(guidance).toContain('Guardrails:')
+        expect(guidance).toContain('do not insist')
+        expect(guidance).toContain('No-progress guard')
+    })
+})
+
+describe('analyzeRequiredIntakeState', () => {
+    it('uses dynamic minimum set on short conversations', () => {
+        const state = analyzeRequiredIntakeState({
+            requiredFields: ['Hizmet Türü', 'Bütçe', 'Konum', 'Tarih'],
+            recentCustomerMessages: ['Fiyat alabilir miyim?', 'Bu hafta uygun musunuz?']
+        })
+
+        expect(state.dynamicMinimumCount).toBe(2)
+        expect(state.effectiveRequiredFields.length).toBe(2)
+        expect(state.missingFields.length).toBeLessThanOrEqual(2)
+    })
+
+    it('treats collected fields as blocked re-ask', () => {
+        const state = analyzeRequiredIntakeState({
+            requiredFields: ['Bütçe', 'Tarih'],
+            recentCustomerMessages: ['Bütçem 2000 TL.'],
+            leadSnapshot: {
+                extracted_fields: {
+                    required_intake_collected: {
+                        Bütçe: '2000 TL'
+                    }
+                }
+            }
+        })
+
+        expect(state.collectedFields).toContain('Bütçe')
+        expect(state.blockedReaskFields).toContain('Bütçe')
+    })
+
+    it('blocks re-ask fields on refusal and suppresses intake on repeated resistance', () => {
+        const state = analyzeRequiredIntakeState({
+            requiredFields: ['Öğrenci Yaşı', 'Bütçe'],
+            recentCustomerMessages: ['Yaşı paylaşmak istemiyorum.', 'Şimdilik bilmiyorum.'],
+            recentAssistantMessages: [
+                'Çocuğunuzun yaşı nedir?',
+                'Çocuğunuzun yaşı nedir?'
+            ]
+        })
+
+        expect(state.blockedReaskFields).toContain('Öğrenci Yaşı')
+        expect(state.noProgressStreak).toBe(true)
+        expect(state.suppressIntakeQuestions).toBe(true)
     })
 })

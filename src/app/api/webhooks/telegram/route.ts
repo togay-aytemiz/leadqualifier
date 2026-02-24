@@ -10,7 +10,12 @@ import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { resolveBotModeAction, resolveLeadExtractionAllowance } from '@/lib/ai/bot-mode'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { buildRequiredIntakeFollowupGuidance, getRequiredIntakeFields } from '@/lib/ai/followup'
+import {
+    analyzeRequiredIntakeState,
+    buildRequiredIntakeFollowupGuidance,
+    getRequiredIntakeFields
+} from '@/lib/ai/followup'
+import { applyLiveAssistantResponseGuards } from '@/lib/ai/response-guards'
 import {
     buildConversationContinuityGuidance,
     stripRepeatedGreeting,
@@ -310,6 +315,13 @@ export async function POST(req: NextRequest) {
         service_type?: string | null
         extracted_fields?: Record<string, unknown> | null
     } | null = null
+    let fallbackKnowledgeContext: string | null = null
+    let requiredIntakeAnalysis = analyzeRequiredIntakeState({
+        requiredFields: requiredIntakeFields,
+        recentCustomerMessages: customerHistoryForFollowup,
+        recentAssistantMessages: assistantHistoryForFollowup,
+        leadSnapshot: leadSnapshotForReply
+    })
 
     // 6. Process AI Response (Skills)
     const matchedSkills = await matchSkillsSafely({
@@ -407,10 +419,20 @@ export async function POST(req: NextRequest) {
             if (latestMessage && !customerHistoryForFollowup.some((item) => item === latestMessage)) {
                 customerHistoryForFollowup.push(latestMessage)
             }
+            requiredIntakeAnalysis = analyzeRequiredIntakeState({
+                requiredFields: requiredIntakeFields,
+                recentCustomerMessages: customerHistoryForFollowup,
+                recentAssistantMessages: assistantHistoryForFollowup,
+                leadSnapshot: leadSnapshotForReply
+            })
             const requiredIntakeGuidance = buildRequiredIntakeFollowupGuidance(
                 requiredIntakeFields,
                 customerHistoryForFollowup,
-                assistantHistoryForFollowup
+                assistantHistoryForFollowup,
+                {
+                    analysis: requiredIntakeAnalysis,
+                    leadSnapshot: leadSnapshotForReply
+                }
             )
 
             const decision = await decideKnowledgeBaseRoute(text, history)
@@ -444,6 +466,9 @@ export async function POST(req: NextRequest) {
                     const { context, chunks } = buildRagContext(kbResults)
                     if (!context) {
                         throw new Error('RAG context is empty')
+                    }
+                    if (!fallbackKnowledgeContext) {
+                        fallbackKnowledgeContext = context.replace(/\s+/g, ' ').trim().slice(0, 1500)
                     }
 
                     const noAnswerToken = 'NO_ANSWER'
@@ -480,6 +505,17 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
 
                     const ragResponse = completion.choices[0]?.message?.content?.trim()
                     const polishedRagResponse = stripRepeatedGreeting(ragResponse ?? '', assistantHistoryForFollowup)
+                    const guardedRagResponse = polishedRagResponse
+                        ? applyLiveAssistantResponseGuards({
+                            response: polishedRagResponse,
+                            userMessage: text,
+                            responseLanguage,
+                            recentAssistantMessages: assistantHistoryForFollowup,
+                            blockedReaskFields: requiredIntakeAnalysis.blockedReaskFields,
+                            suppressIntakeQuestions: requiredIntakeAnalysis.suppressIntakeQuestions,
+                            noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
+                        })
+                        : ''
                     const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                     const ragUsage = completion.usage
                         ? {
@@ -489,8 +525,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         }
                         : {
                             inputTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text),
-                            outputTokens: estimateTokenCount(polishedRagResponse ?? ''),
-                            totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text) + estimateTokenCount(polishedRagResponse ?? '')
+                            outputTokens: estimateTokenCount(guardedRagResponse ?? ''),
+                            totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text) + estimateTokenCount(guardedRagResponse ?? '')
                         }
 
                     await recordAiUsage({
@@ -507,10 +543,10 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         supabase
                     })
 
-                    if (polishedRagResponse && !polishedRagResponse.includes(noAnswerToken)) {
-                        await client.sendMessage(chatId, polishedRagResponse)
+                    if (guardedRagResponse && !guardedRagResponse.includes(noAnswerToken)) {
+                        await client.sendMessage(chatId, guardedRagResponse)
 
-                        await persistBotMessage(polishedRagResponse, {
+                        await persistBotMessage(guardedRagResponse, {
                             is_rag: true,
                             sources: chunks.map(r => r.document_id).filter(Boolean)
                         })
@@ -543,7 +579,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             usageMetadata: {
                 conversation_id: conversation.id,
                 source: 'telegram'
-            }
+            },
+            requiredIntakeAnalysis,
+            knowledgeContext: fallbackKnowledgeContext
         })
 
         await client.sendMessage(chatId, fallbackText)

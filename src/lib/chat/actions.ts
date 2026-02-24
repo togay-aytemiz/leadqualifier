@@ -7,7 +7,12 @@ import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
-import { buildRequiredIntakeFollowupGuidance, getRequiredIntakeFields } from '@/lib/ai/followup'
+import {
+    analyzeRequiredIntakeState,
+    buildRequiredIntakeFollowupGuidance,
+    getRequiredIntakeFields
+} from '@/lib/ai/followup'
+import { applyLiveAssistantResponseGuards } from '@/lib/ai/response-guards'
 import {
     buildConversationContinuityGuidance,
     stripRepeatedGreeting,
@@ -143,10 +148,19 @@ export async function simulateChat(
     if (latestMessage && !customerHistory.some((item) => item === latestMessage)) {
         customerHistory.push(latestMessage)
     }
+    const requiredIntakeAnalysis = analyzeRequiredIntakeState({
+        requiredFields: requiredIntakeFields,
+        recentCustomerMessages: customerHistory,
+        recentAssistantMessages: assistantHistory
+    })
+    let fallbackKnowledgeContext: string | null = null
     const requiredIntakeGuidance = buildRequiredIntakeFollowupGuidance(
         requiredIntakeFields,
         customerHistory,
-        assistantHistory
+        assistantHistory,
+        {
+            analysis: requiredIntakeAnalysis
+        }
     )
 
     // 1. Match skills with ZERO threshold to get ANY match for debugging
@@ -208,7 +222,9 @@ export async function simulateChat(
                 recentAssistantMessages: assistantHistory,
                 conversationHistory: history,
                 aiSettings,
-                trackUsage: false
+                trackUsage: false,
+                requiredIntakeAnalysis,
+                knowledgeContext: fallbackKnowledgeContext
             })
             totalInputTokens += routerInputTokens
             totalOutputTokens += routerOutputTokens
@@ -253,6 +269,9 @@ export async function simulateChat(
             if (!context) {
                 throw new Error('RAG context is empty')
             }
+            if (!fallbackKnowledgeContext) {
+                fallbackKnowledgeContext = context.replace(/\s+/g, ' ').trim().slice(0, 1500)
+            }
 
             const noAnswerToken = 'NO_ANSWER'
             const basePrompt = withBotNamePrompt(aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT, aiSettings.bot_name)
@@ -285,6 +304,17 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             const ragResponse = completion.choices[0]?.message?.content
             const normalizedResponse = ragResponse?.trim() ?? ''
             const polishedResponse = stripRepeatedGreeting(normalizedResponse, assistantHistory)
+            const guardedResponse = polishedResponse
+                ? applyLiveAssistantResponseGuards({
+                    response: polishedResponse,
+                    userMessage: message,
+                    responseLanguage,
+                    recentAssistantMessages: assistantHistory,
+                    blockedReaskFields: requiredIntakeAnalysis.blockedReaskFields,
+                    suppressIntakeQuestions: requiredIntakeAnalysis.suppressIntakeQuestions,
+                    noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
+                })
+                : ''
             const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
 
             if (completion.usage) {
@@ -292,14 +322,14 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 ragOutputTokens += completion.usage.completion_tokens ?? 0
             } else {
                 ragInputTokens += estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(message)
-                ragOutputTokens += estimateTokenCount(polishedResponse)
+                ragOutputTokens += estimateTokenCount(guardedResponse)
             }
-            if (polishedResponse && !polishedResponse.includes(noAnswerToken)) {
+            if (guardedResponse && !guardedResponse.includes(noAnswerToken)) {
                 const topResult = kbResults[0]
                 totalInputTokens += routerInputTokens + ragInputTokens
                 totalOutputTokens += routerOutputTokens + ragOutputTokens
                 return {
-                    response: polishedResponse,
+                    response: guardedResponse,
                     matchedSkill: {
                         id: 'rag-knowledge-base',
                         title: '📚 Knowledge Base',
@@ -337,7 +367,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
         recentAssistantMessages: assistantHistory,
         conversationHistory: history,
         aiSettings,
-        trackUsage: false
+        trackUsage: false,
+        requiredIntakeAnalysis,
+        knowledgeContext: fallbackKnowledgeContext
     })
     totalInputTokens += routerInputTokens + ragInputTokens
     totalOutputTokens += routerOutputTokens + ragOutputTokens
