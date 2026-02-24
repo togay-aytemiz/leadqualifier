@@ -3040,9 +3040,13 @@ describe('qa lab executor helpers', () => {
         )
 
         const reportRecord = toRecord(report)
+        const qaAssistantProfile = toRecord(reportRecord.qa_assistant_profile)
         const errorRecord = toRecord(reportRecord.error)
         const detailsRecord = toRecord(errorRecord.details)
 
+        expect(qaAssistantProfile.assistant_id).toBe('qa_lab_simulated_assistant')
+        expect(qaAssistantProfile.profile_version).toBe('v2')
+        expect(qaAssistantProfile.auto_port_to_live).toBe(false)
         expect(errorRecord.message).toBe('Generator response is not valid JSON')
         expect(detailsRecord.stage).toBe('generator')
         expect(detailsRecord.maxAttempts).toBe(3)

@@ -50,10 +50,10 @@ Success criteria:
 - Lower false-negative quality findings on short interactions.
 - Improved user experience in resistant flows.
 
-### Phase 4 (P2) — Controlled Live Rollout
-1. Feature-flag staged rollout (internal orgs -> pilot orgs -> full).
-2. Monitor key metrics: language consistency, repeated-question ratio, fallback quality, escalation ratio.
-3. Rollback path via flag.
+### Phase 4 (P2) — Global Default Rollout (No Flags)
+1. Enable QA-port runtime behavior globally for all current organizations.
+2. Keep the same behavior as the default for every new organization.
+3. Monitor key metrics: language consistency, repeated-question ratio, fallback quality, escalation ratio.
 
 ## Implementation Checklist
 
@@ -77,6 +77,7 @@ Success criteria:
 - [x] Calibrate missing-field priority order and wording.
 
 ### Phase 4 Tasks (Rollout)
-- [ ] Add feature flags for each guard cluster.
-- [ ] Execute staged rollout with monitoring.
+- [x] Adopt no-flag rollout strategy for pre-customer stage.
+- [x] Keep QA-port runtime behavior globally enabled for all current organizations.
+- [x] Keep QA-port runtime behavior enabled by default for new organizations.
 - [ ] Finalize go-live checklist and rollback criteria.

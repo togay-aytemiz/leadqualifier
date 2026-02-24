@@ -631,6 +631,7 @@
 - [x] Implement admin `AI QA Lab` manual run queue + immutable run snapshot persistence (`qa_runs` migration, `Settings > QA Lab` page, server actions)
 - [x] Implement runtime executor lifecycle (`queued -> running -> completed/failed`) with immutable artifact/report writes
 - [x] Implement two-model QA flow (`Generator` + `Judge`) with QA-local responder execution (synthetic KB + fallback, no tenant skill/org dependency)
+- [x] Keep QA assistant profile explicitly isolated/versioned (`qa_lab_only`) so iterative QA prompt improvements do not auto-apply to live assistant behavior
 - [x] Implement run preset configuration surface (`Quick`, `Regression`) with hard token budgets (`100k`, `100k`) in run snapshots
 - [x] Implement runtime budget-stop behavior (`BUDGET_STOPPED`) during scenario execution
 - [x] Expose AI QA Lab in Admin navigation for system-admin workflow (`/admin/qa-lab`)
@@ -686,6 +687,7 @@
 - [x] Start live-assistant QA-port Phase 2 foundations: make required-intake followup guidance request-mode aware (policy/general turns avoid forced intake) and add refusal/no-progress guardrails to reduce repetitive intake pressure
 - [x] Complete live-assistant QA-port Phase 2/3 runtime behavior: add sector-agnostic intake-state analysis (dynamic minimum short-conversation scope, collected/deferred blocked re-ask fields, missing-field priority calibration) and enforce the same state via response guards in fallback + RAG across shared inbound pipeline, Telegram webhook, and simulator
 - [x] Finalize live-assistant QA-port P1/P2 hardening: enforce no-progress loop-break outputs (concise summary + soft next-step) in runtime guards and inject best-available KB context hints into generic fallback generation before topic-only redirection
+- [x] Finalize live-assistant rollout strategy as no-flag global default: keep QA-port behavior active for all current organizations and as default behavior for every new organization
 - [x] Tighten QA assistant closure quality: keep one-turn deferred retry tolerance (without refusal pressure), enforce explicit follow-up missing-field closure questions, guarantee question-first answer chunks for direct asks, and replace filler-style low-info enrichments with grounded concise detail + mini-summary next-step phrasing
 - [x] Refine resistant-flow trustworthiness: closure summaries now require explicit customer evidence, snake_case intake fields are humanized in user-facing questions, and resistant pricing turns use a single soft critical-field ask with no-pressure fallback wording
 - [x] Unit tests for core logic

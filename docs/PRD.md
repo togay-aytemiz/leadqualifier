@@ -95,7 +95,8 @@ Customer Message → Skill Match? → Yes → Skill Response
  - Token usage is shown per message and as a conversation total in the simulator
  - Simulator chat visuals are channel-agnostic (no WhatsApp-specific brand mimicry)
  - If no skill/KB match, bot suggests available topics using existing skills/KB titles
- - Org-level AI settings control strict/flexible modes, a single sensitivity threshold, and prompt-driven fallback behavior
+- Org-level AI settings control strict/flexible modes, a single sensitivity threshold, and prompt-driven fallback behavior
+- Live QA-port runtime improvements (response guards + intake-state behavior) are globally enabled by default for all organizations (current + newly created) in the pre-customer stage; no feature-flag gating is used.
 
 ---
 
@@ -512,6 +513,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - **Implementation status (v1.2):** `Admin > AI QA Lab` can manually trigger `Quick` / `Regression` runs with a single CTA, enqueue immutable run snapshots in `qa_runs`, and execute runs via lifecycle (`queued` -> `running` -> `completed` / `failed` / `budget_stopped`). The launch flow now dispatches execution for the newly created run ID directly (still queue-first for persistence), which avoids FIFO `batch=1` worker selection accidentally running an older queued job first.
 - Runs are manually triggered and immutable (`run_id` snapshot with config/context hash and full artifacts).
 - QA findings are advisory only: there is no automatic patch/apply path from QA output into the live assistant stack without explicit human review/approval.
+- QA assistant profile is explicitly isolated from live assistant behavior (`qa_lab_only`): QA prompt/guard iterations continue independently and are not auto-promoted to production.
 - Test cases are not hardcoded:
   - `Generator` LLM creates KB fixtures, scenario blueprints, and customer turns from QA-internal synthetic organization context (not tenant data).
   - Each generated KB fixture must be at least `150` lines.

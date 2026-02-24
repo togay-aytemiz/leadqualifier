@@ -45,6 +45,12 @@ const MODEL_TEMPERATURE = 0.3
 const MAX_FINDINGS = 60
 const MAX_TOP_ACTIONS = 5
 const REPORT_VERSION = 'v1'
+const QA_LAB_ASSISTANT_PROFILE = {
+    assistant_id: 'qa_lab_simulated_assistant',
+    profile_version: 'v2',
+    isolation: 'qa_lab_only',
+    auto_port_to_live: false
+} as const
 
 const FALLBACK_SCENARIO_MESSAGES = [
     'Merhaba, fiyat bilgisi alabilir miyim?',
@@ -5870,6 +5876,9 @@ async function generateQaLabAssistantResponse(input: {
             : intakeProgress.activeMissingFields
     )
     const systemPrompt = `You are the AI QA Lab simulated assistant.
+QA_ASSISTANT_PROFILE: ${QA_LAB_ASSISTANT_PROFILE.assistant_id}@${QA_LAB_ASSISTANT_PROFILE.profile_version}
+This QA assistant profile is intentionally isolated from live assistant behavior.
+Changes in this QA profile are for iterative QA evaluation and do NOT auto-apply to production.
 This simulation is synthetic and must NOT use any organization-specific skill catalog.
 Use KB_CONTEXT and CRITICAL_POLICY_FACTS below for factual claims.
 Use conversation history as source of already collected customer data.
@@ -6298,6 +6307,7 @@ export function buildExecutionErrorReport(error: unknown): Json {
     const details = error instanceof QaLabExecutionError ? error.details : null
     return {
         version: REPORT_VERSION,
+        qa_assistant_profile: QA_LAB_ASSISTANT_PROFILE,
         error: {
             message: errorMessage,
             ...(details ? { details } : {})
@@ -6827,6 +6837,7 @@ export async function executeQaLabRunById(
 
         const report = {
             version: REPORT_VERSION,
+            qa_assistant_profile: QA_LAB_ASSISTANT_PROFILE,
             generated_at: new Date().toISOString(),
             budget: {
                 limit_tokens: tracker.budget,
