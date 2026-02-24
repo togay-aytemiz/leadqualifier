@@ -516,6 +516,7 @@ Customer Message → Skill Match? → Yes → Skill Response
     - `Regression`: `10% clean / 40% semi-noisy / 50% messy`
 - `Responder` is QA-local and skill-free: it uses only generated KB fixture context and fallback behavior (no tenant skill catalog, no tenant KB docs).
 - QA responder engagement behavior is conditional: one contextual follow-up question is allowed, but repeated menu-like prompts on consecutive turns are disallowed.
+- QA responder reply language is locked to the customer-turn language: Turkish detection now also handles ASCII Turkish phrasing (for example `Sadece iptal edin yeter`) and mixed-language fallback snippets are normalized before final output.
 - `Judge` LLM is separate from generator and must output evidence-backed findings plus remediation guidance.
 - Judge pricing-groundedness rule: if KB/ground-truth does not contain numeric pricing, assistant must not be penalized for refusing exact price; only fabricated price claims are penalized.
 - Judge engagement rule: do not penalize a single contextual engagement question; penalize only excessive/repetitive/context-breaking follow-up prompting.

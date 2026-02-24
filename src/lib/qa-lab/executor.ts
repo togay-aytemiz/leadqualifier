@@ -18,7 +18,11 @@ import {
 import { buildQaLabPipelineChecks } from '@/lib/qa-lab/pipeline-checks'
 import { calculateQaLabRunUsdCost } from '@/lib/qa-lab/cost'
 import { calculateUsageCreditCost } from '@/lib/billing/credit-cost'
-import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
+import {
+    isLikelyTurkishMessage,
+    resolveMvpResponseLanguage,
+    resolveMvpResponseLanguageName
+} from '@/lib/ai/language'
 import type { Json, QaLabRun, QaLabRunResult, QaLabRunStatus } from '@/types/database'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
@@ -4843,6 +4847,113 @@ export function sanitizeAssistantResponseSurfaceArtifacts(response: string) {
         .trim()
 }
 
+const QA_LAB_ENGLISH_SIGNAL_PATTERN = /\b(i|we|you|your|can|could|would|should|please|continue|clarify|available|options|share|details|information|service|appointment|cancel|contact|support|team|next|step|understood|meanwhile)\b/i
+
+const QA_LAB_TR_TO_EN_KNOWN_SNIPPETS: Array<{ pattern: RegExp, replacement: string }> = [
+    {
+        pattern: /\bBuradan devam ederek uygun seçenekleri netleştirebiliriz\.?/gi,
+        replacement: 'We can continue here and clarify the best available options.'
+    },
+    {
+        pattern: /\bBuradan devam edebiliriz\.?/gi,
+        replacement: 'We can continue here.'
+    },
+    {
+        pattern: /\bİsterseniz bir sonraki adımı netleştirebiliriz\.?/gi,
+        replacement: 'If you want, we can clarify the next step.'
+    },
+    {
+        pattern: /\bBu konuda kesin bir detay paylaşamıyorum\.?/gi,
+        replacement: 'I cannot share a precise detail yet.'
+    },
+    {
+        pattern: /\bMevcut bilgilerle devam edebiliriz\.?/gi,
+        replacement: 'We can continue with the current context.'
+    }
+]
+
+const QA_LAB_EN_TO_TR_KNOWN_SNIPPETS: Array<{ pattern: RegExp, replacement: string }> = [
+    {
+        pattern: /\bWe can continue here and clarify the best available options\.?/gi,
+        replacement: 'Buradan devam ederek uygun seçenekleri netleştirebiliriz.'
+    },
+    {
+        pattern: /\bWe can continue here\.?/gi,
+        replacement: 'Buradan devam edebiliriz.'
+    },
+    {
+        pattern: /\bIf you want,\s*we can clarify the next step\.?/gi,
+        replacement: 'İsterseniz bir sonraki adımı netleştirebiliriz.'
+    },
+    {
+        pattern: /\bI cannot share a precise detail yet\.?/gi,
+        replacement: 'Bu konuda kesin bir detay paylaşamıyorum.'
+    },
+    {
+        pattern: /\bWe can continue with the current context\.?/gi,
+        replacement: 'Mevcut bilgilerle devam edebiliriz.'
+    }
+]
+
+function detectChunkLanguageSignal(chunk: string): 'tr' | 'en' | 'unknown' {
+    const text = chunk.trim()
+    if (!text) return 'unknown'
+    const hasTurkishSignal = isLikelyTurkishMessage(text)
+    const hasEnglishSignal = QA_LAB_ENGLISH_SIGNAL_PATTERN.test(text)
+    if (hasTurkishSignal && !hasEnglishSignal) return 'tr'
+    if (hasEnglishSignal && !hasTurkishSignal) return 'en'
+    if (hasTurkishSignal && hasEnglishSignal) return 'unknown'
+    return 'unknown'
+}
+
+function normalizeKnownCrossLanguageSnippets(input: {
+    response: string
+    responseLanguage: 'tr' | 'en'
+}) {
+    const replacements = input.responseLanguage === 'tr'
+        ? QA_LAB_EN_TO_TR_KNOWN_SNIPPETS
+        : QA_LAB_TR_TO_EN_KNOWN_SNIPPETS
+    let normalized = input.response
+    for (const item of replacements) {
+        normalized = normalized.replace(item.pattern, item.replacement)
+    }
+    return normalized
+}
+
+export function enforceResponseLanguageConsistency(input: {
+    response: string
+    responseLanguage: 'tr' | 'en'
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+
+    const normalized = normalizeKnownCrossLanguageSnippets({
+        response,
+        responseLanguage: input.responseLanguage
+    })
+    const chunks = splitIntoSentenceLikeChunks(normalized)
+    if (chunks.length <= 1) return normalized.replace(/\s+/g, ' ').trim()
+
+    const labeled = chunks.map((chunk) => ({
+        chunk,
+        language: detectChunkLanguageSignal(chunk)
+    }))
+    const targetChunks = labeled
+        .filter((item) => item.language === input.responseLanguage)
+        .map((item) => item.chunk)
+    const oppositeChunkCount = labeled.filter((item) => (
+        item.language !== 'unknown' && item.language !== input.responseLanguage
+    )).length
+    if (targetChunks.length === 0 || oppositeChunkCount === 0) {
+        return normalized.replace(/\s+/g, ' ').trim()
+    }
+
+    const unknownChunks = labeled
+        .filter((item) => item.language === 'unknown')
+        .map((item) => item.chunk)
+    return [...targetChunks, ...unknownChunks].join(' ').replace(/\s+/g, ' ').trim()
+}
+
 function looksLikeGenericUnknownResponse(response: string) {
     const normalized = normalizeForFieldMatching(response)
     if (!normalized) return false
@@ -5964,8 +6075,12 @@ HAS_RELEVANT_CONTEXT: ${kbContext.hasRelevantContext ? 'yes' : 'no'}`
             scenarioContext: input.scenarioContext
         })
     const surfaceSanitizedResponseRaw = sanitizeAssistantResponseSurfaceArtifacts(closureAlignedResponseRaw)
+    const languageConsistentResponseRaw = enforceResponseLanguageConsistency({
+        response: surfaceSanitizedResponseRaw,
+        responseLanguage
+    })
     const response = trimText(
-        surfaceSanitizedResponseRaw,
+        languageConsistentResponseRaw,
         responseLanguage === 'tr'
             ? 'Bu konuda net bilgi bulamadım. Biraz daha detay paylaşır mısınız?'
             : 'I could not find a clear detail yet. Could you share a bit more context?'

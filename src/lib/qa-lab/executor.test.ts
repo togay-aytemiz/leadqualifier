@@ -10,6 +10,7 @@ import {
     ensureDirectQuestionStartsWithAnswer,
     ensureHotCooperativeCriticalFieldQuestion,
     ensureLeadQualificationClosureQuestion,
+    enforceResponseLanguageConsistency,
     enforceGeneralInformationBaselineResponse,
     enforceFieldNamedClarificationQuestion,
     expandFixtureLinesToMinimum,
@@ -1692,6 +1693,28 @@ describe('qa lab executor helpers', () => {
         expect(sanitized).toContain('(Örneğin, bireysel danışmanlık).')
         expect(sanitized).not.toContain('12. 000')
         expect(sanitized).not.toContain('( Örneğin')
+    })
+
+    it('keeps response language aligned with Turkish user turns when mixed-language chunks leak', () => {
+        const normalized = enforceResponseLanguageConsistency({
+            response: 'Maalesef, randevu iptali için gerekli işlemleri gerçekleştiremiyorum. We can continue here and clarify the best available options.',
+            responseLanguage: 'tr'
+        })
+
+        expect(normalized).toContain('Maalesef, randevu iptali için gerekli işlemleri gerçekleştiremiyorum.')
+        expect(normalized).toContain('Buradan devam ederek uygun seçenekleri netleştirebiliriz.')
+        expect(normalized).not.toContain('We can continue here')
+    })
+
+    it('keeps response language aligned with English user turns when mixed-language chunks leak', () => {
+        const normalized = enforceResponseLanguageConsistency({
+            response: 'I cannot process cancellation directly. Buradan devam ederek uygun seçenekleri netleştirebiliriz.',
+            responseLanguage: 'en'
+        })
+
+        expect(normalized).toContain('I cannot process cancellation directly.')
+        expect(normalized).toContain('We can continue here and clarify the best available options.')
+        expect(normalized).not.toContain('Buradan devam ederek uygun seçenekleri netleştirebiliriz.')
     })
 
     it('rewrites generic unknown response into actionable lead-qualification response', () => {
