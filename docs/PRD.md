@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-24 (Hardened billing-lock enforcement to skip AI runtime calls across inbound/reply/document-processing flows, added Telegram duplicate inbound dedupe, started embedding usage credit tracking in AI usage logs, changed AI usage persistence failures from silent logs to fail-fast errors, restricted QA Lab access to allowlisted admin identity, surfaced QA assistant profile metadata in run details, aligned QA report schema versioning to `v2`, and hardened admin organization usage/token totals against Supabase 1000-row truncation while clarifying message-based usage labels.)  
+> **Last Updated:** 2026-02-25 (Added manual WhatsApp template tooling for App Review evidence in Channels and Inbox: connected WABA template listing, manual template send, Inbox expired-window action flow (`Open in WhatsApp` or `Send template`), and an in-modal `How to use` guide for operators.)  
 > **Status:** In Development
 
 ---
@@ -74,6 +74,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
 - MVP reply language policy: if customer message is Turkish, reply in Turkish; otherwise reply in English.
 - WhatsApp and Instagram MVP support text messages only and send replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
+- WhatsApp template send is available only as an explicit manual utility (Settings > Channels and Inbox expired-window action) for review/operational continuation, not as automated conversation runtime behavior.
 - Meta OAuth channel connect starts in a separate popup and returns success/error status to the existing Channels page context (main app tab remains stable)
 - Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
 - Meta OAuth callback diagnostic hint (`meta_oauth_error`) is propagated from popup to main Channels URL for production support troubleshooting.
@@ -321,6 +322,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Instagram card connect CTA is currently gated as `Çok Yakında` for non-connected orgs in Settings > Channels
 - Facebook Messenger card is visible in Settings > Channels as `Çok Yakında` placeholder (integration out of MVP scope)
 - Channels settings card layout is a stacked single-column row list (one channel per row) with non-truncated names and right-side status/action controls for readability
+- Connected WhatsApp cards include a Template Tools modal for listing WABA templates and sending a manual test template message (review/debug utility)
+- Template Tools modal includes an additional usage guide modal (`How to use`) with concise operator instructions (template refresh, recipient format, variable order, send verification)
 - Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
 ### 5.5 AI Settings (Implemented)
@@ -883,7 +886,7 @@ MVP is successful when:
 - **Channel Topology (MVP):** Treat `telegram`, `whatsapp`, and `instagram` as independent channels (`channels.type`) and store conversations with explicit per-channel platform values (`conversations.platform`).
 - **Channel Launch Gating:** Keep Instagram connect CTA and Facebook Messenger card as `Coming Soon` placeholders in Settings > Channels until rollout is reopened; Telegram/WhatsApp flows remain active.
 - **Channels Settings Readability:** Render channel cards as full-width stacked rows (one channel per row), avoid truncating connected channel names, and place status/actions on the right side for fast scanning.
-- **Channels Verification Scope (MVP):** Use live channel connection status + debug diagnostics in Settings > Channels; do not maintain a separate channel-level "test message sandbox" surface in MVP.
+- **Channels Verification Scope (MVP):** Use live channel connection status + debug diagnostics in Settings > Channels; allow a lightweight WhatsApp-only template review utility for App Review evidence (manual list + manual test send).
 - **Messenger Brand Icon:** Use `public/messenger.svg` for Facebook Messenger placeholder visuals in Channels settings.
 - **Meta Channel Onboarding (MVP):** Use Meta OAuth start/callback routes with signed state validation; do not require manual token entry in channel settings UI.
 - **Meta OAuth Redirect Robustness:** Carry a signed/safe `returnTo` channels path in OAuth flow so error/success callbacks return users to their active channel settings route.
@@ -898,7 +901,7 @@ MVP is successful when:
 - **Debug Token WABA Discovery Fallback:** When direct WABA endpoint discovery throws permission errors, attempt `debug_token` granular-scope resolution (`target_ids`) before failing the callback flow.
 - **Meta Webhook Architecture:** Keep channel webhook routes separate (`/api/webhooks/whatsapp`, `/api/webhooks/instagram`) and reuse a shared inbound AI processing pipeline for consistent Skill → KB/RAG → fallback behavior.
 - **WhatsApp MVP Channel Strategy:** Implemented via Meta Cloud API with OAuth-based channel setup (auto-resolved `phone_number_id` + `business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (no proactive/template-first messaging in MVP).
-- **WhatsApp Template Scope (MVP):** Keep template messaging out of scope. If the 24-hour free-form window is closed, API-based outbound sending is blocked until a new inbound customer message arrives.
+- **WhatsApp Template Scope (MVP):** Keep template messaging out of automated runtime scope. If the 24-hour free-form window is closed, inbox free-form outbound remains blocked until new inbound message; template send is limited to explicit manual operator actions (Channels utility and Inbox expired-window modal).
 - **Instagram MVP Channel Strategy:** Implemented via Meta Instagram Messaging API with OAuth-based channel setup (auto-resolved `page_id` + `instagram_business_account_id`), text-only inbound handling, webhook signature verification, and reactive replies only (first turn must come from customer inbound message).
 - **Type Safety (Build):** Align KB router history role types and guard strict array indexing to keep TypeScript builds green.
 - **Skills UI Simplification:** Use a single skills list (no Core/Custom split), keep search above the list, and keep the add CTA visible in the header.

@@ -43,6 +43,7 @@ import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowSc
 import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
+import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -100,6 +101,7 @@ export function InboxContainer({
     const [isMobileConversationOpen, setIsMobileConversationOpen] = useState(false)
     const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false)
     const [showScrollToLatest, setShowScrollToLatest] = useState(false)
+    const [isWhatsAppTemplateModalOpen, setIsWhatsAppTemplateModalOpen] = useState(false)
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -746,6 +748,14 @@ export function InboxContainer({
         }
     }
 
+    const handleOpenInWhatsAppPhone = () => {
+        const activeConversation = conversations.find(conversation => conversation.id === selectedId)
+        const rawPhone = activeConversation?.contact_phone ?? ''
+        const normalizedPhone = rawPhone.replace(/\D/g, '')
+        if (!normalizedPhone) return
+        window.open(`https://wa.me/${normalizedPhone}`, '_blank', 'noopener,noreferrer')
+    }
+
     const handleDeleteConversation = () => {
         if (isReadOnly) return
         if (!selectedId) return
@@ -920,12 +930,15 @@ export function InboxContainer({
         })
         : null
     const isWhatsAppReplyBlocked = Boolean(whatsappReplyWindowState && !whatsappReplyWindowState.canReply)
+    const isWhatsAppWindowExpired = whatsappReplyWindowState?.reason === 'window_expired'
+    const isWhatsAppMissingInbound = whatsappReplyWindowState?.reason === 'missing_inbound'
     const whatsappReplyBlockedTooltip = whatsappReplyWindowState?.reason === 'window_expired'
         ? t('whatsappReplyWindow.tooltipExpired')
         : t('whatsappReplyWindow.tooltipNoInbound')
     const whatsappComposerOverlayMessage = whatsappReplyWindowState?.reason === 'window_expired'
         ? t('whatsappReplyWindow.composerLockedExpired')
         : t('whatsappReplyWindow.composerLockedNoInbound')
+    const canOpenWhatsAppPhone = Boolean((selectedConversation?.contact_phone ?? '').replace(/\D/g, ''))
 
     const resolvedBotMode = (botMode ?? 'active')
     // NEW: Use explicit state from conversation
@@ -1379,14 +1392,39 @@ export function InboxContainer({
                                 </div>
                             )}
 
+                            {isWhatsAppWindowExpired && (
+                                <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+                                    <p className="text-sm font-semibold text-blue-900">{t('whatsappReplyWindow.expiredActionsTitle')}</p>
+                                    <p className="mt-1 text-sm text-blue-800">{t('whatsappReplyWindow.expiredActionsDescription')}</p>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenInWhatsAppPhone}
+                                            disabled={!canOpenWhatsAppPhone}
+                                            className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {t('whatsappReplyWindow.openInWhatsApp')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsWhatsAppTemplateModalOpen(true)}
+                                            disabled={isReadOnly}
+                                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {t('whatsappReplyWindow.sendTemplate')}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-2 lg:gap-3">
                                 <div className="relative flex-1">
-                                    {isWhatsAppReplyBlocked && (
+                                    {isWhatsAppMissingInbound && (
                                         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border border-amber-200 bg-white/90 px-3 text-center text-xs font-medium text-amber-900">
                                             {whatsappComposerOverlayMessage}
                                         </div>
                                     )}
-                                    <div className={`flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppReplyBlocked ? 'opacity-60' : ''}`}>
+                                    <div className={`flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
                                         <IconButton
                                             icon={Paperclip}
                                             size="sm"
@@ -1735,6 +1773,16 @@ export function InboxContainer({
                     <p className="text-sm text-red-600">{scoreReasonMessage}</p>
                 )}
             </Modal>
+
+            {selectedId && (
+                <WhatsAppTemplateSendModal
+                    conversationId={selectedId}
+                    isOpen={isWhatsAppTemplateModalOpen}
+                    isReadOnly={isReadOnly}
+                    onClose={() => setIsWhatsAppTemplateModalOpen(false)}
+                    onSent={() => void refreshMessages(selectedId)}
+                />
+            )}
         </>
     )
 }

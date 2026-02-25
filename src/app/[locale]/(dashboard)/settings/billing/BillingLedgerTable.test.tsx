@@ -45,6 +45,10 @@ const rows: BillingLedgerTableRow[] = [
     }
 ]
 
+const EMPTY_TEXT = 'No rows'
+const SHOW_MORE_LABEL = 'Show more'
+const SHOW_LESS_LABEL = 'Show less'
+
 describe('BillingLedgerTable', () => {
     it('renders a fixed-width table structure for stable column layout', () => {
         const markup = renderToStaticMarkup(
@@ -58,9 +62,9 @@ describe('BillingLedgerTable', () => {
                     balance: 'Balance',
                     reason: 'Reason'
                 }}
-                emptyText="No rows"
-                showMoreLabel="Show more"
-                showLessLabel="Show less"
+                emptyText={EMPTY_TEXT}
+                showMoreLabel={SHOW_MORE_LABEL}
+                showLessLabel={SHOW_LESS_LABEL}
             />
         )
 

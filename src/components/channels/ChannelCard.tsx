@@ -2,13 +2,14 @@
 
 import { Channel } from '@/types/database'
 import { useState } from 'react'
-import { Bug } from 'lucide-react'
+import { Bug, FileText } from 'lucide-react'
 import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { useTranslations } from 'next-intl'
 import type { ChannelCardType } from '@/components/channels/channelCards'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
+import { WhatsAppTemplateModal } from '@/components/channels/WhatsAppTemplateModal'
 
 interface ChannelCardProps {
     channel?: Channel
@@ -40,6 +41,7 @@ export function ChannelCard({ channel, type, onConnect, isComingSoon = false, is
     const t = useTranslations('Channels')
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
+    const [showTemplateModal, setShowTemplateModal] = useState(false)
 
     const handleDebug = async () => {
         if (!channel) return
@@ -109,6 +111,19 @@ export function ChannelCard({ channel, type, onConnect, isComingSoon = false, is
                                 {t('actions.disconnect')}
                             </Button>
 
+                            {type === 'whatsapp' && (
+                                <Button
+                                    onClick={() => setShowTemplateModal(true)}
+                                    disabled={isReadOnly}
+                                    variant="outline"
+                                    size="icon"
+                                    title={t('templateTools.openAction')}
+                                    aria-label={t('templateTools.openAction')}
+                                >
+                                    <FileText size={16} />
+                                </Button>
+                            )}
+
                             {type !== 'messenger' && (
                                 <Button
                                     onClick={handleDebug}
@@ -146,6 +161,15 @@ export function ChannelCard({ channel, type, onConnect, isComingSoon = false, is
                     isLoading={isDisconnecting}
                     onConfirm={handleDisconnect}
                     onCancel={() => setShowConfirm(false)}
+                />
+            )}
+
+            {channel && type === 'whatsapp' && (
+                <WhatsAppTemplateModal
+                    channelId={channel.id}
+                    isOpen={showTemplateModal}
+                    isReadOnly={isReadOnly}
+                    onClose={() => setShowTemplateModal(false)}
                 />
             )}
         </>

@@ -25,6 +25,38 @@ export type LeadRefreshResult =
     | { ok: true }
     | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'request_failed' }
 
+export interface InboxWhatsAppTemplateSummary {
+    id: string | null
+    name: string
+    status: string | null
+    language: string | null
+    category: string | null
+}
+
+type InboxWhatsAppTemplateFailureReason =
+    | 'validation'
+    | 'missing_conversation'
+    | 'not_whatsapp'
+    | 'missing_contact'
+    | 'missing_channel'
+    | 'billing_locked'
+    | 'request_failed'
+
+export type ConversationWhatsAppTemplateListResult =
+    | { ok: true; templates: InboxWhatsAppTemplateSummary[] }
+    | { ok: false; reason: InboxWhatsAppTemplateFailureReason }
+
+export interface SendConversationWhatsAppTemplateMessageInput {
+    conversationId: string
+    templateName: string
+    languageCode: string
+    bodyParameters?: string[]
+}
+
+export type SendConversationWhatsAppTemplateMessageResult =
+    | { ok: true; messageId: string | null; message: Message; conversation: Conversation }
+    | { ok: false; reason: InboxWhatsAppTemplateFailureReason }
+
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
 type ConversationLeadPreview = { status?: string | null }
 type ConversationAssigneePreview = { full_name?: string | null; email?: string | null }
@@ -50,6 +82,96 @@ function toArray<T>(value: MaybeArray<T>): T[] {
 function toSingle<T>(value: MaybeArray<T>): T | null {
     if (!value) return null
     return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+function asConfigRecord(value: Json): Record<string, Json | undefined> {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+    return value as Record<string, Json | undefined>
+}
+
+function readConfigString(config: Json, key: string): string | null {
+    const value = asConfigRecord(config)[key]
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeInboxWhatsAppTemplateSummary(value: unknown): InboxWhatsAppTemplateSummary | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+    const record = value as Record<string, unknown>
+
+    const nameValue = typeof record.name === 'string' ? record.name.trim() : ''
+    if (!nameValue) return null
+
+    const idValue = typeof record.id === 'string' ? record.id.trim() : ''
+    const statusValue = typeof record.status === 'string' ? record.status.trim() : ''
+    const languageValue = typeof record.language === 'string' ? record.language.trim() : ''
+    const categoryValue = typeof record.category === 'string' ? record.category.trim() : ''
+
+    return {
+        id: idValue || null,
+        name: nameValue,
+        status: statusValue || null,
+        language: languageValue || null,
+        category: categoryValue || null
+    }
+}
+
+async function resolveConversationWhatsAppContext(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    conversationId: string
+): Promise<
+    | {
+        ok: true
+        organizationId: string
+        contactPhone: string
+        accessToken: string
+        businessAccountId: string
+        phoneNumberId: string
+    }
+    | {
+        ok: false
+        reason: InboxWhatsAppTemplateFailureReason
+    }
+> {
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('platform, contact_phone, organization_id')
+        .eq('id', conversationId)
+        .single()
+
+    if (!conversation) return { ok: false, reason: 'missing_conversation' }
+    if (conversation.platform !== 'whatsapp') return { ok: false, reason: 'not_whatsapp' }
+    if (!conversation.contact_phone) return { ok: false, reason: 'missing_contact' }
+
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        return { ok: false, reason: 'billing_locked' }
+    }
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('config')
+        .eq('organization_id', conversation.organization_id)
+        .eq('type', 'whatsapp')
+        .eq('status', 'active')
+        .single()
+
+    const accessToken = channel ? readConfigString(channel.config as Json, 'permanent_access_token') : null
+    const businessAccountId = channel ? readConfigString(channel.config as Json, 'business_account_id') : null
+    const phoneNumberId = channel ? readConfigString(channel.config as Json, 'phone_number_id') : null
+
+    if (!accessToken || !businessAccountId || !phoneNumberId) {
+        return { ok: false, reason: 'missing_channel' }
+    }
+
+    return {
+        ok: true,
+        organizationId: conversation.organization_id,
+        contactPhone: conversation.contact_phone,
+        accessToken,
+        businessAccountId,
+        phoneNumberId
+    }
 }
 
 function normalizeConversationListItems(items: unknown[]): ConversationListItem[] {
@@ -682,18 +804,6 @@ export async function sendMessage(
         }
     }
 
-    const asConfigRecord = (value: Json): Record<string, Json | undefined> => {
-        if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
-        return value as Record<string, Json | undefined>
-    }
-
-    const readConfigString = (config: Json, key: string): string | null => {
-        const value = asConfigRecord(config)[key]
-        if (typeof value !== 'string') return null
-        const trimmed = value.trim()
-        return trimmed.length > 0 ? trimmed : null
-    }
-
     // 2. If Telegram, send via API
     if (conversation.platform === 'telegram') {
         // Find the active telegram channel for this org
@@ -804,6 +914,91 @@ export async function sendMessage(
     if (!data) throw new Error('Failed to send message')
 
     return data as { message: Message; conversation: Conversation }
+}
+
+export async function listConversationWhatsAppTemplates(
+    conversationId: string
+): Promise<ConversationWhatsAppTemplateListResult> {
+    const supabase = await createClient()
+
+    const normalizedConversationId = conversationId.trim()
+    if (!normalizedConversationId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationWhatsAppContext(supabase, normalizedConversationId)
+    if (!context.ok) {
+        return { ok: false, reason: context.reason }
+    }
+
+    try {
+        const { WhatsAppClient } = await import('@/lib/whatsapp/client')
+        const client = new WhatsAppClient(context.accessToken)
+        const response = await client.getMessageTemplates(context.businessAccountId)
+        const templates = (response.data ?? [])
+            .map(normalizeInboxWhatsAppTemplateSummary)
+            .filter((item): item is InboxWhatsAppTemplateSummary => item !== null)
+
+        return { ok: true, templates }
+    } catch (error) {
+        console.error('Failed to list WhatsApp templates for conversation:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+}
+
+export async function sendConversationWhatsAppTemplateMessage(
+    input: SendConversationWhatsAppTemplateMessageInput
+): Promise<SendConversationWhatsAppTemplateMessageResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    const templateName = input.templateName.trim()
+    const languageCode = input.languageCode.trim()
+    const bodyParameters = (input.bodyParameters ?? [])
+        .map(value => value.trim())
+        .filter(Boolean)
+
+    if (!conversationId || !templateName || !languageCode) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationWhatsAppContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: context.reason }
+    }
+
+    try {
+        const { WhatsAppClient } = await import('@/lib/whatsapp/client')
+        const client = new WhatsAppClient(context.accessToken)
+        const response = await client.sendTemplate({
+            phoneNumberId: context.phoneNumberId,
+            to: context.contactPhone,
+            templateName,
+            languageCode,
+            bodyParameters
+        })
+
+        const { data, error } = await supabase.rpc('send_operator_message', {
+            p_conversation_id: conversationId,
+            p_content: `Template: ${templateName}`
+        })
+
+        if (error) throw error
+        if (!data) throw new Error('Failed to persist template send message')
+
+        const persisted = data as { message: Message; conversation: Conversation }
+
+        return {
+            ok: true,
+            messageId: response.messages?.[0]?.id ?? null,
+            message: persisted.message,
+            conversation: persisted.conversation
+        }
+    } catch (error) {
+        console.error('Failed to send WhatsApp template for conversation:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
 }
 
 export async function setConversationAgent(conversationId: string, agent: 'bot' | 'operator') {

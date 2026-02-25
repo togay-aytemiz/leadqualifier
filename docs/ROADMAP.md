@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-24 (Hardened billing-lock enforcement to skip AI runtime calls across inbound/reply/document-processing paths, added Telegram duplicate inbound dedupe, started embedding usage credit tracking, changed AI usage persistence to fail-fast, locked QA Lab access to admin-role + allowlisted email only, surfaced QA assistant profile metadata in run details, aligned QA report schema versioning to `v2`, and fixed admin organization usage/token aggregate truncation with clearer `Toplam Mesaj / Total Messages` labeling.)  
+> **Last Updated:** 2026-02-25 (Added WhatsApp template tooling across Channels and Inbox for Meta App Review evidence: connected WABA template listing plus manual template send, including Inbox expired-window actions to open WhatsApp app or send a template, and a built-in `How to use` guide modal in Channels.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -54,6 +54,8 @@
   - [x] WhatsApp OAuth supports env toggle `META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT=1` to include `business_management` when required by `/me/businesses` fallback on certain Meta app setups
   - [x] WhatsApp fallback no longer forces `/me/businesses` on `Missing Permission` unless `META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT=1`, so unsupported `business_management` apps fail on the real direct endpoint instead of looping into invalid-scope recovery
   - [x] WhatsApp callback now attempts `debug_token`-based WABA discovery when direct `/me/whatsapp_business_accounts` request fails, so missing-permission direct-edge failures can still complete connect without forcing `business_management`
+  - [x] Channels > WhatsApp now includes Template Tools modal to list connected WABA templates and send test template messages for Meta App Review evidence
+  - [x] Template Tools now includes a secondary in-modal usage guide (`How to use`) with operator-facing instructions for recipient format, variables, and verification steps
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
@@ -142,6 +144,7 @@
   - [x] Closing and reopening summary panel now regenerates summary without requiring manual refresh
   - [x] WhatsApp conversations now show a far-right 24-hour reply-window indicator (`reply available / reply unavailable`) next to the summary control with tooltip reason when blocked
   - [x] Inbox composer now disables manual send for WhatsApp when the 24-hour free-form window is closed, shows a short lock overlay message, and keeps `active_agent` unchanged
+  - [x] WhatsApp expired-window conversations now surface explicit action buttons (`Open in WhatsApp` / `Send Template`) so operators can continue via phone app or send an approved template directly from Inbox
   - [x] Mobile inbox app flow with list-to-conversation transition and back navigation
   - [x] Mobile chat header details toggle with compact contact/lead snapshot
   - [x] Mobile details payload now includes lead summary, service type, and collected required info

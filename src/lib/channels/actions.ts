@@ -33,6 +33,30 @@ export type WhatsAppDebugResult =
     | { success: true; info: unknown }
     | { success: false; error: string }
 
+export interface WhatsAppTemplateSummary {
+    id: string | null
+    name: string
+    status: string | null
+    language: string | null
+    category: string | null
+}
+
+export type WhatsAppTemplateListResult =
+    | { success: true; templates: WhatsAppTemplateSummary[] }
+    | { success: false; error: string }
+
+export interface SendWhatsAppTemplateMessageInput {
+    channelId: string
+    to: string
+    templateName: string
+    languageCode: string
+    bodyParameters?: string[]
+}
+
+export type SendWhatsAppTemplateMessageResult =
+    | { success: true; messageId: string | null }
+    | { success: false; error: string }
+
 export type InstagramDebugResult =
     | { success: true; info: unknown }
     | { success: false; error: string }
@@ -68,6 +92,27 @@ function readConfigString(config: Json, key: string): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeTemplateSummary(value: unknown): WhatsAppTemplateSummary | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+
+    const record = value as Record<string, unknown>
+    const nameValue = typeof record.name === 'string' ? record.name.trim() : ''
+    if (!nameValue) return null
+
+    const idValue = typeof record.id === 'string' ? record.id.trim() : ''
+    const statusValue = typeof record.status === 'string' ? record.status.trim() : ''
+    const languageValue = typeof record.language === 'string' ? record.language.trim() : ''
+    const categoryValue = typeof record.category === 'string' ? record.category.trim() : ''
+
+    return {
+        id: idValue || null,
+        name: nameValue,
+        status: statusValue || null,
+        language: languageValue || null,
+        category: categoryValue || null
+    }
 }
 
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
@@ -332,6 +377,91 @@ export async function debugWhatsAppChannel(channelId: string): Promise<WhatsAppD
         }
     } catch (error: unknown) {
         return { success: false, error: getErrorMessage(error, 'Failed to read WhatsApp channel info') }
+    }
+}
+
+export async function listWhatsAppMessageTemplates(channelId: string): Promise<WhatsAppTemplateListResult> {
+    const supabase = await createClient()
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('id', channelId)
+        .single()
+
+    const accessToken = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'permanent_access_token')
+        : null
+    const businessAccountId = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'business_account_id')
+        : null
+
+    if (!channel || channel.type !== 'whatsapp' || !accessToken || !businessAccountId) {
+        return { success: false, error: 'Channel not found or not whatsapp' }
+    }
+
+    try {
+        const client = new WhatsAppClient(accessToken)
+        const response = await client.getMessageTemplates(businessAccountId)
+        const templates = (response.data ?? [])
+            .map(normalizeTemplateSummary)
+            .filter((item): item is WhatsAppTemplateSummary => item !== null)
+
+        return { success: true, templates }
+    } catch (error: unknown) {
+        return { success: false, error: getErrorMessage(error, 'Failed to list WhatsApp templates') }
+    }
+}
+
+export async function sendWhatsAppTemplateMessage(input: SendWhatsAppTemplateMessageInput): Promise<SendWhatsAppTemplateMessageResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const channelId = input.channelId.trim()
+    const to = input.to.trim()
+    const templateName = input.templateName.trim()
+    const languageCode = input.languageCode.trim()
+    const bodyParameters = (input.bodyParameters ?? [])
+        .map(value => value.trim())
+        .filter(Boolean)
+
+    if (!channelId || !to || !templateName || !languageCode) {
+        return { success: false, error: 'Missing required template message fields.' }
+    }
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('id', channelId)
+        .single()
+
+    const accessToken = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'permanent_access_token')
+        : null
+    const phoneNumberId = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'phone_number_id')
+        : null
+
+    if (!channel || channel.type !== 'whatsapp' || !accessToken || !phoneNumberId) {
+        return { success: false, error: 'Channel not found or not whatsapp' }
+    }
+
+    try {
+        const client = new WhatsAppClient(accessToken)
+        const response = await client.sendTemplate({
+            phoneNumberId,
+            to,
+            templateName,
+            languageCode,
+            bodyParameters
+        })
+
+        return {
+            success: true,
+            messageId: response.messages?.[0]?.id ?? null
+        }
+    } catch (error: unknown) {
+        return { success: false, error: getErrorMessage(error, 'Failed to send WhatsApp template message') }
     }
 }
 

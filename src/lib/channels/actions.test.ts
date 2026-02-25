@@ -4,13 +4,17 @@ const {
     assertTenantWriteAllowedMock,
     createClientMock,
     getPhoneNumberMock,
+    getMessageTemplatesMock,
     revalidatePathMock,
+    sendTemplateMock,
     whatsAppCtorMock
 } = vi.hoisted(() => ({
     assertTenantWriteAllowedMock: vi.fn(),
     createClientMock: vi.fn(),
     getPhoneNumberMock: vi.fn(),
+    getMessageTemplatesMock: vi.fn(),
     revalidatePathMock: vi.fn(),
+    sendTemplateMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
 }))
 
@@ -33,10 +37,17 @@ vi.mock('@/lib/whatsapp/client', () => ({
         }
 
         getPhoneNumber = getPhoneNumberMock
+        getMessageTemplates = getMessageTemplatesMock
+        sendTemplate = sendTemplateMock
     }
 }))
 
-import { connectWhatsAppChannel, debugWhatsAppChannel } from '@/lib/channels/actions'
+import {
+    connectWhatsAppChannel,
+    debugWhatsAppChannel,
+    listWhatsAppMessageTemplates,
+    sendWhatsAppTemplateMessage
+} from '@/lib/channels/actions'
 
 function createUpsertSupabaseMock(upsertResult: { error: unknown } = { error: null }) {
     const upsertMock = vi.fn(async () => upsertResult)
@@ -92,6 +103,20 @@ describe('channels actions: WhatsApp core flows', () => {
             display_phone_number: '+90 555 111 22 33',
             verified_name: 'Qualy',
             quality_rating: 'GREEN'
+        })
+        getMessageTemplatesMock.mockResolvedValue({
+            data: [
+                {
+                    id: 'tpl-1',
+                    name: 'hello_world',
+                    status: 'APPROVED',
+                    language: 'en_US',
+                    category: 'UTILITY'
+                }
+            ]
+        })
+        sendTemplateMock.mockResolvedValue({
+            messages: [{ id: 'wamid.template.1' }]
         })
     })
 
@@ -175,5 +200,106 @@ describe('channels actions: WhatsApp core flows', () => {
                 quality_rating: 'GREEN'
             }
         })
+    })
+
+    it('lists message templates for a connected WhatsApp channel', async () => {
+        const { supabase, eqMock } = createDebugSupabaseMock({
+            id: 'channel-1',
+            type: 'whatsapp',
+            config: {
+                permanent_access_token: 'token-1',
+                business_account_id: 'waba-1'
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await listWhatsAppMessageTemplates('channel-1')
+
+        expect(eqMock).toHaveBeenCalledWith('id', 'channel-1')
+        expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
+        expect(getMessageTemplatesMock).toHaveBeenCalledWith('waba-1')
+        expect(result).toEqual({
+            success: true,
+            templates: [
+                {
+                    id: 'tpl-1',
+                    name: 'hello_world',
+                    status: 'APPROVED',
+                    language: 'en_US',
+                    category: 'UTILITY'
+                }
+            ]
+        })
+    })
+
+    it('returns validation error when listing templates on non-whatsapp channels', async () => {
+        const { supabase } = createDebugSupabaseMock({
+            id: 'channel-1',
+            type: 'telegram',
+            config: {}
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await listWhatsAppMessageTemplates('channel-1')
+
+        expect(result).toEqual({ success: false, error: 'Channel not found or not whatsapp' })
+        expect(getMessageTemplatesMock).not.toHaveBeenCalled()
+    })
+
+    it('sends template message using channel credentials', async () => {
+        const { supabase, eqMock } = createDebugSupabaseMock({
+            id: 'channel-1',
+            type: 'whatsapp',
+            config: {
+                permanent_access_token: 'token-1',
+                phone_number_id: 'phone-1'
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await sendWhatsAppTemplateMessage({
+            channelId: 'channel-1',
+            to: '905551112233',
+            templateName: 'appointment_reminder',
+            languageCode: 'tr',
+            bodyParameters: ['Togay', 'yarın 16:00']
+        })
+
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(eqMock).toHaveBeenCalledWith('id', 'channel-1')
+        expect(sendTemplateMock).toHaveBeenCalledWith({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            templateName: 'appointment_reminder',
+            languageCode: 'tr',
+            bodyParameters: ['Togay', 'yarın 16:00']
+        })
+        expect(result).toEqual({
+            success: true,
+            messageId: 'wamid.template.1'
+        })
+    })
+
+    it('returns validation error when send template fields are missing', async () => {
+        const { supabase } = createDebugSupabaseMock({
+            id: 'channel-1',
+            type: 'whatsapp',
+            config: {
+                permanent_access_token: 'token-1',
+                phone_number_id: 'phone-1'
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await sendWhatsAppTemplateMessage({
+            channelId: 'channel-1',
+            to: '',
+            templateName: '',
+            languageCode: '',
+            bodyParameters: []
+        })
+
+        expect(result).toEqual({ success: false, error: 'Missing required template message fields.' })
+        expect(sendTemplateMock).not.toHaveBeenCalled()
     })
 })

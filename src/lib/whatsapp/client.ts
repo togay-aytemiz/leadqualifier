@@ -14,6 +14,18 @@ export interface WhatsAppPhoneNumberDetails {
     quality_rating?: string
 }
 
+export interface WhatsAppMessageTemplate {
+    id?: string
+    name?: string
+    status?: string
+    language?: string
+    category?: string
+}
+
+export interface WhatsAppMessageTemplatesResponse {
+    data: WhatsAppMessageTemplate[]
+}
+
 export class WhatsAppClient {
     private accessToken: string
     private graphVersion: string
@@ -57,6 +69,62 @@ export class WhatsAppClient {
                     body: params.text
                 }
             })
+        })
+    }
+
+    async sendTemplate(params: {
+        phoneNumberId: string
+        to: string
+        templateName: string
+        languageCode: string
+        bodyParameters?: string[]
+    }) {
+        const parameters = (params.bodyParameters ?? [])
+            .map(value => value.trim())
+            .filter(Boolean)
+            .map(text => ({
+                type: 'text' as const,
+                text
+            }))
+
+        const templatePayload: {
+            name: string
+            language: { code: string }
+            components?: Array<{
+                type: 'body'
+                parameters: Array<{ type: 'text'; text: string }>
+            }>
+        } = {
+            name: params.templateName,
+            language: {
+                code: params.languageCode
+            }
+        }
+
+        if (parameters.length > 0) {
+            templatePayload.components = [
+                {
+                    type: 'body',
+                    parameters
+                }
+            ]
+        }
+
+        return this.request<{ messages?: Array<{ id?: string }> }>(`${params.phoneNumberId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: params.to,
+                type: 'template',
+                template: templatePayload
+            })
+        })
+    }
+
+    async getMessageTemplates(businessAccountId: string, limit = 100): Promise<WhatsAppMessageTemplatesResponse> {
+        return this.request<WhatsAppMessageTemplatesResponse>(`${businessAccountId}/message_templates?fields=id,name,status,language,category&limit=${limit}`, {
+            method: 'GET'
         })
     }
 
