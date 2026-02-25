@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-25 (Added manual WhatsApp template tooling for App Review evidence in Channels and Inbox: connected WABA template listing, manual template send, Inbox expired-window action flow (`Open in WhatsApp` or `Send template`), and an in-modal `How to use` guide for operators.)  
+> **Last Updated:** 2026-02-25 (Added manual WhatsApp template tooling for App Review evidence in Channels and Inbox: connected WABA template listing, manual template send, Inbox expired-window action flow (`Open in WhatsApp` or `Send template`), an in-modal `How to use` guide for operators, and compact success-state UI with shortened message ID display.)  
 > **Status:** In Development
 
 ---

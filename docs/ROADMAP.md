@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-25 (Added WhatsApp template tooling across Channels and Inbox for Meta App Review evidence: connected WABA template listing plus manual template send, including Inbox expired-window actions to open WhatsApp app or send a template, and a built-in `How to use` guide modal in Channels.)  
+> **Last Updated:** 2026-02-25 (Added WhatsApp template tooling across Channels and Inbox for Meta App Review evidence: connected WABA template listing plus manual template send, including Inbox expired-window actions to open WhatsApp app or send a template, a built-in `How to use` guide modal in Channels, and compact success feedback UI with shortened message ID display.)  
 > Mark items with `[x]` when completed.
 
 ---
