@@ -281,6 +281,7 @@ export interface Conversation {
     status: ConversationStatus
     assignee_id: string | null
     active_agent: 'bot' | 'operator'
+    ai_processing_paused: boolean
     last_message_at: string
     unread_count: number
     ai_usage_input_tokens_total?: number

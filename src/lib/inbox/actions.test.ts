@@ -43,6 +43,7 @@ import {
     getConversations,
     listConversationWhatsAppTemplates,
     sendConversationWhatsAppTemplateMessage,
+    setConversationAiProcessingPaused,
     type ConversationListItem
 } from '@/lib/inbox/actions'
 import type { Conversation } from '@/types/database'
@@ -108,6 +109,7 @@ function createConversation(overrides: Partial<Conversation> = {}): Conversation
         status: 'open',
         assignee_id: 'profile-1',
         active_agent: 'bot',
+        ai_processing_paused: false,
         last_message_at: '2026-02-08T10:00:00.000Z',
         unread_count: 0,
         tags: [],
@@ -422,6 +424,50 @@ describe('inbox WhatsApp template actions', () => {
         expect(rpcMock).toHaveBeenCalledWith('send_operator_message', {
             p_conversation_id: 'conv-1',
             p_content: 'Template: appointment_reminder'
+        })
+    })
+})
+
+describe('setConversationAiProcessingPaused', () => {
+    beforeEach(() => {
+        createClientMock.mockReset()
+        assertTenantWriteAllowedMock.mockResolvedValue(undefined)
+    })
+
+    it('updates pause flag and returns normalized payload', async () => {
+        const singleMock = vi.fn(async () => ({
+            data: {
+                id: 'conv-1',
+                ai_processing_paused: true
+            },
+            error: null
+        }))
+        const selectMock = vi.fn(() => ({ single: singleMock }))
+        const eqMock = vi.fn(() => ({ select: selectMock }))
+        const updateMock = vi.fn(() => ({ eq: eqMock }))
+        const fromMock = vi.fn((table: string) => {
+            if (table !== 'conversations') {
+                throw new Error(`Unexpected query for table: ${table}`)
+            }
+            return {
+                update: updateMock
+            }
+        })
+
+        const supabase = { from: fromMock }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await setConversationAiProcessingPaused('conv-1', true)
+
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            ai_processing_paused: true
+        }))
+        expect(eqMock).toHaveBeenCalledWith('id', 'conv-1')
+        expect(selectMock).toHaveBeenCalledWith('id, ai_processing_paused')
+        expect(result).toEqual({
+            id: 'conv-1',
+            ai_processing_paused: true
         })
     })
 })

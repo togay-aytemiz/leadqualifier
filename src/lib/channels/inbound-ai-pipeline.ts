@@ -141,6 +141,14 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         })
         .eq('id', conversation.id)
 
+    if (conversation.ai_processing_paused) {
+        console.info(`${options.logPrefix}: Conversation AI processing paused`, {
+            organization_id: orgId,
+            conversation_id: conversation.id
+        })
+        return
+    }
+
     const operatorActive = isOperatorActive(conversation)
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)

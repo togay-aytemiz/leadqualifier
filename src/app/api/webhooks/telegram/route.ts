@@ -191,6 +191,13 @@ export async function POST(req: NextRequest) {
             .eq('id', conversation.id)
     }
 
+    if (conversation.ai_processing_paused) {
+        console.log('Telegram Webhook: Conversation AI processing paused. SKIPPING AI PROCESSING.', {
+            conversationId: conversation.id
+        })
+        return NextResponse.json({ ok: true })
+    }
+
     // 5. Check Active Agent Status (Zero-Cost Check)
     // We now use an explicit column on the conversation table.
     // If active_agent is 'operator', we skip all AI processing immediately.

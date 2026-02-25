@@ -23,7 +23,7 @@ export type LeadScoreReasonResult =
 
 export type LeadRefreshResult =
     | { ok: true }
-    | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'request_failed' }
+    | { ok: false; reason: 'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'paused' | 'request_failed' }
 
 export interface InboxWhatsAppTemplateSummary {
     id: string | null
@@ -718,13 +718,16 @@ export async function refreshConversationLead(
 
     const { data: conversation, error } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, ai_processing_paused')
         .eq('id', conversationId)
         .eq('organization_id', organizationId)
         .maybeSingle()
 
     if (error || !conversation) {
         return { ok: false, reason: 'missing_conversation' }
+    }
+    if (conversation.ai_processing_paused) {
+        return { ok: false, reason: 'paused' }
     }
 
     try {
@@ -1018,6 +1021,28 @@ export async function setConversationAgent(conversationId: string, agent: 'bot' 
 
     if (error) throw error
     return true
+}
+
+export async function setConversationAiProcessingPaused(conversationId: string, paused: boolean) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const { data, error } = await supabase
+        .from('conversations')
+        .update({
+            ai_processing_paused: paused,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId)
+        .select('id, ai_processing_paused')
+        .single()
+
+    if (error) throw error
+
+    return {
+        id: data.id as string,
+        ai_processing_paused: Boolean(data.ai_processing_paused)
+    }
 }
 
 export async function sendSystemMessage(conversationId: string, content: string) {

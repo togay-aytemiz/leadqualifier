@@ -13,6 +13,7 @@ export default async function InboxPage() {
     const locale = await getLocale()
     const t = await getTranslations('inbox')
     const supabase = await createClient()
+    const renderedAtIso = new Date().toISOString()
 
     const orgContext = await resolveActiveOrganizationContext()
     if (!orgContext) {
@@ -48,6 +49,7 @@ export default async function InboxPage() {
     return (
         <InboxContainer
             initialConversations={conversations}
+            renderedAtIso={renderedAtIso}
             organizationId={organizationId}
             botName={aiSettings.bot_name}
             botMode={aiSettings.bot_mode}

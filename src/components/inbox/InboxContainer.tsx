@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
 import {
     Inbox, ChevronDown,
-    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { HiMiniSparkles } from 'react-icons/hi2'
@@ -21,11 +21,12 @@ import {
     getConversationLead,
     getLeadScoreReasoning,
     refreshConversationLead,
+    setConversationAiProcessingPaused,
     type ConversationListItem
 } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { setupRealtimeAuth } from '@/lib/supabase/realtime-auth'
-import { formatDistanceToNow, format } from 'date-fns'
+import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
@@ -44,12 +45,14 @@ import { applyLeadStatusToConversationList } from '@/components/inbox/conversati
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
+import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
 
 interface InboxContainerProps {
     initialConversations: ConversationListItem[]
+    renderedAtIso: string
     organizationId: string
     botName?: string
     botMode?: AiBotMode
@@ -64,6 +67,7 @@ const SUMMARY_PANEL_ID = 'conversation-summary-panel'
 
 export function InboxContainer({
     initialConversations,
+    renderedAtIso,
     organizationId,
     botName,
     botMode,
@@ -75,6 +79,10 @@ export function InboxContainer({
     const locale = useLocale()
     const dateLocale = locale === 'tr' ? tr : undefined
     const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
+    const [relativeTimeBaseDate, setRelativeTimeBaseDate] = useState<Date>(() => {
+        const parsed = new Date(renderedAtIso)
+        return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed
+    })
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
     const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null)
@@ -89,7 +97,7 @@ export function InboxContainer({
     const [scoreReasonError, setScoreReasonError] = useState<'missing_api_key' | 'missing_lead' | 'billing_locked' | 'request_failed' | null>(null)
     const [isScoreReasonOpen, setIsScoreReasonOpen] = useState(false)
     const [leadRefreshStatus, setLeadRefreshStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-    const [leadRefreshError, setLeadRefreshError] = useState<'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'request_failed' | null>(null)
+    const [leadRefreshError, setLeadRefreshError] = useState<'missing_api_key' | 'missing_conversation' | 'billing_locked' | 'paused' | 'request_failed' | null>(null)
     const [leadAutoRefreshStatus, setLeadAutoRefreshStatus] = useState<'idle' | 'loading'>('idle')
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
@@ -102,6 +110,8 @@ export function InboxContainer({
     const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false)
     const [showScrollToLatest, setShowScrollToLatest] = useState(false)
     const [isWhatsAppTemplateModalOpen, setIsWhatsAppTemplateModalOpen] = useState(false)
+    const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
+    const [aiPauseError, setAiPauseError] = useState(false)
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -150,6 +160,7 @@ export function InboxContainer({
         setLeadRefreshStatus('idle')
         setLeadRefreshError(null)
         setLeadAutoRefreshStatus('idle')
+        setAiPauseError(false)
         setIsMobileDetailsOpen(false)
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
@@ -166,6 +177,23 @@ export function InboxContainer({
             setIsMobileConversationOpen(false)
         }
     }, [selectedId])
+
+    useEffect(() => {
+        const parsed = new Date(renderedAtIso)
+        if (!Number.isNaN(parsed.getTime())) {
+            setRelativeTimeBaseDate(parsed)
+        }
+    }, [renderedAtIso])
+
+    useEffect(() => {
+        const tick = () => setRelativeTimeBaseDate(new Date())
+        tick()
+        const intervalId = setInterval(tick, 60_000)
+
+        return () => {
+            clearInterval(intervalId)
+        }
+    }, [])
 
     const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
@@ -666,6 +694,8 @@ export function InboxContainer({
 
     const handleRefreshLead = async () => {
         if (!selectedId || leadRefreshStatus === 'loading') return
+        const selectedConversation = conversations.find((conversation) => conversation.id === selectedId)
+        if (selectedConversation?.ai_processing_paused) return
         setLeadRefreshStatus('loading')
         setLeadRefreshError(null)
         try {
@@ -687,6 +717,40 @@ export function InboxContainer({
             console.error('Manual lead refresh failed', error)
             setLeadRefreshError('request_failed')
             setLeadRefreshStatus('error')
+        }
+    }
+
+    const handleSetConversationAiPause = async (paused: boolean) => {
+        if (!selectedId || isReadOnly || isAiPauseUpdating) return
+
+        setAiPauseError(false)
+        setIsAiPauseUpdating(true)
+
+        const previousPaused = Boolean(conversations.find((conversation) => conversation.id === selectedId)?.ai_processing_paused)
+
+        setConversations(prev => prev.map(conversation => (
+            conversation.id === selectedId
+                ? { ...conversation, ai_processing_paused: paused }
+                : conversation
+        )))
+
+        try {
+            const result = await setConversationAiProcessingPaused(selectedId, paused)
+            setConversations(prev => prev.map(conversation => (
+                conversation.id === selectedId
+                    ? { ...conversation, ai_processing_paused: result.ai_processing_paused }
+                    : conversation
+            )))
+        } catch (error) {
+            console.error('Failed to update conversation AI processing pause', error)
+            setConversations(prev => prev.map(conversation => (
+                conversation.id === selectedId
+                    ? { ...conversation, ai_processing_paused: previousPaused }
+                    : conversation
+            )))
+            setAiPauseError(true)
+        } finally {
+            setIsAiPauseUpdating(false)
         }
     }
 
@@ -896,7 +960,11 @@ export function InboxContainer({
                                     </p>
                                     <div className="mt-0.5 flex items-center justify-between">
                                         <span className="text-xs text-gray-400">
-                                            {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: false, locale: dateLocale }).replace('about ', '')}
+                                            {formatRelativeTimeFromBase({
+                                                targetIso: c.last_message_at,
+                                                baseDate: relativeTimeBaseDate,
+                                                locale: dateLocale
+                                            }) || ''}
                                         </span>
                                         {c.unread_count > 0 && (
                                             <span className="h-2 w-2 rounded-full bg-blue-500" />
@@ -965,8 +1033,14 @@ export function InboxContainer({
             : t('scoreReasonError')
     const operatorActive = isOperatorActive(selectedConversation)
     const allowDuringOperator = Boolean(allowLeadExtractionDuringOperator)
-    const leadExtractionPaused = Boolean(selectedConversation) && (resolvedBotMode === 'off' || (operatorActive && !allowDuringOperator))
+    const conversationAiPaused = Boolean(selectedConversation?.ai_processing_paused)
+    const leadExtractionPaused = Boolean(selectedConversation) && (
+        conversationAiPaused
+        || resolvedBotMode === 'off'
+        || (operatorActive && !allowDuringOperator)
+    )
     const pauseReasons: string[] = []
+    if (conversationAiPaused) pauseReasons.push(t('leadPausedReasonConversation'))
     if (operatorActive && !allowDuringOperator) pauseReasons.push(t('leadPausedReasonOperator'))
     if (resolvedBotMode === 'off') pauseReasons.push(t('leadPausedReasonAiOff'))
     const pauseReasonText = pauseReasons.join(t('leadPausedReasonSeparator'))
@@ -976,6 +1050,8 @@ export function InboxContainer({
             ? t('leadRefreshMissingConversation')
             : leadRefreshError === 'billing_locked'
                 ? t('leadRefreshBillingLocked')
+            : leadRefreshError === 'paused'
+                ? t('leadRefreshPaused')
             : t('leadRefreshError')
     const isLeadUpdating = leadRefreshStatus === 'loading' || leadAutoRefreshStatus === 'loading'
     const formattedConversationCredits = new Intl.NumberFormat(locale, {
@@ -1037,6 +1113,11 @@ export function InboxContainer({
                                 >
                                     {isMobileDetailsOpen ? t('hideDetails') : t('details')}
                                 </button>
+                                {conversationAiPaused && (
+                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                                        {t('aiProcessingPausedBadge')}
+                                    </span>
+                                )}
                                 <span className={`hidden md:flex text-xs px-3 py-1.5 rounded-full border items-center gap-1.5 transition-colors ${activeAgent === 'ai'
                                     ? 'bg-purple-50 text-purple-700 border-purple-100'
                                     : 'bg-blue-50 text-blue-700 border-blue-100'
@@ -1090,6 +1171,26 @@ export function InboxContainer({
                                                 <p className="text-sm font-semibold text-gray-900">{selectedConversation.contact_name}</p>
                                                 <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                                             </div>
+                                        </div>
+                                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                            <label className="flex items-start gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={conversationAiPaused}
+                                                    onChange={(event) => {
+                                                        void handleSetConversationAiPause(event.target.checked)
+                                                    }}
+                                                    disabled={isAiPauseUpdating || isReadOnly}
+                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                                />
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900">{t('aiProcessingPauseLabel')}</p>
+                                                    <p className="mt-1 text-xs text-gray-500">{t('aiProcessingPauseHelp')}</p>
+                                                </div>
+                                            </label>
+                                            {aiPauseError && (
+                                                <p className="mt-2 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
@@ -1291,32 +1392,22 @@ export function InboxContainer({
                                             )}
                                         </div>
                                     </div>
-                                    {isWhatsAppConversation && whatsappReplyWindowState && (
-                                        <div className="relative group shrink-0">
-                                            <span
-                                                className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${
-                                                    whatsappReplyWindowState.canReply
-                                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                                        : 'border-amber-200 bg-amber-50 text-amber-800'
-                                                }`}
-                                                title={!whatsappReplyWindowState.canReply ? whatsappReplyBlockedTooltip : undefined}
-                                                aria-label={!whatsappReplyWindowState.canReply ? whatsappReplyBlockedTooltip : undefined}
-                                            >
+                                    {isWhatsAppConversation && whatsappReplyWindowState && !whatsappReplyWindowState.canReply && (
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <div className="relative group shrink-0">
                                                 <span
-                                                    className={`h-1.5 w-1.5 rounded-full ${
-                                                        whatsappReplyWindowState.canReply ? 'bg-emerald-500' : 'bg-amber-500'
-                                                    }`}
-                                                    aria-hidden
-                                                />
-                                                {whatsappReplyWindowState.canReply
-                                                    ? t('whatsappReplyWindow.replyable')
-                                                    : t('whatsappReplyWindow.blocked')}
-                                            </span>
-                                            {!whatsappReplyWindowState.canReply && (
-                                                <div className="pointer-events-none absolute right-0 top-full z-10 mt-2 max-w-[260px] rounded-md bg-gray-900 px-2.5 py-1.5 text-xs leading-4 text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800"
+                                                    title={whatsappReplyBlockedTooltip}
+                                                    aria-label={t('whatsappReplyWindow.infoAriaLabel')}
+                                                >
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                                                    {t('whatsappReplyWindow.blocked')}
+                                                    <CircleHelp size={13} className="text-current opacity-80" />
+                                                </span>
+                                                <div className="pointer-events-none absolute right-0 top-full z-10 mt-2 max-w-[300px] rounded-md bg-gray-900 px-2.5 py-1.5 text-xs leading-4 text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                                                     {whatsappReplyBlockedTooltip}
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1454,6 +1545,17 @@ export function InboxContainer({
                                         />
                                     </div>
                                 </div>
+                                {isWhatsAppConversation && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsWhatsAppTemplateModalOpen(true)}
+                                        disabled={isReadOnly || showConversationSkeleton}
+                                        className="h-11 flex items-center gap-2 px-4 rounded-xl bg-[#25D366] text-white text-sm font-semibold shadow-sm transition-colors hover:bg-[#1fa855] disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        <Send size={16} />
+                                        <span className="hidden sm:inline">{t('whatsappReplyWindow.sendTemplate')}</span>
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!canSend}
@@ -1556,6 +1658,11 @@ export function InboxContainer({
                                                     {t('operator')}
                                                 </span>
                                             )}
+                                            {conversationAiPaused && (
+                                                <span className="text-xs text-amber-800 font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded w-fit">
+                                                    {t('aiProcessingPausedBadge')}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1572,6 +1679,28 @@ export function InboxContainer({
                                             </div>
                                         </div>
                                     )}
+
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
+                                        <span className="text-sm text-gray-500">{t('aiProcessingControl')}</span>
+                                        <div>
+                                            <label className="flex items-start gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={conversationAiPaused}
+                                                    onChange={(event) => {
+                                                        void handleSetConversationAiPause(event.target.checked)
+                                                    }}
+                                                    disabled={isAiPauseUpdating || isReadOnly}
+                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                                />
+                                                <span className="text-sm text-gray-900">{t('aiProcessingPauseLabel')}</span>
+                                            </label>
+                                            <p className="mt-1 text-xs text-gray-500">{t('aiProcessingPauseHelp')}</p>
+                                            {aiPauseError && (
+                                                <p className="mt-1 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">{t('platform')}</span>
@@ -1627,8 +1756,8 @@ export function InboxContainer({
                                             <button
                                                 type="button"
                                                 onClick={handleRefreshLead}
-                                                disabled={leadRefreshStatus === 'loading'}
-                                                className={`shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 transition-colors ${leadRefreshStatus === 'loading' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                disabled={leadRefreshStatus === 'loading' || conversationAiPaused}
+                                                className={`shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 transition-colors ${(leadRefreshStatus === 'loading' || conversationAiPaused) ? 'opacity-60 cursor-not-allowed' : ''}`}
                                             >
                                                 {leadRefreshStatus === 'loading' ? t('leadRefreshLoading') : t('leadRefresh')}
                                             </button>

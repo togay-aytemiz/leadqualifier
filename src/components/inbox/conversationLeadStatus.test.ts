@@ -11,6 +11,7 @@ function buildConversation(id: string, status?: string): ConversationListItem {
         contact_phone: `+90${id}`,
         status: 'open',
         active_agent: 'bot',
+        ai_processing_paused: false,
         unread_count: 0,
         assignee_id: null,
         assignee_assigned_at: null,

@@ -233,6 +233,7 @@ function createConversation(overrides: Record<string, unknown> = {}) {
         status: 'open',
         assignee_id: null,
         active_agent: 'bot',
+        ai_processing_paused: false,
         last_message_at: '2026-02-10T12:00:00.000Z',
         unread_count: 0,
         tags: [],
@@ -372,6 +373,28 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(sendOutbound).not.toHaveBeenCalled()
         expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
         expect(runLeadExtractionMock).not.toHaveBeenCalled()
+    })
+
+    it('skips lead extraction and replies when conversation AI processing is paused', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({ ai_processing_paused: true }))
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(inboundInsert.insertMock).toHaveBeenCalledTimes(1)
+        expect(conversationUpdate.updateMock).toHaveBeenCalledTimes(1)
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
+        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+        expect(resolveOrganizationUsageEntitlementMock).not.toHaveBeenCalled()
     })
 
     it('halts token-consuming flow when billing usage is locked', async () => {

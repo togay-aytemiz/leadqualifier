@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-25 (Added manual WhatsApp template tooling for App Review evidence in Channels and Inbox: connected WABA template listing, manual template send, Inbox expired-window action flow (`Open in WhatsApp` or `Send template`), an in-modal `How to use` guide for operators, and compact success-state UI with shortened message ID display.)  
+> **Last Updated:** 2026-02-25 (Added conversation-level AI processing pause in Inbox details with runtime hard-gating for inbound AI flow: paused conversations still store inbound messages but skip lead extraction and AI replies, and manual lead refresh is blocked while paused.)  
 > **Status:** In Development
 
 ---
@@ -89,6 +89,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - If direct `me/whatsapp_business_accounts` discovery fails, callback also attempts `debug_token` granular-scope discovery to resolve WABA assets without requiring `business_management`.
 - Channels remain independent in runtime/data model (`telegram`, `whatsapp`, `instagram` each has separate channel config + webhook route).
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
+- Conversation-level AI pause (`conversations.ai_processing_paused`) hard-stops inbound AI automation for that specific contact (no lead extraction, no AI reply) while still persisting inbound messages and unread counters.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
 - Shadow inactive banner copy is compact by default (single-line title + one short explanatory sentence).
 - Inbox conversation view should only render message content after selected-thread data is loaded; while loading, show skeletons to avoid stale previous-thread visuals.
@@ -220,6 +221,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
 - Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
 - Non-business conversations are excluded from lead scoring and marked as `ignored` (not `undetermined`).
+- Manual lead refresh from Inbox is blocked when conversation-level AI pause is enabled for that contact.
 
 ---
 
@@ -324,6 +326,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Channels settings card layout is a stacked single-column row list (one channel per row) with non-truncated names and right-side status/action controls for readability
 - Connected WhatsApp cards include a Template Tools modal for listing WABA templates and sending a manual test template message (review/debug utility)
 - Template Tools modal includes an additional usage guide modal (`How to use`) with concise operator instructions (template refresh, recipient format, variable order, send verification)
+- Inbox WhatsApp composer includes a dedicated `Send template` action beside `Send Reply` (WhatsApp-green styling) so operators can trigger manual template flow directly from the primary action row.
+- Inbox WhatsApp conversation header includes a question/help icon inside the blocked reply-window status badge; tooltip explicitly states why free-form reply is unavailable.
 - Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
 ### 5.5 AI Settings (Implemented)
@@ -831,6 +835,7 @@ MVP is successful when:
 - **Inbox Avatars:** Use the shared Avatar component across list, chat, and details to keep initials/colors consistent.
 - **Inbox Details Layout:** Keep the contact header block and group the lead snapshot under Key Information for faster scanning.
 - **Lead Extraction Pause UI:** If the operator is active or AI is off, surface a paused notice and allow a manual lead refresh from inbox details.
+- **Conversation-Level AI Pause Control:** Add per-contact `ai_processing_paused` toggle in Inbox details; when enabled, inbound runtime still stores customer messages but skips both lead extraction and AI replies, and manual lead refresh is blocked.
 - **Lead Snapshot Styling:** Show a minimal AI extraction micro-label and render lead status as text with a small color dot.
 - **Platform Row Icon:** Show the channel icon next to platform values using shared public SVG logos (`/Telegram.svg`, `/whatsapp.svg`, `/instagram.svg`, `/messenger.svg`) across Channels cards, Inbox platform surfaces, and Leads list rows/cards.
 - **Inbox List Badges:** Show a small platform badge on conversation avatars so the channel is visible at a glance.
@@ -841,13 +846,14 @@ MVP is successful when:
 - **Inbox Badge Fine-Tuning:** Allow incremental offset and border tweaks for visual balance.
 - **Inbox Lead Status Chip:** Show lead status as a text chip on the conversation name row (far right) for faster scanability.
 - **Inbox List Time Row:** Keep relative last-message time on a dedicated third line under the one-line preview.
+- **Inbox Relative Time Hydration Safety:** Format list relative-time labels against a deterministic render-time base (`renderedAtIso`) instead of direct `now` calls in SSR output, then refresh on client interval.
 - **Inbox Lead Realtime:** Include `leads` in realtime publication and subscribe to status changes so list indicators update without manual refresh.
 - **Inbox Lead Payload Normalization:** Normalize nested one-to-one `leads` relation payloads to a stable array shape during conversation-list reads so chip rendering is consistent after page reloads.
 - **Inbox Realtime Auth Sync:** Bootstrap realtime auth from session, fall back to `refreshSession()` when missing, and re-apply tokens on auth state changes to avoid stale subscriptions.
 - **Inbox Summary:** Generate summaries on-demand only (no background refresh or cache), show a single-paragraph summary in an accordion, and only reveal refresh after the summary finishes while showing a tooltip when insufficient messages.
 - **Inbox Summary Threshold:** Enable summary when there are at least `3` customer messages; bot message is optional.
 - **Inbox Summary Reopen Behavior:** Closing and re-opening the summary panel should trigger a fresh summary generation (without requiring manual refresh).
-- **Inbox WhatsApp Replyability UX (MVP):** For WhatsApp conversations, show a far-right status indicator (`reply available` / `reply unavailable`) on the summary row; when blocked, show reason via tooltip and lock composer/send with a short overlay notice.
+- **Inbox WhatsApp Replyability UX (MVP):** For WhatsApp conversations, show a far-right status indicator only when free-form reply is blocked (`reply unavailable`); show reason via tooltip and lock composer/send with a short overlay notice.
 - **Inbox Agent-State Rule (MVP):** WhatsApp 24-hour send lock must not mutate `active_agent`; conversation control state remains unchanged.
 - **Inbox Scroll-to-Latest CTA:** Show an animated jump-to-latest button only when chat is away from bottom; anchor it on the composer divider with subtle gray styling.
 - **Inbox Composer Spacing:** Keep a tight vertical rhythm between the summary control row and assistant-state banner to reduce unused space.
