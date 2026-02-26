@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import { useEffect, useState } from 'react'
 import { isSettingsDetailPath, SETTINGS_MOBILE_BACK_EVENT } from '@/components/settings/mobilePaneState'
 
 // --- Button ---
@@ -383,26 +384,61 @@ interface ModalProps {
     isOpen: boolean
     onClose: () => void
     title: string
+    headerActions?: React.ReactNode
     children: React.ReactNode
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
-    if (!isOpen) return null
+export function Modal({ isOpen, onClose, title, headerActions, children }: ModalProps) {
+    const [shouldRender, setShouldRender] = useState(isOpen)
+    const [isVisible, setIsVisible] = useState(isOpen)
+
+    useEffect(() => {
+        let closeTimer: ReturnType<typeof setTimeout> | null = null
+        let openFrame: number | null = null
+
+        if (isOpen) {
+            setShouldRender(true)
+            openFrame = window.requestAnimationFrame(() => {
+                setIsVisible(true)
+            })
+        } else {
+            setIsVisible(false)
+            closeTimer = setTimeout(() => {
+                setShouldRender(false)
+            }, 220)
+        }
+
+        return () => {
+            if (closeTimer) clearTimeout(closeTimer)
+            if (openFrame !== null) window.cancelAnimationFrame(openFrame)
+        }
+    }, [isOpen])
+
+    if (!shouldRender) return null
 
     const content = (
         <div
-            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[1100] flex items-center justify-center p-4"
+            className={cn(
+                "fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm transition-opacity duration-200",
+                isVisible ? "opacity-100" : "opacity-0"
+            )}
             onClick={(e) => e.stopPropagation()}
         >
             <div
-                className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto"
+                className={cn(
+                    "bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden pointer-events-auto transition-all duration-200",
+                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.98]"
+                )}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-900">{title}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors">
-                        <X size={20} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        {headerActions}
+                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
                 <div className="p-6">
                     {children}

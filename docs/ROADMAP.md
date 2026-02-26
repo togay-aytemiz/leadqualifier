@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-25 (Added conversation-level AI processing pause control in Inbox details: operators can pause/resume AI reply + lead extraction per contact, runtime now skips inbound AI processing when paused, and manual lead refresh is blocked while pause is active.)  
+> **Last Updated:** 2026-02-26 (Inbox now supports organization-level predefined message templates and a unified template picker that inserts selected content into composer; template picker UI is now mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -56,6 +56,7 @@
   - [x] WhatsApp callback now attempts `debug_token`-based WABA discovery when direct `/me/whatsapp_business_accounts` request fails, so missing-permission direct-edge failures can still complete connect without forcing `business_management`
   - [x] Channels > WhatsApp now includes Template Tools modal to list connected WABA templates and send test template messages for Meta App Review evidence
   - [x] Template Tools now includes a secondary in-modal usage guide (`How to use`) with operator-facing instructions for recipient format, variables, and verification steps
+  - [x] WhatsApp Template Tools modal now auto-closes after successful send
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
@@ -124,9 +125,11 @@
   - [x] Conversation details panel now shows cumulative AI credit usage (all AI operations) since conversation start
   - [x] Conversation AI credit totals are now persisted on the conversation record (trigger + backfill), and inbox details read the stored total without per-open recomputation
   - [x] Conversation-level AI processing pause toggle in Inbox details (desktop + mobile) to stop AI replies and lead extraction per contact
+  - [x] Inbox Key Information now places conversation AI pause control directly under Total AI Credits
   - [x] Score reasoning UI uses locale-aware copy and labels
   - [x] Lead extraction paused notice + manual refresh in details panel
   - [x] Manual lead refresh is blocked when conversation-level AI processing pause is enabled
+  - [x] Inbox details hide lead panel content when conversation-level AI pause is enabled
   - [x] Lead snapshot header shows AI extraction chip and status uses dot + text
   - [x] Platform row shows channel icon and channel cards use consistent icon sizing
   - [x] Platform icons in Channels cards + Inbox badges/details + Leads list now use shared public SVG assets (`/Telegram.svg`, `/whatsapp.svg`, `/instagram.svg`, `/messenger.svg`)
@@ -145,10 +148,14 @@
   - [x] Conversation summary minimum-message threshold updated to `3` customer messages (bot message optional)
   - [x] Closing and reopening summary panel now regenerates summary without requiring manual refresh
   - [x] WhatsApp conversations now show a far-right 24-hour reply-window indicator only when blocked (`reply unavailable`) next to the summary control, with tooltip reason
-  - [x] WhatsApp conversations now show a dedicated `Send Template` action beside composer `Send Reply` (WhatsApp-green style), so template-send flow is always reachable from the message action row
+  - [x] WhatsApp conversations now show a compact in-input `Send Template` action (document icon + text) aligned to the composer’s far-right area
+  - [x] Inbox template picker now supports two-tab WhatsApp flow (`Hazır mesajlar` + `WhatsApp şablonları`) and single-tab predefined flow on non-WhatsApp conversations
+  - [x] Inbox users can create, edit, delete, and select organization-scoped predefined templates, then insert selected content into `Write a reply` composer without auto-send
+  - [x] Inbox template picker tabs now use compact underline navigation; refresh action is shown only on WhatsApp tab, select chevrons use inset alignment, and tab switching animates modal height smoothly (mobile + desktop)
   - [x] WhatsApp reply-window status now includes a question/help icon inside the blocked status badge with tooltip that shows explicit reason when unavailable
   - [x] Inbox composer now disables manual send for WhatsApp when the 24-hour free-form window is closed, shows a short lock overlay message, and keeps `active_agent` unchanged
   - [x] WhatsApp expired-window conversations now surface explicit action buttons (`Open in WhatsApp` / `Send Template`) so operators can continue via phone app or send an approved template directly from Inbox
+  - [x] Inbox WhatsApp template modal now auto-closes after successful send
   - [x] Mobile inbox app flow with list-to-conversation transition and back navigation
   - [x] Mobile chat header details toggle with compact contact/lead snapshot
   - [x] Mobile details payload now includes lead summary, service type, and collected required info

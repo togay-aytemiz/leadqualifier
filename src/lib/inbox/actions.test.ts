@@ -41,9 +41,13 @@ vi.mock('@/lib/whatsapp/client', () => ({
 
 import {
     getConversations,
+    createConversationPredefinedTemplate,
+    deleteConversationPredefinedTemplate,
     listConversationWhatsAppTemplates,
+    listConversationPredefinedTemplates,
     sendConversationWhatsAppTemplateMessage,
     setConversationAiProcessingPaused,
+    updateConversationPredefinedTemplate,
     type ConversationListItem
 } from '@/lib/inbox/actions'
 import type { Conversation } from '@/types/database'
@@ -425,6 +429,226 @@ describe('inbox WhatsApp template actions', () => {
             p_conversation_id: 'conv-1',
             p_content: 'Template: appointment_reminder'
         })
+    })
+})
+
+describe('inbox predefined template actions', () => {
+    beforeEach(() => {
+        createClientMock.mockReset()
+        assertTenantWriteAllowedMock.mockResolvedValue({
+            userId: 'user-1'
+        })
+    })
+
+    it('lists predefined templates for a conversation organization', async () => {
+        const templateRows = [{
+            id: 'tpl-1',
+            title: 'Karsilama',
+            content: 'Merhaba, nasil yardimci olabilirim?',
+            updated_at: '2026-02-26T09:00:00.000Z'
+        }]
+
+        const conversationSingleMock = vi.fn(async () => ({
+            data: {
+                organization_id: 'org-1',
+                platform: 'whatsapp',
+                contact_phone: '905551112233'
+            },
+            error: null
+        }))
+        const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+        const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+        const templateOrderMock = vi.fn(async () => ({
+            data: templateRows,
+            error: null
+        }))
+        const templateEqMock = vi.fn(() => ({ order: templateOrderMock }))
+        const templateSelectMock = vi.fn(() => ({ eq: templateEqMock }))
+
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table === 'conversations') {
+                    return { select: conversationSelectMock }
+                }
+                if (table === 'inbox_predefined_templates') {
+                    return { select: templateSelectMock }
+                }
+                throw new Error(`Unexpected query for table: ${table}`)
+            })
+        }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await listConversationPredefinedTemplates('conv-1')
+
+        expect(result.ok).toBe(true)
+        if (result.ok) {
+            expect(result.templates).toEqual([{
+                id: 'tpl-1',
+                title: 'Karsilama',
+                content: 'Merhaba, nasil yardimci olabilirim?'
+            }])
+        }
+    })
+
+    it('creates a predefined template for the conversation organization', async () => {
+        const insertedRow = {
+            id: 'tpl-1',
+            organization_id: 'org-1',
+            title: 'Karsilama',
+            content: 'Merhaba, nasil yardimci olabilirim?',
+            created_by: 'user-1',
+            updated_by: 'user-1',
+            created_at: '2026-02-26T09:00:00.000Z',
+            updated_at: '2026-02-26T09:00:00.000Z'
+        }
+
+        const conversationSingleMock = vi.fn(async () => ({
+            data: {
+                organization_id: 'org-1',
+                platform: 'whatsapp',
+                contact_phone: '905551112233'
+            },
+            error: null
+        }))
+        const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+        const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+        const templateSingleMock = vi.fn(async () => ({ data: insertedRow, error: null }))
+        const templateSelectMock = vi.fn(() => ({ single: templateSingleMock }))
+        const templateInsertMock = vi.fn(() => ({ select: templateSelectMock }))
+
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table === 'conversations') {
+                    return { select: conversationSelectMock }
+                }
+                if (table === 'inbox_predefined_templates') {
+                    return { insert: templateInsertMock }
+                }
+                throw new Error(`Unexpected query for table: ${table}`)
+            })
+        }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await createConversationPredefinedTemplate({
+            conversationId: 'conv-1',
+            title: 'Karsilama',
+            content: 'Merhaba, nasil yardimci olabilirim?'
+        })
+
+        expect(result.ok).toBe(true)
+        if (result.ok) {
+            expect(result.template.title).toBe('Karsilama')
+            expect(result.template.content).toContain('Merhaba')
+        }
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+    })
+
+    it('returns validation error for invalid predefined template payload', async () => {
+        createClientMock.mockResolvedValueOnce({})
+
+        const result = await createConversationPredefinedTemplate({
+            conversationId: 'conv-1',
+            title: '   ',
+            content: '   '
+        })
+
+        expect(result).toEqual({ ok: false, reason: 'validation' })
+    })
+
+    it('updates a predefined template for the conversation organization', async () => {
+        const updatedRow = {
+            id: 'tpl-1',
+            organization_id: 'org-1',
+            title: 'Guncel Karsilama',
+            content: 'Yeni metin',
+            created_by: 'user-1',
+            updated_by: 'user-1',
+            created_at: '2026-02-26T09:00:00.000Z',
+            updated_at: '2026-02-26T10:00:00.000Z'
+        }
+
+        const conversationSingleMock = vi.fn(async () => ({
+            data: {
+                organization_id: 'org-1',
+                platform: 'whatsapp',
+                contact_phone: '905551112233'
+            },
+            error: null
+        }))
+        const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+        const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+        const templateMaybeSingleMock = vi.fn(async () => ({ data: updatedRow, error: null }))
+        const templateSelectMock = vi.fn(() => ({ maybeSingle: templateMaybeSingleMock }))
+        const templateEqTemplateIdMock = vi.fn(() => ({ select: templateSelectMock }))
+        const templateEqOrgMock = vi.fn(() => ({ eq: templateEqTemplateIdMock }))
+        const templateUpdateMock = vi.fn(() => ({ eq: templateEqOrgMock }))
+
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table === 'conversations') {
+                    return { select: conversationSelectMock }
+                }
+                if (table === 'inbox_predefined_templates') {
+                    return { update: templateUpdateMock }
+                }
+                throw new Error(`Unexpected query for table: ${table}`)
+            })
+        }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await updateConversationPredefinedTemplate({
+            conversationId: 'conv-1',
+            templateId: 'tpl-1',
+            title: 'Guncel Karsilama',
+            content: 'Yeni metin'
+        })
+
+        expect(result.ok).toBe(true)
+        if (result.ok) {
+            expect(result.template.title).toBe('Guncel Karsilama')
+        }
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+    })
+
+    it('deletes a predefined template for the conversation organization', async () => {
+        const conversationSingleMock = vi.fn(async () => ({
+            data: {
+                organization_id: 'org-1',
+                platform: 'whatsapp',
+                contact_phone: '905551112233'
+            },
+            error: null
+        }))
+        const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+        const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+        const templateEqTemplateIdMock = vi.fn(async () => ({ error: null }))
+        const templateEqOrgMock = vi.fn(() => ({ eq: templateEqTemplateIdMock }))
+        const templateDeleteMock = vi.fn(() => ({ eq: templateEqOrgMock }))
+
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table === 'conversations') {
+                    return { select: conversationSelectMock }
+                }
+                if (table === 'inbox_predefined_templates') {
+                    return { delete: templateDeleteMock }
+                }
+                throw new Error(`Unexpected query for table: ${table}`)
+            })
+        }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await deleteConversationPredefinedTemplate({
+            conversationId: 'conv-1',
+            templateId: 'tpl-1'
+        })
+
+        expect(result).toEqual({ ok: true })
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
     })
 })
 

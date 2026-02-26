@@ -33,6 +33,19 @@ export interface InboxWhatsAppTemplateSummary {
     category: string | null
 }
 
+export interface InboxPredefinedTemplateSummary {
+    id: string
+    title: string
+    content: string
+}
+
+type InboxPredefinedTemplateFailureReason =
+    | 'validation'
+    | 'missing_conversation'
+    | 'missing_template'
+    | 'billing_locked'
+    | 'request_failed'
+
 type InboxWhatsAppTemplateFailureReason =
     | 'validation'
     | 'missing_conversation'
@@ -56,6 +69,37 @@ export interface SendConversationWhatsAppTemplateMessageInput {
 export type SendConversationWhatsAppTemplateMessageResult =
     | { ok: true; messageId: string | null; message: Message; conversation: Conversation }
     | { ok: false; reason: InboxWhatsAppTemplateFailureReason }
+
+export type ConversationPredefinedTemplateListResult =
+    | { ok: true; templates: InboxPredefinedTemplateSummary[] }
+    | { ok: false; reason: InboxPredefinedTemplateFailureReason }
+
+export interface CreateConversationPredefinedTemplateInput {
+    conversationId: string
+    title: string
+    content: string
+}
+
+export interface UpdateConversationPredefinedTemplateInput extends CreateConversationPredefinedTemplateInput {
+    templateId: string
+}
+
+export interface DeleteConversationPredefinedTemplateInput {
+    conversationId: string
+    templateId: string
+}
+
+export type CreateConversationPredefinedTemplateResult =
+    | { ok: true; template: InboxPredefinedTemplateSummary }
+    | { ok: false; reason: InboxPredefinedTemplateFailureReason }
+
+export type UpdateConversationPredefinedTemplateResult =
+    | { ok: true; template: InboxPredefinedTemplateSummary }
+    | { ok: false; reason: InboxPredefinedTemplateFailureReason }
+
+export type DeleteConversationPredefinedTemplateResult =
+    | { ok: true }
+    | { ok: false; reason: InboxPredefinedTemplateFailureReason }
 
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
 type ConversationLeadPreview = { status?: string | null }
@@ -114,6 +158,46 @@ function normalizeInboxWhatsAppTemplateSummary(value: unknown): InboxWhatsAppTem
         status: statusValue || null,
         language: languageValue || null,
         category: categoryValue || null
+    }
+}
+
+function normalizeInboxPredefinedTemplateSummary(value: unknown): InboxPredefinedTemplateSummary | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+    const record = value as Record<string, unknown>
+
+    const idValue = typeof record.id === 'string' ? record.id.trim() : ''
+    const titleValue = typeof record.title === 'string' ? record.title.trim() : ''
+    const contentValue = typeof record.content === 'string' ? record.content.trim() : ''
+    if (!idValue || !titleValue || !contentValue) return null
+
+    return {
+        id: idValue,
+        title: titleValue,
+        content: contentValue
+    }
+}
+
+async function resolveConversationOrganizationContext(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    conversationId: string
+): Promise<
+    | { ok: true; organizationId: string }
+    | { ok: false; reason: InboxPredefinedTemplateFailureReason }
+> {
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('organization_id')
+        .eq('id', conversationId)
+        .single()
+
+    if (!conversation) return { ok: false, reason: 'missing_conversation' }
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        return { ok: false, reason: 'billing_locked' }
+    }
+
+    return {
+        ok: true,
+        organizationId: conversation.organization_id
     }
 }
 
@@ -947,6 +1031,163 @@ export async function listConversationWhatsAppTemplates(
         console.error('Failed to list WhatsApp templates for conversation:', error)
         return { ok: false, reason: 'request_failed' }
     }
+}
+
+export async function listConversationPredefinedTemplates(
+    conversationId: string
+): Promise<ConversationPredefinedTemplateListResult> {
+    const supabase = await createClient()
+
+    const normalizedConversationId = conversationId.trim()
+    if (!normalizedConversationId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationOrganizationContext(supabase, normalizedConversationId)
+    if (!context.ok) {
+        return { ok: false, reason: context.reason }
+    }
+
+    const { data, error } = await supabase
+        .from('inbox_predefined_templates')
+        .select('id, title, content')
+        .eq('organization_id', context.organizationId)
+        .order('updated_at', { ascending: false })
+
+    if (error) {
+        console.error('Failed to list predefined templates for conversation:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    const templates = (data ?? [])
+        .map(normalizeInboxPredefinedTemplateSummary)
+        .filter((item): item is InboxPredefinedTemplateSummary => item !== null)
+
+    return { ok: true, templates }
+}
+
+export async function createConversationPredefinedTemplate(
+    input: CreateConversationPredefinedTemplateInput
+): Promise<CreateConversationPredefinedTemplateResult> {
+    const supabase = await createClient()
+    const userContext = await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    const title = input.title.trim()
+    const content = input.content.trim()
+
+    if (!conversationId || !title || !content || title.length > 80 || content.length > 2000) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationOrganizationContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: context.reason }
+    }
+
+    const { data, error } = await supabase
+        .from('inbox_predefined_templates')
+        .insert({
+            organization_id: context.organizationId,
+            title,
+            content,
+            created_by: userContext.userId,
+            updated_by: userContext.userId
+        })
+        .select('id, title, content')
+        .single()
+
+    if (error) {
+        console.error('Failed to create predefined template for conversation:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    const template = normalizeInboxPredefinedTemplateSummary(data)
+    if (!template) {
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    return { ok: true, template }
+}
+
+export async function updateConversationPredefinedTemplate(
+    input: UpdateConversationPredefinedTemplateInput
+): Promise<UpdateConversationPredefinedTemplateResult> {
+    const supabase = await createClient()
+    const userContext = await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    const templateId = input.templateId.trim()
+    const title = input.title.trim()
+    const content = input.content.trim()
+
+    if (!conversationId || !templateId || !title || !content || title.length > 80 || content.length > 2000) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationOrganizationContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: context.reason }
+    }
+
+    const { data, error } = await supabase
+        .from('inbox_predefined_templates')
+        .update({
+            title,
+            content,
+            updated_by: userContext.userId
+        })
+        .eq('organization_id', context.organizationId)
+        .eq('id', templateId)
+        .select('id, title, content')
+        .maybeSingle()
+
+    if (error) {
+        console.error('Failed to update predefined template for conversation:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+    if (!data) {
+        return { ok: false, reason: 'missing_template' }
+    }
+
+    const template = normalizeInboxPredefinedTemplateSummary(data)
+    if (!template) {
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    return { ok: true, template }
+}
+
+export async function deleteConversationPredefinedTemplate(
+    input: DeleteConversationPredefinedTemplateInput
+): Promise<DeleteConversationPredefinedTemplateResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    const templateId = input.templateId.trim()
+
+    if (!conversationId || !templateId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationOrganizationContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: context.reason }
+    }
+
+    const { error } = await supabase
+        .from('inbox_predefined_templates')
+        .delete()
+        .eq('organization_id', context.organizationId)
+        .eq('id', templateId)
+
+    if (error) {
+        console.error('Failed to delete predefined template for conversation:', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    return { ok: true }
 }
 
 export async function sendConversationWhatsAppTemplateMessage(

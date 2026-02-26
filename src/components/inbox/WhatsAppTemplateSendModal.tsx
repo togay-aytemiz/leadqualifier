@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Modal, TextArea } from '@/design'
+import { RotateCw } from 'lucide-react'
 import {
     listConversationWhatsAppTemplates,
     sendConversationWhatsAppTemplateMessage,
@@ -135,30 +136,31 @@ export function WhatsAppTemplateSendModal({
         setSuccessMessage(t('success'))
         setSuccessMessageId(result.messageId ?? '')
         setIsSending(false)
+        onClose()
         if (onSent) {
-            await onSent()
+            void onSent()
         }
     }
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={t('title')}>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={t('title')}
+            headerActions={(
+                <button
+                    type="button"
+                    onClick={() => void loadTemplates()}
+                    disabled={isLoadingTemplates}
+                    className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={t('refreshTemplates')}
+                    aria-label={t('refreshTemplates')}
+                >
+                    <RotateCw size={16} className={isLoadingTemplates ? 'animate-spin' : ''} />
+                </button>
+            )}
+        >
             <div className="space-y-4">
-                <Alert variant="info">
-                    {t('description')}
-                </Alert>
-
-                <div className="flex justify-end">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void loadTemplates()}
-                        disabled={isLoadingTemplates}
-                    >
-                        {isLoadingTemplates ? t('loadingTemplates') : t('refreshTemplates')}
-                    </Button>
-                </div>
-
                 <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase">
                         {t('templateLabel')}

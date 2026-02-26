@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-25 (Added conversation-level AI processing pause in Inbox details with runtime hard-gating for inbound AI flow: paused conversations still store inbound messages but skip lead extraction and AI replies, and manual lead refresh is blocked while paused.)  
+> **Last Updated:** 2026-02-26 (Inbox template picker now supports organization-level predefined templates plus WhatsApp-template draft insertion into composer; modal now uses mobile-optimized underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
 > **Status:** In Development
 
 ---
@@ -75,6 +75,12 @@ Customer Message → Skill Match? → Yes → Skill Response
 - MVP reply language policy: if customer message is Turkish, reply in Turkish; otherwise reply in English.
 - WhatsApp and Instagram MVP support text messages only and send replies reactively to inbound customer messages (no proactive/template-initiated flow in MVP)
 - WhatsApp template send is available only as an explicit manual utility (Settings > Channels and Inbox expired-window action) for review/operational continuation, not as automated conversation runtime behavior.
+- Inbox WhatsApp conversations expose template access as a compact in-composer action (right-aligned document icon + label) to keep manual actions in one interaction zone.
+- Inbox template picker behavior:
+  - all platforms can open predefined templates and insert selected content into composer (`Write a reply`) without auto-send
+  - WhatsApp conversations additionally show official WhatsApp template tab in the same picker
+  - template picker UI is compact/mobile-first: underline tab navigation, refresh action only on WhatsApp tab, inset-aligned select chevrons, and smooth modal height transition when switching tabs
+  - 24-hour expired fallback keeps direct official template send flow (separate modal/action)
 - Meta OAuth channel connect starts in a separate popup and returns success/error status to the existing Channels page context (main app tab remains stable)
 - Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
 - Meta OAuth callback diagnostic hint (`meta_oauth_error`) is propagated from popup to main Channels URL for production support troubleshooting.
@@ -326,7 +332,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Channels settings card layout is a stacked single-column row list (one channel per row) with non-truncated names and right-side status/action controls for readability
 - Connected WhatsApp cards include a Template Tools modal for listing WABA templates and sending a manual test template message (review/debug utility)
 - Template Tools modal includes an additional usage guide modal (`How to use`) with concise operator instructions (template refresh, recipient format, variable order, send verification)
-- Inbox WhatsApp composer includes a dedicated `Send template` action beside `Send Reply` (WhatsApp-green styling) so operators can trigger manual template flow directly from the primary action row.
+- After successful template send, WhatsApp template modal closes automatically.
+- Inbox WhatsApp composer includes a compact in-input `Send template` action (document icon + label) so operators can trigger manual template flow without leaving the composer area.
 - Inbox WhatsApp conversation header includes a question/help icon inside the blocked reply-window status badge; tooltip explicitly states why free-form reply is unavailable.
 - Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
@@ -836,6 +843,7 @@ MVP is successful when:
 - **Inbox Details Layout:** Keep the contact header block and group the lead snapshot under Key Information for faster scanning.
 - **Lead Extraction Pause UI:** If the operator is active or AI is off, surface a paused notice and allow a manual lead refresh from inbox details.
 - **Conversation-Level AI Pause Control:** Add per-contact `ai_processing_paused` toggle in Inbox details; when enabled, inbound runtime still stores customer messages but skips both lead extraction and AI replies, and manual lead refresh is blocked.
+- **AI Pause Details Layout:** Place conversation-level AI pause control directly under total AI credits in Key Information and hide lead panel content while this pause is enabled.
 - **Lead Snapshot Styling:** Show a minimal AI extraction micro-label and render lead status as text with a small color dot.
 - **Platform Row Icon:** Show the channel icon next to platform values using shared public SVG logos (`/Telegram.svg`, `/whatsapp.svg`, `/instagram.svg`, `/messenger.svg`) across Channels cards, Inbox platform surfaces, and Leads list rows/cards.
 - **Inbox List Badges:** Show a small platform badge on conversation avatars so the channel is visible at a glance.

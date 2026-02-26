@@ -292,6 +292,7 @@
         "readOnlyMode": "Read-only mode: admin impersonation cannot send or modify conversation data.",
         "sendShortcut": "⌘ Enter to send",
         "sendButton": "Send Reply",
+        "templatePickerAction": "Templates",
         "summary": {
             "button": "Conversation Summary",
             "loading": "Preparing summary...",
@@ -312,7 +313,8 @@
             "expiredActionsTitle": "24-hour free-form window expired",
             "expiredActionsDescription": "Continue in WhatsApp app or send a template message from here.",
             "openInWhatsApp": "Open in WhatsApp",
-            "sendTemplate": "Send template"
+            "sendTemplate": "Send template",
+            "sendTemplateCompact": "Template"
         },
         "whatsappTemplateModal": {
             "title": "Send WhatsApp Template",
@@ -337,6 +339,49 @@
                 "missingChannel": "Active WhatsApp channel configuration is missing.",
                 "loadFailed": "Templates could not be loaded. Please try again.",
                 "sendFailed": "Template message could not be sent. Please try again."
+            }
+        },
+        "templatePickerModal": {
+            "title": "Template Picker",
+            "refresh": "Refresh templates",
+            "cancel": "Cancel",
+            "insert": "Insert to reply",
+            "tabs": {
+                "predefined": "Predefined",
+                "whatsapp": "WhatsApp templates"
+            },
+            "predefined": {
+                "templateLabel": "Predefined template",
+                "previewLabel": "Message preview",
+                "emptyState": "No predefined templates yet. Create your first template.",
+                "new": "New",
+                "edit": "Edit",
+                "delete": "Delete",
+                "editorTitleLabel": "Template title",
+                "editorContentLabel": "Message text",
+                "save": "Save template",
+                "saving": "Saving..."
+            },
+            "whatsapp": {
+                "templateLabel": "WhatsApp template",
+                "languageLabel": "Language",
+                "statusLabel": "Status",
+                "categoryLabel": "Category",
+                "emptyState": "No available WhatsApp templates were found for this account.",
+                "paramsLabel": "Template variables (optional)",
+                "paramsPlaceholder": "Enter one value per line in template variable order."
+            },
+            "whatsAppInsertPrefix": "WhatsApp template: {template}",
+            "errors": {
+                "billingLocked": "Template actions are unavailable because usage is locked.",
+                "missingChannel": "Active WhatsApp channel configuration is missing.",
+                "loadPredefinedFailed": "Predefined templates could not be loaded.",
+                "loadWhatsAppFailed": "WhatsApp templates could not be loaded.",
+                "savePredefinedFailed": "Template could not be saved.",
+                "deletePredefinedFailed": "Template could not be deleted.",
+                "validationPredefinedSelection": "Please select a predefined template.",
+                "validationPredefinedDraft": "Title and message text are required.",
+                "validationWhatsAppSelection": "Please select a WhatsApp template."
             }
         },
         "details": "Details",

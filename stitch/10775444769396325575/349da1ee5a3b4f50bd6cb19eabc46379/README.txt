@@ -1,0 +1,9 @@
+Project ID: 10775444769396325575
+Screen ID: 349da1ee5a3b4f50bd6cb19eabc46379
+Title: Template Picker Variant 2
+Screenshot URL: https://lh3.googleusercontent.com/aida/AOfcidVbc4pfwHs6talzqWqUDpQgMnnyDKXlY0NwV5HIG74zmwmOOKTgzyOz7y6_cA40_yEEWkLQOZcemKcQ-Mb0hcap0vgRTz0keIJMPDejYD7FPpwtx1SyZ6vWxZ4Kt2N50gH5kXJpwiOOyKtg_RxSTq2ygBoAArvQ0H5_S_NXyf0n8MDhq7HQRiLotBeru0jWi1BRFx8HX4t-PBZkNAPdMfzzZYTPF22witIytT-D1rcDTGIKe6ihxoc253xn
+HTML URL: https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzc2ZmVkYzY0ZWM5OTRjMWZhMzIwMmNiZTcwMjYwYWMzEgsSBxCHjfj_iR8YAZIBJAoKcHJvamVjdF9pZBIWQhQxMDc3NTQ0NDc2OTM5NjMyNTU3NQ&filename=&opi=89354086
+Saved files:
+- screenshot.png
+- code.html
+- get_screen.json

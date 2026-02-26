@@ -7,7 +7,7 @@ import {
     Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
-import { HiMiniSparkles } from 'react-icons/hi2'
+import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
     getMessages,
@@ -45,6 +45,7 @@ import { applyLeadStatusToConversationList } from '@/components/inbox/conversati
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
+import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
 
 import { useTranslations, useLocale } from 'next-intl'
@@ -109,6 +110,7 @@ export function InboxContainer({
     const [isMobileConversationOpen, setIsMobileConversationOpen] = useState(false)
     const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false)
     const [showScrollToLatest, setShowScrollToLatest] = useState(false)
+    const [isTemplatePickerModalOpen, setIsTemplatePickerModalOpen] = useState(false)
     const [isWhatsAppTemplateModalOpen, setIsWhatsAppTemplateModalOpen] = useState(false)
     const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
     const [aiPauseError, setAiPauseError] = useState(false)
@@ -162,6 +164,7 @@ export function InboxContainer({
         setLeadAutoRefreshStatus('idle')
         setAiPauseError(false)
         setIsMobileDetailsOpen(false)
+        setIsTemplatePickerModalOpen(false)
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
             leadRefreshTimeoutRef.current = null
@@ -1018,6 +1021,7 @@ export function InboxContainer({
     })
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
     const isComposerDisabled = isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked
+    const isTemplatePickerDisabled = isReadOnly || showConversationSkeleton || (isWhatsAppConversation && isWhatsAppReplyBlocked)
     const canSend = !!input.trim() && !isSending && !isComposerDisabled
     const contactMessageCount = visibleMessages.filter(m => m.sender_type === 'contact').length
     const canSummarize = contactMessageCount >= 3
@@ -1172,7 +1176,23 @@ export function InboxContainer({
                                                 <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                                             </div>
                                         </div>
-                                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                        {!conversationAiPaused && (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadService')}</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900">{lead?.service_type || t('leadUnknown')}</p>
+                                                </div>
+                                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                            <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('creditUsage')}</p>
+                                            <p className="mt-1 text-sm font-medium text-gray-900">{conversationCreditValue}</p>
+                                        </div>
+                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
                                             <label className="flex items-start gap-3">
                                                 <input
                                                     type="checkbox"
@@ -1192,39 +1212,29 @@ export function InboxContainer({
                                                 <p className="mt-2 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
                                             )}
                                         </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                                                <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadService')}</p>
-                                                <p className="mt-1 text-sm font-medium text-gray-900">{lead?.service_type || t('leadUnknown')}</p>
+                                        {!conversationAiPaused && (
+                                            <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">{lead?.summary || t('leadEmpty')}</p>
                                             </div>
-                                            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                                                <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
-                                                <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
+                                        )}
+                                        {!conversationAiPaused && (
+                                            <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadRequiredInfo')}</p>
+                                                {collectedRequiredIntake.length > 0 ? (
+                                                    <div className="mt-2 space-y-2">
+                                                        {collectedRequiredIntake.map((item) => (
+                                                            <div key={item.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
+                                                                <span className="text-xs text-gray-500">{item.field}</span>
+                                                                <span className="break-words text-sm text-gray-900">{item.value}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
+                                                )}
                                             </div>
-                                        </div>
-                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                            <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('creditUsage')}</p>
-                                            <p className="mt-1 text-sm font-medium text-gray-900">{conversationCreditValue}</p>
-                                        </div>
-                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
-                                            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">{lead?.summary || t('leadEmpty')}</p>
-                                        </div>
-                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadRequiredInfo')}</p>
-                                            {collectedRequiredIntake.length > 0 ? (
-                                                <div className="mt-2 space-y-2">
-                                                    {collectedRequiredIntake.map((item) => (
-                                                        <div key={item.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
-                                                            <span className="text-xs text-gray-500">{item.field}</span>
-                                                            <span className="break-words text-sm text-gray-900">{item.value}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
-                                            )}
-                                        </div>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -1543,19 +1553,18 @@ export function InboxContainer({
                                             className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 h-6 min-h-[24px]"
                                             placeholder={inputPlaceholder}
                                         />
+                                        <div className="h-6 w-px bg-gray-200" />
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsTemplatePickerModalOpen(true)}
+                                            disabled={isTemplatePickerDisabled}
+                                            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <HiOutlineDocumentText size={15} />
+                                            <span>{t('templatePickerAction')}</span>
+                                        </button>
                                     </div>
                                 </div>
-                                {isWhatsAppConversation && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsWhatsAppTemplateModalOpen(true)}
-                                        disabled={isReadOnly || showConversationSkeleton}
-                                        className="h-11 flex items-center gap-2 px-4 rounded-xl bg-[#25D366] text-white text-sm font-semibold shadow-sm transition-colors hover:bg-[#1fa855] disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        <Send size={16} />
-                                        <span className="hidden sm:inline">{t('whatsappReplyWindow.sendTemplate')}</span>
-                                    </button>
-                                )}
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!canSend}
@@ -1680,28 +1689,6 @@ export function InboxContainer({
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
-                                        <span className="text-sm text-gray-500">{t('aiProcessingControl')}</span>
-                                        <div>
-                                            <label className="flex items-start gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={conversationAiPaused}
-                                                    onChange={(event) => {
-                                                        void handleSetConversationAiPause(event.target.checked)
-                                                    }}
-                                                    disabled={isAiPauseUpdating || isReadOnly}
-                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
-                                                />
-                                                <span className="text-sm text-gray-900">{t('aiProcessingPauseLabel')}</span>
-                                            </label>
-                                            <p className="mt-1 text-xs text-gray-500">{t('aiProcessingPauseHelp')}</p>
-                                            {aiPauseError && (
-                                                <p className="mt-1 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
-                                            )}
-                                        </div>
-                                    </div>
-
                                     <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
                                         <span className="text-sm text-gray-500">{t('platform')}</span>
                                         <div className="flex items-center gap-2">
@@ -1725,11 +1712,34 @@ export function InboxContainer({
                                         <span className="text-sm text-gray-500">{t('creditUsage')}</span>
                                         <span className="text-sm text-gray-900">{conversationCreditValue}</span>
                                     </div>
+
+                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
+                                        <span className="text-sm text-gray-500">{t('aiProcessingControl')}</span>
+                                        <div>
+                                            <label className="flex items-start gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={conversationAiPaused}
+                                                    onChange={(event) => {
+                                                        void handleSetConversationAiPause(event.target.checked)
+                                                    }}
+                                                    disabled={isAiPauseUpdating || isReadOnly}
+                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                                />
+                                                <span className="text-sm text-gray-900">{t('aiProcessingPauseLabel')}</span>
+                                            </label>
+                                            <p className="mt-1 text-xs text-gray-500">{t('aiProcessingPauseHelp')}</p>
+                                            {aiPauseError && (
+                                                <p className="mt-1 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <hr className="border-gray-100/60 my-6" />
 
-                                <div className="mt-6">
+                                {!conversationAiPaused && (
+                                    <div className="mt-6">
                                     <div className="mb-4 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">{t('leadTitle')}</h4>
@@ -1836,7 +1846,8 @@ export function InboxContainer({
                                     ) : (
                                         <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
                                     )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
 
                             <hr className="border-gray-100 my-6" />
@@ -1902,6 +1913,24 @@ export function InboxContainer({
                     <p className="text-sm text-red-600">{scoreReasonMessage}</p>
                 )}
             </Modal>
+
+            {selectedId && (
+                <TemplatePickerModal
+                    conversationId={selectedId}
+                    platform={selectedConversation?.platform ?? 'simulator'}
+                    isOpen={isTemplatePickerModalOpen}
+                    isReadOnly={isReadOnly}
+                    onClose={() => setIsTemplatePickerModalOpen(false)}
+                    onInsert={(value) => {
+                        const trimmedValue = value.trim()
+                        if (!trimmedValue) return
+                        setInput((current) => {
+                            const normalizedCurrent = current.trim()
+                            return normalizedCurrent ? `${current}\n${trimmedValue}` : trimmedValue
+                        })
+                    }}
+                />
+            )}
 
             {selectedId && (
                 <WhatsAppTemplateSendModal

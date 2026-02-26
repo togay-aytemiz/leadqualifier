@@ -137,6 +137,7 @@ export function WhatsAppTemplateModal({
         setSendSuccess(t('templateTools.sendSuccess'))
         setSendSuccessMessageId(result.messageId ?? '')
         setIsSendingTemplate(false)
+        onClose()
     }
 
     return (

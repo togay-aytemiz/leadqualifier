@@ -292,6 +292,7 @@
         "readOnlyMode": "Salt okunur mod: admin impersonation konuşma üzerinde gönderim/değişiklik yapamaz.",
         "sendShortcut": "Göndermek için ⌘ Enter",
         "sendButton": "Yanıtı Gönder",
+        "templatePickerAction": "Şablonlar",
         "summary": {
             "button": "Konuşma Özeti",
             "loading": "Özet hazırlanıyor...",
@@ -312,7 +313,8 @@
             "expiredActionsTitle": "24 saatlik serbest yazışma süresi doldu",
             "expiredActionsDescription": "İsterseniz WhatsApp uygulamasından devam edin veya buradan şablon mesaj gönderin.",
             "openInWhatsApp": "WhatsApp'ta aç",
-            "sendTemplate": "Şablon gönder"
+            "sendTemplate": "Şablon gönder",
+            "sendTemplateCompact": "Şablon"
         },
         "whatsappTemplateModal": {
             "title": "WhatsApp Şablon Gönder",
@@ -337,6 +339,49 @@
                 "missingChannel": "Aktif WhatsApp kanal bilgileri eksik.",
                 "loadFailed": "Şablonlar yüklenemedi. Lütfen tekrar deneyin.",
                 "sendFailed": "Şablon mesajı gönderilemedi. Lütfen tekrar deneyin."
+            }
+        },
+        "templatePickerModal": {
+            "title": "Şablon Seçici",
+            "refresh": "Şablonları yenile",
+            "cancel": "İptal",
+            "insert": "Yanıta ekle",
+            "tabs": {
+                "predefined": "Hazır mesajlar",
+                "whatsapp": "WhatsApp şablonları"
+            },
+            "predefined": {
+                "templateLabel": "Hazır mesaj",
+                "previewLabel": "Mesaj önizleme",
+                "emptyState": "Henüz hazır mesaj yok. İlk şablonunuzu oluşturun.",
+                "new": "Yeni",
+                "edit": "Düzenle",
+                "delete": "Sil",
+                "editorTitleLabel": "Şablon başlığı",
+                "editorContentLabel": "Mesaj metni",
+                "save": "Şablonu kaydet",
+                "saving": "Kaydediliyor..."
+            },
+            "whatsapp": {
+                "templateLabel": "WhatsApp şablonu",
+                "languageLabel": "Dil",
+                "statusLabel": "Durum",
+                "categoryLabel": "Kategori",
+                "emptyState": "Bu hesap için kullanılabilir WhatsApp şablonu bulunamadı.",
+                "paramsLabel": "Şablon değişkenleri (opsiyonel)",
+                "paramsPlaceholder": "Şablondaki değişken sırasına göre her satıra bir değer yazın."
+            },
+            "whatsAppInsertPrefix": "WhatsApp şablonu: {template}",
+            "errors": {
+                "billingLocked": "Kullanım kilitli olduğu için şablon işlemleri kullanılamıyor.",
+                "missingChannel": "Aktif WhatsApp kanal bilgileri eksik.",
+                "loadPredefinedFailed": "Hazır mesajlar yüklenemedi.",
+                "loadWhatsAppFailed": "WhatsApp şablonları yüklenemedi.",
+                "savePredefinedFailed": "Şablon kaydedilemedi.",
+                "deletePredefinedFailed": "Şablon silinemedi.",
+                "validationPredefinedSelection": "Lütfen bir hazır mesaj seçin.",
+                "validationPredefinedDraft": "Başlık ve mesaj metni zorunludur.",
+                "validationWhatsAppSelection": "Lütfen bir WhatsApp şablonu seçin."
             }
         },
         "details": "Detaylar",

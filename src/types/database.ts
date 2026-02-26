@@ -303,6 +303,17 @@ export interface Message {
     created_at: string
 }
 
+export interface InboxPredefinedTemplate {
+    id: string
+    organization_id: string
+    title: string
+    content: string
+    created_by: string | null
+    updated_by: string | null
+    created_at: string
+    updated_at: string
+}
+
 export interface Channel {
     id: string
     organization_id: string
@@ -445,6 +456,11 @@ export interface Database {
                 Row: Message
                 Insert: MessageInsert
                 Update: MessageUpdate
+            }
+            inbox_predefined_templates: {
+                Row: InboxPredefinedTemplate
+                Insert: Omit<InboxPredefinedTemplate, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<InboxPredefinedTemplate, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
             }
             channels: {
                 Row: Channel
