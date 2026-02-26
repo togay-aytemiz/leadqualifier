@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
 import {
     Inbox, ChevronDown,
-    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp, X
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
@@ -54,6 +55,8 @@ import {
     summarizeConversationQueueCounts,
     type InboxQueueTab
 } from '@/components/inbox/conversationQueueFilters'
+import { updateOrgAiSettings } from '@/lib/ai/settings'
+import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -84,6 +87,8 @@ export function InboxContainer({
     isReadOnly = false
 }: InboxContainerProps) {
     const t = useTranslations('inbox')
+    const tSidebar = useTranslations('mainSidebar')
+    const tAiSettings = useTranslations('aiSettings')
     const locale = useLocale()
     const dateLocale = locale === 'tr' ? tr : undefined
     const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
@@ -122,6 +127,12 @@ export function InboxContainer({
     const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
     const [aiPauseError, setAiPauseError] = useState(false)
     const [activeQueueTab, setActiveQueueTab] = useState<InboxQueueTab>('all')
+    const [inboxBotMode, setInboxBotMode] = useState<AiBotMode>(botMode ?? 'active')
+    const [isMobileBotModeSheetOpen, setIsMobileBotModeSheetOpen] = useState(false)
+    const [isMobileBotModeSheetMounted, setIsMobileBotModeSheetMounted] = useState(false)
+    const [isMobileBotModeSheetVisible, setIsMobileBotModeSheetVisible] = useState(false)
+    const [isMobileBotModeUpdating, setIsMobileBotModeUpdating] = useState(false)
+    const [mobileBotModeUpdateError, setMobileBotModeUpdateError] = useState<string | null>(null)
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -158,6 +169,32 @@ export function InboxContainer({
     }, [selectedId])
 
     useEffect(() => {
+        setInboxBotMode(botMode ?? 'active')
+    }, [botMode])
+
+    useEffect(() => {
+        let closeTimer: ReturnType<typeof setTimeout> | null = null
+        let openFrame: number | null = null
+
+        if (isMobileBotModeSheetOpen) {
+            setIsMobileBotModeSheetMounted(true)
+            openFrame = window.requestAnimationFrame(() => {
+                setIsMobileBotModeSheetVisible(true)
+            })
+        } else {
+            setIsMobileBotModeSheetVisible(false)
+            closeTimer = setTimeout(() => {
+                setIsMobileBotModeSheetMounted(false)
+            }, 220)
+        }
+
+        return () => {
+            if (closeTimer) clearTimeout(closeTimer)
+            if (openFrame !== null) window.cancelAnimationFrame(openFrame)
+        }
+    }, [isMobileBotModeSheetOpen])
+
+    useEffect(() => {
         setSummaryStatus('idle')
         setSummaryText('')
         setIsSummaryOpen(false)
@@ -170,6 +207,7 @@ export function InboxContainer({
         setLeadAutoRefreshStatus('idle')
         setAiPauseError(false)
         setIsMobileDetailsOpen(false)
+        setIsMobileBotModeSheetOpen(false)
         setIsTemplatePickerModalOpen(false)
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
@@ -1076,7 +1114,93 @@ export function InboxContainer({
         : t('whatsappReplyWindow.composerLockedNoInbound')
     const canOpenWhatsAppPhone = Boolean((selectedConversation?.contact_phone ?? '').replace(/\D/g, ''))
 
-    const resolvedBotMode = (botMode ?? 'active')
+    const resolvedBotMode = inboxBotMode
+    const botModeToneClassMap = {
+        emerald: {
+            surface: 'border-emerald-200 bg-emerald-100/85 text-emerald-950 hover:bg-emerald-100',
+            badge: 'bg-emerald-200/70 text-emerald-900',
+            dot: 'bg-emerald-500',
+            selected: 'border-emerald-300 bg-emerald-50',
+            selectedIcon: 'bg-emerald-100 text-emerald-700',
+            hover: 'hover:border-emerald-200 hover:bg-emerald-50/60'
+        },
+        amber: {
+            surface: 'border-amber-200 bg-amber-100/85 text-amber-950 hover:bg-amber-100',
+            badge: 'bg-amber-200/70 text-amber-900',
+            dot: 'bg-amber-500',
+            selected: 'border-amber-300 bg-amber-50',
+            selectedIcon: 'bg-amber-100 text-amber-700',
+            hover: 'hover:border-amber-200 hover:bg-amber-50/60'
+        },
+        rose: {
+            surface: 'border-rose-200 bg-rose-100/85 text-rose-950 hover:bg-rose-100',
+            badge: 'bg-rose-200/70 text-rose-900',
+            dot: 'bg-rose-500',
+            selected: 'border-rose-300 bg-rose-50',
+            selectedIcon: 'bg-rose-100 text-rose-700',
+            hover: 'hover:border-rose-200 hover:bg-rose-50/60'
+        }
+    } as const
+    const botModeOptions = useMemo<Array<{ value: AiBotMode; label: string; description: string }>>(() => {
+        return [
+            {
+                value: 'active',
+                label: tAiSettings('botModeActive'),
+                description: tAiSettings('botModeActiveDescription')
+            },
+            {
+                value: 'shadow',
+                label: tAiSettings('botModeShadow'),
+                description: tAiSettings('botModeShadowDescription')
+            },
+            {
+                value: 'off',
+                label: tAiSettings('botModeOff'),
+                description: tAiSettings('botModeOffDescription')
+            }
+        ]
+    }, [tAiSettings])
+    const botModeLabel = useMemo(() => {
+        if (resolvedBotMode === 'shadow') return tSidebar('botStatusShadow')
+        if (resolvedBotMode === 'off') return tSidebar('botStatusOff')
+        return tSidebar('botStatusActive')
+    }, [resolvedBotMode, tSidebar])
+    const botModeTone = resolveMainSidebarBotModeTone(resolvedBotMode)
+    const currentBotModeToneClasses = botModeToneClassMap[botModeTone]
+    const canQuickSwitchBotMode = Boolean(organizationId) && !isReadOnly
+    const botModeQuickSwitchHelperText = canQuickSwitchBotMode
+        ? tSidebar('botStatusQuickSwitchHelp')
+        : tSidebar('botStatusQuickSwitchReadOnly')
+    const handleMobileBotModeChange = useCallback(async (nextBotMode: AiBotMode) => {
+        if (!canQuickSwitchBotMode || isMobileBotModeUpdating) return
+        if (nextBotMode === inboxBotMode) return
+
+        const previousBotMode = inboxBotMode
+        setInboxBotMode(nextBotMode)
+        setIsMobileBotModeUpdating(true)
+        setMobileBotModeUpdateError(null)
+
+        try {
+            const savedSettings = await updateOrgAiSettings({
+                bot_mode: nextBotMode
+            })
+            setInboxBotMode(savedSettings.bot_mode)
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('ai-settings-updated'))
+            }
+        } catch (error) {
+            console.error('Failed to quick switch inbox bot mode', error)
+            setInboxBotMode(previousBotMode)
+            setMobileBotModeUpdateError(tSidebar('botStatusQuickSaveError'))
+        } finally {
+            setIsMobileBotModeUpdating(false)
+        }
+    }, [
+        canQuickSwitchBotMode,
+        inboxBotMode,
+        isMobileBotModeUpdating,
+        tSidebar
+    ])
     // NEW: Use explicit state from conversation
     // Fallback to 'ai' (bot) if undefined (e.g. old data or optimistic new conv)
     const activeAgent = selectedConversation?.active_agent === 'operator' ? 'operator' : 'ai'
@@ -1148,6 +1272,28 @@ export function InboxContainer({
                         <div className="flex items-center">
                             <span className="text-lg font-bold text-gray-900">{t('title')}</span>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsMobileBotModeSheetOpen(true)}
+                            aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                            className={cn(
+                                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors lg:hidden',
+                                currentBotModeToneClasses.surface
+                            )}
+                        >
+                            <span className={cn(
+                                'h-2.5 w-2.5 rounded-full',
+                                currentBotModeToneClasses.dot,
+                                resolvedBotMode === 'active' && 'animate-pulse'
+                            )} />
+                            <span>{botModeLabel}</span>
+                            <ChevronDown
+                                className={cn(
+                                    'h-3.5 w-3.5 opacity-70 transition-transform duration-200 ease-out',
+                                    isMobileBotModeSheetOpen && 'rotate-180'
+                                )}
+                            />
+                        </button>
                     </div>
                     <div className="border-t border-gray-100 px-3 py-2">
                         <div className="flex items-center gap-1 overflow-x-auto pb-1">
@@ -2029,6 +2175,161 @@ export function InboxContainer({
                 </div>
             )}
             </div>
+
+            {isMobileBotModeSheetMounted && (
+                <>
+                    <button
+                        type="button"
+                        aria-label={tSidebar('organizationSwitcherClose')}
+                        onClick={() => setIsMobileBotModeSheetOpen(false)}
+                        className={cn(
+                            'fixed inset-0 z-[1080] bg-gray-950/30 transition-opacity duration-200 ease-out lg:hidden',
+                            isMobileBotModeSheetVisible ? 'opacity-100' : 'opacity-0'
+                        )}
+                    />
+                    <div
+                        className={cn(
+                            'fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[1090] rounded-2xl border border-slate-200 bg-white shadow-xl transition-all duration-200 ease-out lg:hidden',
+                            isMobileBotModeSheetVisible
+                                ? 'translate-y-0 opacity-100'
+                                : 'translate-y-3 opacity-0'
+                        )}
+                    >
+                        <div className="border-b border-slate-100 px-3.5 py-3">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {tSidebar('botStatusQuickSwitchTitle')}
+                                        </p>
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                currentBotModeToneClasses.badge
+                                            )}
+                                        >
+                                            <span className={cn('h-1.5 w-1.5 rounded-full', currentBotModeToneClasses.dot)} />
+                                            {botModeLabel}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                        {botModeQuickSwitchHelperText}
+                                    </p>
+                                    {isMobileBotModeUpdating && (
+                                        <p className="mt-2 text-xs font-medium text-slate-600">
+                                            {tSidebar('botStatusQuickSwitchSaving')}
+                                        </p>
+                                    )}
+                                    {mobileBotModeUpdateError && (
+                                        <p className="mt-2 text-xs font-medium text-rose-600">
+                                            {mobileBotModeUpdateError}
+                                        </p>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileBotModeSheetOpen(false)}
+                                    aria-label={tSidebar('organizationSwitcherClose')}
+                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-2">
+                            {!canQuickSwitchBotMode && (
+                                <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                    <p className="text-xs leading-5 text-slate-600">
+                                        {botModeQuickSwitchHelperText}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                                {botModeOptions.map((option) => {
+                                    const isSelected = resolvedBotMode === option.value
+                                    const optionToneClasses = botModeToneClassMap[resolveMainSidebarBotModeTone(option.value)]
+                                    const optionClassName = cn(
+                                        'w-full rounded-xl border px-2.5 py-2 text-left',
+                                        isSelected
+                                            ? optionToneClasses.selected
+                                            : cn('border-slate-200 bg-white', optionToneClasses.hover),
+                                        !canQuickSwitchBotMode && 'cursor-default'
+                                    )
+
+                                    const optionContent = (
+                                        <div className="flex items-start gap-2.5">
+                                            <span
+                                                className={cn(
+                                                    'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full',
+                                                    isSelected
+                                                        ? optionToneClasses.selectedIcon
+                                                        : 'bg-slate-100 text-slate-500'
+                                                )}
+                                            >
+                                                <span className={cn('h-2 w-2 rounded-full', optionToneClasses.dot)} />
+                                            </span>
+                                            <span className="min-w-0 flex-1">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="truncate text-sm font-semibold text-slate-900">
+                                                        {option.label}
+                                                    </span>
+                                                    {isSelected && (
+                                                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                                            {tSidebar('botStatusCurrentLabel')}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                                                    {option.description}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    )
+
+                                    if (!canQuickSwitchBotMode) {
+                                        return (
+                                            <div key={option.value} className={optionClassName}>
+                                                {optionContent}
+                                            </div>
+                                        )
+                                    }
+
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => void handleMobileBotModeChange(option.value)}
+                                            disabled={isMobileBotModeUpdating}
+                                            className={cn(optionClassName, isMobileBotModeUpdating && 'opacity-70')}
+                                        >
+                                            {optionContent}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileBotModeSheetOpen(false)}
+                                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                    {tSidebar('organizationSwitcherClose')}
+                                </button>
+                                <Link
+                                    href="/settings/ai"
+                                    onClick={() => setIsMobileBotModeSheetOpen(false)}
+                                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100"
+                                >
+                                    {tSidebar('botStatusQuickSwitchOpenSettings')}
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
 
             <ConfirmDialog
                 isOpen={deleteDialog.isOpen}

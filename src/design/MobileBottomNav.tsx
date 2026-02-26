@@ -31,7 +31,7 @@ import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 
 interface NavItem {
-    id: Exclude<MobileNavItemId, 'other'>
+    id: Exclude<MobileNavItemId, 'other' | 'ai'>
     href: string
     label: string
     icon: ComponentType<{ size?: number }>
@@ -58,6 +58,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const tNav = useTranslations('nav')
     const tSidebar = useTranslations('mainSidebar')
     const [isOtherOpen, setIsOtherOpen] = useState(false)
+    const [isAiOpen, setIsAiOpen] = useState(false)
     const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
 
     const activeItem = resolveMobileNavActiveItem(pathname)
@@ -86,6 +87,20 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         },
         shouldRestrictToBilling
     )
+    const skillsMenuNavState = resolveBillingLockedNavItem(
+        {
+            id: 'skills',
+            href: '/skills'
+        },
+        shouldRestrictToBilling
+    )
+    const knowledgeMenuNavState = resolveBillingLockedNavItem(
+        {
+            id: 'knowledge',
+            href: '/knowledge'
+        },
+        shouldRestrictToBilling
+    )
     const navItems = useMemo<NavItem[]>(
         () => {
             const defaultItems: NavItem[] = [
@@ -102,20 +117,6 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                     label: tNav('leads'),
                     icon: HiOutlineUser,
                     activeIcon: HiMiniUser
-                },
-                {
-                    id: 'skills',
-                    href: '/skills',
-                    label: tNav('skills'),
-                    icon: HiOutlineSparkles,
-                    activeIcon: HiMiniSparkles
-                },
-                {
-                    id: 'knowledge',
-                    href: '/knowledge',
-                    label: tNav('knowledgeBase'),
-                    icon: HiOutlineSquare3Stack3D,
-                    activeIcon: HiMiniSquare3Stack3D
                 }
             ]
 
@@ -137,7 +138,12 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         },
         [shouldRestrictToBilling, tNav]
     )
-    const navGridColumnsClass = 'grid-cols-5'
+    const navGridColumnsClass = 'grid-cols-4'
+
+    useEffect(() => {
+        setIsAiOpen(false)
+        setIsOtherOpen(false)
+    }, [pathname])
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch()) return
@@ -409,6 +415,80 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                 </>
             )}
 
+            {isAiOpen && (
+                <>
+                    <button
+                        type="button"
+                        aria-label={tNav('closeAiMenu')}
+                        onClick={() => setIsAiOpen(false)}
+                        className="fixed inset-0 z-40 bg-black/25 lg:hidden"
+                    />
+                    <div className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl lg:hidden">
+                        <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            {tNav('ai')}
+                        </p>
+
+                        {skillsMenuNavState.isLocked ? (
+                            <button
+                                type="button"
+                                disabled
+                                aria-label={`${tNav('skills')} (${tSidebar('lockedLabel')})`}
+                                className="mb-1 flex w-full cursor-not-allowed items-center gap-3 rounded-xl bg-slate-100/80 px-3 py-2.5 text-left text-sm font-medium text-slate-400"
+                            >
+                                <HiOutlineSparkles size={16} />
+                                <span>{tNav('skills')}</span>
+                                <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-white p-1 text-slate-400">
+                                    <Lock size={10} />
+                                </span>
+                            </button>
+                        ) : (
+                            <Link
+                                href={skillsMenuNavState.href ?? '/skills'}
+                                onClick={() => setIsAiOpen(false)}
+                                className={cn(
+                                    'mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                                    activeItem === 'ai' && pathname?.includes('/skills')
+                                        ? 'bg-[#242A40]/8 text-[#242A40]'
+                                        : 'text-slate-700 hover:bg-slate-100'
+                                )}
+                            >
+                                <HiOutlineSparkles size={16} />
+                                {tNav('skills')}
+                            </Link>
+                        )}
+
+                        {knowledgeMenuNavState.isLocked ? (
+                            <button
+                                type="button"
+                                disabled
+                                aria-label={`${tNav('knowledgeBase')} (${tSidebar('lockedLabel')})`}
+                                className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl bg-slate-100/80 px-3 py-2.5 text-left text-sm font-medium text-slate-400"
+                            >
+                                <HiOutlineSquare3Stack3D size={16} />
+                                <span>{tNav('knowledgeBase')}</span>
+                                <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-white p-1 text-slate-400">
+                                    <Lock size={10} />
+                                </span>
+                            </button>
+                        ) : (
+                            <Link
+                                href={knowledgeMenuNavState.href ?? '/knowledge'}
+                                onClick={() => setIsAiOpen(false)}
+                                className={cn(
+                                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                                    activeItem === 'ai' && pathname?.includes('/knowledge')
+                                        ? 'bg-[#242A40]/8 text-[#242A40]'
+                                        : 'text-slate-700 hover:bg-slate-100'
+                                )}
+                            >
+                                <HiOutlineSquare3Stack3D size={16} />
+                                {tNav('knowledgeBase')}
+                            </Link>
+                        )}
+                    </div>
+                </>
+            )}
+
             <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden">
                 <div className={cn(
                     'grid gap-1 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2',
@@ -461,8 +541,34 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
 
                     <button
                         type="button"
+                        aria-expanded={isAiOpen}
+                        onClick={() => {
+                            setIsOtherOpen(false)
+                            setIsAiOpen(prev => !prev)
+                        }}
+                        className={cn(
+                            'flex flex-col items-center justify-center rounded-xl py-1.5 text-[11px] font-medium transition-colors',
+                            activeItem === 'ai' || isAiOpen
+                                ? 'text-[#242A40]'
+                                : 'text-slate-500 hover:text-slate-900'
+                        )}
+                    >
+                        <span className={cn(
+                            'mb-0.5 flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                            activeItem === 'ai' || isAiOpen ? 'bg-[#242A40]/10' : 'bg-transparent'
+                        )}>
+                            {(activeItem === 'ai' || isAiOpen) ? <HiMiniSparkles size={18} /> : <HiOutlineSparkles size={18} />}
+                        </span>
+                        {tNav('ai')}
+                    </button>
+
+                    <button
+                        type="button"
                         aria-expanded={isOtherOpen}
-                        onClick={() => setIsOtherOpen(prev => !prev)}
+                        onClick={() => {
+                            setIsAiOpen(false)
+                            setIsOtherOpen(prev => !prev)
+                        }}
                         className={cn(
                             'flex flex-col items-center justify-center rounded-xl py-1.5 text-[11px] font-medium transition-colors',
                             activeItem === 'other' || isOtherOpen

@@ -206,9 +206,11 @@
         "billing": "Billing",
         "inbox": "Inbox",
         "simulator": "Simulator",
+        "ai": "AI",
         "other": "Other",
         "signout": "Sign out",
-        "closeOtherMenu": "Close other menu"
+        "closeOtherMenu": "Close other menu",
+        "closeAiMenu": "Close AI menu"
     },
     "mainSidebar": {
         "workspace": "Workspace",

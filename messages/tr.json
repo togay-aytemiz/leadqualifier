@@ -206,9 +206,11 @@
         "billing": "Faturalandırma",
         "inbox": "Gelen Kutusu",
         "simulator": "Simülatör",
+        "ai": "AI",
         "other": "Diğer",
         "signout": "Çıkış Yap",
-        "closeOtherMenu": "Diğer menüsünü kapat"
+        "closeOtherMenu": "Diğer menüsünü kapat",
+        "closeAiMenu": "AI menüsünü kapat"
     },
     "mainSidebar": {
         "workspace": "Çalışma Alanı",

@@ -1,4 +1,4 @@
-export type MobileNavItemId = 'inbox' | 'contacts' | 'skills' | 'knowledge' | 'other'
+export type MobileNavItemId = 'inbox' | 'contacts' | 'ai' | 'other'
 
 function normalizePathname(pathname: string): string {
     if (!pathname) return '/'
@@ -12,8 +12,7 @@ export function resolveMobileNavActiveItem(pathname: string): MobileNavItemId {
 
     if (path.startsWith('/inbox')) return 'inbox'
     if (path.startsWith('/leads')) return 'contacts'
-    if (path.startsWith('/skills')) return 'skills'
-    if (path.startsWith('/knowledge')) return 'knowledge'
+    if (path.startsWith('/skills') || path.startsWith('/knowledge')) return 'ai'
     if (path.startsWith('/simulator') || path.startsWith('/settings')) return 'other'
 
     return 'inbox'

@@ -12,9 +12,9 @@ describe('resolveMobileNavActiveItem', () => {
         expect(resolveMobileNavActiveItem('/leads')).toBe('contacts')
     })
 
-    it('marks skills and knowledge routes correctly', () => {
-        expect(resolveMobileNavActiveItem('/skills')).toBe('skills')
-        expect(resolveMobileNavActiveItem('/knowledge/123')).toBe('knowledge')
+    it('marks skills and knowledge routes under ai tab', () => {
+        expect(resolveMobileNavActiveItem('/skills')).toBe('ai')
+        expect(resolveMobileNavActiveItem('/knowledge/123')).toBe('ai')
     })
 
     it('marks simulator and settings routes under other tab', () => {
