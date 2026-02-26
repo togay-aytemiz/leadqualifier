@@ -11,3 +11,11 @@ export function resolveMainSidebarBotMode(
     if (options.isWorkspaceLocked) return 'off'
     return options.botMode
 }
+
+export type MainSidebarBotModeTone = 'emerald' | 'amber' | 'rose'
+
+export function resolveMainSidebarBotModeTone(botMode: AiBotMode): MainSidebarBotModeTone {
+    if (botMode === 'shadow') return 'amber'
+    if (botMode === 'off') return 'rose'
+    return 'emerald'
+}

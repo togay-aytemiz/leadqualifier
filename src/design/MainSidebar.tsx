@@ -3,10 +3,11 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { updateOrgAiSettings } from '@/lib/ai/settings'
 import type { AiBotMode, OrganizationBillingAccount } from '@/types/database'
 import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
@@ -54,7 +55,16 @@ import {
 } from '@/lib/billing/sidebar-progress'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
-import { resolveMainSidebarBotMode } from '@/design/main-sidebar-bot-mode'
+import {
+    resolveMainSidebarBotMode,
+    resolveMainSidebarBotModeTone
+} from '@/design/main-sidebar-bot-mode'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from '@/design/Dropdown'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -108,6 +118,43 @@ function formatCompactCredits(value: number) {
     }).format(safe)
 }
 
+interface SidebarHoverTooltipProps {
+    children: ReactNode
+    content: ReactNode
+    enabled?: boolean
+    className?: string
+    panelClassName?: string
+}
+
+function SidebarHoverTooltip({
+    children,
+    content,
+    enabled = true,
+    className,
+    panelClassName
+}: SidebarHoverTooltipProps) {
+    if (!enabled) {
+        return <>{children}</>
+    }
+
+    return (
+        <div className={cn('relative group/sidebar-tooltip', className)}>
+            {children}
+            <div
+                className={cn(
+                    'pointer-events-none absolute left-full top-1/2 z-[140] ml-2 w-max max-w-64 -translate-y-1/2 translate-x-[-2px] rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 shadow-lg opacity-0 invisible transition-all duration-150 ease-out motion-reduce:transition-none',
+                    'group-hover/sidebar-tooltip:visible group-hover/sidebar-tooltip:translate-x-0 group-hover/sidebar-tooltip:opacity-100',
+                    'group-focus-within/sidebar-tooltip:visible group-focus-within/sidebar-tooltip:translate-x-0 group-focus-within/sidebar-tooltip:opacity-100',
+                    panelClassName
+                )}
+                role="tooltip"
+            >
+                {content}
+            </div>
+        </div>
+    )
+}
+
 interface MainSidebarProps {
     userName?: string
     isSystemAdmin?: boolean
@@ -132,6 +179,7 @@ export function MainSidebar({
     const tNav = useTranslations('nav')
     const tCommon = useTranslations('common')
     const tSidebar = useTranslations('mainSidebar')
+    const tAiSettings = useTranslations('aiSettings')
 
     const [collapsed, setCollapsed] = useState(false)
     const [hasUnread, setHasUnread] = useState(false)
@@ -141,6 +189,9 @@ export function MainSidebar({
     const [isLoadingOrganizationOptions, setIsLoadingOrganizationOptions] = useState(false)
     const [hasLoadedOrganizationOptions, setHasLoadedOrganizationOptions] = useState(!isSystemAdmin)
     const [botMode, setBotMode] = useState<AiBotMode>('active')
+    const [isBotModeDropdownOpen, setIsBotModeDropdownOpen] = useState(false)
+    const [isUpdatingBotMode, setIsUpdatingBotMode] = useState(false)
+    const [botModeUpdateError, setBotModeUpdateError] = useState<string | null>(null)
     const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
     const [isBillingDetailsExpanded, setIsBillingDetailsExpanded] = useState(false)
     const [orgSearch, setOrgSearch] = useState('')
@@ -257,6 +308,7 @@ export function MainSidebar({
         } else {
             setBotMode('active')
         }
+        setBotModeUpdateError(null)
     }, [supabase])
 
     const refreshBillingSnapshot = useCallback(async (orgId: string) => {
@@ -382,6 +434,9 @@ export function MainSidebar({
             setHasUnread(false)
             setHasPendingSuggestions(false)
             setBotMode('active')
+            setIsBotModeDropdownOpen(false)
+            setIsUpdatingBotMode(false)
+            setBotModeUpdateError(null)
             setBillingSnapshot(null)
             setIsBillingDetailsExpanded(false)
             return
@@ -663,16 +718,104 @@ export function MainSidebar({
         botMode,
         isWorkspaceLocked: shouldRestrictToBilling
     })
+    const botModeTone = resolveMainSidebarBotModeTone(effectiveBotMode)
+    const botModeToneClassMap = {
+        emerald: {
+            surface: 'border-emerald-200 bg-emerald-100/85 text-emerald-950 hover:bg-emerald-100',
+            badge: 'bg-emerald-200/70 text-emerald-900',
+            dot: 'bg-emerald-500',
+            selected: 'border-emerald-300 bg-emerald-50',
+            selectedIcon: 'bg-emerald-100 text-emerald-700',
+            hover: 'hover:border-emerald-200 hover:bg-emerald-50/60'
+        },
+        amber: {
+            surface: 'border-amber-200 bg-amber-100/85 text-amber-950 hover:bg-amber-100',
+            badge: 'bg-amber-200/70 text-amber-900',
+            dot: 'bg-amber-500',
+            selected: 'border-amber-300 bg-amber-50',
+            selectedIcon: 'bg-amber-100 text-amber-700',
+            hover: 'hover:border-amber-200 hover:bg-amber-50/60'
+        },
+        rose: {
+            surface: 'border-rose-200 bg-rose-100/85 text-rose-950 hover:bg-rose-100',
+            badge: 'bg-rose-200/70 text-rose-900',
+            dot: 'bg-rose-500',
+            selected: 'border-rose-300 bg-rose-50',
+            selectedIcon: 'bg-rose-100 text-rose-700',
+            hover: 'hover:border-rose-200 hover:bg-rose-50/60'
+        }
+    } as const
+    const currentBotModeToneClasses = botModeToneClassMap[botModeTone]
     const botModeLabel = useMemo(() => {
         if (effectiveBotMode === 'shadow') return tSidebar('botStatusShadow')
         if (effectiveBotMode === 'off') return tSidebar('botStatusOff')
         return tSidebar('botStatusActive')
     }, [effectiveBotMode, tSidebar])
-    const botModeDot = effectiveBotMode === 'shadow'
-        ? 'bg-amber-500'
-        : effectiveBotMode === 'off'
-            ? 'bg-red-500'
-            : 'bg-emerald-500'
+    const botModeOptions = useMemo<Array<{ value: AiBotMode; label: string; description: string }>>(() => {
+        return [
+            {
+                value: 'active',
+                label: tAiSettings('botModeActive'),
+                description: tAiSettings('botModeActiveDescription')
+            },
+            {
+                value: 'shadow',
+                label: tAiSettings('botModeShadow'),
+                description: tAiSettings('botModeShadowDescription')
+            },
+            {
+                value: 'off',
+                label: tAiSettings('botModeOff'),
+                description: tAiSettings('botModeOffDescription')
+            }
+        ]
+    }, [tAiSettings])
+    const canQuickSwitchBotMode = Boolean(organizationId) && !shouldRestrictToBilling && !readOnlyTenantMode
+    const handleQuickBotModeChange = useCallback(async (nextBotMode: AiBotMode) => {
+        if (!organizationId || isUpdatingBotMode || !canQuickSwitchBotMode) {
+            return
+        }
+        if (nextBotMode === botMode) return
+
+        const previousBotMode = botMode
+        setBotMode(nextBotMode)
+        setIsUpdatingBotMode(true)
+        setBotModeUpdateError(null)
+
+        try {
+            const savedSettings = await updateOrgAiSettings({
+                bot_mode: nextBotMode
+            })
+            setBotMode(savedSettings.bot_mode)
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('ai-settings-updated'))
+            }
+        } catch (error) {
+            console.error('Failed to quick switch bot mode', error)
+            setBotMode(previousBotMode)
+            setBotModeUpdateError(tSidebar('botStatusQuickSaveError'))
+        } finally {
+            setIsUpdatingBotMode(false)
+        }
+    }, [
+        botMode,
+        canQuickSwitchBotMode,
+        isUpdatingBotMode,
+        organizationId,
+        tSidebar
+    ])
+    const botModeQuickSwitchHelperText = useMemo(() => {
+        if (readOnlyTenantMode) return tSidebar('botStatusQuickSwitchReadOnly')
+        if (shouldRestrictToBilling) return tSidebar('botStatusQuickSwitchLocked')
+        return tSidebar('botStatusQuickSwitchHelp')
+    }, [readOnlyTenantMode, shouldRestrictToBilling, tSidebar])
+    const currentBotModeOption = useMemo(() => {
+        return botModeOptions.find((option) => option.value === effectiveBotMode) ?? {
+            value: 'active' as const,
+            label: tAiSettings('botModeActive'),
+            description: tAiSettings('botModeActiveDescription')
+        }
+    }, [botModeOptions, effectiveBotMode, tAiSettings])
     const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
     const settingsNavState = resolveBillingLockedNavItem(
         {
@@ -887,33 +1030,51 @@ export function MainSidebar({
                             />
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setCollapsed(prev => !prev)}
-                        className={cn(
-                            'inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/20',
-                            'motion-reduce:transition-none'
-                        )}
-                        aria-label={toggleLabel}
-                        aria-expanded={!collapsed}
-                        title={toggleLabel}
+                    <SidebarHoverTooltip
+                        enabled={collapsed}
+                        content={<span className="font-medium text-slate-900">{toggleLabel}</span>}
                     >
-                        {collapsed ? <ArrowRightFromLine size={16} /> : <ArrowLeftFromLine size={16} />}
-                    </button>
+                        <button
+                            type="button"
+                            onClick={() => setCollapsed(prev => !prev)}
+                            className={cn(
+                                'inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/20',
+                                'motion-reduce:transition-none'
+                            )}
+                            aria-label={toggleLabel}
+                            aria-expanded={!collapsed}
+                            title={collapsed ? undefined : toggleLabel}
+                        >
+                            {collapsed ? <ArrowRightFromLine size={16} /> : <ArrowLeftFromLine size={16} />}
+                        </button>
+                    </SidebarHoverTooltip>
                 </div>
             </div>
 
             {isSystemAdmin && (
                 <div className={cn('px-3 pb-2 space-y-2', collapsed && 'px-2')}>
                     {collapsed ? (
-                        <button
-                            type="button"
-                            onClick={() => setIsOrgPickerOpen(true)}
-                            title={currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
-                            className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                        <SidebarHoverTooltip
+                            content={
+                                <div className="space-y-0.5">
+                                    <p className="font-semibold text-slate-900">{tSidebar('organizationSwitcherTitle')}</p>
+                                    <p className="max-w-52 truncate text-slate-600">
+                                        {currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
+                                    </p>
+                                </div>
+                            }
+                            className="flex justify-center"
+                            panelClassName="max-w-56"
                         >
-                            <Building2 size={15} />
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsOrgPickerOpen(true)}
+                                title={undefined}
+                                className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                            >
+                                <Building2 size={15} />
+                            </button>
+                        </SidebarHoverTooltip>
                     ) : (
                         <div className="rounded-xl border border-slate-200 bg-white p-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -1061,25 +1222,202 @@ export function MainSidebar({
 
             {canAccessTenantModules && (
                 <div className="px-3 pb-2">
-                    <Link
-                        href={settingsNavState.href ?? '/settings/ai'}
-                        title={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
-                        aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
-                        className={cn(
-                            'group flex items-center rounded-xl text-xs font-medium text-slate-600 transition-colors duration-150 motion-reduce:transition-none hover:bg-white hover:text-slate-900',
-                            collapsed ? 'mx-auto h-9 w-9 justify-center' : 'w-full gap-2 px-3 py-2'
-                        )}
+                    <SidebarHoverTooltip
+                        enabled={collapsed && !isBotModeDropdownOpen}
+                        className={cn(collapsed ? 'flex justify-center' : 'w-full')}
+                        panelClassName="w-60"
+                        content={
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                    {tSidebar('botStatusLabel')}
+                                </p>
+                                <p className="text-sm font-semibold text-slate-900">{currentBotModeOption.label}</p>
+                                <p className="text-xs leading-5 text-slate-600">{currentBotModeOption.description}</p>
+                            </div>
+                        }
                     >
-                        <span className={cn('h-2.5 w-2.5 rounded-full', botModeDot)} />
-                        {collapsed ? (
-                            <span className="sr-only">{`${tSidebar('botStatusLabel')}: ${botModeLabel}`}</span>
-                        ) : (
-                            <>
-                                <span className="text-xs text-slate-500">{tSidebar('botStatusLabel')}</span>
-                                <span className="ml-auto text-xs font-semibold text-slate-900">{botModeLabel}</span>
-                            </>
-                        )}
-                    </Link>
+                        <DropdownMenu
+                            fullWidth={!collapsed}
+                            onOpenChange={setIsBotModeDropdownOpen}
+                        >
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    title={collapsed ? undefined : `${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                                    aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
+                                    className={cn(
+                                        'group w-full rounded-xl border shadow-sm transition-colors duration-150 motion-reduce:transition-none',
+                                        currentBotModeToneClasses.surface,
+                                        collapsed
+                                            ? 'mx-auto flex h-11 w-11 items-center justify-center p-0'
+                                            : 'flex items-center gap-2 px-3 py-2.5 text-left'
+                                    )}
+                                >
+                                    {collapsed ? (
+                                        <>
+                                            <span
+                                                className={cn(
+                                                    'h-3 w-3 rounded-full',
+                                                    currentBotModeToneClasses.dot,
+                                                    effectiveBotMode === 'active' && 'animate-pulse'
+                                                )}
+                                            />
+                                            <span className="sr-only">{`${tSidebar('botStatusLabel')}: ${botModeLabel}`}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span
+                                                className={cn(
+                                                    'grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/60 bg-white/60',
+                                                    currentBotModeToneClasses.badge
+                                                )}
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        'h-2.5 w-2.5 rounded-full',
+                                                        currentBotModeToneClasses.dot,
+                                                        effectiveBotMode === 'active' && 'animate-pulse'
+                                                    )}
+                                                />
+                                            </span>
+                                            <div className="min-w-0">
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                                    {tSidebar('botStatusLabel')}
+                                                </p>
+                                                <p className="truncate text-sm font-semibold">
+                                                    {botModeLabel}
+                                                </p>
+                                            </div>
+                                            <ChevronDown
+                                                className={cn(
+                                                    'ml-auto h-4 w-4 shrink-0 opacity-65 transition-transform duration-200 ease-out motion-reduce:transition-none',
+                                                    isBotModeDropdownOpen && 'rotate-180'
+                                                )}
+                                            />
+                                        </>
+                                    )}
+                                </button>
+                            </DropdownMenuTrigger>
+
+                            <DropdownMenuContent
+                                align="start"
+                                className={cn(
+                                    'z-[130] w-[304px] rounded-2xl border border-slate-200 bg-white p-0 shadow-xl',
+                                    collapsed && 'ml-[-2px]'
+                                )}
+                            >
+                                <div className="border-b border-slate-100 px-3.5 py-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {tSidebar('botStatusQuickSwitchTitle')}
+                                        </p>
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                currentBotModeToneClasses.badge
+                                            )}
+                                        >
+                                            <span className={cn('h-1.5 w-1.5 rounded-full', currentBotModeToneClasses.dot)} />
+                                            {botModeLabel}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                        {botModeQuickSwitchHelperText}
+                                    </p>
+                                    {isUpdatingBotMode && (
+                                        <p className="mt-2 text-xs font-medium text-slate-600">
+                                            {tSidebar('botStatusQuickSwitchSaving')}
+                                        </p>
+                                    )}
+                                    {botModeUpdateError && (
+                                        <p className="mt-2 text-xs font-medium text-rose-600">
+                                            {botModeUpdateError}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="p-2">
+                                    {!canQuickSwitchBotMode && (
+                                        <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                            <p className="text-xs leading-5 text-slate-600">
+                                                {botModeQuickSwitchHelperText}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-1.5">
+                                        {botModeOptions.map((option) => {
+                                            const isSelected = effectiveBotMode === option.value
+                                            const optionToneClasses = botModeToneClassMap[resolveMainSidebarBotModeTone(option.value)]
+                                            const optionClassName = cn(
+                                                'rounded-xl border px-2.5 py-2 text-left',
+                                                isSelected
+                                                    ? optionToneClasses.selected
+                                                    : cn('border-slate-200 bg-white', optionToneClasses.hover),
+                                                !canQuickSwitchBotMode && 'cursor-default'
+                                            )
+                                            const optionContent = (
+                                                <div className="flex w-full items-start gap-2.5">
+                                                    <span
+                                                        className={cn(
+                                                            'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full',
+                                                            isSelected
+                                                                ? optionToneClasses.selectedIcon
+                                                                : 'bg-slate-100 text-slate-500'
+                                                        )}
+                                                    >
+                                                        <span className={cn('h-2 w-2 rounded-full', optionToneClasses.dot)} />
+                                                    </span>
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="truncate text-sm font-semibold text-slate-900">
+                                                                {option.label}
+                                                            </span>
+                                                            {isSelected && (
+                                                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                                                    {tSidebar('botStatusCurrentLabel')}
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                                                            {option.description}
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            )
+
+                                            if (!canQuickSwitchBotMode) {
+                                                return (
+                                                    <div key={option.value} className={optionClassName}>
+                                                        {optionContent}
+                                                    </div>
+                                                )
+                                            }
+
+                                            return (
+                                                <DropdownMenuItem
+                                                    key={option.value}
+                                                    onClick={() => handleQuickBotModeChange(option.value)}
+                                                    className={cn(optionClassName, 'hover:bg-transparent')}
+                                                >
+                                                    {optionContent}
+                                                </DropdownMenuItem>
+                                            )
+                                        })}
+                                    </div>
+
+                                    <DropdownMenuItem
+                                        asChild
+                                        className="mt-2 justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                        <Link href={settingsNavState.href ?? '/settings/ai'}>
+                                            {tSidebar('botStatusQuickSwitchOpenSettings')}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </SidebarHoverTooltip>
                 </div>
             )}
 
@@ -1182,14 +1520,21 @@ export function MainSidebar({
                                             )}
                                         </>
                                     )
+                                    const collapsedNavTooltipContent = (
+                                        <div className="space-y-0.5">
+                                            <p className="font-semibold text-slate-900">{item.label}</p>
+                                            {isLockedItem && (
+                                                <p className="text-slate-600">{tSidebar('lockedLabel')}</p>
+                                            )}
+                                        </div>
+                                    )
 
                                     if (isLockedItem) {
-                                        return (
+                                        const lockedButton = (
                                             <button
-                                                key={item.id}
                                                 type="button"
                                                 disabled
-                                                title={itemLabel}
+                                                title={collapsed ? undefined : itemLabel}
                                                 aria-label={itemLabel}
                                                 aria-disabled
                                                 className={navItemClassName}
@@ -1197,18 +1542,53 @@ export function MainSidebar({
                                                 {navItemContent}
                                             </button>
                                         )
+
+                                        if (collapsed) {
+                                            return (
+                                                <SidebarHoverTooltip
+                                                    key={item.id}
+                                                    className="flex justify-center"
+                                                    content={collapsedNavTooltipContent}
+                                                >
+                                                    {lockedButton}
+                                                </SidebarHoverTooltip>
+                                            )
+                                        }
+
+                                        return (
+                                            <div key={item.id}>
+                                                {lockedButton}
+                                            </div>
+                                        )
                                     }
 
-                                    return (
+                                    const navLink = (
                                         <Link
-                                            key={item.id}
                                             href={itemHref}
-                                            title={item.label}
+                                            title={collapsed ? undefined : item.label}
                                             aria-label={item.label}
                                             className={navItemClassName}
                                         >
                                             {navItemContent}
                                         </Link>
+                                    )
+
+                                    if (collapsed) {
+                                        return (
+                                            <SidebarHoverTooltip
+                                                key={item.id}
+                                                className="flex justify-center"
+                                                content={collapsedNavTooltipContent}
+                                            >
+                                                {navLink}
+                                            </SidebarHoverTooltip>
+                                        )
+                                    }
+
+                                    return (
+                                        <div key={item.id}>
+                                            {navLink}
+                                        </div>
                                     )
                                 })}
                             </div>
