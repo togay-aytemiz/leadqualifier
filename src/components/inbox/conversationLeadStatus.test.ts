@@ -23,16 +23,16 @@ function buildConversation(id: string, status?: string): ConversationListItem {
 }
 
 describe('applyLeadStatusToConversationList', () => {
-    it('updates matching conversation with ignored status', () => {
+    it('updates matching conversation with cold status', () => {
         const conversations = [buildConversation('1', 'warm'), buildConversation('2', 'hot')]
-        const next = applyLeadStatusToConversationList(conversations, '1', 'ignored')
+        const next = applyLeadStatusToConversationList(conversations, '1', 'cold')
 
-        expect(next[0]?.leads?.[0]?.status).toBe('ignored')
+        expect(next[0]?.leads?.[0]?.status).toBe('cold')
         expect(next[1]?.leads?.[0]?.status).toBe('hot')
     })
 
     it('clears lead status when lead row is removed', () => {
-        const conversations = [buildConversation('1', 'ignored')]
+        const conversations = [buildConversation('1', 'cold')]
         const next = applyLeadStatusToConversationList(conversations, '1', null)
 
         expect(next[0]?.leads).toEqual([])

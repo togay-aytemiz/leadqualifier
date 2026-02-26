@@ -46,6 +46,7 @@ import {
     listConversationWhatsAppTemplates,
     listConversationPredefinedTemplates,
     sendConversationWhatsAppTemplateMessage,
+    setConversationAgent,
     setConversationAiProcessingPaused,
     updateConversationPredefinedTemplate,
     type ConversationListItem
@@ -184,7 +185,7 @@ describe('getConversations', () => {
                 email: 'test@example.com'
             },
             leads: {
-                status: 'ignored'
+                status: 'cold'
             },
             messages: [{
                 content: 'Selam',
@@ -209,7 +210,7 @@ describe('getConversations', () => {
         const result = await getConversations('org-1')
 
         expect(Array.isArray(result[0]?.leads)).toBe(true)
-        expect(result[0]?.leads?.[0]?.status).toBe('ignored')
+        expect(result[0]?.leads?.[0]?.status).toBe('cold')
     })
 
     it('falls back to flat queries when primary nested query fails', async () => {
@@ -693,5 +694,38 @@ describe('setConversationAiProcessingPaused', () => {
             id: 'conv-1',
             ai_processing_paused: true
         })
+    })
+})
+
+describe('setConversationAgent', () => {
+    beforeEach(() => {
+        createClientMock.mockReset()
+        assertTenantWriteAllowedMock.mockResolvedValue(undefined)
+    })
+
+    it('clears assignee and attention fields when switching back to bot', async () => {
+        const eqMock = vi.fn(async () => ({ error: null }))
+        const updateMock = vi.fn(() => ({ eq: eqMock }))
+        const fromMock = vi.fn((table: string) => {
+            if (table !== 'conversations') {
+                throw new Error(`Unexpected query for table: ${table}`)
+            }
+            return { update: updateMock }
+        })
+        const supabase = { from: fromMock }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await setConversationAgent('conv-1', 'bot')
+
+        expect(result).toBe(true)
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            active_agent: 'bot',
+            assignee_id: null,
+            human_attention_required: false,
+            human_attention_reason: null,
+            human_attention_requested_at: null,
+            human_attention_resolved_at: expect.any(String)
+        }))
     })
 })

@@ -112,9 +112,9 @@ If one service is detected, return one item in services.
 If no clear service is detected, return services as [] and service_type as null.
 service_type should be the primary service in services (usually the first one) or null.
 Score must be an integer from 0 to 10.
-Status must be one of: hot, warm, cold, ignored, undetermined.
-Use status=undetermined when customer information is not enough to qualify intent (for example only greeting/acknowledgement or short unclear turns).
-If non_business is true, set score to 0 and status to ignored.
+Status must be one of: hot, warm, cold.
+If customer information is not enough to qualify intent (for example only greeting/acknowledgement or short unclear turns), use status=cold.
+If non_business is true, set score to 0 and status to cold.
 Use catalog names when possible for service_type and services.
 If catalog is empty, infer service_type and services from offering profile summary/suggestions only when customer messages include a service clue.
 If inferred service matches a provided catalog name, keep that catalog name exactly as-is.
@@ -454,28 +454,29 @@ function normalizeScore(value: unknown) {
 function normalizeStatus(value: unknown) {
     if (typeof value !== 'string') return 'cold'
     const normalized = value.trim().toLowerCase()
-    const aliases: Record<string, 'hot' | 'warm' | 'cold' | 'ignored' | 'undetermined'> = {
+    const aliases: Record<string, 'hot' | 'warm' | 'cold'> = {
         'sıcak': 'hot',
         'sicak': 'hot',
         'ılık': 'warm',
         'ilik': 'warm',
         'soğuk': 'cold',
         'soguk': 'cold',
-        'yok sayıldı': 'ignored',
-        'yoksayıldı': 'ignored',
-        'ignore': 'ignored',
-        'ignored': 'ignored',
-        'belirsiz': 'undetermined',
-        'henüz belli değil': 'undetermined',
-        'henuz belli degil': 'undetermined',
-        'needs more info': 'undetermined',
-        'needs_more_info': 'undetermined',
-        'pending qualification': 'undetermined',
-        'pending_qualification': 'undetermined',
-        'undetermined': 'undetermined'
+        // Legacy status aliases are collapsed into cold.
+        'yok sayıldı': 'cold',
+        'yoksayıldı': 'cold',
+        'ignore': 'cold',
+        'ignored': 'cold',
+        'belirsiz': 'cold',
+        'henüz belli değil': 'cold',
+        'henuz belli degil': 'cold',
+        'needs more info': 'cold',
+        'needs_more_info': 'cold',
+        'pending qualification': 'cold',
+        'pending_qualification': 'cold',
+        'undetermined': 'cold'
     }
     if (aliases[normalized]) return aliases[normalized]
-    if (normalized === 'hot' || normalized === 'warm' || normalized === 'cold' || normalized === 'ignored' || normalized === 'undetermined') {
+    if (normalized === 'hot' || normalized === 'warm' || normalized === 'cold') {
         return normalized
     }
     return 'cold'
@@ -528,7 +529,7 @@ export interface NormalizedLeadExtraction {
     non_business: boolean
     summary: string | null
     score: number
-    status: 'hot' | 'warm' | 'cold' | 'ignored' | 'undetermined'
+    status: 'hot' | 'warm' | 'cold'
 }
 
 function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction {
@@ -552,7 +553,7 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
     const payloadRecord = payload as Record<string, unknown>
     const nonBusiness = normalizeBoolean(payloadRecord.non_business)
     const score = nonBusiness ? 0 : normalizeScore(payloadRecord.score)
-    const status = nonBusiness ? 'ignored' : normalizeStatus(payloadRecord.status)
+    const status = nonBusiness ? 'cold' : normalizeStatus(payloadRecord.status)
     const rawServiceType = typeof payloadRecord.service_type === 'string'
         ? payloadRecord.service_type.trim() || null
         : null
@@ -664,7 +665,7 @@ function hasStrongIntentSignal(intentSignals: string[]) {
         ))
 }
 
-export function normalizeUndeterminedLeadStatus(options: {
+export function normalizeLowSignalLeadStatus(options: {
     extracted: NormalizedLeadExtraction
     customerMessages: string[]
 }) {
@@ -680,7 +681,7 @@ export function normalizeUndeterminedLeadStatus(options: {
             ...extracted,
             non_business: false,
             score: Math.min(extracted.score, 2),
-            status: 'undetermined'
+            status: 'cold'
         } satisfies NormalizedLeadExtraction
     }
 
@@ -696,16 +697,16 @@ export function normalizeUndeterminedLeadStatus(options: {
     )
     const hasStrongIntent = hasStrongIntentSignal(extracted.intent_signals)
     const lacksQualificationSignals = !hasStructuredLeadSignals && !hasStrongIntent
-    const shouldMarkUndetermined = customerMessages.length === 0
+    const shouldMarkLowSignalCold = customerMessages.length === 0
         || isGreetingOnlyConversation
         || (lacksQualificationSignals && extracted.score <= 2)
 
-    if (!shouldMarkUndetermined) return extracted
+    if (!shouldMarkLowSignalCold) return extracted
 
     return {
         ...extracted,
         score: Math.min(extracted.score, 2),
-        status: 'undetermined'
+        status: 'cold'
     } satisfies NormalizedLeadExtraction
 }
 
@@ -892,7 +893,7 @@ export async function runLeadExtraction(options: {
         service_type: persistedPrimaryService,
         services: persistedServiceTypes
     }
-    extracted = normalizeUndeterminedLeadStatus({ extracted, customerMessages })
+    extracted = normalizeLowSignalLeadStatus({ extracted, customerMessages })
     const normalizedExtracted = mergeExtractionWithExisting(extracted, existingLead)
 
     await supabase.from('leads').upsert({

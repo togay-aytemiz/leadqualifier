@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-26 (AI Settings now includes a channel-wide bot disclaimer toggle with localized TR/EN editable text (default enabled); outbound bot replies in WhatsApp/Telegram/Instagram now append disclaimer text as a blockquote line (`\n\n> ...`) when enabled; AI Settings `Sensitivity` control is grouped under `Behavior and Logic` (not `General`); `Lead extraction during operator` is grouped under `Escalation`; Settings nav/page label is standardized as `Qualy AI`; AI Settings keeps reusable animated tabs with 3 grouped areas: `General`, `Behavior and Logic`, and `Escalation`, where Escalation is split into primary `Automatic Escalation` + `Skill Based Handover` title-only sections; Organization Settings now uses 3 tabs (`General`, `Organization Details`, `Security & Data`) with grouped content; AI/Organization settings content starts directly with tabs (no top intro description); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation; Inbox message-day badges now render from message timestamps (`Today`/`Yesterday`/localized full date) instead of a static `Today` chip.)  
+> **Last Updated:** 2026-02-26 (AI Settings now includes a channel-wide bot disclaimer toggle with localized TR/EN editable text (default enabled); outbound bot replies in WhatsApp/Telegram/Instagram now append disclaimer text as a blockquote line (`\n\n> ...`) when enabled; Inbox bot messages now hide this trailing disclaimer from UI while keeping outbound payload unchanged; skill-matched bot replies now carry/display matched `skill_title` metadata in Inbox footer area; matched skills with `requires_human_handover=true` now pass an intent guard (evaluated across top-5 candidates in order) to suppress false-positive handover/escalation responses; AI Settings `Sensitivity` control is grouped under `Behavior and Logic` (not `General`); `Lead extraction during operator` is grouped under `Escalation`; Settings nav/page label is standardized as `Qualy AI`; AI Settings keeps reusable animated tabs with 3 grouped areas: `General`, `Behavior and Logic`, and `Escalation`, where Escalation is split into primary `Automatic Escalation` + `Skill Based Handover` title-only sections; Organization Settings now uses 3 tabs (`General`, `Organization Details`, `Security & Data`) with grouped content; AI/Organization settings content starts directly with tabs (no top intro description); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation; Inbox message-day badges now render from message timestamps (`Today`/`Yesterday`/localized full date) instead of a static `Today` chip; lead status model is simplified to `cold/warm/hot` only and legacy `ignored/undetermined` values normalize to `cold`; Inbox queue now uses `All / Unassigned / Me` tabs with human-attention badges, backed by persisted conversation attention fields.)  
 > **Status:** In Development
 
 ---
@@ -110,6 +110,10 @@ Customer Message → Skill Match? → Yes → Skill Response
 - In Settings navigation/header, the AI module label is `Qualy AI`.
 - Org-level AI settings also control bot-disclaimer behavior: channel-wide enable/disable plus localized TR/EN disclaimer text.
 - When disclaimer is enabled, outbound bot replies append one quoted disclaimer line after one empty line (`\n\n> ...`) across WhatsApp, Telegram, and Instagram.
+- If localized disclaimer fields are missing/blank at runtime, outbound formatting falls back to default TR/EN disclaimer text.
+- Runtime evaluates matched skills in ranked order. If a matched skill requires human handover, runtime applies an additional intent guard (explicit handover/escalation intent, high confidence, or strong lexical overlap) before sending that skill response; rejected candidates are skipped and evaluation continues with the next match. If no candidate is accepted, flow continues via KB/fallback.
+- Inbox rendering rule: if a bot message ends with the standardized disclaimer quote block (`\n\n> ...`), UI strips it from visible bubble content (disclaimer stays in outbound channel payload).
+- Inbox skill attribution rule: for bot messages created from skill matches, message metadata carries `skill_title` and UI displays it in the bot footer area; if no skill match exists, no attribution is shown.
 - Live QA-port runtime improvements (response guards + intake-state behavior) are globally enabled by default for all organizations (current + newly created) in the pre-customer stage; no feature-flag gating is used.
 
 ---
@@ -224,15 +228,15 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Service inference guard: when recent customer turns are generic greetings/acknowledgements without a clear service clue, extraction must keep `service_type = null` (do not infer solely from profile text).
 - Cross-language service acceptance: when recent customer turns contain a concrete service clue that aligns with approved profile/service signals, keep inferred `service_type` even if model output language differs from customer text (for example, customer TR + inferred EN).
 - Service canonicalization: when inferred service matches catalog aliases in another language, persist `service_type` as the approved catalog `name` (catalog/UI language source of truth).
-- Insufficient-information conversations (e.g., greeting-only/unclear short turns with no qualifying signals) are marked as `undetermined`.
-- Greeting-only turns are normalized to `undetermined` even if raw model output marks `non_business=true`, preventing false `ignored` statuses on first-contact hellos.
+- Insufficient-information conversations (e.g., greeting-only/unclear short turns with no qualifying signals) are normalized to low-score `cold`.
+- Greeting-only turns are normalized to `cold` even if raw model output marks `non_business=true`, preventing false non-business classification on first-contact hellos.
 - Extraction locale precedence is deterministic: explicit preferred locale (UI/manual refresh) > organization locale > customer-message language heuristics.
 - Inbox lead details now show collected required fields in an "Important info" card section based on Organization Settings > Required Fields, rendered as plain label-value rows.
 - Leads list required-field columns/cards use the same required-intake resolver as Inbox details so `required_intake_collected` values stay consistent across both surfaces.
 - Leads service column/cards show AI-extracted `services[]` values from `extracted_fields.services`; if empty, UI falls back to `service_type`.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
 - Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
-- Non-business conversations are excluded from lead scoring and marked as `ignored` (not `undetermined`).
+- Non-business conversations are excluded from lead scoring and kept at low-score `cold` (while preserving `non_business=true` as metadata when applicable).
 - Manual lead refresh from Inbox is blocked when conversation-level AI pause is enabled for that contact.
 
 ---
@@ -243,6 +247,7 @@ Customer Message → Skill Match? → Yes → Skill Response
  **Behavior:**
 - **Explicit State:** `active_agent` switches to 'operator'.
 - **Assignee Ownership:** Operator is assigned (`assignee_id`) for ownership/visibility and claim tracking.
+- **Inbox Queue Visibility:** Inbox list is segmented into `Me`, `Unassigned`, and `All` queues for faster takeover routing.
 - **Source of Truth:** AI reply gating uses `active_agent` as the runtime source of truth; `assignee_id` is ownership metadata and legacy fallback only.
 - **AI Silence:** Bot ignores all incoming messages while operator is active.
 - **Resume:** Operator (or Admin) must explicitly "Leave Conversation" to resume Bot.
@@ -262,6 +267,11 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Actions:**
 - `notify_only`: notify owner/team, keep AI active
 - `switch_to_operator`: lock conversation to operator (`active_agent='operator'`)
+
+**Attention Queue Persistence:**
+- On escalation (`skill_handover` or `hot_lead`), runtime sets `conversations.human_attention_required=true`, records reason, and stamps `human_attention_requested_at`.
+- On operator ownership/send, runtime resolves queue state with `human_attention_required=false`, clears reason, and stamps `human_attention_resolved_at`.
+- Inbox `Me` and `Unassigned` tabs show red counters for rows where `human_attention_required=true`.
 
 **Bot Message (Handover):**
 - Handover message is appended only when escalation switches the conversation to operator (`switch_to_operator`) or when a skill forces handover.
@@ -956,6 +966,9 @@ MVP is successful when:
 - **Extraction Confirmation Context:** Include recent role-labeled turns (`customer`/`owner`/`assistant`) in extraction prompts so short customer confirmations can be resolved against the immediately preceding question, while preserving customer-confirmed grounding.
 - **Default Guardrail Scope (MVP):** Ship universal explicit-intent guardrail skills (human support, complaint, urgent, privacy) and keep low-confidence/no-safe-answer auto-handover out of scope.
 - **Default Guardrail Provisioning:** Seed localized default guardrail skills for organizations that have no skills on first Skills load; manage them in the same list as user-created skills.
+- **Skill Handover False-Positive Guard (Implementation v1.23):** For matched skills with `requires_human_handover=true`, require extra runtime intent validation (explicit escalation intent, high-confidence bypass, or strong lexical overlap with matched trigger/title). If validation fails, skip the skill response and continue KB/fallback routing.
+- **Skill Candidate Evaluation Order (Implementation v1.24):** Evaluate top-5 matched skills sequentially and select the first valid candidate; do not stop at a rejected top match.
+- **Inbox Bot Message Presentation (Implementation v1.24):** Hide trailing disclaimer quote text in Inbox bubble rendering (while keeping outbound payload intact); show `skill_title` attribution in footer only for skill-matched bot replies.
 - **Handover Locale Repair:** When legacy/default values create EN text in both localized fields, normalize to TR default for `hot_lead_handover_message_tr` and EN default for `hot_lead_handover_message_en`.
 - **Prompt Locale Repair:** When stored prompt is a known default family (EN/TR), including legacy long EN default variants and legacy strict fallback text, normalize to the active UI locale default prompt in settings.
 - **Lead Extraction Parsing:** Strip code fences and extract the first JSON object before parsing to prevent empty lead updates.
@@ -970,8 +983,8 @@ MVP is successful when:
 - **Offering Profile Updates:** Conflicting content produces update suggestions that revise the targeted approved suggestion on approval.
 - **Offering Profile Context:** Suggestion generation includes the manual summary plus approved/rejected suggestion history for better alignment.
 - **Offering Profile Formatting:** Suggestions must include a short intro plus 3-5 labeled bullets; if output is too sparse, retry generation.
-- **Non-Business Handling:** Skip lead extraction and scoring for personal/non-business conversations (mark as `ignored`).
-- **Insufficient-Info Handling:** Use `undetermined` status for business-context conversations that do not yet contain enough qualification signal.
+- **Non-Business Handling:** Skip lead scoring for personal/non-business conversations (status remains `cold`).
+- **Insufficient-Info Handling:** Business-context conversations without enough qualification signal remain `cold` (low-score normalization).
 - **Offering Profile Location:** Manage the Offering Profile under Organization Settings (not AI Settings) to align with org-level scope.
 - **Organization AI Control:** Use independent section-level AI toggles for Offering Profile and Required Fields UX modes.
 - **AI Suggestions Header:** Keep a single pending indicator label in the accordion header and avoid duplicate right-side count chips.

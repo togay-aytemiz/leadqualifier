@@ -270,8 +270,17 @@
         "billingPackageRenewalUnknown": "Paket yenileme tarihi hazırlanıyor"
     },
     "inbox": {
-        "title": "Gelen Kutusu",
-        "noMessages": "Mesaj yok",
+  "title": "Gelen Kutusu",
+  "queueTabMe": "Ben",
+  "queueTabUnassigned": "Atanmamış",
+  "queueTabAll": "Tümü",
+  "queueAttentionRequired": "Dikkat gerekli",
+  "queueAttentionReasonSkill": "Skill devri",
+  "queueAttentionReasonHotLead": "Sıcak lead",
+  "queueOperatorsTitle": "Operatörler",
+  "queueUnassignedSummary": "Atanmamış: {count}",
+  "queueNoOperators": "Operatör bulunamadı",
+  "noMessages": "Mesaj yok",
         "noMessagesDesc": "Yeni konuşmalar mesaj aldığınızda burada görünecektir.",
         "noMessagesYet": "Henüz mesaj yok",
         "searchPlaceholder": "Ara...",
@@ -430,8 +439,6 @@
         "leadStatusHot": "Sıcak",
         "leadStatusWarm": "Ilık",
         "leadStatusCold": "Soğuk",
-        "leadStatusUndetermined": "Belirsiz",
-        "leadStatusIgnored": "Yok sayıldı",
         "leadAiExtraction": "AI çıkarımı",
         "leadUpdating": "Güncelleniyor...",
         "leadPausedTitle": "Kişi çıkarımı duraklatıldı.",
@@ -1864,8 +1871,6 @@
         },
         "statusHot": "Sıcak",
         "statusWarm": "Ilık",
-        "statusCold": "Soğuk",
-        "statusUndetermined": "Belirsiz",
-        "statusIgnored": "Yok sayıldı"
+        "statusCold": "Soğuk"
     }
 }

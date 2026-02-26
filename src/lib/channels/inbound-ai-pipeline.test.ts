@@ -446,6 +446,7 @@ describe('processInboundAiPipeline guardrails', () => {
         matchSkillsSafelyMock.mockResolvedValueOnce([
             {
                 skill_id: 'skill-1',
+                title: 'Bilgi',
                 response_text: 'Skill response'
             }
         ])
@@ -458,12 +459,288 @@ describe('processInboundAiPipeline guardrails', () => {
                 sender_type: 'bot',
                 content: 'Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',
                 metadata: {
-                    skill_id: 'skill-1'
+                    skill_id: 'skill-1',
+                    skill_title: 'Bilgi'
                 }
             })
         )
         expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover')
         expect(decideHumanEscalationMock).toHaveBeenCalled()
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('marks conversation for human attention when escalation is triggered', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const escalationConversationUpdate = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotReply.builder,
+                escalationConversationUpdate.builder
+            ],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+        decideHumanEscalationMock.mockReturnValueOnce({
+            shouldEscalate: true,
+            reason: 'hot_lead',
+            action: 'notify_only',
+            noticeMode: 'none',
+            noticeMessage: null
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(escalationConversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            human_attention_required: true,
+            human_attention_reason: 'hot_lead',
+            human_attention_resolved_at: null,
+            human_attention_requested_at: expect.any(String)
+        }))
+    })
+
+    it('applies default disclaimer text when localized disclaimer settings are missing', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder]
+        })
+
+        getOrgAiSettingsMock.mockResolvedValueOnce({
+            match_threshold: 0.7,
+            bot_mode: 'active',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 8,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: 'Talebin destek ekibine iletildi.',
+            hot_lead_handover_message_en: 'Your request was forwarded to support.',
+            bot_disclaimer_enabled: true,
+            bot_disclaimer_message_tr: undefined,
+            bot_disclaimer_message_en: undefined,
+            prompt: null,
+            bot_name: null
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response',
+                trigger_text: 'Bilgi almak istiyorum',
+                similarity: 0.8
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('ignores false-positive handover skill matches for non-handover user intent', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historyLimitMock = vi.fn(async () => ({ data: [], error: null }))
+        const historyOrBotInsert = {
+            builder: {
+                select: vi.fn(() => ({
+                    eq: vi.fn(() => ({
+                        order: vi.fn(() => ({
+                            limit: historyLimitMock
+                        }))
+                    }))
+                })),
+                insert: vi.fn(async () => ({ error: null }))
+            }
+        }
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: true })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historyOrBotInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-complaint',
+                title: 'Şikayet ve Memnuniyetsizlik',
+                response_text: 'Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.',
+                trigger_text: 'Bu konuda destek istiyorum',
+                similarity: 0.72
+            }
+        ])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Fallback response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).not.toHaveBeenCalledWith(
+            expect.stringContaining('Yaşadığınız olumsuz deneyim için üzgünüz')
+        )
+        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover')
+        expect(buildFallbackResponseMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses the next matched skill when the top match is rejected by handover-intent guard', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const firstSkillDetails = createSkillDetailsBuilder({ requires_human_handover: true })
+        const secondSkillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [firstSkillDetails.builder, secondSkillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-complaint',
+                title: 'Şikayet ve Memnuniyetsizlik',
+                response_text: 'Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.',
+                trigger_text: 'Bu konuda destek istiyorum',
+                similarity: 0.72
+            },
+            {
+                skill_id: 'skill-service-info',
+                title: 'Hizmet Bilgisi',
+                response_text: 'Elbette, hizmetlerimiz hakkında bilgi paylaşabilirim.',
+                trigger_text: 'hizmetleriniz hakkında bilgi almak istiyorum',
+                similarity: 0.7
+            }
+        ])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Elbette, hizmetlerimiz hakkında bilgi paylaşabilirim.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).not.toHaveBeenCalledWith(
+            expect.stringContaining('Yaşadığınız olumsuz deneyim için üzgünüz')
+        )
+        expect(firstSkillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover')
+        expect(secondSkillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover')
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('falls through to RAG when all matched skills are rejected', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'hizmetleriniz hakkında bilgi almak istiyorum',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: true })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'hizmet bilgisi',
+            reason: 'knowledge_question',
+            usage: {
+                inputTokens: 10,
+                outputTokens: 4,
+                totalTokens: 14
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Güzellik merkezimizde cilt bakımı, lazer epilasyon ve bakım paketleri sunuyoruz.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Güzellik merkezimizde cilt bakımı, lazer epilasyon ve bakım paketleri sunuyoruz.',
+            chunks: [{ document_id: 'doc-1', content: 'Güzellik merkezimizde cilt bakımı, lazer epilasyon ve bakım paketleri sunuyoruz.' }],
+            tokenCount: 10
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Elbette, cilt bakımı ve lazer epilasyon hizmetlerimiz mevcut.' } }],
+            usage: {
+                prompt_tokens: 100,
+                completion_tokens: 20,
+                total_tokens: 120
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-complaint',
+                title: 'Şikayet ve Memnuniyetsizlik',
+                response_text: 'Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.',
+                trigger_text: 'Bu konuda destek istiyorum',
+                similarity: 0.72
+            }
+        ])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Elbette, cilt bakımı ve lazer epilasyon hizmetlerimiz mevcut.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 

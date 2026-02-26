@@ -29,12 +29,10 @@ interface LeadsTableProps {
     requiredFields: string[]
 }
 
-const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info' | 'purple'> = {
+const statusVariants: Record<string, 'error' | 'warning' | 'neutral'> = {
     hot: 'error',
     warm: 'warning',
-    cold: 'neutral',
-    ignored: 'info',
-    undetermined: 'purple'
+    cold: 'neutral'
 }
 
 function normalizeServiceName(value: unknown): string | null {
@@ -121,9 +119,7 @@ export function LeadsTable({
     const statusLabels: Record<string, string> = {
         hot: t('statusHot'),
         warm: t('statusWarm'),
-        cold: t('statusCold'),
-        ignored: t('statusIgnored'),
-        undetermined: t('statusUndetermined')
+        cold: t('statusCold')
     }
 
     // Column type with optional width

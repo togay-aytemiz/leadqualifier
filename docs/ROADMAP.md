@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-26 (AI Settings now includes a channel-wide bot disclaimer toggle with localized TR/EN editable text (default enabled); outbound bot replies in WhatsApp/Telegram/Instagram now append disclaimer text as a blockquote line (`\n\n> ...`) when enabled; AI Settings `Sensitivity` control is now grouped under `Behavior and Logic` (not `General`); `Lead extraction during operator` is now grouped under `Escalation`; Settings navigation/page title label is now `Qualy AI`; AI Settings keeps reusable animated tabs (`General`, `Behavior and Logic`, `Escalation`) with escalation content split into two primary sections (`Automatic Escalation` + `Skill Based Handover`) and no section subtitle text; Organization Settings now uses reusable tabs (`General`, `Organization Details`, `Security & Data`); AI/Organization settings content now starts directly with tabs (intro description text removed); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation; Inbox message-day badges now render from actual message dates (`Today`/`Yesterday`/localized full date) instead of a static `Today` label.)  
+> **Last Updated:** 2026-02-26 (AI Settings now includes a channel-wide bot disclaimer toggle with localized TR/EN editable text (default enabled); outbound bot replies in WhatsApp/Telegram/Instagram now append disclaimer text as a blockquote line (`\n\n> ...`) when enabled; Inbox bot-message rendering now hides trailing disclaimer quote lines from UI while preserving outbound channel payload; matched skill bot replies now persist/display skill title metadata in Inbox footer area when available; matched skills with `requires_human_handover=true` now pass an extra intent guard to suppress false-positive escalations and evaluate top-5 matches sequentially (non-handover intent falls through to next valid match, otherwise KB/fallback); AI Settings `Sensitivity` control is now grouped under `Behavior and Logic` (not `General`); `Lead extraction during operator` is now grouped under `Escalation`; Settings navigation/page title label is now `Qualy AI`; AI Settings keeps reusable animated tabs (`General`, `Behavior and Logic`, `Escalation`) with escalation content split into two primary sections (`Automatic Escalation` + `Skill Based Handover`) and no section subtitle text; Organization Settings now uses reusable tabs (`General`, `Organization Details`, `Security & Data`); AI/Organization settings content now starts directly with tabs (intro description text removed); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation; Inbox message-day badges now render from actual message dates (`Today`/`Yesterday`/localized full date) instead of a static `Today` label; lead status model is simplified to `cold/warm/hot` only and legacy `ignored/undetermined` values are normalized to `cold`; Inbox queue now supports `All / Unassigned / Me` tabs with red human-attention badges and persisted conversation attention state (`human_attention_*`) written on escalation and resolved on operator takeover.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -116,6 +116,8 @@
 ## Phase 3.6: Refinements & Inbox ✅
 - [x] **Inbox UI**
   - [x] Conversation list with lazy loading
+  - [x] Conversation queue tabs (`Me`, `Unassigned`, `All`) with per-tab counts and red attention badges
+  - [x] Conversation list row-level human-attention chip with escalation reason (`Skill handover` / `Hot lead`)
   - [x] Message history view
   - [x] Message-day badge now follows message timestamps (`Today` / `Yesterday` / localized date) instead of a static `Today` chip
   - [x] Delete conversation functionality
@@ -172,7 +174,7 @@
   - [x] Shadow/Off bot modes now show compact inactive-state banner copy (single-line title + short body) in composer area
   - [x] Active bot assistant banner now follows the same spacing/typography layout as inactive banner (color palette unchanged)
   - [x] Conversation switch now shows loading skeletons until selected-thread messages load, preventing avatar-first stale content flashes
-  - [x] Lead status chips now sync after manual lead refresh and realtime lead events, including `ignored` (`Yok sayıldı`) and `undetermined` (`Belirsiz`)
+  - [x] Lead status chips now sync after manual lead refresh and realtime lead events
 - [x] **Refactoring**
   - [x] Migrate to Lucide Icons
   - [x] Primitive component cleanup
@@ -230,6 +232,8 @@
   - [x] Conversation list loading now falls back to flat per-table reads when nested relational query fails, preventing false empty-state inbox views
   - [x] Conversation list lead payloads are normalized for one-to-one nested responses so lead chips remain visible after full page refresh (without opening each thread)
   - [x] Conversation list relative-time labels now use deterministic base-time formatting to prevent SSR/CSR hydration mismatches
+  - [x] Escalation runtime now persists conversation-level human-attention queue state (`human_attention_required/reason/requested_at/resolved_at`) for skill-handover and hot-lead escalations
+  - [x] Operator outbound ownership flow now resolves conversation attention state automatically (`send_operator_message` + manual `setConversationAgent('bot')` cleanup)
 - [x] **Internationalization**
   - [x] Remove hardcoded UI strings
   - [x] Enforce EN/TR parity with automated checks
@@ -349,6 +353,10 @@
 - [x] **AI Settings IA:** Reorganize AI settings into 3 tabs (`General`, `Behavior and Logic`, `Escalation`) and move sections accordingly (Bot mode/name/sensitivity, operator extraction + prompt, and escalation controls with primary `Automatic Escalation` + `Skill Based Handover` sections)
 - [x] **Settings Components:** Add reusable `SettingsTabs` with smooth tab-content height animation for reuse across settings surfaces
 - [x] **AI Settings Matching:** Apply inclusive threshold semantics (`>=`) for Skill + KB similarity checks
+- [x] **Skill Matching Guardrail:** Evaluate matched skills in order and reject likely false-positive `requires_human_handover` matches when inbound intent does not indicate handover/escalation; use next valid skill candidate, otherwise continue via KB/fallback
+- [x] **Bot Disclaimer Reliability:** Add regression coverage to enforce default TR/EN disclaimer fallback when localized disclaimer fields are missing at runtime
+- [x] **Inbox Bot Message Readability:** Hide trailing bot disclaimer quote (`> ...`) from Inbox bubble rendering while keeping outbound channel disclaimer payload unchanged
+- [x] **Inbox Skill Attribution:** Persist/show matched `skill_title` for bot skill replies in message footer metadata area (no label when no skill match)
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details
 - [x] **Organization Settings:** Add self-service organization contact-data deletion flow (`Settings > Organization`) with password-confirmed modal and irreversible delete confirmation
@@ -465,7 +473,7 @@
   - [x] Accept `service_type` when customer wording matches profile service signals even if inferred service text is in another language (prevents false `Unknown` on bilingual extraction output)
   - [x] Canonicalize accepted `service_type` to approved catalog service name when alias-language matches exist (keeps extraction output consistent with org catalog/UI language)
   - [x] Extract and persist `services[]` (one or more) and keep `service_type` as primary canonical service for backward compatibility
-  - [x] Force greeting-only conversations to `undetermined` even when model emits `non_business=true` (keeps `ignored` scoped to true non-business threads)
+  - [x] Force greeting-only low-signal conversations to remain `cold` and clear false `non_business=true` outputs
   - [x] Resolve extraction language with precedence: explicit preferred locale, then organization locale, then message-language heuristics
 - [x] **Lead Scoring**
   - [x] Implement 0-10 scoring algorithm
@@ -473,8 +481,7 @@
   - [x] Keyword-based intent fallback + score reasoning modal
 - [x] **Lead Status**
   - [x] Hot / Warm / Cold classification
-  - [x] Undetermined classification for insufficient-information turns (e.g., greeting-only/unclear short messages)
-  - [x] Ignored status constrained to non-business conversations
+  - [x] Simplified status model to only `hot/warm/cold` (legacy `ignored/undetermined` normalized to `cold`)
   - [x] Status update triggers
 - [x] **Inbox Lead Details**
   - [x] Read-only lead snapshot in conversation details

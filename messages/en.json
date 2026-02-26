@@ -270,8 +270,17 @@
         "billingPackageRenewalUnknown": "Package renewal date is being prepared"
     },
     "inbox": {
-        "title": "Inbox",
-        "noMessages": "No messages",
+  "title": "Inbox",
+  "queueTabMe": "Me",
+  "queueTabUnassigned": "Unassigned",
+  "queueTabAll": "All",
+  "queueAttentionRequired": "Needs attention",
+  "queueAttentionReasonSkill": "Skill handover",
+  "queueAttentionReasonHotLead": "Hot lead",
+  "queueOperatorsTitle": "Operators",
+  "queueUnassignedSummary": "Unassigned: {count}",
+  "queueNoOperators": "No operators found",
+  "noMessages": "No messages",
         "noMessagesDesc": "New conversations will appear here when you receive messages.",
         "noMessagesYet": "No messages yet",
         "searchPlaceholder": "Search...",
@@ -430,8 +439,6 @@
         "leadStatusHot": "Hot",
         "leadStatusWarm": "Warm",
         "leadStatusCold": "Cold",
-        "leadStatusUndetermined": "Undetermined",
-        "leadStatusIgnored": "Ignored",
         "leadAiExtraction": "AI extraction",
         "leadUpdating": "Updating...",
         "leadPausedTitle": "Lead extraction is paused.",
@@ -1864,8 +1871,6 @@
         },
         "statusHot": "Hot",
         "statusWarm": "Warm",
-        "statusCold": "Cold",
-        "statusUndetermined": "Undetermined",
-        "statusIgnored": "Ignored"
+        "statusCold": "Cold"
     }
 }

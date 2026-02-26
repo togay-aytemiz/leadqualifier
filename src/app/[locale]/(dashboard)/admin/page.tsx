@@ -88,16 +88,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     const statusLabels: Record<string, string> = {
         hot: tLeads('statusHot'),
         warm: tLeads('statusWarm'),
-        cold: tLeads('statusCold'),
-        ignored: tLeads('statusIgnored'),
-        undetermined: tLeads('statusUndetermined')
+        cold: tLeads('statusCold')
     }
-    const statusVariants: Record<string, 'error' | 'warning' | 'neutral' | 'info' | 'purple'> = {
+    const statusVariants: Record<string, 'error' | 'warning' | 'neutral'> = {
         hot: 'error',
         warm: 'warning',
-        cold: 'neutral',
-        ignored: 'info',
-        undetermined: 'purple'
+        cold: 'neutral'
     }
     const formatPeriodLabel = (periodKey: string) => {
         if (periodKey === ADMIN_METRIC_PERIOD_ALL) return t('stats.period.allTime')

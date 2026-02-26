@@ -48,6 +48,12 @@ import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSe
 import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
 import { buildMessageDateSeparators } from '@/components/inbox/messageDateSeparators'
+import { extractSkillTitleFromMetadata, splitBotMessageDisclaimer } from '@/components/inbox/botMessageContent'
+import {
+    filterConversationsByQueue,
+    summarizeConversationQueueCounts,
+    type InboxQueueTab
+} from '@/components/inbox/conversationQueueFilters'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -115,6 +121,7 @@ export function InboxContainer({
     const [isWhatsAppTemplateModalOpen, setIsWhatsAppTemplateModalOpen] = useState(false)
     const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
     const [aiPauseError, setAiPauseError] = useState(false)
+    const [activeQueueTab, setActiveQueueTab] = useState<InboxQueueTab>('all')
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -135,9 +142,7 @@ export function InboxContainer({
     const leadStatusLabels: Record<string, string> = {
         hot: t('leadStatusHot'),
         warm: t('leadStatusWarm'),
-        cold: t('leadStatusCold'),
-        ignored: t('leadStatusIgnored'),
-        undetermined: t('leadStatusUndetermined')
+        cold: t('leadStatusCold')
     }
     const leadExtractedFields = lead?.extracted_fields && typeof lead.extracted_fields === 'object' && !Array.isArray(lead.extracted_fields)
         ? lead.extracted_fields as Record<string, unknown>
@@ -896,9 +901,39 @@ export function InboxContainer({
         setIsMobileDetailsOpen(false)
     }
 
+    const currentUserId = currentUserProfile?.id ?? null
+    const effectiveQueueTab: InboxQueueTab = activeQueueTab === 'me' && !currentUserId
+        ? 'all'
+        : activeQueueTab
+    const queueCounts = summarizeConversationQueueCounts({
+        conversations,
+        currentUserId
+    })
+    const filteredConversations = filterConversationsByQueue({
+        conversations,
+        queue: effectiveQueueTab,
+        currentUserId
+    })
+    useEffect(() => {
+        if (filteredConversations.length === 0) {
+            if (selectedId !== null) {
+                setSelectedId(null)
+            }
+            return
+        }
+
+        const selectedExistsInQueue = selectedId
+            ? filteredConversations.some((conversation) => conversation.id === selectedId)
+            : false
+
+        if (!selectedId || !selectedExistsInQueue) {
+            setSelectedId(filteredConversations[0]?.id ?? null)
+        }
+    }, [filteredConversations, selectedId])
+
     const renderConversationListContent = () => (
         <>
-            {conversations.length === 0 ? (
+            {filteredConversations.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-start p-6 pt-20 text-center">
                     <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
                         <Inbox className="text-gray-400" size={24} />
@@ -907,7 +942,7 @@ export function InboxContainer({
                     <p className="mt-1 text-xs text-gray-500">{t('noMessagesDesc')}</p>
                 </div>
             ) : (
-                conversations.map(c => {
+                filteredConversations.map(c => {
                     const leadStatus = c.leads?.[0]?.status
                     const leadStatusLabel = leadStatus
                         ? (leadStatusLabels[leadStatus] ?? leadStatus)
@@ -916,13 +951,14 @@ export function InboxContainer({
                         ? 'border-red-100 bg-red-50 text-red-700'
                         : leadStatus === 'warm'
                             ? 'border-amber-100 bg-amber-50 text-amber-700'
-                        : leadStatus === 'cold'
+                            : leadStatus === 'cold'
                                 ? 'border-slate-200 bg-slate-100 text-slate-600'
-                                : leadStatus === 'ignored'
-                                    ? 'border-blue-100 bg-blue-50 text-blue-700'
-                                    : leadStatus === 'undetermined'
-                                        ? 'border-violet-100 bg-violet-50 text-violet-700'
-                                    : 'border-gray-200 bg-gray-100 text-gray-600'
+                                : 'border-gray-200 bg-gray-100 text-gray-600'
+                    const attentionReasonLabel = c.human_attention_reason === 'skill_handover'
+                        ? t('queueAttentionReasonSkill')
+                        : c.human_attention_reason === 'hot_lead'
+                            ? t('queueAttentionReasonHotLead')
+                            : null
 
                     return (
                         <div
@@ -948,11 +984,20 @@ export function InboxContainer({
                                         <span className={`truncate text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
                                             {c.contact_name}
                                         </span>
-                                        {leadStatusLabel && (
-                                            <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
-                                                {leadStatusLabel}
-                                            </span>
-                                        )}
+                                        <div className="ml-auto flex items-center gap-1.5">
+                                            {leadStatusLabel && (
+                                                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
+                                                    {leadStatusLabel}
+                                                </span>
+                                            )}
+                                            {c.human_attention_required && (
+                                                <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                                                    {attentionReasonLabel
+                                                        ? `${t('queueAttentionRequired')} · ${attentionReasonLabel}`
+                                                        : t('queueAttentionRequired')}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <p className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
                                         {c.messages?.[0] && (
@@ -1088,9 +1133,67 @@ export function InboxContainer({
                     mobileListPaneClasses
                 )}
             >
-                <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 bg-gray-50/30">
-                    <div className="flex items-center">
-                        <span className="text-lg font-bold text-gray-900">{t('title')}</span>
+                <div className="shrink-0 border-b border-gray-200 bg-gray-50/30">
+                    <div className="flex h-14 items-center justify-between px-4">
+                        <div className="flex items-center">
+                            <span className="text-lg font-bold text-gray-900">{t('title')}</span>
+                        </div>
+                    </div>
+                    <div className="border-t border-gray-100 px-3 py-2">
+                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                            <button
+                                type="button"
+                                onClick={() => setActiveQueueTab('all')}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                                    activeQueueTab === 'all'
+                                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                <span>{t('queueTabAll')}</span>
+                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
+                                    {queueCounts.all}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveQueueTab('unassigned')}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                                    activeQueueTab === 'unassigned'
+                                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                <span>{t('queueTabUnassigned')}</span>
+                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
+                                    {queueCounts.unassigned}
+                                </span>
+                                {queueCounts.unassignedAttention > 0 && (
+                                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+                                        {queueCounts.unassignedAttention}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveQueueTab('me')}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                                    activeQueueTab === 'me'
+                                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                <span>{t('queueTabMe')}</span>
+                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
+                                    {queueCounts.me}
+                                </span>
+                                {queueCounts.meAttention > 0 && (
+                                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+                                        {queueCounts.meAttention}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
@@ -1287,6 +1390,13 @@ export function InboxContainer({
                                     const isMe = m.sender_type === 'user'
                                     const isBot = m.sender_type === 'bot'
                                     const isSystem = m.sender_type === 'system'
+                                    const parsedBotContent = isBot
+                                        ? splitBotMessageDisclaimer(m.content)
+                                        : { body: m.content, disclaimer: null as string | null }
+                                    const visibleMessageContent = parsedBotContent.body
+                                    const matchedSkillTitle = isBot
+                                        ? extractSkillTitleFromMetadata(m.metadata)
+                                        : null
                                     const messageDateSeparator = messageDateSeparatorById.get(m.id)
                                     const dateSeparator = messageDateSeparator ? (
                                         <div className="flex justify-center">
@@ -1317,7 +1427,7 @@ export function InboxContainer({
                                                     <Avatar name={selectedConversation.contact_name} size="md" />
                                                     <div className="flex flex-col gap-1 max-w-[80%]">
                                                         <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
-                                                            {m.content}
+                                                            {visibleMessageContent}
                                                         </div>
                                                         <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
                                                     </div>
@@ -1332,12 +1442,20 @@ export function InboxContainer({
                                             <div className="flex items-end gap-3 justify-end">
                                                 <div className="flex flex-col gap-1 items-end max-w-[80%]">
                                                     <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
-                                                        {m.content}
+                                                        {visibleMessageContent}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mr-1">
                                                         <span className="text-xs text-gray-400">
                                                             {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                         </span>
+                                                        {isBot && matchedSkillTitle && (
+                                                            <span
+                                                                title={matchedSkillTitle}
+                                                                className="inline-flex max-w-[210px] truncate rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                                                            >
+                                                                {matchedSkillTitle}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1807,11 +1925,7 @@ export function InboxContainer({
                                                             ? 'bg-red-500'
                                                             : lead.status === 'warm'
                                                                 ? 'bg-amber-500'
-                                                                : lead.status === 'ignored'
-                                                                    ? 'bg-blue-500'
-                                                                    : lead.status === 'undetermined'
-                                                                        ? 'bg-violet-500'
-                                                                    : 'bg-gray-400'
+                                                                : 'bg-gray-400'
                                                             }`}
                                                     />
                                                     <span>{leadStatusLabels[lead.status] ?? lead.status}</span>

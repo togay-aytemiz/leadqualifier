@@ -25,6 +25,7 @@ import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
+import { shouldUseSkillMatchForMessage } from '@/lib/skills/handover-intent'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 import { v4 as uuidv4 } from 'uuid'
@@ -327,23 +328,33 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        if (escalation.action === 'switch_to_operator' && conversation.active_agent !== 'operator') {
-            const { error: switchError } = await supabase
-                .from('conversations')
-                .update({
-                    active_agent: 'operator',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', conversation.id)
+        const nowIso = new Date().toISOString()
+        const attentionRequestedAt = conversation.human_attention_requested_at ?? nowIso
+        const escalationConversationUpdate: Record<string, unknown> = {
+            human_attention_required: true,
+            human_attention_reason: escalation.reason,
+            human_attention_requested_at: attentionRequestedAt,
+            human_attention_resolved_at: null,
+            updated_at: nowIso
+        }
 
-            if (switchError) {
-                console.error('Telegram Webhook: Failed to switch conversation to operator', switchError)
-            } else {
-                conversation = {
-                    ...conversation,
-                    active_agent: 'operator'
-                }
-            }
+        if (escalation.action === 'switch_to_operator' && conversation.active_agent !== 'operator') {
+            escalationConversationUpdate.active_agent = 'operator'
+        }
+
+        const { error: escalationUpdateError } = await supabase
+            .from('conversations')
+            .update(escalationConversationUpdate)
+            .eq('id', conversation.id)
+
+        if (escalationUpdateError) {
+            console.error('Telegram Webhook: Failed to persist conversation escalation state', escalationUpdateError)
+            return
+        }
+
+        conversation = {
+            ...conversation,
+            ...escalationConversationUpdate
         }
     }
 
@@ -371,7 +382,8 @@ export async function POST(req: NextRequest) {
             source: 'telegram'
         }
     })
-    const bestMatch = matchedSkills?.[0]
+    const skillCandidates = matchedSkills ?? []
+    const bestMatch = skillCandidates[0]
 
     console.log('Telegram Webhook: Skill match result', {
         found: !!bestMatch,
@@ -379,47 +391,72 @@ export async function POST(req: NextRequest) {
         similarity: bestMatch?.similarity
     })
 
-    if (bestMatch) {
-        const formattedSkillReply = formatOutboundBotMessage(bestMatch.response_text)
-        await client.sendMessage(chatId, formattedSkillReply)
-
-        await persistBotMessage(formattedSkillReply, { skill_id: bestMatch.skill_id })
-        console.log('Telegram Webhook: Sent matched response')
-
+    for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await supabase
             .from('skills')
             .select('requires_human_handover')
-            .eq('id', bestMatch.skill_id)
+            .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
         if (matchedSkillError) {
-            console.warn('Telegram Webhook: Failed to load matched skill handover flag', matchedSkillError)
+            console.warn('Telegram Webhook: Failed to load matched skill handover flag', {
+                skill_id: candidateMatch.skill_id,
+                error: matchedSkillError
+            })
+            continue
         }
 
+        const skillRequiresHumanHandover = Boolean(matchedSkillDetails?.requires_human_handover)
+        const shouldUseMatch = shouldUseSkillMatchForMessage({
+            userMessage: text,
+            requiresHumanHandover: skillRequiresHumanHandover,
+            match: candidateMatch
+        })
+
+        if (!shouldUseMatch) {
+            console.info('Telegram Webhook: Ignored likely false-positive handover skill match', {
+                organization_id: orgId,
+                conversation_id: conversation.id,
+                skill_id: candidateMatch.skill_id,
+                similarity: candidateMatch.similarity
+            })
+            continue
+        }
+
+        const formattedSkillReply = formatOutboundBotMessage(candidateMatch.response_text)
+        await client.sendMessage(chatId, formattedSkillReply)
+
+        await persistBotMessage(formattedSkillReply, {
+            skill_id: candidateMatch.skill_id,
+            skill_title: candidateMatch.title
+        })
+        console.log('Telegram Webhook: Sent matched response')
+
         await applyEscalationAfterReply({
-            skillRequiresHumanHandover: Boolean(matchedSkillDetails?.requires_human_handover)
+            skillRequiresHumanHandover
         })
 
         return NextResponse.json({ ok: true })
-    } else {
-        // 7. Fallback: Check Knowledge Base (RAG)
-        console.log('Telegram Webhook: No skill matched, searching Knowledge Base...')
+    }
 
-        try {
-            const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions') // Dynamically import to avoid circular dep if any
-            const [{ data: recentMessages, error: historyError }, { data: leadSnapshot, error: leadError }] = await Promise.all([
-                supabase
-                    .from('messages')
-                    .select('sender_type, content, created_at')
-                    .eq('conversation_id', conversation.id)
-                    .order('created_at', { ascending: false })
-                    .limit(12),
-                supabase
-                    .from('leads')
-                    .select('service_type, extracted_fields')
-                    .eq('conversation_id', conversation.id)
-                    .maybeSingle()
-            ])
+    // 7. Fallback: Check Knowledge Base (RAG)
+    console.log('Telegram Webhook: No eligible skill match, searching Knowledge Base...')
+
+    try {
+        const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions') // Dynamically import to avoid circular dep if any
+        const [{ data: recentMessages, error: historyError }, { data: leadSnapshot, error: leadError }] = await Promise.all([
+            supabase
+                .from('messages')
+                .select('sender_type, content, created_at')
+                .eq('conversation_id', conversation.id)
+                .order('created_at', { ascending: false })
+                .limit(12),
+            supabase
+                .from('leads')
+                .select('service_type, extracted_fields')
+                .eq('conversation_id', conversation.id)
+                .maybeSingle()
+        ])
 
             if (historyError) {
                 console.warn('Telegram Webhook: Failed to load history for KB routing', historyError)
@@ -606,44 +643,43 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             } else {
                 console.log('Telegram Webhook: KB routing declined', { reason: decision.reason })
             }
-        } catch (error) {
-            if (error instanceof Error && error.message.includes('Failed to record AI usage')) {
-                console.error('Telegram Webhook: AI usage recording failed, skipping further AI calls', error)
-                return NextResponse.json({ ok: true })
-            }
-            console.error('Telegram Webhook: RAG error', error)
-        }
-
-        // 8. Final Fallback (No Skill, No Knowledge)
-        if (!await ensureUsageAllowed('before_fallback')) {
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('Failed to record AI usage')) {
+            console.error('Telegram Webhook: AI usage recording failed, skipping further AI calls', error)
             return NextResponse.json({ ok: true })
         }
-        console.log('Telegram Webhook: No knowledge match, sending fallback')
-        const fallbackText = await buildFallbackResponse({
-            organizationId: orgId,
-            message: text,
-            preferredLanguage: responseLanguage,
-            requiredIntakeFields,
-            recentCustomerMessages: customerHistoryForFollowup,
-            recentAssistantMessages: assistantHistoryForFollowup,
-            conversationHistory: conversationHistoryForReply,
-            leadSnapshot: leadSnapshotForReply,
-            aiSettings,
-            supabase,
-            usageMetadata: {
-                conversation_id: conversation.id,
-                source: 'telegram'
-            },
-            requiredIntakeAnalysis,
-            knowledgeContext: fallbackKnowledgeContext
-        })
+        console.error('Telegram Webhook: RAG error', error)
+    }
 
-        const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
-        await client.sendMessage(chatId, formattedFallbackReply)
-
-        await persistBotMessage(formattedFallbackReply, { is_fallback: true })
-        await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
-
+    // 8. Final Fallback (No Skill, No Knowledge)
+    if (!await ensureUsageAllowed('before_fallback')) {
         return NextResponse.json({ ok: true })
     }
+    console.log('Telegram Webhook: No knowledge match, sending fallback')
+    const fallbackText = await buildFallbackResponse({
+        organizationId: orgId,
+        message: text,
+        preferredLanguage: responseLanguage,
+        requiredIntakeFields,
+        recentCustomerMessages: customerHistoryForFollowup,
+        recentAssistantMessages: assistantHistoryForFollowup,
+        conversationHistory: conversationHistoryForReply,
+        leadSnapshot: leadSnapshotForReply,
+        aiSettings,
+        supabase,
+        usageMetadata: {
+            conversation_id: conversation.id,
+            source: 'telegram'
+        },
+        requiredIntakeAnalysis,
+        knowledgeContext: fallbackKnowledgeContext
+    })
+
+    const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
+    await client.sendMessage(chatId, formattedFallbackReply)
+
+    await persistBotMessage(formattedFallbackReply, { is_fallback: true })
+    await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
+
+    return NextResponse.json({ ok: true })
 }

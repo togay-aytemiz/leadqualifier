@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     buildLeadExtractionConversationContext,
     mergeExtractionWithExisting,
-    normalizeUndeterminedLeadStatus,
+    normalizeLowSignalLeadStatus,
     resolvePersistedServiceType,
     resolvePersistedServiceTypes,
     resolveLeadExtractionLocale,
@@ -56,7 +56,7 @@ describe('safeParseLeadExtraction', () => {
     it('overrides score/status for non-business', () => {
         const result = safeParseLeadExtraction('{"score": 9, "status": "hot", "non_business": true}')
         expect(result.score).toBe(0)
-        expect(result.status).toBe('ignored')
+        expect(result.status).toBe('cold')
     })
 
     it('accepts localized score/status strings', () => {
@@ -65,10 +65,10 @@ describe('safeParseLeadExtraction', () => {
         expect(result.status).toBe('hot')
     })
 
-    it('accepts undetermined status aliases', () => {
+    it('maps undetermined status aliases to cold', () => {
         const result = safeParseLeadExtraction('{"score": 1, "status": "Belirsiz"}')
         expect(result.score).toBe(1)
-        expect(result.status).toBe('undetermined')
+        expect(result.status).toBe('cold')
     })
 
     it('normalizes required_intake_collected object values', () => {
@@ -95,7 +95,7 @@ describe('mergeExtractionWithExisting', () => {
                 non_business: true,
                 summary: null,
                 score: 0,
-                status: 'ignored'
+                status: 'cold'
             },
             {
                 service_type: 'Yenidoğan çekimi',
@@ -391,19 +391,19 @@ describe('buildLeadExtractionConversationContext', () => {
     })
 })
 
-describe('normalizeUndeterminedLeadStatus', () => {
-    it('marks greeting-only conversations as undetermined', () => {
-        const result = normalizeUndeterminedLeadStatus({
+describe('normalizeLowSignalLeadStatus', () => {
+    it('marks greeting-only conversations as cold', () => {
+        const result = normalizeLowSignalLeadStatus({
             extracted: safeParseLeadExtraction('{"score": 4, "status": "cold", "service_type": null, "summary": "Selamlaştı"}'),
             customerMessages: ['merhaba']
         })
 
-        expect(result.status).toBe('undetermined')
+        expect(result.status).toBe('cold')
         expect(result.score).toBe(2)
     })
 
     it('keeps status when customer intent is explicit', () => {
-        const result = normalizeUndeterminedLeadStatus({
+        const result = normalizeLowSignalLeadStatus({
             extracted: safeParseLeadExtraction('{"score": 7, "status": "warm", "intent_signals": ["decisive"], "summary": "Randevu almak istiyor"}'),
             customerMessages: ['Merhaba, randevu olmak istiyorum.']
         })
@@ -412,14 +412,14 @@ describe('normalizeUndeterminedLeadStatus', () => {
         expect(result.score).toBe(7)
     })
 
-    it('overrides non_business greeting-only outputs to undetermined', () => {
-        const result = normalizeUndeterminedLeadStatus({
+    it('normalizes non_business greeting-only outputs to cold', () => {
+        const result = normalizeLowSignalLeadStatus({
             extracted: safeParseLeadExtraction('{"score": 0, "status": "ignored", "non_business": true, "summary": "Sadece selam verdi"}'),
             customerMessages: ['hello', 'merhaba']
         })
 
         expect(result.non_business).toBe(false)
-        expect(result.status).toBe('undetermined')
+        expect(result.status).toBe('cold')
         expect(result.score).toBe(0)
     })
 })

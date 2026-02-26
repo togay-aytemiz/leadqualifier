@@ -274,6 +274,7 @@ export interface SkillMatch {
 export type ConversationPlatform = 'whatsapp' | 'telegram' | 'instagram' | 'simulator'
 export type ConversationStatus = 'open' | 'closed' | 'snoozed'
 export type MessageSenderType = 'user' | 'contact' | 'system' | 'bot'
+export type HumanAttentionReason = 'skill_handover' | 'hot_lead'
 
 export interface Conversation {
     id: string
@@ -284,6 +285,10 @@ export interface Conversation {
     status: ConversationStatus
     assignee_id: string | null
     active_agent: 'bot' | 'operator'
+    human_attention_required?: boolean
+    human_attention_reason?: HumanAttentionReason | null
+    human_attention_requested_at?: string | null
+    human_attention_resolved_at?: string | null
     ai_processing_paused: boolean
     last_message_at: string
     unread_count: number
@@ -328,7 +333,7 @@ export interface Channel {
     updated_at: string
 }
 
-export type LeadStatus = 'hot' | 'warm' | 'cold' | 'ignored' | 'undetermined'
+export type LeadStatus = 'hot' | 'warm' | 'cold'
 export type ServiceCandidateStatus = 'pending' | 'approved' | 'rejected'
 
 export interface OfferingProfile {

@@ -14,7 +14,7 @@ export interface LeadSignalInput {
 
 export function scoreLead(input: LeadSignalInput) {
     if (input.nonBusiness) {
-        return { serviceFit: 0, intentScore: 0, totalScore: 0, status: 'ignored' as LeadStatus }
+        return { serviceFit: 0, intentScore: 0, totalScore: 0, status: 'cold' as LeadStatus }
     }
 
     const serviceFit = input.hasCatalogMatch ? 4 : input.hasProfileMatch ? 2 : 0

@@ -24,6 +24,7 @@ import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
+import { shouldUseSkillMatchForMessage } from '@/lib/skills/handover-intent'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
@@ -260,23 +261,33 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             })
         }
 
-        if (escalation.action === 'switch_to_operator' && conversation.active_agent !== 'operator') {
-            const { error: switchError } = await options.supabase
-                .from('conversations')
-                .update({
-                    active_agent: 'operator',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', conversation.id)
+        const nowIso = new Date().toISOString()
+        const attentionRequestedAt = conversation.human_attention_requested_at ?? nowIso
+        const escalationConversationUpdate: Record<string, unknown> = {
+            human_attention_required: true,
+            human_attention_reason: escalation.reason,
+            human_attention_requested_at: attentionRequestedAt,
+            human_attention_resolved_at: null,
+            updated_at: nowIso
+        }
 
-            if (switchError) {
-                console.error(`${options.logPrefix}: Failed to switch conversation to operator`, switchError)
-            } else {
-                conversation = {
-                    ...conversation,
-                    active_agent: 'operator'
-                }
-            }
+        if (escalation.action === 'switch_to_operator' && conversation.active_agent !== 'operator') {
+            escalationConversationUpdate.active_agent = 'operator'
+        }
+
+        const { error: escalationUpdateError } = await options.supabase
+            .from('conversations')
+            .update(escalationConversationUpdate)
+            .eq('id', conversation.id)
+
+        if (escalationUpdateError) {
+            console.error(`${options.logPrefix}: Failed to persist conversation escalation state`, escalationUpdateError)
+            return
+        }
+
+        conversation = {
+            ...conversation,
+            ...escalationConversationUpdate
         }
     }
 
@@ -303,25 +314,48 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             source: options.source
         }
     })
-    const bestMatch = matchedSkills?.[0]
-
-    if (bestMatch) {
-        const formattedSkillReply = formatOutboundBotMessage(bestMatch.response_text)
-        await options.sendOutbound(formattedSkillReply)
-        await persistBotMessage(formattedSkillReply, { skill_id: bestMatch.skill_id })
-
+    const skillCandidates = matchedSkills ?? []
+    for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
             .from('skills')
             .select('requires_human_handover')
-            .eq('id', bestMatch.skill_id)
+            .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
         if (matchedSkillError) {
-            console.warn(`${options.logPrefix}: Failed to load matched skill handover flag`, matchedSkillError)
+            console.warn(`${options.logPrefix}: Failed to load matched skill handover flag`, {
+                skill_id: candidateMatch.skill_id,
+                error: matchedSkillError
+            })
+            continue
         }
 
+        const skillRequiresHumanHandover = Boolean(matchedSkillDetails?.requires_human_handover)
+        const shouldUseMatch = shouldUseSkillMatchForMessage({
+            userMessage: options.text,
+            requiresHumanHandover: skillRequiresHumanHandover,
+            match: candidateMatch
+        })
+
+        if (!shouldUseMatch) {
+            console.info(`${options.logPrefix}: Ignored likely false-positive handover skill match`, {
+                organization_id: orgId,
+                conversation_id: conversation.id,
+                skill_id: candidateMatch.skill_id,
+                similarity: candidateMatch.similarity
+            })
+            continue
+        }
+
+        const formattedSkillReply = formatOutboundBotMessage(candidateMatch.response_text)
+        await options.sendOutbound(formattedSkillReply)
+        await persistBotMessage(formattedSkillReply, {
+            skill_id: candidateMatch.skill_id,
+            skill_title: candidateMatch.title
+        })
+
         await applyEscalationAfterReply({
-            skillRequiresHumanHandover: Boolean(matchedSkillDetails?.requires_human_handover)
+            skillRequiresHumanHandover
         })
 
         return

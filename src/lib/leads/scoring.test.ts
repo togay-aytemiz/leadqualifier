@@ -47,7 +47,7 @@ describe('scoreLead', () => {
         expect(result.status).toBe('warm')
     })
 
-    it('marks ignored when non-business', () => {
+    it('falls back to cold when non-business', () => {
         const result = scoreLead({
             hasCatalogMatch: true,
             hasProfileMatch: true,
@@ -59,7 +59,7 @@ describe('scoreLead', () => {
             isFarFuture: false,
             nonBusiness: true
         })
-        expect(result.status).toBe('ignored')
+        expect(result.status).toBe('cold')
         expect(result.totalScore).toBe(0)
     })
 })

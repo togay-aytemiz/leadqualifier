@@ -1250,9 +1250,13 @@ export async function setConversationAgent(conversationId: string, agent: 'bot' 
     await assertTenantWriteAllowed(supabase)
 
     // If switching to bot, we MUST clear the assignee_id to release the lock in webhook
-    const updates: Partial<Pick<Conversation, 'active_agent' | 'assignee_id'>> = { active_agent: agent }
+    const updates: Partial<Conversation> = { active_agent: agent }
     if (agent === 'bot') {
         updates.assignee_id = null
+        updates.human_attention_required = false
+        updates.human_attention_reason = null
+        updates.human_attention_requested_at = null
+        updates.human_attention_resolved_at = new Date().toISOString()
     }
 
     const { error } = await supabase

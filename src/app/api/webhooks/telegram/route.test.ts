@@ -3,22 +3,30 @@ import { NextRequest } from 'next/server'
 
 const {
     createClientMock,
+    decideHumanEscalationMock,
     getOrgAiSettingsMock,
     getRequiredIntakeFieldsMock,
     isOperatorActiveMock,
     matchSkillsSafelyMock,
+    resolveBotModeActionMock,
+    resolveLeadExtractionAllowanceMock,
     resolveOrganizationUsageEntitlementMock,
     runLeadExtractionMock,
-    telegramCtorMock
+    telegramCtorMock,
+    telegramSendMessageMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
+    decideHumanEscalationMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     getRequiredIntakeFieldsMock: vi.fn(),
     isOperatorActiveMock: vi.fn(),
     matchSkillsSafelyMock: vi.fn(),
+    resolveBotModeActionMock: vi.fn(),
+    resolveLeadExtractionAllowanceMock: vi.fn(),
     resolveOrganizationUsageEntitlementMock: vi.fn(),
     runLeadExtractionMock: vi.fn(),
-    telegramCtorMock: vi.fn()
+    telegramCtorMock: vi.fn(),
+    telegramSendMessageMock: vi.fn()
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -51,8 +59,17 @@ vi.mock('@/lib/leads/extraction', () => ({
     runLeadExtraction: runLeadExtractionMock
 }))
 
+vi.mock('@/lib/ai/bot-mode', () => ({
+    resolveBotModeAction: resolveBotModeActionMock,
+    resolveLeadExtractionAllowance: resolveLeadExtractionAllowanceMock
+}))
+
 vi.mock('@/lib/skills/match-safe', () => ({
     matchSkillsSafely: matchSkillsSafelyMock
+}))
+
+vi.mock('@/lib/ai/escalation', () => ({
+    decideHumanEscalation: decideHumanEscalationMock
 }))
 
 vi.mock('@/lib/billing/entitlements', () => ({
@@ -68,6 +85,8 @@ vi.mock('@/lib/telegram/client', () => ({
         constructor() {
             telegramCtorMock()
         }
+
+        sendMessage = telegramSendMessageMock
     }
 }))
 
@@ -114,7 +133,7 @@ function createChannelLookupBuilder() {
     }
 }
 
-function createConversationLookupBuilder() {
+function createConversationLookupBuilder(overrides: Record<string, unknown> = {}) {
     const maybeSingleMock = vi.fn(async () => ({
         data: {
             id: 'conv-1',
@@ -130,7 +149,8 @@ function createConversationLookupBuilder() {
             unread_count: 0,
             tags: [],
             created_at: '2026-02-25T09:00:00.000Z',
-            updated_at: '2026-02-25T09:00:00.000Z'
+            updated_at: '2026-02-25T09:00:00.000Z',
+            ...overrides
         }
     }))
     const limitMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
@@ -176,7 +196,24 @@ function createConversationUpdateBuilder() {
     return {
         builder: {
             update: updateMock
-        }
+        },
+        updateMock
+    }
+}
+
+function createSkillDetailsBuilder() {
+    const maybeSingleMock = vi.fn(async () => ({
+        data: { requires_human_handover: true },
+        error: null
+    }))
+    const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+    const selectMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            select: selectMock
+        },
+        selectMock
     }
 }
 
@@ -198,6 +235,9 @@ describe('Telegram webhook route', () => {
             bot_name: null
         })
         getRequiredIntakeFieldsMock.mockResolvedValue([])
+        resolveBotModeActionMock.mockReturnValue({ allowReplies: true })
+        resolveLeadExtractionAllowanceMock.mockReturnValue(false)
+        decideHumanEscalationMock.mockReturnValue({ shouldEscalate: false })
         resolveOrganizationUsageEntitlementMock.mockResolvedValue({
             isUsageAllowed: true,
             lockReason: null,
@@ -246,5 +286,79 @@ describe('Telegram webhook route', () => {
         expect(isOperatorActiveMock).not.toHaveBeenCalled()
         expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
         expect(telegramCtorMock).not.toHaveBeenCalled()
+    })
+
+    it('writes human attention flags when escalation is required', async () => {
+        const channelLookup = createChannelLookupBuilder()
+        const conversationLookup = createConversationLookupBuilder({
+            ai_processing_paused: false
+        })
+        const dedupeLookup = createInboundDedupeBuilder()
+        const inboundInsert = createInsertMessageBuilder()
+        const botInsert = createInsertMessageBuilder()
+        const conversationUpdateAfterInbound = createConversationUpdateBuilder()
+        const conversationUpdateAfterBotReply = createConversationUpdateBuilder()
+        const escalationUpdate = createConversationUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder()
+
+        const supabase = createSupabaseMock({
+            channels: [channelLookup.builder],
+            conversations: [
+                conversationLookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotReply.builder,
+                escalationUpdate.builder
+            ],
+            messages: [dedupeLookup.builder, inboundInsert.builder, botInsert.builder],
+            skills: [skillDetails.builder]
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        isOperatorActiveMock.mockReturnValue(false)
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Handover',
+                response_text: 'Ekibimize iletiyorum.',
+                trigger_text: 'Yardım istiyorum',
+                similarity: 0.95
+            }
+        ])
+        decideHumanEscalationMock.mockReturnValueOnce({
+            shouldEscalate: true,
+            reason: 'skill_handover',
+            action: 'switch_to_operator',
+            noticeMode: 'none',
+            noticeMessage: null
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                update_id: 1002,
+                message: {
+                    message_id: 13,
+                    text: 'yardım istiyorum',
+                    chat: { id: 123 },
+                    from: { id: 456, first_name: 'Ayse' }
+                }
+            })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        expect(telegramCtorMock).toHaveBeenCalledTimes(1)
+        expect(telegramSendMessageMock).toHaveBeenCalledTimes(1)
+        expect(escalationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            active_agent: 'operator',
+            human_attention_required: true,
+            human_attention_reason: 'skill_handover',
+            human_attention_requested_at: expect.any(String),
+            human_attention_resolved_at: null
+        }))
     })
 })
