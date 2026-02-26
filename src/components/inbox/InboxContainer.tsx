@@ -990,11 +990,21 @@ export function InboxContainer({
                                                     {leadStatusLabel}
                                                 </span>
                                             )}
-                                            {c.human_attention_required && (
-                                                <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                                                    {attentionReasonLabel
-                                                        ? `${t('queueAttentionRequired')} · ${attentionReasonLabel}`
-                                                        : t('queueAttentionRequired')}
+                                            {effectiveQueueTab === 'all' && c.human_attention_required && (
+                                                <span
+                                                    title={
+                                                        attentionReasonLabel
+                                                            ? `${t('queueAttentionRequired')} · ${attentionReasonLabel}`
+                                                            : t('queueAttentionRequired')
+                                                    }
+                                                    aria-label={
+                                                        attentionReasonLabel
+                                                            ? `${t('queueAttentionRequired')} · ${attentionReasonLabel}`
+                                                            : t('queueAttentionRequired')
+                                                    }
+                                                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[12px] font-bold text-white"
+                                                >
+                                                    !
                                                 </span>
                                             )}
                                         </div>
@@ -1151,7 +1161,7 @@ export function InboxContainer({
                                 }`}
                             >
                                 <span>{t('queueTabAll')}</span>
-                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
+                                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/90 px-1.5 text-[10px] text-gray-700">
                                     {queueCounts.all}
                                 </span>
                             </button>
@@ -1165,12 +1175,13 @@ export function InboxContainer({
                                 }`}
                             >
                                 <span>{t('queueTabUnassigned')}</span>
-                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
-                                    {queueCounts.unassigned}
-                                </span>
-                                {queueCounts.unassignedAttention > 0 && (
-                                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+                                {queueCounts.unassignedAttention > 0 ? (
+                                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] text-white">
                                         {queueCounts.unassignedAttention}
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/90 px-1.5 text-[10px] text-gray-700">
+                                        {queueCounts.unassigned}
                                     </span>
                                 )}
                             </button>
@@ -1184,12 +1195,13 @@ export function InboxContainer({
                                 }`}
                             >
                                 <span>{t('queueTabMe')}</span>
-                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">
-                                    {queueCounts.me}
-                                </span>
-                                {queueCounts.meAttention > 0 && (
-                                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
+                                {queueCounts.meAttention > 0 ? (
+                                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] text-white">
                                         {queueCounts.meAttention}
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/90 px-1.5 text-[10px] text-gray-700">
+                                        {queueCounts.me}
                                     </span>
                                 )}
                             </button>

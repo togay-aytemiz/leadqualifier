@@ -25,7 +25,6 @@ import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
-import { shouldUseSkillMatchForMessage } from '@/lib/skills/handover-intent'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 import { v4 as uuidv4 } from 'uuid'
@@ -394,7 +393,7 @@ export async function POST(req: NextRequest) {
     for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await supabase
             .from('skills')
-            .select('requires_human_handover')
+            .select('requires_human_handover, title')
             .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
@@ -407,28 +406,18 @@ export async function POST(req: NextRequest) {
         }
 
         const skillRequiresHumanHandover = Boolean(matchedSkillDetails?.requires_human_handover)
-        const shouldUseMatch = shouldUseSkillMatchForMessage({
-            userMessage: text,
-            requiresHumanHandover: skillRequiresHumanHandover,
-            match: candidateMatch
-        })
-
-        if (!shouldUseMatch) {
-            console.info('Telegram Webhook: Ignored likely false-positive handover skill match', {
-                organization_id: orgId,
-                conversation_id: conversation.id,
-                skill_id: candidateMatch.skill_id,
-                similarity: candidateMatch.similarity
-            })
-            continue
-        }
+        const matchedSkillTitle = (candidateMatch.title ?? '').toString().trim()
+            || (matchedSkillDetails?.title ?? '').toString().trim()
+            || null
 
         const formattedSkillReply = formatOutboundBotMessage(candidateMatch.response_text)
         await client.sendMessage(chatId, formattedSkillReply)
 
         await persistBotMessage(formattedSkillReply, {
             skill_id: candidateMatch.skill_id,
-            skill_title: candidateMatch.title
+            skill_title: matchedSkillTitle,
+            matched_skill_title: matchedSkillTitle,
+            skill_requires_human_handover: skillRequiresHumanHandover
         })
         console.log('Telegram Webhook: Sent matched response')
 

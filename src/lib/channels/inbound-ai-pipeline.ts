@@ -24,7 +24,6 @@ import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
-import { shouldUseSkillMatchForMessage } from '@/lib/skills/handover-intent'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
@@ -318,7 +317,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
             .from('skills')
-            .select('requires_human_handover')
+            .select('requires_human_handover, title')
             .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
@@ -331,27 +330,17 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
 
         const skillRequiresHumanHandover = Boolean(matchedSkillDetails?.requires_human_handover)
-        const shouldUseMatch = shouldUseSkillMatchForMessage({
-            userMessage: options.text,
-            requiresHumanHandover: skillRequiresHumanHandover,
-            match: candidateMatch
-        })
-
-        if (!shouldUseMatch) {
-            console.info(`${options.logPrefix}: Ignored likely false-positive handover skill match`, {
-                organization_id: orgId,
-                conversation_id: conversation.id,
-                skill_id: candidateMatch.skill_id,
-                similarity: candidateMatch.similarity
-            })
-            continue
-        }
+        const matchedSkillTitle = (candidateMatch.title ?? '').toString().trim()
+            || (matchedSkillDetails?.title ?? '').toString().trim()
+            || null
 
         const formattedSkillReply = formatOutboundBotMessage(candidateMatch.response_text)
         await options.sendOutbound(formattedSkillReply)
         await persistBotMessage(formattedSkillReply, {
             skill_id: candidateMatch.skill_id,
-            skill_title: candidateMatch.title
+            skill_title: matchedSkillTitle,
+            matched_skill_title: matchedSkillTitle,
+            skill_requires_human_handover: skillRequiresHumanHandover
         })
 
         await applyEscalationAfterReply({
