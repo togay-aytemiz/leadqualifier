@@ -969,6 +969,11 @@
         "pageTitle": "AI Settings",
         "title": "AI Settings",
         "description": "Tune how the bot responds when it can’t find a Skill or Knowledge Base match.",
+        "tabs": {
+            "general": "General",
+            "behaviorAndLogic": "Behavior and Logic",
+            "escalation": "Escalation"
+        },
         "botModeTitle": "Bot mode",
         "botModeDescription": "Applies to Telegram/WhatsApp/Instagram. Simulator is unaffected.",
         "botModeActive": "Active",
@@ -981,12 +986,8 @@
         "operatorLeadExtractionDescription": "Control whether lead extraction continues when an operator takes over.",
         "operatorLeadExtractionLabel": "Keep lead extraction running during operator takeover",
         "operatorLeadExtractionHelp": "Replies remain disabled; only lead extraction runs.",
-        "humanEscalationTitle": "Human Escalation",
-        "humanEscalationDescription": "Configure automatic escalation and skill-triggered handover.",
-        "humanEscalationStepAutomaticTitle": "1) Automatic escalation",
-        "humanEscalationStepAutomaticDescription": "Configure score-based escalation and action.",
-        "humanEscalationStepSkillTitle": "2) Skill-based handover",
-        "humanEscalationStepSkillDescription": "If a skill requires human handover, the system always switches to operator and sends the bot message.",
+        "automaticEscalationTitle": "Automatic Escalation",
+        "skillBasedHandoverTitle": "Skill Based Handover",
         "hotLeadScoreLabel": "Lead extraction score",
         "hotLeadScoreHelp": "Escalate when lead extraction score is this value or higher.",
         "humanEscalationActionLabel": "Action",
@@ -1253,6 +1254,11 @@
     "organizationSettings": {
         "pageTitle": "Organization",
         "description": "Manage your organization profile and defaults.",
+        "tabs": {
+            "general": "General",
+            "organizationDetails": "Organization Details",
+            "securityAndData": "Security & Data"
+        },
         "nameTitle": "Organization name",
         "nameDescription": "Shown to your team and in shared views.",
         "nameLabel": "Organization name",

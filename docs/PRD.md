@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-26 (Inbox template picker now supports organization-level predefined templates plus WhatsApp-template draft insertion into composer; modal now uses mobile-optimized underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
+> **Last Updated:** 2026-02-26 (AI Settings now uses reusable animated tabs with 3 grouped areas: `General`, `Behavior and Logic`, and `Escalation`, where Escalation is split into primary `Automatic Escalation` + `Skill Based Handover` title-only sections; Organization Settings now uses 3 tabs (`General`, `Organization Details`, `Security & Data`) with grouped content; AI/Organization settings content starts directly with tabs (no top intro description); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
 > **Status:** In Development
 
 ---
@@ -349,7 +349,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Sidebar status dots map to green/amber/red for Active/Dinleyici/Kapalı
 - Bot mode and escalation action cards use compact visual density (reduced title size, radio size, and card padding)
 - Bot mode and escalation card titles align to section-title scale, with one-step smaller description text for tighter visual hierarchy
-- Human Escalation section: two-step flow (automatic escalation + skill handover), hot lead threshold slider, escalation action cards, and locale-aware editable handover message
+- Escalation tab uses two primary sections (`Automatic Escalation` and `Skill Based Handover`) with hot lead threshold slider, escalation action cards, and locale-aware editable handover message
+- AI Settings information architecture is grouped into three tabs:
+  - `General`: bot mode, bot name, sensitivity
+  - `Behavior and Logic`: lead extraction during operator, AI prompt
+  - `Escalation`: automatic escalation, skill-based handover, escalation action, bot message
+- Escalation sections are rendered as title-only headers (no extra subtitle text under section titles)
+- AI Settings content starts directly with tabs in the detail pane (intro description text removed)
+- Tab navigation uses a reusable settings-tab component with animated content-height transitions for smooth tab switches
 - Handover notice terminology in UI uses "Bot message" / "Bot mesajı" (replaces "Assistant's Promise" / "Asistan Sözü")
 - Low-confidence automatic handover is intentionally disabled in MVP; explicit guardrail skills and existing KB/fallback flow are used instead
 - Sensitivity slider now mirrors threshold semantics visually with right-side (`>=`) highlight and blue styling aligned to the hot lead score control
@@ -386,7 +393,11 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Customer bubbles are explicitly labeled (`Müşteri` / `Customer`) to clarify that shown messages are incoming customer text in the simulation.
 - Organization: company name and future org-level defaults
 - Organization settings include interface language selection (TR/EN); dedicated General settings is hidden from navigation and legacy `/settings/general` redirects to `/settings/organization`.
-- Organization settings language selector is positioned near the lower section (just above data deletion) and locale option buttons use content-hug sizing.
+- Organization settings are grouped into tabs:
+  - `General`: organization name + interface language
+  - `Organization Details`: offering profile, service list, required fields
+  - `Security & Data`: data deletion actions
+- Organization settings content starts directly with tabs in the detail pane (intro description text removed)
 - Mobile Settings navigation now opens with a dedicated settings list page first, then transitions to selected detail pages with an explicit back action.
 - Mobile Settings back action uses client-side route transition (not full-page refresh) to keep mobile flow stable.
 - Desktop Settings keeps the inner settings sidebar persistent across sub-route navigation; only the detail pane content swaps and shows loading states.
@@ -736,6 +747,8 @@ MVP is successful when:
 - **Auth Preview Small-Viewport Stability:** Prefer fixed/clamped thread height over content-driven growth so additional bubbles are clipped/faded rather than pushing the auth canvas.
 - **Auth Preview Motion Stability:** Animate incoming bubbles and reserve typing-bubble height to prevent micro-jumps while agent text appears.
 - **Auth Preview Density:** Keep message stack and thread-to-composer spacing slightly compact to avoid excess whitespace while preserving readability.
+- **AI Settings IA (Implementation v1.19):** Group AI settings into three reusable tabs (`General`, `Behavior and Logic`, `Escalation`) and drive tab transitions with a shared animated settings-tabs component so future settings pages can reuse the same interaction pattern.
+- **Organization Settings IA (Implementation v1.19):** Group organization settings into three reusable tabs (`General`, `Organization Details`, `Security & Data`) so org identity/language, lead-qualification defaults, and destructive data operations stay clearly separated.
 - **Password Recovery Visual Consistency:** Keep Forgot/Reset forms in the same auth form system as Sign In/Sign Up (ink accent focus/CTA/link styles, no secondary inner card wrapper).
 - **Auth Scenario Variety:** Avoid semantically chained scenario rotations; each scenario should represent a separate use-case category.
 - **Auth Scoring Visibility:** Do not show scoring before first customer input; start scoring only after initial message signal exists.

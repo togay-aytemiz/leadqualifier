@@ -969,6 +969,11 @@
         "pageTitle": "AI Ayarları",
         "title": "AI Ayarları",
         "description": "Yetenek veya Bilgi Bankası eşleşmesi bulunamazsa botun nasıl yanıt vereceğini ayarlayın.",
+        "tabs": {
+            "general": "Genel",
+            "behaviorAndLogic": "Davranış ve Mantık",
+            "escalation": "Eskalasyon"
+        },
         "botModeTitle": "Bot durumu",
         "botModeDescription": "Telegram/WhatsApp/Instagram için geçerlidir. Simülatör etkilenmez.",
         "botModeActive": "Aktif",
@@ -981,12 +986,8 @@
         "operatorLeadExtractionDescription": "Operatör devredeyken kişi çıkarımının devam edip etmeyeceğini belirleyin.",
         "operatorLeadExtractionLabel": "Operatör devraldığında kişi çıkarımı devam etsin",
         "operatorLeadExtractionHelp": "Yanıtlar kapalı kalır; sadece kişi çıkarımı çalışır.",
-        "humanEscalationTitle": "İnsan Eskalasyonu",
-        "humanEscalationDescription": "Otomatik eskalasyon ve yetenek tabanlı insan devri ayarlarını yapın.",
-        "humanEscalationStepAutomaticTitle": "1) Otomatik eskalasyon",
-        "humanEscalationStepAutomaticDescription": "Skora dayalı eskalasyon eşiğini ve aksiyonu belirleyin.",
-        "humanEscalationStepSkillTitle": "2) Yetenek tabanlı devir",
-        "humanEscalationStepSkillDescription": "Bir yetenek insan devri istiyorsa sistem her zaman operatöre geçer ve Bot mesajını gönderir.",
+        "automaticEscalationTitle": "Otomatik Eskalasyon",
+        "skillBasedHandoverTitle": "Skill Based Handover",
         "hotLeadScoreLabel": "Kişi çıkarım skoru",
         "hotLeadScoreHelp": "Kişi çıkarım skoru bu değere eşit veya büyük olduğunda eskale edilir.",
         "humanEscalationActionLabel": "Aksiyon",
@@ -1253,6 +1254,11 @@
     "organizationSettings": {
         "pageTitle": "Organizasyon",
         "description": "Organizasyon profilinizi ve varsayılanları yönetin.",
+        "tabs": {
+            "general": "Genel",
+            "organizationDetails": "Organizasyon Detayları",
+            "securityAndData": "Güvenlik ve Veri"
+        },
         "nameTitle": "Şirket adı",
         "nameDescription": "Ekibinize ve paylaşılan görünümlere yansır.",
         "nameLabel": "Şirket adı",

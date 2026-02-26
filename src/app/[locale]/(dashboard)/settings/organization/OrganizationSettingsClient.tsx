@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { usePathname, useRouter as useLocaleRouter } from '@/i18n/navigation'
 import { Button, Modal, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
+import { SettingsTabs } from '@/components/settings/SettingsTabs'
 import { transformPendingHrefForLocale } from '@/components/settings/localeHref'
 import { deleteOrganizationDataSelfServe, type DeleteOrganizationDataResult, updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion, ServiceCandidate, ServiceCatalogItem } from '@/types/database'
@@ -35,6 +36,14 @@ interface OrganizationSettingsClientProps {
     serviceCatalogItems: ServiceCatalogItem[]
     serviceCandidates: ServiceCandidate[]
     isReadOnly?: boolean
+}
+
+type OrganizationSettingsTabId = 'general' | 'organizationDetails' | 'securityAndData'
+
+function resolveOrganizationTabFromFocus(focusTarget: string | null): OrganizationSettingsTabId {
+    if (focusTarget === 'offering-suggestions') return 'organizationDetails'
+    if (focusTarget === 'data-deletion') return 'securityAndData'
+    return 'general'
 }
 
 export default function OrganizationSettingsClient({
@@ -103,6 +112,7 @@ export default function OrganizationSettingsClient({
     const [deletionResult, setDeletionResult] = useState<DeleteOrganizationDataResult | null>(null)
     const [deletionModalOpen, setDeletionModalOpen] = useState(false)
     const [isDeletingContactData, setIsDeletingContactData] = useState(false)
+    const [activeTab, setActiveTab] = useState<OrganizationSettingsTabId>(() => resolveOrganizationTabFromFocus(searchParams.get('focus')))
 
     const normalizedRequiredIntakeFields = useMemo(() => {
         return normalizeIntakeFields(requiredIntakeFields)
@@ -243,6 +253,12 @@ export default function OrganizationSettingsClient({
             setSaved(false)
         }
     }, [isDirty])
+
+    useEffect(() => {
+        const focusTarget = searchParams.get('focus')
+        if (focusTarget !== 'offering-suggestions' && focusTarget !== 'data-deletion') return
+        setActiveTab(resolveOrganizationTabFromFocus(focusTarget))
+    }, [searchParams])
 
     useEffect(() => {
         if (!saved) return
@@ -530,135 +546,155 @@ export default function OrganizationSettingsClient({
             />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-5xl mb-6">
-                    <p className="text-sm text-gray-500">{t('description')}</p>
-                    {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
-                </div>
-
                 <div className="max-w-5xl">
-                    <SettingsSection title={t('nameTitle')} description={t('nameDescription')}>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            aria-label={t('nameLabel')}
-                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
-                        />
-                    </SettingsSection>
-
-                    <OfferingProfileSection
-                        summary={profileSummary}
-                        aiSuggestionsEnabled={offeringProfileAiEnabled}
-                        suggestions={suggestions}
-                        autoOpenSuggestions={autoOpenOfferingSuggestions}
-                        onSummaryChange={setProfileSummary}
-                        manualProfileNote={manualProfileNote}
-                        onManualProfileNoteChange={handleManualProfileNoteChange}
-                        onAiSuggestionsEnabledChange={setOfferingProfileAiEnabled}
-                        onReviewSuggestion={handleReviewSuggestion}
-                        onArchiveSuggestion={handleArchiveSuggestion}
-                        onGenerateSuggestions={handleGenerateSuggestions}
-                        isGeneratingSuggestions={isGeneratingSuggestions}
-                    />
-
-                    <ServiceCatalogSection
-                        services={normalizedServiceCatalogItems}
-                        aiServices={approvedAiServiceNames}
-                        aiSuggestionsEnabled={serviceCatalogAiEnabled}
-                        onAiSuggestionsEnabledChange={setServiceCatalogAiEnabled}
-                        onServicesChange={(services) => setServiceCatalogItems(normalizeServiceCatalogNames(services))}
-                    />
-
-                    <RequiredIntakeFieldsSection
-                        fields={requiredIntakeFields}
-                        aiFields={normalizedRequiredIntakeFieldsAi}
-                        aiSuggestionsEnabled={requiredIntakeFieldsAiEnabled}
-                        onAiSuggestionsEnabledChange={setRequiredIntakeFieldsAiEnabled}
-                        onFieldsChange={(fields) => setRequiredIntakeFields(normalizeIntakeFields(fields))}
-                        onAiFieldsChange={setRequiredIntakeFieldsAi}
-                    />
-
-                    <SettingsSection title={t('languageTitle')} description={t('languageDescription')}>
-                        <div className="flex flex-wrap gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedLocale('en')}
-                                className={`inline-flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${selectedLocale === 'en'
-                                    ? 'border-blue-500 bg-blue-50/50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
-                                    }`}>
-                                    {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                </div>
-                                <span className="text-sm font-medium text-gray-900">{t('languageEnglish')}</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setSelectedLocale('tr')}
-                                className={`inline-flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${selectedLocale === 'tr'
-                                    ? 'border-blue-500 bg-blue-50/50'
-                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                            >
-                                <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
-                                    }`}>
-                                    {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-                                </div>
-                                <span className="text-sm font-medium text-gray-900">{t('languageTurkish')}</span>
-                            </button>
-                        </div>
-                    </SettingsSection>
-
-                    <SettingsSection
-                        title={t('dataDeletionTitle')}
-                        description={t('dataDeletionDescription')}
-                        showBottomDivider={false}
+                    {saveError && <p className="mb-4 text-sm text-red-600">{saveError}</p>}
+                    <SettingsTabs
+                        tabs={[
+                            { id: 'general', label: t('tabs.general') },
+                            { id: 'organizationDetails', label: t('tabs.organizationDetails') },
+                            { id: 'securityAndData', label: t('tabs.securityAndData') }
+                        ]}
+                        activeTabId={activeTab}
+                        onTabChange={(tabId) => setActiveTab(tabId as OrganizationSettingsTabId)}
                     >
-                        <div className="space-y-4">
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                {t('dataDeletionWarning')}
-                            </div>
+                        {(tabId) => (
+                            <>
+                                {tabId === 'general' && (
+                                    <>
+                                        <SettingsSection title={t('nameTitle')} description={t('nameDescription')}>
+                                            <input
+                                                type="text"
+                                                value={name}
+                                                onChange={(event) => setName(event.target.value)}
+                                                aria-label={t('nameLabel')}
+                                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                                            />
+                                        </SettingsSection>
 
-                            {isReadOnly && (
-                                <p className="text-sm text-amber-700">{t('dataDeletionReadOnly')}</p>
-                            )}
+                                        <SettingsSection title={t('languageTitle')} description={t('languageDescription')}>
+                                            <div className="flex flex-wrap gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedLocale('en')}
+                                                    className={`inline-flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${selectedLocale === 'en'
+                                                        ? 'border-blue-500 bg-blue-50/50'
+                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'en' ? 'border-blue-500' : 'border-gray-300'
+                                                        }`}>
+                                                        {selectedLocale === 'en' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                                    </div>
+                                                    <span className="text-sm font-medium text-gray-900">{t('languageEnglish')}</span>
+                                                </button>
 
-                            {deletionFeedback && (
-                                <p
-                                    className={
-                                        deletionFeedback.type === 'error'
-                                            ? 'text-sm text-red-600'
-                                            : deletionFeedback.type === 'success'
-                                                ? 'text-sm text-green-700'
-                                                : 'text-sm text-amber-700'
-                                    }
-                                >
-                                    {deletionFeedback.message}
-                                </p>
-                            )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedLocale('tr')}
+                                                    className={`inline-flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${selectedLocale === 'tr'
+                                                        ? 'border-blue-500 bg-blue-50/50'
+                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <div className={`flex h-4 w-4 items-center justify-center rounded-full border ${selectedLocale === 'tr' ? 'border-blue-500' : 'border-gray-300'
+                                                        }`}>
+                                                        {selectedLocale === 'tr' && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                                    </div>
+                                                    <span className="text-sm font-medium text-gray-900">{t('languageTurkish')}</span>
+                                                </button>
+                                            </div>
+                                        </SettingsSection>
+                                    </>
+                                )}
 
-                            {deletionResult && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
-                                    <p>{t('dataDeletionResultConversations', { count: deletionResult.deletedConversations })}</p>
-                                    <p>{t('dataDeletionResultAiUsage', { count: deletionResult.deletedAiUsageRows })}</p>
-                                </div>
-                            )}
+                                {tabId === 'organizationDetails' && (
+                                    <>
+                                        <OfferingProfileSection
+                                            summary={profileSummary}
+                                            aiSuggestionsEnabled={offeringProfileAiEnabled}
+                                            suggestions={suggestions}
+                                            autoOpenSuggestions={autoOpenOfferingSuggestions}
+                                            onSummaryChange={setProfileSummary}
+                                            manualProfileNote={manualProfileNote}
+                                            onManualProfileNoteChange={handleManualProfileNoteChange}
+                                            onAiSuggestionsEnabledChange={setOfferingProfileAiEnabled}
+                                            onReviewSuggestion={handleReviewSuggestion}
+                                            onArchiveSuggestion={handleArchiveSuggestion}
+                                            onGenerateSuggestions={handleGenerateSuggestions}
+                                            isGeneratingSuggestions={isGeneratingSuggestions}
+                                        />
 
-                            <div className="pt-1">
-                                <Button
-                                    type="button"
-                                    variant="danger"
-                                    onClick={handleDeleteOrganizationDataRequest}
-                                    disabled={isReadOnly || isDeletingContactData}
-                                >
-                                    {isDeletingContactData ? t('dataDeletionDeleting') : t('dataDeletionSubmit')}
-                                </Button>
-                            </div>
-                        </div>
-                    </SettingsSection>
+                                        <ServiceCatalogSection
+                                            services={normalizedServiceCatalogItems}
+                                            aiServices={approvedAiServiceNames}
+                                            aiSuggestionsEnabled={serviceCatalogAiEnabled}
+                                            onAiSuggestionsEnabledChange={setServiceCatalogAiEnabled}
+                                            onServicesChange={(services) => setServiceCatalogItems(normalizeServiceCatalogNames(services))}
+                                        />
+
+                                        <RequiredIntakeFieldsSection
+                                            fields={requiredIntakeFields}
+                                            aiFields={normalizedRequiredIntakeFieldsAi}
+                                            aiSuggestionsEnabled={requiredIntakeFieldsAiEnabled}
+                                            onAiSuggestionsEnabledChange={setRequiredIntakeFieldsAiEnabled}
+                                            onFieldsChange={(fields) => setRequiredIntakeFields(normalizeIntakeFields(fields))}
+                                            onAiFieldsChange={setRequiredIntakeFieldsAi}
+                                        />
+                                    </>
+                                )}
+
+                                {tabId === 'securityAndData' && (
+                                    <SettingsSection
+                                        title={t('dataDeletionTitle')}
+                                        description={t('dataDeletionDescription')}
+                                        showBottomDivider={false}
+                                    >
+                                        <div className="space-y-4">
+                                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                {t('dataDeletionWarning')}
+                                            </div>
+
+                                            {isReadOnly && (
+                                                <p className="text-sm text-amber-700">{t('dataDeletionReadOnly')}</p>
+                                            )}
+
+                                            {deletionFeedback && (
+                                                <p
+                                                    className={
+                                                        deletionFeedback.type === 'error'
+                                                            ? 'text-sm text-red-600'
+                                                            : deletionFeedback.type === 'success'
+                                                                ? 'text-sm text-green-700'
+                                                                : 'text-sm text-amber-700'
+                                                    }
+                                                >
+                                                    {deletionFeedback.message}
+                                                </p>
+                                            )}
+
+                                            {deletionResult && (
+                                                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
+                                                    <p>{t('dataDeletionResultConversations', { count: deletionResult.deletedConversations })}</p>
+                                                    <p>{t('dataDeletionResultAiUsage', { count: deletionResult.deletedAiUsageRows })}</p>
+                                                </div>
+                                            )}
+
+                                            <div className="pt-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="danger"
+                                                    onClick={handleDeleteOrganizationDataRequest}
+                                                    disabled={isReadOnly || isDeletingContactData}
+                                                >
+                                                    {isDeletingContactData ? t('dataDeletionDeleting') : t('dataDeletionSubmit')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </SettingsSection>
+                                )}
+                            </>
+                        )}
+                    </SettingsTabs>
                 </div>
             </div>
 

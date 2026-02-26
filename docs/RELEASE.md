@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- Added reusable Settings tabs component with underline navigation and smooth tab-content height animation for settings surfaces (`src/components/settings/SettingsTabs.tsx`).
+- Added AI settings tab-structure regression tests to lock section grouping across `General`, `Behavior and Logic`, and `Escalation` tabs (`src/app/[locale]/(dashboard)/settings/ai/AiSettingsForm.test.tsx`).
 - Added organization-scoped Inbox predefined message templates with server-action CRUD and RLS-backed schema (`supabase/migrations/00072_inbox_predefined_templates.sql`, `src/lib/inbox/actions.ts`, `src/lib/inbox/actions.test.ts`, `src/types/database.ts`).
 - Added unified Inbox template picker modal: non-WhatsApp conversations use predefined templates only, while WhatsApp conversations use dual tabs (`Predefined` + `WhatsApp templates`) and insert selected content into composer instead of auto-send (`src/components/inbox/TemplatePickerModal.tsx`, `src/components/inbox/template-picker-state.ts`, `src/components/inbox/template-picker-state.test.ts`, `src/components/inbox/InboxContainer.tsx`, `messages/en.json`, `messages/tr.json`).
 - Added conversation-level AI processing pause control for Inbox contacts via details-panel toggle (desktop + mobile), backed by new `conversations.ai_processing_paused` schema and server action toggle API (`supabase/migrations/00071_conversation_ai_processing_pause.sql`, `src/lib/inbox/actions.ts`, `src/components/inbox/InboxContainer.tsx`, `messages/en.json`, `messages/tr.json`).
@@ -168,7 +170,7 @@
 - Usage & Billing now includes storage usage cards with total estimated size and Skills vs Knowledge Base breakdown.
 - Added `src/lib/billing/usage.ts` plus unit tests for message and storage usage calculations.
 - Human escalation policy implementation (Telegram): centralized precedence (`skill override > hot lead score`), AI Settings two-step controls (automatic escalation + skill handover), and runtime operator switch + bot message execution.
-- Skills now support `Requires Human Handover` with read-only bot message preview and deep-link to AI Settings (`Human Escalation` section + handover message focus).
+- Skills now support `Requires Human Handover` with read-only bot message preview and deep-link to AI Settings (Escalation tab + handover message focus).
 - AI Settings form now shows a dedicated divider above the Bot Name section for clearer section separation.
 - Human escalation copy polish: TR label now uses `Kişi çıkarım skoru`, step title uses `Yetenek tabanlı devir`, and the locale helper text under bot message is removed.
 - AI Settings sensitivity slider now uses the same blue right-side (`>=`) threshold highlight style as the human escalation score slider for consistent semantics.
@@ -176,6 +178,10 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+- Changed AI Settings > Escalation section presentation to remove subtitle/description lines under `Automatic Escalation` and `Skill Based Handover`, keeping title-only section headers for a cleaner layout (`src/app/[locale]/(dashboard)/settings/ai/AiSettingsForm.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed Settings > AI information architecture to three tabs and moved controls by domain: `General` (bot mode/name/sensitivity), `Behavior and Logic` (operator extraction + prompt), and `Escalation` (primary `Automatic Escalation` + `Skill Based Handover` sections with action + bot message controls); deep-links now auto-open Escalation tab for handover focus (`src/app/[locale]/(dashboard)/settings/ai/AiSettingsForm.tsx`, `src/app/[locale]/(dashboard)/settings/ai/AiSettingsClient.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed Settings > Organization information architecture to three tabs: `General` (organization name + language), `Organization Details` (offering profile, service list, required fields), and `Security & Data` (data deletion); `focus=offering-suggestions` deep-link now auto-opens `Organization Details` (`src/app/[locale]/(dashboard)/settings/organization/OrganizationSettingsClient.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed AI and Organization settings detail panes to start directly with tab navigation by removing top intro description lines (`src/app/[locale]/(dashboard)/settings/ai/AiSettingsClient.tsx`, `src/app/[locale]/(dashboard)/settings/organization/OrganizationSettingsClient.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed modal primitive to support optional header actions so compact tool icons (like refresh) can live in modal header without consuming body space (`src/design/primitives.tsx`).
 - Changed Inbox template UX for compactness: template refresh moved from body button to header refresh icon in modal flows, and composer template action now opens the unified picker (`src/components/inbox/WhatsAppTemplateSendModal.tsx`, `src/components/inbox/TemplatePickerModal.tsx`, `src/components/inbox/InboxContainer.tsx`).
 - Changed modal primitive behavior to support smoother open/close transitions (fade + slight scale/slide), improving dialog UX across the app (`src/design/primitives.tsx`).

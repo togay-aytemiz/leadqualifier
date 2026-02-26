@@ -2,7 +2,10 @@
 
 import { useTranslations } from 'next-intl'
 import { SettingsSection } from '@/components/settings/SettingsSection'
+import { SettingsTabs } from '@/components/settings/SettingsTabs'
 import type { AiBotMode, HumanEscalationAction } from '@/types/database'
+
+export type AiSettingsTabId = 'general' | 'behaviorAndLogic' | 'escalation'
 
 interface AiSettingsFormProps {
     botName: string
@@ -13,6 +16,8 @@ interface AiSettingsFormProps {
     hotLeadHandoverMessage: string
     matchThreshold: number
     prompt: string
+    activeTab: AiSettingsTabId
+    onActiveTabChange: (value: AiSettingsTabId) => void
     onBotNameChange: (value: string) => void
     onBotModeChange: (value: AiBotMode) => void
     onAllowLeadExtractionDuringOperatorChange: (value: boolean) => void
@@ -64,6 +69,8 @@ export default function AiSettingsForm({
     hotLeadHandoverMessage,
     matchThreshold,
     prompt,
+    activeTab,
+    onActiveTabChange,
     onBotNameChange,
     onBotModeChange,
     onAllowLeadExtractionDuringOperatorChange,
@@ -95,181 +102,198 @@ export default function AiSettingsForm({
     const hotLeadRightFillPercent = (normalizedHotLeadThreshold / 10) * 100
     const normalizedMatchThreshold = Math.max(0, Math.min(1, matchThreshold))
     const matchRightFillPercent = normalizedMatchThreshold * 100
+    const tabs = [
+        { id: 'general', label: t('tabs.general') },
+        { id: 'behaviorAndLogic', label: t('tabs.behaviorAndLogic') },
+        { id: 'escalation', label: t('tabs.escalation') }
+    ] as const
 
     return (
         <div className="max-w-5xl">
-            <SettingsSection
-                title={t('botModeTitle')}
-                description={t('botModeDescription')}
+            <SettingsTabs
+                tabs={tabs.map(tab => ({ id: tab.id, label: tab.label }))}
+                activeTabId={activeTab}
+                onTabChange={(value) => onActiveTabChange(value as AiSettingsTabId)}
             >
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    {options.map(option => {
-                        const isSelected = botMode === option.value
-                        return (
-                            <SelectionCard
-                                key={option.value}
-                                label={option.label}
-                                description={option.description}
-                                selected={isSelected}
-                                onSelect={() => onBotModeChange(option.value)}
-                            />
-                        )
-                    })}
-                </div>
-            </SettingsSection>
+                {(tabId) => (
+                    <>
+                        {tabId === 'general' && (
+                            <>
+                                <SettingsSection
+                                    title={t('botModeTitle')}
+                                    description={t('botModeDescription')}
+                                >
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                        {options.map(option => {
+                                            const isSelected = botMode === option.value
+                                            return (
+                                                <SelectionCard
+                                                    key={option.value}
+                                                    label={option.label}
+                                                    description={option.description}
+                                                    selected={isSelected}
+                                                    onSelect={() => onBotModeChange(option.value)}
+                                                />
+                                            )
+                                        })}
+                                    </div>
+                                </SettingsSection>
 
-            <SettingsSection
-                title={t('operatorLeadExtractionTitle')}
-                description={t('operatorLeadExtractionDescription')}
-            >
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                        type="checkbox"
-                        checked={allowLeadExtractionDuringOperator}
-                        onChange={(e) => onAllowLeadExtractionDuringOperatorChange(e.target.checked)}
-                    />
-                    {t('operatorLeadExtractionLabel')}
-                </label>
-                <p className="text-xs text-gray-500">{t('operatorLeadExtractionHelp')}</p>
-            </SettingsSection>
-
-            <div id="human-escalation">
-                <SettingsSection
-                    title={t('humanEscalationTitle')}
-                    description={t('humanEscalationDescription')}
-                    showBottomDivider={false}
-                >
-                    <div className="space-y-8">
-                        <div className="space-y-4">
-                            <div>
-                                <p className="text-xs font-semibold text-gray-500 tracking-wider">{t('humanEscalationStepAutomaticTitle')}</p>
-                                <p className="mt-1 text-sm text-gray-500">{t('humanEscalationStepAutomaticDescription')}</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-700">{t('hotLeadScoreLabel')}</label>
-                                <div className="flex items-center gap-3">
+                                <SettingsSection
+                                    title={t('botNameTitle')}
+                                    description={t('botNameDescription')}
+                                    showTopDivider
+                                >
                                     <input
-                                        type="range"
-                                        min="0"
-                                        max="10"
-                                        step="1"
-                                        value={normalizedHotLeadThreshold}
-                                        onChange={(event) => {
-                                            const nextValue = Number.parseInt(event.target.value, 10)
-                                            onHotLeadScoreThresholdChange(Number.isFinite(nextValue) ? nextValue : 0)
-                                        }}
-                                        aria-label={t('hotLeadScoreLabel')}
-                                        style={{
-                                            background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${hotLeadRightFillPercent}%, #bfdbfe ${hotLeadRightFillPercent}%, #bfdbfe 100%)`
-                                        }}
-                                        className="flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                        type="text"
+                                        value={botName}
+                                        onChange={(e) => onBotNameChange(e.target.value)}
+                                        placeholder={t('botNamePlaceholder')}
+                                        aria-label={t('botNameLabel')}
+                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
                                     />
-                                    <span className="text-xs font-mono text-gray-700 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">
-                                        {`≥ ${normalizedHotLeadThreshold}`}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between text-[11px] text-gray-400">
-                                    <span>0</span>
-                                    <span>10</span>
-                                </div>
-                                <p className="text-xs text-gray-500">{t('hotLeadScoreHelp')}</p>
+                                </SettingsSection>
+
+                                <SettingsSection
+                                    title={t('thresholdTitle')}
+                                    description={t('thresholdDescription')}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="1"
+                                            step="0.05"
+                                            value={normalizedMatchThreshold}
+                                            onChange={(event) => {
+                                                const nextValue = Number.parseFloat(event.target.value)
+                                                onMatchThresholdChange(Number.isFinite(nextValue) ? nextValue : 0)
+                                            }}
+                                            aria-label={t('threshold')}
+                                            style={{
+                                                background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${matchRightFillPercent}%, #bfdbfe ${matchRightFillPercent}%, #bfdbfe 100%)`
+                                            }}
+                                            className="flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                        />
+                                        <span className="text-xs font-mono text-gray-700 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">
+                                            {`≥ ${normalizedMatchThreshold.toFixed(2)}`}
+                                        </span>
+                                    </div>
+                                </SettingsSection>
+                            </>
+                        )}
+
+                        {tabId === 'behaviorAndLogic' && (
+                            <>
+                                <SettingsSection
+                                    title={t('operatorLeadExtractionTitle')}
+                                    description={t('operatorLeadExtractionDescription')}
+                                >
+                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={allowLeadExtractionDuringOperator}
+                                            onChange={(e) => onAllowLeadExtractionDuringOperatorChange(e.target.checked)}
+                                        />
+                                        {t('operatorLeadExtractionLabel')}
+                                    </label>
+                                    <p className="text-xs text-gray-500">{t('operatorLeadExtractionHelp')}</p>
+                                </SettingsSection>
+
+                                <SettingsSection
+                                    title={t('promptTitle')}
+                                    description={t('promptDescription')}
+                                >
+                                    <textarea
+                                        rows={6}
+                                        value={prompt}
+                                        onChange={(e) => onPromptChange(e.target.value)}
+                                        aria-label={t('promptLabel')}
+                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                                    />
+                                </SettingsSection>
+                            </>
+                        )}
+
+                        {tabId === 'escalation' && (
+                            <div id="human-escalation">
+                                <SettingsSection
+                                    title={t('automaticEscalationTitle')}
+                                >
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-medium text-gray-700">{t('hotLeadScoreLabel')}</label>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="10"
+                                                    step="1"
+                                                    value={normalizedHotLeadThreshold}
+                                                    onChange={(event) => {
+                                                        const nextValue = Number.parseInt(event.target.value, 10)
+                                                        onHotLeadScoreThresholdChange(Number.isFinite(nextValue) ? nextValue : 0)
+                                                    }}
+                                                    aria-label={t('hotLeadScoreLabel')}
+                                                    style={{
+                                                        background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${hotLeadRightFillPercent}%, #bfdbfe ${hotLeadRightFillPercent}%, #bfdbfe 100%)`
+                                                    }}
+                                                    className="flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                />
+                                                <span className="text-xs font-mono text-gray-700 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">
+                                                    {`≥ ${normalizedHotLeadThreshold}`}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] text-gray-400">
+                                                <span>0</span>
+                                                <span>10</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500">{t('hotLeadScoreHelp')}</p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-medium text-gray-700">{t('humanEscalationActionLabel')}</p>
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                {hotLeadActionOptions.map(option => {
+                                                    const isSelected = hotLeadAction === option.value
+                                                    return (
+                                                        <SelectionCard
+                                                            key={option.value}
+                                                            label={option.label}
+                                                            description={option.description}
+                                                            selected={isSelected}
+                                                            onSelect={() => onHotLeadActionChange(option.value)}
+                                                        />
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </SettingsSection>
+
+                                <SettingsSection
+                                    title={t('skillBasedHandoverTitle')}
+                                    showBottomDivider={false}
+                                >
+                                    <div className="space-y-3">
+                                        <label htmlFor="hot-lead-handover-message" className="block text-sm font-medium text-gray-700">
+                                            {t('humanEscalationMessageLabel')}
+                                        </label>
+                                        <textarea
+                                            id="hot-lead-handover-message"
+                                            rows={3}
+                                            value={hotLeadHandoverMessage}
+                                            onChange={(event) => onHotLeadHandoverMessageChange(event.target.value)}
+                                            aria-label={t('humanEscalationMessageLabel')}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
+                                        />
+                                    </div>
+                                </SettingsSection>
                             </div>
-
-                            <div className="space-y-2">
-                                <p className="text-sm font-medium text-gray-700">{t('humanEscalationActionLabel')}</p>
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    {hotLeadActionOptions.map(option => {
-                                        const isSelected = hotLeadAction === option.value
-                                        return (
-                                            <SelectionCard
-                                                key={option.value}
-                                                label={option.label}
-                                                description={option.description}
-                                                selected={isSelected}
-                                                onSelect={() => onHotLeadActionChange(option.value)}
-                                            />
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3 border-t border-gray-200 pt-6">
-                            <div>
-                                <p className="text-xs font-semibold text-gray-500 tracking-wider">{t('humanEscalationStepSkillTitle')}</p>
-                                <p className="mt-1 text-sm text-gray-500">{t('humanEscalationStepSkillDescription')}</p>
-                            </div>
-                            <label htmlFor="hot-lead-handover-message" className="block text-sm font-medium text-gray-700">
-                                {t('humanEscalationMessageLabel')}
-                            </label>
-                            <textarea
-                                id="hot-lead-handover-message"
-                                rows={3}
-                                value={hotLeadHandoverMessage}
-                                onChange={(event) => onHotLeadHandoverMessageChange(event.target.value)}
-                                aria-label={t('humanEscalationMessageLabel')}
-                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-                            />
-                        </div>
-                    </div>
-                </SettingsSection>
-            </div>
-
-            <SettingsSection
-                title={t('botNameTitle')}
-                description={t('botNameDescription')}
-                showTopDivider
-            >
-                <input
-                    type="text"
-                    value={botName}
-                    onChange={(e) => onBotNameChange(e.target.value)}
-                    placeholder={t('botNamePlaceholder')}
-                    aria-label={t('botNameLabel')}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-                />
-            </SettingsSection>
-
-            <SettingsSection
-                title={t('thresholdTitle')}
-                description={t('thresholdDescription')}
-            >
-                <div className="flex items-center gap-3">
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={normalizedMatchThreshold}
-                        onChange={(event) => {
-                            const nextValue = Number.parseFloat(event.target.value)
-                            onMatchThresholdChange(Number.isFinite(nextValue) ? nextValue : 0)
-                        }}
-                        aria-label={t('threshold')}
-                        style={{
-                            background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${matchRightFillPercent}%, #bfdbfe ${matchRightFillPercent}%, #bfdbfe 100%)`
-                        }}
-                        className="flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                    <span className="text-xs font-mono text-gray-700 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">
-                        {`≥ ${normalizedMatchThreshold.toFixed(2)}`}
-                    </span>
-                </div>
-            </SettingsSection>
-
-            <SettingsSection
-                title={t('promptTitle')}
-                description={t('promptDescription')}
-            >
-                <textarea
-                    rows={6}
-                    value={prompt}
-                    onChange={(e) => onPromptChange(e.target.value)}
-                    aria-label={t('promptLabel')}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-                />
-            </SettingsSection>
+                        )}
+                    </>
+                )}
+            </SettingsTabs>
         </div >
     )
 }

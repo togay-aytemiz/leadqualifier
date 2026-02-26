@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-26 (Inbox now supports organization-level predefined message templates and a unified template picker that inserts selected content into composer; template picker UI is now mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
+> **Last Updated:** 2026-02-26 (AI Settings now uses reusable animated tabs (`General`, `Behavior and Logic`, `Escalation`) with escalation content split into two primary sections (`Automatic Escalation` + `Skill Based Handover`) and no section subtitle text; Organization Settings now uses reusable tabs (`General`, `Organization Details`, `Security & Data`); AI/Organization settings content now starts directly with tabs (intro description text removed); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -291,8 +291,8 @@
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
 - [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
 - [x] **AI Settings:** Configurable bot name (org-level)
-- [x] **Human Escalation**
-  - [x] AI Settings section: two-step flow (automatic escalation + skill handover), hot lead score slider, action cards, and locale-aware handover message
+- [x] **Escalation Controls**
+  - [x] AI Settings Escalation tab: two primary sections (`Automatic Escalation` + `Skill Based Handover`), hot lead score slider, action cards, and locale-aware handover message
   - [x] Skill-level `Requires Human Handover` toggle with read-only message preview
   - [x] Centralized escalation policy with precedence: skill override > hot lead score
   - [x] Locale-aware handover message repair so TR UI no longer displays EN default text
@@ -332,12 +332,16 @@
 - [x] **Settings UX:** Align settings column widths and remove duplicate field labels for cleaner alignment
 - [x] **Settings UX:** Refresh settings sidebar icons with bubbles/circle-user icons
 - [x] **Settings UX:** Settings page headers now match sidebar item labels (AI + Organization)
-- [x] **Organization Settings UX:** Move language selector near the bottom (above data deletion) and switch locale buttons to content-hug sizing
+- [x] **Settings UX:** AI and Organization settings pages now start directly with tabs (top description copy removed)
+- [x] **Organization Settings IA:** Split page into 3 tabs (`General`, `Organization Details`, `Security & Data`) with grouped content (name+language, offering profile/service list/required fields, data deletion)
 - [x] **Settings IA:** Removed dedicated General settings entry; language selector moved under Organization settings and `/settings/general` now redirects to `/settings/organization`
 - [x] **AI Settings UI:** Compact bot mode/escalation selection cards (smaller title, radio, and padding)
 - [x] **AI Settings UI:** Downsize selection card title text to section-title scale and reduce description font one step
 - [x] **AI Settings UI:** Align sensitivity slider with hot lead threshold styling (blue `>=` right-side highlight)
 - [x] **AI Settings Copy:** Rename handover notice label from “Asistan Sözü” to “Bot mesajı” (TR/EN)
+- [x] **AI Settings UI:** Remove Escalation section subtitle text and keep title-only section headers (`Automatic Escalation` + `Skill Based Handover`)
+- [x] **AI Settings IA:** Reorganize AI settings into 3 tabs (`General`, `Behavior and Logic`, `Escalation`) and move sections accordingly (Bot mode/name/sensitivity, operator extraction + prompt, and escalation controls with primary `Automatic Escalation` + `Skill Based Handover` sections)
+- [x] **Settings Components:** Add reusable `SettingsTabs` with smooth tab-content height animation for reuse across settings surfaces
 - [x] **AI Settings Matching:** Apply inclusive threshold semantics (`>=`) for Skill + KB similarity checks
 - [x] **Unsaved Changes Modal:** Make secondary buttons hug content, save CTA single-line, and discard soft-danger
 - [x] **Profile/Organization Settings:** Basic pages for user and org details

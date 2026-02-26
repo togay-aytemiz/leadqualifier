@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useSearchParams } from 'next/navigation'
 import { Button, PageHeader } from '@/design'
-import AiSettingsForm from './AiSettingsForm'
+import AiSettingsForm, { type AiSettingsTabId } from './AiSettingsForm'
 import type { OrganizationAiSettings } from '@/types/database'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
@@ -32,6 +32,7 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const [hotLeadHandoverMessageEn, setHotLeadHandoverMessageEn] = useState(initialSettings.hot_lead_handover_message_en)
     const [matchThreshold, setMatchThreshold] = useState(initialSettings.match_threshold)
     const [prompt, setPrompt] = useState(initialSettings.prompt)
+    const [activeTab, setActiveTab] = useState<AiSettingsTabId>('general')
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
@@ -75,18 +76,20 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
         const focusTarget = searchParams.get('focus')
         if (focusTarget !== 'human-escalation') return
 
-        const field = searchParams.get('field')
-        const section = document.getElementById('human-escalation')
-        if (section) {
-            section.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }
+        setActiveTab('escalation')
 
-        if (field === 'handover-message') {
-            window.setTimeout(() => {
+        const field = searchParams.get('field')
+        window.setTimeout(() => {
+            const section = document.getElementById('human-escalation')
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+
+            if (field === 'handover-message') {
                 const target = document.getElementById('hot-lead-handover-message') as HTMLTextAreaElement | null
                 target?.focus({ preventScroll: true })
-            }, 220)
-        }
+            }
+        }, 260)
     }, [searchParams])
 
     useEffect(() => {
@@ -180,28 +183,29 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-5xl mb-6">
-                    <p className="text-sm text-gray-500">{t('description')}</p>
-                    {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
+                <div className="max-w-5xl">
+                    {saveError && <p className="mb-4 text-sm text-red-600">{saveError}</p>}
+                    <AiSettingsForm
+                        botName={botName}
+                        botMode={botMode}
+                        allowLeadExtractionDuringOperator={allowLeadExtractionDuringOperator}
+                        hotLeadScoreThreshold={hotLeadScoreThreshold}
+                        hotLeadAction={hotLeadAction}
+                        hotLeadHandoverMessage={localizedHandoverMessage}
+                        matchThreshold={matchThreshold}
+                        prompt={prompt}
+                        activeTab={activeTab}
+                        onActiveTabChange={setActiveTab}
+                        onBotNameChange={setBotName}
+                        onBotModeChange={setBotMode}
+                        onAllowLeadExtractionDuringOperatorChange={setAllowLeadExtractionDuringOperator}
+                        onHotLeadScoreThresholdChange={setHotLeadScoreThreshold}
+                        onHotLeadActionChange={setHotLeadAction}
+                        onHotLeadHandoverMessageChange={handleLocalizedHandoverMessageChange}
+                        onMatchThresholdChange={setMatchThreshold}
+                        onPromptChange={setPrompt}
+                    />
                 </div>
-                <AiSettingsForm
-                    botName={botName}
-                    botMode={botMode}
-                    allowLeadExtractionDuringOperator={allowLeadExtractionDuringOperator}
-                    hotLeadScoreThreshold={hotLeadScoreThreshold}
-                    hotLeadAction={hotLeadAction}
-                    hotLeadHandoverMessage={localizedHandoverMessage}
-                    matchThreshold={matchThreshold}
-                    prompt={prompt}
-                    onBotNameChange={setBotName}
-                    onBotModeChange={setBotMode}
-                    onAllowLeadExtractionDuringOperatorChange={setAllowLeadExtractionDuringOperator}
-                    onHotLeadScoreThresholdChange={setHotLeadScoreThreshold}
-                    onHotLeadActionChange={setHotLeadAction}
-                    onHotLeadHandoverMessageChange={handleLocalizedHandoverMessageChange}
-                    onMatchThresholdChange={setMatchThreshold}
-                    onPromptChange={setPrompt}
-                />
             </div>
 
             <UnsavedChangesDialog
