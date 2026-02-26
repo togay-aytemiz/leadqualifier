@@ -9,7 +9,7 @@
 ### Changed
 - Changed lead qualification status model to `hot/warm/cold` only across extraction, scoring, Inbox chips, Admin recent leads, and Leads table mappings; legacy `ignored/undetermined` outputs now normalize to `cold` (`src/lib/leads/extraction.ts`, `src/lib/leads/scoring.ts`, `src/components/inbox/InboxContainer.tsx`, `src/components/leads/LeadsTable.tsx`, `src/app/[locale]/(dashboard)/admin/page.tsx`, `src/types/database.ts`, `messages/en.json`, `messages/tr.json`).
 - Changed Inbox list UX to enterprise-style queue navigation with `All / Unassigned / Me` tabs, inline per-tab counters, and red attention counters (`src/components/inbox/InboxContainer.tsx`, `src/components/inbox/conversationQueueFilters.ts`, `src/components/inbox/conversationQueueFilters.test.ts`, `src/app/[locale]/(dashboard)/inbox/page.tsx`, `messages/en.json`, `messages/tr.json`).
-- Changed Inbox queue badges to single circular presentation on `Unassigned`/`Me` (no duplicate neutral+red pair when attention exists), and changed row-level attention chip into compact filled red `!` indicator to prevent overflow (`src/components/inbox/InboxContainer.tsx`).
+- Changed Inbox queue badges to single circular presentation on `Unassigned`/`Me` (no duplicate neutral+red pair when attention exists), and changed row-level attention chip into compact filled red `!` indicator shown only on `All` tab to prevent overflow/redundancy in filtered queues (`src/components/inbox/InboxContainer.tsx`).
 
 ### Fixed
 - Fixed historical lead rows that still used removed statuses by backfilling any non-`hot/warm/cold` value to `cold` before reapplying the status constraint (`supabase/migrations/00074_leads_status_three_tiers.sql`).
