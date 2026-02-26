@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-02-26 (AI Settings now uses reusable animated tabs with 3 grouped areas: `General`, `Behavior and Logic`, and `Escalation`, where Escalation is split into primary `Automatic Escalation` + `Skill Based Handover` title-only sections; Organization Settings now uses 3 tabs (`General`, `Organization Details`, `Security & Data`) with grouped content; AI/Organization settings content starts directly with tabs (no top intro description); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
+> **Last Updated:** 2026-02-26 (AI Settings now includes a channel-wide bot disclaimer toggle with localized TR/EN editable text (default enabled); outbound bot replies in WhatsApp/Telegram/Instagram now append disclaimer text as a blockquote line (`\n\n> ...`) when enabled; AI Settings `Sensitivity` control is grouped under `Behavior and Logic` (not `General`); `Lead extraction during operator` is grouped under `Escalation`; Settings nav/page label is standardized as `Qualy AI`; AI Settings keeps reusable animated tabs with 3 grouped areas: `General`, `Behavior and Logic`, and `Escalation`, where Escalation is split into primary `Automatic Escalation` + `Skill Based Handover` title-only sections; Organization Settings now uses 3 tabs (`General`, `Organization Details`, `Security & Data`) with grouped content; AI/Organization settings content starts directly with tabs (no top intro description); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation; Inbox message-day badges now render from message timestamps (`Today`/`Yesterday`/localized full date) instead of a static `Today` chip.)  
 > **Status:** In Development
 
 ---
@@ -99,11 +99,17 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.
 - Shadow inactive banner copy is compact by default (single-line title + one short explanatory sentence).
 - Inbox conversation view should only render message content after selected-thread data is loaded; while loading, show skeletons to avoid stale previous-thread visuals.
+- Inbox message timeline must render date separators from message timestamps (`Today`, `Yesterday`, or localized full date) in viewer-local time.
 - Simulator includes token usage visibility for debugging
  - Token usage is shown per message and as a conversation total in the simulator
  - Simulator chat visuals are channel-agnostic (no WhatsApp-specific brand mimicry)
  - If no skill/KB match, bot suggests available topics using existing skills/KB titles
 - Org-level AI settings control strict/flexible modes, a single sensitivity threshold, and prompt-driven fallback behavior
+- In Settings IA, `Sensitivity` is placed under `Behavior and Logic` so matching logic controls are grouped together.
+- In Settings IA, `Lead extraction during operator` is placed under `Escalation` so operator handover/extraction rules are grouped in one place.
+- In Settings navigation/header, the AI module label is `Qualy AI`.
+- Org-level AI settings also control bot-disclaimer behavior: channel-wide enable/disable plus localized TR/EN disclaimer text.
+- When disclaimer is enabled, outbound bot replies append one quoted disclaimer line after one empty line (`\n\n> ...`) across WhatsApp, Telegram, and Instagram.
 - Live QA-port runtime improvements (response guards + intake-state behavior) are globally enabled by default for all organizations (current + newly created) in the pre-customer stage; no feature-flag gating is used.
 
 ---
@@ -693,7 +699,7 @@ MVP is successful when:
 
 ## Appendix: Tech Decisions ✅
 
-> Finalized: 2026-01-31 (updated with implementation decisions through 2026-02-19)
+> Finalized: 2026-01-31 (updated with implementation decisions through 2026-02-26)
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
@@ -838,7 +844,11 @@ MVP is successful when:
 - **Mobile Knowledge Flow:** Keep Knowledge Base single-pane on small screens by hiding the sidebar and rendering file lists as touch-friendly cards, while preserving desktop split layout.
 - **AI Settings Simplification:** Always-on flexible mode with a single match threshold (Skill + KB) and a single prompt field for fallback responses.
 - **Bot Name:** Store an org-level `bot_name` in AI settings and inject it into AI prompts, summaries, and inbox labels.
+- **Bot Disclaimer (Implementation v1.20):** Store org-level `bot_disclaimer_enabled` + localized `bot_disclaimer_message_tr/en` in AI settings; when enabled, append a quoted disclaimer (`\n\n> ...`) to outbound bot replies for WhatsApp/Telegram/Instagram.
+- **AI Settings Grouping & Naming (Implementation v1.21):** Place `Sensitivity` under `Behavior and Logic` and standardize Settings navigation/page label as `Qualy AI`.
+- **AI Settings Escalation Grouping (Implementation v1.22):** Place `Lead extraction during operator` under `Escalation` to keep operator takeover behavior with escalation controls.
 - **Inbox Message Contrast:** Bot-authored inbox messages use a dark-violet bubble with light text to keep bot replies easy to scan against operator and contact messages.
+- **Inbox Message-Day Separator:** Render day chips from each message timestamp (`Today`/`Yesterday`/localized full date) instead of showing a static label.
 - **Simulator UI Direction:** Keep the simulator channel-agnostic with a neutral chatbot look (no WhatsApp wallpaper/green header/read ticks) while preserving the same matching/debug behavior.
 - **Skill Testing Strategy (MVP):** Use Simulator as the canonical skill testing workflow; do not build a separate per-skill playground in MVP.
 - **Token Usage Accounting:** All token-consuming features must record usage in `organization_ai_usage` for monthly UTC and total tallies.

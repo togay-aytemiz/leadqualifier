@@ -13,6 +13,10 @@ import {
     DEFAULT_HANDOVER_MESSAGE_TR
 } from '@/lib/ai/escalation'
 import {
+    DEFAULT_BOT_DISCLAIMER_MESSAGE_EN,
+    DEFAULT_BOT_DISCLAIMER_MESSAGE_TR
+} from '@/lib/ai/bot-disclaimer'
+import {
     DEFAULT_BOT_NAME,
     DEFAULT_FLEXIBLE_PROMPT,
     DEFAULT_FLEXIBLE_PROMPT_TR,
@@ -33,6 +37,9 @@ const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'cre
     match_threshold: 0.6,
     prompt: DEFAULT_FLEXIBLE_PROMPT,
     bot_name: DEFAULT_BOT_NAME,
+    bot_disclaimer_enabled: true,
+    bot_disclaimer_message_tr: DEFAULT_BOT_DISCLAIMER_MESSAGE_TR,
+    bot_disclaimer_message_en: DEFAULT_BOT_DISCLAIMER_MESSAGE_EN,
     allow_lead_extraction_during_operator: false,
     hot_lead_score_threshold: 7,
     hot_lead_action: 'notify_only',
@@ -76,6 +83,16 @@ function normalizeHotLeadAction(action: string | null | undefined): HumanEscalat
         return action
     }
     return DEFAULT_AI_SETTINGS.hot_lead_action
+}
+
+function normalizeBotDisclaimerEnabled(value: boolean | null | undefined) {
+    if (typeof value === 'boolean') return value
+    return DEFAULT_AI_SETTINGS.bot_disclaimer_enabled
+}
+
+function resolveBotDisclaimerMessage(message: string | null | undefined, fallback: string) {
+    const trimmed = (message ?? '').toString().trim()
+    return trimmed || fallback
 }
 
 function resolveHandoverMessage(message: string | null | undefined, fallback: string) {
@@ -125,6 +142,19 @@ function resolveLocalizedHandoverMessages(settings: Partial<OrganizationAiSettin
     }
 }
 
+function resolveLocalizedBotDisclaimerMessages(settings: Partial<OrganizationAiSettings> | null) {
+    return {
+        bot_disclaimer_message_tr: resolveBotDisclaimerMessage(
+            settings?.bot_disclaimer_message_tr,
+            DEFAULT_AI_SETTINGS.bot_disclaimer_message_tr
+        ),
+        bot_disclaimer_message_en: resolveBotDisclaimerMessage(
+            settings?.bot_disclaimer_message_en,
+            DEFAULT_AI_SETTINGS.bot_disclaimer_message_en
+        )
+    }
+}
+
 function resolvePromptForLocale(prompt: string | null | undefined, locale: string | null | undefined) {
     const normalizedLocale = (locale ?? '').toString().toLowerCase()
     const localizedDefaultPrompt = normalizedLocale.startsWith('tr')
@@ -156,6 +186,7 @@ function applyAiDefaults(
 ): Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'> {
     const mode = normalizeMode()
     const localizedHandoverMessages = resolveLocalizedHandoverMessages(settings)
+    const localizedBotDisclaimerMessages = resolveLocalizedBotDisclaimerMessages(settings)
 
     return {
         mode,
@@ -163,6 +194,9 @@ function applyAiDefaults(
         match_threshold: clamp(Number(settings?.match_threshold ?? DEFAULT_AI_SETTINGS.match_threshold), 0, 1),
         prompt: resolvePromptForLocale(settings?.prompt, locale),
         bot_name: normalizeBotName(settings?.bot_name),
+        bot_disclaimer_enabled: normalizeBotDisclaimerEnabled(settings?.bot_disclaimer_enabled),
+        bot_disclaimer_message_tr: localizedBotDisclaimerMessages.bot_disclaimer_message_tr,
+        bot_disclaimer_message_en: localizedBotDisclaimerMessages.bot_disclaimer_message_en,
         allow_lead_extraction_during_operator: Boolean(
             settings?.allow_lead_extraction_during_operator ?? DEFAULT_AI_SETTINGS.allow_lead_extraction_during_operator
         ),

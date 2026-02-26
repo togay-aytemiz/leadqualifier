@@ -28,6 +28,7 @@ import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
 import { v4 as uuidv4 } from 'uuid'
+import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -90,6 +91,11 @@ export async function POST(req: NextRequest) {
 
     const orgId = channel.organization_id
     const aiSettings = await getOrgAiSettings(orgId, { supabase })
+    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
+        message: content,
+        responseLanguage,
+        settings: aiSettings
+    })
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
     const requiredIntakeFields = await getRequiredIntakeFields({ organizationId: orgId, supabase })
@@ -312,8 +318,9 @@ export async function POST(req: NextRequest) {
             escalation.noticeMessage &&
             conversation.active_agent !== 'operator'
         ) {
-            await client.sendMessage(chatId, escalation.noticeMessage)
-            await persistBotMessage(escalation.noticeMessage, {
+            const formattedEscalationNotice = formatOutboundBotMessage(escalation.noticeMessage)
+            await client.sendMessage(chatId, formattedEscalationNotice)
+            await persistBotMessage(formattedEscalationNotice, {
                 is_handover_notice: true,
                 escalation_reason: escalation.reason,
                 escalation_action: escalation.action
@@ -373,9 +380,10 @@ export async function POST(req: NextRequest) {
     })
 
     if (bestMatch) {
-        await client.sendMessage(chatId, bestMatch.response_text)
+        const formattedSkillReply = formatOutboundBotMessage(bestMatch.response_text)
+        await client.sendMessage(chatId, formattedSkillReply)
 
-        await persistBotMessage(bestMatch.response_text, { skill_id: bestMatch.skill_id })
+        await persistBotMessage(formattedSkillReply, { skill_id: bestMatch.skill_id })
         console.log('Telegram Webhook: Sent matched response')
 
         const { data: matchedSkillDetails, error: matchedSkillError } = await supabase
@@ -582,9 +590,10 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     })
 
                     if (guardedRagResponse && !guardedRagResponse.includes(noAnswerToken)) {
-                        await client.sendMessage(chatId, guardedRagResponse)
+                        const formattedRagReply = formatOutboundBotMessage(guardedRagResponse)
+                        await client.sendMessage(chatId, formattedRagReply)
 
-                        await persistBotMessage(guardedRagResponse, {
+                        await persistBotMessage(formattedRagReply, {
                             is_rag: true,
                             sources: chunks.map(r => r.document_id).filter(Boolean)
                         })
@@ -629,9 +638,10 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             knowledgeContext: fallbackKnowledgeContext
         })
 
-        await client.sendMessage(chatId, fallbackText)
+        const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
+        await client.sendMessage(chatId, formattedFallbackReply)
 
-        await persistBotMessage(fallbackText, { is_fallback: true })
+        await persistBotMessage(formattedFallbackReply, { is_fallback: true })
         await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 
         return NextResponse.json({ ok: true })

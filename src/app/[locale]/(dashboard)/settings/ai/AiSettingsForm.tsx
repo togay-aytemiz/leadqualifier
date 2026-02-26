@@ -10,6 +10,8 @@ export type AiSettingsTabId = 'general' | 'behaviorAndLogic' | 'escalation'
 interface AiSettingsFormProps {
     botName: string
     botMode: AiBotMode
+    botDisclaimerEnabled: boolean
+    botDisclaimerMessage: string
     allowLeadExtractionDuringOperator: boolean
     hotLeadScoreThreshold: number
     hotLeadAction: HumanEscalationAction
@@ -20,6 +22,8 @@ interface AiSettingsFormProps {
     onActiveTabChange: (value: AiSettingsTabId) => void
     onBotNameChange: (value: string) => void
     onBotModeChange: (value: AiBotMode) => void
+    onBotDisclaimerEnabledChange: (value: boolean) => void
+    onBotDisclaimerMessageChange: (value: string) => void
     onAllowLeadExtractionDuringOperatorChange: (value: boolean) => void
     onHotLeadScoreThresholdChange: (value: number) => void
     onHotLeadActionChange: (value: HumanEscalationAction) => void
@@ -63,6 +67,8 @@ function SelectionCard({ label, description, selected, onSelect }: SelectionCard
 export default function AiSettingsForm({
     botName,
     botMode,
+    botDisclaimerEnabled,
+    botDisclaimerMessage,
     allowLeadExtractionDuringOperator,
     hotLeadScoreThreshold,
     hotLeadAction,
@@ -73,6 +79,8 @@ export default function AiSettingsForm({
     onActiveTabChange,
     onBotNameChange,
     onBotModeChange,
+    onBotDisclaimerEnabledChange,
+    onBotDisclaimerMessageChange,
     onAllowLeadExtractionDuringOperatorChange,
     onHotLeadScoreThresholdChange,
     onHotLeadActionChange,
@@ -155,6 +163,36 @@ export default function AiSettingsForm({
                                 </SettingsSection>
 
                                 <SettingsSection
+                                    title={t('botDisclaimerTitle')}
+                                    description={t('botDisclaimerDescription')}
+                                >
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={botDisclaimerEnabled}
+                                                onChange={(event) => onBotDisclaimerEnabledChange(event.target.checked)}
+                                            />
+                                            {t('botDisclaimerEnabledLabel')}
+                                        </label>
+                                        <p className="text-xs text-gray-500">{t('botDisclaimerHelp')}</p>
+                                        <textarea
+                                            rows={3}
+                                            value={botDisclaimerMessage}
+                                            onChange={(event) => onBotDisclaimerMessageChange(event.target.value)}
+                                            disabled={!botDisclaimerEnabled}
+                                            aria-label={t('botDisclaimerMessageLabel')}
+                                            placeholder={t('botDisclaimerPlaceholder')}
+                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                                        />
+                                    </div>
+                                </SettingsSection>
+                            </>
+                        )}
+
+                        {tabId === 'behaviorAndLogic' && (
+                            <>
+                                <SettingsSection
                                     title={t('thresholdTitle')}
                                     description={t('thresholdDescription')}
                                 >
@@ -180,25 +218,6 @@ export default function AiSettingsForm({
                                         </span>
                                     </div>
                                 </SettingsSection>
-                            </>
-                        )}
-
-                        {tabId === 'behaviorAndLogic' && (
-                            <>
-                                <SettingsSection
-                                    title={t('operatorLeadExtractionTitle')}
-                                    description={t('operatorLeadExtractionDescription')}
-                                >
-                                    <label className="flex items-center gap-2 text-sm text-gray-700">
-                                        <input
-                                            type="checkbox"
-                                            checked={allowLeadExtractionDuringOperator}
-                                            onChange={(e) => onAllowLeadExtractionDuringOperatorChange(e.target.checked)}
-                                        />
-                                        {t('operatorLeadExtractionLabel')}
-                                    </label>
-                                    <p className="text-xs text-gray-500">{t('operatorLeadExtractionHelp')}</p>
-                                </SettingsSection>
 
                                 <SettingsSection
                                     title={t('promptTitle')}
@@ -217,6 +236,21 @@ export default function AiSettingsForm({
 
                         {tabId === 'escalation' && (
                             <div id="human-escalation">
+                                <SettingsSection
+                                    title={t('operatorLeadExtractionTitle')}
+                                    description={t('operatorLeadExtractionDescription')}
+                                >
+                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={allowLeadExtractionDuringOperator}
+                                            onChange={(event) => onAllowLeadExtractionDuringOperatorChange(event.target.checked)}
+                                        />
+                                        {t('operatorLeadExtractionLabel')}
+                                    </label>
+                                    <p className="text-xs text-gray-500">{t('operatorLeadExtractionHelp')}</p>
+                                </SettingsSection>
+
                                 <SettingsSection
                                     title={t('automaticEscalationTitle')}
                                 >

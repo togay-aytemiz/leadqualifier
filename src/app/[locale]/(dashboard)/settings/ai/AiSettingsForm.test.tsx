@@ -7,6 +7,7 @@ vi.mock('next-intl', () => ({
 }))
 
 const TEST_HANDOVER_MESSAGE = 'handover_message'
+const TEST_BOT_DISCLAIMER_MESSAGE = 'bot_disclaimer_message'
 const TEST_PROMPT = 'ai_prompt'
 
 function renderForm(activeTab: 'general' | 'behaviorAndLogic' | 'escalation') {
@@ -14,6 +15,8 @@ function renderForm(activeTab: 'general' | 'behaviorAndLogic' | 'escalation') {
         <AiSettingsForm
             botName="Qualy"
             botMode="active"
+            botDisclaimerEnabled={true}
+            botDisclaimerMessage={TEST_BOT_DISCLAIMER_MESSAGE}
             allowLeadExtractionDuringOperator={true}
             hotLeadScoreThreshold={7}
             hotLeadAction="notify_only"
@@ -24,6 +27,8 @@ function renderForm(activeTab: 'general' | 'behaviorAndLogic' | 'escalation') {
             onActiveTabChange={() => {}}
             onBotNameChange={() => {}}
             onBotModeChange={() => {}}
+            onBotDisclaimerEnabledChange={() => {}}
+            onBotDisclaimerMessageChange={() => {}}
             onAllowLeadExtractionDuringOperatorChange={() => {}}
             onHotLeadScoreThresholdChange={() => {}}
             onHotLeadActionChange={() => {}}
@@ -48,7 +53,8 @@ describe('AiSettingsForm', () => {
 
         expect(markup).toContain('botModeTitle')
         expect(markup).toContain('botNameTitle')
-        expect(markup).toContain('thresholdTitle')
+        expect(markup).toContain('botDisclaimerTitle')
+        expect(markup).not.toContain('thresholdTitle')
         expect(markup).not.toContain('operatorLeadExtractionTitle')
         expect(markup).not.toContain('promptTitle')
         expect(markup).not.toContain('humanEscalationTitle')
@@ -57,8 +63,9 @@ describe('AiSettingsForm', () => {
     it('shows behavior settings in Behavior and Logic tab', () => {
         const markup = renderForm('behaviorAndLogic')
 
-        expect(markup).toContain('operatorLeadExtractionTitle')
+        expect(markup).toContain('thresholdTitle')
         expect(markup).toContain('promptTitle')
+        expect(markup).not.toContain('operatorLeadExtractionTitle')
         expect(markup).not.toContain('botModeTitle')
         expect(markup).not.toContain('botNameTitle')
         expect(markup).not.toContain('humanEscalationTitle')
@@ -69,11 +76,11 @@ describe('AiSettingsForm', () => {
 
         expect(markup).toContain('automaticEscalationTitle')
         expect(markup).toContain('skillBasedHandoverTitle')
+        expect(markup).toContain('operatorLeadExtractionTitle')
         expect(markup).toContain('humanEscalationActionLabel')
         expect(markup).toContain('humanEscalationMessageLabel')
         expect(markup).not.toContain('humanEscalationTitle')
         expect(markup).not.toContain('botModeTitle')
-        expect(markup).not.toContain('operatorLeadExtractionTitle')
         expect(markup).not.toContain('promptTitle')
     })
 })

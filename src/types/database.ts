@@ -25,6 +25,9 @@ export interface OrganizationAiSettings {
     prompt: string
     bot_mode: AiBotMode
     bot_name: string
+    bot_disclaimer_enabled: boolean
+    bot_disclaimer_message_tr: string
+    bot_disclaimer_message_en: string
     allow_lead_extraction_during_operator: boolean
     hot_lead_score_threshold: number
     hot_lead_action: HumanEscalationAction

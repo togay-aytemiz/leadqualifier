@@ -26,6 +26,7 @@ import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
+import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -49,6 +50,11 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const responseLanguage = resolveMvpResponseLanguage(options.text)
     const responseLanguageName = resolveMvpResponseLanguageName(options.text)
     const aiSettings = await getOrgAiSettings(orgId, { supabase: options.supabase })
+    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
+        message: content,
+        responseLanguage,
+        settings: aiSettings
+    })
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
     const requiredIntakeFields = await getRequiredIntakeFields({
@@ -245,8 +251,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             && escalation.noticeMessage
             && conversation.active_agent !== 'operator'
         ) {
-            await options.sendOutbound(escalation.noticeMessage)
-            await persistBotMessage(escalation.noticeMessage, {
+            const formattedEscalationNotice = formatOutboundBotMessage(escalation.noticeMessage)
+            await options.sendOutbound(formattedEscalationNotice)
+            await persistBotMessage(formattedEscalationNotice, {
                 is_handover_notice: true,
                 escalation_reason: escalation.reason,
                 escalation_action: escalation.action
@@ -299,8 +306,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const bestMatch = matchedSkills?.[0]
 
     if (bestMatch) {
-        await options.sendOutbound(bestMatch.response_text)
-        await persistBotMessage(bestMatch.response_text, { skill_id: bestMatch.skill_id })
+        const formattedSkillReply = formatOutboundBotMessage(bestMatch.response_text)
+        await options.sendOutbound(formattedSkillReply)
+        await persistBotMessage(formattedSkillReply, { skill_id: bestMatch.skill_id })
 
         const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
             .from('skills')
@@ -498,8 +506,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 })
 
                 if (guardedRagResponse && !guardedRagResponse.includes(noAnswerToken)) {
-                    await options.sendOutbound(guardedRagResponse)
-                    await persistBotMessage(guardedRagResponse, {
+                    const formattedRagReply = formatOutboundBotMessage(guardedRagResponse)
+                    await options.sendOutbound(formattedRagReply)
+                    await persistBotMessage(formattedRagReply, {
                         is_rag: true,
                         sources: chunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
@@ -536,7 +545,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
         knowledgeContext: fallbackKnowledgeContext
     })
 
-    await options.sendOutbound(fallbackText)
-    await persistBotMessage(fallbackText, { is_fallback: true })
+    const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
+    await options.sendOutbound(formattedFallbackReply)
+    await persistBotMessage(formattedFallbackReply, { is_fallback: true })
     await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 }

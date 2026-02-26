@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-02-26 (AI Settings now uses reusable animated tabs (`General`, `Behavior and Logic`, `Escalation`) with escalation content split into two primary sections (`Automatic Escalation` + `Skill Based Handover`) and no section subtitle text; Organization Settings now uses reusable tabs (`General`, `Organization Details`, `Security & Data`); AI/Organization settings content now starts directly with tabs (intro description text removed); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation.)  
+> **Last Updated:** 2026-02-26 (AI Settings now includes a channel-wide bot disclaimer toggle with localized TR/EN editable text (default enabled); outbound bot replies in WhatsApp/Telegram/Instagram now append disclaimer text as a blockquote line (`\n\n> ...`) when enabled; AI Settings `Sensitivity` control is now grouped under `Behavior and Logic` (not `General`); `Lead extraction during operator` is now grouped under `Escalation`; Settings navigation/page title label is now `Qualy AI`; AI Settings keeps reusable animated tabs (`General`, `Behavior and Logic`, `Escalation`) with escalation content split into two primary sections (`Automatic Escalation` + `Skill Based Handover`) and no section subtitle text; Organization Settings now uses reusable tabs (`General`, `Organization Details`, `Security & Data`); AI/Organization settings content now starts directly with tabs (intro description text removed); Inbox template picker remains mobile-optimized with underline tabs, WhatsApp-only refresh action, inset chevrons, and smooth tab resize animation; Inbox message-day badges now render from actual message dates (`Today`/`Yesterday`/localized full date) instead of a static `Today` label.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -117,6 +117,7 @@
 - [x] **Inbox UI**
   - [x] Conversation list with lazy loading
   - [x] Message history view
+  - [x] Message-day badge now follows message timestamps (`Today` / `Yesterday` / localized date) instead of a static `Today` chip
   - [x] Delete conversation functionality
   - [x] Composer banner copy + centered layout
   - [x] Details avatar initials match conversation list
@@ -291,6 +292,8 @@
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and prompt field
 - [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
 - [x] **AI Settings:** Configurable bot name (org-level)
+- [x] **AI Settings:** Channel-wide bot disclaimer toggle + localized TR/EN disclaimer text (default enabled)
+- [x] **Bot Reply Formatting:** Outbound bot replies append blockquote disclaimer text (`\n\n> ...`) across WhatsApp/Telegram/Instagram when disclaimer is enabled
 - [x] **Escalation Controls**
   - [x] AI Settings Escalation tab: two primary sections (`Automatic Escalation` + `Skill Based Handover`), hot lead score slider, action cards, and locale-aware handover message
   - [x] Skill-level `Requires Human Handover` toggle with read-only message preview
@@ -337,6 +340,9 @@
 - [x] **Settings IA:** Removed dedicated General settings entry; language selector moved under Organization settings and `/settings/general` now redirects to `/settings/organization`
 - [x] **AI Settings UI:** Compact bot mode/escalation selection cards (smaller title, radio, and padding)
 - [x] **AI Settings UI:** Downsize selection card title text to section-title scale and reduce description font one step
+- [x] **AI Settings IA:** Move `Sensitivity` control from `General` to `Behavior and Logic` for better settings grouping
+- [x] **AI Settings IA:** Move `Lead extraction during operator` from `Behavior and Logic` to `Escalation`
+- [x] **Settings Naming:** Rename Settings AI nav/page label from `AI` to `Qualy AI`
 - [x] **AI Settings UI:** Align sensitivity slider with hot lead threshold styling (blue `>=` right-side highlight)
 - [x] **AI Settings Copy:** Rename handover notice label from “Asistan Sözü” to “Bot mesajı” (TR/EN)
 - [x] **AI Settings UI:** Remove Escalation section subtitle text and keep title-only section headers (`Automatic Escalation` + `Skill Based Handover`)

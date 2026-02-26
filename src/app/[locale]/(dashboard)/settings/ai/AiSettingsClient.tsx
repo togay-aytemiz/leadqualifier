@@ -23,6 +23,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const [baseline, setBaseline] = useState(initialSettings)
     const [botName, setBotName] = useState(initialSettings.bot_name)
     const [botMode, setBotMode] = useState(initialSettings.bot_mode)
+    const [botDisclaimerEnabled, setBotDisclaimerEnabled] = useState(initialSettings.bot_disclaimer_enabled)
+    const [botDisclaimerMessageTr, setBotDisclaimerMessageTr] = useState(initialSettings.bot_disclaimer_message_tr)
+    const [botDisclaimerMessageEn, setBotDisclaimerMessageEn] = useState(initialSettings.bot_disclaimer_message_en)
     const [allowLeadExtractionDuringOperator, setAllowLeadExtractionDuringOperator] = useState(
         initialSettings.allow_lead_extraction_during_operator
     )
@@ -41,6 +44,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
         return (
             botName !== baseline.bot_name ||
             botMode !== baseline.bot_mode ||
+            botDisclaimerEnabled !== baseline.bot_disclaimer_enabled ||
+            botDisclaimerMessageTr !== baseline.bot_disclaimer_message_tr ||
+            botDisclaimerMessageEn !== baseline.bot_disclaimer_message_en ||
             allowLeadExtractionDuringOperator !== baseline.allow_lead_extraction_during_operator ||
             hotLeadScoreThreshold !== baseline.hot_lead_score_threshold ||
             hotLeadAction !== baseline.hot_lead_action ||
@@ -52,6 +58,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     }, [
         botName,
         botMode,
+        botDisclaimerEnabled,
+        botDisclaimerMessageTr,
+        botDisclaimerMessageEn,
         allowLeadExtractionDuringOperator,
         hotLeadScoreThreshold,
         hotLeadAction,
@@ -63,6 +72,7 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     ])
 
     const localizedHandoverMessage = locale === 'tr' ? hotLeadHandoverMessageTr : hotLeadHandoverMessageEn
+    const localizedDisclaimerMessage = locale === 'tr' ? botDisclaimerMessageTr : botDisclaimerMessageEn
 
     const handleLocalizedHandoverMessageChange = (value: string) => {
         if (locale === 'tr') {
@@ -70,6 +80,14 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             return
         }
         setHotLeadHandoverMessageEn(value)
+    }
+
+    const handleLocalizedDisclaimerMessageChange = (value: string) => {
+        if (locale === 'tr') {
+            setBotDisclaimerMessageTr(value)
+            return
+        }
+        setBotDisclaimerMessageEn(value)
     }
 
     useEffect(() => {
@@ -115,6 +133,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                 mode: 'flexible',
                 bot_name: botName,
                 bot_mode: botMode,
+                bot_disclaimer_enabled: botDisclaimerEnabled,
+                bot_disclaimer_message_tr: botDisclaimerMessageTr,
+                bot_disclaimer_message_en: botDisclaimerMessageEn,
                 allow_lead_extraction_during_operator: allowLeadExtractionDuringOperator,
                 hot_lead_score_threshold: hotLeadScoreThreshold,
                 hot_lead_action: hotLeadAction,
@@ -126,6 +147,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             setBaseline(savedSettings)
             setBotName(savedSettings.bot_name)
             setBotMode(savedSettings.bot_mode)
+            setBotDisclaimerEnabled(savedSettings.bot_disclaimer_enabled)
+            setBotDisclaimerMessageTr(savedSettings.bot_disclaimer_message_tr)
+            setBotDisclaimerMessageEn(savedSettings.bot_disclaimer_message_en)
             setAllowLeadExtractionDuringOperator(savedSettings.allow_lead_extraction_during_operator)
             setHotLeadScoreThreshold(savedSettings.hot_lead_score_threshold)
             setHotLeadAction(savedSettings.hot_lead_action)
@@ -150,6 +174,9 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const handleDiscard = () => {
         setBotName(baseline.bot_name)
         setBotMode(baseline.bot_mode)
+        setBotDisclaimerEnabled(baseline.bot_disclaimer_enabled)
+        setBotDisclaimerMessageTr(baseline.bot_disclaimer_message_tr)
+        setBotDisclaimerMessageEn(baseline.bot_disclaimer_message_en)
         setAllowLeadExtractionDuringOperator(baseline.allow_lead_extraction_during_operator)
         setHotLeadScoreThreshold(baseline.hot_lead_score_threshold)
         setHotLeadAction(baseline.hot_lead_action)
@@ -188,6 +215,8 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                     <AiSettingsForm
                         botName={botName}
                         botMode={botMode}
+                        botDisclaimerEnabled={botDisclaimerEnabled}
+                        botDisclaimerMessage={localizedDisclaimerMessage}
                         allowLeadExtractionDuringOperator={allowLeadExtractionDuringOperator}
                         hotLeadScoreThreshold={hotLeadScoreThreshold}
                         hotLeadAction={hotLeadAction}
@@ -198,6 +227,8 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                         onActiveTabChange={setActiveTab}
                         onBotNameChange={setBotName}
                         onBotModeChange={setBotMode}
+                        onBotDisclaimerEnabledChange={setBotDisclaimerEnabled}
+                        onBotDisclaimerMessageChange={handleLocalizedDisclaimerMessageChange}
                         onAllowLeadExtractionDuringOperatorChange={setAllowLeadExtractionDuringOperator}
                         onHotLeadScoreThresholdChange={setHotLeadScoreThreshold}
                         onHotLeadActionChange={setHotLeadAction}

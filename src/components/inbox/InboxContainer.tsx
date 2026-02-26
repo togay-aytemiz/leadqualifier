@@ -47,6 +47,7 @@ import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/li
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
 import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
+import { buildMessageDateSeparators } from '@/components/inbox/messageDateSeparators'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -991,6 +992,15 @@ export function InboxContainer({
     const selectedConversation = conversations.find(c => c.id === selectedId)
     const showConversationSkeleton = shouldShowConversationSkeleton(selectedConversation?.id ?? null, loadedConversationId)
     const visibleMessages = showConversationSkeleton ? [] : messages
+    const messageDateSeparatorById = new Map(
+        buildMessageDateSeparators({
+            messages: visibleMessages,
+            now: relativeTimeBaseDate,
+            todayLabel: t('today'),
+            yesterdayLabel: t('yesterday'),
+            dateLocale
+        }).map(separator => [separator.messageId, separator.label])
+    )
     const isWhatsAppConversation = selectedConversation?.platform === 'whatsapp'
     const latestWhatsAppInboundAt = isWhatsAppConversation && !showConversationSkeleton
         ? getLatestContactMessageAt(visibleMessages)
@@ -1257,9 +1267,6 @@ export function InboxContainer({
                             onScroll={handleMessagesScroll}
                             className="flex-1 overflow-y-auto bg-gray-50/30 p-4 lg:p-8 space-y-6 lg:space-y-8"
                         >
-                            <div className="flex justify-center">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">{t('today')}</span>
-                            </div>
                             {showConversationSkeleton ? (
                                 <div className="space-y-4">
                                     <div className="flex items-end gap-3">
@@ -1280,41 +1287,58 @@ export function InboxContainer({
                                     const isMe = m.sender_type === 'user'
                                     const isBot = m.sender_type === 'bot'
                                     const isSystem = m.sender_type === 'system'
+                                    const messageDateSeparator = messageDateSeparatorById.get(m.id)
+                                    const dateSeparator = messageDateSeparator ? (
+                                        <div className="flex justify-center">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">
+                                                {messageDateSeparator}
+                                            </span>
+                                        </div>
+                                    ) : null
 
                                     if (isSystem) {
                                         return (
-                                            <div key={m.id} className="flex items-center justify-center w-full py-2">
-                                                <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                                                    {m.content}
-                                                </span>
+                                            <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                                {dateSeparator}
+                                                <div className="flex items-center justify-center w-full py-2">
+                                                    <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                                                        {m.content}
+                                                    </span>
+                                                </div>
                                             </div>
                                         )
                                     }
 
                                     if (!isMe && !isBot) {
                                         return (
-                                            <div key={m.id} className="flex items-end gap-3">
-                                                <Avatar name={selectedConversation.contact_name} size="md" />
-                                                <div className="flex flex-col gap-1 max-w-[80%]">
-                                                    <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
-                                                        {m.content}
+                                            <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                                {dateSeparator}
+                                                <div className="flex items-end gap-3">
+                                                    <Avatar name={selectedConversation.contact_name} size="md" />
+                                                    <div className="flex flex-col gap-1 max-w-[80%]">
+                                                        <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
+                                                            {m.content}
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
                                                     </div>
-                                                    <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
                                                 </div>
                                             </div>
                                         )
                                     }
 
                                     return (
-                                        <div key={m.id} className="flex items-end gap-3 justify-end">
-                                            <div className="flex flex-col gap-1 items-end max-w-[80%]">
-                                                <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
-                                                    {m.content}
-                                                </div>
-                                                <div className="flex items-center gap-1.5 mr-1">
-                                                    <span className="text-xs text-gray-400">
-                                                        {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
-                                                    </span>
+                                        <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                            {dateSeparator}
+                                            <div className="flex items-end gap-3 justify-end">
+                                                <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                                                    <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
+                                                        {m.content}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 mr-1">
+                                                        <span className="text-xs text-gray-400">
+                                                            {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
