@@ -1256,6 +1256,123 @@ export function InboxContainer({
     const mobileConversationPaneClasses = getMobileConversationPaneClasses(isMobileConversationOpen)
     const mobileDetailsOverlayClasses = getMobileDetailsOverlayClasses(isMobileDetailsOpen)
     const mobileDetailsPanelClasses = getMobileDetailsPanelClasses(isMobileDetailsOpen)
+    const renderConversationKeyInfoSection = (variant: 'mobile' | 'desktop') => {
+        if (!selectedConversation) return null
+        const isMobileVariant = variant === 'mobile'
+        const rowClassName = isMobileVariant
+            ? 'grid grid-cols-[92px_1fr] items-start gap-3'
+            : 'grid grid-cols-[100px_1fr] gap-4'
+        const labelClassName = isMobileVariant
+            ? 'pt-0.5 text-xs text-gray-500'
+            : 'text-sm text-gray-500'
+        const valueTextClassName = isMobileVariant ? 'text-sm text-gray-900' : 'text-sm text-gray-900'
+
+        const rows = (
+            <div className={isMobileVariant ? 'space-y-3' : 'space-y-4'}>
+                <div className={cn(rowClassName, !isMobileVariant && 'items-center')}>
+                    <span className={labelClassName}>{t('activeAgent')}</span>
+                    <div className="flex items-start flex-wrap gap-2">
+                        {activeAgent === 'ai' ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                                <Bot size={12} />
+                                {t('copilot')}
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                <Zap size={12} />
+                                {t('operator')}
+                            </span>
+                        )}
+                        {conversationAiPaused && (
+                            <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                {t('aiProcessingPausedBadge')}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {activeAgent === 'operator' && (
+                    <div className={cn(rowClassName, !isMobileVariant && 'items-center')}>
+                        <span className={labelClassName}>{t('operator')}</span>
+                        <div className={valueTextClassName}>
+                            {selectedConversation.assignee ? (
+                                <span>{selectedConversation.assignee.full_name}</span>
+                            ) : (
+                                <span className="text-xs font-medium text-orange-500">{t('unassigned')}</span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                <div className={cn(rowClassName, !isMobileVariant && 'items-center')}>
+                    <span className={labelClassName}>{t('platform')}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex h-4 w-4 items-center justify-center">
+                            {selectedConversation.platform !== 'simulator' ? (
+                                <img alt="" aria-hidden className="h-4 w-4" src={getChannelPlatformIconSrc(selectedConversation.platform)} />
+                            ) : (
+                                <span className="text-[10px] font-semibold uppercase text-gray-400">{t('platformSimulatorShort')}</span>
+                            )}
+                        </span>
+                        <span className={cn(valueTextClassName, 'capitalize')}>{selectedConversation.platform}</span>
+                    </div>
+                </div>
+
+                <div className={cn(rowClassName, !isMobileVariant && 'items-center')}>
+                    <span className={labelClassName}>{t('received')}</span>
+                    <span className={valueTextClassName}>
+                        {format(new Date(selectedConversation.created_at), 'PP p', { locale: dateLocale })}
+                    </span>
+                </div>
+
+                <div className={cn(rowClassName, !isMobileVariant && 'items-center')}>
+                    <span className={labelClassName}>{t('creditUsage')}</span>
+                    <span className={valueTextClassName}>{conversationCreditValue}</span>
+                </div>
+
+                <div className={cn(rowClassName, 'items-start')}>
+                    <span className={labelClassName}>{t('aiProcessingControl')}</span>
+                    <div>
+                        <label className="flex items-start gap-2">
+                            <input
+                                type="checkbox"
+                                checked={conversationAiPaused}
+                                onChange={(event) => {
+                                    void handleSetConversationAiPause(event.target.checked)
+                                }}
+                                disabled={isAiPauseUpdating || isReadOnly}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            />
+                            <span className={valueTextClassName}>{t('aiProcessingPauseLabel')}</span>
+                        </label>
+                        <p className={cn('mt-1 text-xs text-gray-500', isMobileVariant && 'leading-5')}>{t('aiProcessingPauseHelp')}</p>
+                        {aiPauseError && (
+                            <p className="mt-1 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )
+
+        if (isMobileVariant) {
+            return (
+                <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+                    <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-900">
+                        {t('keyInfo')}
+                    </h4>
+                    {rows}
+                </div>
+            )
+        }
+
+        return (
+            <>
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">{t('keyInfo')}</h4>
+                {rows}
+                <hr className="border-gray-100/60 my-6" />
+            </>
+        )
+    }
 
     return (
         <>
@@ -1369,7 +1486,7 @@ export function InboxContainer({
                         )}
                     >
                         <div className="h-14 shrink-0 border-b border-gray-200 bg-white px-4 lg:px-6 flex items-center justify-between">
-                            <div className="flex items-center gap-2 lg:gap-3">
+                            <div className="flex min-w-0 items-center gap-2 lg:gap-3">
                                 <button
                                     type="button"
                                     onClick={handleBackToConversationList}
@@ -1378,9 +1495,39 @@ export function InboxContainer({
                                 >
                                     <ArrowLeft size={18} />
                                 </button>
-                                <h2 className="font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
+                                {selectedConversation.platform !== 'simulator' ? (
+                                    <img
+                                        alt=""
+                                        aria-hidden
+                                        title={`${t('platform')}: ${selectedConversation.platform}`}
+                                        className="h-5 w-5 shrink-0 lg:hidden"
+                                        src={getChannelPlatformIconSrc(selectedConversation.platform)}
+                                    />
+                                ) : (
+                                    <span
+                                        title={`${t('platform')}: ${selectedConversation.platform}`}
+                                        className="shrink-0 text-[10px] font-semibold uppercase text-gray-400 lg:hidden"
+                                    >
+                                        {t('platformSimulatorShort')}
+                                    </span>
+                                )}
+                                <h2 className="min-w-0 truncate font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
                             </div>
                             <div className="flex items-center gap-2">
+                                <span
+                                    className={cn(
+                                        'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold md:hidden',
+                                        activeAgent === 'ai'
+                                            ? 'border-purple-100 bg-purple-50 text-purple-700'
+                                            : 'border-blue-100 bg-blue-50 text-blue-700'
+                                    )}
+                                    aria-label={`${t('activeAgent')}: ${activeAgent === 'ai' ? t('copilot') : t('operator')}`}
+                                >
+                                    {activeAgent === 'ai' ? <Bot size={12} /> : <Zap size={12} />}
+                                    <span className="max-w-[70px] truncate">
+                                        {activeAgent === 'ai' ? (botName ?? t('botName')) : t('operator')}
+                                    </span>
+                                </span>
                                 <button
                                     type="button"
                                     onClick={() => setIsMobileDetailsOpen(prev => !prev)}
@@ -1447,62 +1594,132 @@ export function InboxContainer({
                                                 <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                                             </div>
                                         </div>
-                                        {!conversationAiPaused && (
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadService')}</p>
-                                                    <p className="mt-1 text-sm font-medium text-gray-900">{lead?.service_type || t('leadUnknown')}</p>
-                                                </div>
-                                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('leadScore')}</p>
-                                                    <p className="mt-1 text-sm font-medium text-gray-900">{lead?.total_score ?? '-'}</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                            <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('creditUsage')}</p>
-                                            <p className="mt-1 text-sm font-medium text-gray-900">{conversationCreditValue}</p>
-                                        </div>
-                                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                            <label className="flex items-start gap-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={conversationAiPaused}
-                                                    onChange={(event) => {
-                                                        void handleSetConversationAiPause(event.target.checked)
-                                                    }}
-                                                    disabled={isAiPauseUpdating || isReadOnly}
-                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
-                                                />
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-900">{t('aiProcessingPauseLabel')}</p>
-                                                    <p className="mt-1 text-xs text-gray-500">{t('aiProcessingPauseHelp')}</p>
-                                                </div>
-                                            </label>
-                                            {aiPauseError && (
-                                                <p className="mt-2 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
-                                            )}
-                                        </div>
+                                        <div className="my-3 h-px bg-gray-100" />
+
+                                        {renderConversationKeyInfoSection('mobile')}
+
                                         {!conversationAiPaused && (
                                             <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadSummary')}</p>
-                                                <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">{lead?.summary || t('leadEmpty')}</p>
-                                            </div>
-                                        )}
-                                        {!conversationAiPaused && (
-                                            <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{t('leadRequiredInfo')}</p>
-                                                {collectedRequiredIntake.length > 0 ? (
-                                                    <div className="mt-2 space-y-2">
-                                                        {collectedRequiredIntake.map((item) => (
-                                                            <div key={item.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
-                                                                <span className="text-xs text-gray-500">{item.field}</span>
-                                                                <span className="break-words text-sm text-gray-900">{item.value}</span>
+                                                <div className="mb-3 flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-900">
+                                                            {t('leadTitle')}
+                                                        </h4>
+                                                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-500">
+                                                            {t('leadAiExtraction')}
+                                                        </span>
+                                                    </div>
+                                                    {isLeadUpdating && (
+                                                        <span className="text-xs font-semibold text-emerald-600">{t('leadUpdating')}</span>
+                                                    )}
+                                                </div>
+
+                                                {leadExtractionPaused && (
+                                                    <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs font-semibold text-amber-900">{t('leadPausedTitle')}</p>
+                                                            <p className="text-xs text-amber-800">{pauseReasonText}</p>
+                                                            {leadRefreshStatus === 'error' && (
+                                                                <p className="text-xs text-red-600">{leadRefreshMessage}</p>
+                                                            )}
+                                                            {leadRefreshStatus === 'success' && (
+                                                                <p className="text-xs text-green-700">{t('leadRefreshSuccess')}</p>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleRefreshLead}
+                                                            disabled={leadRefreshStatus === 'loading' || conversationAiPaused}
+                                                            className={cn(
+                                                                'shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100',
+                                                                (leadRefreshStatus === 'loading' || conversationAiPaused) && 'cursor-not-allowed opacity-60'
+                                                            )}
+                                                        >
+                                                            {leadRefreshStatus === 'loading' ? t('leadRefreshLoading') : t('leadRefresh')}
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {lead ? (
+                                                    <div className="space-y-3">
+                                                        <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                                            <span className="pt-0.5 text-xs text-gray-500">{t('leadStatus')}</span>
+                                                            <div className="flex items-center gap-2 text-sm text-gray-900">
+                                                                <span
+                                                                    className={cn(
+                                                                        'h-2 w-2 rounded-full',
+                                                                        lead.status === 'hot'
+                                                                            ? 'bg-red-500'
+                                                                            : lead.status === 'warm'
+                                                                                ? 'bg-amber-500'
+                                                                                : 'bg-gray-400'
+                                                                    )}
+                                                                />
+                                                                <span>{leadStatusLabels[lead.status] ?? lead.status}</span>
                                                             </div>
-                                                        ))}
+                                                        </div>
+
+                                                        <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                                            <span className="pt-0.5 text-xs text-gray-500">{t('leadScore')}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm text-gray-900">{lead.total_score}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleOpenScoreReason}
+                                                                    disabled={scoreReasonStatus === 'loading'}
+                                                                    className={cn(
+                                                                        'text-xs font-medium text-blue-600 hover:text-blue-700',
+                                                                        scoreReasonStatus === 'loading' && 'cursor-not-allowed opacity-60'
+                                                                    )}
+                                                                >
+                                                                    {t('scoreReason')}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                                            <span className="pt-0.5 text-xs text-gray-500">{t('leadService')}</span>
+                                                            <span className="text-sm text-gray-900">{lead.service_type || t('leadUnknown')}</span>
+                                                        </div>
+
+                                                        {lead.summary && (
+                                                            <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                                                <span className="pt-0.5 text-xs text-gray-500">{t('leadSummary')}</span>
+                                                                <span className="whitespace-pre-wrap text-sm text-gray-900">{lead.summary}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {requiredIntakeFields.length > 0 && (
+                                                            <div className="rounded-lg border border-gray-200 bg-gray-50/40 px-3 py-3">
+                                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                                                    {t('leadRequiredInfo')}
+                                                                </p>
+                                                                {collectedRequiredIntake.length > 0 ? (
+                                                                    <div className="mt-2 space-y-2">
+                                                                        {collectedRequiredIntake.map((item) => (
+                                                                            <div key={item.field} className="grid grid-cols-[110px_1fr] items-start gap-2">
+                                                                                <span className="text-xs text-gray-500">{item.field}</span>
+                                                                                <span className="break-words text-sm text-gray-900">{item.value}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {lead.updated_at && (
+                                                            <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                                                <span className="pt-0.5 text-xs text-gray-500">{t('leadUpdated')}</span>
+                                                                <span className="text-sm text-gray-900">
+                                                                    {format(new Date(lead.updated_at), 'PP p', { locale: dateLocale })}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ) : (
-                                                    <p className="mt-2 text-sm text-gray-500">{t('leadRequiredInfoEmpty')}</p>
+                                                    <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
                                                 )}
                                             </div>
                                         )}
@@ -1950,93 +2167,7 @@ export function InboxContainer({
                                     <hr className="border-gray-100 my-6" />
 
                                     <div className="flex-1">
-                                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">{t('keyInfo')}</h4>
-                                <div className="space-y-4">
-                                    {/* Active Agent Status */}
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">{t('activeAgent')}</span>
-                                        <div className="flex items-start flex-col gap-1">
-                                            {activeAgent === 'ai' ? (
-                                                <span className="text-xs text-purple-700 font-medium bg-purple-50 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
-                                                    <Bot size={12} />
-                                                    {t('copilot')}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
-                                                    <Zap size={12} />
-                                                    {t('operator')}
-                                                </span>
-                                            )}
-                                            {conversationAiPaused && (
-                                                <span className="text-xs text-amber-800 font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded w-fit">
-                                                    {t('aiProcessingPausedBadge')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Assigned Operator */}
-                                    {activeAgent === 'operator' && (
-                                        <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                            <span className="text-sm text-gray-500">{t('operator')}</span>
-                                            <div className="text-sm text-gray-900">
-                                                {selectedConversation.assignee ? (
-                                                    <span>{selectedConversation.assignee.full_name}</span>
-                                                ) : (
-                                                    <span className="text-orange-500 text-xs font-medium">{t('unassigned')}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">{t('platform')}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="h-4 w-4 inline-flex items-center justify-center">
-                                                {selectedConversation.platform !== 'simulator' ? (
-                                                    <img alt="" aria-hidden className="h-4 w-4" src={getChannelPlatformIconSrc(selectedConversation.platform)} />
-                                                ) : (
-                                                    <span className="text-[10px] font-semibold text-gray-400 uppercase">{t('platformSimulatorShort')}</span>
-                                                )}
-                                            </span>
-                                            <span className="text-sm text-gray-900 capitalize">{selectedConversation.platform}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">{t('received')}</span>
-                                        <span className="text-sm text-gray-900">{format(new Date(selectedConversation.created_at), 'PP p', { locale: dateLocale })}</span>
-                                    </div>
-
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                        <span className="text-sm text-gray-500">{t('creditUsage')}</span>
-                                        <span className="text-sm text-gray-900">{conversationCreditValue}</span>
-                                    </div>
-
-                                    <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
-                                        <span className="text-sm text-gray-500">{t('aiProcessingControl')}</span>
-                                        <div>
-                                            <label className="flex items-start gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={conversationAiPaused}
-                                                    onChange={(event) => {
-                                                        void handleSetConversationAiPause(event.target.checked)
-                                                    }}
-                                                    disabled={isAiPauseUpdating || isReadOnly}
-                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
-                                                />
-                                                <span className="text-sm text-gray-900">{t('aiProcessingPauseLabel')}</span>
-                                            </label>
-                                            <p className="mt-1 text-xs text-gray-500">{t('aiProcessingPauseHelp')}</p>
-                                            {aiPauseError && (
-                                                <p className="mt-1 text-xs text-red-600">{t('aiProcessingPauseError')}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <hr className="border-gray-100/60 my-6" />
+                                {renderConversationKeyInfoSection('desktop')}
 
                                 {!conversationAiPaused && (
                                     <div className="mt-6">
@@ -2183,16 +2314,16 @@ export function InboxContainer({
                         aria-label={tSidebar('organizationSwitcherClose')}
                         onClick={() => setIsMobileBotModeSheetOpen(false)}
                         className={cn(
-                            'fixed inset-0 z-[1080] bg-gray-950/30 transition-opacity duration-200 ease-out lg:hidden',
+                            'fixed inset-0 top-14 z-[1080] bg-gray-950/30 transition-opacity duration-200 ease-out lg:hidden',
                             isMobileBotModeSheetVisible ? 'opacity-100' : 'opacity-0'
                         )}
                     />
                     <div
                         className={cn(
-                            'fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[1090] rounded-2xl border border-slate-200 bg-white shadow-xl transition-all duration-200 ease-out lg:hidden',
+                            'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-[1090] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl transition-all duration-200 ease-out lg:hidden',
                             isMobileBotModeSheetVisible
                                 ? 'translate-y-0 opacity-100'
-                                : 'translate-y-3 opacity-0'
+                                : '-translate-y-3 opacity-0'
                         )}
                     >
                         <div className="border-b border-slate-100 px-3.5 py-3">

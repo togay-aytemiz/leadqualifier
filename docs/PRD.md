@@ -97,6 +97,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Bot mode (org-level): Active (replies), Shadow (lead extraction only), Off (no AI processing). Simulator is unaffected.
 - Main sidebar bot-status control opens a compact dropdown panel that shows the meaning of `Active / Shadow / Off`, supports quick mode switching when writes are allowed, includes a shortcut to Settings, and uses animated open/close transitions.
 - Mobile Inbox header shows a compact bot-status pill; tapping it opens a bottom sheet with `Active / Shadow / Off` meanings, quick mode switching (when writes are allowed), and a shortcut to `Settings > AI`.
+- Mobile conversation details sheet should keep desktop-equivalent key-info coverage and order (`Active Agent`, assigned operator when active, channel/platform, received timestamp, credit usage, AI pause control) before lead-extraction details.
+- Mobile conversation header should surface quick operational context before opening details (leading channel icon + active-agent chip); channel icon should render directly before contact name without extra framed wrapper, and the inbox bot-status quick-switch sheet should open from the top (matching mobile details-panel motion direction).
 - In collapsed desktop sidebar mode, bot status and navigation controls show immediate hover tooltips (custom UI tooltip, not delayed browser title-only behavior).
 - Conversation-level AI pause (`conversations.ai_processing_paused`) hard-stops inbound AI automation for that specific contact (no lead extraction, no AI reply) while still persisting inbound messages and unread counters.
 - Inbox composer banner mirrors bot mode state: Active shows “assistant active”, Shadow/Off show “assistant not active”.

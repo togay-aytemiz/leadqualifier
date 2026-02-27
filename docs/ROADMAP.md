@@ -119,6 +119,8 @@
   - [x] Conversation queue tabs (`All`, `Unassigned`, `Me`) with single circular badge presentation (red for attention count) and no duplicate badge on Unassigned/Me
   - [x] Conversation list row-level human-attention indicator is compact red `!` and rendered only on `All` tab (tooltip keeps reason detail: `Skill handover` / `Hot lead`)
   - [x] Mobile inbox header now shows bot-status pill and opens a bot-mode quick-switch bottom sheet with `Active / Shadow / Off` explanations + Settings shortcut
+  - [x] Mobile conversation details sheet now matches desktop key-info ordering and includes active agent, assigned operator, platform/channel, received time, and AI control metadata
+  - [x] Mobile conversation header now exposes quick context without opening details (channel icon + active agent chip), with channel icon shown directly before contact name (no extra framed wrapper), and mobile bot-status quick-switch sheet now opens from top like the details panel
   - [x] Message history view
   - [x] Message-day badge now follows message timestamps (`Today` / `Yesterday` / localized date) instead of a static `Today` chip
   - [x] Delete conversation functionality
