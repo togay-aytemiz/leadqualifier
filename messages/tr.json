@@ -404,6 +404,31 @@
                 "validationWhatsAppSelection": "Lütfen bir WhatsApp şablonu seçin."
             }
         },
+        "composerAttachments": {
+            "remove": "Eki kaldır",
+            "previewTitle": "Ek önizleme",
+            "limitHint": "Tek seferde en fazla {count} dosya gönderebilirsiniz.",
+            "sending": "Gönderiliyor...",
+            "failed": "Başarısız",
+            "outboundPlaceholderImage": "[Görsel]",
+            "outboundPlaceholderDocument": "[Belge]",
+            "mimeTypeLabel": "Tür",
+            "sizeLabel": "Boyut",
+            "sizeMb": "{size} MB",
+            "sizeKb": "{size} KB",
+            "errors": {
+                "validation": "Bir mesaj veya en az bir ek ekleyin.",
+                "maxCount": "Tek seferde en fazla {count} dosya ekleyebilirsiniz.",
+                "invalidType": "Yalnızca WhatsApp'ın desteklediği görsel ve belge türleri eklenebilir.",
+                "maxImageSize": "Görsel dosya boyutu limiti aşıyor ({sizeMb} MB).",
+                "maxDocumentSize": "Belge dosya boyutu limiti aşıyor ({sizeMb} MB).",
+                "sendFailed": "Ekler gönderilemedi. Lütfen tekrar deneyin.",
+                "missingChannel": "Aktif WhatsApp kanal yapılandırması eksik.",
+                "billingLocked": "Kullanım kilitli olduğu için ek gönderilemiyor.",
+                "replyWindowBlocked": "Bu konuşmada WhatsApp yanıt penceresi kapalı.",
+                "notWhatsApp": "Ek gönderimi şu anda yalnızca WhatsApp konuşmalarında destekleniyor."
+            }
+        },
         "details": "Detaylar",
         "hideDetails": "Detayları gizle",
         "backToInbox": "Gelen kutusuna dön",
@@ -982,13 +1007,14 @@
         "messageIncomingLabel": "Müşteri girişi",
         "messageUsageEmptyState": "Henüz mesaj aktivitesi yok.",
         "storageUsageTitle": "Alan Kullanımı",
-        "storageUsageDescription": "Yetenekler ve Bilgi Bankası için kullanılan yaklaşık içerik alanı.",
+        "storageUsageDescription": "Yetenekler, Bilgi Bankası ve gelen WhatsApp medyası için kullanılan yaklaşık alan.",
         "storageBreakdownLabel": "Dağılım",
         "storageSkillsLabel": "Yetenekler",
         "storageKnowledgeLabel": "Bilgi bankası",
+        "storageWhatsAppMediaLabel": "WhatsApp medyası",
         "storageSkillsCountLabel": "{count} yetenek",
         "storageKnowledgeCountLabel": "{count} doküman",
-        "storageUsageApproxNote": "Mevcut metin içeriklerine göre yaklaşık hesaplanır.",
+        "storageWhatsAppMediaCountLabel": "{count} dosya",
         "noOrganization": "Organizasyon Bulunamadı",
         "noOrganizationDesc": "Kullanım verilerini görmek için bir organizasyona bağlı olmalısınız."
     },
@@ -1671,13 +1697,15 @@
                 "tokens": "Toplam Token",
                 "skills": "Yetenekler",
                 "knowledge": "Bilgi Bankası",
+                "storage": "Depolama",
                 "premium": "Üyelik",
                 "paidFee": "Ödenen Ücret",
                 "plan": "Paket Kredileri",
                 "trial": "Ücretsiz Deneme Kredileri",
                 "created": "Oluşturulma",
                 "details": "Detay"
-            }
+            },
+            "storageMediaLabel": "WA medya: {value}"
         },
         "users": {
             "title": "Kullanıcılar",
@@ -1747,7 +1775,9 @@
                 "usage": "Toplam Mesaj",
                 "tokens": "Toplam Token",
                 "skills": "Yetenekler",
-                "knowledge": "Bilgi Bankası"
+                "knowledge": "Bilgi Bankası",
+                "storage": "Depolama",
+                "storageMedia": "WA medya: {value}"
             },
             "billing": {
                 "membership": "Üyelik",

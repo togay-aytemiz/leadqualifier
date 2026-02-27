@@ -389,6 +389,41 @@ describe('buildLeadExtractionConversationContext', () => {
             'm6'
         ])
     })
+
+    it('excludes whatsapp media messages and keeps text-only turns', () => {
+        const result = buildLeadExtractionConversationContext({
+            messages: [
+                {
+                    sender_type: 'contact',
+                    content: '[WhatsApp image]',
+                    metadata: {
+                        whatsapp_message_type: 'image',
+                        whatsapp_media: {
+                            type: 'image',
+                            storage_url: 'https://cdn.example.com/media-1.jpg'
+                        }
+                    }
+                },
+                {
+                    sender_type: 'contact',
+                    content: 'Fiyat alabilir miyim?',
+                    metadata: {
+                        whatsapp_message_type: 'text'
+                    }
+                },
+                {
+                    sender_type: 'bot',
+                    content: 'Tabii, hangi hizmet için?'
+                }
+            ]
+        })
+
+        expect(result.conversationTurns).toEqual([
+            'assistant: Tabii, hangi hizmet için?',
+            'customer: Fiyat alabilir miyim?'
+        ])
+        expect(result.customerMessages).toEqual(['Fiyat alabilir miyim?'])
+    })
 })
 
 describe('normalizeLowSignalLeadStatus', () => {

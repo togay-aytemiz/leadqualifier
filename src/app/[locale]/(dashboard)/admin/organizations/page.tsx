@@ -4,6 +4,7 @@ import { DataTable, TableHead, TableBody, TableRow, TableCell, PageHeader, Badge
 import { ArrowLeft, Building2 } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import { getAdminOrganizationListResult, type AdminBillingSnapshot } from '@/lib/admin/read-models'
+import { formatStorageSize } from '@/lib/billing/usage'
 
 interface AdminOrganizationsPageProps {
     searchParams: Promise<{ search?: string; page?: string }>
@@ -76,6 +77,10 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
         }
         return formatter.format(amount)
     }
+    const formatStorageLabel = (bytes: number) => {
+        const formatted = formatStorageSize(bytes, locale)
+        return `${formatted.value} ${formatted.unit}`
+    }
 
     const from = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1
     const to = result.total === 0 ? 0 : from + organizations.length - 1
@@ -141,7 +146,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                         {organizations.length === 0 ? (
                             <tbody>
                                 <tr>
-                                    <td colSpan={13} className="px-6 py-12 text-center">
+                                    <td colSpan={14} className="px-6 py-12 text-center">
                                         <div className="mx-auto flex max-w-md flex-col items-center">
                                             <Building2 className="mb-3 text-gray-300" size={40} />
                                             <p className="text-lg font-medium text-gray-900">
@@ -164,6 +169,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                     tAdmin('organizations.columns.tokens'),
                                     tAdmin('organizations.columns.skills'),
                                     tAdmin('organizations.columns.knowledge'),
+                                    tAdmin('organizations.columns.storage'),
                                     tAdmin('organizations.columns.premium'),
                                     tAdmin('organizations.columns.paidFee'),
                                     tAdmin('organizations.columns.plan'),
@@ -194,6 +200,18 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                             </TableCell>
                                             <TableCell>
                                                 <span className="text-sm text-gray-600">{formatNumber.format(org.knowledgeDocumentCount)}</span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-sm font-medium text-gray-700">
+                                                        {formatStorageLabel(org.storageTotalBytes)}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {tAdmin('organizations.storageMediaLabel', {
+                                                            value: formatStorageLabel(org.storageWhatsAppMediaBytes)
+                                                        })}
+                                                    </p>
+                                                </div>
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant={resolveMembershipBadgeVariant(org.billing.membershipState)}>

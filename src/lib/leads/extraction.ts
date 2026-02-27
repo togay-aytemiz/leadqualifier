@@ -325,6 +325,7 @@ interface LeadExtractionMessageRecord {
     sender_type?: string | null
     content?: string | null
     created_at?: string | null
+    metadata?: unknown
 }
 
 function normalizeLeadMessageContent(value: unknown) {
@@ -345,6 +346,34 @@ function toLeadConversationRole(senderType: string | null | undefined) {
     return null
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseMessageMetadataRecord(metadata: unknown) {
+    if (isRecord(metadata)) return metadata
+    if (typeof metadata !== 'string') return null
+    const trimmed = metadata.trim()
+    if (!trimmed) return null
+    try {
+        const parsed = JSON.parse(trimmed)
+        return isRecord(parsed) ? parsed : null
+    } catch {
+        return null
+    }
+}
+
+function isMediaLikeMessage(message: LeadExtractionMessageRecord) {
+    const metadata = parseMessageMetadataRecord(message.metadata)
+    if (!metadata) return false
+
+    if (isRecord(metadata.whatsapp_media)) return true
+    const whatsappMessageType = typeof metadata.whatsapp_message_type === 'string'
+        ? metadata.whatsapp_message_type.trim().toLowerCase()
+        : ''
+    return ['image', 'document', 'audio', 'video', 'sticker'].includes(whatsappMessageType)
+}
+
 export function buildLeadExtractionConversationContext(options: {
     messages?: LeadExtractionMessageRecord[]
     latestCustomerMessage?: string | null
@@ -352,6 +381,7 @@ export function buildLeadExtractionConversationContext(options: {
 }) {
     const maxTurns = Math.max(1, Math.min(options.maxTurns ?? LEAD_EXTRACTION_MAX_CONTEXT_TURNS, 20))
     const turns = [...(options.messages ?? [])]
+        .filter((message) => !isMediaLikeMessage(message))
         .reverse()
         .map((message) => {
             const role = toLeadConversationRole(message.sender_type)
@@ -729,7 +759,7 @@ export async function runLeadExtraction(options: {
         supabase.from('service_catalog').select('name, aliases, active').eq('organization_id', options.organizationId).eq('active', true),
         supabase
             .from('messages')
-            .select('sender_type, content, created_at')
+            .select('sender_type, content, created_at, metadata')
             .eq('conversation_id', options.conversationId)
             .order('created_at', { ascending: false })
             .limit(LEAD_EXTRACTION_MAX_MESSAGES_TO_LOAD),

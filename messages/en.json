@@ -404,6 +404,31 @@
                 "validationWhatsAppSelection": "Please select a WhatsApp template."
             }
         },
+        "composerAttachments": {
+            "remove": "Remove attachment",
+            "previewTitle": "Attachment preview",
+            "limitHint": "You can send up to {count} files in one message.",
+            "sending": "Sending...",
+            "failed": "Failed",
+            "outboundPlaceholderImage": "[Image]",
+            "outboundPlaceholderDocument": "[Document]",
+            "mimeTypeLabel": "Type",
+            "sizeLabel": "Size",
+            "sizeMb": "{size} MB",
+            "sizeKb": "{size} KB",
+            "errors": {
+                "validation": "Add a message or at least one attachment.",
+                "maxCount": "You can attach up to {count} files at once.",
+                "invalidType": "Only WhatsApp-supported images and documents can be attached.",
+                "maxImageSize": "Image file exceeds the limit ({sizeMb} MB).",
+                "maxDocumentSize": "Document file exceeds the limit ({sizeMb} MB).",
+                "sendFailed": "Attachments could not be sent. Please try again.",
+                "missingChannel": "Active WhatsApp channel configuration is missing.",
+                "billingLocked": "Usage is locked. Attachments cannot be sent.",
+                "replyWindowBlocked": "WhatsApp reply window is blocked for this conversation.",
+                "notWhatsApp": "Attachments are currently available only in WhatsApp conversations."
+            }
+        },
         "details": "Details",
         "hideDetails": "Hide details",
         "backToInbox": "Back to inbox",
@@ -982,13 +1007,14 @@
         "messageIncomingLabel": "Customer inbound",
         "messageUsageEmptyState": "No message activity yet.",
         "storageUsageTitle": "Storage Usage",
-        "storageUsageDescription": "Approximate content storage used by Skills and Knowledge Base.",
+        "storageUsageDescription": "Approximate storage used by Skills, Knowledge Base, and inbound WhatsApp media.",
         "storageBreakdownLabel": "Breakdown",
         "storageSkillsLabel": "Skills",
         "storageKnowledgeLabel": "Knowledge base",
+        "storageWhatsAppMediaLabel": "WhatsApp media",
         "storageSkillsCountLabel": "{count} skills",
         "storageKnowledgeCountLabel": "{count} documents",
-        "storageUsageApproxNote": "Approximation based on text content currently stored.",
+        "storageWhatsAppMediaCountLabel": "{count} files",
         "noOrganization": "No Organization Found",
         "noOrganizationDesc": "You need to be part of an organization to view usage."
     },
@@ -1671,13 +1697,15 @@
                 "tokens": "Total Tokens",
                 "skills": "Skills",
                 "knowledge": "Knowledge Base",
+                "storage": "Storage",
                 "premium": "Membership",
                 "paidFee": "Paid Fee",
                 "plan": "Package Credits",
                 "trial": "Trial Credits",
                 "created": "Created",
                 "details": "Details"
-            }
+            },
+            "storageMediaLabel": "WA media: {value}"
         },
         "users": {
             "title": "Users",
@@ -1747,7 +1775,9 @@
                 "usage": "Total Messages",
                 "tokens": "Total Tokens",
                 "skills": "Skills",
-                "knowledge": "Knowledge Base"
+                "knowledge": "Knowledge Base",
+                "storage": "Storage",
+                "storageMedia": "WA media: {value}"
             },
             "billing": {
                 "membership": "Membership",

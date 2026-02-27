@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
     getCountByOrganization,
+    getStorageUsageByOrganization,
     getTokenTotalsByOrganization
 } from './organization-metrics'
 
@@ -55,6 +56,87 @@ describe('organization admin metrics helpers', () => {
 
         expect(totals.get('org_a')).toBe(1205)
         expect(totals.get('org_b')).toBe(20)
+    })
+
+    it('passes configured media bucket ids to storage usage RPC and maps totals', async () => {
+        const rpcMock = vi.fn(async () => ({
+            data: [
+                {
+                    organization_id: 'org_a',
+                    total_bytes: 6000,
+                    skills_bytes: 1000,
+                    knowledge_bytes: 2000,
+                    whatsapp_media_bytes: 3000,
+                    whatsapp_media_object_count: 3
+                }
+            ],
+            error: null
+        }))
+        const supabase = {
+            rpc: rpcMock
+        }
+
+        const totals = await getStorageUsageByOrganization(
+            supabase as never,
+            ['org_a']
+        )
+
+        expect(rpcMock).toHaveBeenCalledWith('get_organization_storage_usage', {
+            target_organization_ids: ['org_a'],
+            target_media_bucket_ids: ['whatsapp-media']
+        })
+        expect(totals.get('org_a')).toEqual({
+            totalBytes: 6000,
+            skillsBytes: 1000,
+            knowledgeBytes: 2000,
+            whatsappMediaBytes: 3000,
+            whatsappMediaObjectCount: 3
+        })
+    })
+
+    it('falls back to legacy storage RPC signature when bucket-aware RPC is unavailable', async () => {
+        const rpcMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                data: null,
+                error: { message: 'function get_organization_storage_usage(uuid[], text[]) does not exist' }
+            })
+            .mockResolvedValueOnce({
+                data: [
+                    {
+                        organization_id: 'org_a',
+                        total_bytes: 4500,
+                        skills_bytes: 1000,
+                        knowledge_bytes: 2000,
+                        whatsapp_media_bytes: 1500,
+                        whatsapp_media_object_count: 2
+                    }
+                ],
+                error: null
+            })
+        const supabase = {
+            rpc: rpcMock
+        }
+
+        const totals = await getStorageUsageByOrganization(
+            supabase as never,
+            ['org_a']
+        )
+
+        expect(rpcMock).toHaveBeenNthCalledWith(1, 'get_organization_storage_usage', {
+            target_organization_ids: ['org_a'],
+            target_media_bucket_ids: ['whatsapp-media']
+        })
+        expect(rpcMock).toHaveBeenNthCalledWith(2, 'get_organization_storage_usage', {
+            target_organization_ids: ['org_a']
+        })
+        expect(totals.get('org_a')).toEqual({
+            totalBytes: 4500,
+            skillsBytes: 1000,
+            knowledgeBytes: 2000,
+            whatsappMediaBytes: 1500,
+            whatsappMediaObjectCount: 2
+        })
     })
 })
 

@@ -6,6 +6,7 @@ import {
     calculateKnowledgeStorageBytes,
     calculateSkillStorageBytes,
     getOrgCreditUsageSummary,
+    getOrgStorageUsageSummary,
     formatCreditAmount,
     formatStorageSize
 } from './usage'
@@ -229,6 +230,12 @@ interface UsageSummarySupabaseRow {
     id?: string
 }
 
+interface StorageUsageListItem {
+    id: string | null
+    name: string
+    metadata?: { size?: number; contentLength?: number } | null
+}
+
 function createUsageSummarySupabaseMock(options: {
     ledgerRows: UsageSummarySupabaseRow[]
     usageRows: UsageSummarySupabaseRow[]
@@ -339,3 +346,228 @@ function createLedgerQueryMock(rows: UsageSummarySupabaseRow[]) {
         getOrganizationFilter: () => organizationFilter
     }
 }
+
+function createStorageUsageSupabaseMock(options: {
+    rpcData?: unknown[]
+    rpcError?: unknown
+    skillsRows?: Array<{
+        title: string | null
+        response_text: string | null
+        trigger_examples: string[] | null
+    }>
+    knowledgeRows?: Array<{
+        title: string | null
+        content: string | null
+    }>
+    storageRowsByPath?: Record<string, StorageUsageListItem[]>
+}) {
+    const rpcMock = vi.fn(async () => ({
+        data: options.rpcData ?? [],
+        error: options.rpcError ?? null
+    }))
+    const storageListMock = vi.fn(async (path: string, optionsArg?: { limit?: number; offset?: number }) => {
+        const rows = options.storageRowsByPath?.[path] ?? []
+        const offset = optionsArg?.offset ?? 0
+        const limit = optionsArg?.limit ?? rows.length
+
+        return {
+            data: rows.slice(offset, offset + limit),
+            error: null
+        }
+    })
+    const storageFromMock = vi.fn((_bucketName: string) => ({
+        list: storageListMock
+    }))
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'skills') {
+            return {
+                select: vi.fn(() => ({
+                    eq: vi.fn(async () => ({
+                        data: options.skillsRows ?? [],
+                        error: null
+                    }))
+                }))
+            }
+        }
+
+        if (table === 'knowledge_documents') {
+            return {
+                select: vi.fn(() => ({
+                    eq: vi.fn(async () => ({
+                        data: options.knowledgeRows ?? [],
+                        error: null
+                    }))
+                }))
+            }
+        }
+
+        throw new Error(`Unexpected table for storage summary mock: ${table}`)
+    })
+
+    return {
+        rpc: rpcMock,
+        from: fromMock,
+        storage: {
+            from: storageFromMock
+        }
+    }
+}
+
+describe('getOrgStorageUsageSummary', () => {
+    it('uses RPC storage aggregate when available', async () => {
+        const supabase = createStorageUsageSupabaseMock({
+            rpcData: [{
+                organization_id: 'org-1',
+                skill_count: 3,
+                knowledge_document_count: 2,
+                skills_bytes: 1200,
+                knowledge_bytes: 3400,
+                whatsapp_media_object_count: 4,
+                whatsapp_media_bytes: 8192,
+                total_bytes: 12792
+            }]
+        })
+
+        const summary = await getOrgStorageUsageSummary('org-1', {
+            supabase: supabase as never
+        })
+
+        expect(summary).toEqual({
+            totalBytes: 12792,
+            skillsBytes: 1200,
+            knowledgeBytes: 3400,
+            whatsappMediaBytes: 8192,
+            whatsappMediaObjectCount: 4,
+            skillCount: 3,
+            knowledgeDocumentCount: 2
+        })
+        expect(supabase.rpc).toHaveBeenCalledWith('get_organization_storage_usage', {
+            target_organization_ids: ['org-1'],
+            target_media_bucket_ids: ['whatsapp-media']
+        })
+        expect(supabase.from).not.toHaveBeenCalled()
+    })
+
+    it('falls back to skills + knowledge queries when RPC is unavailable', async () => {
+        const supabase = createStorageUsageSupabaseMock({
+            rpcError: { message: 'function missing' },
+            skillsRows: [{
+                title: 'S',
+                response_text: 'AA',
+                trigger_examples: ['B']
+            }],
+            knowledgeRows: [{
+                title: 'Doc',
+                content: 'Hello'
+            }]
+        })
+
+        const summary = await getOrgStorageUsageSummary('org-1', {
+            supabase: supabase as never
+        })
+
+        expect(summary).toEqual({
+            totalBytes: 12,
+            skillsBytes: 4,
+            knowledgeBytes: 8,
+            whatsappMediaBytes: 0,
+            whatsappMediaObjectCount: 0,
+            skillCount: 1,
+            knowledgeDocumentCount: 1
+        })
+        expect(supabase.from).toHaveBeenCalledTimes(2)
+    })
+
+    it('reconciles WhatsApp media usage from storage listing when RPC media values are zero', async () => {
+        const supabase = createStorageUsageSupabaseMock({
+            rpcData: [{
+                organization_id: 'org-1',
+                skill_count: 3,
+                knowledge_document_count: 2,
+                skills_bytes: 1200,
+                knowledge_bytes: 3400,
+                whatsapp_media_object_count: 0,
+                whatsapp_media_bytes: 0,
+                total_bytes: 4600
+            }],
+            storageRowsByPath: {
+                'org-1': [
+                    { id: null, name: '1027043280489864', metadata: null }
+                ],
+                'org-1/1027043280489864': [
+                    { id: 'obj-1', name: 'file-1.jpg', metadata: { size: 2000 } },
+                    { id: 'obj-2', name: 'file-2.jpg', metadata: { contentLength: 3000 } }
+                ]
+            }
+        })
+
+        const summary = await getOrgStorageUsageSummary('org-1', {
+            supabase: supabase as never
+        })
+
+        expect(summary).toEqual({
+            totalBytes: 9600,
+            skillsBytes: 1200,
+            knowledgeBytes: 3400,
+            whatsappMediaBytes: 5000,
+            whatsappMediaObjectCount: 2,
+            skillCount: 3,
+            knowledgeDocumentCount: 2
+        })
+    })
+
+    it('falls back to legacy storage RPC signature when bucket-aware RPC is unavailable', async () => {
+        const rpcMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                data: null,
+                error: { message: 'function get_organization_storage_usage(uuid[], text[]) does not exist' }
+            })
+            .mockResolvedValueOnce({
+                data: [{
+                    organization_id: 'org-1',
+                    skill_count: 1,
+                    knowledge_document_count: 1,
+                    skills_bytes: 100,
+                    knowledge_bytes: 200,
+                    whatsapp_media_object_count: 2,
+                    whatsapp_media_bytes: 300,
+                    total_bytes: 600
+                }],
+                error: null
+            })
+        const fromMock = vi.fn(() => {
+            throw new Error('from should not be called for legacy rpc fallback')
+        })
+        const listMock = vi.fn(async () => ({ data: [], error: null }))
+        const supabase = {
+            rpc: rpcMock,
+            from: fromMock,
+            storage: {
+                from: vi.fn(() => ({ list: listMock }))
+            }
+        }
+
+        const summary = await getOrgStorageUsageSummary('org-1', {
+            supabase: supabase as never
+        })
+
+        expect(rpcMock).toHaveBeenNthCalledWith(1, 'get_organization_storage_usage', {
+            target_organization_ids: ['org-1'],
+            target_media_bucket_ids: ['whatsapp-media']
+        })
+        expect(rpcMock).toHaveBeenNthCalledWith(2, 'get_organization_storage_usage', {
+            target_organization_ids: ['org-1']
+        })
+        expect(summary).toEqual({
+            totalBytes: 600,
+            skillsBytes: 100,
+            knowledgeBytes: 200,
+            whatsappMediaBytes: 300,
+            whatsappMediaObjectCount: 2,
+            skillCount: 1,
+            knowledgeDocumentCount: 1
+        })
+        expect(fromMock).not.toHaveBeenCalled()
+    })
+})

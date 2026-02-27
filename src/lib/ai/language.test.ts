@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    isMvpResponseLanguageAmbiguous,
     isLikelyTurkishMessage,
     resolveMvpResponseLanguage,
     resolveMvpResponseLanguageName
@@ -23,5 +24,33 @@ describe('ai language helpers', () => {
     it('resolves Turkish labels correctly', () => {
         expect(resolveMvpResponseLanguage('Merhaba')).toBe('tr')
         expect(resolveMvpResponseLanguageName('Merhaba')).toBe('Turkish')
+    })
+
+    it('treats ascii Turkish complaint phrases as Turkish', () => {
+        expect(isLikelyTurkishMessage('Sikayetim var')).toBe(true)
+        expect(resolveMvpResponseLanguage('Sikayetim var')).toBe('tr')
+        expect(resolveMvpResponseLanguageName('Sikayetim var')).toBe('Turkish')
+    })
+
+    it('uses history when current message language is ambiguous', () => {
+        expect(isMvpResponseLanguageAmbiguous('ok')).toBe(true)
+        expect(resolveMvpResponseLanguage('ok', {
+            historyMessages: [
+                'Merhaba, detay alabilir miyim?',
+                'fiyat bilgisi paylaşır mısınız?'
+            ]
+        })).toBe('tr')
+        expect(resolveMvpResponseLanguageName('ok', {
+            historyMessages: ['Merhaba, detay alabilir miyim?']
+        })).toBe('Turkish')
+    })
+
+    it('keeps decisive current language over opposite history', () => {
+        expect(resolveMvpResponseLanguage('Please share availability', {
+            historyMessages: ['Merhaba, fiyat nedir?']
+        })).toBe('en')
+        expect(resolveMvpResponseLanguageName('Please share availability', {
+            historyMessages: ['Merhaba, fiyat nedir?']
+        })).toBe('English')
     })
 })

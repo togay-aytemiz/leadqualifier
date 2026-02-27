@@ -4,7 +4,9 @@ import { PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import {
     formatCreditAmount,
+    formatStorageSize,
     getOrgCreditUsageSummary,
+    getOrgStorageUsageSummary,
 } from '@/lib/billing/usage'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getOrganizationBillingLedger, type BillingLedgerEntry } from '@/lib/billing/server'
@@ -199,8 +201,9 @@ export default async function BillingSettingsPage() {
         )
     }
 
-    const [usage, billingLedger] = await Promise.all([
+    const [usage, storageUsage, billingLedger] = await Promise.all([
         getOrgCreditUsageSummary(organizationId, { supabase }),
+        getOrgStorageUsageSummary(organizationId, { supabase }),
         getOrganizationBillingLedger(organizationId, { supabase, limit: 20 })
     ])
     const formatDateTime = new Intl.DateTimeFormat(locale, {
@@ -278,6 +281,14 @@ export default async function BillingSettingsPage() {
 
     const monthlyCredits = usage.monthly.credits
     const totalCredits = usage.total.credits
+    const formatStorageLabel = (bytes: number) => {
+        const formatted = formatStorageSize(bytes, locale)
+        return `${formatted.value} ${formatted.unit}`
+    }
+    const storageTotalLabel = formatStorageLabel(storageUsage.totalBytes)
+    const storageSkillsLabel = formatStorageLabel(storageUsage.skillsBytes)
+    const storageKnowledgeLabel = formatStorageLabel(storageUsage.knowledgeBytes)
+    const storageWhatsAppMediaLabel = formatStorageLabel(storageUsage.whatsappMediaBytes)
     const ledgerRows = billingLedger.map((entry) => {
         const isDebit = entry.creditsDelta < 0
         return {
@@ -334,6 +345,45 @@ export default async function BillingSettingsPage() {
                         {totalCredits === 0 && (
                             <p className="mt-4 text-sm text-gray-500">{tBilling('emptyState')}</p>
                         )}
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title={tBilling('storageUsageTitle')}
+                        description={tBilling('storageUsageDescription')}
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('totalLabel')}</p>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">{storageTotalLabel}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('storageWhatsAppMediaLabel')}</p>
+                                <p className="mt-2 text-2xl font-semibold text-gray-900">{storageWhatsAppMediaLabel}</p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {tBilling('storageWhatsAppMediaCountLabel', {
+                                        count: storageUsage.whatsappMediaObjectCount
+                                    })}
+                                </p>
+                            </div>
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('storageSkillsLabel')}</p>
+                                <p className="mt-2 text-lg font-semibold text-gray-900">{storageSkillsLabel}</p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {tBilling('storageSkillsCountLabel', {
+                                        count: storageUsage.skillCount
+                                    })}
+                                </p>
+                            </div>
+                            <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-xs uppercase tracking-wider text-gray-400">{tBilling('storageKnowledgeLabel')}</p>
+                                <p className="mt-2 text-lg font-semibold text-gray-900">{storageKnowledgeLabel}</p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {tBilling('storageKnowledgeCountLabel', {
+                                        count: storageUsage.knowledgeDocumentCount
+                                    })}
+                                </p>
+                            </div>
+                        </div>
                     </SettingsSection>
 
                     <SettingsSection

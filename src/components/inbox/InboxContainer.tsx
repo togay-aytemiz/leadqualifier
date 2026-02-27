@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
 import {
     Inbox, ChevronDown,
-    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp, X
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp, X, Loader2, FileText
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
@@ -13,6 +13,8 @@ import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
     getMessages,
     sendMessage,
+    prepareConversationWhatsAppMediaUploads,
+    sendConversationWhatsAppMediaBatch,
     getConversations,
     deleteConversation,
     sendSystemMessage,
@@ -23,7 +25,8 @@ import {
     getLeadScoreReasoning,
     refreshConversationLead,
     setConversationAiProcessingPaused,
-    type ConversationListItem
+    type ConversationListItem,
+    type ConversationWhatsAppOutboundAttachmentUploadTarget
 } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
 import { setupRealtimeAuth } from '@/lib/supabase/realtime-auth'
@@ -45,12 +48,22 @@ import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowSc
 import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
+import { sortMessagesChronologically } from '@/lib/inbox/message-order'
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
 import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
 import { buildMessageDateSeparators } from '@/components/inbox/messageDateSeparators'
 import { extractSkillTitleFromMetadata, splitBotMessageDisclaimer } from '@/components/inbox/botMessageContent'
 import { extractMediaFromMessageMetadata, resolveMessagePreviewContent } from '@/components/inbox/messageMedia'
+import { buildInboxImageGalleryLookup } from '@/components/inbox/message-image-groups'
+import {
+    MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
+    MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
+    MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES,
+    resolveOutboundMediaCaption,
+    validateWhatsAppOutboundAttachments,
+    type WhatsAppOutboundMediaType
+} from '@/lib/inbox/outbound-media'
 import {
     filterConversationsByQueue,
     summarizeConversationQueueCounts,
@@ -76,6 +89,78 @@ interface InboxContainerProps {
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 const SUMMARY_PANEL_ID = 'conversation-summary-panel'
+const WHATSAPP_MEDIA_BUCKET = 'whatsapp-media'
+const WHATSAPP_UPLOAD_ACCEPT = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+].join(',')
+
+type PendingAttachment = {
+    id: string
+    file: File
+    name: string
+    mimeType: string
+    sizeBytes: number
+    mediaType: WhatsAppOutboundMediaType
+    previewUrl: string | null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseMessageMetadataRecord(metadata: unknown) {
+    if (isRecord(metadata)) return metadata
+    if (typeof metadata !== 'string') return null
+    const trimmed = metadata.trim()
+    if (!trimmed) return null
+    try {
+        const parsed = JSON.parse(trimmed)
+        return isRecord(parsed) ? parsed : null
+    } catch {
+        return null
+    }
+}
+
+function extractOutboundAttachmentId(metadata: unknown) {
+    const parsed = parseMessageMetadataRecord(metadata)
+    if (!parsed) return null
+    const value = parsed.whatsapp_outbound_attachment_id
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+function resolveOutboundDeliveryState(metadata: unknown): 'sending' | 'failed' | null {
+    const parsed = parseMessageMetadataRecord(metadata)
+    if (!parsed) return null
+    const value = parsed.whatsapp_outbound_status
+    if (value === 'sending') return 'sending'
+    if (value === 'failed') return 'failed'
+    return null
+}
+
+function makePendingAttachmentId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID()
+    }
+    return `pending-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function extractImageFilesFromClipboard(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(event.clipboardData?.items ?? [])
+    return items
+        .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => file !== null)
+}
 
 export function InboxContainer({
     initialConversations,
@@ -103,6 +188,9 @@ export function InboxContainer({
     const [lead, setLead] = useState<Lead | null>(null)
     const [input, setInput] = useState('')
     const [isSending, setIsSending] = useState(false)
+    const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null)
+    const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
+    const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null)
     const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
     const [summaryText, setSummaryText] = useState('')
     const [isSummaryOpen, setIsSummaryOpen] = useState(false)
@@ -151,6 +239,9 @@ export function InboxContainer({
     const selectedIdRef = useRef(selectedId)
     const leadRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const leadAutoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const pendingAttachmentsRef = useRef<PendingAttachment[]>([])
+    const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
     const leadStatusLabels: Record<string, string> = {
         hot: t('leadStatusHot'),
         warm: t('leadStatusWarm'),
@@ -165,9 +256,70 @@ export function InboxContainer({
         serviceType: lead?.service_type
     })
 
+    const revokeAttachmentPreviewUrl = useCallback((previewUrl: string | null) => {
+        if (!previewUrl) return
+        URL.revokeObjectURL(previewUrl)
+    }, [])
+
+    const clearPendingAttachments = useCallback(() => {
+        setPendingAttachments((previous) => {
+            previous.forEach((attachment) => revokeAttachmentPreviewUrl(attachment.previewUrl))
+            return []
+        })
+    }, [revokeAttachmentPreviewUrl])
+
+    const markOptimisticMessagesAsFailed = useCallback((tempMessageIds: string[]) => {
+        if (tempMessageIds.length === 0) return
+
+        setMessages((previous) => previous.map((message) => {
+            if (!tempMessageIds.includes(message.id)) return message
+            const metadataRecord = parseMessageMetadataRecord(message.metadata) ?? {}
+            return {
+                ...message,
+                metadata: {
+                    ...metadataRecord,
+                    whatsapp_outbound_status: 'failed'
+                }
+            }
+        }))
+    }, [])
+
+    const resolveAttachmentValidationErrorMessage = useCallback((args: {
+        validationResult: ReturnType<typeof validateWhatsAppOutboundAttachments>
+        drafts: Array<{ id: string; mimeType: string }>
+    }) => {
+        if (args.validationResult.ok) return null
+        const { validationResult } = args
+        if (validationResult.reason === 'too_many_attachments') {
+            return t('composerAttachments.errors.maxCount', { count: validationResult.maxCount })
+        }
+        if (validationResult.reason === 'invalid_mime_type') {
+            return t('composerAttachments.errors.invalidType')
+        }
+        if (validationResult.reason !== 'file_too_large') {
+            return t('composerAttachments.errors.invalidType')
+        }
+
+        const draft = args.drafts.find((item) => item.id === validationResult.attachmentId)
+        if (draft?.mimeType.startsWith('image/')) {
+            return t('composerAttachments.errors.maxImageSize', { sizeMb: Math.floor(MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES / (1024 * 1024)) })
+        }
+        return t('composerAttachments.errors.maxDocumentSize', { sizeMb: Math.floor(MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES / (1024 * 1024)) })
+    }, [t])
+
     useEffect(() => {
         selectedIdRef.current = selectedId
     }, [selectedId])
+
+    useEffect(() => {
+        pendingAttachmentsRef.current = pendingAttachments
+    }, [pendingAttachments])
+
+    useEffect(() => {
+        return () => {
+            pendingAttachmentsRef.current.forEach((attachment) => revokeAttachmentPreviewUrl(attachment.previewUrl))
+        }
+    }, [revokeAttachmentPreviewUrl])
 
     useEffect(() => {
         setInboxBotMode(botMode ?? 'active')
@@ -210,6 +362,9 @@ export function InboxContainer({
         setIsMobileDetailsOpen(false)
         setIsMobileBotModeSheetOpen(false)
         setIsTemplatePickerModalOpen(false)
+        setComposerErrorMessage(null)
+        setPreviewAttachmentId(null)
+        clearPendingAttachments()
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
             leadRefreshTimeoutRef.current = null
@@ -218,7 +373,7 @@ export function InboxContainer({
             clearTimeout(leadAutoRefreshTimeoutRef.current)
             leadAutoRefreshTimeoutRef.current = null
         }
-    }, [selectedId])
+    }, [clearPendingAttachments, selectedId])
 
     useEffect(() => {
         if (!selectedId) {
@@ -516,13 +671,23 @@ export function InboxContainer({
                             // Dedupe optimistic messages:
                             // If we find a temp message with same content & sender, remove it and add real one
                             const isUserSender = newMsg.sender_type === 'user'
+                            const inboundAttachmentId = extractOutboundAttachmentId(newMsg.metadata)
 
                             // Filter out matching temp messages if it's a user message
                             const filtered = isUserSender
-                                ? prev.filter(m => !(m.id.startsWith('temp-') && m.content === newMsg.content && m.sender_type === 'user'))
+                                ? prev.filter((message) => {
+                                    if (!message.id.startsWith('temp-') || message.sender_type !== 'user') return true
+
+                                    const tempAttachmentId = extractOutboundAttachmentId(message.metadata)
+                                    if (inboundAttachmentId && tempAttachmentId) {
+                                        return inboundAttachmentId !== tempAttachmentId
+                                    }
+
+                                    return message.content !== newMsg.content
+                                })
                                 : prev
 
-                            return [...filtered, newMsg]
+                            return sortMessagesChronologically([...filtered, newMsg])
                         })
                     }
 
@@ -803,60 +968,305 @@ export function InboxContainer({
         }
     }
 
+    const handleOpenAttachmentPicker = () => {
+        if (isReadOnly) return
+        if (!isWhatsAppConversation) {
+            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+            return
+        }
+        attachmentInputRef.current?.click()
+    }
+
+    const handleOpenImagePicker = () => {
+        if (isReadOnly) return
+        if (!isWhatsAppConversation) {
+            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+            return
+        }
+        imageInputRef.current?.click()
+    }
+
+    const handleRemovePendingAttachment = (attachmentId: string) => {
+        if (previewAttachmentId === attachmentId) {
+            setPreviewAttachmentId(null)
+        }
+        setPendingAttachments((previous) => {
+            const target = previous.find((attachment) => attachment.id === attachmentId)
+            if (target) {
+                revokeAttachmentPreviewUrl(target.previewUrl)
+            }
+            return previous.filter((attachment) => attachment.id !== attachmentId)
+        })
+    }
+
+    const handleAttachmentSelection = (
+        files: File[],
+        options?: {
+            truncateToAvailableSlots?: boolean
+        }
+    ) => {
+        if (files.length === 0) return
+        if (!isWhatsAppConversation) {
+            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+            return
+        }
+
+        const availableSlots = Math.max(0, MAX_WHATSAPP_OUTBOUND_ATTACHMENTS - pendingAttachments.length)
+        const selectedFiles = options?.truncateToAvailableSlots
+            ? files.slice(0, availableSlots)
+            : files
+
+        if (selectedFiles.length === 0) {
+            setComposerErrorMessage(t('composerAttachments.errors.maxCount', { count: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS }))
+            return
+        }
+
+        const existingDrafts = pendingAttachments.map((attachment) => ({
+            id: attachment.id,
+            name: attachment.name,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes
+        }))
+        const incomingDrafts = selectedFiles.map((file) => ({
+            id: makePendingAttachmentId(),
+            name: file.name,
+            mimeType: file.type.trim().toLowerCase(),
+            sizeBytes: file.size
+        }))
+
+        const validationResult = validateWhatsAppOutboundAttachments([
+            ...existingDrafts,
+            ...incomingDrafts
+        ])
+        if (!validationResult.ok) {
+            const message = resolveAttachmentValidationErrorMessage({
+                validationResult,
+                drafts: [...existingDrafts, ...incomingDrafts]
+            })
+            setComposerErrorMessage(message ?? t('composerAttachments.errors.invalidType'))
+            return
+        }
+
+        const normalizedById = new Map(validationResult.attachments.map((attachment) => [attachment.id, attachment]))
+        const nextAttachments: PendingAttachment[] = incomingDrafts.flatMap((draft, index) => {
+            const normalized = normalizedById.get(draft.id)
+            const sourceFile = selectedFiles[index]
+            if (!normalized || !sourceFile) return []
+
+            return [{
+                id: draft.id,
+                file: sourceFile,
+                name: draft.name,
+                mimeType: draft.mimeType,
+                sizeBytes: draft.sizeBytes,
+                mediaType: normalized.mediaType,
+                previewUrl: normalized.mediaType === 'image' ? URL.createObjectURL(sourceFile) : null
+            }]
+        })
+
+        setPendingAttachments((previous) => [...previous, ...nextAttachments])
+        setComposerErrorMessage(null)
+    }
+
+    const handleAttachmentInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files ?? [])
+        event.currentTarget.value = ''
+        if (files.length === 0) return
+        handleAttachmentSelection(files)
+    }
+
+    const handleInputPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        if (isReadOnly || isComposerDisabled || !isWhatsAppConversation) return
+
+        const pastedImages = extractImageFilesFromClipboard(event)
+        if (pastedImages.length === 0) return
+
+        event.preventDefault()
+        handleAttachmentSelection(pastedImages, {
+            truncateToAvailableSlots: true
+        })
+    }
+
+    const resolveMediaSendErrorMessage = (reason: string, maxAllowed?: number) => {
+        if (reason === 'missing_channel') return t('composerAttachments.errors.missingChannel')
+        if (reason === 'billing_locked') return t('composerAttachments.errors.billingLocked')
+        if (reason === 'reply_blocked') return t('composerAttachments.errors.replyWindowBlocked')
+        if (reason === 'too_many_attachments') {
+            return t('composerAttachments.errors.maxCount', {
+                count: maxAllowed ?? MAX_WHATSAPP_OUTBOUND_ATTACHMENTS
+            })
+        }
+        if (reason === 'invalid_attachment') return t('composerAttachments.errors.invalidType')
+        if (reason === 'validation') return t('composerAttachments.errors.validation')
+        return t('composerAttachments.errors.sendFailed')
+    }
+
     const handleSendMessage = async () => {
         if (isReadOnly) return
-        if (!selectedId || !input.trim() || isSending || isWhatsAppReplyBlocked) return
-        const tempMsg: Message = {
-            id: 'temp-' + Date.now(),
-            conversation_id: selectedId,
-            sender_type: 'user',
-            content: input,
-            metadata: {},
-            created_at: new Date().toISOString()
-        }
-        setMessages(prev => [...prev, tempMsg])
+        if (!selectedId || isSending || isWhatsAppReplyBlocked) return
 
-        // Optimistically set active agent to operator
+        const normalizedInput = input.trim()
+        const selectedAttachments = [...pendingAttachments]
+        if (!normalizedInput && selectedAttachments.length === 0) return
+        if (selectedAttachments.length > 0 && !isWhatsAppConversation) {
+            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+            return
+        }
+
+        const nowIso = new Date().toISOString()
         const optimisticAssignee: Assignee | null = currentUserProfile
             ? { full_name: currentUserProfile.full_name, email: currentUserProfile.email }
             : null
-        const optimisticPreviewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'> = {
-            content: input,
-            created_at: new Date().toISOString(),
-            sender_type: 'user',
-            metadata: {}
-        }
 
+        const conversationId = selectedId
+        const optimisticMessages: Message[] = selectedAttachments.length > 0
+            ? selectedAttachments.map((attachment, index) => {
+                const caption = resolveOutboundMediaCaption(normalizedInput, index)
+                const content = caption ?? (attachment.mediaType === 'image'
+                    ? t('composerAttachments.outboundPlaceholderImage')
+                    : t('composerAttachments.outboundPlaceholderDocument'))
+
+                return {
+                    id: `temp-media-${Date.now()}-${index}`,
+                    conversation_id: conversationId,
+                    sender_type: 'user',
+                    content,
+                    metadata: {
+                        whatsapp_outbound_status: 'sending',
+                        whatsapp_outbound_attachment_id: attachment.id,
+                        whatsapp_is_media_placeholder: !caption,
+                        whatsapp_media: {
+                            type: attachment.mediaType,
+                            mime_type: attachment.mimeType,
+                            caption,
+                            filename: attachment.name,
+                            storage_path: null,
+                            storage_url: attachment.previewUrl,
+                            download_status: 'sending'
+                        }
+                    },
+                    created_at: new Date(Date.now() + index).toISOString()
+                }
+            })
+            : [{
+                id: `temp-${Date.now()}`,
+                conversation_id: conversationId,
+                sender_type: 'user',
+                content: normalizedInput,
+                metadata: {},
+                created_at: nowIso
+            }]
+        const optimisticPreviewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'> = selectedAttachments.length > 0
+            ? {
+                content: optimisticMessages[optimisticMessages.length - 1]?.content ?? normalizedInput,
+                created_at: optimisticMessages[optimisticMessages.length - 1]?.created_at ?? nowIso,
+                sender_type: 'user',
+                metadata: optimisticMessages[optimisticMessages.length - 1]?.metadata ?? {}
+            }
+            : {
+                content: normalizedInput,
+                created_at: nowIso,
+                sender_type: 'user',
+                metadata: {}
+            }
+
+        setMessages((previous) => sortMessagesChronologically([...previous, ...optimisticMessages]))
+
+        // Optimistically set active agent to operator
         setConversations(prev => prev.map(c =>
-            c.id === selectedId ? {
+            c.id === conversationId ? {
                 ...c,
                 active_agent: 'operator' as const,
                 assignee_id: currentUserProfile?.id ?? c.assignee_id,
                 assignee: optimisticAssignee ?? c.assignee,
-                last_message_at: new Date().toISOString(),
+                last_message_at: optimisticPreviewMessage.created_at,
                 messages: [optimisticPreviewMessage]
             } : c
         ).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
 
         setInput('')
+        clearPendingAttachments()
+        setComposerErrorMessage(null)
         setIsSending(true)
         try {
-            const result = await sendMessage(selectedId, input)
-            if (result?.conversation) {
-                const assignee = await resolveAssignee(result.conversation.assignee_id ?? null)
-                setConversations(prev => prev.map(c =>
-                    c.id === selectedId
-                        ? {
-                            ...c,
-                            ...result.conversation,
-                            assignee: assignee ?? c.assignee
-                        }
-                        : c
-                ))
+            if (selectedAttachments.length > 0) {
+                const prepareResult = await prepareConversationWhatsAppMediaUploads({
+                    conversationId,
+                    attachments: selectedAttachments.map((attachment) => ({
+                        id: attachment.id,
+                        name: attachment.name,
+                        mimeType: attachment.mimeType,
+                        sizeBytes: attachment.sizeBytes
+                    }))
+                })
+
+                if (!prepareResult.ok) {
+                    setComposerErrorMessage(resolveMediaSendErrorMessage(prepareResult.reason, prepareResult.maxAllowed))
+                    markOptimisticMessagesAsFailed(optimisticMessages.map((message) => message.id))
+                    return
+                }
+
+                const uploadTargetsById = new Map(prepareResult.uploads.map((upload) => [upload.id, upload]))
+                const uploadedAttachments: ConversationWhatsAppOutboundAttachmentUploadTarget[] = []
+
+                for (const attachment of selectedAttachments) {
+                    const uploadTarget = uploadTargetsById.get(attachment.id)
+                    if (!uploadTarget) {
+                        throw new Error(`Missing upload target for attachment ${attachment.id}`)
+                    }
+
+                    const { error: uploadError } = await supabase.storage
+                        .from(WHATSAPP_MEDIA_BUCKET)
+                        .uploadToSignedUrl(uploadTarget.storagePath, uploadTarget.uploadToken, attachment.file)
+                    if (uploadError) {
+                        throw uploadError
+                    }
+                    uploadedAttachments.push(uploadTarget)
+                }
+
+                const batchResult = await sendConversationWhatsAppMediaBatch({
+                    conversationId,
+                    text: normalizedInput,
+                    attachments: uploadedAttachments
+                })
+                if (!batchResult.ok) {
+                    setComposerErrorMessage(resolveMediaSendErrorMessage(batchResult.reason))
+                    markOptimisticMessagesAsFailed(optimisticMessages.map((message) => message.id))
+                    return
+                }
+
+                if (batchResult.conversation) {
+                    const assignee = await resolveAssignee(batchResult.conversation.assignee_id ?? null)
+                    setConversations(prev => prev.map(c =>
+                        c.id === conversationId
+                            ? {
+                                ...c,
+                                ...batchResult.conversation,
+                                assignee: assignee ?? c.assignee
+                            }
+                            : c
+                    ))
+                }
+            } else {
+                const result = await sendMessage(conversationId, normalizedInput)
+                if (result?.conversation) {
+                    const assignee = await resolveAssignee(result.conversation.assignee_id ?? null)
+                    setConversations(prev => prev.map(c =>
+                        c.id === conversationId
+                            ? {
+                                ...c,
+                                ...result.conversation,
+                                assignee: assignee ?? c.assignee
+                            }
+                            : c
+                    ))
+                }
             }
-            await refreshMessages(selectedId)
+            await refreshMessages(conversationId)
         } catch (error) {
             console.error('Failed to send message', error)
+            setComposerErrorMessage(t('composerAttachments.errors.sendFailed'))
+            markOptimisticMessagesAsFailed(optimisticMessages.map((message) => message.id))
         } finally {
             setIsSending(false)
         }
@@ -1110,6 +1520,10 @@ export function InboxContainer({
             dateLocale
         }).map(separator => [separator.messageId, separator.label])
     )
+    const imageGalleryLookup = useMemo(
+        () => buildInboxImageGalleryLookup(visibleMessages),
+        [visibleMessages]
+    )
     const isWhatsAppConversation = selectedConversation?.platform === 'whatsapp'
     const latestWhatsAppInboundAt = isWhatsAppConversation && !showConversationSkeleton
         ? getLatestContactMessageAt(visibleMessages)
@@ -1129,6 +1543,14 @@ export function InboxContainer({
         ? t('whatsappReplyWindow.composerLockedExpired')
         : t('whatsappReplyWindow.composerLockedNoInbound')
     const canOpenWhatsAppPhone = Boolean((selectedConversation?.contact_phone ?? '').replace(/\D/g, ''))
+    const resolveMediaPreviewLabel = (mediaType: string | null | undefined) => {
+        if (mediaType === 'image') return t('mediaPreview.image')
+        if (mediaType === 'document') return t('mediaPreview.document')
+        if (mediaType === 'audio') return t('mediaPreview.audio')
+        if (mediaType === 'video') return t('mediaPreview.video')
+        if (mediaType === 'sticker') return t('mediaPreview.sticker')
+        return t('mediaPreview.media')
+    }
 
     const resolvedBotMode = inboxBotMode
     const botModeToneClassMap = {
@@ -1226,9 +1648,23 @@ export function InboxContainer({
     })
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
     const isComposerDisabled = isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked
+    const isAttachmentPickerDisabled = isComposerDisabled || !isWhatsAppConversation
     const isTemplatePickerDisabled = isReadOnly || showConversationSkeleton || (isWhatsAppConversation && isWhatsAppReplyBlocked)
-    const canSend = !!input.trim() && !isSending && !isComposerDisabled
+    const hasMessageInput = Boolean(input.trim())
+    const hasPendingAttachments = pendingAttachments.length > 0
+    const canSend = (hasMessageInput || hasPendingAttachments) && !isSending && !isComposerDisabled
     const contactMessageCount = visibleMessages.filter(m => m.sender_type === 'contact').length
+    const previewAttachment = pendingAttachments.find((attachment) => attachment.id === previewAttachmentId) ?? null
+    const formatAttachmentSize = useCallback((sizeBytes: number) => {
+        const sizeInMb = sizeBytes / (1024 * 1024)
+        if (sizeInMb >= 1) {
+            return t('composerAttachments.sizeMb', {
+                size: sizeInMb.toFixed(1)
+            })
+        }
+        const sizeInKb = Math.max(1, Math.round(sizeBytes / 1024))
+        return t('composerAttachments.sizeKb', { size: sizeInKb })
+    }, [t])
     const canSummarize = contactMessageCount >= 3
     const summaryHeaderDisabled = !canSummarize
     const summaryRefreshDisabled = !canSummarize || summaryStatus === 'loading'
@@ -1778,9 +2214,18 @@ export function InboxContainer({
                                 </div>
                             ) : (
                                 visibleMessages.map(m => {
+                                    const galleryGroup = imageGalleryLookup.groupsByStartId.get(m.id)
+                                    const isGroupedMessage = imageGalleryLookup.groupedMessageIds.has(m.id)
+                                    if (isGroupedMessage && !galleryGroup) {
+                                        return null
+                                    }
+
                                     const isMe = m.sender_type === 'user'
                                     const isBot = m.sender_type === 'bot'
                                     const isSystem = m.sender_type === 'system'
+                                    const outboundDeliveryState = isMe && !isBot
+                                        ? resolveOutboundDeliveryState(m.metadata)
+                                        : null
                                     const parsedBotContent = isBot
                                         ? splitBotMessageDisclaimer(m.content)
                                         : { body: m.content, disclaimer: null as string | null }
@@ -1790,19 +2235,7 @@ export function InboxContainer({
                                         : null
                                     const media = extractMediaFromMessageMetadata(m.metadata)
                                     const mediaPreviewLabel = media
-                                        ? (
-                                            media.type === 'image'
-                                                ? t('mediaPreview.image')
-                                                : media.type === 'document'
-                                                    ? t('mediaPreview.document')
-                                                    : media.type === 'audio'
-                                                        ? t('mediaPreview.audio')
-                                                        : media.type === 'video'
-                                                            ? t('mediaPreview.video')
-                                                            : media.type === 'sticker'
-                                                                ? t('mediaPreview.sticker')
-                                                                : t('mediaPreview.media')
-                                        )
+                                        ? resolveMediaPreviewLabel(media.type)
                                         : null
                                     const shouldHideMessageText = Boolean(media && media.isPlaceholder && !media.caption)
                                     const renderMessageText = shouldHideMessageText
@@ -1816,6 +2249,63 @@ export function InboxContainer({
                                             </span>
                                         </div>
                                     ) : null
+
+                                    const galleryDisplayItems = galleryGroup
+                                        ? galleryGroup.items.slice(0, 4)
+                                        : []
+                                    const hiddenGalleryItemCount = galleryGroup
+                                        ? Math.max(0, galleryGroup.items.length - galleryDisplayItems.length)
+                                        : 0
+                                    const galleryTimestamp = galleryGroup
+                                        ? (
+                                            galleryGroup.items[galleryGroup.items.length - 1]?.message.created_at
+                                            ?? m.created_at
+                                        )
+                                        : m.created_at
+
+                                    const resolveGalleryTileClass = (totalItems: number, index: number) => {
+                                        if (totalItems === 1) return 'col-span-2 aspect-[4/3]'
+                                        if (totalItems === 3 && index === 0) return 'col-span-2 aspect-[16/9]'
+                                        return 'aspect-square'
+                                    }
+
+                                    const renderGalleryGrid = (isDark: boolean) => {
+                                        if (!galleryGroup || galleryDisplayItems.length === 0) return null
+
+                                        return (
+                                            <div className="w-[280px] max-w-full sm:w-[320px]">
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    {galleryDisplayItems.map((item, index) => {
+                                                        const tileClassName = resolveGalleryTileClass(galleryDisplayItems.length, index)
+                                                        const shouldShowHiddenCount = hiddenGalleryItemCount > 0 && index === galleryDisplayItems.length - 1
+
+                                                        return (
+                                                            <a
+                                                                key={item.message.id}
+                                                                href={item.media.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className={`relative overflow-hidden rounded-lg ${tileClassName} ${isDark ? 'border border-white/20' : 'border border-gray-200 bg-white'}`}
+                                                            >
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img
+                                                                    src={item.media.url}
+                                                                    alt={item.media.caption ?? t('mediaPreview.image')}
+                                                                    className="h-full w-full object-cover"
+                                                                    loading="lazy"
+                                                                />
+                                                                {shouldShowHiddenCount && (
+                                                                    <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-semibold text-white">
+                                                                        +{hiddenGalleryItemCount}
+                                                                    </span>
+                                                                )}
+                                                            </a>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )
+                                    }
 
                                     if (isSystem) {
                                         return (
@@ -1831,6 +2321,25 @@ export function InboxContainer({
                                     }
 
                                     if (!isMe && !isBot) {
+                                        if (galleryGroup) {
+                                            return (
+                                                <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                                    {dateSeparator}
+                                                    <div className="flex items-end gap-3">
+                                                        <Avatar name={selectedConversation.contact_name} size="md" />
+                                                        <div className="flex flex-col gap-1 max-w-[80%]">
+                                                            <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none p-2.5">
+                                                                {renderGalleryGrid(false)}
+                                                            </div>
+                                                            <span className="text-xs text-gray-400 ml-1">
+                                                                {format(new Date(galleryTimestamp), 'HH:mm', { locale: dateLocale })}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        }
+
                                         return (
                                             <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                 {dateSeparator}
@@ -1877,6 +2386,45 @@ export function InboxContainer({
                                                             )}
                                                         </div>
                                                         <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+
+                                    if (galleryGroup) {
+                                        return (
+                                            <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                                {dateSeparator}
+                                                <div className="flex items-end gap-3 justify-end">
+                                                    <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                                                        <div className={`rounded-2xl rounded-br-none p-2.5 ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
+                                                            {renderGalleryGrid(true)}
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 mr-1">
+                                                            <span className="text-xs text-gray-400">
+                                                                {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(galleryTimestamp), 'HH:mm', { locale: dateLocale })}
+                                                            </span>
+                                                            {!isBot && outboundDeliveryState === 'sending' && (
+                                                                <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                                                                    <Loader2 size={12} className="animate-spin" />
+                                                                    {t('composerAttachments.sending')}
+                                                                </span>
+                                                            )}
+                                                            {!isBot && outboundDeliveryState === 'failed' && (
+                                                                <span className="text-[11px] font-medium text-red-500">
+                                                                    {t('composerAttachments.failed')}
+                                                                </span>
+                                                            )}
+                                                            {isBot && matchedSkillTitle && (
+                                                                <span
+                                                                    title={matchedSkillTitle}
+                                                                    className="inline-flex max-w-[210px] truncate rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                                                                >
+                                                                    {matchedSkillTitle}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1931,6 +2479,17 @@ export function InboxContainer({
                                                         <span className="text-xs text-gray-400">
                                                             {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                         </span>
+                                                        {!isBot && outboundDeliveryState === 'sending' && (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                                                                <Loader2 size={12} className="animate-spin" />
+                                                                {t('composerAttachments.sending')}
+                                                            </span>
+                                                        )}
+                                                        {!isBot && outboundDeliveryState === 'failed' && (
+                                                            <span className="text-[11px] font-medium text-red-500">
+                                                                {t('composerAttachments.failed')}
+                                                            </span>
+                                                        )}
                                                         {isBot && matchedSkillTitle && (
                                                             <span
                                                                 title={matchedSkillTitle}
@@ -2145,28 +2704,106 @@ export function InboxContainer({
 
                             <div className="flex items-center gap-2 lg:gap-3">
                                 <div className="relative flex-1">
-                                    {isWhatsAppMissingInbound && (
-                                        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border border-amber-200 bg-white/90 px-3 text-center text-xs font-medium text-amber-900">
-                                            {whatsappComposerOverlayMessage}
+                                    <input
+                                        ref={attachmentInputRef}
+                                        type="file"
+                                        multiple
+                                        accept={WHATSAPP_UPLOAD_ACCEPT}
+                                        className="hidden"
+                                        onChange={handleAttachmentInputChange}
+                                    />
+                                    <input
+                                        ref={imageInputRef}
+                                        type="file"
+                                        multiple
+                                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                                        className="hidden"
+                                        onChange={handleAttachmentInputChange}
+                                    />
+                                    {pendingAttachments.length > 0 && (
+                                        <div className="mb-2 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-sm">
+                                            <div className="flex gap-2 overflow-x-auto pb-1">
+                                                {pendingAttachments.map((attachment) => (
+                                                    <button
+                                                        key={attachment.id}
+                                                        type="button"
+                                                        onClick={() => setPreviewAttachmentId(attachment.id)}
+                                                        className="group relative flex min-w-[120px] max-w-[160px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-left"
+                                                    >
+                                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+                                                            {attachment.mediaType === 'image' && attachment.previewUrl ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img
+                                                                    src={attachment.previewUrl}
+                                                                    alt={attachment.name}
+                                                                    className="h-full w-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <FileText size={16} className="text-gray-500" />
+                                                            )}
+                                                        </span>
+                                                        <span className="min-w-0">
+                                                            <span className="block truncate text-xs font-medium text-gray-800">
+                                                                {attachment.name}
+                                                            </span>
+                                                            <span className="block text-[11px] text-gray-500">
+                                                                {formatAttachmentSize(attachment.sizeBytes)}
+                                                            </span>
+                                                        </span>
+                                                        <span
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            onClick={(event) => {
+                                                                event.preventDefault()
+                                                                event.stopPropagation()
+                                                                handleRemovePendingAttachment(attachment.id)
+                                                            }}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key !== 'Enter' && event.key !== ' ') return
+                                                                event.preventDefault()
+                                                                event.stopPropagation()
+                                                                handleRemovePendingAttachment(attachment.id)
+                                                            }}
+                                                            className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-gray-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                                                            aria-label={t('composerAttachments.remove')}
+                                                        >
+                                                            <X size={12} />
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="mt-1 text-[11px] text-gray-500">
+                                                {t('composerAttachments.limitHint', { count: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS })}
+                                            </p>
                                         </div>
                                     )}
-                                    <div className={`flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
+                                    <div className="relative">
+                                        {isWhatsAppMissingInbound && (
+                                            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border border-amber-200 bg-white/90 px-3 text-center text-xs font-medium text-amber-900">
+                                                {whatsappComposerOverlayMessage}
+                                            </div>
+                                        )}
+                                        <div className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
+                                            <div className="flex items-center gap-2">
                                         <IconButton
                                             icon={Paperclip}
                                             size="sm"
-                                            disabled={isComposerDisabled}
+                                            onClick={handleOpenAttachmentPicker}
+                                            disabled={isAttachmentPickerDisabled}
                                             className="disabled:cursor-not-allowed disabled:opacity-50"
                                         />
                                         <IconButton
                                             icon={Image}
                                             size="sm"
-                                            disabled={isComposerDisabled}
+                                            onClick={handleOpenImagePicker}
+                                            disabled={isAttachmentPickerDisabled}
                                             className="disabled:cursor-not-allowed disabled:opacity-50"
                                         />
                                         <div className="h-6 w-px bg-gray-200 mx-1" />
                                         <textarea
                                             value={input}
                                             onChange={(e) => setInput(e.target.value)}
+                                            onPaste={handleInputPaste}
                                             disabled={isComposerDisabled}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -2189,6 +2826,13 @@ export function InboxContainer({
                                             <span>{t('templatePickerAction')}</span>
                                         </button>
                                     </div>
+                                    </div>
+                                    </div>
+                                    {composerErrorMessage && (
+                                        <p className="mt-2 text-xs font-medium text-red-600">
+                                            {composerErrorMessage}
+                                        </p>
+                                    )}
                                 </div>
                                 <button
                                     onClick={handleSendMessage}
@@ -2199,8 +2843,8 @@ export function InboxContainer({
                                         : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
                                         }`}
                                 >
-                                    <Send size={18} />
-                                    <span className="hidden sm:inline">{t('sendButton')}</span>
+                                    {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                    <span className="hidden sm:inline">{isSending ? t('composerAttachments.sending') : t('sendButton')}</span>
                                 </button>
                             </div>
                         </div>
@@ -2631,6 +3275,41 @@ export function InboxContainer({
                     onSent={() => void refreshMessages(selectedId)}
                 />
             )}
+
+            <Modal
+                isOpen={Boolean(previewAttachment)}
+                onClose={() => setPreviewAttachmentId(null)}
+                title={previewAttachment?.name ?? t('composerAttachments.previewTitle')}
+            >
+                {previewAttachment && (
+                    <div className="space-y-4">
+                        {previewAttachment.mediaType === 'image' && previewAttachment.previewUrl ? (
+                            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={previewAttachment.previewUrl}
+                                    alt={previewAttachment.name}
+                                    className="max-h-[420px] w-full object-contain"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-500">
+                                    <FileText size={18} />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium text-gray-800">{previewAttachment.name}</p>
+                                    <p className="text-xs text-gray-500">{formatAttachmentSize(previewAttachment.sizeBytes)}</p>
+                                </div>
+                            </div>
+                        )}
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
+                            <p>{t('composerAttachments.mimeTypeLabel')}: {previewAttachment.mimeType}</p>
+                            <p>{t('composerAttachments.sizeLabel')}: {formatAttachmentSize(previewAttachment.sizeBytes)}</p>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </>
     )
 }

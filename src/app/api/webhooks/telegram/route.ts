@@ -26,7 +26,11 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
-import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
+import {
+    isMvpResponseLanguageAmbiguous,
+    resolveMvpResponseLanguage,
+    resolveMvpResponseLanguageName
+} from '@/lib/ai/language'
 import { v4 as uuidv4 } from 'uuid'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 
@@ -53,8 +57,6 @@ export async function POST(req: NextRequest) {
 
     const { chat, text, from } = update.message
     const chatId = chat.id.toString()
-    const responseLanguage = resolveMvpResponseLanguage(text)
-    const responseLanguageName = resolveMvpResponseLanguageName(text)
 
     console.log('Telegram Webhook: Processing message', {
         chatId,
@@ -90,15 +92,6 @@ export async function POST(req: NextRequest) {
     }
 
     const orgId = channel.organization_id
-    const aiSettings = await getOrgAiSettings(orgId, { supabase })
-    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
-        message: content,
-        responseLanguage,
-        settings: aiSettings
-    })
-    const matchThreshold = aiSettings.match_threshold
-    const kbThreshold = matchThreshold
-    const requiredIntakeFields = await getRequiredIntakeFields({ organizationId: orgId, supabase })
 
     // 3. Find or Create Conversation
     // 3. Find or Create Conversation
@@ -171,6 +164,42 @@ export async function POST(req: NextRequest) {
         console.log('Telegram Webhook: Duplicate inbound detected, skipping')
         return NextResponse.json({ ok: true })
     }
+
+    let languageHistoryMessages: string[] = []
+    if (isMvpResponseLanguageAmbiguous(text)) {
+        const { data: languageHistoryRows, error: languageHistoryError } = await supabase
+            .from('messages')
+            .select('sender_type, content')
+            .eq('conversation_id', conversation.id)
+            .order('created_at', { ascending: false })
+            .limit(8)
+
+        if (languageHistoryError) {
+            console.warn('Telegram Webhook: Failed to load language history', languageHistoryError)
+        } else {
+            languageHistoryMessages = (languageHistoryRows ?? [])
+                .filter((row) => row.sender_type === 'contact')
+                .map((row) => (row.content ?? '').toString().trim())
+                .filter(Boolean)
+                .slice(0, 6)
+        }
+    }
+
+    const responseLanguage = resolveMvpResponseLanguage(text, {
+        historyMessages: languageHistoryMessages
+    })
+    const responseLanguageName = resolveMvpResponseLanguageName(text, {
+        historyMessages: languageHistoryMessages
+    })
+    const aiSettings = await getOrgAiSettings(orgId, { supabase })
+    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
+        message: content,
+        responseLanguage,
+        settings: aiSettings
+    })
+    const matchThreshold = aiSettings.match_threshold
+    const kbThreshold = matchThreshold
+    const requiredIntakeFields = await getRequiredIntakeFields({ organizationId: orgId, supabase })
 
     // 4. Save Incoming Message
     const { error: msgError } = await supabase.from('messages').insert({

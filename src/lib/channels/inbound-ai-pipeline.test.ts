@@ -718,6 +718,64 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
+    it('resolves ambiguous language from recent customer history for handover notice selection', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const languageHistory = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Merhaba, fiyat bilgisi alabilir miyim?',
+                created_at: '2026-02-10T11:58:00.000Z'
+            },
+            {
+                sender_type: 'bot',
+                content: 'Tabii, yardımcı olayım.',
+                created_at: '2026-02-10T11:59:00.000Z'
+            }
+        ])
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const escalationConversationUpdate = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: true })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, languageHistory.builder, botInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotReply.builder,
+                escalationConversationUpdate.builder
+            ],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-complaint',
+                title: 'Şikayet ve Memnuniyetsizlik',
+                response_text: 'Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.',
+                trigger_text: 'şikayet',
+                similarity: 0.8
+            }
+        ])
+        decideHumanEscalationMock.mockReturnValueOnce({
+            shouldEscalate: true,
+            reason: 'skill_handover',
+            action: 'switch_to_operator',
+            noticeMode: 'none',
+            noticeMessage: null
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, { text: 'ok' }))
+
+        expect(decideHumanEscalationMock).toHaveBeenCalledWith(expect.objectContaining({
+            handoverMessage: 'Talebin destek ekibine iletildi.'
+        }))
+    })
+
     it('returns on the first successful match from top candidates', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)

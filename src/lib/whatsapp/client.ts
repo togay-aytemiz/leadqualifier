@@ -80,6 +80,73 @@ export class WhatsAppClient {
         })
     }
 
+    async sendImage(params: {
+        phoneNumberId: string
+        to: string
+        imageUrl: string
+        caption?: string
+    }) {
+        const imagePayload: {
+            link: string
+            caption?: string
+        } = {
+            link: params.imageUrl
+        }
+
+        const caption = params.caption?.trim()
+        if (caption) {
+            imagePayload.caption = caption
+        }
+
+        return this.request<{ messages?: Array<{ id?: string }> }>(`${params.phoneNumberId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: params.to,
+                type: 'image',
+                image: imagePayload
+            })
+        })
+    }
+
+    async sendDocument(params: {
+        phoneNumberId: string
+        to: string
+        documentUrl: string
+        caption?: string
+        filename?: string
+    }) {
+        const documentPayload: {
+            link: string
+            caption?: string
+            filename?: string
+        } = {
+            link: params.documentUrl
+        }
+
+        const caption = params.caption?.trim()
+        if (caption) {
+            documentPayload.caption = caption
+        }
+
+        const filename = params.filename?.trim()
+        if (filename) {
+            documentPayload.filename = filename
+        }
+
+        return this.request<{ messages?: Array<{ id?: string }> }>(`${params.phoneNumberId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: params.to,
+                type: 'document',
+                document: documentPayload
+            })
+        })
+    }
+
     async sendTemplate(params: {
         phoneNumberId: string
         to: string

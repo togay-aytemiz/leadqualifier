@@ -1,5 +1,6 @@
 'use server'
 
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 import { withBotNamePrompt } from '@/lib/ai/prompts'
@@ -11,6 +12,16 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
+import { sortMessagesChronologically } from '@/lib/inbox/message-order'
+import {
+    MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
+    MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
+    MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES,
+    resolveOutboundMediaCaption,
+    validateWhatsAppOutboundAttachments,
+    type WhatsAppOutboundAttachment
+} from '@/lib/inbox/outbound-media'
+import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholders'
 import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -101,6 +112,60 @@ export type DeleteConversationPredefinedTemplateResult =
     | { ok: true }
     | { ok: false; reason: InboxPredefinedTemplateFailureReason }
 
+const WHATSAPP_MEDIA_BUCKET = process.env.WHATSAPP_MEDIA_BUCKET?.trim() || 'whatsapp-media'
+
+type InboxWhatsAppMediaFailureReason =
+    | InboxWhatsAppTemplateFailureReason
+    | 'validation'
+    | 'invalid_attachment'
+    | 'too_many_attachments'
+    | 'reply_blocked'
+    | 'request_failed'
+
+export interface ConversationWhatsAppOutboundAttachmentDraft {
+    id: string
+    name: string
+    mimeType: string
+    sizeBytes: number
+}
+
+export interface ConversationWhatsAppOutboundAttachmentUploadTarget extends ConversationWhatsAppOutboundAttachmentDraft {
+    mediaType: WhatsAppOutboundAttachment['mediaType']
+    storagePath: string
+    uploadToken: string
+    publicUrl: string
+}
+
+export interface PrepareConversationWhatsAppMediaUploadsInput {
+    conversationId: string
+    attachments: ConversationWhatsAppOutboundAttachmentDraft[]
+}
+
+export type PrepareConversationWhatsAppMediaUploadsResult =
+    | {
+        ok: true
+        maxAttachmentCount: number
+        maxImageBytes: number
+        maxDocumentBytes: number
+        uploads: ConversationWhatsAppOutboundAttachmentUploadTarget[]
+    }
+    | {
+        ok: false
+        reason: InboxWhatsAppMediaFailureReason
+        attachmentId?: string
+        maxAllowed?: number
+    }
+
+export interface SendConversationWhatsAppMediaBatchInput {
+    conversationId: string
+    text: string
+    attachments: ConversationWhatsAppOutboundAttachmentUploadTarget[]
+}
+
+export type SendConversationWhatsAppMediaBatchResult =
+    | { ok: true; messages: Message[]; conversation: Conversation | null }
+    | { ok: false; reason: InboxWhatsAppMediaFailureReason; attachmentId?: string }
+
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'>
 type ConversationLeadPreview = { status?: string | null }
 type ConversationAssigneePreview = { full_name?: string | null; email?: string | null }
@@ -138,6 +203,44 @@ function readConfigString(config: Json, key: string): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function sanitizePathSegment(value: string) {
+    return value.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+function extensionFromFilename(filename: string) {
+    const trimmed = filename.trim()
+    if (!trimmed) return null
+    const lastDot = trimmed.lastIndexOf('.')
+    if (lastDot < 0 || lastDot === trimmed.length - 1) return null
+    const extension = trimmed.slice(lastDot + 1).toLowerCase()
+    return extension.replace(/[^a-z0-9]/g, '') || null
+}
+
+function extensionFromMimeType(mimeType: string) {
+    const normalized = mimeType.toLowerCase()
+    if (normalized.includes('jpeg')) return 'jpg'
+    if (normalized.includes('png')) return 'png'
+    if (normalized.includes('webp')) return 'webp'
+    if (normalized.includes('gif')) return 'gif'
+    if (normalized.includes('pdf')) return 'pdf'
+    if (normalized.includes('msword')) return 'doc'
+    if (normalized.includes('officedocument.wordprocessingml.document')) return 'docx'
+    if (normalized.includes('text/plain')) return 'txt'
+    return null
+}
+
+function buildOutboundMediaStoragePath(args: {
+    organizationId: string
+    phoneNumberId: string
+    attachmentId: string
+    extension: string
+}) {
+    const orgSegment = sanitizePathSegment(args.organizationId)
+    const phoneSegment = sanitizePathSegment(args.phoneNumberId)
+    const fileSegment = sanitizePathSegment(`${Date.now()}-${args.attachmentId}-${crypto.randomUUID().slice(0, 8)}`)
+    return `${orgSegment}/${phoneSegment}/outbound/${fileSegment}.${args.extension}`
 }
 
 function normalizeInboxWhatsAppTemplateSummary(value: unknown): InboxWhatsAppTemplateSummary | null {
@@ -460,7 +563,7 @@ export async function getMessages(conversationId: string) {
         return []
     }
 
-    return data as Message[]
+    return sortMessagesChronologically((data ?? []) as Message[])
 }
 
 export async function getConversationLead(conversationId: string): Promise<Lead | null> {
@@ -1003,6 +1106,317 @@ export async function sendMessage(
     if (!data) throw new Error('Failed to send message')
 
     return data as { message: Message; conversation: Conversation }
+}
+
+function mapMediaContextReason(reason: InboxWhatsAppTemplateFailureReason): InboxWhatsAppMediaFailureReason {
+    if (reason === 'validation') return 'validation'
+    if (reason === 'missing_conversation') return 'missing_conversation'
+    if (reason === 'not_whatsapp') return 'not_whatsapp'
+    if (reason === 'missing_contact') return 'missing_contact'
+    if (reason === 'missing_channel') return 'missing_channel'
+    if (reason === 'billing_locked') return 'billing_locked'
+    return 'request_failed'
+}
+
+export async function prepareConversationWhatsAppMediaUploads(
+    input: PrepareConversationWhatsAppMediaUploadsInput
+): Promise<PrepareConversationWhatsAppMediaUploadsResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    if (!conversationId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const draftAttachments = (input.attachments ?? []).map((attachment) => ({
+        id: attachment.id.trim(),
+        name: attachment.name.trim(),
+        mimeType: attachment.mimeType.trim().toLowerCase(),
+        sizeBytes: Number(attachment.sizeBytes)
+    }))
+
+    const validationResult = validateWhatsAppOutboundAttachments(draftAttachments)
+    if (!validationResult.ok) {
+        if (validationResult.reason === 'too_many_attachments') {
+            return {
+                ok: false,
+                reason: 'too_many_attachments',
+                maxAllowed: validationResult.maxCount
+            }
+        }
+        if (validationResult.reason === 'invalid_mime_type') {
+            return {
+                ok: false,
+                reason: 'invalid_attachment',
+                attachmentId: validationResult.attachmentId
+            }
+        }
+        return {
+            ok: false,
+            reason: 'invalid_attachment',
+            attachmentId: validationResult.attachmentId,
+            maxAllowed: validationResult.maxSizeBytes
+        }
+    }
+
+    if (validationResult.attachments.length === 0) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationWhatsAppContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: mapMediaContextReason(context.reason) }
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    if (!supabaseUrl || !serviceRoleKey) {
+        console.error('Missing Supabase env for media upload target generation')
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    try {
+        const serviceClient = createServiceClient(supabaseUrl, serviceRoleKey)
+        const storage = serviceClient.storage.from(WHATSAPP_MEDIA_BUCKET)
+        const uploads: ConversationWhatsAppOutboundAttachmentUploadTarget[] = []
+
+        for (const attachment of validationResult.attachments) {
+            const extension = extensionFromFilename(attachment.name)
+                || extensionFromMimeType(attachment.mimeType)
+                || 'bin'
+            const storagePath = buildOutboundMediaStoragePath({
+                organizationId: context.organizationId,
+                phoneNumberId: context.phoneNumberId,
+                attachmentId: attachment.id,
+                extension
+            })
+
+            const { data: signedUploadData, error: signedUploadError } = await storage.createSignedUploadUrl(storagePath)
+            if (signedUploadError || !signedUploadData?.token) {
+                throw signedUploadError ?? new Error('Missing signed upload token')
+            }
+
+            const { data: publicUrlData } = storage.getPublicUrl(storagePath)
+            const publicUrl = publicUrlData?.publicUrl?.trim() ?? ''
+            if (!publicUrl) {
+                throw new Error('Could not resolve public URL for media upload')
+            }
+
+            uploads.push({
+                id: attachment.id,
+                name: attachment.name,
+                mimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
+                mediaType: attachment.mediaType,
+                storagePath,
+                uploadToken: signedUploadData.token,
+                publicUrl
+            })
+        }
+
+        return {
+            ok: true,
+            maxAttachmentCount: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
+            maxImageBytes: MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES,
+            maxDocumentBytes: MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
+            uploads
+        }
+    } catch (error) {
+        console.error('Failed to prepare WhatsApp outbound media uploads', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+}
+
+export async function sendConversationWhatsAppMediaBatch(
+    input: SendConversationWhatsAppMediaBatchInput
+): Promise<SendConversationWhatsAppMediaBatchResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    if (!conversationId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const normalizedText = input.text.trim()
+    const normalizedAttachments = (input.attachments ?? []).map((attachment) => ({
+        ...attachment,
+        id: attachment.id.trim(),
+        name: attachment.name.trim(),
+        mimeType: attachment.mimeType.trim().toLowerCase(),
+        storagePath: attachment.storagePath.trim(),
+        publicUrl: attachment.publicUrl.trim(),
+        sizeBytes: Number(attachment.sizeBytes)
+    }))
+
+    if (normalizedAttachments.length === 0) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const validationResult = validateWhatsAppOutboundAttachments(
+        normalizedAttachments.map((attachment) => ({
+            id: attachment.id,
+            name: attachment.name,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes
+        }))
+    )
+    if (!validationResult.ok) {
+        if (validationResult.reason === 'too_many_attachments') {
+            return {
+                ok: false,
+                reason: 'too_many_attachments'
+            }
+        }
+        return {
+            ok: false,
+            reason: 'invalid_attachment',
+            attachmentId: validationResult.attachmentId
+        }
+    }
+
+    const attachmentById = new Map(normalizedAttachments.map((attachment) => [attachment.id, attachment]))
+    for (const attachment of normalizedAttachments) {
+        if (!attachment.publicUrl || !attachment.storagePath) {
+            return {
+                ok: false,
+                reason: 'invalid_attachment',
+                attachmentId: attachment.id
+            }
+        }
+    }
+
+    const context = await resolveConversationWhatsAppContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: mapMediaContextReason(context.reason) }
+    }
+
+    const { data: latestInbound, error: latestInboundError } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('conversation_id', conversationId)
+        .eq('sender_type', 'contact')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (latestInboundError) {
+        console.error('Failed to validate WhatsApp reply window for media send:', latestInboundError)
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    const replyWindowState = resolveWhatsAppReplyWindowState({
+        latestInboundAt: latestInbound?.created_at ?? null
+    })
+    if (!replyWindowState.canReply) {
+        return { ok: false, reason: 'reply_blocked' }
+    }
+
+    const persistedMessages: Message[] = []
+    let conversationSnapshot: Conversation | null = null
+    let activeAttachmentId: string | undefined
+
+    try {
+        const { WhatsAppClient } = await import('@/lib/whatsapp/client')
+        const client = new WhatsAppClient(context.accessToken)
+
+        for (const [index, validatedAttachment] of validationResult.attachments.entries()) {
+            activeAttachmentId = validatedAttachment.id
+            const attachment = attachmentById.get(validatedAttachment.id)
+            if (!attachment) {
+                return {
+                    ok: false,
+                    reason: 'invalid_attachment',
+                    attachmentId: validatedAttachment.id
+                }
+            }
+
+            const caption = resolveOutboundMediaCaption(normalizedText, index)
+            const messageContent = caption ?? resolveWhatsAppMediaPlaceholder(validatedAttachment.mediaType)
+
+            let whatsappMessageId: string | null = null
+            if (validatedAttachment.mediaType === 'image') {
+                const response = await client.sendImage({
+                    phoneNumberId: context.phoneNumberId,
+                    to: context.contactPhone,
+                    imageUrl: attachment.publicUrl,
+                    caption: caption ?? undefined
+                })
+                whatsappMessageId = response.messages?.[0]?.id?.trim() || null
+            } else {
+                const response = await client.sendDocument({
+                    phoneNumberId: context.phoneNumberId,
+                    to: context.contactPhone,
+                    documentUrl: attachment.publicUrl,
+                    caption: caption ?? undefined,
+                    filename: attachment.name || undefined
+                })
+                whatsappMessageId = response.messages?.[0]?.id?.trim() || null
+            }
+
+            const { data, error } = await supabase.rpc('send_operator_message', {
+                p_conversation_id: conversationId,
+                p_content: messageContent
+            })
+            if (error || !data) {
+                throw error ?? new Error('Failed to persist outbound media message')
+            }
+
+            const persisted = data as { message: Message; conversation: Conversation }
+            conversationSnapshot = persisted.conversation
+
+            const metadata: Json = {
+                whatsapp_message_id: whatsappMessageId,
+                whatsapp_message_type: validatedAttachment.mediaType,
+                whatsapp_media_type: validatedAttachment.mediaType,
+                whatsapp_media_mime_type: attachment.mimeType,
+                whatsapp_media_caption: caption,
+                whatsapp_media_filename: attachment.name,
+                whatsapp_is_media_placeholder: !caption,
+                whatsapp_outbound_status: 'sent',
+                whatsapp_outbound_attachment_id: validatedAttachment.id,
+                whatsapp_media: {
+                    type: validatedAttachment.mediaType,
+                    mime_type: attachment.mimeType,
+                    caption,
+                    filename: attachment.name,
+                    storage_path: attachment.storagePath,
+                    storage_url: attachment.publicUrl,
+                    download_status: 'stored'
+                }
+            }
+
+            const { data: updatedMessage, error: updateError } = await supabase
+                .from('messages')
+                .update({
+                    metadata
+                })
+                .eq('id', persisted.message.id)
+                .eq('conversation_id', conversationId)
+                .select()
+                .single()
+
+            if (updateError || !updatedMessage) {
+                throw updateError ?? new Error('Failed to update outbound media metadata')
+            }
+
+            persistedMessages.push(updatedMessage as Message)
+        }
+
+        return {
+            ok: true,
+            messages: persistedMessages,
+            conversation: conversationSnapshot
+        }
+    } catch (error) {
+        console.error('Failed to send WhatsApp media batch:', error)
+        return {
+            ok: false,
+            reason: 'request_failed',
+            attachmentId: activeAttachmentId
+        }
+    }
 }
 
 export async function listConversationWhatsAppTemplates(

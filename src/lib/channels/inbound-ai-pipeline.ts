@@ -25,7 +25,11 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
-import { resolveMvpResponseLanguage, resolveMvpResponseLanguageName } from '@/lib/ai/language'
+import {
+    isMvpResponseLanguageAmbiguous,
+    resolveMvpResponseLanguage,
+    resolveMvpResponseLanguageName
+} from '@/lib/ai/language'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
@@ -48,20 +52,6 @@ export interface InboundAiPipelineInput {
 
 export async function processInboundAiPipeline(options: InboundAiPipelineInput) {
     const orgId = options.organizationId
-    const responseLanguage = resolveMvpResponseLanguage(options.text)
-    const responseLanguageName = resolveMvpResponseLanguageName(options.text)
-    const aiSettings = await getOrgAiSettings(orgId, { supabase: options.supabase })
-    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
-        message: content,
-        responseLanguage,
-        settings: aiSettings
-    })
-    const matchThreshold = aiSettings.match_threshold
-    const kbThreshold = matchThreshold
-    const requiredIntakeFields = await getRequiredIntakeFields({
-        organizationId: orgId,
-        supabase: options.supabase
-    })
 
     const dedupeFilter = `metadata->>${options.inboundMessageIdMetadataKey}`
     const { data: existingInboundData } = await options.supabase
@@ -164,6 +154,45 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         })
         return
     }
+
+    let languageHistoryMessages: string[] = []
+    if (isMvpResponseLanguageAmbiguous(options.text)) {
+        const { data: languageHistoryRows, error: languageHistoryError } = await options.supabase
+            .from('messages')
+            .select('sender_type, content')
+            .eq('conversation_id', conversation.id)
+            .order('created_at', { ascending: false })
+            .limit(8)
+
+        if (languageHistoryError) {
+            console.warn(`${options.logPrefix}: Failed to load language history`, languageHistoryError)
+        } else {
+            languageHistoryMessages = (languageHistoryRows ?? [])
+                .filter((row) => row.sender_type === 'contact')
+                .map((row) => (row.content ?? '').toString().trim())
+                .filter(Boolean)
+                .slice(0, 6)
+        }
+    }
+
+    const responseLanguage = resolveMvpResponseLanguage(options.text, {
+        historyMessages: languageHistoryMessages
+    })
+    const responseLanguageName = resolveMvpResponseLanguageName(options.text, {
+        historyMessages: languageHistoryMessages
+    })
+    const aiSettings = await getOrgAiSettings(orgId, { supabase: options.supabase })
+    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
+        message: content,
+        responseLanguage,
+        settings: aiSettings
+    })
+    const matchThreshold = aiSettings.match_threshold
+    const kbThreshold = matchThreshold
+    const requiredIntakeFields = await getRequiredIntakeFields({
+        organizationId: orgId,
+        supabase: options.supabase
+    })
 
     const operatorActive = isOperatorActive(conversation)
     const botMode = aiSettings.bot_mode ?? 'active'

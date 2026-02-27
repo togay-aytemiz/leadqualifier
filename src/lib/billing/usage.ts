@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 export interface MessageUsageCounts {
     aiGenerated: number
@@ -32,8 +33,21 @@ export interface StorageUsageSummary {
     totalBytes: number
     skillsBytes: number
     knowledgeBytes: number
+    whatsappMediaBytes: number
+    whatsappMediaObjectCount: number
     skillCount: number
     knowledgeDocumentCount: number
+}
+
+interface OrganizationStorageUsageRpcRow {
+    organization_id: string
+    skill_count: number | string | null
+    knowledge_document_count: number | string | null
+    skills_bytes: number | string | null
+    knowledge_bytes: number | string | null
+    whatsapp_media_object_count: number | string | null
+    whatsapp_media_bytes: number | string | null
+    total_bytes: number | string | null
 }
 
 export interface FormattedStorageSize {
@@ -76,6 +90,27 @@ export interface CreditUsageSummary {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
+interface StorageListCapableSupabaseClient {
+    storage: {
+        from: (bucketName: string) => {
+            list: (
+                path?: string,
+                options?: {
+                    limit?: number
+                    offset?: number
+                    sortBy?: {
+                        column?: string
+                        order?: 'asc' | 'desc'
+                    }
+                }
+            ) => Promise<{
+                data: Array<{ id?: string | null; name?: string; metadata?: unknown }> | null
+                error: { message?: string } | null
+            }>
+        }
+    }
+}
+
 interface GetSummaryOptions {
     supabase?: SupabaseClient
 }
@@ -91,8 +126,11 @@ const CREDIT_OUTPUT_TOKEN_WEIGHT = 4
 const TOKENS_PER_CREDIT = 3000
 const DEFAULT_USAGE_TIMEZONE = 'Europe/Istanbul'
 const DEFAULT_USAGE_CATEGORIES = ['router', 'rag', 'fallback', 'summary', 'lead_extraction', 'lead_reasoning', 'embedding']
+const DEFAULT_WHATSAPP_MEDIA_BUCKET = 'whatsapp-media'
+const WHATSAPP_MEDIA_BUCKET = process.env.WHATSAPP_MEDIA_BUCKET?.trim() || DEFAULT_WHATSAPP_MEDIA_BUCKET
 const CREDIT_USAGE_LEDGER_PAGE_SIZE = 1000
 const USAGE_METADATA_BATCH_SIZE = 200
+const STORAGE_LIST_PAGE_SIZE = 1000
 const DOCUMENT_PROCESSING_SOURCES = new Set([
     'offering_profile_suggestion',
     'service_catalog_candidates',
@@ -103,6 +141,22 @@ const DOCUMENT_PROCESSING_SOURCES = new Set([
 function normalizeCount(value?: number | null) {
     if (!Number.isFinite(value ?? Number.NaN)) return 0
     return Math.max(0, Math.round(value ?? 0))
+}
+
+function normalizeWholeCount(value: unknown) {
+    const parsed = typeof value === 'string'
+        ? Number.parseInt(value, 10)
+        : Number(value ?? 0)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.round(parsed))
+}
+
+function normalizeStorageBytes(value: unknown) {
+    const parsed = typeof value === 'string'
+        ? Number.parseFloat(value)
+        : Number(value ?? 0)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, Math.round(parsed))
 }
 
 function normalizeCreditDelta(value?: number | string | null) {
@@ -237,6 +291,95 @@ function splitIntoChunks<T>(values: T[], chunkSize: number) {
         chunks.push(values.slice(index, index + chunkSize))
     }
     return chunks
+}
+
+function normalizeStorageObjectSize(metadata: unknown) {
+    const record = toRecord(metadata)
+    if (!record) return 0
+
+    const sizeFromMetadata = Number(record.size ?? 0)
+    if (Number.isFinite(sizeFromMetadata) && sizeFromMetadata > 0) {
+        return Math.round(sizeFromMetadata)
+    }
+
+    const sizeFromContentLength = Number(record.contentLength ?? 0)
+    if (Number.isFinite(sizeFromContentLength) && sizeFromContentLength > 0) {
+        return Math.round(sizeFromContentLength)
+    }
+
+    return 0
+}
+
+interface StorageListRow {
+    id?: string | null
+    name?: string
+    metadata?: unknown
+}
+
+async function resolveWhatsAppMediaUsageFromStorageBucket(options: {
+    supabase: StorageListCapableSupabaseClient
+    organizationId: string
+    bucketName: string
+}) {
+    const folderQueue: string[] = [options.organizationId]
+    let bytes = 0
+    let objectCount = 0
+
+    while (folderQueue.length > 0) {
+        const currentPath = folderQueue.shift() ?? ''
+        let offset = 0
+
+        while (true) {
+            const { data, error } = await options.supabase.storage
+                .from(options.bucketName)
+                .list(currentPath, {
+                    limit: STORAGE_LIST_PAGE_SIZE,
+                    offset,
+                    sortBy: { column: 'name', order: 'asc' }
+                })
+
+            if (error) {
+                console.warn(`Failed to list storage objects for ${options.bucketName}/${currentPath}:`, error)
+                return { bytes, objectCount }
+            }
+
+            const rows = (data ?? []) as StorageListRow[]
+            for (const row of rows) {
+                const itemName = typeof row.name === 'string' ? row.name.trim() : ''
+                if (!itemName) continue
+
+                const childPath = currentPath ? `${currentPath}/${itemName}` : itemName
+                const isFolder = !row.id
+
+                if (isFolder) {
+                    folderQueue.push(childPath)
+                    continue
+                }
+
+                objectCount += 1
+                bytes += normalizeStorageObjectSize(row.metadata)
+            }
+
+            if (rows.length < STORAGE_LIST_PAGE_SIZE) break
+            offset += STORAGE_LIST_PAGE_SIZE
+        }
+    }
+
+    return { bytes, objectCount }
+}
+
+function resolveStorageUsageClient(baseSupabase: SupabaseClient): StorageListCapableSupabaseClient {
+    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+
+    if (!serviceUrl || !serviceRoleKey) return baseSupabase as unknown as StorageListCapableSupabaseClient
+
+    return createServiceClient(serviceUrl, serviceRoleKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false
+        }
+    }) as unknown as StorageListCapableSupabaseClient
 }
 
 async function loadAllUsageDebitLedgerRows(
@@ -613,6 +756,84 @@ export async function getOrgStorageUsageSummary(
     options?: GetSummaryOptions
 ): Promise<StorageUsageSummary> {
     const supabase = options?.supabase ?? await createClient()
+    const storageUsageClient = resolveStorageUsageClient(supabase)
+
+    let { data: storageRows, error: storageRpcError } = await supabase.rpc('get_organization_storage_usage', {
+        target_organization_ids: [organizationId],
+        target_media_bucket_ids: [WHATSAPP_MEDIA_BUCKET]
+    })
+
+    if (storageRpcError) {
+        const message = typeof storageRpcError.message === 'string' ? storageRpcError.message : ''
+        if (message.includes('get_organization_storage_usage')) {
+            const legacyRpc = await supabase.rpc('get_organization_storage_usage', {
+                target_organization_ids: [organizationId]
+            })
+            storageRows = legacyRpc.data
+            storageRpcError = legacyRpc.error
+        }
+    }
+
+    if (!storageRpcError) {
+        const storageRow = ((storageRows ?? []) as OrganizationStorageUsageRpcRow[]).find(
+            (row) => row.organization_id === organizationId
+        )
+
+        if (storageRow) {
+            const rpcSummary: StorageUsageSummary = {
+                totalBytes: normalizeStorageBytes(storageRow.total_bytes),
+                skillsBytes: normalizeStorageBytes(storageRow.skills_bytes),
+                knowledgeBytes: normalizeStorageBytes(storageRow.knowledge_bytes),
+                whatsappMediaBytes: normalizeStorageBytes(storageRow.whatsapp_media_bytes),
+                whatsappMediaObjectCount: normalizeWholeCount(storageRow.whatsapp_media_object_count),
+                skillCount: normalizeWholeCount(storageRow.skill_count),
+                knowledgeDocumentCount: normalizeWholeCount(storageRow.knowledge_document_count)
+            }
+
+            if (rpcSummary.whatsappMediaBytes > 0 || rpcSummary.whatsappMediaObjectCount > 0) {
+                return rpcSummary
+            }
+
+            const bucketMediaUsage = await resolveWhatsAppMediaUsageFromStorageBucket({
+                supabase: storageUsageClient,
+                organizationId,
+                bucketName: WHATSAPP_MEDIA_BUCKET
+            })
+
+            if (bucketMediaUsage.bytes > 0 || bucketMediaUsage.objectCount > 0) {
+                return {
+                    ...rpcSummary,
+                    totalBytes: rpcSummary.skillsBytes + rpcSummary.knowledgeBytes + bucketMediaUsage.bytes,
+                    whatsappMediaBytes: bucketMediaUsage.bytes,
+                    whatsappMediaObjectCount: bucketMediaUsage.objectCount
+                }
+            }
+
+            return rpcSummary
+        }
+
+        const bucketMediaUsage = await resolveWhatsAppMediaUsageFromStorageBucket({
+            supabase: storageUsageClient,
+            organizationId,
+            bucketName: WHATSAPP_MEDIA_BUCKET
+        })
+
+        if (bucketMediaUsage.bytes > 0 || bucketMediaUsage.objectCount > 0) {
+            return {
+                totalBytes: bucketMediaUsage.bytes,
+                skillsBytes: 0,
+                knowledgeBytes: 0,
+                whatsappMediaBytes: bucketMediaUsage.bytes,
+                whatsappMediaObjectCount: bucketMediaUsage.objectCount,
+                skillCount: 0,
+                knowledgeDocumentCount: 0
+            }
+        }
+    }
+
+    if (storageRpcError) {
+        console.warn('Failed to load storage summary via RPC, using table fallback:', storageRpcError)
+    }
 
     const [skillsResult, knowledgeResult] = await Promise.all([
         supabase
@@ -638,11 +859,18 @@ export async function getOrgStorageUsageSummary(
 
     const skillsBytes = calculateSkillStorageBytes(skillsRows)
     const knowledgeBytes = calculateKnowledgeStorageBytes(knowledgeRows)
+    const bucketMediaUsage = await resolveWhatsAppMediaUsageFromStorageBucket({
+        supabase: storageUsageClient,
+        organizationId,
+        bucketName: WHATSAPP_MEDIA_BUCKET
+    })
 
     return {
-        totalBytes: skillsBytes + knowledgeBytes,
+        totalBytes: skillsBytes + knowledgeBytes + bucketMediaUsage.bytes,
         skillsBytes,
         knowledgeBytes,
+        whatsappMediaBytes: bucketMediaUsage.bytes,
+        whatsappMediaObjectCount: bucketMediaUsage.objectCount,
         skillCount: skillsRows.length,
         knowledgeDocumentCount: knowledgeRows.length
     }

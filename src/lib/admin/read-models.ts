@@ -23,6 +23,7 @@ import {
 import { summarizeUsageMetricRows } from '@/lib/admin/dashboard-usage-metrics'
 import {
     getCountByOrganization as loadCountByOrganization,
+    getStorageUsageByOrganization as loadStorageUsageByOrganization,
     getTokenTotalsByOrganization as loadTokenTotalsByOrganization
 } from '@/lib/admin/organization-metrics'
 
@@ -39,6 +40,11 @@ export interface AdminOrganizationSummary {
     knowledgeDocumentCount: number
     totalMessageCount: number
     totalTokenCount: number
+    storageTotalBytes: number
+    storageSkillsBytes: number
+    storageKnowledgeBytes: number
+    storageWhatsAppMediaBytes: number
+    storageWhatsAppMediaObjectCount: number
     billing: AdminBillingSnapshot
     paidFee: AdminOrganizationPaidFee
 }
@@ -318,6 +324,22 @@ async function getTokenTotalsByOrganization(
     return loadTokenTotalsByOrganization(supabase, organizationIds)
 }
 
+interface OrganizationStorageUsageTotals {
+    totalBytes: number
+    skillsBytes: number
+    knowledgeBytes: number
+    whatsappMediaBytes: number
+    whatsappMediaObjectCount: number
+}
+
+async function getStorageUsageByOrganization(
+    supabase: SupabaseClient,
+    organizationIds: string[]
+): Promise<Map<string, OrganizationStorageUsageTotals>> {
+    if (organizationIds.length === 0) return new Map()
+    return loadStorageUsageByOrganization(supabase, organizationIds)
+}
+
 function mapBillingRowToAdminSnapshot(row: OrganizationBillingAccount): AdminBillingSnapshot {
     const snapshot = buildOrganizationBillingSnapshot(row)
 
@@ -581,26 +603,6 @@ async function getUsageTotalsForRange(
         totalTokenCount: Math.floor(totalTokenCount),
         totalCreditUsage: totalCreditUsageTenths / 10
     }
-}
-
-async function getGlobalTokenTotalFallback(supabase: SupabaseClient): Promise<number> {
-    const usageTotals = await getUsageTotalsForRange(supabase, {})
-    return usageTotals.totalTokenCount
-}
-
-async function getCreditUsageTotalFallback(
-    supabase: SupabaseClient,
-    organizationId?: string
-): Promise<number> {
-    const usageTotals = await getUsageTotalsForRange(supabase, {
-        organizationId
-    })
-
-    return usageTotals.totalCreditUsage
-}
-
-async function getGlobalCreditUsageFallback(supabase: SupabaseClient): Promise<number> {
-    return getCreditUsageTotalFallback(supabase)
 }
 
 export async function getAdminUsageMetricsSummary(
@@ -958,6 +960,7 @@ async function buildOrganizationSummariesFromRows(
         knowledgeCounts,
         messageCounts,
         tokenTotals,
+        storageUsageTotals,
         billingByOrganization,
         subscriptionMetadataByOrganization
     ] = await Promise.all([
@@ -966,6 +969,7 @@ async function buildOrganizationSummariesFromRows(
         getCountByOrganization(supabase, organizationIds, 'knowledge_documents'),
         getCountByOrganization(supabase, organizationIds, 'messages'),
         getTokenTotalsByOrganization(supabase, organizationIds),
+        getStorageUsageByOrganization(supabase, organizationIds),
         getBillingByOrganization(supabase, organizationIds),
         getLatestSubscriptionMetadataByOrganization(supabase, organizationIds)
     ])
@@ -973,6 +977,7 @@ async function buildOrganizationSummariesFromRows(
     return organizations.map((organization) => {
         const memberCount = getCount(memberCounts, organization.id)
         const billing = billingByOrganization.get(organization.id) ?? EMPTY_BILLING_SNAPSHOT
+        const storageUsage = storageUsageTotals.get(organization.id)
 
         return {
             id: organization.id,
@@ -985,6 +990,11 @@ async function buildOrganizationSummariesFromRows(
             knowledgeDocumentCount: getCount(knowledgeCounts, organization.id),
             totalMessageCount: getCount(messageCounts, organization.id),
             totalTokenCount: getCount(tokenTotals, organization.id),
+            storageTotalBytes: storageUsage?.totalBytes ?? 0,
+            storageSkillsBytes: storageUsage?.skillsBytes ?? 0,
+            storageKnowledgeBytes: storageUsage?.knowledgeBytes ?? 0,
+            storageWhatsAppMediaBytes: storageUsage?.whatsappMediaBytes ?? 0,
+            storageWhatsAppMediaObjectCount: storageUsage?.whatsappMediaObjectCount ?? 0,
             billing,
             paidFee: resolveAdminOrganizationPaidFee({
                 metadata: subscriptionMetadataByOrganization.get(organization.id) ?? null,

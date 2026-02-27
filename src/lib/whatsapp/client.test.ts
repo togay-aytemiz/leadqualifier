@@ -34,6 +34,70 @@ describe('WhatsAppClient', () => {
         )
     })
 
+    it('sends image messages with optional caption', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ messages: [{ id: 'wamid.image.1' }] })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        await client.sendImage({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            imageUrl: 'https://cdn.example.com/media/image-1.jpg',
+            caption: 'Fiyat listesi'
+        })
+
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        const [, callInit] = fetchMock.mock.calls[0] ?? []
+        const body = JSON.parse(String((callInit as RequestInit)?.body))
+
+        expect(body).toEqual({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: '905551112233',
+            type: 'image',
+            image: {
+                link: 'https://cdn.example.com/media/image-1.jpg',
+                caption: 'Fiyat listesi'
+            }
+        })
+    })
+
+    it('sends document messages with optional caption and filename', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ messages: [{ id: 'wamid.doc.1' }] })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        await client.sendDocument({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            documentUrl: 'https://cdn.example.com/media/file-1.pdf',
+            caption: 'Doküman',
+            filename: 'fiyat.pdf'
+        })
+
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        const [, callInit] = fetchMock.mock.calls[0] ?? []
+        const body = JSON.parse(String((callInit as RequestInit)?.body))
+
+        expect(body).toEqual({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: '905551112233',
+            type: 'document',
+            document: {
+                link: 'https://cdn.example.com/media/file-1.pdf',
+                caption: 'Doküman',
+                filename: 'fiyat.pdf'
+            }
+        })
+    })
+
     it('fetches phone number details for health checks', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

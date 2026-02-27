@@ -10,6 +10,7 @@ import {
     type AdminBillingAuditEntry,
     type AdminBillingSnapshot
 } from '@/lib/admin/read-models'
+import { formatStorageSize } from '@/lib/billing/usage'
 import {
     adminAdjustPackageCredits,
     adminAdjustTrialCredits,
@@ -197,6 +198,10 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
         return nextMonth.toISOString().slice(0, 10)
     })()
     const formatNumber = new Intl.NumberFormat(locale)
+    const formatStorageLabel = (bytes: number) => {
+        const formatted = formatStorageSize(bytes, locale)
+        return `${formatted.value} ${formatted.unit}`
+    }
     const billingActionError = (search.billing_error ?? null) as AdminBillingActionError | null
     const billingActionStatus = search.billing_status === 'success'
         ? 'success'
@@ -473,6 +478,17 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                         <div className="rounded-xl border border-gray-200 bg-white p-4">
                             <p className="text-xs uppercase tracking-wider text-gray-400">{tAdmin('organizationDetail.summary.knowledge')}</p>
                             <p className="mt-2 text-sm font-semibold text-gray-900">{formatNumber.format(details.organization.knowledgeDocumentCount)}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                            <p className="text-xs uppercase tracking-wider text-gray-400">{tAdmin('organizationDetail.summary.storage')}</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-900">
+                                {formatStorageLabel(details.organization.storageTotalBytes)}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                                {tAdmin('organizationDetail.summary.storageMedia', {
+                                    value: formatStorageLabel(details.organization.storageWhatsAppMediaBytes)
+                                })}
+                            </p>
                         </div>
                     </div>
 
