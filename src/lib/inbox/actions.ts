@@ -101,10 +101,10 @@ export type DeleteConversationPredefinedTemplateResult =
     | { ok: true }
     | { ok: false; reason: InboxPredefinedTemplateFailureReason }
 
-type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type'>
+type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'>
 type ConversationLeadPreview = { status?: string | null }
 type ConversationAssigneePreview = { full_name?: string | null; email?: string | null }
-type ConversationPreviewMessageRow = Pick<Message, 'conversation_id' | 'content' | 'created_at' | 'sender_type'>
+type ConversationPreviewMessageRow = Pick<Message, 'conversation_id' | 'content' | 'created_at' | 'sender_type' | 'metadata'>
 type ConversationLeadPreviewRow = { conversation_id: string; status?: string | null }
 type ConversationAssigneePreviewRow = { id: string; full_name?: string | null; email?: string | null }
 const SUMMARY_MAX_OUTPUT_TOKENS = 180
@@ -287,7 +287,8 @@ function buildConversationListItemsFromFallback(
         messageByConversationId.set(message.conversation_id, {
             content: message.content,
             created_at: message.created_at,
-            sender_type: message.sender_type
+            sender_type: message.sender_type,
+            metadata: message.metadata
         })
     }
 
@@ -349,7 +350,8 @@ export async function getConversations(
             messages (
                 content,
                 created_at,
-                sender_type
+                sender_type,
+                metadata
             )
         `)
         .eq('organization_id', organizationId)
@@ -392,7 +394,7 @@ export async function getConversations(
     const [messagesResult, leadsResult, assigneesResult] = await Promise.all([
         supabase
             .from('messages')
-            .select('conversation_id, content, created_at, sender_type')
+            .select('conversation_id, content, created_at, sender_type, metadata')
             .eq('organization_id', organizationId)
             .in('conversation_id', conversationIds)
             .order('created_at', { ascending: false }),

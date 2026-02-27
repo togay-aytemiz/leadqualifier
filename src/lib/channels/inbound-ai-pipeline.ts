@@ -41,6 +41,7 @@ export interface InboundAiPipelineInput {
     inboundMessageId: string
     inboundMessageIdMetadataKey: string
     inboundMessageMetadata: Record<string, unknown>
+    skipAutomation?: boolean
     sendOutbound: (content: string) => Promise<void>
     logPrefix: string
 }
@@ -146,6 +147,15 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             updated_at: new Date().toISOString()
         })
         .eq('id', conversation.id)
+
+    if (options.skipAutomation) {
+        console.info(`${options.logPrefix}: Automation skipped for inbound message`, {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            inbound_message_id: options.inboundMessageId
+        })
+        return
+    }
 
     if (conversation.ai_processing_paused) {
         console.info(`${options.logPrefix}: Conversation AI processing paused`, {

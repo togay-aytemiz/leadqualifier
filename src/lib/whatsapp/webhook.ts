@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export interface WhatsAppTextMessageEvent {
+    kind: 'text'
     phoneNumberId: string
     contactPhone: string
     contactName: string | null
@@ -8,6 +9,25 @@ export interface WhatsAppTextMessageEvent {
     text: string
     timestamp: string | null
 }
+
+export type WhatsAppMediaType = 'image' | 'document' | 'audio' | 'video' | 'sticker' | 'unknown'
+
+export interface WhatsAppMediaMessageEvent {
+    kind: 'media'
+    phoneNumberId: string
+    contactPhone: string
+    contactName: string | null
+    messageId: string
+    mediaType: WhatsAppMediaType
+    mediaId: string
+    mimeType: string | null
+    sha256: string | null
+    caption: string | null
+    filename: string | null
+    timestamp: string | null
+}
+
+export type WhatsAppInboundMessageEvent = WhatsAppTextMessageEvent | WhatsAppMediaMessageEvent
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -54,10 +74,42 @@ export function isValidMetaSignature(signatureHeader: string | null, rawBody: st
     return timingSafeEqual(expectedBuffer, receivedBuffer)
 }
 
-export function extractWhatsAppTextMessages(payload: unknown): WhatsAppTextMessageEvent[] {
+function resolveMediaType(messageType: string | null): WhatsAppMediaType | null {
+    if (messageType === 'image') return 'image'
+    if (messageType === 'document') return 'document'
+    if (messageType === 'audio') return 'audio'
+    if (messageType === 'video') return 'video'
+    if (messageType === 'sticker') return 'sticker'
+    if (messageType === 'unknown') return 'unknown'
+    return null
+}
+
+function readMediaNode(message: Record<string, unknown>, mediaType: WhatsAppMediaType) {
+    const mediaNodeValue = message[mediaType]
+    const mediaNode = isRecord(mediaNodeValue) ? mediaNodeValue : null
+    if (!mediaNode) return null
+
+    const mediaId = asString(mediaNode.id)
+    if (!mediaId) return null
+
+    const mimeType = asString(mediaNode.mime_type)
+    const sha256 = asString(mediaNode.sha256)
+    const caption = asString(mediaNode.caption)
+    const filename = asString(mediaNode.filename)
+
+    return {
+        mediaId,
+        mimeType,
+        sha256,
+        caption,
+        filename
+    }
+}
+
+export function extractWhatsAppInboundMessages(payload: unknown): WhatsAppInboundMessageEvent[] {
     if (!isRecord(payload) || !Array.isArray(payload.entry)) return []
 
-    const events: WhatsAppTextMessageEvent[] = []
+    const events: WhatsAppInboundMessageEvent[] = []
 
     for (const entry of payload.entry) {
         if (!isRecord(entry) || !Array.isArray(entry.changes)) continue
@@ -78,17 +130,44 @@ export function extractWhatsAppTextMessages(payload: unknown): WhatsAppTextMessa
                 const from = asString(message.from)
                 const messageId = asString(message.id)
                 const timestamp = asString(message.timestamp)
-                const textNode = isRecord(message.text) ? message.text : null
-                const text = textNode ? asString(textNode.body) : null
 
-                if (messageType !== 'text' || !from || !messageId || !text) continue
+                if (!from || !messageId) continue
+
+                if (messageType === 'text') {
+                    const textNode = isRecord(message.text) ? message.text : null
+                    const text = textNode ? asString(textNode.body) : null
+                    if (!text) continue
+
+                    events.push({
+                        kind: 'text',
+                        phoneNumberId,
+                        contactPhone: from,
+                        contactName: contactNames.get(from) ?? null,
+                        messageId,
+                        text,
+                        timestamp
+                    })
+                    continue
+                }
+
+                const mediaType = resolveMediaType(messageType)
+                if (!mediaType) continue
+
+                const media = readMediaNode(message, mediaType)
+                if (!media) continue
 
                 events.push({
+                    kind: 'media',
                     phoneNumberId,
                     contactPhone: from,
                     contactName: contactNames.get(from) ?? null,
                     messageId,
-                    text,
+                    mediaType,
+                    mediaId: media.mediaId,
+                    mimeType: media.mimeType,
+                    sha256: media.sha256,
+                    caption: media.caption,
+                    filename: media.filename,
                     timestamp
                 })
             }
@@ -96,4 +175,17 @@ export function extractWhatsAppTextMessages(payload: unknown): WhatsAppTextMessa
     }
 
     return events
+}
+
+export function extractWhatsAppTextMessages(payload: unknown): Omit<WhatsAppTextMessageEvent, 'kind'>[] {
+    return extractWhatsAppInboundMessages(payload)
+        .filter((event): event is WhatsAppTextMessageEvent => event.kind === 'text')
+        .map((event) => ({
+            phoneNumberId: event.phoneNumberId,
+            contactPhone: event.contactPhone,
+            contactName: event.contactName,
+            messageId: event.messageId,
+            text: event.text,
+            timestamp: event.timestamp
+        }))
 }

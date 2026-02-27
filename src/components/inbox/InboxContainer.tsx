@@ -50,6 +50,7 @@ import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
 import { buildMessageDateSeparators } from '@/components/inbox/messageDateSeparators'
 import { extractSkillTitleFromMetadata, splitBotMessageDisclaimer } from '@/components/inbox/botMessageContent'
+import { extractMediaFromMessageMetadata, resolveMessagePreviewContent } from '@/components/inbox/messageMedia'
 import {
     filterConversationsByQueue,
     summarizeConversationQueueCounts,
@@ -533,10 +534,11 @@ export function InboxContainer({
                     setConversations(prev => prev.map(c => {
                         if (c.id === newMsg.conversation_id) {
                             const shouldIncrementUnread = newMsg.sender_type === 'contact'
-                            const previewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type'> = {
+                            const previewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'> = {
                                 content: newMsg.content,
                                 created_at: newMsg.created_at,
-                                sender_type: newMsg.sender_type
+                                sender_type: newMsg.sender_type,
+                                metadata: newMsg.metadata
                             }
                             return {
                                 ...c,
@@ -818,10 +820,11 @@ export function InboxContainer({
         const optimisticAssignee: Assignee | null = currentUserProfile
             ? { full_name: currentUserProfile.full_name, email: currentUserProfile.email }
             : null
-        const optimisticPreviewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type'> = {
+        const optimisticPreviewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'> = {
             content: input,
             created_at: new Date().toISOString(),
-            sender_type: 'user'
+            sender_type: 'user',
+            metadata: {}
         }
 
         setConversations(prev => prev.map(c =>
@@ -997,6 +1000,19 @@ export function InboxContainer({
                         : c.human_attention_reason === 'hot_lead'
                             ? t('queueAttentionReasonHotLead')
                             : null
+                    const previewContent = resolveMessagePreviewContent({
+                        content: c.messages?.[0]?.content,
+                        metadata: c.messages?.[0]?.metadata,
+                        fallbackNoMessage: t('noMessagesYet'),
+                        labels: {
+                            image: t('mediaPreview.image'),
+                            document: t('mediaPreview.document'),
+                            audio: t('mediaPreview.audio'),
+                            video: t('mediaPreview.video'),
+                            sticker: t('mediaPreview.sticker'),
+                            media: t('mediaPreview.media')
+                        }
+                    })
 
                     return (
                         <div
@@ -1053,7 +1069,7 @@ export function InboxContainer({
                                                 ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
                                                 : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
                                         )}
-                                        <span className="truncate">{c.messages?.[0]?.content || t('noMessagesYet')}</span>
+                                        <span className="truncate">{previewContent}</span>
                                     </p>
                                     <div className="mt-0.5 flex items-center justify-between">
                                         <span className="text-xs text-gray-400">
@@ -1772,6 +1788,26 @@ export function InboxContainer({
                                     const matchedSkillTitle = isBot
                                         ? extractSkillTitleFromMetadata(m.metadata)
                                         : null
+                                    const media = extractMediaFromMessageMetadata(m.metadata)
+                                    const mediaPreviewLabel = media
+                                        ? (
+                                            media.type === 'image'
+                                                ? t('mediaPreview.image')
+                                                : media.type === 'document'
+                                                    ? t('mediaPreview.document')
+                                                    : media.type === 'audio'
+                                                        ? t('mediaPreview.audio')
+                                                        : media.type === 'video'
+                                                            ? t('mediaPreview.video')
+                                                            : media.type === 'sticker'
+                                                                ? t('mediaPreview.sticker')
+                                                                : t('mediaPreview.media')
+                                        )
+                                        : null
+                                    const shouldHideMessageText = Boolean(media && media.isPlaceholder && !media.caption)
+                                    const renderMessageText = shouldHideMessageText
+                                        ? ''
+                                        : visibleMessageContent
                                     const messageDateSeparator = messageDateSeparatorById.get(m.id)
                                     const dateSeparator = messageDateSeparator ? (
                                         <div className="flex justify-center">
@@ -1802,7 +1838,43 @@ export function InboxContainer({
                                                     <Avatar name={selectedConversation.contact_name} size="md" />
                                                     <div className="flex flex-col gap-1 max-w-[80%]">
                                                         <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
-                                                            {visibleMessageContent}
+                                                            {media && (
+                                                                <div className="space-y-2">
+                                                                    {media.type === 'image' && media.url ? (
+                                                                        <a href={media.url} target="_blank" rel="noopener noreferrer" className="block">
+                                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                            <img
+                                                                                src={media.url}
+                                                                                alt={media.caption ?? mediaPreviewLabel ?? t('mediaPreview.media')}
+                                                                                className="max-h-64 w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain"
+                                                                                loading="lazy"
+                                                                            />
+                                                                        </a>
+                                                                    ) : (
+                                                                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                                                            <div className="text-xs font-semibold text-gray-700">{mediaPreviewLabel}</div>
+                                                                            {media.fileName && (
+                                                                                <div className="mt-1 text-xs text-gray-500">{media.fileName}</div>
+                                                                            )}
+                                                                            {media.url && (
+                                                                                <a
+                                                                                    href={media.url}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="mt-2 inline-block text-xs font-medium text-blue-600 hover:text-blue-700"
+                                                                                >
+                                                                                    {t('mediaPreview.open')}
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {renderMessageText && (
+                                                                <div className={media ? 'mt-2' : undefined}>
+                                                                    {renderMessageText}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
                                                     </div>
@@ -1817,7 +1889,43 @@ export function InboxContainer({
                                             <div className="flex items-end gap-3 justify-end">
                                                 <div className="flex flex-col gap-1 items-end max-w-[80%]">
                                                     <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
-                                                        {visibleMessageContent}
+                                                        {media && (
+                                                            <div className="space-y-2 text-left">
+                                                                {media.type === 'image' && media.url ? (
+                                                                    <a href={media.url} target="_blank" rel="noopener noreferrer" className="block">
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img
+                                                                            src={media.url}
+                                                                            alt={media.caption ?? mediaPreviewLabel ?? t('mediaPreview.media')}
+                                                                            className="max-h-64 w-auto max-w-full rounded-lg border border-white/20 object-contain"
+                                                                            loading="lazy"
+                                                                        />
+                                                                    </a>
+                                                                ) : (
+                                                                    <div className="rounded-lg border border-white/20 bg-black/15 px-3 py-2 text-left">
+                                                                        <div className="text-xs font-semibold text-white">{mediaPreviewLabel}</div>
+                                                                        {media.fileName && (
+                                                                            <div className="mt-1 text-xs text-white/80">{media.fileName}</div>
+                                                                        )}
+                                                                        {media.url && (
+                                                                            <a
+                                                                                href={media.url}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="mt-2 inline-block text-xs font-medium text-white underline underline-offset-2"
+                                                                            >
+                                                                                {t('mediaPreview.open')}
+                                                                            </a>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {renderMessageText && (
+                                                            <div className={media ? 'mt-2 text-right' : undefined}>
+                                                                {renderMessageText}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mr-1">
                                                         <span className="text-xs text-gray-400">

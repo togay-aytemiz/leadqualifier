@@ -123,6 +123,56 @@ describe('WhatsAppClient', () => {
         })
     })
 
+    it('fetches media metadata by media id', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({
+                id: 'media-1',
+                url: 'https://graph.facebook.com/v21.0/media-1',
+                mime_type: 'image/jpeg'
+            })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        const result = await client.getMediaMetadata('media-1')
+
+        expect(result.id).toBe('media-1')
+        expect(result.url).toContain('/media-1')
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.facebook.com/v21.0/media-1',
+            expect.objectContaining({
+                method: 'GET'
+            })
+        )
+    })
+
+    it('downloads media bytes using access token', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            arrayBuffer: async () => new TextEncoder().encode('abc').buffer,
+            headers: {
+                get: (key: string) => (key === 'content-type' ? 'image/jpeg' : null)
+            }
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        const result = await client.downloadMedia('https://graph.facebook.com/v21.0/media-1')
+
+        expect(result.contentType).toBe('image/jpeg')
+        expect(new Uint8Array(result.data)).toEqual(new Uint8Array([97, 98, 99]))
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.facebook.com/v21.0/media-1',
+            expect.objectContaining({
+                method: 'GET',
+                headers: expect.objectContaining({
+                    Authorization: 'Bearer token-1'
+                })
+            })
+        )
+    })
+
     it('throws a normalized error when graph api returns non-ok response', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: false,

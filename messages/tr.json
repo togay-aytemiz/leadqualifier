@@ -280,17 +280,17 @@
         "billingPackageRenewalUnknown": "Paket yenileme tarihi hazırlanıyor"
     },
     "inbox": {
-  "title": "Gelen Kutusu",
-  "queueTabMe": "Ben",
-  "queueTabUnassigned": "Atanmamış",
-  "queueTabAll": "Tümü",
-  "queueAttentionRequired": "Dikkat gerekli",
-  "queueAttentionReasonSkill": "Skill devri",
-  "queueAttentionReasonHotLead": "Sıcak lead",
-  "queueOperatorsTitle": "Operatörler",
-  "queueUnassignedSummary": "Atanmamış: {count}",
-  "queueNoOperators": "Operatör bulunamadı",
-  "noMessages": "Mesaj yok",
+        "title": "Gelen Kutusu",
+        "queueTabMe": "Ben",
+        "queueTabUnassigned": "Atanmamış",
+        "queueTabAll": "Tümü",
+        "queueAttentionRequired": "Dikkat gerekli",
+        "queueAttentionReasonSkill": "Skill devri",
+        "queueAttentionReasonHotLead": "Sıcak lead",
+        "queueOperatorsTitle": "Operatörler",
+        "queueUnassignedSummary": "Atanmamış: {count}",
+        "queueNoOperators": "Operatör bulunamadı",
+        "noMessages": "Mesaj yok",
         "noMessagesDesc": "Yeni konuşmalar mesaj aldığınızda burada görünecektir.",
         "noMessagesYet": "Henüz mesaj yok",
         "searchPlaceholder": "Ara...",
@@ -474,7 +474,16 @@
         "creditUsageLoading": "Hesaplanıyor...",
         "creditUsageUnavailable": "Kullanılamıyor",
         "creditUsageValue": "{credits} kredi",
-        "scrollToLatest": "Son mesaja git"
+        "scrollToLatest": "Son mesaja git",
+        "mediaPreview": {
+            "image": "Görsel alındı",
+            "document": "Belge alındı",
+            "audio": "Ses alındı",
+            "video": "Video alındı",
+            "sticker": "Çıkartma alındı",
+            "media": "Medya alındı",
+            "open": "Dosyayı aç"
+        }
     },
     "simulator": {
         "title": "Mesajlaşma Simülatörü",

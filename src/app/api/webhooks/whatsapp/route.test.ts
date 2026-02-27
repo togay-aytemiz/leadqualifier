@@ -3,17 +3,27 @@ import { NextRequest } from 'next/server'
 
 const {
     createClientMock,
-    extractWhatsAppTextMessagesMock,
+    downloadMediaMock,
+    extractWhatsAppInboundMessagesMock,
+    getMediaMetadataMock,
     isValidMetaSignatureMock,
     processInboundAiPipelineMock,
     sendTextMock,
+    storageFromMock,
+    storageGetPublicUrlMock,
+    storageUploadMock,
     whatsAppCtorMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
-    extractWhatsAppTextMessagesMock: vi.fn(),
+    downloadMediaMock: vi.fn(),
+    extractWhatsAppInboundMessagesMock: vi.fn(),
+    getMediaMetadataMock: vi.fn(),
     isValidMetaSignatureMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
     sendTextMock: vi.fn(),
+    storageFromMock: vi.fn(),
+    storageGetPublicUrlMock: vi.fn(),
+    storageUploadMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
 }))
 
@@ -22,7 +32,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 
 vi.mock('@/lib/whatsapp/webhook', () => ({
-    extractWhatsAppTextMessages: extractWhatsAppTextMessagesMock,
+    extractWhatsAppInboundMessages: extractWhatsAppInboundMessagesMock,
     isValidMetaSignature: isValidMetaSignatureMock
 }))
 
@@ -36,6 +46,8 @@ vi.mock('@/lib/whatsapp/client', () => ({
             whatsAppCtorMock(token)
         }
 
+        getMediaMetadata = getMediaMetadataMock
+        downloadMedia = downloadMediaMock
         sendText = sendTextMock
     }
 }))
@@ -59,7 +71,10 @@ function createChannelLookupSupabaseMock(channelData: unknown) {
 
     return {
         supabase: {
-            from: fromMock
+            from: fromMock,
+            storage: {
+                from: storageFromMock
+            }
         },
         fromMock,
         selectMock,
@@ -112,7 +127,10 @@ describe('WhatsApp webhook route', () => {
         })
 
         createClientMock.mockReturnValue(supabase)
-        extractWhatsAppTextMessagesMock.mockReturnValue([event])
+        extractWhatsAppInboundMessagesMock.mockReturnValue([{
+            kind: 'text',
+            ...event
+        }])
         isValidMetaSignatureMock.mockReturnValue(false)
 
         const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
@@ -151,7 +169,10 @@ describe('WhatsApp webhook route', () => {
         })
 
         createClientMock.mockReturnValue(supabase)
-        extractWhatsAppTextMessagesMock.mockReturnValue([event])
+        extractWhatsAppInboundMessagesMock.mockReturnValue([{
+            kind: 'text',
+            ...event
+        }])
         isValidMetaSignatureMock.mockReturnValue(true)
         processInboundAiPipelineMock.mockImplementationOnce(async (input: { sendOutbound: (text: string) => Promise<void> }) => {
             await input.sendOutbound('Bot reply')
@@ -187,5 +208,92 @@ describe('WhatsApp webhook route', () => {
             to: '905551112233',
             text: 'Bot reply'
         })
+    })
+
+    it('stores inbound image media and persists placeholder message without auto-reply when caption is missing', async () => {
+        const event = {
+            kind: 'media' as const,
+            phoneNumberId: 'phone-1',
+            contactPhone: '905551112233',
+            contactName: 'Ayse',
+            messageId: 'wamid-media-1',
+            mediaType: 'image' as const,
+            mediaId: 'media-1',
+            mimeType: 'image/jpeg',
+            sha256: 'sha-1',
+            caption: null,
+            filename: null,
+            timestamp: '1738000001'
+        }
+        const { supabase } = createChannelLookupSupabaseMock({
+            id: 'channel-1',
+            organization_id: 'org-1',
+            config: {
+                phone_number_id: 'phone-1',
+                app_secret: 'app-secret',
+                permanent_access_token: 'token-1'
+            }
+        })
+
+        storageUploadMock.mockResolvedValue({ error: null })
+        storageGetPublicUrlMock.mockReturnValue({
+            data: {
+                publicUrl: 'https://cdn.example.com/whatsapp-media/image-1.jpg'
+            }
+        })
+        storageFromMock.mockReturnValue({
+            upload: storageUploadMock,
+            getPublicUrl: storageGetPublicUrlMock
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractWhatsAppInboundMessagesMock.mockReturnValue([event])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        getMediaMetadataMock.mockResolvedValue({
+            id: 'media-1',
+            url: 'https://graph.example.com/media-1',
+            mime_type: 'image/jpeg',
+            sha256: 'sha-1'
+        })
+        downloadMediaMock.mockResolvedValue({
+            data: new Uint8Array([1, 2, 3]).buffer,
+            contentType: 'image/jpeg'
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [{}] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(getMediaMetadataMock).toHaveBeenCalledWith('media-1')
+        expect(downloadMediaMock).toHaveBeenCalledWith('https://graph.example.com/media-1')
+        expect(storageFromMock).toHaveBeenCalledWith('whatsapp-media')
+        expect(storageUploadMock).toHaveBeenCalledTimes(1)
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                text: '[WhatsApp image]',
+                skipAutomation: true,
+                inboundMessageId: 'wamid-media-1',
+                inboundMessageMetadata: expect.objectContaining({
+                    whatsapp_media_type: 'image',
+                    whatsapp_is_media_placeholder: true,
+                    whatsapp_media: expect.objectContaining({
+                        type: 'image',
+                        media_id: 'media-1',
+                        storage_url: 'https://cdn.example.com/whatsapp-media/image-1.jpg',
+                        download_status: 'stored'
+                    })
+                })
+            })
+        )
+        expect(sendTextMock).not.toHaveBeenCalled()
     })
 })

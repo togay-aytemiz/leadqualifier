@@ -280,17 +280,17 @@
         "billingPackageRenewalUnknown": "Package renewal date is being prepared"
     },
     "inbox": {
-  "title": "Inbox",
-  "queueTabMe": "Me",
-  "queueTabUnassigned": "Unassigned",
-  "queueTabAll": "All",
-  "queueAttentionRequired": "Needs attention",
-  "queueAttentionReasonSkill": "Skill handover",
-  "queueAttentionReasonHotLead": "Hot lead",
-  "queueOperatorsTitle": "Operators",
-  "queueUnassignedSummary": "Unassigned: {count}",
-  "queueNoOperators": "No operators found",
-  "noMessages": "No messages",
+        "title": "Inbox",
+        "queueTabMe": "Me",
+        "queueTabUnassigned": "Unassigned",
+        "queueTabAll": "All",
+        "queueAttentionRequired": "Needs attention",
+        "queueAttentionReasonSkill": "Skill handover",
+        "queueAttentionReasonHotLead": "Hot lead",
+        "queueOperatorsTitle": "Operators",
+        "queueUnassignedSummary": "Unassigned: {count}",
+        "queueNoOperators": "No operators found",
+        "noMessages": "No messages",
         "noMessagesDesc": "New conversations will appear here when you receive messages.",
         "noMessagesYet": "No messages yet",
         "searchPlaceholder": "Search...",
@@ -474,7 +474,16 @@
         "creditUsageLoading": "Calculating...",
         "creditUsageUnavailable": "Unavailable",
         "creditUsageValue": "{credits} credits",
-        "scrollToLatest": "Jump to latest message"
+        "scrollToLatest": "Jump to latest message",
+        "mediaPreview": {
+            "image": "Image received",
+            "document": "Document received",
+            "audio": "Audio received",
+            "video": "Video received",
+            "sticker": "Sticker received",
+            "media": "Media received",
+            "open": "Open file"
+        }
     },
     "simulator": {
         "title": "Simulator",

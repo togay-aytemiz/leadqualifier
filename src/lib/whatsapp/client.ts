@@ -26,6 +26,14 @@ export interface WhatsAppMessageTemplatesResponse {
     data: WhatsAppMessageTemplate[]
 }
 
+export interface WhatsAppMediaMetadata {
+    id: string
+    url: string
+    mime_type?: string
+    sha256?: string
+    file_size?: number
+}
+
 export class WhatsAppClient {
     private accessToken: string
     private graphVersion: string
@@ -132,5 +140,36 @@ export class WhatsAppClient {
         return this.request<WhatsAppPhoneNumberDetails>(`${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating`, {
             method: 'GET'
         })
+    }
+
+    async getMediaMetadata(mediaId: string): Promise<WhatsAppMediaMetadata> {
+        return this.request<WhatsAppMediaMetadata>(`${mediaId}`, {
+            method: 'GET'
+        })
+    }
+
+    async downloadMedia(mediaUrl: string): Promise<{ data: ArrayBuffer; contentType: string | null }> {
+        const response = await fetch(mediaUrl, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${this.accessToken}`
+            }
+        })
+
+        if (!response.ok) {
+            let errorMessage = `WhatsApp media download failed with status ${response.status}`
+            try {
+                const payload = await response.json() as GraphApiErrorResponse
+                errorMessage = payload?.error?.message || errorMessage
+            } catch {
+                // Keep fallback error message when non-JSON body is returned.
+            }
+            throw new Error(errorMessage)
+        }
+
+        return {
+            data: await response.arrayBuffer(),
+            contentType: response.headers.get('content-type')
+        }
     }
 }

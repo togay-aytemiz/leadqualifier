@@ -400,6 +400,31 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(resolveOrganizationUsageEntitlementMock).not.toHaveBeenCalled()
     })
 
+    it('stores inbound message and exits before AI flow when skipAutomation is enabled', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            text: '[WhatsApp image]',
+            skipAutomation: true
+        }))
+
+        expect(inboundInsert.insertMock).toHaveBeenCalledTimes(1)
+        expect(conversationUpdate.updateMock).toHaveBeenCalledTimes(1)
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
+        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+        expect(resolveOrganizationUsageEntitlementMock).not.toHaveBeenCalled()
+    })
+
     it('halts token-consuming flow when billing usage is locked', async () => {
         const sendOutbound = vi.fn()
         const dedupe = createDedupeBuilder(null)
