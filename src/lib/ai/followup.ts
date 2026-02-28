@@ -191,7 +191,7 @@ function messageMentionsField(field: string, message: string) {
             || normalizedMessage.includes(token)
         if (!matched) continue
         tokenHits += 1
-        if (token.length >= 5) hasStrongTokenHit = true
+        if (token.length >= 4) hasStrongTokenHit = true
     }
     if (tokens.length === 1) return tokenHits >= 1
     if (tokenHits >= Math.min(2, tokens.length)) return true
@@ -447,7 +447,7 @@ Answer the user request directly and keep followup_question null unless user exp
         extraGuardLines.push('User explicitly refused sharing details in the latest turn: do not insist and avoid intake-style follow-up question in this turn.')
     }
     if (analysis.noProgressStreak) {
-        extraGuardLines.push('No-progress guard: if the last two customer turns show refusal/uncertainty, do not repeat the same intake ask; prefer concise status + optional next step.')
+        extraGuardLines.push('No-progress guard: if the last two customer turns show refusal/uncertainty, do not insist or repeat the same intake ask; prefer concise status + optional next step.')
     }
     if (analysis.blockedReaskFields.length > 0) {
         extraGuardLines.push('Blocked re-ask fields must not be requested again in this turn.')

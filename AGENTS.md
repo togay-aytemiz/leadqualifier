@@ -53,6 +53,15 @@ This is a **WhatsApp AI Qualy** SaaS for Turkish SMBs. The system:
 
 5. **Build Verification**
    - Run `npm run build` to ensure no regressions or type errors.
+6. **AI Intake Regression Guard (Mandatory for followup/guardrail changes)**
+   - Reproduce the bug first with a failing targeted test before patching.
+   - Run at minimum:
+     - `npm test -- --run src/lib/ai/followup.test.ts`
+     - `npm test -- --run src/lib/ai/response-guards.test.ts`
+   - For blocked re-ask logic, do NOT require full field-label token match only; handle partial-but-strong field cues (e.g. `Öğrenci Yaşı` vs `çocuğunuzun yaşı`) so refusal/no-progress turns cannot trigger repeated pressure questions.
+   - Add/keep regression tests that guarantee:
+     - refusal + no-progress (`paylaşmak istemiyorum` + `bilmiyorum`) blocks re-ask for previously asked intake fields
+     - suppressed turns explicitly avoid insistence phrasing
 
 ---
 

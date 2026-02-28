@@ -910,9 +910,13 @@ type QaLabIntakeFieldCategory =
     | 'callback_time'
     | 'generic'
 
+const COMBINING_MARKS = /[\u0300-\u036f]/g
+
 function normalizeForFieldMatching(value: string) {
     return value
+        .normalize('NFKD')
         .toLowerCase()
+        .replace(COMBINING_MARKS, '')
         .replace(/ı/g, 'i')
         .replace(/ç/g, 'c')
         .replace(/ğ/g, 'g')

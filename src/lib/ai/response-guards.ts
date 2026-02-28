@@ -407,7 +407,14 @@ function stripBlockedFieldReaskQuestions(input: {
             ? 'Anladım. Bu bilgiler olmadan mevcut seçeneklerle devam edebiliriz.'
             : 'Understood. We can continue with the available options without those details.'
     }
-    return filtered.join(' ').replace(/\s+/g, ' ').trim()
+    const merged = filtered.join(' ').replace(/\s+/g, ' ').trim()
+    const weakAcknowledgementOnly = /^(peki|tamam|olur|ok|okay)\.?$/i.test(merged)
+    if (weakAcknowledgementOnly) {
+        return input.responseLanguage === 'tr'
+            ? 'Anladım. Bu bilgiler olmadan mevcut seçeneklerle devam edebiliriz.'
+            : 'Understood. We can continue with the available options without those details.'
+    }
+    return merged
 }
 
 function moveAnswerChunkFirstForDirectQuestion(input: {
