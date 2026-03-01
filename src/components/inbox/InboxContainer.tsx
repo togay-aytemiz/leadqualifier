@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
 import {
     Inbox, ChevronDown,
@@ -11,7 +11,7 @@ import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
-    getMessages,
+    getMessagesPage,
     sendMessage,
     prepareConversationWhatsAppMediaUploads,
     sendConversationWhatsAppMediaBatch,
@@ -44,7 +44,12 @@ import {
 import { resolveSummaryToggle } from '@/components/inbox/summaryPanelState'
 import { shouldShowConversationSkeleton } from '@/components/inbox/conversationSwitchState'
 import { cn } from '@/lib/utils'
-import { DEFAULT_SCROLL_TO_LATEST_THRESHOLD, getDistanceFromBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
+import {
+    DEFAULT_SCROLL_TO_LATEST_THRESHOLD,
+    getDistanceFromBottom,
+    scrollContainerToBottom,
+    shouldShowScrollToLatestButton
+} from '@/components/inbox/scrollToLatest'
 import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
@@ -56,6 +61,11 @@ import { buildMessageDateSeparators } from '@/components/inbox/messageDateSepara
 import { extractSkillTitleFromMetadata, splitBotMessageDisclaimer } from '@/components/inbox/botMessageContent'
 import { extractMediaFromMessageMetadata, resolveMessagePreviewContent } from '@/components/inbox/messageMedia'
 import { buildInboxImageGalleryLookup } from '@/components/inbox/message-image-groups'
+import {
+    prependOlderMessages,
+    resolveRestoredScrollTop,
+    shouldLoadOlderMessages
+} from '@/components/inbox/messagePagination'
 import {
     MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
     MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
@@ -90,6 +100,8 @@ type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 const SUMMARY_PANEL_ID = 'conversation-summary-panel'
 const WHATSAPP_MEDIA_BUCKET = 'whatsapp-media'
+const MESSAGES_PAGE_SIZE = 50
+const MESSAGE_HISTORY_TOP_THRESHOLD = 96
 const WHATSAPP_UPLOAD_ACCEPT = [
     'image/jpeg',
     'image/jpg',
@@ -184,6 +196,9 @@ export function InboxContainer({
     })
     const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
     const [messages, setMessages] = useState<Message[]>([])
+    const [messageOffset, setMessageOffset] = useState(0)
+    const [hasMoreMessageHistory, setHasMoreMessageHistory] = useState(false)
+    const [isLoadingMessageHistory, setIsLoadingMessageHistory] = useState(false)
     const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null)
     const [lead, setLead] = useState<Lead | null>(null)
     const [input, setInput] = useState('')
@@ -229,8 +244,14 @@ export function InboxContainer({
     }
     const supabase = supabaseRef.current
 
-    const messagesEndRef = useRef<HTMLDivElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const composerContainerRef = useRef<HTMLDivElement>(null)
+    const isNearBottomRef = useRef(true)
+    const isLoadingMessageHistoryRef = useRef(false)
+    const pendingPrependScrollRestoreRef = useRef<{
+        previousScrollHeight: number
+        previousScrollTop: number
+    } | null>(null)
     const messagesRef = useRef<Message[]>([])
     const leadRef = useRef<Lead | null>(null)
     const refreshInFlightRef = useRef(false)
@@ -364,6 +385,11 @@ export function InboxContainer({
         setIsTemplatePickerModalOpen(false)
         setComposerErrorMessage(null)
         setPreviewAttachmentId(null)
+        setMessageOffset(0)
+        setHasMoreMessageHistory(false)
+        setIsLoadingMessageHistory(false)
+        isLoadingMessageHistoryRef.current = false
+        pendingPrependScrollRestoreRef.current = null
         clearPendingAttachments()
         if (leadRefreshTimeoutRef.current) {
             clearTimeout(leadRefreshTimeoutRef.current)
@@ -471,9 +497,14 @@ export function InboxContainer({
             while (refreshRequestRef.current) {
                 const nextId = refreshRequestRef.current
                 refreshRequestRef.current = null
-                const msgs = await getMessages(nextId)
+                const pageResult = await getMessagesPage(nextId, 0, MESSAGES_PAGE_SIZE)
                 if (selectedIdRef.current !== nextId) continue
-                setMessages(msgs)
+                pendingPrependScrollRestoreRef.current = null
+                isLoadingMessageHistoryRef.current = false
+                setMessages(pageResult.messages)
+                setMessageOffset(pageResult.fetchedCount)
+                setHasMoreMessageHistory(pageResult.hasMore)
+                setIsLoadingMessageHistory(false)
                 setLoadedConversationId(nextId)
                 setConversations(prev => prev.map(c =>
                     c.id === nextId ? { ...c, unread_count: 0 } : c
@@ -483,10 +514,60 @@ export function InboxContainer({
             }
         } catch (error) {
             console.error('Failed to refresh messages', error)
+            if (selectedIdRef.current === conversationId) {
+                isLoadingMessageHistoryRef.current = false
+                setIsLoadingMessageHistory(false)
+            }
         } finally {
             refreshInFlightRef.current = false
         }
     }, [refreshLead])
+
+    const loadOlderMessages = useCallback(async () => {
+        const conversationId = selectedIdRef.current
+        if (!conversationId || !hasMoreMessageHistory || isLoadingMessageHistoryRef.current) return
+
+        const container = messagesContainerRef.current
+        const restoreSnapshot = container
+            ? {
+                previousScrollHeight: container.scrollHeight,
+                previousScrollTop: container.scrollTop
+            }
+            : null
+
+        isLoadingMessageHistoryRef.current = true
+        setIsLoadingMessageHistory(true)
+
+        try {
+            const pageResult = await getMessagesPage(conversationId, messageOffset, MESSAGES_PAGE_SIZE)
+            if (selectedIdRef.current !== conversationId) return
+
+            if (restoreSnapshot) {
+                pendingPrependScrollRestoreRef.current = restoreSnapshot
+            }
+
+            setMessages((previousMessages) => {
+                const merged = prependOlderMessages({
+                    currentMessages: previousMessages,
+                    olderBatch: pageResult.messages
+                })
+                if (merged.addedCount === 0) {
+                    pendingPrependScrollRestoreRef.current = null
+                }
+                return merged.mergedMessages
+            })
+
+            setMessageOffset((previousOffset) => previousOffset + pageResult.fetchedCount)
+            setHasMoreMessageHistory(pageResult.hasMore)
+        } catch (error) {
+            console.error('Failed to load older messages', error)
+        } finally {
+            if (selectedIdRef.current === conversationId) {
+                setIsLoadingMessageHistory(false)
+            }
+            isLoadingMessageHistoryRef.current = false
+        }
+    }, [hasMoreMessageHistory, messageOffset])
 
     const resolveAssignee = useCallback(async (assigneeId: string | null) => {
         if (!assigneeId) return null
@@ -514,6 +595,20 @@ export function InboxContainer({
 
     useEffect(() => {
         messagesRef.current = messages
+    }, [messages])
+
+    useLayoutEffect(() => {
+        const pendingRestore = pendingPrependScrollRestoreRef.current
+        if (!pendingRestore) return
+        const container = messagesContainerRef.current
+        if (!container) return
+
+        container.scrollTop = resolveRestoredScrollTop({
+            previousScrollHeight: pendingRestore.previousScrollHeight,
+            previousScrollTop: pendingRestore.previousScrollTop,
+            nextScrollHeight: container.scrollHeight
+        })
+        pendingPrependScrollRestoreRef.current = null
     }, [messages])
 
     useEffect(() => {
@@ -558,6 +653,11 @@ export function InboxContainer({
     useEffect(() => {
         if (!selectedId) {
             setMessages([])
+            setMessageOffset(0)
+            setHasMoreMessageHistory(false)
+            setIsLoadingMessageHistory(false)
+            isLoadingMessageHistoryRef.current = false
+            pendingPrependScrollRestoreRef.current = null
             setLoadedConversationId(null)
             setLead(null)
             return
@@ -569,36 +669,60 @@ export function InboxContainer({
     }, [refreshMessages, refreshLead, selectedId])
 
     // Scroll Management
-    const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-        if (!messagesEndRef.current) return
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+        requestAnimationFrame(() => {
+            const container = messagesContainerRef.current
+            if (!container) return
 
-        // Use setTimeout to ensure DOM is fully rendered/layout updated
-        setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' })
-            setTimeout(() => setShowScrollToLatest(false), behavior === 'smooth' ? 250 : 0)
-        }, 100)
-    }
+            scrollContainerToBottom(container, behavior)
+
+            window.setTimeout(() => {
+                const latestContainer = messagesContainerRef.current
+                if (!latestContainer) return
+                scrollContainerToBottom(latestContainer, 'auto')
+                isNearBottomRef.current = true
+                setShowScrollToLatest(false)
+            }, behavior === 'smooth' ? 280 : 0)
+        })
+    }, [])
 
     const syncScrollToLatestVisibility = useCallback(() => {
         const container = messagesContainerRef.current
         if (!container) {
+            isNearBottomRef.current = true
             setShowScrollToLatest(false)
             return
         }
         const distanceFromBottom = getDistanceFromBottom(container)
-        setShowScrollToLatest(
-            shouldShowScrollToLatestButton(distanceFromBottom, DEFAULT_SCROLL_TO_LATEST_THRESHOLD)
-        )
+        const shouldShow = shouldShowScrollToLatestButton(distanceFromBottom, DEFAULT_SCROLL_TO_LATEST_THRESHOLD)
+        isNearBottomRef.current = !shouldShow
+        setShowScrollToLatest(shouldShow)
     }, [])
 
-    const handleMessagesScroll = useCallback(() => {
+    const handleMessagesScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
         syncScrollToLatestVisibility()
-    }, [syncScrollToLatestVisibility])
+        if (shouldLoadOlderMessages({
+            scrollTop: event.currentTarget.scrollTop,
+            hasMore: hasMoreMessageHistory,
+            isLoading: isLoadingMessageHistory,
+            threshold: MESSAGE_HISTORY_TOP_THRESHOLD
+        })) {
+            void loadOlderMessages()
+        }
+    }, [hasMoreMessageHistory, isLoadingMessageHistory, loadOlderMessages, syncScrollToLatestVisibility])
+
+    const handleMessageMediaLoad = useCallback(() => {
+        if (isNearBottomRef.current) {
+            scrollToBottom('auto')
+            return
+        }
+        syncScrollToLatestVisibility()
+    }, [scrollToBottom, syncScrollToLatestVisibility])
 
     // Effect for conversation switch (Instant scroll)
     useEffect(() => {
         scrollToBottom('auto')
-    }, [selectedId])
+    }, [selectedId, scrollToBottom])
 
     // Effect for new messages (Smooth scroll)
     // We strictly track 'messages' length or content change?
@@ -610,7 +734,7 @@ export function InboxContainer({
             scrollToBottom('smooth')
         }
         prevMessagesLength.current = messages.length
-    }, [messages])
+    }, [messages, scrollToBottom])
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -618,6 +742,33 @@ export function InboxContainer({
         }, 120)
         return () => clearTimeout(timer)
     }, [messages, selectedId, syncScrollToLatestVisibility])
+
+    useEffect(() => {
+        const composer = composerContainerRef.current
+        if (!composer || typeof ResizeObserver === 'undefined') return
+
+        let frameId: number | null = null
+        const observer = new ResizeObserver(() => {
+            if (frameId !== null) {
+                cancelAnimationFrame(frameId)
+            }
+            frameId = requestAnimationFrame(() => {
+                if (isNearBottomRef.current) {
+                    scrollToBottom('auto')
+                    return
+                }
+                syncScrollToLatestVisibility()
+            })
+        })
+
+        observer.observe(composer)
+        return () => {
+            if (frameId !== null) {
+                cancelAnimationFrame(frameId)
+            }
+            observer.disconnect()
+        }
+    }, [selectedId, scrollToBottom, syncScrollToLatestVisibility])
 
     // Also force scroll on mount/updates just in case
     // useEffect(() => { scrollToBottom() }, [])
@@ -2213,7 +2364,16 @@ export function InboxContainer({
                                     </div>
                                 </div>
                             ) : (
-                                visibleMessages.map(m => {
+                                <>
+                                    {isLoadingMessageHistory && (
+                                        <div className="flex justify-center">
+                                            <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-xs font-medium text-gray-500">
+                                                <Loader2 size={12} className="animate-spin" />
+                                                {t('loadingOlderMessages')}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {visibleMessages.map(m => {
                                     const galleryGroup = imageGalleryLookup.groupsByStartId.get(m.id)
                                     const isGroupedMessage = imageGalleryLookup.groupedMessageIds.has(m.id)
                                     if (isGroupedMessage && !galleryGroup) {
@@ -2293,6 +2453,7 @@ export function InboxContainer({
                                                                     alt={item.media.caption ?? t('mediaPreview.image')}
                                                                     className="h-full w-full object-cover"
                                                                     loading="lazy"
+                                                                    onLoad={handleMessageMediaLoad}
                                                                 />
                                                                 {shouldShowHiddenCount && (
                                                                     <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-semibold text-white">
@@ -2357,6 +2518,7 @@ export function InboxContainer({
                                                                                 alt={media.caption ?? mediaPreviewLabel ?? t('mediaPreview.media')}
                                                                                 className="max-h-64 w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain"
                                                                                 loading="lazy"
+                                                                                onLoad={handleMessageMediaLoad}
                                                                             />
                                                                         </a>
                                                                     ) : (
@@ -2447,6 +2609,7 @@ export function InboxContainer({
                                                                             alt={media.caption ?? mediaPreviewLabel ?? t('mediaPreview.media')}
                                                                             className="max-h-64 w-auto max-w-full rounded-lg border border-white/20 object-contain"
                                                                             loading="lazy"
+                                                                            onLoad={handleMessageMediaLoad}
                                                                         />
                                                                     </a>
                                                                 ) : (
@@ -2503,12 +2666,15 @@ export function InboxContainer({
                                             </div>
                                         </div>
                                     )
-                                })
+                                })}
+                                </>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
 
-                        <div className="relative border-t border-gray-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:p-6">
+                        <div
+                            ref={composerContainerRef}
+                            className="relative border-t border-gray-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:p-6"
+                        >
                             <div
                                 className="pointer-events-none absolute right-4 top-0 z-20 -translate-y-1/2 lg:right-6"
                                 aria-hidden={!showScrollToLatest}

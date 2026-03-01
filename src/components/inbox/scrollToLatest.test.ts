@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { getDistanceFromBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
+import { getDistanceFromBottom, scrollContainerToBottom, shouldShowScrollToLatestButton } from '@/components/inbox/scrollToLatest'
 
 describe('shouldShowScrollToLatestButton', () => {
     it('returns false when distance is within threshold', () => {
@@ -21,5 +21,32 @@ describe('getDistanceFromBottom', () => {
         } as HTMLElement
 
         expect(getDistanceFromBottom(element)).toBe(50)
+    })
+})
+
+describe('scrollContainerToBottom', () => {
+    it('uses scrollTo for smooth behavior without forcing an immediate jump', () => {
+        const scrollTo = vi.fn()
+        const element = {
+            scrollHeight: 1420,
+            scrollTop: 120,
+            scrollTo
+        } as unknown as HTMLElement
+
+        scrollContainerToBottom(element, 'smooth')
+
+        expect(scrollTo).toHaveBeenCalledWith({ top: 1420, behavior: 'smooth' })
+        expect(element.scrollTop).toBe(120)
+    })
+
+    it('falls back to scrollTop assignment when scrollTo is unavailable', () => {
+        const element = {
+            scrollHeight: 980,
+            scrollTop: 40
+        } as unknown as HTMLElement
+
+        scrollContainerToBottom(element)
+
+        expect(element.scrollTop).toBe(980)
     })
 })

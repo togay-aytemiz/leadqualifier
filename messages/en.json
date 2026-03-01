@@ -500,6 +500,7 @@
         "creditUsageUnavailable": "Unavailable",
         "creditUsageValue": "{credits} credits",
         "scrollToLatest": "Jump to latest message",
+        "loadingOlderMessages": "Loading older messages...",
         "mediaPreview": {
             "image": "Image received",
             "document": "Document received",

@@ -566,6 +566,79 @@ export async function getMessages(conversationId: string) {
     return sortMessagesChronologically((data ?? []) as Message[])
 }
 
+const DEFAULT_MESSAGES_PAGE_SIZE = 50
+const MAX_MESSAGES_PAGE_SIZE = 100
+
+export interface ConversationMessagesPageResult {
+    messages: Message[]
+    hasMore: boolean
+    fetchedCount: number
+}
+
+export async function getMessagesPage(
+    conversationId: string,
+    offset: number = 0,
+    pageSize: number = DEFAULT_MESSAGES_PAGE_SIZE
+): Promise<ConversationMessagesPageResult> {
+    const supabase = await createClient()
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('organization_id')
+        .eq('id', conversationId)
+        .maybeSingle()
+
+    if (!conversation) {
+        return {
+            messages: [],
+            hasMore: false,
+            fetchedCount: 0
+        }
+    }
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        return {
+            messages: [],
+            hasMore: false,
+            fetchedCount: 0
+        }
+    }
+
+    const normalizedOffset = Number.isFinite(offset) ? Math.max(0, Math.trunc(offset)) : 0
+    const normalizedPageSize = Number.isFinite(pageSize)
+        ? Math.min(MAX_MESSAGES_PAGE_SIZE, Math.max(1, Math.trunc(pageSize)))
+        : DEFAULT_MESSAGES_PAGE_SIZE
+    const fetchLimit = normalizedPageSize + 1
+    const rangeFrom = normalizedOffset
+    const rangeTo = normalizedOffset + fetchLimit - 1
+
+    const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .range(rangeFrom, rangeTo)
+
+    if (error) {
+        console.error('Error fetching paginated messages:', error)
+        return {
+            messages: [],
+            hasMore: false,
+            fetchedCount: 0
+        }
+    }
+
+    const fetchedMessages = (data ?? []) as Message[]
+    const hasMore = fetchedMessages.length > normalizedPageSize
+    const pageMessages = hasMore
+        ? fetchedMessages.slice(0, normalizedPageSize)
+        : fetchedMessages
+
+    return {
+        messages: sortMessagesChronologically(pageMessages),
+        hasMore,
+        fetchedCount: pageMessages.length
+    }
+}
+
 export async function getConversationLead(conversationId: string): Promise<Lead | null> {
     const supabase = await createClient()
     const { data: conversation } = await supabase

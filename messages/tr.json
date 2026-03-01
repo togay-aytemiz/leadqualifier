@@ -500,6 +500,7 @@
         "creditUsageUnavailable": "Kullanılamıyor",
         "creditUsageValue": "{credits} kredi",
         "scrollToLatest": "Son mesaja git",
+        "loadingOlderMessages": "Eski mesajlar yükleniyor...",
         "mediaPreview": {
             "image": "Görsel alındı",
             "document": "Belge alındı",
