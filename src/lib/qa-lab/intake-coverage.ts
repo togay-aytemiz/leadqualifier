@@ -631,7 +631,13 @@ function hasLikelyInformativeSemanticReply(text: string) {
 }
 
 function canUseBroadSemanticFallbackForMatcher(matcher: QaLabFieldMatcher) {
-    if (matcher.categories.size > 0) return false
+    const normalizedField = normalizeText(matcher.field)
+    const isServiceContextStyleField = (
+        matcher.categories.size === 1
+        && matcher.categories.has('service')
+        && /\b(talep|baglam|bağlam|ihtiyac|ihtiyaç|amac|amaç|context|need|goal)\b/i.test(normalizedField)
+    )
+    if (matcher.categories.size > 0 && !isServiceContextStyleField) return false
     if (hasTypeLikeFieldSignal(matcher.field)) return false
     return true
 }
