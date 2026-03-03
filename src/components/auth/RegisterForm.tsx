@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { useActionState, useEffect, useState } from 'react'
-import { register } from '@/lib/auth/actions'
+import { register, type RegisterActionState } from '@/lib/auth/actions'
 import { Link, useRouter } from '@/i18n/navigation'
 import { Button } from '@/design'
 import {
@@ -13,19 +13,41 @@ import {
 import { getRegisterConsentLinks } from '@/components/auth/registerConsentLinks'
 import { Eye, EyeOff } from 'lucide-react'
 import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import Script from 'next/script'
 
-export function RegisterForm() {
+type TranslateFn = (key: string, values?: Record<string, string | number>) => string
+
+function resolveRegisterErrorMessage(state: RegisterActionState | null, t: TranslateFn) {
+    if (!state) return null
+
+    if (state.errorCode === 'signup_rate_limited') {
+        return t('signupRateLimited', { seconds: Math.max(1, state.cooldownSeconds ?? 0) })
+    }
+
+    if (state.errorCode === 'captcha_required') {
+        return t('captchaRequired')
+    }
+
+    if (state.errorCode === 'captcha_failed') {
+        return t('captchaVerificationFailed')
+    }
+
+    return state.error ?? null
+}
+
+export function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
     const router = useRouter()
     const [showPassword, setShowPassword] = useState(false)
     const consentLinks = getRegisterConsentLinks()
     const [state, formAction, pending] = useActionState(
-        async (_prevState: { error?: string } | null, formData: FormData) => {
+        async (_prevState: RegisterActionState | null, formData: FormData) => {
             return await register(formData)
         },
         null
     )
+    const errorMessage = resolveRegisterErrorMessage(state, t)
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch()) return
@@ -51,9 +73,9 @@ export function RegisterForm() {
             </div>
 
             <form action={formAction} className="space-y-5">
-                {state?.error && (
+                {errorMessage && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        {state.error}
+                        {errorMessage}
                     </div>
                 )}
 
@@ -115,6 +137,17 @@ export function RegisterForm() {
                 </div>
 
                 <input type="hidden" name="companyName" value="" />
+
+                {turnstileSiteKey.length > 0 && (
+                    <div className="space-y-2">
+                        <Script
+                            src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+                            strategy="afterInteractive"
+                        />
+                        <div className="cf-turnstile" data-sitekey={turnstileSiteKey} data-theme="light" />
+                        <p className="text-xs text-gray-500">{t('captchaHelp')}</p>
+                    </div>
+                )}
 
                 <p className={`${getRegisterConsentLabelClasses()} ${getRegisterConsentTextClasses()}`}>
                     {t.rich('consentNotice', {

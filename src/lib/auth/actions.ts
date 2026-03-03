@@ -3,9 +3,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
+import {
+    checkSignupVelocityGuard,
+    isTurnstileCaptchaEnabled,
+    recordSignupVelocityAttempt,
+    resolveSignupRequestMetadata,
+    verifyTurnstileCaptcha,
+} from '@/lib/auth/signup-guard'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
+
+export type RegisterActionState = {
+    error?: string
+    errorCode?: 'signup_rate_limited' | 'captcha_required' | 'captcha_failed'
+    cooldownSeconds?: number
+}
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -29,7 +42,44 @@ export async function register(formData: FormData) {
     const requestHeaders = await headers()
 
     const { email, password, fullName, companyName } = normalizeRegisterFormData(formData)
+    const signupRequestMetadata = resolveSignupRequestMetadata(requestHeaders)
     const billingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
+    const turnstileEnabled = isTurnstileCaptchaEnabled()
+
+    if (turnstileEnabled) {
+        const captchaToken = String(formData.get('cf-turnstile-response') ?? '').trim()
+
+        if (!captchaToken) {
+            return {
+                errorCode: 'captcha_required',
+            } satisfies RegisterActionState
+        }
+
+        const captchaResult = await verifyTurnstileCaptcha({
+            token: captchaToken,
+            secretKey: process.env.TURNSTILE_SECRET_KEY ?? '',
+            ipAddress: signupRequestMetadata.ipAddress,
+        })
+
+        if (!captchaResult.success) {
+            return {
+                errorCode: 'captcha_failed',
+            } satisfies RegisterActionState
+        }
+    }
+
+    const signupVelocityGuard = await checkSignupVelocityGuard({
+        supabase,
+        email,
+        metadata: signupRequestMetadata,
+    })
+
+    if (!signupVelocityGuard.allowed) {
+        return {
+            errorCode: 'signup_rate_limited',
+            cooldownSeconds: signupVelocityGuard.cooldownSeconds,
+        } satisfies RegisterActionState
+    }
 
     const { error } = await supabase.auth.signUp({
         email,
@@ -44,8 +94,22 @@ export async function register(formData: FormData) {
     })
 
     if (error) {
+        await recordSignupVelocityAttempt({
+            supabase,
+            email,
+            metadata: signupRequestMetadata,
+            succeeded: false,
+        })
+
         return { error: error.message }
     }
+
+    await recordSignupVelocityAttempt({
+        supabase,
+        email,
+        metadata: signupRequestMetadata,
+        succeeded: true,
+    })
 
     redirect('/')
 }
