@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+    checkTrialBusinessIdentity,
     checkSignupVelocityGuard,
     recordSignupVelocityAttempt,
     resolveSignupRequestMetadata,
@@ -109,6 +110,35 @@ describe('signup velocity guard', () => {
             input_ip: '203.0.113.99',
             input_user_agent: 'UA',
             input_succeeded: false,
+        })
+    })
+
+    it('returns ineligible when trial business identity signals already exist', async () => {
+        const rpcMock = vi.fn(async () => ({
+            data: {
+                eligible: false,
+                conflict_signal_type: 'company_name',
+            },
+            error: null,
+        }))
+
+        const result = await checkTrialBusinessIdentity({
+            supabase: {
+                rpc: rpcMock,
+            },
+            email: 'owner@acme.com',
+            companyName: 'Acme',
+        })
+
+        expect(result).toEqual({
+            eligible: false,
+            conflictSignalType: 'company_name',
+        })
+        expect(rpcMock).toHaveBeenCalledWith('check_trial_business_identity', {
+            input_company_name: 'Acme',
+            input_email: 'owner@acme.com',
+            input_whatsapp_business_account_id: null,
+            input_phone: null,
         })
     })
 })

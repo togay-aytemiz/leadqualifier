@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
 import {
+    checkTrialBusinessIdentity,
     checkSignupVelocityGuard,
     isTurnstileCaptchaEnabled,
     recordSignupVelocityAttempt,
@@ -16,7 +17,7 @@ import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-re
 
 export type RegisterActionState = {
     error?: string
-    errorCode?: 'signup_rate_limited' | 'captcha_required' | 'captcha_failed'
+    errorCode?: 'signup_rate_limited' | 'captcha_required' | 'captcha_failed' | 'trial_already_used_business'
     cooldownSeconds?: number
 }
 
@@ -78,6 +79,18 @@ export async function register(formData: FormData) {
         return {
             errorCode: 'signup_rate_limited',
             cooldownSeconds: signupVelocityGuard.cooldownSeconds,
+        } satisfies RegisterActionState
+    }
+
+    const trialBusinessIdentity = await checkTrialBusinessIdentity({
+        supabase,
+        email,
+        companyName,
+    })
+
+    if (!trialBusinessIdentity.eligible) {
+        return {
+            errorCode: 'trial_already_used_business',
         } satisfies RegisterActionState
     }
 

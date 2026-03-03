@@ -136,7 +136,8 @@
             "weakPassword": "Password must be at least 6 characters",
             "emailInUse": "Email is already in use",
             "generic": "Something went wrong. Please try again."
-        }
+        },
+        "trialAlreadyUsedBusiness": "This business has already used its free trial. Please sign in or contact support."
     },
     "dashboard": {
         "title": "Dashboard",

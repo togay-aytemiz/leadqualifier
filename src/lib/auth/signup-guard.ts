@@ -18,6 +18,11 @@ export interface SignupVelocityGuardResult {
     reason: string | null
 }
 
+export interface TrialBusinessIdentityResult {
+    eligible: boolean
+    conflictSignalType: string | null
+}
+
 interface TurnstileVerificationResult {
     success: boolean
     reason: string | null
@@ -151,6 +156,53 @@ export async function recordSignupVelocityAttempt(options: {
     }
 
     return true
+}
+
+export async function checkTrialBusinessIdentity(options: {
+    supabase: SignupGuardSupabaseClient
+    email: string
+    companyName: string
+}): Promise<TrialBusinessIdentityResult> {
+    const normalizedEmail = normalizeEmail(options.email)
+    const normalizedCompanyName = options.companyName.trim()
+
+    if (!normalizedEmail && !normalizedCompanyName) {
+        return {
+            eligible: true,
+            conflictSignalType: null,
+        }
+    }
+
+    const { data, error } = await options.supabase.rpc('check_trial_business_identity', {
+        input_company_name: normalizedCompanyName,
+        input_email: normalizedEmail,
+        input_whatsapp_business_account_id: null,
+        input_phone: null,
+    })
+
+    if (error) {
+        console.error('Trial business identity check failed:', error)
+        return {
+            eligible: true,
+            conflictSignalType: null,
+        }
+    }
+
+    if (!data || typeof data !== 'object') {
+        return {
+            eligible: true,
+            conflictSignalType: null,
+        }
+    }
+
+    const payload = data as Record<string, unknown>
+
+    return {
+        eligible: payload.eligible !== false,
+        conflictSignalType: typeof payload.conflict_signal_type === 'string'
+            ? payload.conflict_signal_type
+            : null,
+    }
 }
 
 export function isTurnstileCaptchaEnabled(): boolean {

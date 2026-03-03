@@ -32,6 +32,10 @@ function resolveRegisterErrorMessage(state: RegisterActionState | null, t: Trans
         return t('captchaVerificationFailed')
     }
 
+    if (state.errorCode === 'trial_already_used_business') {
+        return t('trialAlreadyUsedBusiness')
+    }
+
     return state.error ?? null
 }
 

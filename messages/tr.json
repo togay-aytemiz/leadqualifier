@@ -136,7 +136,8 @@
             "weakPassword": "Şifre en az 6 karakter olmalıdır",
             "emailInUse": "E-posta zaten kullanımda",
             "generic": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
-        }
+        },
+        "trialAlreadyUsedBusiness": "Bu işletme ücretsiz deneme hakkını daha önce kullandı. Lütfen giriş yapın veya destek ile iletişime geçin."
     },
     "dashboard": {
         "title": "Panel",

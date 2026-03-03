@@ -215,6 +215,23 @@ export async function connectWhatsAppChannel(organizationId: string, input: Conn
 
         if (error) throw error
 
+        const rpcMethod = (supabase as unknown as {
+            rpc?: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+        }).rpc
+
+        if (typeof rpcMethod === 'function') {
+            const { error: policyError } = await rpcMethod('enforce_org_trial_business_policy', {
+                target_organization_id: organizationId,
+                input_whatsapp_business_account_id: businessAccountId,
+                input_phone: displayPhoneNumber || null,
+                input_source: 'whatsapp_connect'
+            })
+
+            if (policyError) {
+                console.error('Failed to enforce trial business policy on WhatsApp connect:', policyError)
+            }
+        }
+
         revalidatePath('/settings/channels')
         return { success: true }
     } catch (error: unknown) {

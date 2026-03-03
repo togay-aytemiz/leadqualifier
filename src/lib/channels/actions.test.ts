@@ -51,6 +51,7 @@ import {
 
 function createUpsertSupabaseMock(upsertResult: { error: unknown } = { error: null }) {
     const upsertMock = vi.fn(async () => upsertResult)
+    const rpcMock = vi.fn(async () => ({ data: { eligible: true }, error: null }))
     const fromMock = vi.fn((table: string) => {
         if (table !== 'channels') {
             throw new Error(`Unexpected table ${table}`)
@@ -63,10 +64,12 @@ function createUpsertSupabaseMock(upsertResult: { error: unknown } = { error: nu
 
     return {
         supabase: {
-            from: fromMock
+            from: fromMock,
+            rpc: rpcMock
         },
         upsertMock,
-        fromMock
+        fromMock,
+        rpcMock
     }
 }
 
@@ -139,7 +142,7 @@ describe('channels actions: WhatsApp core flows', () => {
     })
 
     it('upserts WhatsApp channel and revalidates channels settings on success', async () => {
-        const { supabase, upsertMock } = createUpsertSupabaseMock()
+        const { supabase, upsertMock, rpcMock } = createUpsertSupabaseMock()
         createClientMock.mockResolvedValueOnce(supabase)
 
         const result = await connectWhatsAppChannel('org-1', {
@@ -171,6 +174,12 @@ describe('channels actions: WhatsApp core flows', () => {
             }),
             { onConflict: 'organization_id,type' }
         )
+        expect(rpcMock).toHaveBeenCalledWith('enforce_org_trial_business_policy', {
+            target_organization_id: 'org-1',
+            input_whatsapp_business_account_id: 'biz-1',
+            input_phone: '+90 555 111 22 33',
+            input_source: 'whatsapp_connect'
+        })
         expect(revalidatePathMock).toHaveBeenCalledWith('/settings/channels')
     })
 

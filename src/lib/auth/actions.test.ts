@@ -133,6 +133,16 @@ describe('auth register action', () => {
                 }
             }
 
+            if (fn === 'check_trial_business_identity') {
+                return {
+                    data: {
+                        eligible: true,
+                        conflict_signal_type: null,
+                    },
+                    error: null,
+                }
+            }
+
             if (fn === 'record_signup_trial_attempt') {
                 return {
                     data: {
@@ -166,5 +176,52 @@ describe('auth register action', () => {
         expect(rpcMock).toHaveBeenCalledWith('record_signup_trial_attempt', expect.objectContaining({
             input_succeeded: false,
         }))
+    })
+
+    it('blocks signup when business fingerprint already used trial', async () => {
+        const rpcMock = vi.fn(async (fn: string) => {
+            if (fn === 'check_signup_trial_rate_limit') {
+                return {
+                    data: {
+                        allowed: true,
+                        cooldown_seconds: 0,
+                        reason: null,
+                    },
+                    error: null,
+                }
+            }
+
+            if (fn === 'check_trial_business_identity') {
+                return {
+                    data: {
+                        eligible: false,
+                        conflict_signal_type: 'company_name',
+                    },
+                    error: null,
+                }
+            }
+
+            throw new Error(`Unexpected rpc ${fn}`)
+        })
+
+        const signUpMock = vi.fn(async () => ({
+            error: null,
+        }))
+
+        createClientMock.mockResolvedValue({
+            rpc: rpcMock,
+            auth: {
+                signUp: signUpMock,
+            },
+        })
+
+        const result = await register(createRegisterFormData({
+            companyName: 'ACME Studio',
+        }))
+
+        expect(result).toEqual({
+            errorCode: 'trial_already_used_business',
+        })
+        expect(signUpMock).not.toHaveBeenCalled()
     })
 })
