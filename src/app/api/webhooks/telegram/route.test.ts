@@ -217,6 +217,21 @@ function createSkillDetailsBuilder() {
     }
 }
 
+function createLeadScoreBuilder(totalScore: number | null = null) {
+    const maybeSingleMock = vi.fn(async () => ({
+        data: totalScore === null ? null : { total_score: totalScore },
+        error: null
+    }))
+    const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+    const selectMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            select: selectMock
+        }
+    }
+}
+
 describe('Telegram webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -286,6 +301,75 @@ describe('Telegram webhook route', () => {
         expect(isOperatorActiveMock).not.toHaveBeenCalled()
         expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
         expect(telegramCtorMock).not.toHaveBeenCalled()
+    })
+
+    it('runs lead extraction but does not auto-reply in shadow mode', async () => {
+        const channelLookup = createChannelLookupBuilder()
+        const conversationLookup = createConversationLookupBuilder({
+            ai_processing_paused: false
+        })
+        const dedupeLookup = createInboundDedupeBuilder()
+        const inboundInsert = createInsertMessageBuilder()
+        const conversationUpdate = createConversationUpdateBuilder()
+        const leadScore = createLeadScoreBuilder(5)
+
+        const supabase = createSupabaseMock({
+            channels: [channelLookup.builder],
+            conversations: [conversationLookup.builder, conversationUpdate.builder],
+            messages: [dedupeLookup.builder, inboundInsert.builder],
+            leads: [leadScore.builder]
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        getOrgAiSettingsMock.mockResolvedValueOnce({
+            match_threshold: 0.7,
+            bot_mode: 'shadow',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 8,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: 'Talebin destek ekibine iletildi.',
+            hot_lead_handover_message_en: 'Your request was forwarded to support.',
+            prompt: null,
+            bot_name: null
+        })
+        resolveBotModeActionMock.mockReturnValueOnce({ allowReplies: false })
+        resolveLeadExtractionAllowanceMock.mockReturnValueOnce(true)
+        isOperatorActiveMock.mockReturnValueOnce(false)
+
+        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                update_id: 1011,
+                message: {
+                    message_id: 22,
+                    text: 'Merhaba',
+                    chat: { id: 123 },
+                    from: { id: 456, first_name: 'Ayse' }
+                }
+            })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(resolveLeadExtractionAllowanceMock).toHaveBeenCalledWith({
+            botMode: 'shadow',
+            operatorActive: false,
+            allowDuringOperator: false
+        })
+        expect(runLeadExtractionMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            conversationId: 'conv-1',
+            latestMessage: 'Merhaba',
+            source: 'telegram'
+        }))
+        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+        expect(telegramCtorMock).not.toHaveBeenCalled()
+        expect(telegramSendMessageMock).not.toHaveBeenCalled()
     })
 
     it('writes human attention flags when escalation is required', async () => {

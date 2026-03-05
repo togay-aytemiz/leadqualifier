@@ -13,6 +13,49 @@ export function parseSuggestionPayload(raw: string) {
     }
 }
 
+const MIN_OFFERING_PROFILE_SUGGESTION_CHARS = 180
+const MIN_OFFERING_PROFILE_BULLET_WORDS = 5
+const MIN_OFFERING_PROFILE_DETAIL_BULLETS = 3
+
+function normalizeSuggestionLine(value: string) {
+    return value.trim().replace(/\s+/g, ' ')
+}
+
+function stripBulletPrefix(value: string) {
+    const withoutMarker = value.replace(/^-+\s*/, '').trim()
+    const colonIndex = withoutMarker.indexOf(':')
+    if (colonIndex < 0) return withoutMarker
+    return withoutMarker.slice(colonIndex + 1).trim()
+}
+
+function countWords(value: string) {
+    return value
+        .split(/\s+/)
+        .map((word) => word.trim())
+        .filter(Boolean)
+        .length
+}
+
+export function hasSufficientOfferingProfileDetail(text: string) {
+    const normalized = text.trim().replace(/\s+/g, ' ')
+    if (normalized.length < MIN_OFFERING_PROFILE_SUGGESTION_CHARS) return false
+
+    const lines = text
+        .split('\n')
+        .map(normalizeSuggestionLine)
+        .filter(Boolean)
+
+    const bulletLines = lines.filter((line) => line.startsWith('- '))
+    if (bulletLines.length < MIN_OFFERING_PROFILE_DETAIL_BULLETS) return false
+
+    const detailedBullets = bulletLines.filter((line) => {
+        const content = stripBulletPrefix(line)
+        return countWords(content) >= MIN_OFFERING_PROFILE_BULLET_WORDS
+    })
+
+    return detailedBullets.length >= MIN_OFFERING_PROFILE_DETAIL_BULLETS
+}
+
 const COMBINING_MARKS = /[\u0300-\u036f]/g
 
 function normalizeIntakeFieldLabel(value: string) {

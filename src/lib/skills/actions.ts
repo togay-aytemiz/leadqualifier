@@ -6,6 +6,7 @@ import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/databa
 import { buildDefaultSystemSkills } from '@/lib/skills/default-system-skills'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 import { shouldRunSkillsMaintenanceForOrganization } from '@/lib/skills/maintenance-cache'
+import { sanitizeSkillActions } from '@/lib/skills/skill-actions'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import {
     appendServiceCatalogCandidates,
@@ -72,9 +73,17 @@ export async function getSkill(skillId: string): Promise<Skill | null> {
 export async function createSkill(skill: SkillInsert): Promise<Skill> {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
+    const sanitizedSkillActions = sanitizeSkillActions(skill.skill_actions ?? [])
 
     // Create the skill
-    const { data, error } = await supabase.from('skills').insert(skill).select().single()
+    const { data, error } = await supabase
+        .from('skills')
+        .insert({
+            ...skill,
+            skill_actions: sanitizedSkillActions
+        })
+        .select()
+        .single()
 
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Failed to create skill')
@@ -137,8 +146,19 @@ export async function updateSkill(
 ): Promise<Skill> {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
+    const updatesWithSanitizedSkillActions = updates.skill_actions
+        ? {
+            ...updates,
+            skill_actions: sanitizeSkillActions(updates.skill_actions)
+        }
+        : updates
 
-    const { data, error } = await supabase.from('skills').update(updates).eq('id', skillId).select().single()
+    const { data, error } = await supabase
+        .from('skills')
+        .update(updatesWithSanitizedSkillActions)
+        .eq('id', skillId)
+        .select()
+        .single()
 
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Failed to update skill')

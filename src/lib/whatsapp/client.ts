@@ -1,5 +1,7 @@
 const WHATSAPP_GRAPH_API_BASE = 'https://graph.facebook.com'
 const DEFAULT_GRAPH_API_VERSION = 'v21.0'
+const WHATSAPP_REPLY_BUTTON_LIMIT = 3
+const WHATSAPP_REPLY_BUTTON_TITLE_MAX = 20
 
 type GraphApiErrorResponse = {
     error?: {
@@ -32,6 +34,37 @@ export interface WhatsAppMediaMetadata {
     mime_type?: string
     sha256?: string
     file_size?: number
+}
+
+export interface WhatsAppReplyButton {
+    id: string
+    title: string
+}
+
+function truncateReplyButtonTitle(value: string) {
+    return Array.from(value).slice(0, WHATSAPP_REPLY_BUTTON_TITLE_MAX).join('')
+}
+
+function normalizeReplyButtons(buttons: WhatsAppReplyButton[]) {
+    return buttons
+        .map((button) => {
+            const id = button.id.trim()
+            const title = truncateReplyButtonTitle(button.title.trim())
+            if (!id || !title) return null
+
+            return {
+                type: 'reply' as const,
+                reply: {
+                    id,
+                    title
+                }
+            }
+        })
+        .filter((button): button is {
+            type: 'reply'
+            reply: { id: string; title: string }
+        } => button !== null)
+        .slice(0, WHATSAPP_REPLY_BUTTON_LIMIT)
 }
 
 export class WhatsAppClient {
@@ -193,6 +226,37 @@ export class WhatsAppClient {
                 to: params.to,
                 type: 'template',
                 template: templatePayload
+            })
+        })
+    }
+
+    async sendReplyButtons(params: {
+        phoneNumberId: string
+        to: string
+        text: string
+        buttons: WhatsAppReplyButton[]
+    }) {
+        const buttons = normalizeReplyButtons(params.buttons)
+        if (buttons.length === 0) {
+            throw new Error('At least one valid reply button is required')
+        }
+
+        return this.request<{ messages?: Array<{ id?: string }> }>(`${params.phoneNumberId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: params.to,
+                type: 'interactive',
+                interactive: {
+                    type: 'button',
+                    body: {
+                        text: params.text
+                    },
+                    action: {
+                        buttons
+                    }
+                }
             })
         })
     }

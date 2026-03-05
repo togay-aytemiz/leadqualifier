@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
 import {
     HiMiniChatBubbleBottomCenterText,
@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { OrganizationBillingAccount } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 import { buildBillingRefreshSignal } from '@/lib/billing/refresh-signal'
+import { BILLING_UPDATED_EVENT } from '@/lib/billing/events'
 import {
     calculateSidebarBillingProgressSegments,
     isLowCreditWarningVisible
@@ -64,8 +65,8 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const activeItem = resolveMobileNavActiveItem(pathname)
     const supabase = useMemo(() => createClient(), [])
     const billingRefreshSignal = useMemo(
-        () => buildBillingRefreshSignal(searchParams),
-        [searchParams]
+        () => buildBillingRefreshSignal(searchParams, pathname),
+        [pathname, searchParams]
     )
 
     const workspaceAccess = useMemo(
@@ -158,40 +159,41 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         return () => clearTimeout(timeoutId)
     }, [router])
 
+    const refreshBillingSnapshot = useCallback(async () => {
+        if (!activeOrganizationId) {
+            setBillingSnapshot(null)
+            return
+        }
+
+        const { data, error } = await supabase
+            .from('organization_billing_accounts')
+            .select('*')
+            .eq('organization_id', activeOrganizationId)
+            .maybeSingle()
+
+        if (error || !data) {
+            if (error) {
+                console.error('Failed to load mobile billing status', error)
+            }
+            setBillingSnapshot(null)
+            return
+        }
+
+        setBillingSnapshot(buildOrganizationBillingSnapshot(data as OrganizationBillingAccount))
+    }, [activeOrganizationId, supabase])
+
     useEffect(() => {
-        let isActive = true
+        void refreshBillingSnapshot()
+    }, [billingRefreshSignal, refreshBillingSnapshot])
 
-        const loadBillingSnapshot = async () => {
-            if (!activeOrganizationId) {
-                if (isActive) setBillingSnapshot(null)
-                return
-            }
-
-            const { data, error } = await supabase
-                .from('organization_billing_accounts')
-                .select('*')
-                .eq('organization_id', activeOrganizationId)
-                .maybeSingle()
-
-            if (!isActive) return
-
-            if (error || !data) {
-                if (error) {
-                    console.error('Failed to load mobile billing status', error)
-                }
-                setBillingSnapshot(null)
-                return
-            }
-
-            setBillingSnapshot(buildOrganizationBillingSnapshot(data as OrganizationBillingAccount))
+    useEffect(() => {
+        if (!activeOrganizationId) return
+        const handler = () => {
+            void refreshBillingSnapshot()
         }
-
-        loadBillingSnapshot()
-
-        return () => {
-            isActive = false
-        }
-    }, [activeOrganizationId, billingRefreshSignal, supabase])
+        window.addEventListener(BILLING_UPDATED_EVENT, handler)
+        return () => window.removeEventListener(BILLING_UPDATED_EVENT, handler)
+    }, [activeOrganizationId, refreshBillingSnapshot])
 
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')

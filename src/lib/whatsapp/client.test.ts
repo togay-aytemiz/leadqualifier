@@ -187,6 +187,129 @@ describe('WhatsAppClient', () => {
         })
     })
 
+    it('sends interactive reply-button messages', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ messages: [{ id: 'wamid.interactive.1' }] })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        await client.sendReplyButtons({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            text: 'Nasıl yardımcı olabilirim?',
+            buttons: [
+                { id: 'skill_action:skill-1:action-1', title: 'Randevu Al' },
+                { id: 'skill_action:skill-1:action-2', title: 'Instagram' }
+            ]
+        })
+
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        const [, callInit] = fetchMock.mock.calls[0] ?? []
+        const body = JSON.parse(String((callInit as RequestInit)?.body))
+
+        expect(body).toEqual({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: '905551112233',
+            type: 'interactive',
+            interactive: {
+                type: 'button',
+                body: {
+                    text: 'Nasıl yardımcı olabilirim?'
+                },
+                action: {
+                    buttons: [
+                        {
+                            type: 'reply',
+                            reply: {
+                                id: 'skill_action:skill-1:action-1',
+                                title: 'Randevu Al'
+                            }
+                        },
+                        {
+                            type: 'reply',
+                            reply: {
+                                id: 'skill_action:skill-1:action-2',
+                                title: 'Instagram'
+                            }
+                        }
+                    ]
+                }
+            }
+        })
+    })
+
+    it('sanitizes interactive reply buttons before sending', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ messages: [{ id: 'wamid.interactive.2' }] })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        await client.sendReplyButtons({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            text: 'Seçim yapın',
+            buttons: [
+                { id: '  action-1  ', title: '  Uzun Buton Başlığı 1234567890  ' },
+                { id: 'action-2', title: 'Instagram' },
+                { id: 'action-3', title: 'Web' },
+                { id: 'action-4', title: 'Dışarıda Kalmalı' },
+                { id: '   ', title: 'Geçersiz' }
+            ]
+        })
+
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        const [, callInit] = fetchMock.mock.calls[0] ?? []
+        const body = JSON.parse(String((callInit as RequestInit)?.body))
+        expect(body.interactive.action.buttons).toEqual([
+            {
+                type: 'reply',
+                reply: {
+                    id: 'action-1',
+                    title: 'Uzun Buton Başlığı 1'
+                }
+            },
+            {
+                type: 'reply',
+                reply: {
+                    id: 'action-2',
+                    title: 'Instagram'
+                }
+            },
+            {
+                type: 'reply',
+                reply: {
+                    id: 'action-3',
+                    title: 'Web'
+                }
+            }
+        ])
+    })
+
+    it('throws when no valid interactive reply buttons are provided', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ messages: [{ id: 'wamid.interactive.3' }] })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        await expect(client.sendReplyButtons({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            text: 'Seçim yapın',
+            buttons: [
+                { id: '   ', title: ' ' }
+            ]
+        })).rejects.toThrow('At least one valid reply button is required')
+
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
+
     it('fetches media metadata by media id', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

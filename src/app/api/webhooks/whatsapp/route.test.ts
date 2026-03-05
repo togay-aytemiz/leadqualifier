@@ -8,6 +8,7 @@ const {
     getMediaMetadataMock,
     isValidMetaSignatureMock,
     processInboundAiPipelineMock,
+    sendReplyButtonsMock,
     sendTextMock,
     storageFromMock,
     storageGetPublicUrlMock,
@@ -20,6 +21,7 @@ const {
     getMediaMetadataMock: vi.fn(),
     isValidMetaSignatureMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
+    sendReplyButtonsMock: vi.fn(),
     sendTextMock: vi.fn(),
     storageFromMock: vi.fn(),
     storageGetPublicUrlMock: vi.fn(),
@@ -48,6 +50,7 @@ vi.mock('@/lib/whatsapp/client', () => ({
 
         getMediaMetadata = getMediaMetadataMock
         downloadMedia = downloadMediaMock
+        sendReplyButtons = sendReplyButtonsMock
         sendText = sendTextMock
     }
 }))
@@ -203,6 +206,186 @@ describe('WhatsApp webhook route', () => {
                 inboundMessageId: 'wamid-1'
             })
         )
+        expect(sendTextMock).toHaveBeenCalledWith({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            text: 'Bot reply'
+        })
+    })
+
+    it('forwards interactive button-reply event with parsed skill action selection', async () => {
+        const event = {
+            kind: 'interactive' as const,
+            phoneNumberId: 'phone-1',
+            contactPhone: '905551112233',
+            contactName: 'Ayse',
+            messageId: 'wamid-interactive-1',
+            buttonReplyId: 'skill_action:skill-source-1:action-1',
+            buttonReplyTitle: 'Randevu Al',
+            timestamp: '1738000002'
+        }
+        const { supabase } = createChannelLookupSupabaseMock({
+            id: 'channel-1',
+            organization_id: 'org-1',
+            config: {
+                phone_number_id: 'phone-1',
+                app_secret: 'app-secret',
+                permanent_access_token: 'token-1'
+            }
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractWhatsAppInboundMessagesMock.mockReturnValue([event])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        processInboundAiPipelineMock.mockResolvedValueOnce(undefined)
+
+        const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [{}] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organizationId: 'org-1',
+                platform: 'whatsapp',
+                source: 'whatsapp',
+                contactId: '905551112233',
+                text: 'Randevu Al',
+                inboundMessageId: 'wamid-interactive-1',
+                inboundActionSelection: {
+                    kind: 'skill_action',
+                    sourceSkillId: 'skill-source-1',
+                    actionId: 'action-1',
+                    buttonTitle: 'Randevu Al'
+                },
+                inboundMessageMetadata: expect.objectContaining({
+                    whatsapp_message_type: 'interactive',
+                    whatsapp_interactive_type: 'button_reply',
+                    whatsapp_button_reply_id: 'skill_action:skill-source-1:action-1',
+                    whatsapp_button_reply_title: 'Randevu Al'
+                }),
+                sendOutbound: expect.any(Function)
+            })
+        )
+    })
+
+    it('uses interactive reply-button send when pipeline emits reply buttons', async () => {
+        const event = {
+            phoneNumberId: 'phone-1',
+            contactPhone: '905551112233',
+            contactName: 'Ayse',
+            messageId: 'wamid-1',
+            text: 'Merhaba',
+            timestamp: '1738000000'
+        }
+        const { supabase } = createChannelLookupSupabaseMock({
+            id: 'channel-1',
+            organization_id: 'org-1',
+            config: {
+                phone_number_id: 'phone-1',
+                app_secret: 'app-secret',
+                permanent_access_token: 'token-1'
+            }
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractWhatsAppInboundMessagesMock.mockReturnValue([{
+            kind: 'text',
+            ...event
+        }])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        processInboundAiPipelineMock.mockImplementationOnce(async (input: { sendOutbound: (payload: { content: string; replyButtons?: Array<{ id: string; title: string }> }) => Promise<void> }) => {
+            await input.sendOutbound({
+                content: 'Bot reply',
+                replyButtons: [
+                    { id: 'skill_action:skill-1:action-1', title: 'Randevu Al' },
+                    { id: 'skill_action:skill-1:action-2', title: 'Instagram' }
+                ]
+            })
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [{}] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(sendReplyButtonsMock).toHaveBeenCalledWith({
+            phoneNumberId: 'phone-1',
+            to: '905551112233',
+            text: 'Bot reply',
+            buttons: [
+                { id: 'skill_action:skill-1:action-1', title: 'Randevu Al' },
+                { id: 'skill_action:skill-1:action-2', title: 'Instagram' }
+            ]
+        })
+        expect(sendTextMock).not.toHaveBeenCalled()
+    })
+
+    it('falls back to plain text send when interactive reply-button send fails', async () => {
+        const event = {
+            phoneNumberId: 'phone-1',
+            contactPhone: '905551112233',
+            contactName: 'Ayse',
+            messageId: 'wamid-1',
+            text: 'Merhaba',
+            timestamp: '1738000000'
+        }
+        const { supabase } = createChannelLookupSupabaseMock({
+            id: 'channel-1',
+            organization_id: 'org-1',
+            config: {
+                phone_number_id: 'phone-1',
+                app_secret: 'app-secret',
+                permanent_access_token: 'token-1'
+            }
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractWhatsAppInboundMessagesMock.mockReturnValue([{
+            kind: 'text',
+            ...event
+        }])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        sendReplyButtonsMock.mockRejectedValueOnce(new Error('interactive failed'))
+        processInboundAiPipelineMock.mockImplementationOnce(async (input: { sendOutbound: (payload: { content: string; replyButtons?: Array<{ id: string; title: string }> }) => Promise<void> }) => {
+            await input.sendOutbound({
+                content: 'Bot reply',
+                replyButtons: [
+                    { id: 'skill_action:skill-1:action-1', title: 'Randevu Al' }
+                ]
+            })
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [{}] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(sendReplyButtonsMock).toHaveBeenCalledTimes(1)
         expect(sendTextMock).toHaveBeenCalledWith({
             phoneNumberId: 'phone-1',
             to: '905551112233',

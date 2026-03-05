@@ -25,12 +25,14 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
+import type { OutboundMessageInput, OutboundReplyButton } from '@/lib/channels/outbound-message'
 import {
     isMvpResponseLanguageAmbiguous,
     resolveMvpResponseLanguage,
     resolveMvpResponseLanguageName
 } from '@/lib/ai/language'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
+import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/skill-actions'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -45,8 +47,14 @@ export interface InboundAiPipelineInput {
     inboundMessageId: string
     inboundMessageIdMetadataKey: string
     inboundMessageMetadata: Record<string, unknown>
+    inboundActionSelection?: {
+        kind: 'skill_action'
+        sourceSkillId: string
+        actionId: string
+        buttonTitle: string | null
+    }
     skipAutomation?: boolean
-    sendOutbound: (content: string) => Promise<void>
+    sendOutbound: (content: OutboundMessageInput) => Promise<void>
     logPrefix: string
 }
 
@@ -329,6 +337,59 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
     }
 
+    const buildSkillReplyButtons = (skillId: string, rawActions: unknown): OutboundReplyButton[] => {
+        const actions = sanitizeSkillActions(rawActions)
+        return buildReplyButtonsForSkill(skillId, actions)
+    }
+
+    const buildSkillActionUnavailableMessage = () => (
+        responseLanguage === 'tr'
+            ? 'Bu seçenek şu anda kullanılamıyor. Lütfen farklı bir seçim yapın.'
+            : 'This option is currently unavailable. Please choose a different option.'
+    )
+
+    const sendSkillActionUnavailableReply = async (metadata: Record<string, unknown>) => {
+        const unavailableReply = formatOutboundBotMessage(buildSkillActionUnavailableMessage())
+        await options.sendOutbound(unavailableReply)
+        await persistBotMessage(unavailableReply, {
+            is_skill_action: true,
+            skill_action_unavailable: true,
+            ...metadata
+        })
+    }
+
+    const sendSkillReply = async (args: {
+        skillId: string
+        skillTitle: string | null
+        responseText: string
+        skillRequiresHumanHandover: boolean
+        rawSkillActions: unknown
+        metadata: Record<string, unknown>
+    }) => {
+        const formattedSkillReply = formatOutboundBotMessage(args.responseText)
+        const replyButtons = buildSkillReplyButtons(args.skillId, args.rawSkillActions)
+        if (replyButtons.length > 0) {
+            await options.sendOutbound({
+                content: formattedSkillReply,
+                replyButtons
+            })
+        } else {
+            await options.sendOutbound(formattedSkillReply)
+        }
+
+        await persistBotMessage(formattedSkillReply, {
+            skill_id: args.skillId,
+            skill_title: args.skillTitle,
+            matched_skill_title: args.skillTitle,
+            skill_requires_human_handover: args.skillRequiresHumanHandover,
+            ...args.metadata
+        })
+
+        await applyEscalationAfterReply({
+            skillRequiresHumanHandover: args.skillRequiresHumanHandover
+        })
+    }
+
     let customerHistoryForFollowup = [options.text.trim()].filter(Boolean)
     let assistantHistoryForFollowup: string[] = []
     let conversationHistoryForReply: ConversationTurn[] = []
@@ -344,6 +405,115 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         leadSnapshot: leadSnapshotForReply
     })
 
+    if (options.inboundActionSelection?.kind === 'skill_action') {
+        const { data: sourceSkill, error: sourceSkillError } = await options.supabase
+            .from('skills')
+            .select('id, organization_id, title, skill_actions')
+            .eq('id', options.inboundActionSelection.sourceSkillId)
+            .maybeSingle()
+
+        if (sourceSkillError) {
+            console.warn(`${options.logPrefix}: Failed to resolve source skill action`, {
+                source_skill_id: options.inboundActionSelection.sourceSkillId,
+                error: sourceSkillError
+            })
+            await sendSkillActionUnavailableReply({
+                source_skill_id: options.inboundActionSelection.sourceSkillId,
+                skill_action_id: options.inboundActionSelection.actionId
+            })
+            return
+        }
+
+        if (!sourceSkill || sourceSkill.organization_id !== orgId) {
+            await sendSkillActionUnavailableReply({
+                source_skill_id: options.inboundActionSelection.sourceSkillId,
+                skill_action_id: options.inboundActionSelection.actionId
+            })
+            return
+        }
+
+        if (sourceSkill && sourceSkill.organization_id === orgId) {
+            const sourceSkillActions = sanitizeSkillActions(sourceSkill.skill_actions)
+            const matchedAction = sourceSkillActions.find((action) => action.id === options.inboundActionSelection?.actionId)
+
+            if (!matchedAction) {
+                await sendSkillActionUnavailableReply({
+                    source_skill_id: sourceSkill.id,
+                    source_skill_title: sourceSkill.title,
+                    skill_action_id: options.inboundActionSelection.actionId
+                })
+                return
+            }
+
+            if (matchedAction?.type === 'open_url') {
+                const formattedUrlReply = formatOutboundBotMessage(matchedAction.url)
+                await options.sendOutbound(formattedUrlReply)
+                await persistBotMessage(formattedUrlReply, {
+                    is_skill_action: true,
+                    skill_action_type: matchedAction.type,
+                    skill_action_id: matchedAction.id,
+                    skill_action_label: matchedAction.label,
+                    source_skill_id: sourceSkill.id,
+                    source_skill_title: sourceSkill.title
+                })
+                await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
+                return
+            }
+
+            if (matchedAction?.type === 'trigger_skill') {
+                const { data: targetSkill, error: targetSkillError } = await options.supabase
+                    .from('skills')
+                    .select('id, organization_id, title, response_text, enabled, requires_human_handover, skill_actions')
+                    .eq('id', matchedAction.target_skill_id)
+                    .maybeSingle()
+
+                if (targetSkillError) {
+                    console.warn(`${options.logPrefix}: Failed to load trigger-skill action target`, {
+                        source_skill_id: sourceSkill.id,
+                        target_skill_id: matchedAction.target_skill_id,
+                        error: targetSkillError
+                    })
+                    await sendSkillActionUnavailableReply({
+                        source_skill_id: sourceSkill.id,
+                        source_skill_title: sourceSkill.title,
+                        skill_action_type: matchedAction.type,
+                        skill_action_id: matchedAction.id,
+                        skill_action_label: matchedAction.label
+                    })
+                    return
+                } else if (targetSkill && targetSkill.organization_id === orgId && targetSkill.enabled) {
+                    const targetSkillTitle = (targetSkill.title ?? '').toString().trim() || null
+                    await sendSkillReply({
+                        skillId: targetSkill.id,
+                        skillTitle: targetSkillTitle,
+                        responseText: targetSkill.response_text,
+                        skillRequiresHumanHandover: Boolean(targetSkill.requires_human_handover),
+                        rawSkillActions: targetSkill.skill_actions,
+                        metadata: {
+                            is_skill_action: true,
+                            skill_action_type: matchedAction.type,
+                            skill_action_id: matchedAction.id,
+                            skill_action_label: matchedAction.label,
+                            source_skill_id: sourceSkill.id,
+                            source_skill_title: sourceSkill.title
+                        }
+                    })
+                    return
+                }
+
+                await sendSkillActionUnavailableReply({
+                    source_skill_id: sourceSkill.id,
+                    source_skill_title: sourceSkill.title,
+                    skill_action_type: matchedAction.type,
+                    skill_action_id: matchedAction.id,
+                    skill_action_label: matchedAction.label,
+                    target_skill_id: matchedAction.target_skill_id
+                })
+                return
+            }
+        }
+    }
+
     const matchedSkills = await matchSkillsSafely({
         matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
         context: {
@@ -356,7 +526,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
             .from('skills')
-            .select('requires_human_handover, title')
+            .select('requires_human_handover, title, skill_actions')
             .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
@@ -373,17 +543,15 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             || (matchedSkillDetails?.title ?? '').toString().trim()
             || null
 
-        const formattedSkillReply = formatOutboundBotMessage(candidateMatch.response_text)
-        await options.sendOutbound(formattedSkillReply)
-        await persistBotMessage(formattedSkillReply, {
-            skill_id: candidateMatch.skill_id,
-            skill_title: matchedSkillTitle,
-            matched_skill_title: matchedSkillTitle,
-            skill_requires_human_handover: skillRequiresHumanHandover
-        })
-
-        await applyEscalationAfterReply({
-            skillRequiresHumanHandover
+        await sendSkillReply({
+            skillId: candidateMatch.skill_id,
+            skillTitle: matchedSkillTitle,
+            responseText: candidateMatch.response_text,
+            skillRequiresHumanHandover,
+            rawSkillActions: matchedSkillDetails?.skill_actions,
+            metadata: {
+                skill_match_source: 'semantic_top_match'
+            }
         })
 
         return

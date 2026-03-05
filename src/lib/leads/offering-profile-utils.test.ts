@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     filterMissingIntakeFields,
+    hasSufficientOfferingProfileDetail,
     mergeIntakeFields,
     normalizeIntakeFields,
     normalizeServiceCatalogNames,
@@ -104,5 +105,29 @@ describe('parseServiceCandidatesPayload', () => {
 
     it('returns null for invalid payload', () => {
         expect(parseServiceCandidatesPayload('not-json')).toBeNull()
+    })
+})
+
+describe('hasSufficientOfferingProfileDetail', () => {
+    it('returns false for overly short profile suggestions', () => {
+        const shortSuggestion = [
+            'Klinik genel dis hekimligi hizmeti sunar.',
+            '- Sunulanlar: Muayene, dolgu.',
+            '- Sunulmayanlar: Gece nobeti yok.',
+            '- Koşullar: Uygunluk muayene ile belirlenir.'
+        ].join('\n')
+
+        expect(hasSufficientOfferingProfileDetail(shortSuggestion)).toBe(false)
+    })
+
+    it('returns true for detail-rich hybrid suggestions', () => {
+        const detailedSuggestion = [
+            'Klinik, estetik ve tedavi odakli dis hekimligi hizmetlerini planli randevu akisiyla sunar.',
+            '- Sunulanlar: Implant, ortodonti, kanal tedavisi ve dis beyazlatma hizmetleri hasta ihtiyacina gore muayene sonrasi asamali olarak planlanir.',
+            '- Sunulmayanlar: Genel anestezi altinda buyuk cerrahi islemler, evde tedavi ve 7/24 acil nobet kapsami bu merkezde verilmez.',
+            '- Koşullar: Kesin tedavi plani ile fiyatlandirma ilk muayene ve gerekli goruntuleme sonrasinda hekim degerlendirmesiyle netlestirilir.'
+        ].join('\n')
+
+        expect(hasSufficientOfferingProfileDetail(detailedSuggestion)).toBe(true)
     })
 })

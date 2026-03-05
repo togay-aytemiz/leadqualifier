@@ -32,4 +32,10 @@ describe('buildBillingRefreshSignal', () => {
 
         expect(buildBillingRefreshSignal(successParams)).not.toBe(buildBillingRefreshSignal(failedParams))
     })
+
+    it('changes when the pathname changes even without checkout params', () => {
+        expect(buildBillingRefreshSignal(new URLSearchParams(), '/knowledge')).not.toBe(
+            buildBillingRefreshSignal(new URLSearchParams(), '/settings/plans')
+        )
+    })
 })

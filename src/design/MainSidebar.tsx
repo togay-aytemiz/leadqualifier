@@ -15,6 +15,7 @@ import {
     type OrganizationBillingSnapshot
 } from '@/lib/billing/snapshot'
 import { buildBillingRefreshSignal } from '@/lib/billing/refresh-signal'
+import { BILLING_UPDATED_EVENT } from '@/lib/billing/events'
 import {
     HiMiniChatBubbleBottomCenterText,
     HiOutlineChatBubbleBottomCenterText,
@@ -226,8 +227,8 @@ export function MainSidebar({
         })
     }, [orgSearch, organizationOptions])
     const billingRefreshSignal = useMemo(
-        () => buildBillingRefreshSignal(searchParams),
-        [searchParams]
+        () => buildBillingRefreshSignal(searchParams, pathname),
+        [pathname, searchParams]
     )
 
     const loadOrganizationOptions = useCallback(async () => {
@@ -546,6 +547,13 @@ export function MainSidebar({
         window.addEventListener('pending-suggestions-updated', handler)
         return () => window.removeEventListener('pending-suggestions-updated', handler)
     }, [organizationId, refreshPendingSuggestions])
+
+    useEffect(() => {
+        if (!organizationId) return
+        const handler = () => refreshBillingSnapshot(organizationId)
+        window.addEventListener(BILLING_UPDATED_EVENT, handler)
+        return () => window.removeEventListener(BILLING_UPDATED_EVENT, handler)
+    }, [organizationId, refreshBillingSnapshot])
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch()) return

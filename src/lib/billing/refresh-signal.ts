@@ -8,10 +8,18 @@ const BILLING_REFRESH_QUERY_KEYS = [
     'checkout_error'
 ] as const
 
-export function buildBillingRefreshSignal(searchParams: SearchParamsLike | null | undefined): string {
-    if (!searchParams) return ''
+export function buildBillingRefreshSignal(
+    searchParams: SearchParamsLike | null | undefined,
+    pathname?: string | null
+): string {
+    const normalizedPathname = typeof pathname === 'string' ? pathname.trim() : ''
+    const signalParts = normalizedPathname ? [`pathname=${normalizedPathname}`] : []
 
-    return BILLING_REFRESH_QUERY_KEYS
-        .map((key) => `${key}=${searchParams.get(key) ?? ''}`)
-        .join('|')
+    if (searchParams) {
+        signalParts.push(
+            ...BILLING_REFRESH_QUERY_KEYS.map((key) => `${key}=${searchParams.get(key) ?? ''}`)
+        )
+    }
+
+    return signalParts.join('|')
 }

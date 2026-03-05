@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
 import { Button, PageHeader, Input, TextArea } from '@/design'
 import { createKnowledgeBaseEntry, getCollections, KnowledgeCollection } from '@/lib/knowledge-base/actions'
+import { processKnowledgeDocumentInBackground } from '@/lib/knowledge-base/process-client'
 import { useTranslations } from 'next-intl'
 
 export default function CreateContentPage() {
@@ -46,11 +47,8 @@ export default function CreateContentPage() {
             window.dispatchEvent(new Event('pending-suggestions-updated'))
 
             if (created?.id) {
-                void fetch('/api/knowledge/process', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: created.id }),
-                    keepalive: true
+                void processKnowledgeDocumentInBackground(created.id).catch((error) => {
+                    console.error('Failed to process knowledge document', error)
                 })
             }
         } catch (error) {

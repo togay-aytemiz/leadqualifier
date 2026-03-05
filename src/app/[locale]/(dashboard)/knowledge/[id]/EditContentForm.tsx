@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { Button, PageHeader, Input, TextArea, ConfirmDialog, Badge } from '@/design'
 import { updateKnowledgeBaseEntry, deleteKnowledgeBaseEntry, KnowledgeCollection } from '@/lib/knowledge-base/actions'
+import { processKnowledgeDocumentInBackground } from '@/lib/knowledge-base/process-client'
 import { useTranslations } from 'next-intl'
 
 interface EditContentFormProps {
@@ -76,11 +77,8 @@ export function EditContentForm({
             const updated = await updatePromise
 
             if (updated?.id) {
-                void fetch('/api/knowledge/process', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: updated.id }),
-                    keepalive: true
+                void processKnowledgeDocumentInBackground(updated.id).catch((error) => {
+                    console.error('Failed to process knowledge document', error)
                 })
             }
             router.refresh()

@@ -94,7 +94,7 @@ export async function register(formData: FormData) {
         } satisfies RegisterActionState
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -124,7 +124,11 @@ export async function register(formData: FormData) {
         succeeded: true,
     })
 
-    redirect('/')
+    if (data.session) {
+        redirect('/')
+    }
+
+    redirect(`/register/check-email?email=${encodeURIComponent(email)}`)
 }
 
 export async function logout() {

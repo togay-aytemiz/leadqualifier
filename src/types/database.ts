@@ -242,12 +242,31 @@ export interface ProfileWithOrganizations extends Profile {
 }
 
 // Skill types
+export type SkillActionType = 'trigger_skill' | 'open_url'
+
+export interface SkillTriggerAction {
+    id: string
+    type: 'trigger_skill'
+    label: string
+    target_skill_id: string
+}
+
+export interface SkillOpenUrlAction {
+    id: string
+    type: 'open_url'
+    label: string
+    url: string
+}
+
+export type SkillAction = SkillTriggerAction | SkillOpenUrlAction
+
 export interface Skill {
     id: string
     organization_id: string
     title: string
     trigger_examples: string[]
     response_text: string
+    skill_actions?: SkillAction[]
     enabled: boolean
     requires_human_handover: boolean
     created_at: string

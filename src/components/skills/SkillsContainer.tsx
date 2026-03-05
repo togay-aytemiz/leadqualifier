@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Skill } from '@/types/database'
+import type { Skill, SkillAction } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
 import { Badge, ConfirmDialog } from '@/design/primitives'
 import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
@@ -16,12 +16,31 @@ import {
 
 import { useTranslations } from 'next-intl'
 import { useLocale } from 'next-intl'
+import { getAvailableActionTargetSkills } from '@/components/skills/action-target-skills'
 
 interface SkillsContainerProps {
     initialSkills: Skill[]
     organizationId: string
     handoverMessage: string
     isReadOnly?: boolean
+}
+
+const MAX_SKILL_ACTIONS = 3
+
+function createActionId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID()
+    }
+    return `skill-action-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function isValidHttpUrl(value: string) {
+    try {
+        const parsed = new URL(value)
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+        return false
+    }
 }
 
 export function SkillsContainer({ initialSkills, organizationId, handoverMessage, isReadOnly = false }: SkillsContainerProps) {
@@ -42,7 +61,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         title: '',
         response_text: '',
         triggers: [''], // Start with one empty trigger
-        requires_human_handover: false
+        requires_human_handover: false,
+        skill_actions: [] as SkillAction[]
     })
 
     // To track dirty state
@@ -50,7 +70,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         title: '',
         response_text: '',
         triggers: [''],
-        requires_human_handover: false
+        requires_human_handover: false,
+        skill_actions: [] as SkillAction[]
     })
 
     // Sync skills when initialSkills changes (e.g. after search)
@@ -68,7 +89,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     response_text: skill.response_text,
                     // Ensure at least 3 triggers for editing consistency if backend data is sparse
                     triggers: ensureMinTriggers(skill.trigger_examples, 3),
-                    requires_human_handover: skill.requires_human_handover ?? false
+                    requires_human_handover: skill.requires_human_handover ?? false,
+                    skill_actions: Array.isArray(skill.skill_actions) ? skill.skill_actions : []
                 }
                 setFormData(initialData)
                 setInitialFormState(initialData)
@@ -80,7 +102,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                 title: '',
                 response_text: '',
                 triggers: ['', '', ''], // 3 empty triggers for new skill
-                requires_human_handover: false
+                requires_human_handover: false,
+                skill_actions: []
             }
             setFormData(initialData)
             setInitialFormState(initialData)
@@ -162,6 +185,89 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         setFormData(prev => ({ ...prev, triggers: newTriggers }))
     }
 
+    const handleAddAction = () => {
+        if (isReadOnly) return
+
+        setFormData(prev => ({
+            ...prev,
+            skill_actions: [
+                ...prev.skill_actions,
+                {
+                    id: createActionId(),
+                    type: 'trigger_skill',
+                    label: '',
+                    target_skill_id: ''
+                }
+            ]
+        }))
+    }
+
+    const handleRemoveAction = (actionId: string) => {
+        if (isReadOnly) return
+        setFormData(prev => ({
+            ...prev,
+            skill_actions: prev.skill_actions.filter(action => action.id !== actionId)
+        }))
+    }
+
+    const handleActionLabelChange = (actionId: string, label: string) => {
+        setFormData(prev => ({
+            ...prev,
+            skill_actions: prev.skill_actions.map((action) => (
+                action.id === actionId
+                    ? { ...action, label }
+                    : action
+            ))
+        }))
+    }
+
+    const handleActionTypeChange = (actionId: string, type: 'trigger_skill' | 'open_url') => {
+        setFormData(prev => ({
+            ...prev,
+            skill_actions: prev.skill_actions.map((action) => {
+                if (action.id !== actionId) return action
+
+                if (type === 'trigger_skill') {
+                    return {
+                        id: action.id,
+                        type: 'trigger_skill',
+                        label: action.label,
+                        target_skill_id: ''
+                    }
+                }
+
+                return {
+                    id: action.id,
+                    type: 'open_url',
+                    label: action.label,
+                    url: ''
+                }
+            })
+        }))
+    }
+
+    const handleActionTargetSkillChange = (actionId: string, targetSkillId: string) => {
+        setFormData(prev => ({
+            ...prev,
+            skill_actions: prev.skill_actions.map((action) => (
+                action.id === actionId && action.type === 'trigger_skill'
+                    ? { ...action, target_skill_id: targetSkillId }
+                    : action
+            ))
+        }))
+    }
+
+    const handleActionUrlChange = (actionId: string, url: string) => {
+        setFormData(prev => ({
+            ...prev,
+            skill_actions: prev.skill_actions.map((action) => (
+                action.id === actionId && action.type === 'open_url'
+                    ? { ...action, url }
+                    : action
+            ))
+        }))
+    }
+
     const handleSave = async () => {
         if (isReadOnly) return
         setValidationError(null)
@@ -184,9 +290,43 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
             return
         }
 
+        for (const action of formData.skill_actions) {
+            if (!action.label.trim()) {
+                setValidationError(t('validation.actionLabelRequired'))
+                return
+            }
+
+            if (action.type === 'trigger_skill') {
+                if (!action.target_skill_id.trim()) {
+                    setValidationError(t('validation.actionTargetSkillRequired'))
+                    return
+                }
+            } else if (action.type === 'open_url') {
+                if (!action.url.trim() || !isValidHttpUrl(action.url.trim())) {
+                    setValidationError(t('validation.actionUrlInvalid'))
+                    return
+                }
+            }
+        }
+
         setIsSaving(true)
         try {
             const cleanTriggers = formData.triggers.map(t => t.trim()).filter(Boolean)
+            const cleanActions = formData.skill_actions.map((action) => {
+                if (action.type === 'trigger_skill') {
+                    return {
+                        ...action,
+                        label: action.label.trim(),
+                        target_skill_id: action.target_skill_id.trim()
+                    }
+                }
+
+                return {
+                    ...action,
+                    label: action.label.trim(),
+                    url: action.url.trim()
+                }
+            })
 
             if (isCreating) {
                 const newSkill = await createSkill({
@@ -195,7 +335,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     response_text: formData.response_text,
                     trigger_examples: cleanTriggers,
                     enabled: true,
-                    requires_human_handover: formData.requires_human_handover
+                    requires_human_handover: formData.requires_human_handover,
+                    skill_actions: cleanActions
                 })
 
                 // Refresh and select the new skill
@@ -215,7 +356,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     title: formData.title,
                     response_text: formData.response_text,
                     trigger_examples: cleanTriggers,
-                    requires_human_handover: formData.requires_human_handover
+                    requires_human_handover: formData.requires_human_handover,
+                    skill_actions: cleanActions
                 })
                 router.refresh()
 
@@ -226,7 +368,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                         title: formData.title,
                         response_text: formData.response_text,
                         trigger_examples: cleanTriggers,
-                        requires_human_handover: formData.requires_human_handover
+                        requires_human_handover: formData.requires_human_handover,
+                        skill_actions: cleanActions
                     } : s
                 ))
                 setInitialFormState(formData)
@@ -260,6 +403,9 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
     }
 
     const selectedSkill = skills.find(s => s.id === selectedSkillId)
+    const availableActionTargetSkills = getAvailableActionTargetSkills(skills, selectedSkillId)
+    const actionCount = formData.skill_actions.length
+    const actionLimitExceeded = actionCount > MAX_SKILL_ACTIONS
     const showForm = isCreating || selectedSkill
     const mobileListPaneClasses = getSkillsMobileListPaneClasses(isMobileDetailOpen)
     const mobileDetailPaneClasses = getSkillsMobileDetailPaneClasses(isMobileDetailOpen)
@@ -472,6 +618,92 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     disabled={isReadOnly}
                                     className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
                                 />
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                        {t('actionsLabel')} {actionCount}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddAction}
+                                        disabled={isReadOnly}
+                                        className="text-sm text-blue-600 font-medium hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+                                    >
+                                        <Plus size={16} />
+                                        {t('addAction')}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-400">{t('actionsHint')}</p>
+
+                                {actionLimitExceeded && (
+                                    <div className="rounded-lg px-3 py-2 text-xs border bg-amber-50 border-amber-200 text-amber-900">
+                                        {t('actionsOverflowBanner', { limit: MAX_SKILL_ACTIONS })}
+                                    </div>
+                                )}
+
+                                {actionCount === 0 && (
+                                    <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                                        {t('actionsEmpty')}
+                                    </p>
+                                )}
+
+                                {formData.skill_actions.map((action) => (
+                                    <div key={action.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
+                                        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                                            <input
+                                                value={action.label}
+                                                onChange={(event) => handleActionLabelChange(action.id, event.target.value)}
+                                                placeholder={t('actionLabelPlaceholder')}
+                                                disabled={isReadOnly}
+                                                className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveAction(action.id)}
+                                                disabled={isReadOnly}
+                                                className="h-[42px] px-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                            >
+                                                {t('removeAction')}
+                                            </button>
+                                        </div>
+
+                                        <select
+                                            value={action.type}
+                                            onChange={(event) => handleActionTypeChange(action.id, event.target.value as 'trigger_skill' | 'open_url')}
+                                            disabled={isReadOnly}
+                                            className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                        >
+                                            <option value="trigger_skill">{t('actionTypeTriggerSkill')}</option>
+                                            <option value="open_url">{t('actionTypeOpenUrl')}</option>
+                                        </select>
+
+                                        {action.type === 'trigger_skill' ? (
+                                            <select
+                                                value={action.target_skill_id}
+                                                onChange={(event) => handleActionTargetSkillChange(action.id, event.target.value)}
+                                                disabled={isReadOnly}
+                                                className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                            >
+                                                <option value="">{t('actionTargetSkillPlaceholder')}</option>
+                                                {availableActionTargetSkills.map((skillOption) => (
+                                                    <option key={skillOption.id} value={skillOption.id}>
+                                                        {skillOption.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                value={action.url}
+                                                onChange={(event) => handleActionUrlChange(action.id, event.target.value)}
+                                                placeholder={t('actionUrlPlaceholder')}
+                                                disabled={isReadOnly}
+                                                className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                            />
+                                        )}
+                                    </div>
+                                ))}
                             </div>
 
                             <div className="space-y-3">

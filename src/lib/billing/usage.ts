@@ -133,9 +133,16 @@ const USAGE_METADATA_BATCH_SIZE = 200
 const STORAGE_LIST_PAGE_SIZE = 1000
 const DOCUMENT_PROCESSING_SOURCES = new Set([
     'offering_profile_suggestion',
-    'service_catalog_candidates',
     'required_intake_fields',
-    'required_intake_followup'
+    'service_catalog_candidates'
+])
+const AI_REPLY_EMBEDDING_SOURCES = new Set([
+    'knowledge_search_query_embedding',
+    'skill_query_embedding'
+])
+const DOCUMENT_PROCESSING_EMBEDDING_SOURCES = new Set([
+    'knowledge_chunk_index_embedding',
+    'skill_index_embedding'
 ])
 
 function normalizeCount(value?: number | null) {
@@ -272,6 +279,18 @@ function addToBreakdown(options: {
 
     if (category === 'lead_reasoning') {
         totals.leadExtraction += credits
+        return
+    }
+
+    if (category === 'embedding') {
+        if (source && AI_REPLY_EMBEDDING_SOURCES.has(source)) {
+            totals.aiReplies += credits
+            return
+        }
+
+        if (source && DOCUMENT_PROCESSING_EMBEDDING_SOURCES.has(source)) {
+            totals.documentProcessing += credits
+        }
     }
 }
 

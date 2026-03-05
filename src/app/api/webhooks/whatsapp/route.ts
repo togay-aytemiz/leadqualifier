@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
+import { normalizeOutboundMessage, type OutboundMessageInput } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
+import { parseSkillActionButtonId } from '@/lib/skills/skill-actions'
 import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholders'
 import {
     extractWhatsAppInboundMessages,
@@ -293,6 +295,35 @@ export async function POST(req: NextRequest) {
 
         if (!channel || !client) continue
 
+        const sendOutboundForEvent = async (message: OutboundMessageInput) => {
+            const normalized = normalizeOutboundMessage(message)
+            if (normalized.replyButtons && normalized.replyButtons.length > 0) {
+                try {
+                    await client.sendReplyButtons({
+                        phoneNumberId: event.phoneNumberId,
+                        to: event.contactPhone,
+                        text: normalized.content,
+                        buttons: normalized.replyButtons
+                    })
+                    return
+                } catch (error) {
+                    console.warn('WhatsApp Webhook: Interactive reply-button send failed, falling back to plain text', {
+                        organization_id: channel.organization_id,
+                        phone_number_id: event.phoneNumberId,
+                        contact_phone: event.contactPhone,
+                        inbound_message_id: event.messageId,
+                        error: error instanceof Error ? error.message : String(error)
+                    })
+                }
+            }
+
+            await client.sendText({
+                phoneNumberId: event.phoneNumberId,
+                to: event.contactPhone,
+                text: normalized.content
+            })
+        }
+
         const baseMetadata = {
             whatsapp_message_id: event.messageId,
             whatsapp_timestamp: event.timestamp,
@@ -314,13 +345,40 @@ export async function POST(req: NextRequest) {
                     ...baseMetadata,
                     whatsapp_message_type: 'text'
                 },
-                sendOutbound: async (content: string) => {
-                    await client.sendText({
-                        phoneNumberId: event.phoneNumberId,
-                        to: event.contactPhone,
-                        text: content
-                    })
+                sendOutbound: sendOutboundForEvent,
+                logPrefix: 'WhatsApp Webhook'
+            })
+            continue
+        }
+
+        if (event.kind === 'interactive') {
+            const skillActionSelection = parseSkillActionButtonId(event.buttonReplyId)
+            await processInboundAiPipeline({
+                supabase,
+                organizationId: channel.organization_id,
+                platform: 'whatsapp',
+                source: 'whatsapp',
+                contactId: event.contactPhone,
+                contactName: event.contactName,
+                text: event.buttonReplyTitle ?? event.buttonReplyId,
+                inboundMessageId: event.messageId,
+                inboundMessageIdMetadataKey: 'whatsapp_message_id',
+                inboundMessageMetadata: {
+                    ...baseMetadata,
+                    whatsapp_message_type: 'interactive',
+                    whatsapp_interactive_type: 'button_reply',
+                    whatsapp_button_reply_id: event.buttonReplyId,
+                    whatsapp_button_reply_title: event.buttonReplyTitle
                 },
+                inboundActionSelection: skillActionSelection
+                    ? {
+                        kind: 'skill_action',
+                        sourceSkillId: skillActionSelection.sourceSkillId,
+                        actionId: skillActionSelection.actionId,
+                        buttonTitle: event.buttonReplyTitle
+                    }
+                    : undefined,
+                sendOutbound: sendOutboundForEvent,
                 logPrefix: 'WhatsApp Webhook'
             })
             continue
@@ -370,13 +428,7 @@ export async function POST(req: NextRequest) {
                 }
             },
             skipAutomation,
-            sendOutbound: async (content: string) => {
-                await client.sendText({
-                    phoneNumberId: event.phoneNumberId,
-                    to: event.contactPhone,
-                    text: content
-                })
-            },
+            sendOutbound: sendOutboundForEvent,
             logPrefix: 'WhatsApp Webhook'
         })
     }

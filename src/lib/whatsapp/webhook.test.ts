@@ -66,6 +66,18 @@ describe('whatsapp webhook utilities', () => {
                                 sha256: 'def456',
                                 filename: 'katalog.pdf'
                             }
+                        }, {
+                            from: '905551112233',
+                            id: 'wamid-4',
+                            timestamp: '1738000003',
+                            type: 'interactive',
+                            interactive: {
+                                type: 'button_reply',
+                                button_reply: {
+                                    id: 'skill_action:skill-1:action-1',
+                                    title: 'Randevu Al'
+                                }
+                            }
                         }]
                     }
                 }]
@@ -111,6 +123,16 @@ describe('whatsapp webhook utilities', () => {
                 caption: null,
                 filename: 'katalog.pdf',
                 timestamp: '1738000002'
+            },
+            {
+                kind: 'interactive',
+                phoneNumberId: 'phone-1',
+                contactPhone: '905551112233',
+                contactName: 'Ayse',
+                messageId: 'wamid-4',
+                buttonReplyId: 'skill_action:skill-1:action-1',
+                buttonReplyTitle: 'Randevu Al',
+                timestamp: '1738000003'
             }
         ])
     })

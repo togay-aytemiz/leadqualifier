@@ -27,7 +27,21 @@ export interface WhatsAppMediaMessageEvent {
     timestamp: string | null
 }
 
-export type WhatsAppInboundMessageEvent = WhatsAppTextMessageEvent | WhatsAppMediaMessageEvent
+export interface WhatsAppInteractiveMessageEvent {
+    kind: 'interactive'
+    phoneNumberId: string
+    contactPhone: string
+    contactName: string | null
+    messageId: string
+    buttonReplyId: string
+    buttonReplyTitle: string | null
+    timestamp: string | null
+}
+
+export type WhatsAppInboundMessageEvent =
+    | WhatsAppTextMessageEvent
+    | WhatsAppMediaMessageEvent
+    | WhatsAppInteractiveMessageEvent
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -145,6 +159,32 @@ export function extractWhatsAppInboundMessages(payload: unknown): WhatsAppInboun
                         contactName: contactNames.get(from) ?? null,
                         messageId,
                         text,
+                        timestamp
+                    })
+                    continue
+                }
+
+                if (messageType === 'interactive') {
+                    const interactiveNode = isRecord(message.interactive) ? message.interactive : null
+                    const interactiveType = interactiveNode ? asString(interactiveNode.type) : null
+                    if (interactiveType !== 'button_reply') continue
+
+                    const buttonReplyNode = interactiveNode && isRecord(interactiveNode.button_reply)
+                        ? interactiveNode.button_reply
+                        : null
+                    const buttonReplyId = buttonReplyNode ? asString(buttonReplyNode.id) : null
+                    if (!buttonReplyId) continue
+
+                    const buttonReplyTitle = buttonReplyNode ? asString(buttonReplyNode.title) : null
+
+                    events.push({
+                        kind: 'interactive',
+                        phoneNumberId,
+                        contactPhone: from,
+                        contactName: contactNames.get(from) ?? null,
+                        messageId,
+                        buttonReplyId,
+                        buttonReplyTitle,
                         timestamp
                     })
                     continue

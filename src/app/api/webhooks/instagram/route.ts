@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { InstagramClient } from '@/lib/instagram/client'
 import { extractInstagramTextMessages, isValidMetaSignature } from '@/lib/instagram/webhook'
+import { normalizeOutboundMessage } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 
 export const runtime = 'nodejs'
@@ -147,11 +148,12 @@ export async function POST(req: NextRequest) {
                 instagram_timestamp: event.timestamp,
                 instagram_business_account_id: event.instagramBusinessAccountId
             },
-            sendOutbound: async (content: string) => {
+            sendOutbound: async (content) => {
+                const normalized = normalizeOutboundMessage(content)
                 await client.sendText({
                     instagramBusinessAccountId: event.instagramBusinessAccountId,
                     to: event.contactId,
-                    text: content
+                    text: normalized.content
                 })
             },
             logPrefix: 'Instagram Webhook'

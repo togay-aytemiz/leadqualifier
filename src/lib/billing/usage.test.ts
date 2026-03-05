@@ -186,6 +186,78 @@ describe('billing usage helpers', () => {
         expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(0.7, 5)
     })
 
+    it('routes embedding and follow-up costs into visible billing buckets', () => {
+        const summary = buildCreditUsageSummary(
+            [
+                {
+                    created_at: '2026-02-08T12:00:00.000Z',
+                    credits_delta: -0.4,
+                    metadata: { category: 'router' }
+                },
+                {
+                    created_at: '2026-02-08T12:05:00.000Z',
+                    credits_delta: -0.1,
+                    metadata: { category: 'embedding', source: 'knowledge_search_query_embedding' }
+                },
+                {
+                    created_at: '2026-02-08T12:10:00.000Z',
+                    credits_delta: -0.2,
+                    metadata: { category: 'embedding', source: 'skill_query_embedding' }
+                },
+                {
+                    created_at: '2026-02-08T12:15:00.000Z',
+                    credits_delta: -0.2,
+                    metadata: { category: 'summary' }
+                },
+                {
+                    created_at: '2026-02-08T12:20:00.000Z',
+                    credits_delta: -0.3,
+                    metadata: { category: 'lead_extraction', source: 'whatsapp' }
+                },
+                {
+                    created_at: '2026-02-08T12:25:00.000Z',
+                    credits_delta: -0.2,
+                    metadata: { category: 'lead_extraction', source: 'required_intake_followup' }
+                },
+                {
+                    created_at: '2026-02-08T12:30:00.000Z',
+                    credits_delta: -0.1,
+                    metadata: { category: 'lead_reasoning' }
+                },
+                {
+                    created_at: '2026-02-08T12:35:00.000Z',
+                    credits_delta: -0.5,
+                    metadata: { category: 'lead_extraction', source: 'offering_profile_suggestion' }
+                },
+                {
+                    created_at: '2026-02-08T12:40:00.000Z',
+                    credits_delta: -0.2,
+                    metadata: { category: 'lead_extraction', source: 'required_intake_fields' }
+                },
+                {
+                    created_at: '2026-02-08T12:45:00.000Z',
+                    credits_delta: -0.3,
+                    metadata: { category: 'embedding', source: 'knowledge_chunk_index_embedding' }
+                },
+                {
+                    created_at: '2026-02-08T12:50:00.000Z',
+                    credits_delta: -0.1,
+                    metadata: { category: 'embedding', source: 'skill_index_embedding' }
+                }
+            ],
+            {
+                now: new Date('2026-02-10T09:00:00.000Z'),
+                timeZone: 'Europe/Istanbul'
+            }
+        )
+
+        expect(summary.monthly.credits).toBeCloseTo(2.6, 5)
+        expect(summary.monthly.breakdown.aiReplies).toBeCloseTo(0.7, 5)
+        expect(summary.monthly.breakdown.conversationSummary).toBeCloseTo(0.2, 5)
+        expect(summary.monthly.breakdown.leadExtraction).toBeCloseTo(0.6, 5)
+        expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(1.1, 5)
+    })
+
     it('loads all usage debit ledger rows beyond Supabase default 1000-row page', async () => {
         const organizationId = 'org_1'
         const ledgerRows = Array.from({ length: 1205 }, (_, index) => ({

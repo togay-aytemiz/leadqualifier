@@ -39,7 +39,13 @@ function resolveRegisterErrorMessage(state: RegisterActionState | null, t: Trans
     return state.error ?? null
 }
 
-export function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
+export function RegisterForm({
+    turnstileSiteKey,
+    initialEmail = '',
+}: {
+    turnstileSiteKey: string
+    initialEmail?: string
+}) {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
     const router = useRouter()
@@ -59,6 +65,7 @@ export function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string })
         const timeoutId = window.setTimeout(() => {
             router.prefetch('/login')
             router.prefetch('/forgot-password')
+            router.prefetch('/register/check-email')
             router.prefetch('/inbox')
             router.prefetch('/skills')
             router.prefetch('/settings/ai')
@@ -107,6 +114,7 @@ export function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string })
                         name="email"
                         type="email"
                         required
+                        defaultValue={initialEmail}
                         autoComplete="email"
                         className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-400 focus:border-[#242A40] focus:outline-none focus:ring-2 focus:ring-[#242A40]/10 sm:text-sm"
                         placeholder={t('emailPlaceholder')}

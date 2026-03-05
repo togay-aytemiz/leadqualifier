@@ -8,6 +8,7 @@ import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeServiceName, isNewCandidate } from '@/lib/leads/catalog'
 import {
     filterMissingIntakeFields,
+    hasSufficientOfferingProfileDetail,
     mergeIntakeFields,
     normalizeIntakeFields,
     normalizeServiceCatalogNames,
@@ -34,6 +35,7 @@ Write the suggestion in ${language}.
 Format:
 - One short intro sentence.
 - 3 to 5 bullet points total. Each bullet starts with a category label and a colon.
+- Keep the intro and bullets information-rich (avoid terse fragments). Include concrete scope details in each bullet.
 - Include concrete constraints (e.g., time window, eligibility limits, not-offered items) when present.
 Use labels in the same language. Allowed labels: ${labels}.
 If existing approved suggestions are provided and new content conflicts or overlaps, set update_index to the 1-based item to update.
@@ -65,11 +67,15 @@ const hasValidHybridFormat = (text: string, labels: string[]) => {
     return labeledBullets.length >= 2
 }
 
+const isSuggestionUsable = (text: string, labels: string[]) =>
+    hasValidHybridFormat(text, labels) && hasSufficientOfferingProfileDetail(text)
+
 const buildRepairSystemPrompt = (language: string, labels: string) => `Rewrite the draft into the required service offering profile format.
 Write in ${language}. Keep the same meaning but add missing details from the provided content.
 Format:
 - One short intro sentence.
 - 3 to 5 bullet points total. Each bullet starts with a category label and a colon.
+- Expand terse bullets into fuller, concrete statements grounded in the content.
 Use labels in the same language. Allowed labels: ${labels}.
 Return JSON: { suggestion: string, update_index: number | null } only.`
 
@@ -297,7 +303,7 @@ async function createSuggestion(options: {
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0.2,
-        max_tokens: 260,
+        max_tokens: 320,
         response_format: { type: 'json_object' },
         messages: [
             { role: 'system', content: systemPrompt },
@@ -320,7 +326,7 @@ async function createSuggestion(options: {
 
     let parsed = parseSuggestionPayload(response)
     if (!parsed) return null
-    if (!hasValidHybridFormat(parsed.suggestion, labels)) {
+    if (!isSuggestionUsable(parsed.suggestion, labels)) {
         if (!await isOrganizationUsageAllowed({
             organizationId: options.organizationId,
             supabase,
@@ -334,7 +340,7 @@ async function createSuggestion(options: {
         const repairCompletion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.2,
-            max_tokens: 260,
+            max_tokens: 320,
             response_format: { type: 'json_object' },
             messages: [
                 { role: 'system', content: repairSystemPrompt },
@@ -353,7 +359,7 @@ async function createSuggestion(options: {
             sourceType: options.sourceType
         })
         const repaired = parseSuggestionPayload(repairResponse)
-        if (!repaired || !hasValidHybridFormat(repaired.suggestion, labels)) return null
+        if (!repaired || !isSuggestionUsable(repaired.suggestion, labels)) return null
         parsed = repaired
     }
     const updateTarget = parsed.updateIndex ? approvedSuggestions?.[parsed.updateIndex - 1] : null
