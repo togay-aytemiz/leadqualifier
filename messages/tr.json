@@ -870,7 +870,8 @@
                 "notAvailable": "Bu ortamda mock checkout fonksiyonları henüz aktif değil.",
                 "requestFailed": "Checkout isteği başarısız oldu. Lütfen tekrar deneyin.",
                 "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
-                "topupNotAllowed": "Mevcut üyelik/paket durumunda ek kredi izinli değil."
+                "topupNotAllowed": "Mevcut üyelik/paket durumunda ek kredi izinli değil.",
+                "providerNotConfigured": "Iyzico ayarları eksik. Ortam değişkenlerine API anahtarları ve plan referanslarını ekleyin."
             }
         },
         "renewalStatus": {

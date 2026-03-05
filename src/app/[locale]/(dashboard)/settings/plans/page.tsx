@@ -9,6 +9,7 @@ import { resolveActiveOrganizationContext } from '@/lib/organizations/active-con
 import { getOrganizationBillingSnapshot } from '@/lib/billing/server'
 import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 import {
+    type BillingPlanTierId,
     getBillingPricingCatalog,
     resolveBillingCurrencyByRegion,
     resolveLocalizedMoneyForRegion
@@ -38,6 +39,7 @@ import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { Link } from '@/i18n/navigation'
 import { AlertCircle } from 'lucide-react'
 import { TopupCheckoutCard, type TopupPackOption } from './TopupCheckoutCard'
@@ -111,6 +113,16 @@ function toPositiveNumber(value: string) {
     const parsed = Number.parseFloat(value)
     if (!Number.isFinite(parsed)) return Number.NaN
     return parsed
+}
+
+function readHeaderValue(value: string | null | undefined) {
+    if (!value) return null
+    const first = value.split(',')[0]?.trim() || null
+    return first || null
+}
+
+function normalizeCheckoutLocale(locale: string) {
+    return locale.toLowerCase().startsWith('en') ? 'en' : 'tr'
 }
 
 function buildCheckoutRedirect(
@@ -235,6 +247,17 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     }
 
     const requestBillingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
+    const appOrigin = resolveMetaOrigin({
+        appUrl: process.env.NEXT_PUBLIC_APP_URL,
+        siteUrl: process.env.SITE_URL ?? null,
+        forwardedHost: requestHeaders.get('x-forwarded-host'),
+        forwardedProto: requestHeaders.get('x-forwarded-proto'),
+        requestOrigin: `https://${requestHeaders.get('host') ?? 'localhost:3000'}`
+    })
+    const checkoutLocale = normalizeCheckoutLocale(locale)
+    const customerIp = readHeaderValue(requestHeaders.get('x-forwarded-for')) ?? '127.0.0.1'
+    const subscriptionCallbackUrl = `${appOrigin}/api/billing/iyzico/callback?action=subscribe&locale=${checkoutLocale}`
+    const topupCallbackUrl = `${appOrigin}/api/billing/iyzico/callback?action=topup&locale=${checkoutLocale}`
     const organizationBillingRegion = resolveBillingRegionForOrganization({
         organizationBillingRegion: organizationRecord?.billing_region,
         headers: requestHeaders
@@ -349,6 +372,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             || value === 'request_failed'
             || value === 'topup_not_allowed'
             || value === 'admin_locked'
+            || value === 'provider_not_configured'
         ) {
             return value as MockCheckoutError
         }
@@ -507,6 +531,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             return tPlans('checkoutStatus.errors.adminLocked')
         case 'topup_not_allowed':
             return tPlans('checkoutStatus.errors.topupNotAllowed')
+        case 'provider_not_configured':
+            return tPlans('checkoutStatus.errors.providerNotConfigured')
         default:
             return tPlans('checkoutStatus.errors.requestFailed')
         }
@@ -550,6 +576,10 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
 
         const orgId = String(formData.get('organizationId') ?? '')
         const simulatedOutcome = toMockOutcome(String(formData.get('simulatedOutcome') ?? 'success'))
+        const planIdValue = String(formData.get('planId') ?? '').trim()
+        const planId = planIdValue === 'starter' || planIdValue === 'growth' || planIdValue === 'scale'
+            ? planIdValue as BillingPlanTierId
+            : null
         const monthlyPriceTry = toPositiveNumber(String(formData.get('monthlyPriceTry') ?? '0'))
         const monthlyCredits = toPositiveNumber(String(formData.get('monthlyCredits') ?? '0'))
 
@@ -557,8 +587,15 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             organizationId: orgId,
             simulatedOutcome,
             monthlyPriceTry,
-            monthlyCredits
+            monthlyCredits,
+            planId,
+            callbackUrl: subscriptionCallbackUrl,
+            locale: checkoutLocale
         })
+
+        if (result.redirectUrl) {
+            redirect(result.redirectUrl)
+        }
 
         revalidatePath(`/${locale}/settings/plans`)
         revalidatePath(`/${locale}/settings/billing`)
@@ -577,8 +614,15 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             organizationId: orgId,
             simulatedOutcome,
             credits,
-            amountTry
+            amountTry,
+            callbackUrl: topupCallbackUrl,
+            locale: checkoutLocale,
+            customerIp
         })
+
+        if (result.redirectUrl) {
+            redirect(result.redirectUrl)
+        }
 
         revalidatePath(`/${locale}/settings/plans`)
         revalidatePath(`/${locale}/settings/billing`)
@@ -914,6 +958,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
 
                                                 <form action={handleMockSubscribe} className="mt-4">
                                                     <input type="hidden" name="organizationId" value={organizationId} />
+                                                    <input type="hidden" name="planId" value={plan.id} />
                                                     <input type="hidden" name="monthlyPriceTry" value={String(plan.priceTry)} />
                                                     <input type="hidden" name="monthlyCredits" value={String(plan.credits)} />
                                                     <input type="hidden" name="simulatedOutcome" value="success" />

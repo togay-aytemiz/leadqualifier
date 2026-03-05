@@ -2,9 +2,16 @@
 
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import type { BillingPlanTierId } from '@/lib/billing/pricing-catalog'
+import { getBillingProviderConfig, getIyzicoPlanReferenceCode } from '@/lib/billing/providers/config'
+import {
+    initializeIyzicoSubscriptionCheckout,
+    initializeIyzicoTopupCheckout,
+    IyzicoClientError
+} from '@/lib/billing/providers/iyzico/client'
 
 export type MockPaymentOutcome = 'success' | 'failed'
-export type MockCheckoutStatus = 'success' | 'scheduled' | 'failed' | 'blocked' | 'error'
+export type MockCheckoutStatus = 'success' | 'scheduled' | 'failed' | 'blocked' | 'error' | 'redirect'
 export type MockCheckoutError =
     | 'unauthorized'
     | 'invalid_input'
@@ -12,6 +19,7 @@ export type MockCheckoutError =
     | 'request_failed'
     | 'topup_not_allowed'
     | 'admin_locked'
+    | 'provider_not_configured'
 
 export interface MockCheckoutResult {
     ok: boolean
@@ -19,6 +27,7 @@ export interface MockCheckoutResult {
     error: MockCheckoutError | null
     changeType?: string | null
     effectiveAt?: string | null
+    redirectUrl?: string | null
 }
 
 interface MockCheckoutRpcPayload {
@@ -35,6 +44,25 @@ interface BillingAccountFallbackRow {
     monthly_package_credit_limit: number
     monthly_package_credit_used: number
     topup_credit_balance: number
+}
+
+interface ProfileRow {
+    full_name: string | null
+    email: string | null
+}
+
+interface OrganizationRow {
+    name: string
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    return value as Record<string, unknown>
+}
+
+function toErrorMessage(error: unknown) {
+    if (error instanceof Error && error.message) return error.message
+    return typeof error === 'string' ? error : 'Unknown error'
 }
 
 function errorResult(error: MockCheckoutError): MockCheckoutResult {
@@ -137,6 +165,70 @@ function toNonNegativeNumber(value: unknown) {
     const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     if (!Number.isFinite(parsed)) return 0
     return Math.max(0, parsed)
+}
+
+function formatIyzicoDate(date: Date) {
+    const pad = (value: number) => value.toString().padStart(2, '0')
+    const year = date.getUTCFullYear()
+    const month = pad(date.getUTCMonth() + 1)
+    const day = pad(date.getUTCDate())
+    const hour = pad(date.getUTCHours())
+    const minute = pad(date.getUTCMinutes())
+    const second = pad(date.getUTCSeconds())
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+}
+
+function resolveIyzicoLocale(locale: string | null | undefined): 'tr' | 'en' {
+    return (locale ?? '').toLowerCase().startsWith('en') ? 'en' : 'tr'
+}
+
+function resolveRouteLocale(locale: string | null | undefined): 'tr' | 'en' {
+    return resolveIyzicoLocale(locale)
+}
+
+function resolveDefaultCallbackBaseUrl() {
+    const value = process.env.NEXT_PUBLIC_APP_URL?.trim()
+    if (!value) return null
+
+    try {
+        return new URL(value).origin
+    } catch {
+        return null
+    }
+}
+
+function resolveCheckoutCallbackUrl(input: {
+    action: 'subscribe' | 'topup'
+    callbackUrl?: string | null
+    locale?: string | null
+}) {
+    const action = input.action
+    const locale = resolveRouteLocale(input.locale)
+    const callbackUrl = input.callbackUrl?.trim()
+    if (callbackUrl) return callbackUrl
+
+    const baseUrl = resolveDefaultCallbackBaseUrl()
+    if (!baseUrl) return null
+    const query = new URLSearchParams({
+        action,
+        locale
+    })
+    return `${baseUrl}/api/billing/iyzico/callback?${query.toString()}`
+}
+
+function splitNameParts(value: string | null | undefined) {
+    const trimmed = (value ?? '').trim()
+    if (!trimmed) {
+        return {
+            name: 'Qualy',
+            surname: 'Customer'
+        }
+    }
+
+    const parts = trimmed.split(/\s+/).filter(Boolean)
+    const [name = 'Qualy', ...rest] = parts
+    const surname = rest.join(' ').trim() || 'Customer'
+    return { name, surname }
 }
 
 function createServiceRoleClient() {
@@ -302,23 +394,12 @@ async function tryLegacyPremiumTopupFallback(input: {
     }
 }
 
-export async function simulateMockSubscriptionCheckout(input: {
+async function runLegacyMockSubscriptionCheckout(input: {
     organizationId: string
     simulatedOutcome: MockPaymentOutcome
     monthlyPriceTry: number
     monthlyCredits: number
 }): Promise<MockCheckoutResult> {
-    if (
-        !input.organizationId
-        || !isValidOutcome(input.simulatedOutcome)
-        || !Number.isFinite(input.monthlyPriceTry)
-        || input.monthlyPriceTry < 0
-        || !Number.isFinite(input.monthlyCredits)
-        || input.monthlyCredits <= 0
-    ) {
-        return errorResult('invalid_input')
-    }
-
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -341,23 +422,12 @@ export async function simulateMockSubscriptionCheckout(input: {
     return mapRpcPayloadToResult(parseRpcPayload(data))
 }
 
-export async function simulateMockTopupCheckout(input: {
+async function runLegacyMockTopupCheckout(input: {
     organizationId: string
     simulatedOutcome: MockPaymentOutcome
     credits: number
     amountTry: number
 }): Promise<MockCheckoutResult> {
-    if (
-        !input.organizationId
-        || !isValidOutcome(input.simulatedOutcome)
-        || !Number.isFinite(input.credits)
-        || input.credits <= 0
-        || !Number.isFinite(input.amountTry)
-        || input.amountTry < 0
-    ) {
-        return errorResult('invalid_input')
-    }
-
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -393,4 +463,575 @@ export async function simulateMockTopupCheckout(input: {
     }
 
     return mappedResult
+}
+
+async function loadIyzicoCheckoutContext(input: {
+    organizationId: string
+}) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return {
+            supabase,
+            user: null as null,
+            billing: null as BillingAccountFallbackRow | null
+        }
+    }
+
+    const membership = await supabase.rpc('assert_org_member_or_admin', {
+        target_organization_id: input.organizationId
+    })
+    if (membership.error) {
+        return {
+            supabase,
+            user: null as null,
+            billing: null as BillingAccountFallbackRow | null
+        }
+    }
+
+    const billingResult = await supabase
+        .from('organization_billing_accounts')
+        .select('membership_state, lock_reason, monthly_package_credit_limit, monthly_package_credit_used, topup_credit_balance')
+        .eq('organization_id', input.organizationId)
+        .maybeSingle()
+
+    if (billingResult.error || !billingResult.data) {
+        return {
+            supabase,
+            user,
+            billing: null as BillingAccountFallbackRow | null
+        }
+    }
+
+    return {
+        supabase,
+        user,
+        billing: billingResult.data as BillingAccountFallbackRow
+    }
+}
+
+function mapIyzicoErrorToCheckoutError(error: unknown): MockCheckoutError {
+    if (error instanceof IyzicoClientError) {
+        if (error.code === 'provider_not_configured') {
+            return 'provider_not_configured'
+        }
+    }
+    return 'request_failed'
+}
+
+async function resolveProfileAndOrganization(input: {
+    tenantSupabase: Awaited<ReturnType<typeof createClient>>
+    userId: string
+    organizationId: string
+}) {
+    const [{ data: profile }, { data: organization }] = await Promise.all([
+        input.tenantSupabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', input.userId)
+            .maybeSingle(),
+        input.tenantSupabase
+            .from('organizations')
+            .select('name')
+            .eq('id', input.organizationId)
+            .maybeSingle()
+    ])
+
+    return {
+        profile: (profile ?? null) as ProfileRow | null,
+        organization: (organization ?? null) as OrganizationRow | null
+    }
+}
+
+function resolvePlanIdFromCredits(input: {
+    planId: BillingPlanTierId | null | undefined
+    monthlyCredits: number
+}): BillingPlanTierId | null {
+    if (input.planId) return input.planId
+    if (Math.round(input.monthlyCredits) === 1000) return 'starter'
+    if (Math.round(input.monthlyCredits) === 2000) return 'growth'
+    if (Math.round(input.monthlyCredits) === 4000) return 'scale'
+    return null
+}
+
+export async function simulateMockSubscriptionCheckout(input: {
+    organizationId: string
+    simulatedOutcome: MockPaymentOutcome
+    monthlyPriceTry: number
+    monthlyCredits: number
+    planId?: BillingPlanTierId | null
+    callbackUrl?: string | null
+    locale?: string | null
+}): Promise<MockCheckoutResult> {
+    if (
+        !input.organizationId
+        || !isValidOutcome(input.simulatedOutcome)
+        || !Number.isFinite(input.monthlyPriceTry)
+        || input.monthlyPriceTry < 0
+        || !Number.isFinite(input.monthlyCredits)
+        || input.monthlyCredits <= 0
+    ) {
+        return errorResult('invalid_input')
+    }
+
+    const providerConfig = getBillingProviderConfig()
+    if (providerConfig.provider !== 'iyzico') {
+        return runLegacyMockSubscriptionCheckout({
+            organizationId: input.organizationId,
+            simulatedOutcome: input.simulatedOutcome,
+            monthlyPriceTry: input.monthlyPriceTry,
+            monthlyCredits: input.monthlyCredits
+        })
+    }
+
+    if (!providerConfig.iyzico.enabled) {
+        return errorResult('provider_not_configured')
+    }
+
+    if (input.simulatedOutcome === 'failed') {
+        return {
+            ok: false,
+            status: 'failed',
+            error: null,
+            changeType: null,
+            effectiveAt: null
+        }
+    }
+
+    const { supabase, user, billing } = await loadIyzicoCheckoutContext({
+        organizationId: input.organizationId
+    })
+    if (!user) return errorResult('unauthorized')
+    if (!billing) return errorResult('request_failed')
+    if (billing.lock_reason === 'admin_locked' || billing.membership_state === 'admin_locked') {
+        return {
+            ok: false,
+            status: 'blocked',
+            error: 'admin_locked'
+        }
+    }
+
+    const currentCredits = Math.round(toNonNegativeNumber(billing.monthly_package_credit_limit))
+    const requestedCredits = Math.round(toNonNegativeNumber(input.monthlyCredits))
+    if (billing.membership_state === 'premium_active') {
+        if (requestedCredits === currentCredits) {
+            return {
+                ok: true,
+                status: 'success',
+                error: null,
+                changeType: 'no_change',
+                effectiveAt: null
+            }
+        }
+
+        if (requestedCredits < currentCredits) {
+            return {
+                ok: true,
+                status: 'scheduled',
+                error: null,
+                changeType: 'downgrade',
+                effectiveAt: null
+            }
+        }
+
+        return errorResult('request_failed')
+    }
+
+    const planId = resolvePlanIdFromCredits({
+        planId: input.planId,
+        monthlyCredits: input.monthlyCredits
+    })
+    if (!planId) {
+        return errorResult('invalid_input')
+    }
+
+    const pricingPlanReferenceCode = getIyzicoPlanReferenceCode(planId)
+    if (!pricingPlanReferenceCode) {
+        return errorResult('provider_not_configured')
+    }
+
+    const callbackUrl = resolveCheckoutCallbackUrl({
+        action: 'subscribe',
+        callbackUrl: input.callbackUrl,
+        locale: input.locale
+    })
+    if (!callbackUrl) {
+        return errorResult('request_failed')
+    }
+
+    const serviceSupabase = createServiceRoleClient()
+    if (!serviceSupabase) {
+        return errorResult('request_failed')
+    }
+
+    const { profile, organization } = await resolveProfileAndOrganization({
+        tenantSupabase: supabase,
+        userId: user.id,
+        organizationId: input.organizationId
+    })
+    const nameParts = splitNameParts(profile?.full_name)
+    const contactName = `${nameParts.name} ${nameParts.surname}`.trim()
+    const defaultEmail = profile?.email?.trim() || 'billing@example.com'
+    const defaultAddress = process.env.IYZICO_DEFAULT_ADDRESS?.trim() || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
+    const defaultCity = process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
+    const defaultCountry = process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
+    const defaultZipCode = process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
+    const defaultIdentity = process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim() || '11111111111'
+    const defaultGsm = process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim() || '+905555555555'
+    const now = new Date().toISOString()
+
+    const pendingInsert = await serviceSupabase
+        .from('organization_subscription_records')
+        .insert({
+            organization_id: input.organizationId,
+            provider: 'iyzico',
+            provider_subscription_id: null,
+            status: 'pending',
+            period_start: null,
+            period_end: null,
+            metadata: {
+                source: 'iyzico_checkout_form',
+                checkout_locale: resolveRouteLocale(input.locale),
+                callback_url: callbackUrl,
+                requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                requested_monthly_credits: toNonNegativeNumber(input.monthlyCredits),
+                requested_plan_id: planId,
+                initiated_by: user.id,
+                initiated_at: now
+            }
+        })
+        .select('id, metadata')
+        .maybeSingle()
+
+    if (pendingInsert.error || !pendingInsert.data?.id) {
+        console.error('Failed to create pending iyzico subscription row:', pendingInsert.error)
+        return errorResult('request_failed')
+    }
+
+    const pendingId = pendingInsert.data.id
+
+    try {
+        const checkoutResult = await initializeIyzicoSubscriptionCheckout({
+            locale: resolveIyzicoLocale(input.locale),
+            conversationId: pendingId,
+            callbackUrl,
+            pricingPlanReferenceCode,
+            customer: {
+                name: nameParts.name,
+                surname: nameParts.surname,
+                identityNumber: defaultIdentity,
+                email: defaultEmail,
+                gsmNumber: defaultGsm,
+                billingAddress: {
+                    contactName,
+                    city: defaultCity,
+                    country: defaultCountry,
+                    address: defaultAddress,
+                    zipCode: defaultZipCode
+                },
+                shippingAddress: {
+                    contactName,
+                    city: defaultCity,
+                    country: defaultCountry,
+                    address: defaultAddress,
+                    zipCode: defaultZipCode
+                }
+            }
+        })
+
+        const token = typeof checkoutResult.token === 'string'
+            ? checkoutResult.token.trim()
+            : ''
+        const checkoutFormContent = typeof checkoutResult.checkoutFormContent === 'string'
+            ? checkoutResult.checkoutFormContent
+            : ''
+
+        if (!token || !checkoutFormContent) {
+            await serviceSupabase
+                .from('organization_subscription_records')
+                .update({
+                    status: 'incomplete',
+                    metadata: {
+                        ...asRecord(pendingInsert.data.metadata),
+                        checkout_error: 'missing_checkout_form_payload',
+                        updated_at: new Date().toISOString()
+                    }
+                })
+                .eq('id', pendingId)
+
+            return errorResult('request_failed')
+        }
+
+        await serviceSupabase
+            .from('organization_subscription_records')
+            .update({
+                metadata: {
+                    ...asRecord(pendingInsert.data.metadata),
+                    organization_name: organization?.name ?? null,
+                    checkout_token: token,
+                    checkout_form_content: checkoutFormContent,
+                    checkout_initialize_response: checkoutResult
+                }
+            })
+            .eq('id', pendingId)
+
+        return {
+            ok: true,
+            status: 'redirect',
+            error: null,
+            changeType: 'start',
+            effectiveAt: null,
+            redirectUrl: `/${resolveRouteLocale(input.locale)}/settings/plans/subscription-checkout/${pendingId}`
+        }
+    } catch (error) {
+        await serviceSupabase
+            .from('organization_subscription_records')
+            .update({
+                status: 'incomplete',
+                metadata: {
+                    ...asRecord(pendingInsert.data.metadata),
+                    checkout_error: toErrorMessage(error),
+                    updated_at: new Date().toISOString()
+                }
+            })
+            .eq('id', pendingId)
+
+        return errorResult(mapIyzicoErrorToCheckoutError(error))
+    }
+}
+
+export async function simulateMockTopupCheckout(input: {
+    organizationId: string
+    simulatedOutcome: MockPaymentOutcome
+    credits: number
+    amountTry: number
+    callbackUrl?: string | null
+    locale?: string | null
+    customerIp?: string | null
+}): Promise<MockCheckoutResult> {
+    if (
+        !input.organizationId
+        || !isValidOutcome(input.simulatedOutcome)
+        || !Number.isFinite(input.credits)
+        || input.credits <= 0
+        || !Number.isFinite(input.amountTry)
+        || input.amountTry < 0
+    ) {
+        return errorResult('invalid_input')
+    }
+
+    const providerConfig = getBillingProviderConfig()
+    if (providerConfig.provider !== 'iyzico') {
+        return runLegacyMockTopupCheckout({
+            organizationId: input.organizationId,
+            simulatedOutcome: input.simulatedOutcome,
+            credits: input.credits,
+            amountTry: input.amountTry
+        })
+    }
+
+    if (!providerConfig.iyzico.enabled) {
+        return errorResult('provider_not_configured')
+    }
+
+    if (input.simulatedOutcome === 'failed') {
+        return {
+            ok: false,
+            status: 'failed',
+            error: null,
+            changeType: null,
+            effectiveAt: null
+        }
+    }
+
+    const { supabase, user, billing } = await loadIyzicoCheckoutContext({
+        organizationId: input.organizationId
+    })
+    if (!user) return errorResult('unauthorized')
+    if (!billing) return errorResult('request_failed')
+    if (billing.lock_reason === 'admin_locked' || billing.membership_state === 'admin_locked') {
+        return {
+            ok: false,
+            status: 'blocked',
+            error: 'admin_locked'
+        }
+    }
+
+    if (billing.membership_state !== 'premium_active') {
+        return {
+            ok: false,
+            status: 'blocked',
+            error: 'topup_not_allowed'
+        }
+    }
+
+    const callbackUrl = resolveCheckoutCallbackUrl({
+        action: 'topup',
+        callbackUrl: input.callbackUrl,
+        locale: input.locale
+    })
+    if (!callbackUrl) {
+        return errorResult('request_failed')
+    }
+
+    const serviceSupabase = createServiceRoleClient()
+    if (!serviceSupabase) {
+        return errorResult('request_failed')
+    }
+
+    const { profile } = await resolveProfileAndOrganization({
+        tenantSupabase: supabase,
+        userId: user.id,
+        organizationId: input.organizationId
+    })
+    const nameParts = splitNameParts(profile?.full_name)
+    const contactName = `${nameParts.name} ${nameParts.surname}`.trim()
+    const now = new Date()
+    const nowFormatted = formatIyzicoDate(now)
+    const defaultEmail = profile?.email?.trim() || 'billing@example.com'
+    const defaultAddress = process.env.IYZICO_DEFAULT_ADDRESS?.trim() || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
+    const defaultCity = process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
+    const defaultCountry = process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
+    const defaultZipCode = process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
+    const defaultIdentity = process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim() || '11111111111'
+    const defaultGsm = process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim() || '+905555555555'
+    const ipAddress = input.customerIp?.trim() || process.env.IYZICO_DEFAULT_IP?.trim() || '127.0.0.1'
+
+    const pendingOrderInsert = await serviceSupabase
+        .from('credit_purchase_orders')
+        .insert({
+            organization_id: input.organizationId,
+            provider: 'iyzico',
+            provider_checkout_id: null,
+            provider_payment_id: null,
+            status: 'pending',
+            credits: toNonNegativeNumber(input.credits),
+            amount_try: toNonNegativeNumber(input.amountTry),
+            currency: 'TRY',
+            paid_at: null,
+            metadata: {
+                source: 'iyzico_checkout_form',
+                checkout_locale: resolveRouteLocale(input.locale),
+                callback_url: callbackUrl,
+                initiated_by: user.id,
+                initiated_at: now.toISOString()
+            }
+        })
+        .select('id, metadata')
+        .maybeSingle()
+
+    if (pendingOrderInsert.error || !pendingOrderInsert.data?.id) {
+        console.error('Failed to create pending iyzico top-up order:', pendingOrderInsert.error)
+        return errorResult('request_failed')
+    }
+
+    const orderId = pendingOrderInsert.data.id
+
+    try {
+        const checkoutResult = await initializeIyzicoTopupCheckout({
+            locale: resolveIyzicoLocale(input.locale),
+            conversationId: orderId,
+            callbackUrl,
+            price: toNonNegativeNumber(input.amountTry),
+            paidPrice: toNonNegativeNumber(input.amountTry),
+            currency: 'TRY',
+            basketId: `topup_${orderId}`,
+            buyer: {
+                id: user.id,
+                name: nameParts.name,
+                surname: nameParts.surname,
+                identityNumber: defaultIdentity,
+                email: defaultEmail,
+                gsmNumber: defaultGsm,
+                registrationDate: nowFormatted,
+                lastLoginDate: nowFormatted,
+                registrationAddress: defaultAddress,
+                ip: ipAddress,
+                city: defaultCity,
+                country: defaultCountry,
+                zipCode: defaultZipCode
+            },
+            shippingAddress: {
+                contactName,
+                city: defaultCity,
+                country: defaultCountry,
+                address: defaultAddress,
+                zipCode: defaultZipCode
+            },
+            billingAddress: {
+                contactName,
+                city: defaultCity,
+                country: defaultCountry,
+                address: defaultAddress,
+                zipCode: defaultZipCode
+            },
+            basketItems: [
+                {
+                    id: `topup_pack_${Math.round(toNonNegativeNumber(input.credits))}`,
+                    name: 'Qualy AI Top-up Credits',
+                    category1: 'SaaS',
+                    category2: 'Credit Topup',
+                    itemType: 'VIRTUAL',
+                    price: toNonNegativeNumber(input.amountTry)
+                }
+            ]
+        })
+
+        const checkoutToken = typeof checkoutResult.token === 'string'
+            ? checkoutResult.token.trim()
+            : ''
+        const paymentPageUrl = typeof checkoutResult.paymentPageUrl === 'string'
+            ? checkoutResult.paymentPageUrl.trim()
+            : ''
+        if (!checkoutToken || !paymentPageUrl) {
+            await serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    status: 'failed',
+                    metadata: {
+                        ...asRecord(pendingOrderInsert.data.metadata),
+                        checkout_error: 'missing_checkout_page_url_or_token',
+                        checkout_initialize_response: checkoutResult
+                    }
+                })
+                .eq('id', orderId)
+
+            return errorResult('request_failed')
+        }
+
+        await serviceSupabase
+            .from('credit_purchase_orders')
+            .update({
+                provider_checkout_id: checkoutToken,
+                metadata: {
+                    ...asRecord(pendingOrderInsert.data.metadata),
+                    checkout_token: checkoutToken,
+                    checkout_page_url: paymentPageUrl,
+                    checkout_initialize_response: checkoutResult
+                }
+            })
+            .eq('id', orderId)
+
+        return {
+            ok: true,
+            status: 'redirect',
+            error: null,
+            changeType: null,
+            effectiveAt: null,
+            redirectUrl: paymentPageUrl
+        }
+    } catch (error) {
+        await serviceSupabase
+            .from('credit_purchase_orders')
+            .update({
+                status: 'failed',
+                metadata: {
+                    ...asRecord(pendingOrderInsert.data.metadata),
+                    checkout_error: toErrorMessage(error)
+                }
+            })
+            .eq('id', orderId)
+
+        return errorResult(mapIyzicoErrorToCheckoutError(error))
+    }
 }

@@ -870,7 +870,8 @@
                 "notAvailable": "Mock checkout functions are not available in this environment yet.",
                 "requestFailed": "The checkout request failed. Please retry.",
                 "adminLocked": "This organization is admin-locked.",
-                "topupNotAllowed": "Top-up credits are not allowed by current membership/package state."
+                "topupNotAllowed": "Top-up credits are not allowed by current membership/package state.",
+                "providerNotConfigured": "Iyzico provider settings are missing. Add API keys and plan references in environment variables."
             }
         },
         "renewalStatus": {

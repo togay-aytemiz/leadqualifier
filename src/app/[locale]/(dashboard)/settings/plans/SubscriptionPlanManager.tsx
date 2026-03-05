@@ -202,6 +202,7 @@ export function SubscriptionPlanManager({
 
                                 <form action={planAction} className="mt-4">
                                     <input type="hidden" name="organizationId" value={organizationId} />
+                                    <input type="hidden" name="planId" value={plan.id} />
                                     <input type="hidden" name="monthlyPriceTry" value={String(plan.priceTry)} />
                                     <input type="hidden" name="monthlyCredits" value={String(plan.credits)} />
                                     <input type="hidden" name="simulatedOutcome" value="success" />
