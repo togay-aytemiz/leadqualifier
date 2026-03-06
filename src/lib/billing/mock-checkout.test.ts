@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { simulateMockSubscriptionCheckout, simulateMockTopupCheckout } from '@/lib/billing/mock-checkout'
 
-const { createClientMock, createServiceClientMock } = vi.hoisted(() => ({
+const { createClientMock, createServiceClientMock, initializeIyzicoSubscriptionCheckoutMock, initializeIyzicoTopupCheckoutMock, upgradeIyzicoSubscriptionMock } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
-    createServiceClientMock: vi.fn()
+    createServiceClientMock: vi.fn(),
+    initializeIyzicoSubscriptionCheckoutMock: vi.fn(),
+    initializeIyzicoTopupCheckoutMock: vi.fn(),
+    upgradeIyzicoSubscriptionMock: vi.fn()
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -14,12 +17,32 @@ vi.mock('@supabase/supabase-js', () => ({
     createClient: createServiceClientMock
 }))
 
+vi.mock('@/lib/billing/providers/iyzico/client', () => {
+    class MockIyzicoClientError extends Error {
+        readonly code: string
+
+        constructor(code: string, message: string) {
+            super(message)
+            this.code = code
+        }
+    }
+
+    return {
+        initializeIyzicoSubscriptionCheckout: initializeIyzicoSubscriptionCheckoutMock,
+        initializeIyzicoTopupCheckout: initializeIyzicoTopupCheckoutMock,
+        upgradeIyzicoSubscription: upgradeIyzicoSubscriptionMock,
+        IyzicoClientError: MockIyzicoClientError
+    }
+})
+
 interface SupabaseMockOptions {
     userId?: string | null
     rpcResultByFn?: Record<string, { data: unknown; error: unknown }>
     billingAccountRow?: Record<string, unknown> | null
     billingAccountError?: unknown
     assertMemberError?: unknown
+    activeSubscriptionRow?: Record<string, unknown> | null
+    activeSubscriptionError?: unknown
 }
 
 function createSupabaseMock(options: SupabaseMockOptions = {}) {
@@ -52,10 +75,39 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
         eq: billingEqMock
     }))
 
+    const subscriptionMaybeSingleMock = vi.fn(async () => ({
+        data: options.activeSubscriptionRow ?? null,
+        error: options.activeSubscriptionError ?? null
+    }))
+    const subscriptionLimitMock = vi.fn(() => ({
+        maybeSingle: subscriptionMaybeSingleMock
+    }))
+    const subscriptionOrderMock = vi.fn(() => ({
+        limit: subscriptionLimitMock
+    }))
+    const subscriptionInMock = vi.fn(() => ({
+        order: subscriptionOrderMock
+    }))
+    const subscriptionSecondEqMock = vi.fn(() => ({
+        in: subscriptionInMock
+    }))
+    const subscriptionFirstEqMock = vi.fn(() => ({
+        eq: subscriptionSecondEqMock
+    }))
+    const subscriptionSelectMock = vi.fn(() => ({
+        eq: subscriptionFirstEqMock
+    }))
+
     const fromMock = vi.fn((table: string) => {
         if (table === 'organization_billing_accounts') {
             return {
                 select: billingSelectMock
+            }
+        }
+
+        if (table === 'organization_subscription_records') {
+            return {
+                select: subscriptionSelectMock
             }
         }
 
@@ -74,7 +126,14 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
         fromMock,
         billingSelectMock,
         billingEqMock,
-        billingMaybeSingleMock
+        billingMaybeSingleMock,
+        subscriptionSelectMock,
+        subscriptionFirstEqMock,
+        subscriptionSecondEqMock,
+        subscriptionInMock,
+        subscriptionOrderMock,
+        subscriptionLimitMock,
+        subscriptionMaybeSingleMock
     }
 }
 
@@ -100,6 +159,11 @@ function createServiceSupabaseMock() {
         eq: billingUpdateEqMock
     }))
 
+    const subscriptionUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const subscriptionUpdateMock = vi.fn(() => ({
+        eq: subscriptionUpdateEqMock
+    }))
+
     const ledgerInsertMock = vi.fn(async () => ({ error: null }))
 
     const fromMock = vi.fn((table: string) => {
@@ -113,6 +177,12 @@ function createServiceSupabaseMock() {
         if (table === 'organization_billing_accounts') {
             return {
                 update: billingUpdateMock
+            }
+        }
+
+        if (table === 'organization_subscription_records') {
+            return {
+                update: subscriptionUpdateMock
             }
         }
 
@@ -138,6 +208,8 @@ function createServiceSupabaseMock() {
             purchaseUpdateEqMock,
             billingUpdateMock,
             billingUpdateEqMock,
+            subscriptionUpdateMock,
+            subscriptionUpdateEqMock,
             ledgerInsertMock
         }
     }
@@ -146,8 +218,59 @@ function createServiceSupabaseMock() {
 describe('mock checkout simulation wrappers', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        process.env.NODE_ENV = 'test'
+        process.env.BILLING_PROVIDER = 'mock'
+        process.env.BILLING_MOCK_ENABLED = '1'
+        delete process.env.IYZICO_API_KEY
+        delete process.env.IYZICO_SECRET_KEY
+        delete process.env.IYZICO_BASE_URL
+        delete process.env.IYZICO_SUBSCRIPTION_PLAN_STARTER_REF
+        delete process.env.IYZICO_SUBSCRIPTION_PLAN_GROWTH_REF
+        delete process.env.IYZICO_SUBSCRIPTION_PLAN_SCALE_REF
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+    })
+
+    it('returns provider_not_configured for subscription checkout when provider env is missing in production', async () => {
+        process.env.NODE_ENV = 'production'
+        delete process.env.BILLING_PROVIDER
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 49,
+            monthlyCredits: 1000
+        })
+
+        expect(result).toEqual({
+            ok: false,
+            status: 'error',
+            error: 'provider_not_configured',
+            changeType: null,
+            effectiveAt: null
+        })
+        expect(createClientMock).not.toHaveBeenCalled()
+    })
+
+    it('returns provider_not_configured for top-up checkout when mock is requested without explicit opt-in', async () => {
+        process.env.BILLING_PROVIDER = 'mock'
+        delete process.env.BILLING_MOCK_ENABLED
+
+        const result = await simulateMockTopupCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            credits: 500,
+            amountTry: 200
+        })
+
+        expect(result).toEqual({
+            ok: false,
+            status: 'error',
+            error: 'provider_not_configured',
+            changeType: null,
+            effectiveAt: null
+        })
+        expect(createClientMock).not.toHaveBeenCalled()
     })
 
     it('returns invalid_input for malformed subscription payload', async () => {
@@ -248,6 +371,91 @@ describe('mock checkout simulation wrappers', () => {
             changeType: 'downgrade',
             effectiveAt: '2026-03-01T00:00:00.000Z'
         })
+    })
+
+    it('upgrades active premium subscription through iyzico when a higher plan is selected', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+        process.env.IYZICO_SUBSCRIPTION_PLAN_GROWTH_REF = 'growth-plan-ref'
+
+        const serviceSupabase = createServiceSupabaseMock()
+        createServiceClientMock.mockReturnValue(serviceSupabase.client)
+        upgradeIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {
+                referenceCode: 'sub_ref_growth',
+                startDate: String(Date.parse('2026-03-01T00:00:00.000Z')),
+                endDate: String(Date.parse('2026-04-01T00:00:00.000Z'))
+            }
+        })
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 1000,
+                monthly_package_credit_used: 150,
+                topup_credit_balance: 20
+            },
+            activeSubscriptionRow: {
+                id: 'sub_row_1',
+                status: 'active',
+                provider_subscription_id: 'sub_ref_starter',
+                period_start: '2026-03-01T00:00:00.000Z',
+                period_end: '2026-04-01T00:00:00.000Z',
+                metadata: {
+                    source: 'iyzico_checkout_form'
+                }
+            }
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 649,
+            monthlyCredits: 2000,
+            planId: 'growth'
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            status: 'success',
+            error: null,
+            changeType: 'upgrade',
+            effectiveAt: null
+        })
+        expect(upgradeIyzicoSubscriptionMock).toHaveBeenCalledWith({
+            subscriptionReferenceCode: 'sub_ref_starter',
+            newPricingPlanReferenceCode: 'growth-plan-ref'
+        })
+        expect(serviceSupabase.spies.billingUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            monthly_package_credit_limit: 2000,
+            monthly_package_credit_used: 150,
+            current_period_start: '2026-03-01T00:00:00.000Z',
+            current_period_end: '2026-04-01T00:00:00.000Z'
+        }))
+        expect(serviceSupabase.spies.subscriptionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            provider_subscription_id: 'sub_ref_growth',
+            metadata: expect.objectContaining({
+                change_type: 'upgrade',
+                requested_monthly_credits: 2000,
+                requested_monthly_price_try: 649
+            })
+        }))
+        expect(serviceSupabase.spies.ledgerInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+            entry_type: 'package_grant',
+            credit_pool: 'package_pool',
+            credits_delta: 1000,
+            balance_after: 1870,
+            metadata: expect.objectContaining({
+                subscription_id: 'sub_row_1',
+                change_type: 'upgrade',
+                requested_monthly_credits: 2000
+            })
+        }))
     })
 
     it('falls back to compatibility mode when legacy RPC blocks top-up for premium accounts', async () => {

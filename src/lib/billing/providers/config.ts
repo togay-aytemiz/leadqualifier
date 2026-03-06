@@ -6,6 +6,10 @@ export type BillingProviderConfigError = 'provider_not_configured'
 
 export interface BillingProviderConfig {
     provider: BillingProvider
+    mock: {
+        enabled: boolean
+        error: BillingProviderConfigError | null
+    }
     iyzico: {
         enabled: boolean
         apiKey: string | null
@@ -23,9 +27,23 @@ function readEnv(name: string) {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function isTruthyEnvFlag(value: string | null) {
+    if (!value) return false
+
+    switch (value.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'on':
+        return true
+    default:
+        return false
+    }
+}
+
 export function resolveBillingProvider(): BillingProvider {
     const raw = readEnv('BILLING_PROVIDER')
-    if (!raw) return 'mock'
+    if (!raw) return 'iyzico'
 
     return raw.toLowerCase() === 'iyzico'
         ? 'iyzico'
@@ -51,6 +69,8 @@ export function getIyzicoPlanReferenceCode(planId: BillingPlanTierId) {
 
 export function getBillingProviderConfig(): BillingProviderConfig {
     const provider = resolveBillingProvider()
+    const mockEnabled = provider === 'mock'
+        && isTruthyEnvFlag(readEnv('BILLING_MOCK_ENABLED'))
     const apiKey = readEnv('IYZICO_API_KEY')
     const secretKey = readEnv('IYZICO_SECRET_KEY')
     const baseUrl = resolveIyzicoBaseUrl()
@@ -62,6 +82,12 @@ export function getBillingProviderConfig(): BillingProviderConfig {
 
     return {
         provider,
+        mock: {
+            enabled: mockEnabled,
+            error: provider === 'mock' && !mockEnabled
+                ? 'provider_not_configured'
+                : null
+        },
         iyzico: {
             enabled: iyzicoEnabled,
             apiKey,

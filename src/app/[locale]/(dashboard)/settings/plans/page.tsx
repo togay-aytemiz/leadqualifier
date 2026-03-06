@@ -24,8 +24,7 @@ import {
     simulateMockTopupCheckout,
     type MockCheckoutError,
     type MockCheckoutResult,
-    type MockCheckoutStatus,
-    type MockPaymentOutcome
+    type MockCheckoutStatus
 } from '@/lib/billing/mock-checkout'
 import {
     cancelSubscriptionRenewal,
@@ -39,11 +38,15 @@ import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import { readCheckoutLegalConsent } from '@/lib/billing/checkout-legal'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
+import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 import { Link } from '@/i18n/navigation'
 import { AlertCircle } from 'lucide-react'
+import { PlansStatusBanner } from './PlansStatusBanner'
 import { TopupCheckoutCard, type TopupPackOption } from './TopupCheckoutCard'
 import { SubscriptionPlanManager, type SubscriptionPlanOption } from './SubscriptionPlanManager'
+import { SubscriptionPlanCatalog } from './SubscriptionPlanCatalog'
 
 interface PlansSettingsPageProps {
     searchParams: Promise<{
@@ -104,17 +107,6 @@ function resolveMembershipLabel(
     }
 }
 
-function toMockOutcome(value: string): MockPaymentOutcome {
-    if (value === 'failed') return 'failed'
-    return 'success'
-}
-
-function toPositiveNumber(value: string) {
-    const parsed = Number.parseFloat(value)
-    if (!Number.isFinite(parsed)) return Number.NaN
-    return parsed
-}
-
 function readHeaderValue(value: string | null | undefined) {
     if (!value) return null
     const first = value.split(',')[0]?.trim() || null
@@ -142,7 +134,7 @@ function buildCheckoutRedirect(
     if (result.effectiveAt) {
         query.set('checkout_effective_at', result.effectiveAt)
     }
-    return `/${locale}/settings/plans?${query.toString()}`
+    return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
 }
 
 function buildRenewalRedirect(
@@ -156,7 +148,7 @@ function buildRenewalRedirect(
     if (result.error) {
         query.set('renewal_error', result.error)
     }
-    return `/${locale}/settings/plans?${query.toString()}`
+    return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
 }
 
 function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): {
@@ -195,6 +187,20 @@ function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): 
         allowed: true,
         reasonKey: null
     }
+}
+
+function redirectWithCheckoutError(
+    locale: string,
+    action: 'subscribe' | 'topup',
+    error: MockCheckoutError
+): never {
+    redirect(buildCheckoutRedirect(locale, action, {
+        ok: false,
+        status: 'error',
+        error,
+        changeType: null,
+        effectiveAt: null
+    }))
 }
 
 export default async function PlansSettingsPage({ searchParams }: PlansSettingsPageProps) {
@@ -368,6 +374,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         if (
             value === 'unauthorized'
             || value === 'invalid_input'
+            || value === 'legal_consent_required'
             || value === 'not_available'
             || value === 'request_failed'
             || value === 'topup_not_allowed'
@@ -525,6 +532,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             return tPlans('checkoutStatus.errors.unauthorized')
         case 'invalid_input':
             return tPlans('checkoutStatus.errors.invalidInput')
+        case 'legal_consent_required':
+            return tPlans('checkoutStatus.errors.legalConsentRequired')
         case 'not_available':
             return tPlans('checkoutStatus.errors.notAvailable')
         case 'admin_locked':
@@ -574,21 +583,30 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     const handleMockSubscribe = async (formData: FormData) => {
         'use server'
 
+        const consent = readCheckoutLegalConsent(formData)
+        if (!consent.isComplete) {
+            redirectWithCheckoutError(locale, 'subscribe', 'legal_consent_required')
+        }
+
         const orgId = String(formData.get('organizationId') ?? '')
-        const simulatedOutcome = toMockOutcome(String(formData.get('simulatedOutcome') ?? 'success'))
         const planIdValue = String(formData.get('planId') ?? '').trim()
         const planId = planIdValue === 'starter' || planIdValue === 'growth' || planIdValue === 'scale'
             ? planIdValue as BillingPlanTierId
             : null
-        const monthlyPriceTry = toPositiveNumber(String(formData.get('monthlyPriceTry') ?? '0'))
-        const monthlyCredits = toPositiveNumber(String(formData.get('monthlyCredits') ?? '0'))
+        const selectedPlan = planId
+            ? subscriptionPlanOptions.find((plan) => plan.id === planId) ?? null
+            : null
+
+        if (!selectedPlan) {
+            redirectWithCheckoutError(locale, 'subscribe', 'invalid_input')
+        }
 
         const result = await simulateMockSubscriptionCheckout({
             organizationId: orgId,
-            simulatedOutcome,
-            monthlyPriceTry,
-            monthlyCredits,
-            planId,
+            simulatedOutcome: 'success',
+            monthlyPriceTry: selectedPlan.priceTry,
+            monthlyCredits: selectedPlan.credits,
+            planId: selectedPlan.id as BillingPlanTierId,
             callbackUrl: subscriptionCallbackUrl,
             locale: checkoutLocale
         })
@@ -605,16 +623,24 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     const handleMockTopup = async (formData: FormData) => {
         'use server'
 
+        const consent = readCheckoutLegalConsent(formData)
+        if (!consent.isComplete) {
+            redirectWithCheckoutError(locale, 'topup', 'legal_consent_required')
+        }
+
         const orgId = String(formData.get('organizationId') ?? '')
-        const simulatedOutcome = toMockOutcome(String(formData.get('simulatedOutcome') ?? 'success'))
-        const credits = toPositiveNumber(String(formData.get('credits') ?? '0'))
-        const amountTry = toPositiveNumber(String(formData.get('amountTry') ?? '0'))
+        const packId = String(formData.get('packId') ?? '').trim()
+        const selectedPack = topupPacks.find((pack) => pack.id === packId) ?? null
+
+        if (!selectedPack) {
+            redirectWithCheckoutError(locale, 'topup', 'invalid_input')
+        }
 
         const result = await simulateMockTopupCheckout({
             organizationId: orgId,
-            simulatedOutcome,
-            credits,
-            amountTry,
+            simulatedOutcome: 'success',
+            credits: selectedPack.credits,
+            amountTry: selectedPack.amountTry,
             callbackUrl: topupCallbackUrl,
             locale: checkoutLocale,
             customerIp
@@ -668,37 +694,35 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                     <p className="text-sm text-gray-500">{tPlans('description')}</p>
 
                     {checkoutStatus && (
-                        <p
-                            className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                        <PlansStatusBanner
+                            className={
                                 checkoutStatus === 'success'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                                     : checkoutStatus === 'scheduled'
                                         ? 'border-sky-200 bg-sky-50 text-sky-900'
-                                    : checkoutStatus === 'failed' || checkoutStatus === 'blocked'
-                                        ? 'border-amber-200 bg-amber-50 text-amber-900'
-                                        : 'border-rose-200 bg-rose-50 text-rose-900'
-                            }`}
-                        >
-                            {getCheckoutTitle()}
-                            {' — '}
-                            {getCheckoutDescription()}
-                        </p>
+                                        : checkoutStatus === 'failed' || checkoutStatus === 'blocked'
+                                            ? 'border-amber-200 bg-amber-50 text-amber-900'
+                                            : 'border-rose-200 bg-rose-50 text-rose-900'
+                            }
+                            dismissLabel={tPlans('statusBanner.dismiss')}
+                            title={getCheckoutTitle()}
+                            description={getCheckoutDescription()}
+                        />
                     )}
 
                     {renewalStatus && (
-                        <p
-                            className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                        <PlansStatusBanner
+                            className={
                                 renewalStatus === 'success'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                                     : renewalStatus === 'blocked'
                                         ? 'border-amber-200 bg-amber-50 text-amber-900'
                                         : 'border-rose-200 bg-rose-50 text-rose-900'
-                            }`}
-                        >
-                            {getRenewalTitle()}
-                            {' — '}
-                            {getRenewalDescription()}
-                        </p>
+                            }
+                            dismissLabel={tPlans('statusBanner.dismiss')}
+                            title={getRenewalTitle()}
+                            description={getRenewalDescription()}
+                        />
                     )}
 
                     <SettingsSection
@@ -912,68 +936,12 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                     resumeAction={handleResumeRenewal}
                                 />
                             ) : (
-                                <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-                                    {localizedPlanTiers.map((plan) => {
-                                        const isPopularPlan = plan.id === 'growth'
-                                        return (
-                                            <article
-                                                key={plan.id}
-                                                className={`flex h-full flex-col rounded-2xl border bg-white p-5 shadow-sm ${
-                                                    isPopularPlan ? 'border-sky-200' : 'border-gray-200'
-                                                }`}
-                                            >
-                                                <div className="mb-4 flex min-h-7 items-center justify-between gap-2">
-                                                    <p className="text-sm font-semibold text-gray-900">
-                                                        {tPlans(`packageCatalog.planNames.${plan.id}`)}
-                                                    </p>
-                                                    {isPopularPlan && (
-                                                        <p className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800">
-                                                            {tPlans('packageCatalog.badges.popular')}
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                <p className="tabular-nums text-3xl font-semibold leading-tight text-gray-900">
-                                                    {formatCurrency.format(plan.localizedPrice)}
-                                                    <span className="ml-1 text-base font-medium text-gray-500">
-                                                        / {tPlans('packageCatalog.month')}
-                                                    </span>
-                                                </p>
-                                                <p className="mt-3 text-sm text-gray-700">
-                                                    {tPlans('packageCatalog.creditsIncluded', {
-                                                        credits: formatNumber.format(plan.credits)
-                                                    })}
-                                                </p>
-                                                <p className="mt-1 text-xs text-gray-600">
-                                                    {tPlans('packageCatalog.approxConversations', {
-                                                        min: formatNumber.format(plan.conversationRange.min),
-                                                        max: formatNumber.format(plan.conversationRange.max)
-                                                    })}
-                                                </p>
-                                                <p className="mt-1 text-xs text-gray-500">
-                                                    {tPlans('packageCatalog.unitPrice', {
-                                                        price: formatCurrency.format(plan.unitPrice)
-                                                    })}
-                                                </p>
-
-                                                <form action={handleMockSubscribe} className="mt-4">
-                                                    <input type="hidden" name="organizationId" value={organizationId} />
-                                                    <input type="hidden" name="planId" value={plan.id} />
-                                                    <input type="hidden" name="monthlyPriceTry" value={String(plan.priceTry)} />
-                                                    <input type="hidden" name="monthlyCredits" value={String(plan.credits)} />
-                                                    <input type="hidden" name="simulatedOutcome" value="success" />
-                                                    <button
-                                                        type="submit"
-                                                        className="inline-flex h-10 min-w-[132px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                                        disabled={!canSubmitPlanSelection}
-                                                    >
-                                                        {tPlans('packageCatalog.planCta.start')}
-                                                    </button>
-                                                </form>
-                                            </article>
-                                        )
-                                    })}
-                                </div>
+                                <SubscriptionPlanCatalog
+                                    organizationId={organizationId}
+                                    plans={localizedPlanTiers}
+                                    canSubmit={canSubmitPlanSelection}
+                                    planAction={handleMockSubscribe}
+                                />
                             )}
 
                             <article className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-5">

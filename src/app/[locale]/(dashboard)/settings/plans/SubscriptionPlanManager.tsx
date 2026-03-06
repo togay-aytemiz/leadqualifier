@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { CheckoutLegalConsentModal } from './CheckoutLegalConsentModal'
 
 interface PlanConversationRange {
     min: number
@@ -54,6 +55,7 @@ export function SubscriptionPlanManager({
     const [isClient, setIsClient] = useState(false)
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+    const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
     const locale = useLocale()
     const tPlans = useTranslations('billingPlans')
 
@@ -82,6 +84,7 @@ export function SubscriptionPlanManager({
         [locale]
     )
     const hasHigherPlan = plans.some((plan) => plan.credits > activePlanCredits)
+    const checkoutPlan = plans.find((plan) => plan.id === checkoutPlanId) ?? null
 
     useEffect(() => {
         setIsClient(true)
@@ -145,9 +148,9 @@ export function SubscriptionPlanManager({
                         const isDowngrade = !isCurrent && plan.credits < activePlanCredits
                         const buttonLabel = (() => {
                             if (isCurrent) return tPlans('packageCatalog.planModal.current')
-                            if (isUpgrade) return tPlans('packageCatalog.planModal.upgrade')
-                            if (isDowngrade) return tPlans('packageCatalog.planModal.downgrade')
-                            return tPlans('packageCatalog.planModal.switch')
+                            if (isUpgrade) return tPlans('packageCatalog.planModal.upgradeContinue')
+                            if (isDowngrade) return tPlans('packageCatalog.planModal.downgradeContinue')
+                            return tPlans('packageCatalog.planModal.switchContinue')
                         })()
 
                         return (
@@ -200,20 +203,16 @@ export function SubscriptionPlanManager({
                                     })}
                                 </p>
 
-                                <form action={planAction} className="mt-4">
-                                    <input type="hidden" name="organizationId" value={organizationId} />
-                                    <input type="hidden" name="planId" value={plan.id} />
-                                    <input type="hidden" name="monthlyPriceTry" value={String(plan.priceTry)} />
-                                    <input type="hidden" name="monthlyCredits" value={String(plan.credits)} />
-                                    <input type="hidden" name="simulatedOutcome" value="success" />
+                                <div className="mt-4">
                                     <button
-                                        type="submit"
-                                        className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                        type="button"
+                                        onClick={() => setCheckoutPlanId(plan.id)}
+                                        className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
                                         disabled={!canManage || isCurrent}
                                     >
                                         {buttonLabel}
                                     </button>
-                                </form>
+                                </div>
                                 {isDowngrade && (
                                     <p className="mt-2 text-[11px] text-gray-500">
                                         {tPlans('packageCatalog.planModal.downgradeHint')}
@@ -320,7 +319,7 @@ export function SubscriptionPlanManager({
                         <button
                             type="button"
                             onClick={() => setIsPlanModalOpen(true)}
-                            className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+                            className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
                             disabled={!canManage}
                         >
                             {hasHigherPlan
@@ -332,7 +331,7 @@ export function SubscriptionPlanManager({
                             <button
                                 type="button"
                                 onClick={() => setIsCancelModalOpen(true)}
-                                className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                                className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                                 disabled={!canManage}
                             >
                                 {tPlans('packageCatalog.manager.cancelCta')}
@@ -342,7 +341,7 @@ export function SubscriptionPlanManager({
                                 <input type="hidden" name="organizationId" value={organizationId} />
                                 <button
                                     type="submit"
-                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-[#242A40] bg-white px-4 text-sm font-semibold text-[#242A40] transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500"
+                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-[#242A40] bg-white px-4 text-sm font-semibold text-[#242A40] transition-colors hover:border-[#3b4768] hover:bg-[#f4f6fb] hover:text-[#1f2437] disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500"
                                     disabled={!canManage}
                                 >
                                     {tPlans('packageCatalog.manager.resumeCta')}
@@ -355,6 +354,23 @@ export function SubscriptionPlanManager({
 
             {isClient && isPlanModalOpen && createPortal(planModal, document.body)}
             {isClient && isCancelModalOpen && createPortal(cancelModal, document.body)}
+            {isClient && checkoutPlan && createPortal(
+                <CheckoutLegalConsentModal
+                    flowType="subscription"
+                    summary={tPlans('checkoutLegal.subscriptionSummary', {
+                        plan: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
+                        price: formatCurrency.format(checkoutPlan.localizedPrice),
+                        credits: formatNumber.format(checkoutPlan.credits)
+                    })}
+                    action={planAction}
+                    hiddenFields={[
+                        { name: 'organizationId', value: organizationId },
+                        { name: 'planId', value: checkoutPlan.id }
+                    ]}
+                    onClose={() => setCheckoutPlanId(null)}
+                />,
+                document.body
+            )}
         </>
     )
 }

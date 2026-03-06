@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { resetIyzicoCheckoutRuntime } from '@/lib/billing/providers/iyzico/checkout-embed'
 
 interface SubscriptionCheckoutEmbedProps {
     checkoutFormContent: string
@@ -13,6 +14,7 @@ export function SubscriptionCheckoutEmbed({ checkoutFormContent }: SubscriptionC
         const container = containerRef.current
         if (!container) return
 
+        resetIyzicoCheckoutRuntime(document, window)
         container.innerHTML = ''
 
         const mountNode = document.createElement('div')
@@ -36,6 +38,11 @@ export function SubscriptionCheckoutEmbed({ checkoutFormContent }: SubscriptionC
             }
             script.text = scriptElement.textContent ?? ''
             container.appendChild(script)
+        }
+
+        return () => {
+            resetIyzicoCheckoutRuntime(document, window)
+            container.innerHTML = ''
         }
     }, [checkoutFormContent])
 

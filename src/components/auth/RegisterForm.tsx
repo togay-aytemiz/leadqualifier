@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useActionState, useEffect, useState } from 'react'
 import { register, type RegisterActionState } from '@/lib/auth/actions'
 import { Link, useRouter } from '@/i18n/navigation'
@@ -48,9 +48,10 @@ export function RegisterForm({
 }) {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
+    const locale = useLocale()
     const router = useRouter()
     const [showPassword, setShowPassword] = useState(false)
-    const consentLinks = getRegisterConsentLinks()
+    const consentLinks = getRegisterConsentLinks(locale)
     const [state, formAction, pending] = useActionState(
         async (_prevState: RegisterActionState | null, formData: FormData) => {
             return await register(formData)
@@ -178,6 +179,20 @@ export function RegisterForm({
                                 href={consentLinks.privacy.href}
                                 target={consentLinks.privacy.target}
                                 rel={consentLinks.privacy.rel}
+                                className={getRegisterConsentLinkClasses()}
+                            >
+                                {chunks}
+                            </a>
+                        ),
+                    })}
+                </p>
+                <p className="text-xs leading-snug text-gray-500">
+                    {t.rich('kvkkNotice', {
+                        kvkk: (chunks) => (
+                            <a
+                                href={consentLinks.kvkk.href}
+                                target={consentLinks.kvkk.target}
+                                rel={consentLinks.kvkk.rel}
                                 className={getRegisterConsentLinkClasses()}
                             >
                                 {chunks}

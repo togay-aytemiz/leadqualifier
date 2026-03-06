@@ -1,15 +1,62 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
     getBillingProviderConfig,
     getIyzicoPlanReferenceCode,
     resolveBillingProvider
 } from '@/lib/billing/providers/config'
 
+const originalNodeEnv = process.env.NODE_ENV
+
 describe('billing provider config', () => {
-    it('falls back to mock provider when BILLING_PROVIDER is not set', () => {
+    beforeEach(() => {
+        process.env.NODE_ENV = 'test'
+        delete process.env.BILLING_PROVIDER
+        delete process.env.BILLING_MOCK_ENABLED
+        delete process.env.IYZICO_API_KEY
+        delete process.env.IYZICO_SECRET_KEY
+        delete process.env.IYZICO_BASE_URL
+        delete process.env.IYZICO_SUBSCRIPTION_PLAN_STARTER_REF
+        delete process.env.IYZICO_SUBSCRIPTION_PLAN_GROWTH_REF
+        delete process.env.IYZICO_SUBSCRIPTION_PLAN_SCALE_REF
+    })
+
+    afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv
+    })
+
+    it('defaults to iyzico provider when BILLING_PROVIDER is not set outside production', () => {
         delete process.env.BILLING_PROVIDER
 
-        expect(resolveBillingProvider()).toBe('mock')
+        expect(resolveBillingProvider()).toBe('iyzico')
+    })
+
+    it('defaults to iyzico provider when BILLING_PROVIDER is not set in production', () => {
+        process.env.NODE_ENV = 'production'
+        delete process.env.BILLING_PROVIDER
+
+        expect(resolveBillingProvider()).toBe('iyzico')
+    })
+
+    it('disables mock billing unless explicitly enabled', () => {
+        process.env.BILLING_PROVIDER = 'mock'
+        delete process.env.BILLING_MOCK_ENABLED
+
+        const config = getBillingProviderConfig()
+
+        expect(config.provider).toBe('mock')
+        expect(config.mock.enabled).toBe(false)
+        expect(config.mock.error).toBe('provider_not_configured')
+    })
+
+    it('allows mock billing only when explicitly enabled', () => {
+        process.env.BILLING_PROVIDER = 'mock'
+        process.env.BILLING_MOCK_ENABLED = '1'
+
+        const config = getBillingProviderConfig()
+
+        expect(config.provider).toBe('mock')
+        expect(config.mock.enabled).toBe(true)
+        expect(config.mock.error).toBe(null)
     })
 
     it('returns not-configured iyzico state when secrets are missing', () => {
@@ -21,6 +68,7 @@ describe('billing provider config', () => {
         const config = getBillingProviderConfig()
 
         expect(config.provider).toBe('iyzico')
+        expect(config.mock.enabled).toBe(false)
         expect(config.iyzico.enabled).toBe(false)
         expect(config.iyzico.error).toBe('provider_not_configured')
     })
@@ -34,6 +82,7 @@ describe('billing provider config', () => {
         const config = getBillingProviderConfig()
 
         expect(config.provider).toBe('iyzico')
+        expect(config.mock.enabled).toBe(false)
         expect(config.iyzico.enabled).toBe(true)
         expect(config.iyzico.baseUrl).toBe('https://sandbox-api.iyzipay.com')
         expect(config.iyzico.error).toBe(null)

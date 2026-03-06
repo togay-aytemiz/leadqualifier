@@ -7,14 +7,21 @@ import { getBillingProviderConfig, getIyzicoPlanReferenceCode } from '@/lib/bill
 import {
     initializeIyzicoSubscriptionCheckout,
     initializeIyzicoTopupCheckout,
-    IyzicoClientError
+    IyzicoClientError,
+    upgradeIyzicoSubscription
 } from '@/lib/billing/providers/iyzico/client'
+import {
+    extractIyzicoSubscriptionReferenceCode,
+    extractIyzicoSubscriptionStartEnd
+} from '@/lib/billing/providers/iyzico/checkout-result'
+import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 
 export type MockPaymentOutcome = 'success' | 'failed'
 export type MockCheckoutStatus = 'success' | 'scheduled' | 'failed' | 'blocked' | 'error' | 'redirect'
 export type MockCheckoutError =
     | 'unauthorized'
     | 'invalid_input'
+    | 'legal_consent_required'
     | 'not_available'
     | 'request_failed'
     | 'topup_not_allowed'
@@ -53,6 +60,15 @@ interface ProfileRow {
 
 interface OrganizationRow {
     name: string
+}
+
+interface ActiveSubscriptionRecordRow {
+    id: string
+    status: string
+    provider_subscription_id: string | null
+    period_start: string | null
+    period_end: string | null
+    metadata: unknown
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -543,6 +559,27 @@ async function resolveProfileAndOrganization(input: {
     }
 }
 
+async function resolveActiveIyzicoSubscriptionRecord(input: {
+    tenantSupabase: Awaited<ReturnType<typeof createClient>>
+    organizationId: string
+}) {
+    const { data, error } = await input.tenantSupabase
+        .from('organization_subscription_records')
+        .select('id, status, provider_subscription_id, period_start, period_end, metadata')
+        .eq('organization_id', input.organizationId)
+        .eq('provider', 'iyzico')
+        .in('status', ['active', 'past_due'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (error || !data) {
+        return null
+    }
+
+    return data as ActiveSubscriptionRecordRow
+}
+
 function resolvePlanIdFromCredits(input: {
     planId: BillingPlanTierId | null | undefined
     monthlyCredits: number
@@ -576,6 +613,10 @@ export async function simulateMockSubscriptionCheckout(input: {
 
     const providerConfig = getBillingProviderConfig()
     if (providerConfig.provider !== 'iyzico') {
+        if (!providerConfig.mock.enabled) {
+            return errorResult('provider_not_configured')
+        }
+
         return runLegacyMockSubscriptionCheckout({
             organizationId: input.organizationId,
             simulatedOutcome: input.simulatedOutcome,
@@ -634,7 +675,110 @@ export async function simulateMockSubscriptionCheckout(input: {
             }
         }
 
-        return errorResult('request_failed')
+        const planId = resolvePlanIdFromCredits({
+            planId: input.planId,
+            monthlyCredits: input.monthlyCredits
+        })
+        if (!planId) {
+            return errorResult('invalid_input')
+        }
+
+        const pricingPlanReferenceCode = getIyzicoPlanReferenceCode(planId)
+        if (!pricingPlanReferenceCode) {
+            return errorResult('provider_not_configured')
+        }
+
+        const activeSubscription = await resolveActiveIyzicoSubscriptionRecord({
+            tenantSupabase: supabase,
+            organizationId: input.organizationId
+        })
+        if (!activeSubscription?.id || !activeSubscription.provider_subscription_id) {
+            return errorResult('request_failed')
+        }
+
+        const serviceSupabase = createServiceRoleClient()
+        if (!serviceSupabase) {
+            return errorResult('request_failed')
+        }
+
+        try {
+            const upgradeResult = await upgradeIyzicoSubscription({
+                subscriptionReferenceCode: activeSubscription.provider_subscription_id,
+                newPricingPlanReferenceCode: pricingPlanReferenceCode
+            })
+            const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(upgradeResult)
+                ?? activeSubscription.provider_subscription_id
+            const { startAt, endAt } = extractIyzicoSubscriptionStartEnd(upgradeResult)
+            const currentUsed = Math.round(toNonNegativeNumber(billing.monthly_package_credit_used))
+            const topupBalance = toNonNegativeNumber(billing.topup_credit_balance)
+            const nextPackageBalance = Math.max(0, requestedCredits - currentUsed)
+            const creditDelta = Math.max(0, requestedCredits - currentCredits)
+            const nowIso = new Date().toISOString()
+            const metadata = asRecord(activeSubscription.metadata)
+            const periodStart = startAt ?? activeSubscription.period_start
+            const periodEnd = endAt ?? activeSubscription.period_end
+
+            await serviceSupabase
+                .from('organization_billing_accounts')
+                .update({
+                    membership_state: 'premium_active',
+                    lock_reason: 'none',
+                    monthly_package_credit_limit: requestedCredits,
+                    monthly_package_credit_used: currentUsed,
+                    current_period_start: periodStart,
+                    current_period_end: periodEnd
+                })
+                .eq('organization_id', input.organizationId)
+
+            await serviceSupabase
+                .from('organization_subscription_records')
+                .update({
+                    provider_subscription_id: subscriptionReferenceCode,
+                    period_start: periodStart,
+                    period_end: periodEnd,
+                    metadata: {
+                        ...metadata,
+                        source: 'iyzico_subscription_upgrade',
+                        change_type: 'upgrade',
+                        requested_plan_id: planId,
+                        requested_monthly_credits: requestedCredits,
+                        requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                        upgraded_at: nowIso,
+                        upgrade_response: upgradeResult
+                    }
+                })
+                .eq('id', activeSubscription.id)
+
+            if (creditDelta > 0) {
+                await serviceSupabase
+                    .from('organization_credit_ledger')
+                    .insert({
+                        organization_id: input.organizationId,
+                        entry_type: 'package_grant',
+                        credit_pool: 'package_pool',
+                        credits_delta: creditDelta,
+                        balance_after: nextPackageBalance + topupBalance,
+                        reason: 'Iyzico subscription upgrade success',
+                        metadata: {
+                            source: 'iyzico_subscription_upgrade',
+                            subscription_id: activeSubscription.id,
+                            requested_monthly_credits: requestedCredits,
+                            requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                            change_type: 'upgrade'
+                        }
+                    })
+            }
+
+            return {
+                ok: true,
+                status: 'success',
+                error: null,
+                changeType: 'upgrade',
+                effectiveAt: null
+            }
+        } catch (error) {
+            return errorResult(mapIyzicoErrorToCheckoutError(error))
+        }
     }
 
     const planId = resolvePlanIdFromCredits({
@@ -781,7 +925,7 @@ export async function simulateMockSubscriptionCheckout(input: {
             error: null,
             changeType: 'start',
             effectiveAt: null,
-            redirectUrl: `/${resolveRouteLocale(input.locale)}/settings/plans/subscription-checkout/${pendingId}`
+            redirectUrl: buildLocalizedPath(`/settings/plans/subscription-checkout/${pendingId}`, input.locale)
         }
     } catch (error) {
         await serviceSupabase
@@ -822,6 +966,10 @@ export async function simulateMockTopupCheckout(input: {
 
     const providerConfig = getBillingProviderConfig()
     if (providerConfig.provider !== 'iyzico') {
+        if (!providerConfig.mock.enabled) {
+            return errorResult('provider_not_configured')
+        }
+
         return runLegacyMockTopupCheckout({
             organizationId: input.organizationId,
             simulatedOutcome: input.simulatedOutcome,

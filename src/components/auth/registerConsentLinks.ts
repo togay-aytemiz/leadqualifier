@@ -1,3 +1,5 @@
+import { createExternalLegalLink } from '@/lib/legal/external-links'
+
 interface RegisterConsentLink {
     href: string
     target: '_blank'
@@ -7,22 +9,13 @@ interface RegisterConsentLink {
 interface RegisterConsentLinks {
     terms: RegisterConsentLink
     privacy: RegisterConsentLink
+    kvkk: RegisterConsentLink
 }
 
-const EXTERNAL_LINK_TARGET = '_blank'
-const EXTERNAL_LINK_REL = 'noopener noreferrer'
-
-function createExternalLink(href: string): RegisterConsentLink {
+export function getRegisterConsentLinks(locale: string | null | undefined): RegisterConsentLinks {
     return {
-        href,
-        target: EXTERNAL_LINK_TARGET,
-        rel: EXTERNAL_LINK_REL,
-    }
-}
-
-export function getRegisterConsentLinks(): RegisterConsentLinks {
-    return {
-        terms: createExternalLink('https://askqualy.com/terms'),
-        privacy: createExternalLink('https://askqualy.com/privacy'),
+        terms: createExternalLegalLink('terms', locale),
+        privacy: createExternalLegalLink('privacy', locale),
+        kvkk: createExternalLegalLink('kvkk', locale)
     }
 }

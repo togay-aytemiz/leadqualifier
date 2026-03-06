@@ -9,6 +9,7 @@ import {
     extractIyzicoSubscriptionReferenceCode,
     extractIyzicoSubscriptionStartEnd
 } from '@/lib/billing/providers/iyzico/checkout-result'
+import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 
 export const runtime = 'nodejs'
 
@@ -82,7 +83,7 @@ function buildPlansRedirectUrl(input: {
     if (input.error) query.set('checkout_error', input.error)
     if (input.changeType) query.set('checkout_change_type', input.changeType)
     if (input.effectiveAt) query.set('checkout_effective_at', input.effectiveAt)
-    const target = `/${input.locale}/settings/plans?${query.toString()}`
+    const target = `${buildLocalizedPath('/settings/plans', input.locale)}?${query.toString()}`
     return new URL(target, input.req.nextUrl.origin)
 }
 

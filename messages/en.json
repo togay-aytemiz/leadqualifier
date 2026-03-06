@@ -43,6 +43,7 @@
         "hidePassword": "Hide password",
         "consentLabel": "I agree to the Terms of Service and Privacy Policy.",
         "consentNotice": "By signing up, you accept the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+        "kvkkNotice": "For Turkish personal-data disclosure details, review the <kvkk>KVKK Disclosure Text</kvkk>.",
         "language": "Language",
         "languageEnglish": "EN",
         "languageTurkish": "TR",
@@ -801,6 +802,9 @@
             "lowCreditWarning": "Approaching usage limit",
             "unavailable": "Plan status is unavailable."
         },
+        "statusBanner": {
+            "dismiss": "Dismiss status message"
+        },
         "packageCatalog": {
             "title": "Monthly packages",
             "description": "Pick the monthly package that fits your business.",
@@ -823,7 +827,7 @@
             "approxConversations": "~{min}-{max} conversations / month",
             "unitPrice": "{price} / credit",
             "planCta": {
-                "start": "Start package",
+                "start": "Select plan and continue",
                 "upgrade": "Upgrade",
                 "downgrade": "Downgrade",
                 "switch": "Switch package",
@@ -847,8 +851,11 @@
                 "close": "Close",
                 "current": "Current plan",
                 "upgrade": "Upgrade to this",
+                "upgradeContinue": "Select this plan and continue",
                 "downgrade": "Switch at period end",
+                "downgradeContinue": "Select this plan (period end) and continue",
                 "switch": "Go to this plan",
+                "switchContinue": "Select this plan and continue",
                 "downgradeHint": "Lower-tier changes apply at period end."
             },
             "cancelModal": {
@@ -903,7 +910,29 @@
                 "selectedSummary": "Selected: {credits} credits • {amount}",
                 "cancel": "Cancel",
                 "submit": "Buy credits",
+                "continue": "Continue",
                 "close": "Close"
+            }
+        },
+        "checkoutLegal": {
+            "title": "Pre-payment confirmation",
+            "description": "Review the documents below and complete the required confirmations before you continue to the Iyzico payment screen.",
+            "summaryLabel": "Selected product",
+            "providerNotice": "Payment is completed on the Iyzico screen in the next step.",
+            "infoDocsTitle": "Informational documents",
+            "acceptRequiredDocs": "I have read and accept the <preInformation>Pre-Information Form</preInformation>, <distanceSalesAgreement>Distance Sales Agreement</distanceSalesAgreement>, and <terms>Terms of Service</terms>.",
+            "acceptImmediateStart": "I want the digital service to become available right after payment is completed.",
+            "continue": "Continue to payment screen",
+            "back": "Back",
+            "close": "Close",
+            "subscriptionSummary": "{plan} • {price} / month • {credits} credits",
+            "topupSummary": "{credits} credits • {amount}",
+            "docs": {
+                "preInformation": "Pre-Information Form",
+                "distanceSalesAgreement": "Distance Sales Agreement",
+                "terms": "Terms of Service",
+                "cancellationRefund": "Cancellation, Refund, and Withdrawal Policy",
+                "kvkk": "KVKK Disclosure Text"
             }
         },
         "actions": {
@@ -930,6 +959,7 @@
             "errors": {
                 "unauthorized": "Your session is not authenticated.",
                 "invalidInput": "Invalid checkout form values. Please retry.",
+                "legalConsentRequired": "Complete the required consent checkboxes before continuing to payment.",
                 "notAvailable": "Mock checkout functions are not available in this environment yet.",
                 "requestFailed": "The checkout request failed. Please retry.",
                 "adminLocked": "This organization is admin-locked.",

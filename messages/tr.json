@@ -43,6 +43,7 @@
         "hidePassword": "Şifreyi gizle",
         "consentLabel": "Hizmet Koşulları ve Gizlilik Politikası'nı kabul ediyorum.",
         "consentNotice": "Kayıt olarak <terms>Hizmet Koşulları</terms> ve <privacy>Gizlilik Politikası</privacy> kabul etmiş olursunuz.",
+        "kvkkNotice": "Kişisel verilerin işlenmesine ilişkin detaylar için <kvkk>KVKK Aydınlatma Metni</kvkk>'ni inceleyebilirsiniz.",
         "language": "Dil",
         "languageEnglish": "EN",
         "languageTurkish": "TR",
@@ -801,6 +802,9 @@
             "lowCreditWarning": "Kullanım limitine yaklaşılıyor",
             "unavailable": "Plan durumu alınamıyor."
         },
+        "statusBanner": {
+            "dismiss": "Durum mesajini kapat"
+        },
         "packageCatalog": {
             "title": "Aylık paketler",
             "description": "İşletmene en uygun aylık paketi seç.",
@@ -823,7 +827,7 @@
             "approxConversations": "Ayda yaklaşık {min}-{max} konuşma",
             "unitPrice": "Kredi başı {price}",
             "planCta": {
-                "start": "Planı başlat",
+                "start": "Planı seç ve devam et",
                 "upgrade": "Yükselt",
                 "downgrade": "Düşür",
                 "switch": "Planı değiştir",
@@ -847,8 +851,11 @@
                 "close": "Kapat",
                 "current": "Mevcut planın",
                 "upgrade": "Bu plana yükselt",
+                "upgradeContinue": "Bu planı seç ve devam et",
                 "downgrade": "Bu plana geç (dönem sonu)",
+                "downgradeContinue": "Bu planı seç (dönem sonu) ve devam et",
                 "switch": "Bu plana geç",
+                "switchContinue": "Bu planı seç ve devam et",
                 "downgradeHint": "Daha düşük plan değişikliği dönem sonunda uygulanır."
             },
             "cancelModal": {
@@ -903,7 +910,29 @@
                 "selectedSummary": "Seçiminiz: {credits} kredi • {amount}",
                 "cancel": "İptal",
                 "submit": "Kredi al",
+                "continue": "Devam et",
                 "close": "Kapat"
+            }
+        },
+        "checkoutLegal": {
+            "title": "Ödeme öncesi onay",
+            "description": "Iyzico ödeme ekranına geçmeden önce aşağıdaki dökümanları inceleyin ve zorunlu onayları tamamlayın.",
+            "summaryLabel": "Seçilen ürün",
+            "providerNotice": "Ödeme bu adımdan sonra Iyzico ekranında tamamlanır.",
+            "infoDocsTitle": "Bilgilendirme dökümanları",
+            "acceptRequiredDocs": "<preInformation>Ön Bilgilendirme Formu</preInformation>, <distanceSalesAgreement>Mesafeli Hizmet Sözleşmesi</distanceSalesAgreement> ve <terms>Hizmet Şartları</terms>'nı okudum ve kabul ediyorum.",
+            "acceptImmediateStart": "Ödeme tamamlandıktan sonra dijital hizmetin hemen kullanıma açılmasını istiyorum.",
+            "continue": "Ödeme ekranına devam et",
+            "back": "Geri",
+            "close": "Kapat",
+            "subscriptionSummary": "{plan} • {price} / ay • {credits} kredi",
+            "topupSummary": "{credits} kredi • {amount}",
+            "docs": {
+                "preInformation": "Ön Bilgilendirme Formu",
+                "distanceSalesAgreement": "Mesafeli Hizmet Sözleşmesi",
+                "terms": "Hizmet Şartları",
+                "cancellationRefund": "İptal, İade ve Cayma Politikası",
+                "kvkk": "KVKK Aydınlatma Metni"
             }
         },
         "actions": {
@@ -930,6 +959,7 @@
             "errors": {
                 "unauthorized": "Oturum doğrulanamadı.",
                 "invalidInput": "Checkout form değerleri geçersiz. Lütfen tekrar deneyin.",
+                "legalConsentRequired": "Ödeme ekranına geçmeden önce zorunlu onay kutularını tamamlayın.",
                 "notAvailable": "Bu ortamda mock checkout fonksiyonları henüz aktif değil.",
                 "requestFailed": "Checkout isteği başarısız oldu. Lütfen tekrar deneyin.",
                 "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
