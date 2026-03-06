@@ -9,12 +9,17 @@ export type BillingMembershipState =
 export interface TopupEligibilityInput {
     membershipState: BillingMembershipState
     remainingPackageCredits: number
+    currentPeriodEndIso?: string | null
+    nowIso?: string
 }
+
+export const PREMIUM_PERIOD_END_GRACE_WINDOW_MS = 1000 * 60 * 60
 
 export interface UsageEligibilityInput {
     membershipState: BillingMembershipState
     remainingTrialCredits: number
     trialEndsAtIso: string | null
+    currentPeriodEndIso?: string | null
     nowIso?: string
     remainingPackageCredits: number
     topupCredits: number
@@ -30,7 +35,31 @@ function clampNonNegative(value: number) {
     return Math.max(0, value)
 }
 
+function parseDate(value: string | null | undefined) {
+    if (!value) return null
+    const date = new Date(value)
+    if (!Number.isFinite(date.getTime())) return null
+    return date
+}
+
+export function hasPremiumPeriodEnded(input: {
+    membershipState: BillingMembershipState
+    currentPeriodEndIso?: string | null
+    nowIso?: string
+}) {
+    if (input.membershipState !== 'premium_active') return false
+
+    const periodEnd = parseDate(input.currentPeriodEndIso)
+    if (!periodEnd) return false
+
+    const now = parseDate(input.nowIso) ?? new Date()
+    if (!Number.isFinite(now.getTime())) return false
+
+    return now.getTime() > periodEnd.getTime() + PREMIUM_PERIOD_END_GRACE_WINDOW_MS
+}
+
 export function isTopupAllowed(input: TopupEligibilityInput) {
+    if (hasPremiumPeriodEnded(input)) return false
     return input.membershipState === 'premium_active'
 }
 
@@ -61,6 +90,7 @@ export function isUsageAllowed(input: UsageEligibilityInput) {
     }
 
     if (input.membershipState === 'premium_active') {
+        if (hasPremiumPeriodEnded(input)) return false
         return remainingPackageCredits > 0 || topupCredits > 0
     }
 

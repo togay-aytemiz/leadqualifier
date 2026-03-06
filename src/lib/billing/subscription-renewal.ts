@@ -1,5 +1,8 @@
 'use server'
 
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { cancelIyzicoSubscription, IyzicoClientError } from '@/lib/billing/providers/iyzico/client'
+import { getBillingProviderConfig } from '@/lib/billing/providers/config'
 import { createClient } from '@/lib/supabase/server'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -50,8 +53,18 @@ export interface PendingPlanChange {
 }
 
 interface SubscriptionRenewalRow {
+    id: string
+    organization_id: string
+    provider: string
+    provider_subscription_id: string | null
+    status: string
     metadata: unknown
     period_end: string | null
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    return value as Record<string, unknown>
 }
 
 function errorResult(error: RenewalActionError): RenewalActionResult {
@@ -60,6 +73,19 @@ function errorResult(error: RenewalActionError): RenewalActionResult {
         status: 'error',
         error
     }
+}
+
+function createServiceRoleClient() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !serviceRoleKey) return null
+
+    return createServiceClient(url, serviceRoleKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    })
 }
 
 function isNotAvailableRpcError(error: unknown) {
@@ -221,6 +247,99 @@ async function runRenewalAction(input: {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
         return errorResult('unauthorized')
+    }
+
+    const providerConfig = getBillingProviderConfig()
+    if (providerConfig.provider === 'iyzico') {
+        if (input.action === 'resume') {
+            return errorResult('not_available')
+        }
+
+        const membershipCheck = await supabase.rpc('assert_org_member_or_admin', {
+            target_organization_id: input.organizationId
+        })
+        if (membershipCheck.error) {
+            return errorResult('unauthorized')
+        }
+
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+            .from('organization_subscription_records')
+            .select('id, organization_id, provider, provider_subscription_id, status, metadata, period_end')
+            .eq('organization_id', input.organizationId)
+            .in('status', ['active', 'past_due'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (subscriptionError) {
+            console.error('Failed to load iyzico subscription row for cancel:', subscriptionError)
+            return errorResult('request_failed')
+        }
+
+        const subscriptionRow = subscriptionData as SubscriptionRenewalRow | null
+        if (!subscriptionRow || subscriptionRow.provider !== 'iyzico' || !subscriptionRow.provider_subscription_id) {
+            return errorResult('not_available')
+        }
+
+        try {
+            await cancelIyzicoSubscription({
+                subscriptionReferenceCode: subscriptionRow.provider_subscription_id
+            })
+        } catch (error) {
+            console.error('cancelIyzicoSubscription failed:', error)
+            if (error instanceof IyzicoClientError && error.code === 'provider_not_configured') {
+                return errorResult('not_available')
+            }
+            return errorResult('request_failed')
+        }
+
+        const serviceSupabase = createServiceRoleClient()
+        if (!serviceSupabase) {
+            return errorResult('request_failed')
+        }
+
+        const nowIso = new Date().toISOString()
+        const nextMetadata = {
+            ...asRecord(subscriptionRow.metadata),
+            auto_renew: false,
+            cancel_at_period_end: true,
+            cancellation_requested_at: nowIso,
+            canceled_by: 'self_serve',
+            canceled_via_provider: 'iyzico',
+            canceled_reason: input.reason ?? null,
+            provider_canceled_at: nowIso
+        }
+
+        const { error: subscriptionUpdateError } = await serviceSupabase
+            .from('organization_subscription_records')
+            .update({
+                metadata: nextMetadata
+            })
+            .eq('id', subscriptionRow.id)
+
+        if (subscriptionUpdateError) {
+            console.error('Failed to persist iyzico subscription cancel state:', subscriptionUpdateError)
+            return errorResult('request_failed')
+        }
+
+        const { error: billingUpdateError } = await serviceSupabase
+            .from('organization_billing_accounts')
+            .update({
+                last_manual_action_at: nowIso,
+                updated_at: nowIso
+            })
+            .eq('organization_id', input.organizationId)
+
+        if (billingUpdateError) {
+            console.error('Failed to persist iyzico billing cancel state:', billingUpdateError)
+            return errorResult('request_failed')
+        }
+
+        return {
+            ok: true,
+            status: 'success',
+            error: null
+        }
     }
 
     const rpcName = input.action === 'cancel'

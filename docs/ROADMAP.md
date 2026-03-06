@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-03-06 (Iyzico hosted subscription checkout remount is now hardened for repeated SPA attempts by clearing stale checkout globals and injected bundle scripts before mount/unmount, but the reset path is now descriptor-safe so non-configurable `window.iyzi*` globals no longer crash the hosted checkout screen; billing checkout and callback redirects now use locale-aware `as-needed` path building so Turkish default routes no longer force a hardcoded `/tr` prefix; checkout flows now add a merchant-controlled pre-payment legal consent gate for both subscription and one-time extra-credit purchases, with mandatory acceptance narrowed to three inline-linked contractual documents (`pre-information`, `distance-sales-agreement`, `terms`) plus a short immediate-start acknowledgment, informational links (`cancellation-refund`, `kvkk`) rendered below a subtle left-aligned divider, and server actions now reject bypassed submissions unless both consent fields are posted; subscription/top-up server actions also resolve package/top-up pricing from server-side catalog IDs instead of trusting client-posted credit/price amounts; Plans CTA hover feedback now uses clearer color shifts instead of motion/shadow.)  
+> **Last Updated:** 2026-03-06 (Iyzico subscription lifecycle is now provider-backed beyond initial checkout: self-serve cancel calls Iyzico cancel API, turns off renewal, and keeps access active until the paid `current_period_end`; a new `/api/billing/iyzico/webhook` route syncs recurring renewal success/failure/cancellation events; recurring renewal success is now applied through a dedicated DB RPC so subscription/account/ledger updates stay atomic and retry-safe; premium expiry now includes a one-hour grace window after `current_period_end` to reduce false lockouts when provider webhooks are delayed; failed renewals still move accounts to `past_due` and pause usage until payment is resolved; Plans now shows explicit scheduled-cancel and past-due states, without exposing an in-app undo/resume CTA after cancellation; hosted checkout remount remains hardened for repeated SPA attempts; billing redirects remain locale-aware `as-needed`; checkout legal consent stays server-enforced; first premium activation still converts unused trial credits into persistent extra-credit balance while monthly package credits remain non-rollover; sandbox validation now covers direct Iyzico success/decline card matrix plus provider-backed cancel flow; provider payment failures map to specific user-facing checkout errors instead of generic request failures; and SQL entitlement/usage guards now reject premium access after the grace window even if provider cancellation was only finalized locally in metadata.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -625,7 +625,7 @@
   - [x] Implement immediate Iyzico upgrade flow for active premium subscriptions with non-stacking entitlement update
   - [x] Implement top-up checkout flow (available for active premium subscriptions)
   - [x] Prevent implicit mock auto-activation when live env vars are missing; explicit mock now requires `BILLING_MOCK_ENABLED=1` in every environment
-  - [ ] Implement payment webhook sync + failed-payment handling
+  - [x] Implement payment webhook sync + failed-payment handling
 - [ ] **Membership States (Trial / Premium)**
   - [x] Define state model (`trial_active`, `trial_exhausted`, `premium_active`, `past_due`, `canceled`, `admin_locked`)
   - [x] Enforce entitlements in tenant runtime and admin read models
@@ -655,6 +655,7 @@
   - [x] Reset stale Iyzico checkout runtime on hosted checkout mount/unmount and switch Plans/callback redirects to locale-aware `as-needed` paths so repeated package attempts do not render a blank checkout surface
   - [x] Add pre-Iyzico legal consent gate for subscription and top-up checkout, using public `Qualy-lp` legal pages in new tabs and a non-final `continue` CTA before provider payment
   - [x] Enforce checkout legal consent server-side and resolve selected plans/top-up packs from server catalog IDs so hidden client fields cannot bypass consent or tamper with credits/pricing
+  - [x] Preserve unused trial credits as persistent extra-credit balance on first premium activation while keeping monthly package credits non-rollover
   - [x] Refresh sidebar/mobile billing snapshot on client-side route changes and reconcile embedding/indexing usage into visible `Settings > Usage` buckets so async content-processing credits do not require a hard reload to appear consistently
   - [x] Emit explicit browser refresh events after async Knowledge Base processing completes so sidebar/mobile billing cards and KB suggestion indicators update even when realtime timing is delayed
   - [x] Standardize user-facing top-up terminology to `ek kredi / extra credits`
@@ -677,7 +678,11 @@
   - [x] Backfill existing non-system-admin organizations into trial mode baseline for rollout (`00058` migration)
   - [x] Publish iyzico production-integration execution plan (`docs/plans/2026-02-17-iyzico-billing-integration-implementation-plan.md`)
   - [x] Add recurring premium checkout + top-up checkout callback sync (token retrieve) + idempotent credit/package grants
-  - [ ] Add payment webhook sync for provider lifecycle events
+  - [x] Add payment webhook sync for provider lifecycle events
+  - [x] Make iyzico self-serve cancellation provider-backed but keep access active until period end, hide unsupported in-app resume for provider-backed cancellations, and treat failed recurring renewals as `past_due` with locked usage until payment is resolved
+  - [x] Remove scheduled-cancellation undo CTA from Plans UI so users resubscribe manually after period end if needed
+  - [x] Add one-hour post-period grace window plus atomic renewal-success RPC to reduce false lockouts and partial renewal-state drift during webhook retries/delays
+  - [x] Validate iyzico sandbox success/decline card scenarios and normalize provider failure codes into user-facing checkout errors instead of generic callback failures
 - [ ] **Trial Abuse Prevention**
   - [x] Enforce one-trial-per-business policy keyed by `whatsapp_business_account_id` + normalized phone + company identity signals (`trial_business_fingerprints` + signup pre-check + billing initialization + WhatsApp connect enforcement)
   - [ ] Add risk controls for disposable email domains, VOIP-heavy signup numbers, and repeated device/IP fingerprints

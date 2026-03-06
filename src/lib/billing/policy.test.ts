@@ -62,8 +62,37 @@ describe('billing policy helpers', () => {
                 remainingTrialCredits: 0,
                 trialEndsAtIso: '2026-02-01T00:00:00.000Z',
                 nowIso: '2026-02-14T00:00:00.000Z',
+                currentPeriodEndIso: '2026-03-01T00:00:00.000Z',
                 remainingPackageCredits: 0,
                 topupCredits: 2.5
+            })
+        ).toBe(true)
+    })
+
+    it('blocks premium usage once the current billing period has ended', () => {
+        expect(
+            isUsageAllowed({
+                membershipState: premiumState(),
+                remainingTrialCredits: 0,
+                trialEndsAtIso: '2026-02-01T00:00:00.000Z',
+                nowIso: '2026-03-02T00:00:00.000Z',
+                currentPeriodEndIso: '2026-03-01T00:00:00.000Z',
+                remainingPackageCredits: 50,
+                topupCredits: 10
+            })
+        ).toBe(false)
+    })
+
+    it('keeps premium usage active during the renewal grace window after period end', () => {
+        expect(
+            isUsageAllowed({
+                membershipState: premiumState(),
+                remainingTrialCredits: 0,
+                trialEndsAtIso: '2026-02-01T00:00:00.000Z',
+                nowIso: '2026-03-01T00:30:00.000Z',
+                currentPeriodEndIso: '2026-03-01T00:00:00.000Z',
+                remainingPackageCredits: 50,
+                topupCredits: 10
             })
         ).toBe(true)
     })

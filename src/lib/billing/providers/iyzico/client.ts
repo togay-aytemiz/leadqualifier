@@ -90,10 +90,20 @@ export type IyzicoClientErrorCode =
 
 export class IyzicoClientError extends Error {
     readonly code: IyzicoClientErrorCode
+    readonly providerErrorCode: string | null
+    readonly providerErrorMessage: string | null
+    readonly providerErrorGroup: string | null
 
-    constructor(code: IyzicoClientErrorCode, message: string) {
+    constructor(code: IyzicoClientErrorCode, message: string, details?: {
+        providerErrorCode?: string | null
+        providerErrorMessage?: string | null
+        providerErrorGroup?: string | null
+    }) {
         super(message)
         this.code = code
+        this.providerErrorCode = details?.providerErrorCode ?? null
+        this.providerErrorMessage = details?.providerErrorMessage ?? null
+        this.providerErrorGroup = details?.providerErrorGroup ?? null
     }
 }
 
@@ -125,7 +135,11 @@ function assertSuccessResult(result: unknown): IyzicoResultEnvelope {
         const message = typeof envelope.errorMessage === 'string' && envelope.errorMessage.trim()
             ? envelope.errorMessage
             : 'iyzico request failed'
-        throw new IyzicoClientError('request_failed', message)
+        throw new IyzicoClientError('request_failed', message, {
+            providerErrorCode: typeof envelope.errorCode === 'string' ? envelope.errorCode.trim() : null,
+            providerErrorMessage: typeof envelope.errorMessage === 'string' ? envelope.errorMessage.trim() : null,
+            providerErrorGroup: typeof envelope.errorGroup === 'string' ? envelope.errorGroup.trim() : null
+        })
     }
 
     return envelope
@@ -219,5 +233,23 @@ export async function upgradeIyzicoSubscription(input: {
         subscriptionReferenceCode: input.subscriptionReferenceCode,
         newPricingPlanReferenceCode: input.newPricingPlanReferenceCode,
         upgradePeriod: Iyzipay.SUBSCRIPTION_UPGRADE_PERIOD.NOW
+    }, cb))
+}
+
+export async function cancelIyzicoSubscription(input: {
+    subscriptionReferenceCode: string
+}) {
+    const client = createIyzicoSdkClient()
+    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.cancel({
+        subscriptionReferenceCode: input.subscriptionReferenceCode
+    }, cb))
+}
+
+export async function retrieveIyzicoSubscription(input: {
+    subscriptionReferenceCode: string
+}) {
+    const client = createIyzicoSdkClient()
+    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.retrieve({
+        subscriptionReferenceCode: input.subscriptionReferenceCode
     }, cb))
 }

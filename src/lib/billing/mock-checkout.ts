@@ -14,6 +14,10 @@ import {
     extractIyzicoSubscriptionReferenceCode,
     extractIyzicoSubscriptionStartEnd
 } from '@/lib/billing/providers/iyzico/checkout-result'
+import {
+    mapIyzicoProviderFailureToCheckoutError,
+    type IyzicoCheckoutFailureReason
+} from '@/lib/billing/providers/iyzico/error-map'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 
 export type MockPaymentOutcome = 'success' | 'failed'
@@ -27,6 +31,7 @@ export type MockCheckoutError =
     | 'topup_not_allowed'
     | 'admin_locked'
     | 'provider_not_configured'
+    | IyzicoCheckoutFailureReason
 
 export interface MockCheckoutResult {
     ok: boolean
@@ -530,6 +535,11 @@ function mapIyzicoErrorToCheckoutError(error: unknown): MockCheckoutError {
     if (error instanceof IyzicoClientError) {
         if (error.code === 'provider_not_configured') {
             return 'provider_not_configured'
+        }
+
+        const providerFailure = mapIyzicoProviderFailureToCheckoutError(error)
+        if (providerFailure) {
+            return providerFailure
         }
     }
     return 'request_failed'

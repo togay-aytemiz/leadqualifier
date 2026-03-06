@@ -34,7 +34,6 @@ interface SubscriptionPlanManagerProps {
     pendingPlanEffectiveAt: string | null
     planAction: (formData: FormData) => void | Promise<void>
     cancelAction: (formData: FormData) => void | Promise<void>
-    resumeAction: (formData: FormData) => void | Promise<void>
 }
 
 export function SubscriptionPlanManager({
@@ -49,8 +48,7 @@ export function SubscriptionPlanManager({
     pendingPlanName,
     pendingPlanEffectiveAt,
     planAction,
-    cancelAction,
-    resumeAction
+    cancelAction
 }: SubscriptionPlanManagerProps) {
     const [isClient, setIsClient] = useState(false)
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
@@ -334,20 +332,9 @@ export function SubscriptionPlanManager({
                                 className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                                 disabled={!canManage}
                             >
-                                {tPlans('packageCatalog.manager.cancelCta')}
-                            </button>
-                        ) : (
-                            <form action={resumeAction}>
-                                <input type="hidden" name="organizationId" value={organizationId} />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-[#242A40] bg-white px-4 text-sm font-semibold text-[#242A40] transition-colors hover:border-[#3b4768] hover:bg-[#f4f6fb] hover:text-[#1f2437] disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500"
-                                    disabled={!canManage}
-                                >
-                                    {tPlans('packageCatalog.manager.resumeCta')}
-                                </button>
-                            </form>
-                        )}
+                            {tPlans('packageCatalog.manager.cancelCta')}
+                        </button>
+                        ) : null}
                     </div>
                 </div>
             </article>

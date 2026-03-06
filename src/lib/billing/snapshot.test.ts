@@ -123,4 +123,46 @@ describe('buildOrganizationBillingSnapshot', () => {
         expect(snapshot.lockReason).toBe('package_credits_exhausted')
         expect(snapshot.activeCreditPool).toBeNull()
     })
+
+    it('treats canceled-at-period-end premium access as expired after period end', () => {
+        const snapshot = buildOrganizationBillingSnapshot(
+            createBillingAccount({
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 100,
+                monthly_package_credit_used: 20,
+                topup_credit_balance: 15,
+                current_period_start: '2026-02-01T00:00:00.000Z',
+                current_period_end: '2026-03-01T00:00:00.000Z'
+            }),
+            { nowIso: '2026-03-02T00:00:00.000Z' }
+        )
+
+        expect(snapshot.membershipState).toBe('canceled')
+        expect(snapshot.isUsageAllowed).toBe(false)
+        expect(snapshot.isTopupAllowed).toBe(false)
+        expect(snapshot.lockReason).toBe('subscription_required')
+        expect(snapshot.activeCreditPool).toBeNull()
+    })
+
+    it('keeps premium access active during the grace window after period end', () => {
+        const snapshot = buildOrganizationBillingSnapshot(
+            createBillingAccount({
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 100,
+                monthly_package_credit_used: 20,
+                topup_credit_balance: 15,
+                current_period_start: '2026-02-01T00:00:00.000Z',
+                current_period_end: '2026-03-01T00:00:00.000Z'
+            }),
+            { nowIso: '2026-03-01T00:30:00.000Z' }
+        )
+
+        expect(snapshot.membershipState).toBe('premium_active')
+        expect(snapshot.isUsageAllowed).toBe(true)
+        expect(snapshot.isTopupAllowed).toBe(true)
+        expect(snapshot.lockReason).toBe('none')
+        expect(snapshot.activeCreditPool).toBe('package_pool')
+    })
 })

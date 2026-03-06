@@ -835,11 +835,10 @@
             },
             "manager": {
                 "title": "Aboneliğini yönet",
-                "description": "Yükseltme hemen uygulanır. Daha düşük pakete geçiş dönem sonunda devreye girer.",
+                "description": "Yükseltme hemen uygulanır. Daha düşük pakete geçiş dönem sonunda devreye girer. İptal ettiğinde otomatik yenileme kapanır ve planın dönem sonuna kadar aktif kalır.",
                 "manageCtaPrimary": "Yükselt veya değiştir",
                 "manageCtaFallback": "Planı yönet",
                 "cancelCta": "Aboneliği iptal et",
-                "resumeCta": "İptali geri al",
                 "cancelScheduledWithDate": "Abonelik iptali planlandı. Planın {date} tarihine kadar aktif kalacak.",
                 "cancelScheduledNoDate": "Abonelik iptali planlandı. Planın mevcut dönem sonuna kadar aktif kalacak.",
                 "pendingPlanWithDate": "Yeni plan: {plan}. Geçiş tarihi: {date}.",
@@ -859,11 +858,11 @@
                 "downgradeHint": "Daha düşük plan değişikliği dönem sonunda uygulanır."
             },
             "cancelModal": {
-                "title": "Aboneliği iptal et",
-                "descriptionWithDate": "İptal edersen abonelik yenilenmez ve planın {date} tarihine kadar aktif kalır.",
-                "descriptionNoDate": "İptal edersen abonelik yenilenmez ve planın mevcut dönem sonuna kadar aktif kalır.",
+                "title": "Aboneliği iptal etmek istediğine emin misin?",
+                "descriptionWithDate": "İptal işlemini onayladığında otomatik yenileme kapanır. Planın {date} tarihine kadar aktif kalmaya devam eder.",
+                "descriptionNoDate": "İptal işlemini onayladığında otomatik yenileme kapanır. Planın mevcut dönem sonuna kadar aktif kalmaya devam eder.",
                 "keep": "Vazgeç",
-                "confirm": "İptali onayla",
+                "confirm": "Aboneliği iptal et",
                 "close": "Kapat"
             },
             "downgradeHiddenHint": "Daha düşük pakete geçiş, aşağıdaki paket yönetimi alanından dönem sonu için planlanır.",
@@ -964,23 +963,35 @@
                 "requestFailed": "Checkout isteği başarısız oldu. Lütfen tekrar deneyin.",
                 "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
                 "topupNotAllowed": "Mevcut üyelik/paket durumunda ek kredi izinli değil.",
-                "providerNotConfigured": "Iyzico ayarları eksik. Ortam değişkenlerine API anahtarları ve plan referanslarını ekleyin."
+                "providerNotConfigured": "Iyzico ayarları eksik. Ortam değişkenlerine API anahtarları ve plan referanslarını ekleyin.",
+                "insufficientFunds": "Kart limiti veya bakiye yetersiz görünüyor.",
+                "paymentNotApproved": "Banka bu işlemi onaylamadı. Farklı bir kartla veya bankanızla tekrar deneyin.",
+                "securityCheckFailed": "Ödeme güvenlik denetimini geçemedi. Farklı bir kart deneyin veya bankanızla görüşün.",
+                "expiredCard": "Kartın son kullanma tarihi geçersiz görünüyor.",
+                "invalidCvc": "Kartın CVC güvenlik kodu hatalı görünüyor.",
+                "internetShoppingDisabled": "Kart internetten alışverişe kapalı görünüyor.",
+                "cardNotSupported": "Bu kart bu işlem için uygun görünmüyor.",
+                "paymentProcessingError": "Ödeme işlenirken genel bir hata oluştu. Lütfen tekrar deneyin."
             }
         },
         "renewalStatus": {
             "successTitle": "Abonelik güncellendi",
             "blockedTitle": "İşlem engellendi",
             "errorTitle": "İşlem başarısız",
-            "successCancel": "Otomatik yenileme kapatıldı.",
+            "successCancel": "Otomatik yenileme kapatıldı. Planın dönem sonuna kadar aktif kalacak.",
             "successResume": "Otomatik yenileme yeniden açıldı.",
             "errors": {
                 "unauthorized": "Oturum doğrulanamadı.",
                 "invalidInput": "İstek verileri geçersiz. Lütfen tekrar deneyin.",
-                "notAvailable": "Bu ortamda otomatik yenileme kontrolü henüz aktif değil.",
+                "notAvailable": "Bu ortamda abonelik yönetimi işlemi kullanılamıyor.",
                 "requestFailed": "İşlem tamamlanamadı. Lütfen tekrar deneyin.",
                 "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
                 "premiumRequired": "Bu işlem için aktif aylık paket gerekir."
             }
+        },
+        "renewalFailureNotice": {
+            "title": "Yenileme alınamadı",
+            "description": "Karttan tahsilat başarısız oldu. Abonelik ödeme düzeltilene kadar duraklatıldı."
         }
     },
     "billingUsage": {

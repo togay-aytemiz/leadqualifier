@@ -29,7 +29,6 @@ import {
 import {
     cancelSubscriptionRenewal,
     getSubscriptionRenewalState,
-    resumeSubscriptionRenewal,
     type RenewalActionError,
     type RenewalActionResult,
     type RenewalActionStatus
@@ -380,6 +379,14 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             || value === 'topup_not_allowed'
             || value === 'admin_locked'
             || value === 'provider_not_configured'
+            || value === 'insufficient_funds'
+            || value === 'payment_not_approved'
+            || value === 'security_check_failed'
+            || value === 'expired_card'
+            || value === 'invalid_cvc'
+            || value === 'internet_shopping_disabled'
+            || value === 'card_not_supported'
+            || value === 'payment_processing_error'
         ) {
             return value as MockCheckoutError
         }
@@ -516,6 +523,26 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         }
 
         if (checkoutStatus === 'failed') {
+            switch (checkoutError) {
+            case 'insufficient_funds':
+                return tPlans('checkoutStatus.errors.insufficientFunds')
+            case 'payment_not_approved':
+                return tPlans('checkoutStatus.errors.paymentNotApproved')
+            case 'security_check_failed':
+                return tPlans('checkoutStatus.errors.securityCheckFailed')
+            case 'expired_card':
+                return tPlans('checkoutStatus.errors.expiredCard')
+            case 'invalid_cvc':
+                return tPlans('checkoutStatus.errors.invalidCvc')
+            case 'internet_shopping_disabled':
+                return tPlans('checkoutStatus.errors.internetShoppingDisabled')
+            case 'card_not_supported':
+                return tPlans('checkoutStatus.errors.cardNotSupported')
+            case 'payment_processing_error':
+                return tPlans('checkoutStatus.errors.paymentProcessingError')
+            default:
+                break
+            }
             return checkoutAction === 'topup'
                 ? tPlans('checkoutStatus.failedTopup')
                 : tPlans('checkoutStatus.failedSubscribe')
@@ -542,6 +569,22 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             return tPlans('checkoutStatus.errors.topupNotAllowed')
         case 'provider_not_configured':
             return tPlans('checkoutStatus.errors.providerNotConfigured')
+        case 'insufficient_funds':
+            return tPlans('checkoutStatus.errors.insufficientFunds')
+        case 'payment_not_approved':
+            return tPlans('checkoutStatus.errors.paymentNotApproved')
+        case 'security_check_failed':
+            return tPlans('checkoutStatus.errors.securityCheckFailed')
+        case 'expired_card':
+            return tPlans('checkoutStatus.errors.expiredCard')
+        case 'invalid_cvc':
+            return tPlans('checkoutStatus.errors.invalidCvc')
+        case 'internet_shopping_disabled':
+            return tPlans('checkoutStatus.errors.internetShoppingDisabled')
+        case 'card_not_supported':
+            return tPlans('checkoutStatus.errors.cardNotSupported')
+        case 'payment_processing_error':
+            return tPlans('checkoutStatus.errors.paymentProcessingError')
         default:
             return tPlans('checkoutStatus.errors.requestFailed')
         }
@@ -670,21 +713,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         redirect(buildRenewalRedirect(locale, 'cancel', result))
     }
 
-    const handleResumeRenewal = async (formData: FormData) => {
-        'use server'
-
-        const orgId = String(formData.get('organizationId') ?? '')
-
-        const result = await resumeSubscriptionRenewal({
-            organizationId: orgId,
-            reason: 'self_serve_resume_renewal'
-        })
-
-        revalidatePath(`/${locale}/settings/plans`)
-        revalidatePath(`/${locale}/settings/billing`)
-        redirect(buildRenewalRedirect(locale, 'resume', result))
-    }
-
     return (
         <>
             <PageHeader title={tPlans('pageTitle')} />
@@ -723,6 +751,14 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                             title={getRenewalTitle()}
                             description={getRenewalDescription()}
                         />
+                    )}
+
+                    {snapshot?.membershipState === 'past_due' && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                            {tPlans('renewalFailureNotice.title')}
+                            {' — '}
+                            {tPlans('renewalFailureNotice.description')}
+                        </div>
                     )}
 
                     <SettingsSection
@@ -933,7 +969,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                     pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
                                     planAction={handleMockSubscribe}
                                     cancelAction={handleCancelRenewal}
-                                    resumeAction={handleResumeRenewal}
                                 />
                             ) : (
                                 <SubscriptionPlanCatalog

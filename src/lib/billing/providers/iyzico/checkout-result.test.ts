@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     extractIyzicoCheckoutPaymentConversationId,
+    extractIyzicoRetrievedSubscriptionItem,
     extractIyzicoSubscriptionReferenceCode,
     extractIyzicoSubscriptionStartEnd
 } from '@/lib/billing/providers/iyzico/checkout-result'
@@ -38,6 +39,30 @@ describe('iyzico checkout result helpers', () => {
         expect(result).toEqual({
             startAt: '2026-01-01T00:00:00.000Z',
             endAt: '2026-02-01T00:00:00.000Z'
+        })
+    })
+
+    it('extracts a matching subscription detail item from retrieve payload', () => {
+        const result = extractIyzicoRetrievedSubscriptionItem({
+            data: {
+                items: [
+                    {
+                        referenceCode: 'sub_ref_1',
+                        status: 'ACTIVE',
+                        pricingPlanReferenceCode: 'plan_ref_1',
+                        startDate: Date.UTC(2026, 2, 1, 0, 0, 0),
+                        endDate: Date.UTC(2026, 3, 1, 0, 0, 0)
+                    }
+                ]
+            }
+        }, 'sub_ref_1')
+
+        expect(result).toEqual({
+            referenceCode: 'sub_ref_1',
+            status: 'ACTIVE',
+            pricingPlanReferenceCode: 'plan_ref_1',
+            startAt: '2026-03-01T00:00:00.000Z',
+            endAt: '2026-04-01T00:00:00.000Z'
         })
     })
 })

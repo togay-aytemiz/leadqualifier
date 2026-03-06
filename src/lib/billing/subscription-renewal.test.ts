@@ -5,12 +5,46 @@ import {
     resumeSubscriptionRenewal
 } from '@/lib/billing/subscription-renewal'
 
-const { createClientMock } = vi.hoisted(() => ({
-    createClientMock: vi.fn()
+const {
+    cancelIyzicoSubscriptionMock,
+    createClientMock,
+    createServiceClientMock,
+    getBillingProviderConfigMock
+} = vi.hoisted(() => ({
+    cancelIyzicoSubscriptionMock: vi.fn(),
+    createClientMock: vi.fn(),
+    createServiceClientMock: vi.fn(),
+    getBillingProviderConfigMock: vi.fn(() => ({
+        provider: 'mock',
+        mock: {
+            enabled: true,
+            error: null
+        },
+        iyzico: {
+            enabled: false,
+            apiKey: null,
+            secretKey: null,
+            baseUrl: null,
+            webhookSecret: null,
+            error: null
+        }
+    }))
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
     createClient: createClientMock
+}))
+
+vi.mock('@supabase/supabase-js', () => ({
+    createClient: createServiceClientMock
+}))
+
+vi.mock('@/lib/billing/providers/config', () => ({
+    getBillingProviderConfig: getBillingProviderConfigMock
+}))
+
+vi.mock('@/lib/billing/providers/iyzico/client', () => ({
+    cancelIyzicoSubscription: cancelIyzicoSubscriptionMock
 }))
 
 interface SupabaseMockOptions {
@@ -75,9 +109,52 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
     }
 }
 
+function createServiceSupabaseMock() {
+    const subscriptionUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const subscriptionUpdateMock = vi.fn(() => ({
+        eq: subscriptionUpdateEqMock
+    }))
+
+    const billingUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const billingUpdateMock = vi.fn(() => ({
+        eq: billingUpdateEqMock
+    }))
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'organization_subscription_records') {
+            return {
+                update: subscriptionUpdateMock
+            }
+        }
+
+        if (table === 'organization_billing_accounts') {
+            return {
+                update: billingUpdateMock
+            }
+        }
+
+        throw new Error(`Unexpected service table: ${table}`)
+    })
+
+    return {
+        client: {
+            from: fromMock
+        },
+        spies: {
+            fromMock,
+            subscriptionUpdateMock,
+            subscriptionUpdateEqMock,
+            billingUpdateMock,
+            billingUpdateEqMock
+        }
+    }
+}
+
 describe('subscription renewal controls', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
+        process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
     })
 
     it('returns auto-renew enabled defaults when no subscription row exists', async () => {
@@ -215,6 +292,98 @@ describe('subscription renewal controls', () => {
             }
         })
         createClientMock.mockResolvedValue(supabase)
+
+        const result = await resumeSubscriptionRenewal({
+            organizationId: 'org_1'
+        })
+
+        expect(result).toEqual({
+            ok: false,
+            status: 'error',
+            error: 'not_available'
+        })
+    })
+
+    it('calls iyzico cancel instead of mock rpc when provider is iyzico', async () => {
+        const { supabase, rpcMock } = createSupabaseMock({
+            renewalRow: {
+                id: 'sub_row_1',
+                organization_id: 'org_1',
+                provider: 'iyzico',
+                provider_subscription_id: 'iyzi_sub_1',
+                status: 'active',
+                metadata: {},
+                period_end: '2026-03-01T00:00:00.000Z'
+            }
+        })
+        const { client: serviceSupabase, spies } = createServiceSupabaseMock()
+        createClientMock.mockResolvedValue(supabase)
+        createServiceClientMock.mockReturnValue(serviceSupabase)
+        getBillingProviderConfigMock.mockReturnValue({
+            provider: 'iyzico',
+            mock: {
+                enabled: false,
+                error: null
+            },
+            iyzico: {
+                enabled: true,
+                apiKey: 'key',
+                secretKey: 'secret',
+                baseUrl: 'https://sandbox-api.iyzipay.com',
+                webhookSecret: null,
+                error: null
+            }
+        })
+        cancelIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success'
+        })
+
+        const result = await cancelSubscriptionRenewal({
+            organizationId: 'org_1',
+            reason: 'test_reason'
+        })
+
+        expect(cancelIyzicoSubscriptionMock).toHaveBeenCalledWith({
+            subscriptionReferenceCode: 'iyzi_sub_1'
+        })
+        expect(rpcMock).not.toHaveBeenCalledWith('mock_subscription_cancel_renewal', expect.anything())
+        expect(spies.subscriptionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                auto_renew: false,
+                cancel_at_period_end: true
+            })
+        }))
+        expect(spies.billingUpdateMock).toHaveBeenCalledWith(expect.not.objectContaining({
+            membership_state: 'canceled',
+            monthly_package_credit_limit: 0
+        }))
+        expect(spies.subscriptionUpdateEqMock).toHaveBeenCalled()
+        expect(spies.billingUpdateEqMock).toHaveBeenCalledWith('organization_id', 'org_1')
+        expect(result).toEqual({
+            ok: true,
+            status: 'success',
+            error: null
+        })
+    })
+
+    it('returns not_available for iyzico resume because provider cancel is immediate', async () => {
+        const { supabase } = createSupabaseMock()
+        createClientMock.mockResolvedValue(supabase)
+        getBillingProviderConfigMock.mockReturnValue({
+            provider: 'iyzico',
+            mock: {
+                enabled: false,
+                error: null
+            },
+            iyzico: {
+                enabled: true,
+                apiKey: 'key',
+                secretKey: 'secret',
+                baseUrl: 'https://sandbox-api.iyzipay.com',
+                webhookSecret: null,
+                error: null
+            }
+        })
 
         const result = await resumeSubscriptionRenewal({
             organizationId: 'org_1'

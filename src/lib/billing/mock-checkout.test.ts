@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { simulateMockSubscriptionCheckout, simulateMockTopupCheckout } from '@/lib/billing/mock-checkout'
+import { IyzicoClientError } from '@/lib/billing/providers/iyzico/client'
 
 const { createClientMock, createServiceClientMock, initializeIyzicoSubscriptionCheckoutMock, initializeIyzicoTopupCheckoutMock, upgradeIyzicoSubscriptionMock } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
@@ -20,10 +21,24 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('@/lib/billing/providers/iyzico/client', () => {
     class MockIyzicoClientError extends Error {
         readonly code: string
+        readonly providerErrorCode: string | null
+        readonly providerErrorMessage: string | null
+        readonly providerErrorGroup: string | null
 
-        constructor(code: string, message: string) {
+        constructor(
+            code: string,
+            message: string,
+            details?: {
+                providerErrorCode?: string | null
+                providerErrorMessage?: string | null
+                providerErrorGroup?: string | null
+            }
+        ) {
             super(message)
             this.code = code
+            this.providerErrorCode = details?.providerErrorCode ?? null
+            this.providerErrorMessage = details?.providerErrorMessage ?? null
+            this.providerErrorGroup = details?.providerErrorGroup ?? null
         }
     }
 
@@ -43,6 +58,8 @@ interface SupabaseMockOptions {
     assertMemberError?: unknown
     activeSubscriptionRow?: Record<string, unknown> | null
     activeSubscriptionError?: unknown
+    profileRow?: Record<string, unknown> | null
+    organizationRow?: Record<string, unknown> | null
 }
 
 function createSupabaseMock(options: SupabaseMockOptions = {}) {
@@ -98,6 +115,33 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
         eq: subscriptionFirstEqMock
     }))
 
+    const profileMaybeSingleMock = vi.fn(async () => ({
+        data: options.profileRow ?? {
+            full_name: 'Iyzico Test',
+            email: 'test@example.com'
+        },
+        error: null
+    }))
+    const profileEqMock = vi.fn(() => ({
+        maybeSingle: profileMaybeSingleMock
+    }))
+    const profileSelectMock = vi.fn(() => ({
+        eq: profileEqMock
+    }))
+
+    const organizationMaybeSingleMock = vi.fn(async () => ({
+        data: options.organizationRow ?? {
+            name: 'Sandbox Org'
+        },
+        error: null
+    }))
+    const organizationEqMock = vi.fn(() => ({
+        maybeSingle: organizationMaybeSingleMock
+    }))
+    const organizationSelectMock = vi.fn(() => ({
+        eq: organizationEqMock
+    }))
+
     const fromMock = vi.fn((table: string) => {
         if (table === 'organization_billing_accounts') {
             return {
@@ -108,6 +152,18 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
         if (table === 'organization_subscription_records') {
             return {
                 select: subscriptionSelectMock
+            }
+        }
+
+        if (table === 'profiles') {
+            return {
+                select: profileSelectMock
+            }
+        }
+
+        if (table === 'organizations') {
+            return {
+                select: organizationSelectMock
             }
         }
 
@@ -138,6 +194,20 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
 }
 
 function createServiceSupabaseMock() {
+    const subscriptionInsertMaybeSingleMock = vi.fn(async () => ({
+        data: {
+            id: 'sub_row_1',
+            metadata: {}
+        },
+        error: null
+    }))
+    const subscriptionInsertSelectMock = vi.fn(() => ({
+        maybeSingle: subscriptionInsertMaybeSingleMock
+    }))
+    const subscriptionInsertMock = vi.fn(() => ({
+        select: subscriptionInsertSelectMock
+    }))
+
     const purchaseInsertMaybeSingleMock = vi.fn(async () => ({
         data: { id: 'order_1' },
         error: null
@@ -182,6 +252,7 @@ function createServiceSupabaseMock() {
 
         if (table === 'organization_subscription_records') {
             return {
+                insert: subscriptionInsertMock,
                 update: subscriptionUpdateMock
             }
         }
@@ -201,6 +272,9 @@ function createServiceSupabaseMock() {
         },
         spies: {
             fromMock,
+            subscriptionInsertMock,
+            subscriptionInsertSelectMock,
+            subscriptionInsertMaybeSingleMock,
             purchaseInsertMock,
             purchaseInsertSelectMock,
             purchaseInsertMaybeSingleMock,
@@ -252,6 +326,52 @@ describe('mock checkout simulation wrappers', () => {
         expect(createClientMock).not.toHaveBeenCalled()
     })
 
+    it('maps provider insufficient-funds failures for subscription checkout', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+        process.env.IYZICO_SUBSCRIPTION_PLAN_STARTER_REF = 'starter-ref'
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'trial_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 0,
+                monthly_package_credit_used: 0,
+                topup_credit_balance: 0
+            }
+        })
+        const { client: serviceClient } = createServiceSupabaseMock()
+
+        createClientMock.mockResolvedValue(supabase)
+        createServiceClientMock.mockReturnValue(serviceClient)
+        initializeIyzicoSubscriptionCheckoutMock.mockRejectedValue(
+            new IyzicoClientError('request_failed', 'Kart limiti yetersiz, yetersiz bakiye', {
+                providerErrorCode: '10051',
+                providerErrorMessage: 'Kart limiti yetersiz, yetersiz bakiye'
+            })
+        )
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 349,
+            monthlyCredits: 1000,
+            planId: 'starter',
+            callbackUrl: 'http://127.0.0.1:3001/api/billing/iyzico/callback?action=subscribe&locale=tr',
+            locale: 'tr'
+        })
+
+        expect(result).toEqual({
+            ok: false,
+            status: 'error',
+            error: 'insufficient_funds',
+            changeType: null,
+            effectiveAt: null
+        })
+    })
+
     it('returns provider_not_configured for top-up checkout when mock is requested without explicit opt-in', async () => {
         process.env.BILLING_PROVIDER = 'mock'
         delete process.env.BILLING_MOCK_ENABLED
@@ -271,6 +391,51 @@ describe('mock checkout simulation wrappers', () => {
             effectiveAt: null
         })
         expect(createClientMock).not.toHaveBeenCalled()
+    })
+
+    it('maps provider invalid-cvc failures for top-up checkout', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 1000,
+                monthly_package_credit_used: 0,
+                topup_credit_balance: 0
+            }
+        })
+        const { client: serviceClient } = createServiceSupabaseMock()
+
+        createClientMock.mockResolvedValue(supabase)
+        createServiceClientMock.mockReturnValue(serviceClient)
+        initializeIyzicoTopupCheckoutMock.mockRejectedValue(
+            new IyzicoClientError('request_failed', 'Cvc2 bilgisi hatalı', {
+                providerErrorCode: '10084',
+                providerErrorMessage: 'Cvc2 bilgisi hatalı'
+            })
+        )
+
+        const result = await simulateMockTopupCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            credits: 500,
+            amountTry: 200,
+            callbackUrl: 'http://127.0.0.1:3001/api/billing/iyzico/callback?action=topup&locale=tr',
+            locale: 'tr',
+            customerIp: '127.0.0.1'
+        })
+
+        expect(result).toEqual({
+            ok: false,
+            status: 'error',
+            error: 'invalid_cvc',
+            changeType: null,
+            effectiveAt: null
+        })
     })
 
     it('returns invalid_input for malformed subscription payload', async () => {

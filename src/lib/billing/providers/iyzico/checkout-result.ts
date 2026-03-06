@@ -11,6 +11,12 @@ function toIsoFromEpochMs(value: unknown) {
     return new Date(timestamp).toISOString()
 }
 
+function readString(value: unknown) {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
 export function extractIyzicoCheckoutPaymentConversationId(value: unknown): string | null {
     const record = asRecord(value)
     const conversationId = record.paymentConversationId
@@ -39,5 +45,38 @@ export function extractIyzicoSubscriptionStartEnd(value: unknown): {
     return {
         startAt: toIsoFromEpochMs(data.startDate),
         endAt: toIsoFromEpochMs(data.endDate)
+    }
+}
+
+export function extractIyzicoRetrievedSubscriptionItem(
+    value: unknown,
+    subscriptionReferenceCode: string | null = null
+): {
+    referenceCode: string | null
+    status: string | null
+    pricingPlanReferenceCode: string | null
+    startAt: string | null
+    endAt: string | null
+} | null {
+    const record = asRecord(value)
+    const data = asRecord(record.data)
+    const items = Array.isArray(data.items) ? data.items : []
+
+    const match = items.find((item) => {
+        const itemRecord = asRecord(item)
+        const itemReferenceCode = readString(itemRecord.referenceCode)
+        if (!subscriptionReferenceCode) return Boolean(itemReferenceCode)
+        return itemReferenceCode === subscriptionReferenceCode
+    })
+
+    if (!match) return null
+
+    const itemRecord = asRecord(match)
+    return {
+        referenceCode: readString(itemRecord.referenceCode),
+        status: readString(itemRecord.status),
+        pricingPlanReferenceCode: readString(itemRecord.pricingPlanReferenceCode),
+        startAt: toIsoFromEpochMs(itemRecord.startDate),
+        endAt: toIsoFromEpochMs(itemRecord.endDate)
     }
 }

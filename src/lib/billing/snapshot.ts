@@ -4,7 +4,12 @@ import type {
     BillingMembershipState,
     OrganizationBillingAccount
 } from '@/types/database'
-import { calculateCreditProgress, isTopupAllowed, isUsageAllowed } from '@/lib/billing/policy'
+import {
+    calculateCreditProgress,
+    hasPremiumPeriodEnded,
+    isTopupAllowed,
+    isUsageAllowed
+} from '@/lib/billing/policy'
 
 export interface CreditBalanceSnapshot {
     limit: number
@@ -61,6 +66,22 @@ function parseDate(dateIso: string | null | undefined): Date | null {
 function clampPercentage(value: number) {
     if (!Number.isFinite(value)) return 0
     return Math.max(0, Math.min(100, value))
+}
+
+function resolveEffectiveMembershipState(options: {
+    membershipState: BillingMembershipState
+    currentPeriodEnd: string | null
+    nowIso: string
+}) {
+    if (hasPremiumPeriodEnded({
+        membershipState: options.membershipState,
+        currentPeriodEndIso: options.currentPeriodEnd,
+        nowIso: options.nowIso
+    })) {
+        return 'canceled' as const
+    }
+
+    return options.membershipState
 }
 
 function resolveCreditPool(options: {
@@ -170,9 +191,14 @@ export function buildOrganizationBillingSnapshot(
     const totalDays = trialDurationMs > 0
         ? Math.max(1, Math.ceil(trialDurationMs / (1000 * 60 * 60 * 24)))
         : 0
+    const effectiveMembershipState = resolveEffectiveMembershipState({
+        membershipState: accountRow.membership_state,
+        currentPeriodEnd: accountRow.current_period_end,
+        nowIso: nowDate.toISOString()
+    })
 
     const resolvedLockReason = resolveLockReason({
-        membershipState: accountRow.membership_state,
+        membershipState: effectiveMembershipState,
         lockReason: accountRow.lock_reason,
         remainingTrialCredits: trialCreditBalance.remaining,
         trialEndsAt: accountRow.trial_ends_at,
@@ -182,21 +208,24 @@ export function buildOrganizationBillingSnapshot(
     })
 
     const usageAllowed = isUsageAllowed({
-        membershipState: accountRow.membership_state,
+        membershipState: effectiveMembershipState,
         remainingTrialCredits: trialCreditBalance.remaining,
         trialEndsAtIso: accountRow.trial_ends_at,
+        currentPeriodEndIso: accountRow.current_period_end,
         nowIso: nowDate.toISOString(),
         remainingPackageCredits: packageCreditBalance.remaining,
         topupCredits: topupBalance
     })
 
     const topupAllowed = isTopupAllowed({
-        membershipState: accountRow.membership_state,
-        remainingPackageCredits: packageCreditBalance.remaining
+        membershipState: effectiveMembershipState,
+        remainingPackageCredits: packageCreditBalance.remaining,
+        currentPeriodEndIso: accountRow.current_period_end,
+        nowIso: nowDate.toISOString()
     })
 
     const activeCreditPool = resolveCreditPool({
-        membershipState: accountRow.membership_state,
+        membershipState: effectiveMembershipState,
         remainingTrialCredits: trialCreditBalance.remaining,
         remainingPackageCredits: packageCreditBalance.remaining,
         topupBalance
@@ -204,7 +233,7 @@ export function buildOrganizationBillingSnapshot(
 
     return {
         organizationId: accountRow.organization_id,
-        membershipState: accountRow.membership_state,
+        membershipState: effectiveMembershipState,
         lockReason: resolvedLockReason,
         isUsageAllowed: usageAllowed,
         isTopupAllowed: topupAllowed,

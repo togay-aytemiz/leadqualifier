@@ -9,6 +9,8 @@ import {
     extractIyzicoSubscriptionReferenceCode,
     extractIyzicoSubscriptionStartEnd
 } from '@/lib/billing/providers/iyzico/checkout-result'
+import { mapIyzicoProviderFailureToCheckoutError } from '@/lib/billing/providers/iyzico/error-map'
+import { resolvePremiumActivationBalances } from '@/lib/billing/premium-activation'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 
 export const runtime = 'nodejs'
@@ -32,6 +34,8 @@ interface SubscriptionRecordRow {
 
 interface BillingAccountRow {
     organization_id: string
+    trial_credit_limit: number
+    trial_credit_used: number
     monthly_package_credit_limit: number
     monthly_package_credit_used: number
     topup_credit_balance: number
@@ -183,7 +187,31 @@ async function processTopupCallback(input: {
     }
 
     const conversationId = input.order.id
-    const checkoutResult = await retrieveIyzicoTopupCheckoutResult(input.token, conversationId)
+    let checkoutResult: Awaited<ReturnType<typeof retrieveIyzicoTopupCheckoutResult>>
+    try {
+        checkoutResult = await retrieveIyzicoTopupCheckoutResult(input.token, conversationId)
+    } catch (error) {
+        await input.serviceSupabase
+            .from('credit_purchase_orders')
+            .update({
+                status: 'failed',
+                metadata: {
+                    ...asRecord(input.order.metadata),
+                    callback_token: input.token,
+                    callback_processed_at: new Date().toISOString(),
+                    callback_error: error instanceof Error ? error.message : 'Unknown iyzico callback error'
+                }
+            })
+            .eq('id', input.order.id)
+
+        return NextResponse.redirect(buildPlansRedirectUrl({
+            req: input.req,
+            locale: input.locale,
+            action: 'topup',
+            status: 'failed',
+            error: mapIyzicoProviderFailureToCheckoutError(error) ?? 'request_failed'
+        }))
+    }
     const paymentStatus = typeof checkoutResult.paymentStatus === 'string'
         ? checkoutResult.paymentStatus.toUpperCase()
         : ''
@@ -206,7 +234,8 @@ async function processTopupCallback(input: {
             req: input.req,
             locale: input.locale,
             action: 'topup',
-            status: 'failed'
+            status: 'failed',
+            error: mapIyzicoProviderFailureToCheckoutError(checkoutResult) ?? null
         }))
     }
 
@@ -316,7 +345,31 @@ async function processSubscriptionCallback(input: {
         }))
     }
 
-    const checkoutResult = await retrieveIyzicoSubscriptionCheckoutResult(input.token)
+    let checkoutResult: Awaited<ReturnType<typeof retrieveIyzicoSubscriptionCheckoutResult>>
+    try {
+        checkoutResult = await retrieveIyzicoSubscriptionCheckoutResult(input.token)
+    } catch (error) {
+        await input.serviceSupabase
+            .from('organization_subscription_records')
+            .update({
+                status: 'incomplete',
+                metadata: {
+                    ...asRecord(input.subscriptionRecord.metadata),
+                    callback_token: input.token,
+                    callback_processed_at: new Date().toISOString(),
+                    callback_error: error instanceof Error ? error.message : 'Unknown iyzico callback error'
+                }
+            })
+            .eq('id', input.subscriptionRecord.id)
+
+        return NextResponse.redirect(buildPlansRedirectUrl({
+            req: input.req,
+            locale: input.locale,
+            action: 'subscribe',
+            status: 'failed',
+            error: mapIyzicoProviderFailureToCheckoutError(error) ?? 'request_failed'
+        }))
+    }
     const resultRecord = asRecord(checkoutResult)
     const data = asRecord(resultRecord.data)
     const subscriptionStatus = typeof data.subscriptionStatus === 'string'
@@ -342,7 +395,8 @@ async function processSubscriptionCallback(input: {
             req: input.req,
             locale: input.locale,
             action: 'subscribe',
-            status: 'failed'
+            status: 'failed',
+            error: mapIyzicoProviderFailureToCheckoutError(checkoutResult) ?? null
         }))
     }
 
@@ -357,7 +411,7 @@ async function processSubscriptionCallback(input: {
 
     const { data: billingAccount, error: billingError } = await input.serviceSupabase
         .from('organization_billing_accounts')
-        .select('organization_id, monthly_package_credit_limit, monthly_package_credit_used, topup_credit_balance, premium_assigned_at')
+        .select('organization_id, trial_credit_limit, trial_credit_used, monthly_package_credit_limit, monthly_package_credit_used, topup_credit_balance, premium_assigned_at')
         .eq('organization_id', input.subscriptionRecord.organization_id)
         .maybeSingle()
 
@@ -372,7 +426,17 @@ async function processSubscriptionCallback(input: {
     }
 
     const billing = billingAccount as BillingAccountRow
-    const topupBalance = toNonNegativeNumber(billing.topup_credit_balance)
+    const {
+        carryoverTrialCredits,
+        nextTrialCreditUsed,
+        nextTopupCreditBalance,
+        totalRemainingCreditsAfterActivation
+    } = resolvePremiumActivationBalances({
+        trialCreditLimit: toNonNegativeNumber(billing.trial_credit_limit),
+        trialCreditUsed: toNonNegativeNumber(billing.trial_credit_used),
+        topupCreditBalance: toNonNegativeNumber(billing.topup_credit_balance),
+        requestedPackageCredits: requestedCredits
+    })
 
     await input.serviceSupabase
         .from('organization_billing_accounts')
@@ -381,8 +445,10 @@ async function processSubscriptionCallback(input: {
             lock_reason: 'none',
             current_period_start: periodStart,
             current_period_end: periodEnd,
+            trial_credit_used: nextTrialCreditUsed,
             monthly_package_credit_limit: requestedCredits,
             monthly_package_credit_used: 0,
+            topup_credit_balance: nextTopupCreditBalance,
             premium_assigned_at: billing.premium_assigned_at ?? nowIso
         })
         .eq('organization_id', input.subscriptionRecord.organization_id)
@@ -414,6 +480,23 @@ async function processSubscriptionCallback(input: {
         .maybeSingle()
 
     if (!existingLedger?.id) {
+        if (carryoverTrialCredits > 0) {
+            await input.serviceSupabase
+                .from('organization_credit_ledger')
+                .insert({
+                    organization_id: input.subscriptionRecord.organization_id,
+                    entry_type: 'adjustment',
+                    credit_pool: 'topup_pool',
+                    credits_delta: carryoverTrialCredits,
+                    balance_after: totalRemainingCreditsAfterActivation,
+                    reason: 'Trial credit carryover on premium activation',
+                    metadata: {
+                        source: 'trial_credit_carryover',
+                        subscription_record_id: input.subscriptionRecord.id
+                    }
+                })
+        }
+
         await input.serviceSupabase
             .from('organization_credit_ledger')
             .insert({
@@ -421,7 +504,7 @@ async function processSubscriptionCallback(input: {
                 entry_type: 'package_grant',
                 credit_pool: 'package_pool',
                 credits_delta: requestedCredits,
-                balance_after: requestedCredits + topupBalance,
+                balance_after: totalRemainingCreditsAfterActivation,
                 reason: 'Iyzico subscription checkout success',
                 metadata: {
                     source: 'iyzico_subscription_checkout_form',

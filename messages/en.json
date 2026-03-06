@@ -835,11 +835,10 @@
             },
             "manager": {
                 "title": "Manage subscription",
-                "description": "Upgrades apply immediately. Lower-tier changes start at period end.",
+                "description": "Upgrades apply immediately. Lower-tier changes start at period end. When you cancel, auto-renew turns off and the plan stays active until the current period ends.",
                 "manageCtaPrimary": "Upgrade or switch",
                 "manageCtaFallback": "Manage plan",
                 "cancelCta": "Cancel subscription",
-                "resumeCta": "Undo cancellation",
                 "cancelScheduledWithDate": "Cancellation scheduled. Your plan stays active until {date}.",
                 "cancelScheduledNoDate": "Cancellation scheduled. Your plan stays active until the current period ends.",
                 "pendingPlanWithDate": "Upcoming plan: {plan}. Effective on {date}.",
@@ -859,11 +858,11 @@
                 "downgradeHint": "Lower-tier changes apply at period end."
             },
             "cancelModal": {
-                "title": "Cancel subscription",
-                "descriptionWithDate": "If you cancel, renewal stops and your plan stays active until {date}.",
-                "descriptionNoDate": "If you cancel, renewal stops and your plan stays active until the current period ends.",
+                "title": "Are you sure you want to cancel your subscription?",
+                "descriptionWithDate": "When you confirm, auto-renew will be turned off. Your plan will remain active until {date}.",
+                "descriptionNoDate": "When you confirm, auto-renew will be turned off. Your plan will remain active until the current period ends.",
                 "keep": "Keep plan",
-                "confirm": "Confirm cancellation",
+                "confirm": "Cancel subscription",
                 "close": "Close"
             },
             "downgradeHiddenHint": "Downgrades are scheduled from plan management and apply at period end.",
@@ -964,23 +963,35 @@
                 "requestFailed": "The checkout request failed. Please retry.",
                 "adminLocked": "This organization is admin-locked.",
                 "topupNotAllowed": "Top-up credits are not allowed by current membership/package state.",
-                "providerNotConfigured": "Iyzico provider settings are missing. Add API keys and plan references in environment variables."
+                "providerNotConfigured": "Iyzico provider settings are missing. Add API keys and plan references in environment variables.",
+                "insufficientFunds": "The card appears to have insufficient limit or balance.",
+                "paymentNotApproved": "The bank did not approve this payment. Try another card or contact your bank.",
+                "securityCheckFailed": "The payment did not pass the issuer security check. Try another card or contact your bank.",
+                "expiredCard": "The card expiry date appears to be invalid.",
+                "invalidCvc": "The card CVC security code appears to be invalid.",
+                "internetShoppingDisabled": "The card appears to be closed for online purchases.",
+                "cardNotSupported": "This card does not appear to be supported for this transaction.",
+                "paymentProcessingError": "A general error occurred while processing the payment. Please try again."
             }
         },
         "renewalStatus": {
             "successTitle": "Subscription updated",
             "blockedTitle": "Action blocked",
             "errorTitle": "Action failed",
-            "successCancel": "Auto-renew is now turned off.",
+            "successCancel": "Auto-renew has been turned off. Your plan stays active until the current period ends.",
             "successResume": "Auto-renew is now turned on.",
             "errors": {
                 "unauthorized": "Your session is not authenticated.",
                 "invalidInput": "Invalid request values. Please retry.",
-                "notAvailable": "Auto-renew controls are not available in this environment yet.",
+                "notAvailable": "This subscription-management action is not available in this environment.",
                 "requestFailed": "The request failed. Please retry.",
                 "adminLocked": "This organization is admin-locked.",
                 "premiumRequired": "This action requires an active monthly package."
             }
+        },
+        "renewalFailureNotice": {
+            "title": "Renewal failed",
+            "description": "The recurring charge could not be collected. Subscription access is paused until payment is resolved."
         }
     },
     "billingUsage": {
