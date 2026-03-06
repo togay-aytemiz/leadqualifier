@@ -1,4 +1,4 @@
-import { BILLING_UPDATED_EVENT } from '@/lib/billing/events'
+import { dispatchBillingUpdated } from '@/lib/billing/events'
 
 interface BrowserEventTarget {
     dispatchEvent: (event: Event) => boolean
@@ -15,7 +15,7 @@ export const PENDING_SUGGESTIONS_UPDATED_EVENT = 'pending-suggestions-updated'
 function dispatchCompletionEvents(eventTarget: BrowserEventTarget) {
     eventTarget.dispatchEvent(new Event(KNOWLEDGE_UPDATED_EVENT))
     eventTarget.dispatchEvent(new Event(PENDING_SUGGESTIONS_UPDATED_EVENT))
-    eventTarget.dispatchEvent(new Event(BILLING_UPDATED_EVENT))
+    dispatchBillingUpdated(eventTarget)
 }
 
 export async function processKnowledgeDocumentInBackground(

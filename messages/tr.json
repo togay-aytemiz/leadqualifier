@@ -678,6 +678,48 @@
         "connectWhatsApp": "WhatsApp Bağla",
         "connectInstagram": "Instagram Bağla",
         "connectWhatsAppTitle": "WhatsApp Business Bağla",
+        "whatsappConnect": {
+            "choosePathDescription": "İşletmenize uygun kurulum yolunu seçin. Çoğu işletme önce yönlendirmeli Meta kurulumu ile başlamalı; eski asset akışı varsayılan yol değildir.",
+            "back": "Geri",
+            "connecting": "Bağlanıyor...",
+            "startEmbeddedSignup": "Yönlendirmeli Meta kurulumunu başlat",
+            "startLegacyConnect": "Mevcut Meta asset'leri ile devam et",
+            "embeddedSignupUnavailable": "Yönlendirmeli WhatsApp kurulumu bu workspace'te henüz yapılandırılmadı. Önce Meta Embedded Signup ayarını tamamlayın; yalnızca Meta Cloud API asset'leriniz zaten hazırsa eski asset akışını kullanın.",
+            "embeddedSignupCancelled": "WhatsApp kurulumu tamamlanmadan iptal edildi.",
+            "embeddedSignupCancelledStep": "WhatsApp kurulumu şu adımda iptal edildi: {step}.",
+            "embeddedSignupFailedReason": "WhatsApp kurulumu başarısız: {reason}",
+            "embeddedSignupSuccess": "WhatsApp başarıyla bağlandı.",
+            "options": {
+                "existingTitle": "Mevcut WhatsApp Business numaramı koruyacağım",
+                "existingDescription": "Müşterilerle zaten WhatsApp Business uygulamasından konuşuyorsanız ve aynı numarayı korumak istiyorsanız bunu seçin.",
+                "newTitle": "Yeni bir numara kullanacağım",
+                "newDescription": "API mesajlaşması için sıfır bir numara bağlayacaksanız bunu seçin.",
+                "assetsTitle": "Meta Cloud API asset'lerim zaten hazır",
+                "assetsDescription": "Bunu yalnızca Meta içinde WhatsApp Business Account ve bağlı numaranız zaten varsa kullanın."
+            },
+            "existingChecklistTitle": "Devam etmeden önce",
+            "existingDescriptionLong": "Meta, kurulum sırasında ana telefondan onay vermenizi ve business portfolio adımlarını tamamlamanızı isteyebilir. Bu yol mevcut WhatsApp Business numaraları içindir.",
+            "existingChecklist": {
+                "step1": "Numara şu anda aktif olarak WhatsApp Business uygulamasında kullanılıyor.",
+                "step2": "Ana telefonda WhatsApp Business uygulamasının güncel sürümü yüklü.",
+                "step3": "Kurulum sırasında ana cihazdan QR okutabilir veya onay verebilirsiniz.",
+                "step4": "Meta isterse kurulum sırasında yeni bir business portfolio oluşturabilir ya da mevcut olanı seçebilirsiniz."
+            },
+            "newChecklistTitle": "Devam etmeden önce",
+            "newDescriptionLong": "Bu akış, gerekli WhatsApp Business asset'lerini oluşturup yeni numarayı tek kurulum içinde kaydetmek için yönlendirmeli Meta setup kullanır.",
+            "newChecklist": {
+                "step1": "Numara şu anda başka bir WhatsApp hesabında aktif olmamalı.",
+                "step2": "Bu numara için SMS veya sesli doğrulamaya erişiminiz olmalı.",
+                "step3": "Kurulum sırasında bir Meta business portfolio oluşturma veya seçme adımına hazır olun."
+            },
+            "assetsChecklistTitle": "Bu yolu yalnızca şu durumda kullanın",
+            "assetsDescriptionLong": "Bu fallback yol yalnızca Meta kullanıcınıza zaten görünür olan mevcut Meta Cloud API asset'lerini keşfeder. Yeni numara açmaz ve mevcut WhatsApp Business uygulama numarasını taşımaz.",
+            "assetsChecklist": {
+                "step1": "Meta içinde zaten bir WhatsApp Business Account'unuz var.",
+                "step2": "Bu WABA içinde bağlı telefon numarası var ve Meta kullanıcınız bu numarayı görebiliyor.",
+                "step3": "Bu uygulamanın yapması gereken tek şey mevcut asset'leri keşfedip bağlamak."
+            }
+        },
         "connectWhatsAppHelpTitle": "Meta Cloud API kurulum kontrol listesi:",
         "connectWhatsAppSteps": {
             "step1": "Meta Developers içinde bir WhatsApp uygulaması oluşturun ve Phone Number ID ile Business Account ID değerlerini alın.",

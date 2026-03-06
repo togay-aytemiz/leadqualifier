@@ -4,6 +4,7 @@ import { Channel } from '@/types/database'
 import { useEffect, useState } from 'react'
 import { ChannelCard } from '@/components/channels/ChannelCard'
 import { ConnectTelegramModal } from '@/components/channels/ConnectTelegramModal'
+import { ConnectWhatsAppModal } from '@/components/channels/ConnectWhatsAppModal'
 import { connectTelegramChannel } from '@/lib/channels/actions'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
@@ -21,6 +22,7 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
     const locale = useLocale()
     const searchParams = useSearchParams()
     const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false)
+    const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false)
     const router = useRouter()
 
     const handleConnectTelegram = async (token: string) => {
@@ -159,7 +161,7 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
 
     const getConnectHandler = (type: ChannelCardType) => {
         if (type === 'telegram') return () => setIsTelegramModalOpen(true)
-        if (type === 'whatsapp') return () => startMetaOAuth('whatsapp')
+        if (type === 'whatsapp') return () => setIsWhatsAppModalOpen(true)
         return () => undefined
     }
 
@@ -186,6 +188,12 @@ export function ChannelsList({ channels, organizationId, showDescription = true,
                         isOpen={isTelegramModalOpen}
                         onClose={() => setIsTelegramModalOpen(false)}
                         onConnect={handleConnectTelegram}
+                    />
+                    <ConnectWhatsAppModal
+                        isOpen={isWhatsAppModalOpen}
+                        organizationId={organizationId}
+                        onClose={() => setIsWhatsAppModalOpen(false)}
+                        onLegacyConnect={() => startMetaOAuth('whatsapp')}
                     />
                 </>
             )}

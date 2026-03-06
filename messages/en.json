@@ -678,6 +678,48 @@
         "connectWhatsApp": "Connect WhatsApp",
         "connectInstagram": "Connect Instagram",
         "connectWhatsAppTitle": "Connect WhatsApp Business",
+        "whatsappConnect": {
+            "choosePathDescription": "Choose the setup path that matches your business. Most businesses should start with guided Meta setup, not the legacy asset flow.",
+            "back": "Back",
+            "connecting": "Connecting...",
+            "startEmbeddedSignup": "Start guided Meta setup",
+            "startLegacyConnect": "Continue with existing Meta assets",
+            "embeddedSignupUnavailable": "Guided WhatsApp setup is not configured yet on this workspace. Finish Meta Embedded Signup setup first or use the legacy asset flow only if your Meta Cloud API assets are already ready.",
+            "embeddedSignupCancelled": "WhatsApp setup was cancelled before completion.",
+            "embeddedSignupCancelledStep": "WhatsApp setup was cancelled at step: {step}.",
+            "embeddedSignupFailedReason": "WhatsApp setup failed: {reason}",
+            "embeddedSignupSuccess": "WhatsApp connected successfully.",
+            "options": {
+                "existingTitle": "Keep my current WhatsApp Business number",
+                "existingDescription": "Use this if you already talk to customers from WhatsApp Business app and want to keep that number.",
+                "newTitle": "Use a new number",
+                "newDescription": "Use this if you will connect a fresh number dedicated to API messaging.",
+                "assetsTitle": "I already have Meta Cloud API assets",
+                "assetsDescription": "Use this only if you already set up a WhatsApp Business Account and phone number inside Meta."
+            },
+            "existingChecklistTitle": "Before you continue",
+            "existingDescriptionLong": "Meta may ask you to confirm setup from the main phone and complete business portfolio steps during signup. This path is for existing WhatsApp Business numbers.",
+            "existingChecklist": {
+                "step1": "The number is actively used in WhatsApp Business app.",
+                "step2": "The main phone has the latest WhatsApp Business app version installed.",
+                "step3": "You can scan a QR code or confirm setup from that primary device during onboarding.",
+                "step4": "You can create or select a Meta business portfolio during signup if Meta asks for it."
+            },
+            "newChecklistTitle": "Before you continue",
+            "newDescriptionLong": "Use guided Meta setup to create the required WhatsApp Business assets and register the new number in one flow.",
+            "newChecklist": {
+                "step1": "Use a phone number that is not currently active in another WhatsApp account.",
+                "step2": "Keep access to SMS or voice verification for that number.",
+                "step3": "Be ready to create or select a Meta business portfolio during setup."
+            },
+            "assetsChecklistTitle": "Use this path only if",
+            "assetsDescriptionLong": "This fallback path only discovers existing Meta Cloud API assets that are already visible to your Meta user. It does not onboard a new number or migrate an existing WhatsApp Business app number.",
+            "assetsChecklist": {
+                "step1": "You already have a WhatsApp Business Account in Meta.",
+                "step2": "That WABA already has a phone number connected and visible to your Meta user.",
+                "step3": "You only need this app to discover and connect those existing assets."
+            }
+        },
         "connectWhatsAppHelpTitle": "Meta Cloud API setup checklist:",
         "connectWhatsAppSteps": {
             "step1": "Create a WhatsApp app in Meta Developers and copy the Phone Number ID + Business Account ID.",

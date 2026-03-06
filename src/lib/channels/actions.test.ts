@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
     assertTenantWriteAllowedMock,
     createClientMock,
+    exchangeMetaCodeForTokenMock,
+    exchangeMetaForLongLivedTokenMock,
     getPhoneNumberMock,
     getMessageTemplatesMock,
     revalidatePathMock,
@@ -11,6 +13,8 @@ const {
 } = vi.hoisted(() => ({
     assertTenantWriteAllowedMock: vi.fn(),
     createClientMock: vi.fn(),
+    exchangeMetaCodeForTokenMock: vi.fn(),
+    exchangeMetaForLongLivedTokenMock: vi.fn(),
     getPhoneNumberMock: vi.fn(),
     getMessageTemplatesMock: vi.fn(),
     revalidatePathMock: vi.fn(),
@@ -30,6 +34,11 @@ vi.mock('@/lib/organizations/active-context', () => ({
     assertTenantWriteAllowed: assertTenantWriteAllowedMock
 }))
 
+vi.mock('@/lib/channels/meta-oauth', () => ({
+    exchangeMetaCodeForToken: exchangeMetaCodeForTokenMock,
+    exchangeMetaForLongLivedToken: exchangeMetaForLongLivedTokenMock
+}))
+
 vi.mock('@/lib/whatsapp/client', () => ({
     WhatsAppClient: class {
         constructor(token: string) {
@@ -43,6 +52,7 @@ vi.mock('@/lib/whatsapp/client', () => ({
 }))
 
 import {
+    completeWhatsAppEmbeddedSignupChannel,
     connectWhatsAppChannel,
     debugWhatsAppChannel,
     listWhatsAppMessageTemplates,
@@ -101,7 +111,12 @@ function createDebugSupabaseMock(channelData: unknown) {
 describe('channels actions: WhatsApp core flows', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        process.env.META_APP_ID = 'meta-app-1'
+        process.env.META_APP_SECRET = 'meta-secret-1'
+        process.env.META_WEBHOOK_VERIFY_TOKEN = 'global-verify-token'
         assertTenantWriteAllowedMock.mockResolvedValue(undefined)
+        exchangeMetaCodeForTokenMock.mockResolvedValue('short-token-1')
+        exchangeMetaForLongLivedTokenMock.mockResolvedValue('long-token-1')
         getPhoneNumberMock.mockResolvedValue({
             display_phone_number: '+90 555 111 22 33',
             verified_name: 'Qualy',
@@ -181,6 +196,56 @@ describe('channels actions: WhatsApp core flows', () => {
             input_source: 'whatsapp_connect'
         })
         expect(revalidatePathMock).toHaveBeenCalledWith('/settings/channels')
+    })
+
+    it('completes embedded signup by exchanging code and upserting the WhatsApp channel', async () => {
+        const { supabase, upsertMock, rpcMock } = createUpsertSupabaseMock()
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await completeWhatsAppEmbeddedSignupChannel('org-1', {
+            authCode: 'auth-code-1',
+            phoneNumberId: 'phone-1',
+            businessAccountId: 'waba-1'
+        })
+
+        expect(result).toEqual({ success: true })
+        expect(exchangeMetaCodeForTokenMock).toHaveBeenCalledWith({
+            appId: 'meta-app-1',
+            appSecret: 'meta-secret-1',
+            redirectUri: '',
+            code: 'auth-code-1'
+        })
+        expect(exchangeMetaForLongLivedTokenMock).toHaveBeenCalledWith({
+            appId: 'meta-app-1',
+            appSecret: 'meta-secret-1',
+            shortLivedToken: 'short-token-1'
+        })
+        expect(whatsAppCtorMock).toHaveBeenCalledWith('long-token-1')
+        expect(getPhoneNumberMock).toHaveBeenCalledWith('phone-1')
+        expect(upsertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organization_id: 'org-1',
+                type: 'whatsapp',
+                name: 'WhatsApp (+90 555 111 22 33)',
+                status: 'active',
+                config: expect.objectContaining({
+                    phone_number_id: 'phone-1',
+                    business_account_id: 'waba-1',
+                    permanent_access_token: 'long-token-1',
+                    verify_token: 'global-verify-token',
+                    connected_via: 'embedded_signup',
+                    display_phone_number: '+90 555 111 22 33',
+                    webhook_verified_at: null
+                })
+            }),
+            { onConflict: 'organization_id,type' }
+        )
+        expect(rpcMock).toHaveBeenCalledWith('enforce_org_trial_business_policy', {
+            target_organization_id: 'org-1',
+            input_whatsapp_business_account_id: 'waba-1',
+            input_phone: '+90 555 111 22 33',
+            input_source: 'whatsapp_connect'
+        })
     })
 
     it('returns normalized debug info for WhatsApp channel', async () => {

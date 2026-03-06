@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { TelegramClient } from '@/lib/telegram/client'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
 import { InstagramClient } from '@/lib/instagram/client'
+import { exchangeMetaCodeForToken, exchangeMetaForLongLivedToken } from '@/lib/channels/meta-oauth'
 import { v4 as uuidv4 } from 'uuid'
 import type { Json } from '@/types/database'
 
@@ -75,6 +76,12 @@ export interface ConnectInstagramChannelInput {
     pageAccessToken: string
     appSecret: string
     verifyToken: string
+}
+
+export interface CompleteWhatsAppEmbeddedSignupInput {
+    authCode: string
+    phoneNumberId: string
+    businessAccountId: string
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -290,6 +297,98 @@ export async function connectInstagramChannel(organizationId: string, input: Con
     } catch (error: unknown) {
         console.error('Instagram connection error:', error)
         return { error: getErrorMessage(error, 'Failed to connect Instagram channel') }
+    }
+}
+
+export async function completeWhatsAppEmbeddedSignupChannel(
+    organizationId: string,
+    input: CompleteWhatsAppEmbeddedSignupInput
+) {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const appId = process.env.META_APP_ID?.trim()
+    const appSecret = process.env.META_APP_SECRET?.trim()
+    const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || null
+    const authCode = input.authCode.trim()
+    const phoneNumberId = input.phoneNumberId.trim()
+    const businessAccountId = input.businessAccountId.trim()
+
+    if (!authCode || !phoneNumberId || !businessAccountId) {
+        return { error: 'Missing required WhatsApp embedded signup fields.' }
+    }
+
+    if (!appId || !appSecret) {
+        return { error: 'Meta app configuration is missing.' }
+    }
+
+    try {
+        const shortLivedToken = await exchangeMetaCodeForToken({
+            appId,
+            appSecret,
+            redirectUri: '',
+            code: authCode
+        })
+
+        const permanentAccessToken = await exchangeMetaForLongLivedToken({
+            appId,
+            appSecret,
+            shortLivedToken
+        })
+
+        const client = new WhatsAppClient(permanentAccessToken)
+        const phoneDetails = await client.getPhoneNumber(phoneNumberId)
+
+        const displayPhoneNumber = (phoneDetails.display_phone_number ?? '').trim()
+        const channelName = displayPhoneNumber
+            ? `WhatsApp (${displayPhoneNumber})`
+            : `WhatsApp (${phoneNumberId})`
+
+        const { error } = await supabase
+            .from('channels')
+            .upsert({
+                organization_id: organizationId,
+                type: 'whatsapp',
+                name: channelName,
+                status: 'active',
+                config: {
+                    phone_number_id: phoneNumberId,
+                    business_account_id: businessAccountId,
+                    permanent_access_token: permanentAccessToken,
+                    verify_token: globalVerifyToken || uuidv4(),
+                    connected_via: 'embedded_signup',
+                    oauth_connected_at: new Date().toISOString(),
+                    display_phone_number: displayPhoneNumber,
+                    webhook_verified_at: null
+                }
+            }, {
+                onConflict: 'organization_id,type'
+            })
+
+        if (error) throw error
+
+        const rpcMethod = (supabase as unknown as {
+            rpc?: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+        }).rpc
+
+        if (typeof rpcMethod === 'function') {
+            const { error: policyError } = await rpcMethod('enforce_org_trial_business_policy', {
+                target_organization_id: organizationId,
+                input_whatsapp_business_account_id: businessAccountId,
+                input_phone: displayPhoneNumber || null,
+                input_source: 'whatsapp_connect'
+            })
+
+            if (policyError) {
+                console.error('Failed to enforce trial business policy on WhatsApp connect:', policyError)
+            }
+        }
+
+        revalidatePath('/settings/channels')
+        return { success: true }
+    } catch (error: unknown) {
+        console.error('WhatsApp embedded signup completion error:', error)
+        return { error: getErrorMessage(error, 'Failed to complete WhatsApp embedded signup') }
     }
 }
 

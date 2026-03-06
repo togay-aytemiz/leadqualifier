@@ -2,15 +2,15 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Replace blind WhatsApp self-serve connect with an existing-number-first onboarding flow that routes most businesses into concierge-assisted setup and only opens Meta OAuth for prequalified cases.
+**Goal:** Let WhatsApp Business users connect their real business number to the product without requiring pre-existing Cloud API assets, while preserving a fallback path for users who already completed Meta asset setup.
 
-**Architecture:** Keep Meta Cloud API as the channel runtime, but change onboarding from a single `Connect with Meta` action into a staged flow: preflight intake -> eligibility classification -> concierge/operator queue -> controlled Meta connect step. Optimize for businesses that already use WhatsApp Business on their existing number; treat brand-new number onboarding as secondary. Do not assume prior `business.facebook.com` usage; the flow must handle businesses that need to create or connect a Meta business portfolio during assisted signup.
+**Architecture:** Keep Meta Cloud API as the runtime, but replace the current blind asset-discovery OAuth entry with a guided WhatsApp connect modal that supports two real onboarding modes: Meta Embedded Signup for new/existing numbers, and legacy OAuth asset discovery only for users who already have a ready WABA + phone number in Meta. Concierge remains a fallback, not the primary implementation.
 
 **Tech Stack:** Next.js App Router, React client components, Supabase Postgres + RLS, next-intl TR/EN, existing channel settings surfaces, Meta OAuth routes.
 
 ---
 
-### Task 1: Lock the product decision in docs before code changes
+### Task 1: Lock the revised product decision in docs before code changes
 
 **Files:**
 - Modify: `docs/PRD.md`
@@ -19,11 +19,11 @@
 - Create: `docs/plans/2026-03-05-whatsapp-existing-number-onboarding-productization-plan.md`
 
 **Notes:**
-- Record the MVP decision as `concierge-first existing-number onboarding`.
-- State explicitly that standard self-serve Meta OAuth is not the default path for businesses already using WhatsApp Business.
-- Keep `new number` as a secondary path, not the primary happy path.
+- Record the MVP decision as `embedded-signup first`.
+- State explicitly that current server OAuth is only an asset-discovery fallback, not the primary onboarding path.
+- Keep concierge as fallback for blocked/unready users, not the main happy path.
 
-### Task 2: Replace the current WhatsApp connect CTA with an onboarding preflight
+### Task 2: Replace the current WhatsApp connect CTA with a three-path onboarding modal
 
 **Files:**
 - Modify: `src/components/channels/ConnectWhatsAppModal.tsx`
@@ -34,134 +34,107 @@
 - Test: `src/components/channels/channelCards.test.ts`
 
 **Scope:**
-- Replace the current generic Meta checklist with a short decision flow:
-  - `I want to keep my current WhatsApp number`
-  - `I can use a new number`
-- For existing-number cases, collect the minimum facts needed for triage:
-  - country
-  - current use of WhatsApp Business app
-  - same number retention
-  - access to Meta Business account/admin
-  - willingness for assisted setup call
-- Add a short prep checklist for existing-number cases:
-  - WhatsApp Business app is in active use on that number
-  - latest app version is installed on the primary phone
-  - the business can access a QR-capable primary device during setup
-  - the business can link or has linked the number to a Facebook Page / Meta business assets
-- Do not send this branch directly to Meta OAuth.
+- Replace the current blind connect button with explicit paths:
+  - `Use my current WhatsApp Business number`
+  - `Use a new number`
+  - `I already have Meta Cloud API assets`
+- Route the first two paths to Embedded Signup when config is available.
+- Route the third path to the current server OAuth asset-discovery flow.
+- Show an existing-number prep checklist:
+  - WhatsApp Business app is active on the main phone
+  - latest app version is installed
+  - QR-capable primary device is available during setup
+  - user can create/select a Meta business portfolio during signup
 
-### Task 3: Persist onboarding requests and operator-facing status
+### Task 3: Add Embedded Signup client parsing and launch support
 
 **Files:**
-- Create: `supabase/migrations/00084_whatsapp_onboarding_requests.sql`
-- Modify: `src/types/database.ts`
-- Create: `src/lib/channels/onboarding.ts`
-- Create: `src/lib/channels/onboarding.test.ts`
+- Create: `src/lib/channels/meta-embedded-signup.ts`
+- Create: `src/lib/channels/meta-embedded-signup.test.ts`
+- Modify: `src/components/channels/ConnectWhatsAppModal.tsx`
+- Modify: `src/components/channels/ChannelsList.tsx`
 
 **Scope:**
-- Add an organization-scoped onboarding request table for WhatsApp setup.
-- Suggested fields:
-  - `organization_id`
-  - `requested_phone`
-  - `country_code`
-  - `current_whatsapp_mode` (`business_app`, `personal`, `unknown`)
-  - `wants_existing_number`
-  - `has_meta_business_access`
-  - `status` (`submitted`, `qualified_for_oauth`, `needs_concierge`, `blocked`, `completed`)
-  - `classification_reason`
-  - `operator_notes`
-- Add tenant-safe insert/read helpers and basic validation tests.
+- Load the Meta JavaScript SDK only for WhatsApp connect.
+- Start Facebook Login for Business / Embedded Signup using app-level configuration id.
+- Parse Meta `postMessage` events safely and capture:
+  - `FINISH` with `phone_number_id` + `waba_id`
+  - `CANCEL`
+  - `ERROR`
+- Distinguish trusted Meta origins from untrusted window messages.
 
-### Task 4: Add a deterministic eligibility classifier and gate Meta OAuth behind it
+### Task 4: Add backend completion action for Embedded Signup
 
 **Files:**
 - Modify: `src/lib/channels/actions.ts`
 - Modify: `src/lib/channels/actions.test.ts`
+- Modify: `src/types/database.ts`
+
+**Scope:**
+- Accept the Embedded Signup auth code plus returned `waba_id` and `phone_number_id`.
+- Exchange the auth code for a long-lived access token.
+- Fetch phone details and upsert the WhatsApp channel directly from embedded-signup output.
+- Reuse existing trial fingerprint enforcement and channel naming behavior.
+
+### Task 5: Keep current OAuth flow as explicit fallback for asset-ready users
+
+**Files:**
 - Modify: `src/app/api/channels/meta/start/route.ts`
 - Modify: `src/app/api/channels/meta/callback/route.ts`
 - Modify: `src/lib/channels/meta-oauth.ts`
 - Modify: `src/lib/channels/meta-oauth.test.ts`
 
 **Scope:**
-- Introduce a small rule-based classifier for onboarding outcomes:
-  - `new_number_direct_oauth`
-  - `existing_number_concierge`
-  - `existing_number_blocked`
-- Only allow direct Meta OAuth when the request is explicitly eligible.
-- Preserve current OAuth/callback behavior for approved cases.
-- Log structured failure reasons so support can distinguish:
-  - missing asset access
-  - already-registered number
-  - migration/coexistence required
-  - unsupported or unclear setup state
+- Keep the current discovery flow intact for users who already have accessible WABA assets.
+- Rename its UI copy so users understand it is for pre-existing Meta Cloud API setups.
+- Avoid treating this fallback as the default path for ordinary SMBs.
 
-### Task 5: Add a lightweight admin/onboarding queue for manual setup
+### Task 6: Add customer-facing guidance and config gating
 
 **Files:**
-- Create: `src/app/[locale]/(dashboard)/admin/whatsapp-onboarding/page.tsx`
-- Create: `src/app/[locale]/(dashboard)/admin/whatsapp-onboarding/WhatsAppOnboardingAdminClient.tsx`
-- Modify: `src/lib/organizations/actions.ts`
 - Modify: `messages/en.json`
 - Modify: `messages/tr.json`
+- Modify: `docs/PRD.md`
+- Modify: `docs/ROADMAP.md`
+- Modify: `docs/RELEASE.md`
 
 **Scope:**
-- Show submitted onboarding requests with status, phone, org, and classification.
-- Allow operators/admins to:
-  - mark `qualified_for_oauth`
-  - mark `needs_concierge`
-  - mark `blocked`
-  - store internal notes
-- Keep MVP narrow; no calendar scheduling or complex CRM workflow.
+- Add precise statuses for:
+  - embedded signup unavailable
+  - embedded signup cancelled
+  - embedded signup failed
+  - embedded signup completed
+  - legacy asset connect
+- Document required env/config:
+  - `META_APP_ID`
+  - `META_APP_SECRET`
+  - `NEXT_PUBLIC_META_APP_ID`
+  - `NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`
+- Document the operator-side Meta setup needed before rollout.
 
-### Task 6: Add customer-facing onboarding states and next-step guidance
+### Task 7: Concierge fallback for blocked/unready users
 
 **Files:**
 - Modify: `src/components/channels/ConnectWhatsAppModal.tsx`
-- Modify: `src/components/channels/ChannelsList.tsx`
 - Modify: `messages/en.json`
 - Modify: `messages/tr.json`
 
 **Scope:**
-- Replace vague Meta errors with productized next steps:
-  - `We received your setup request`
-  - `This number needs assisted migration/setup`
-  - `This number is ready for Meta connect`
-  - `This setup is currently blocked`
-- Explain that existing WhatsApp Business numbers may require migration/coexistence and that the team will guide setup when needed.
-
-### Task 7: Add success metrics and rollout guardrails
-
-**Files:**
-- Modify: `docs/PRD.md`
-- Modify: `docs/ROADMAP.md`
-- Optional: `src/lib/channels/actions.ts`
-
-**Scope:**
-- Track funnel counts:
-  - preflight started
-  - submitted
-  - qualified for OAuth
-  - concierge required
-  - connected successfully
-  - blocked
-- Define MVP exit criteria:
-  - no blind Meta redirect for existing-number businesses
-  - support can classify every failed connect into a visible bucket
-  - first 5-10 pilot onboardings complete without requiring users to self-diagnose Meta account state
+- If Embedded Signup config is unavailable or the user is not ready, show deterministic next-step guidance instead of a dead-end Meta redirect.
+- Concierge can remain copy-only in this iteration; do not block self-serve implementation on a full onboarding queue.
 
 ### Task 8: Verification
 
 **Commands:**
+- `npm test -- --run src/lib/channels/meta-embedded-signup.test.ts`
 - `npm test -- --run src/lib/channels/actions.test.ts`
 - `npm test -- --run src/lib/channels/meta-oauth.test.ts`
-- `npm test -- --run src/components/channels/channelCards.test.ts`
 - `npm run build`
 
 ### Recommended commit sequence
 
 **Commits:**
-- `docs(phase-2): define concierge-first whatsapp onboarding strategy`
-- `feat(phase-2): add whatsapp onboarding preflight intake`
-- `feat(phase-2): persist whatsapp onboarding requests and classification`
-- `feat(phase-2): gate meta oauth behind onboarding eligibility`
-- `feat(phase-2): add admin whatsapp onboarding queue`
+- `docs(phase-2): revise whatsapp onboarding strategy around embedded signup`
+- `feat(phase-2): add whatsapp embedded signup connect flow`
+- `feat(phase-2): add embedded signup completion route`
+- `feat(phase-2): clarify legacy meta asset connect fallback`
