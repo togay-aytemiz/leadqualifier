@@ -22,7 +22,7 @@ vi.mock('next/navigation', () => ({
     redirect: redirectMock,
 }))
 
-import { register } from '@/lib/auth/actions'
+import { register, requestPasswordReset } from '@/lib/auth/actions'
 
 function createRegisterFormData(values?: Partial<Record<'email' | 'password' | 'fullName' | 'companyName', string>>) {
     const formData = new FormData()
@@ -36,6 +36,9 @@ function createRegisterFormData(values?: Partial<Record<'email' | 'password' | '
 describe('auth register action', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        delete process.env.NEXT_PUBLIC_SITE_URL
+        delete process.env.URL
+        delete process.env.VERCEL_URL
         delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
         delete process.env.TURNSTILE_SECRET_KEY
         headersMock.mockResolvedValue(new Headers({
@@ -280,5 +283,39 @@ describe('auth register action', () => {
             errorCode: 'trial_already_used_business',
         })
         expect(signUpMock).not.toHaveBeenCalled()
+    })
+})
+
+describe('auth password reset action', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        delete process.env.NEXT_PUBLIC_SITE_URL
+        delete process.env.URL
+        delete process.env.VERCEL_URL
+    })
+
+    it('uses Netlify URL env as base redirect when explicit site URL is absent', async () => {
+        process.env.URL = 'https://app.askqualy.com'
+
+        const resetPasswordForEmailMock = vi.fn(async () => ({
+            error: null,
+        }))
+
+        createClientMock.mockResolvedValue({
+            auth: {
+                resetPasswordForEmail: resetPasswordForEmailMock,
+            },
+        })
+
+        const formData = new FormData()
+        formData.set('email', 'jane@example.com')
+        formData.set('locale', 'tr')
+
+        const result = await requestPasswordReset(formData)
+
+        expect(result).toEqual({ success: true })
+        expect(resetPasswordForEmailMock).toHaveBeenCalledWith('jane@example.com', {
+            redirectTo: 'https://app.askqualy.com/reset-password',
+        })
     })
 })

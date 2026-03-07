@@ -6,7 +6,10 @@ import { login } from '@/lib/auth/actions'
 import { Link, useRouter } from '@/i18n/navigation'
 import { Button } from '@/design'
 import { Eye, EyeOff } from 'lucide-react'
-import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import {
+    getAuthManualPrefetchRoutes,
+    shouldEnableManualRoutePrefetch
+} from '@/design/manual-prefetch'
 
 export function LoginForm() {
     const t = useTranslations('auth')
@@ -24,11 +27,9 @@ export function LoginForm() {
         if (!shouldEnableManualRoutePrefetch()) return
 
         const timeoutId = window.setTimeout(() => {
-            router.prefetch('/register')
-            router.prefetch('/forgot-password')
-            router.prefetch('/inbox')
-            router.prefetch('/skills')
-            router.prefetch('/settings/ai')
+            getAuthManualPrefetchRoutes('login').forEach((href) => {
+                router.prefetch(href)
+            })
         }, 120)
 
         return () => {

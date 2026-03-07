@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-03-06 (Iyzico subscription lifecycle is now provider-backed beyond initial checkout: self-serve cancel calls Iyzico cancel API, turns off renewal, and keeps access active until the paid `current_period_end`; a new `/api/billing/iyzico/webhook` route syncs recurring renewal success/failure/cancellation events; recurring renewal success is now applied through a dedicated DB RPC so subscription/account/ledger updates stay atomic and retry-safe; premium expiry now includes a one-hour grace window after `current_period_end` to reduce false lockouts when provider webhooks are delayed; failed renewals still move accounts to `past_due` and pause usage until payment is resolved; Plans now shows explicit scheduled-cancel and past-due states, without exposing an in-app undo/resume CTA after cancellation; hosted checkout remount remains hardened for repeated SPA attempts; billing redirects remain locale-aware `as-needed`; checkout legal consent stays server-enforced; first premium activation still converts unused trial credits into persistent extra-credit balance while monthly package credits remain non-rollover; sandbox validation now covers direct Iyzico success/decline card matrix plus provider-backed cancel flow; provider payment failures map to specific user-facing checkout errors instead of generic request failures; and SQL entitlement/usage guards now reject premium access after the grace window even if provider cancellation was only finalized locally in metadata.)  
+> **Last Updated:** 2026-03-07 (Auth pages now prefetch only auth-safe sibling routes instead of protected dashboard pages, removing unnecessary signed-out auth/org/data warmups that made login/register openings and post-signout redirects feel slow; password-reset base URL fallback now supports Netlify `URL` when explicit site URL config is absent; project docs and stack references now reflect Netlify as the active hosting platform; Iyzico subscription lifecycle remains provider-backed beyond initial checkout: self-serve cancel calls Iyzico cancel API, turns off renewal, and keeps access active until the paid `current_period_end`; a new `/api/billing/iyzico/webhook` route syncs recurring renewal success/failure/cancellation events; recurring renewal success is now applied through a dedicated DB RPC so subscription/account/ledger updates stay atomic and retry-safe; premium expiry now includes a one-hour grace window after `current_period_end` to reduce false lockouts when provider webhooks are delayed; failed renewals still move accounts to `past_due` and pause usage until payment is resolved; Plans now shows explicit scheduled-cancel and past-due states, without exposing an in-app undo/resume CTA after cancellation; hosted checkout remount remains hardened for repeated SPA attempts; billing redirects remain locale-aware `as-needed`; checkout legal consent stays server-enforced; first premium activation still converts unused trial credits into persistent extra-credit balance while monthly package credits remain non-rollover; sandbox validation now covers direct Iyzico success/decline card matrix plus provider-backed cancel flow; provider payment failures map to specific user-facing checkout errors instead of generic request failures; and SQL entitlement/usage guards now reject premium access after the grace window even if provider cancellation was only finalized locally in metadata.)  
 > Mark items with `[x]` when completed.
 
 ---
@@ -9,7 +9,7 @@
 - [x] Initialize project repository
 - [x] Set up development environment
 - [x] Choose and configure tech stack
-- [x] Set up CI/CD pipeline (Vercel auto-deploys)
+- [x] Set up CI/CD pipeline (Netlify auto-deploys)
 - [x] Configure database (Supabase client ready)
 - [x] Set up environment variables
 - [x] Codify agent workflow rules (always provide commit message)
@@ -30,6 +30,8 @@
   - [x] Role-based access (admin, member)
   - [x] Signout redirect now resolves `register` URL from runtime request origin instead of static app URL env fallback
   - [x] Sign Up now redirects unconfirmed users to a dedicated check-email checkpoint page (submitted email, spam hint, quick change-email return, and sign-in shortcut)
+  - [x] Auth pages now avoid prefetching protected dashboard routes while signed out, reducing slow-feeling login/register open and signout return flows
+  - [x] Password reset and auth docs now recognize Netlify as the primary hosting/runtime platform
 
 ---
 

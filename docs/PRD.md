@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-03-06 (Iyzico billing provider integration now covers recurring lifecycle sync as well as checkout initiation: hosted checkout remains hardened for repeated SPA attempts, callback redirects remain locale-aware `as-needed`, pre-payment legal consent is server-enforced, first premium activation still preserves unused trial credits as persistent extra-credit balance, and a new provider-backed lifecycle layer now handles self-serve cancellation + webhook-driven renewal success/failure/cancellation sync; provider-backed cancellation now turns off renewal immediately but keeps workspace access active until the paid `current_period_end`, successful recurring renewals refresh monthly package credits without rolling over prior package balance, renewal success persistence is now applied through a single DB RPC to keep subscription/account/ledger state atomic across retries, premium expiry now uses a one-hour grace window after `current_period_end` to reduce false lockouts on delayed provider webhooks, failed renewals move the workspace to `past_due` and pause usage until payment is resolved, sandbox validation now covers direct success/decline card scenarios plus provider-backed cancel flow, checkout failures map provider error codes to specific user-facing reasons instead of generic request failures, Plans surfaces show explicit scheduled-cancel and past-due warning states, and SQL entitlement/usage guards reject premium access after the grace window even if the billing row has not yet been hard-finalized to `canceled`.)  
+> **Last Updated:** 2026-03-07 (Auth route warmup is now signed-out safe: login/register pages prefetch only auth sibling routes and do not warm protected dashboard pages before a session exists, reducing slow-feeling opens and post-signout redirects; password-reset base URL fallback now supports Netlify `URL` when explicit site URL config is absent; product docs and stack decisions now reflect Netlify as the active hosting platform; Iyzico billing provider integration still covers recurring lifecycle sync as well as checkout initiation: hosted checkout remains hardened for repeated SPA attempts, callback redirects remain locale-aware `as-needed`, pre-payment legal consent is server-enforced, first premium activation still preserves unused trial credits as persistent extra-credit balance, and a new provider-backed lifecycle layer now handles self-serve cancellation + webhook-driven renewal success/failure/cancellation sync; provider-backed cancellation now turns off renewal immediately but keeps workspace access active until the paid `current_period_end`, successful recurring renewals refresh monthly package credits without rolling over prior package balance, renewal success persistence is now applied through a single DB RPC to keep subscription/account/ledger state atomic across retries, premium expiry now uses a one-hour grace window after `current_period_end` to reduce false lockouts on delayed provider webhooks, failed renewals move the workspace to `past_due` and pause usage until payment is resolved, sandbox validation now covers direct success/decline card scenarios plus provider-backed cancel flow, checkout failures map provider error codes to specific user-facing reasons instead of generic request failures, Plans surfaces show explicit scheduled-cancel and past-due warning states, and SQL entitlement/usage guards reject premium access after the grace window even if the billing row has not yet been hard-finalized to `canceled`.)  
 > **Status:** In Development
 
 ---
@@ -742,7 +742,7 @@ MVP is successful when:
 
 ## Appendix: Tech Decisions ✅
 
-> Finalized: 2026-01-31 (updated with implementation decisions through 2026-03-05)
+> Finalized: 2026-01-31 (updated with implementation decisions through 2026-03-07)
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
 - **Chunking Strategy:** ~800 token chunks with overlap to preserve context, with token-budgeted prompt assembly.
@@ -816,6 +816,7 @@ MVP is successful when:
 - **Sign Up Email Confirmation Checkpoint (Implementation v1.26):** When signup succeeds without an active auth session (email verification required), route users to `/register/check-email` and display submitted email + spam/junk guidance + quick change-email return path (`/register?email=...`) + sign-in shortcut; keep direct app redirect only when signup returns an active session.
 - **Auth Mobile Input Sizing:** Use `text-base` (`16px`) on small-screen auth inputs to avoid iOS Safari auto-zoom while preserving compact `sm:text-sm` on larger screens.
 - **Auth Mobile Viewport Stability:** Use `dvh`-based auth shell height and fixed light background tokens to avoid visible black bands at top/bottom on mobile browsers.
+- **Auth Prefetch Scope (Implementation v1.28):** Signed-out auth surfaces must prefetch only adjacent auth routes (`login`, `register`, `forgot-password`, `register/check-email`) and must not warm protected dashboard pages before a session exists, because those routes trigger avoidable auth/org/data reads and degrade perceived login/register and signout performance.
 - **Legacy Cleanup:** Remove `knowledge_base` (legacy) and use documents/chunks as the single source of truth.
 - **KB Routing:** Use LLM to decide whether to query KB and rewrite follow-up questions into standalone queries.
 - **KB Routing Heuristics:** If routing is uncertain, definition-style questions are treated as KB queries.
@@ -1096,7 +1097,7 @@ MVP is successful when:
 | AI/LLM | **OpenAI GPT-4o-mini** | Cost-effective, good Turkish support |
 | Embeddings | **OpenAI + Supabase pgvector** | All-in-one, no extra services |
 | Realtime | **Supabase Realtime** | Live inbox updates (Postgres changes) |
-| Hosting | **Vercel** | Optimal for Next.js, generous free tier |
+| Hosting | **Netlify** | Matches current deployment platform and runtime environment |
 | i18n | **TR + EN from day one** | Avoid retrofit pain |
 | Onboarding | **Embedded Signup first (MVP)** | Guided self-serve WhatsApp setup for real business numbers, with concierge fallback for blocked pilot cases |
 | Inbox Updates | **Atomic send RPC + realtime fallback** | Prevents unassigned state and keeps bot/user messages visible |

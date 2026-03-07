@@ -10,7 +10,7 @@ WhatsApp AI Qualy for Turkish SMBs.
 - **Auth:** Supabase Auth (Email/Password)
 - **AI/LLM:** OpenAI GPT-4o-mini
 - **WhatsApp:** Meta Cloud API
-- **Hosting:** Vercel
+- **Hosting:** Netlify
 - **i18n:** next-intl (TR + EN)
 
 ## Getting Started

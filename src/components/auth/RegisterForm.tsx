@@ -12,7 +12,10 @@ import {
 } from '@/components/auth/registerConsentStyles'
 import { getRegisterConsentLinks } from '@/components/auth/registerConsentLinks'
 import { Eye, EyeOff } from 'lucide-react'
-import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import {
+    getAuthManualPrefetchRoutes,
+    shouldEnableManualRoutePrefetch
+} from '@/design/manual-prefetch'
 import Script from 'next/script'
 
 type TranslateFn = (key: string, values?: Record<string, string | number>) => string
@@ -64,12 +67,9 @@ export function RegisterForm({
         if (!shouldEnableManualRoutePrefetch()) return
 
         const timeoutId = window.setTimeout(() => {
-            router.prefetch('/login')
-            router.prefetch('/forgot-password')
-            router.prefetch('/register/check-email')
-            router.prefetch('/inbox')
-            router.prefetch('/skills')
-            router.prefetch('/settings/ai')
+            getAuthManualPrefetchRoutes('register').forEach((href) => {
+                router.prefetch(href)
+            })
         }, 120)
 
         return () => {

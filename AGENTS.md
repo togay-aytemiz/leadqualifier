@@ -134,7 +134,7 @@ Before starting work, check these skills:
 | AI/LLM | OpenAI GPT-4o-mini |
 | Embeddings | OpenAI text-embedding-3-small + pgvector |
 | WhatsApp | Meta Cloud API |
-| Hosting | Vercel |
+| Hosting | Netlify |
 | i18n | next-intl (TR + EN) |
 
 ---
