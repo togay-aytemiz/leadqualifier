@@ -686,6 +686,7 @@
             "startEmbeddedSignup": "Start guided Meta setup",
             "startLegacyConnect": "Continue with existing Meta assets",
             "embeddedSignupUnavailable": "Guided WhatsApp setup is not configured yet on this workspace. Finish Meta Embedded Signup setup first or use the legacy asset flow only if your Meta Cloud API assets are already ready.",
+            "existingEmbeddedSignupUnavailable": "Current-number WhatsApp setup is not configured yet on this workspace. Add a dedicated Meta Embedded Signup config for existing WhatsApp Business numbers or continue with assisted setup.",
             "embeddedSignupCancelled": "WhatsApp setup was cancelled before completion.",
             "embeddedSignupCancelledStep": "WhatsApp setup was cancelled at step: {step}.",
             "embeddedSignupFailedReason": "WhatsApp setup failed: {reason}",

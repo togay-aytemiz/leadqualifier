@@ -6,8 +6,10 @@ const AUTH_MANUAL_PREFETCH_ROUTES = {
 } as const
 
 export type AuthManualPrefetchSurface = keyof typeof AUTH_MANUAL_PREFETCH_ROUTES
+export type ManualPrefetchSurface = 'auth' | 'app-shell'
 
 export function shouldEnableManualRoutePrefetch(
+    surface: ManualPrefetchSurface = 'app-shell',
     environment: string = process.env.NODE_ENV ?? '',
     disabledFlag: string | undefined = process.env.NEXT_PUBLIC_DISABLE_MANUAL_PREFETCH
 ) {
@@ -16,6 +18,10 @@ export function shouldEnableManualRoutePrefetch(
     }
 
     if (environment === 'test') {
+        return false
+    }
+
+    if (surface === 'app-shell') {
         return false
     }
 

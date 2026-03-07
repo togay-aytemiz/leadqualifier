@@ -64,7 +64,7 @@ export function RegisterForm({
     const errorMessage = resolveRegisterErrorMessage(state, t)
 
     useEffect(() => {
-        if (!shouldEnableManualRoutePrefetch()) return
+        if (!shouldEnableManualRoutePrefetch('auth')) return
 
         const timeoutId = window.setTimeout(() => {
             getAuthManualPrefetchRoutes('register').forEach((href) => {

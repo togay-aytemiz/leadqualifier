@@ -6,21 +6,30 @@ import {
 } from '@/design/manual-prefetch'
 
 describe('shouldEnableManualRoutePrefetch', () => {
-    it('enables manual prefetch in production', () => {
-        expect(shouldEnableManualRoutePrefetch('production')).toBe(true)
+    it('enables auth manual prefetch in production', () => {
+        expect(shouldEnableManualRoutePrefetch('auth', 'production')).toBe(true)
     })
 
-    it('enables manual prefetch in development', () => {
-        expect(shouldEnableManualRoutePrefetch('development')).toBe(true)
+    it('enables auth manual prefetch in development', () => {
+        expect(shouldEnableManualRoutePrefetch('auth', 'development')).toBe(true)
+    })
+
+    it('disables app-shell manual prefetch in production', () => {
+        expect(shouldEnableManualRoutePrefetch('app-shell', 'production')).toBe(false)
+    })
+
+    it('disables app-shell manual prefetch in development', () => {
+        expect(shouldEnableManualRoutePrefetch('app-shell', 'development')).toBe(false)
     })
 
     it('disables manual prefetch in test', () => {
-        expect(shouldEnableManualRoutePrefetch('test')).toBe(false)
+        expect(shouldEnableManualRoutePrefetch('auth', 'test')).toBe(false)
+        expect(shouldEnableManualRoutePrefetch('app-shell', 'test')).toBe(false)
     })
 
     it('disables manual prefetch when disable flag is set', () => {
-        expect(shouldEnableManualRoutePrefetch('production', '1')).toBe(false)
-        expect(shouldEnableManualRoutePrefetch('development', 'true')).toBe(false)
+        expect(shouldEnableManualRoutePrefetch('auth', 'production', '1')).toBe(false)
+        expect(shouldEnableManualRoutePrefetch('auth', 'development', 'true')).toBe(false)
     })
 })
 

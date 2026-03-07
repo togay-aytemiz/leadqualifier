@@ -182,7 +182,7 @@ export function SettingsResponsiveShell({
     }, [navigateBackToSettings])
 
     useEffect(() => {
-        if (!shouldEnableManualRoutePrefetch()) return
+        if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
         const routes = navItems
             .filter((item) => !item.locked)

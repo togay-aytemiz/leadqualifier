@@ -556,7 +556,7 @@ export function MainSidebar({
     }, [organizationId, refreshBillingSnapshot])
 
     useEffect(() => {
-        if (!shouldEnableManualRoutePrefetch()) return
+        if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
         const routesToPrefetch = [
             '/inbox',

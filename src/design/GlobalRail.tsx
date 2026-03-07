@@ -76,7 +76,7 @@ export function GlobalRail({ userName }: GlobalRailProps) {
     const SettingsIcon = isSettingsActive ? HiMiniCog6Tooth : HiOutlineCog6Tooth
 
     useEffect(() => {
-        if (!shouldEnableManualRoutePrefetch()) return
+        if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
         const timeoutId = window.setTimeout(() => {
             router.prefetch('/inbox')

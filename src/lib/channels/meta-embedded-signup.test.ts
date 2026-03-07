@@ -9,6 +9,7 @@ describe('meta embedded signup helpers', () => {
     afterEach(() => {
         delete process.env.NEXT_PUBLIC_META_APP_ID
         delete process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID
+        delete process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_EXISTING_NUMBER_CONFIG_ID
     })
 
     it('parses finish events from trusted Meta origins', () => {
@@ -57,16 +58,30 @@ describe('meta embedded signup helpers', () => {
     })
 
     it('returns embedded signup config only when required public env vars exist', () => {
-        expect(getMetaEmbeddedSignupConfig()).toBeNull()
+        expect(getMetaEmbeddedSignupConfig('new')).toBeNull()
 
         process.env.NEXT_PUBLIC_META_APP_ID = 'app-1'
-        expect(getMetaEmbeddedSignupConfig()).toBeNull()
+        expect(getMetaEmbeddedSignupConfig('new')).toBeNull()
 
         process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = 'config-1'
 
-        expect(getMetaEmbeddedSignupConfig()).toEqual({
+        expect(getMetaEmbeddedSignupConfig('new')).toEqual({
             appId: 'app-1',
             configId: 'config-1'
+        })
+    })
+
+    it('requires a dedicated existing-number config for current WhatsApp Business numbers', () => {
+        process.env.NEXT_PUBLIC_META_APP_ID = 'app-1'
+        process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = 'new-config'
+
+        expect(getMetaEmbeddedSignupConfig('existing')).toBeNull()
+
+        process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_EXISTING_NUMBER_CONFIG_ID = 'existing-config'
+
+        expect(getMetaEmbeddedSignupConfig('existing')).toEqual({
+            appId: 'app-1',
+            configId: 'existing-config'
         })
     })
 })

@@ -24,7 +24,7 @@ export function LoginForm() {
     )
 
     useEffect(() => {
-        if (!shouldEnableManualRoutePrefetch()) return
+        if (!shouldEnableManualRoutePrefetch('auth')) return
 
         const timeoutId = window.setTimeout(() => {
             getAuthManualPrefetchRoutes('login').forEach((href) => {

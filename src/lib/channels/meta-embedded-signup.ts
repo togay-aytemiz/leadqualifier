@@ -3,6 +3,8 @@ export interface MetaEmbeddedSignupConfig {
     configId: string
 }
 
+export type MetaEmbeddedSignupMode = 'new' | 'existing'
+
 export type MetaEmbeddedSignupEvent =
     | {
         type: 'finish'
@@ -44,9 +46,11 @@ function isTrustedMetaOrigin(origin: string) {
     return origin === 'https://www.facebook.com' || origin === 'https://web.facebook.com'
 }
 
-export function getMetaEmbeddedSignupConfig(): MetaEmbeddedSignupConfig | null {
+export function getMetaEmbeddedSignupConfig(mode: MetaEmbeddedSignupMode = 'new'): MetaEmbeddedSignupConfig | null {
     const appId = asString(process.env.NEXT_PUBLIC_META_APP_ID)
-    const configId = asString(process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID)
+    const configId = mode === 'existing'
+        ? asString(process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_EXISTING_NUMBER_CONFIG_ID)
+        : asString(process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID)
 
     if (!appId || !configId) return null
 

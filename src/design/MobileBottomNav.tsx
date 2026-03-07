@@ -147,7 +147,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     }, [pathname])
 
     useEffect(() => {
-        if (!shouldEnableManualRoutePrefetch()) return
+        if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
         const hotRoutes = ['/inbox', '/leads', '/skills', '/knowledge', '/simulator', '/settings', '/settings/plans', '/settings/billing']
 

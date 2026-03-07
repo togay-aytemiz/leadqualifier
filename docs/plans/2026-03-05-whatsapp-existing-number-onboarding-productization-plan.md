@@ -4,7 +4,7 @@
 
 **Goal:** Let WhatsApp Business users connect their real business number to the product without requiring pre-existing Cloud API assets, while preserving a fallback path for users who already completed Meta asset setup.
 
-**Architecture:** Keep Meta Cloud API as the runtime, but replace the current blind asset-discovery OAuth entry with a guided WhatsApp connect modal that supports two real onboarding modes: Meta Embedded Signup for new/existing numbers, and legacy OAuth asset discovery only for users who already have a ready WABA + phone number in Meta. Concierge remains a fallback, not the primary implementation.
+**Architecture:** Keep Meta Cloud API as the runtime, but replace the current blind asset-discovery OAuth entry with a guided WhatsApp connect modal that supports two real onboarding modes: Meta Embedded Signup for new numbers, plus a dedicated existing-number/coexistence-ready Embedded Signup config for current WhatsApp Business numbers. Legacy OAuth asset discovery remains only for users who already have a ready WABA + phone number in Meta. Concierge remains a fallback, not the primary implementation.
 
 **Tech Stack:** Next.js App Router, React client components, Supabase Postgres + RLS, next-intl TR/EN, existing channel settings surfaces, Meta OAuth routes.
 
@@ -39,6 +39,7 @@
   - `Use a new number`
   - `I already have Meta Cloud API assets`
 - Route the first two paths to Embedded Signup when config is available.
+- Do not allow `existing number` to silently reuse the generic new-number config.
 - Route the third path to the current server OAuth asset-discovery flow.
 - Show an existing-number prep checklist:
   - WhatsApp Business app is active on the main phone
@@ -110,6 +111,7 @@
   - `META_APP_SECRET`
   - `NEXT_PUBLIC_META_APP_ID`
   - `NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`
+  - `NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_EXISTING_NUMBER_CONFIG_ID`
 - Document the operator-side Meta setup needed before rollout.
 
 ### Task 7: Concierge fallback for blocked/unready users

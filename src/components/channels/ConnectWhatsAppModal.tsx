@@ -8,6 +8,7 @@ import { completeWhatsAppEmbeddedSignupChannel } from '@/lib/channels/actions'
 import {
     getMetaEmbeddedSignupConfig,
     parseMetaEmbeddedSignupMessage,
+    type MetaEmbeddedSignupMode,
     type MetaEmbeddedSignupEvent
 } from '@/lib/channels/meta-embedded-signup'
 
@@ -153,7 +154,8 @@ export function ConnectWhatsAppModal({
 }: ConnectWhatsAppModalProps) {
     const t = useTranslations('Channels')
     const router = useRouter()
-    const embeddedSignupConfig = getMetaEmbeddedSignupConfig()
+    const newNumberSignupConfig = getMetaEmbeddedSignupConfig('new')
+    const existingNumberSignupConfig = getMetaEmbeddedSignupConfig('existing')
     const [activePath, setActivePath] = useState<WhatsAppConnectPath>('menu')
     const [isConnecting, setIsConnecting] = useState(false)
     const [error, setError] = useState('')
@@ -186,9 +188,14 @@ export function ConnectWhatsAppModal({
         }
     }
 
-    const handleEmbeddedSignup = async () => {
+    const handleEmbeddedSignup = async (mode: MetaEmbeddedSignupMode) => {
+        const embeddedSignupConfig = mode === 'existing' ? existingNumberSignupConfig : newNumberSignupConfig
+        const unavailableMessage = mode === 'existing'
+            ? t('whatsappConnect.existingEmbeddedSignupUnavailable')
+            : t('whatsappConnect.embeddedSignupUnavailable')
+
         if (!embeddedSignupConfig) {
-            setError(t('whatsappConnect.embeddedSignupUnavailable'))
+            setError(unavailableMessage)
             return
         }
 
@@ -294,9 +301,9 @@ export function ConnectWhatsAppModal({
 
                     <p className="text-sm text-gray-600">{t('whatsappConnect.existingDescriptionLong')}</p>
 
-                    {!embeddedSignupConfig && (
+                    {!existingNumberSignupConfig && (
                         <Alert variant="warning">
-                            {t('whatsappConnect.embeddedSignupUnavailable')}
+                            {t('whatsappConnect.existingEmbeddedSignupUnavailable')}
                         </Alert>
                     )}
 
@@ -304,7 +311,11 @@ export function ConnectWhatsAppModal({
                         <Button type="button" variant="secondary" onClick={() => setActivePath('menu')}>
                             {t('whatsappConnect.back')}
                         </Button>
-                        <Button type="button" onClick={handleEmbeddedSignup} disabled={isConnecting || !embeddedSignupConfig}>
+                        <Button
+                            type="button"
+                            onClick={() => handleEmbeddedSignup('existing')}
+                            disabled={isConnecting || !existingNumberSignupConfig}
+                        >
                             {isConnecting ? t('whatsappConnect.connecting') : t('whatsappConnect.startEmbeddedSignup')}
                         </Button>
                     </div>
@@ -326,7 +337,7 @@ export function ConnectWhatsAppModal({
 
                     <p className="text-sm text-gray-600">{t('whatsappConnect.newDescriptionLong')}</p>
 
-                    {!embeddedSignupConfig && (
+                    {!newNumberSignupConfig && (
                         <Alert variant="warning">
                             {t('whatsappConnect.embeddedSignupUnavailable')}
                         </Alert>
@@ -336,7 +347,11 @@ export function ConnectWhatsAppModal({
                         <Button type="button" variant="secondary" onClick={() => setActivePath('menu')}>
                             {t('whatsappConnect.back')}
                         </Button>
-                        <Button type="button" onClick={handleEmbeddedSignup} disabled={isConnecting || !embeddedSignupConfig}>
+                        <Button
+                            type="button"
+                            onClick={() => handleEmbeddedSignup('new')}
+                            disabled={isConnecting || !newNumberSignupConfig}
+                        >
                             {isConnecting ? t('whatsappConnect.connecting') : t('whatsappConnect.startEmbeddedSignup')}
                         </Button>
                     </div>

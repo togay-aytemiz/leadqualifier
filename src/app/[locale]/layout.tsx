@@ -1,6 +1,4 @@
 import type { Metadata } from 'next'
-import { NextIntlClientProvider } from 'next-intl'
-import { getMessages } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import '../globals.css'
@@ -27,13 +25,9 @@ export default async function LocaleLayout({ children, params }: Props) {
         notFound()
     }
 
-    const messages = await getMessages()
-
     return (
         <html lang={locale}>
-            <body className="font-sans antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>
-                <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
-            </body>
+            <body className="font-sans antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>{children}</body>
         </html>
     )
 }

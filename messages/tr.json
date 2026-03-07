@@ -686,6 +686,7 @@
             "startEmbeddedSignup": "Yönlendirmeli Meta kurulumunu başlat",
             "startLegacyConnect": "Mevcut Meta asset'leri ile devam et",
             "embeddedSignupUnavailable": "Yönlendirmeli WhatsApp kurulumu bu workspace'te henüz yapılandırılmadı. Önce Meta Embedded Signup ayarını tamamlayın; yalnızca Meta Cloud API asset'leriniz zaten hazırsa eski asset akışını kullanın.",
+            "existingEmbeddedSignupUnavailable": "Mevcut numarayı koruma akışı bu workspace'te henüz yapılandırılmadı. Mevcut WhatsApp Business numaraları için ayrı bir Meta Embedded Signup config'i ekleyin ya da destekli kurulumla devam edin.",
             "embeddedSignupCancelled": "WhatsApp kurulumu tamamlanmadan iptal edildi.",
             "embeddedSignupCancelledStep": "WhatsApp kurulumu şu adımda iptal edildi: {step}.",
             "embeddedSignupFailedReason": "WhatsApp kurulumu başarısız: {reason}",
