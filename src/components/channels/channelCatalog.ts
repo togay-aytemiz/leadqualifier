@@ -71,8 +71,7 @@ const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
         type: 'instagram',
         href: '/settings/channels/instagram',
         tone: 'sunset',
-        badge: 'comingSoon',
-        onboardingSurface: 'placeholder',
+        onboardingSurface: 'interactive',
         resources: [
             {
                 labelKey: 'instagramOverview',

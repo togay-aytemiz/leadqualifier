@@ -28,6 +28,7 @@ describe('channelCatalog', () => {
     it('exposes onboarding metadata for the primary channels', () => {
         const whatsapp = getChannelCatalogEntry('whatsapp')
         const telegram = getChannelCatalogEntry('telegram')
+        const instagram = getChannelCatalogEntry('instagram')
         const messenger = getChannelCatalogEntry('messenger')
 
         expect(whatsapp?.badge).toBe('popular')
@@ -35,6 +36,8 @@ describe('channelCatalog', () => {
         expect(whatsapp?.resources.length).toBeGreaterThan(0)
         expect(whatsapp?.resources.map((resource) => resource.labelKey)).toContain('whatsappMigration')
         expect(telegram?.onboardingSurface).toBe('interactive')
+        expect(instagram?.onboardingSurface).toBe('interactive')
+        expect(instagram?.badge).toBeUndefined()
         expect(messenger?.onboardingSurface).toBe('placeholder')
         expect(messenger?.badge).toBe('comingSoon')
     })

@@ -610,7 +610,7 @@
                     "description": "Bu workspace için Meta sayfa mesajlaşma asset'leriniz hazır olduğunda Facebook Messenger'ı bağlayın."
                 },
                 "instagram": {
-                    "description": "Meta business asset'leriniz hazır olduğunda Instagram DM mesajlaşmasını bağlayın."
+                    "description": "Instagram DM mesajlaşmasını bağlayın; Qualy aynı gelen kutusunda AI ile cevap verip lead kalifikasyonu yapsın."
                 }
             }
         },
@@ -666,10 +666,13 @@
             },
             "instagram": {
                 "sidebarTitle": "Instagram",
-                "sidebarDescription": "Instagram DM mesajlarının ileride Qualy'ye akabilmesi için mesajlaşma kurulumunuzu hazırlayın.",
-                "heading": "Instagram kurulumu",
-                "subheading": "Bu kanal galeride görünüyor, ancak yeni workspace onboarding'i şu anda duraklatılmış durumda.",
-                "body": "Instagram bağlantısı yeni workspace'ler için şu anda açılmadı. Açılış tekrar aktif olmadan önce soldaki dokümantasyonla Sayfa, profesyonel hesap ve mesajlaşma izinlerinizi hazırlayın."
+                "sidebarDescription": "Instagram mesajlaşmasını bağlayın; müşteri DM'leri doğrudan Qualy'ye düşsün, AI yanıt ve lead kalifikasyonu aynı akışta çalışsın.",
+                "heading": "Instagram mesajlaşmasını bağla",
+                "subheading": "Instagram ile Devam Et'e tıkladıktan sonra, Instagram'a yönlendirilerek bağlamak istediğiniz hesabı seçer ve Partner izinlerini verirsiniz. Sonrasında kurulum tamamlanır ve kanal kullanıma hazır olur.",
+                "body": "Instagram ile Devam Et'e bastıktan sonra bağlamak istediğiniz profesyonel Instagram hesabını seçip izinleri onaylayın. Yetkilendirme tamamlanınca kanal webhook alımı ve reaktif yanıtlar için aktif olur.",
+                "connectedHeading": "Bağlı Instagram kanalınızı yönetin",
+                "connectedDescription": "Instagram kanalınız zaten aktif. Webhook sağlığını kontrol edebilir veya bu workspace'ten bağlantısını kesebilirsiniz.",
+                "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır."
             },
             "messenger": {
                 "sidebarTitle": "Facebook Messenger",
@@ -734,6 +737,8 @@
         "connectInstagramError": "Instagram kanalı bağlanamadı",
         "validating": "Doğrulanıyor...",
         "redirecting": "Yönlendiriliyor...",
+        "connectWithInstagram": "Instagram ile Devam Et",
+        "oauthConnectDescriptionInstagram": "Instagram ile Devam Et'e tıkladıktan sonra, Instagram'a yönlendirilerek bağlamak istediğiniz hesabı seçer ve Partner izinlerini verirsiniz. Sonrasında kurulum tamamlanır ve kanal kullanıma hazır olur.",
         "connectWithMeta": "Meta ile Devam Et",
         "oauthConnectDescription": "Bu kanal bağlantısı için Meta'ya yönlendirileceksiniz. Onaydan sonra otomatik olarak buraya dönersiniz.",
         "oauthStatus": {
@@ -894,11 +899,11 @@
             "step3": "App secret ve verify token belirleyin. Aynı verify token değerini webhook ayarında kullanın."
         },
         "connectInstagramTitle": "Instagram Business Bağla",
-        "connectInstagramHelpTitle": "Meta Instagram Messaging kurulum kontrol listesi:",
+        "connectInstagramHelpTitle": "Instagram Business Login kurulum kontrol listesi:",
         "connectInstagramSteps": {
-            "step1": "Instagram profesyonel hesabınızı bir Facebook Sayfasına bağlayın ve Meta uygulama ayarlarında Instagram Messaging API erişimini açın.",
-            "step2": "Page ID ve Instagram Business Account ID değerlerini alın, ardından mesajlaşma izinli bir Page Access Token üretin.",
-            "step3": "App secret ve verify token belirleyin. Aynı verify token değerini Meta webhook ayarında kullanın."
+            "step1": "Instagram hesabınızı profesyonel hesaba (Business veya Creator) dönüştürün.",
+            "step2": "Meta Developers > Instagram API with Instagram Login bölümünde gerekli izinleri açın: instagram_business_basic, instagram_business_manage_messages, instagram_business_manage_comments.",
+            "step3": "Webhook callback URL ve verify token değerlerini ayarlayın, ardından Instagram ile Devam Et ile hesabı yetkilendirin."
         },
         "whatsappPhoneNumberIdLabel": "Phone Number ID",
         "whatsappPhoneNumberIdPlaceholder": "örn. 123456789012345",

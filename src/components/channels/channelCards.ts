@@ -15,16 +15,14 @@ export function getChannelCardConfigs(channels: Channel[]): ChannelCardConfig[] 
         const channel = entry.type === 'messenger'
             ? undefined
             : channels.find((item) => item.type === entry.type)
-        const isComingSoon = entry.type === 'instagram'
-            ? !channel
-            : entry.onboardingSurface === 'placeholder'
+        const isComingSoon = entry.onboardingSurface === 'placeholder'
 
         return {
             type: entry.type,
             channel,
             isComingSoon,
             tone: entry.tone,
-            badge: channel && entry.type === 'instagram' ? undefined : entry.badge,
+            badge: entry.badge,
             href: entry.href
         }
     })

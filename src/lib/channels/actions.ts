@@ -307,8 +307,8 @@ export async function completeWhatsAppEmbeddedSignupChannel(
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
 
-    const appId = process.env.META_APP_ID?.trim()
-    const appSecret = process.env.META_APP_SECRET?.trim()
+    const appId = process.env.META_WHATSAPP_APP_ID?.trim() || process.env.META_APP_ID?.trim()
+    const appSecret = process.env.META_WHATSAPP_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim()
     const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || null
     const authCode = input.authCode.trim()
     const phoneNumberId = input.phoneNumberId.trim()

@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
-import { buildMetaAuthorizeUrl, encodeMetaOAuthState, resolveMetaChannelsReturnPath, type MetaChannelType } from '@/lib/channels/meta-oauth'
+import {
+    buildMetaAuthorizeUrl,
+    encodeMetaOAuthState,
+    resolveMetaAppCredentials,
+    resolveMetaChannelsReturnPath,
+    resolveMetaOAuthStateSecret,
+    type MetaChannelType
+} from '@/lib/channels/meta-oauth'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 
 function normalizeLocale(value: string | null) {
@@ -43,11 +50,10 @@ export async function GET(req: NextRequest) {
         return redirectToChannels(req, locale, 'invalid_channel', channelParam ?? 'unknown', returnToPath, popup)
     }
 
-    const appId = process.env.META_APP_ID
-    const appSecret = process.env.META_APP_SECRET
-    const stateSecret = process.env.META_OAUTH_STATE_SECRET || appSecret
+    const credentials = resolveMetaAppCredentials(channel)
+    const stateSecret = resolveMetaOAuthStateSecret()
 
-    if (!appId || !stateSecret) {
+    if (!credentials.appId || !stateSecret) {
         return redirectToChannels(req, locale, 'missing_meta_env', channel, returnToPath, popup)
     }
 
@@ -86,7 +92,7 @@ export async function GET(req: NextRequest) {
     }, stateSecret)
 
     const authorizeUrl = buildMetaAuthorizeUrl({
-        appId,
+        appId: credentials.appId,
         redirectUri: callbackUrl.toString(),
         state,
         channel: channel as MetaChannelType

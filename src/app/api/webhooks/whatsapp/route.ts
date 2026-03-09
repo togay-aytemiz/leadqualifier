@@ -275,7 +275,9 @@ export async function POST(req: NextRequest) {
             }
 
             channel = data as WhatsAppChannelRecord
-            const appSecret = process.env.META_APP_SECRET || readConfigString(channel.config, 'app_secret')
+            const appSecret = process.env.META_WHATSAPP_APP_SECRET
+                || process.env.META_APP_SECRET
+                || readConfigString(channel.config, 'app_secret')
             const isValid = isValidMetaSignature(signatureHeader, rawBody, appSecret)
             if (!isValid) {
                 console.warn('WhatsApp Webhook: Invalid signature')

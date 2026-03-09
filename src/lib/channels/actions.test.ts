@@ -248,6 +248,29 @@ describe('channels actions: WhatsApp core flows', () => {
         })
     })
 
+    it('uses whatsapp-specific app credentials for embedded signup when provided', async () => {
+        process.env.META_APP_ID = 'shared-meta-app-id'
+        process.env.META_APP_SECRET = 'shared-meta-app-secret'
+        process.env.META_WHATSAPP_APP_ID = 'whatsapp-app-id'
+        process.env.META_WHATSAPP_APP_SECRET = 'whatsapp-app-secret'
+
+        const { supabase } = createUpsertSupabaseMock()
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        await completeWhatsAppEmbeddedSignupChannel('org-1', {
+            authCode: 'auth-code-1',
+            phoneNumberId: 'phone-1',
+            businessAccountId: 'waba-1'
+        })
+
+        expect(exchangeMetaCodeForTokenMock).toHaveBeenCalledWith({
+            appId: 'whatsapp-app-id',
+            appSecret: 'whatsapp-app-secret',
+            redirectUri: '',
+            code: 'auth-code-1'
+        })
+    })
+
     it('returns normalized debug info for WhatsApp channel', async () => {
         const { supabase, eqMock } = createDebugSupabaseMock({
             id: 'channel-1',

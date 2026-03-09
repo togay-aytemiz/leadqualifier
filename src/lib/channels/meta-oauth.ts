@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 const META_OAUTH_BASE = 'https://www.facebook.com/v21.0/dialog/oauth'
+const INSTAGRAM_BIZ_LOGIN_OAUTH_BASE = 'https://www.instagram.com/consent/'
 
 export type MetaChannelType = 'whatsapp' | 'instagram'
 
@@ -35,6 +36,37 @@ export interface WhatsAppConnectionCandidate {
     displayPhoneNumber: string | null
 }
 
+function readEnvString(key: string) {
+    const value = process.env[key]
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+export function resolveMetaAppCredentials(channel: MetaChannelType) {
+    const sharedAppId = readEnvString('META_APP_ID')
+    const sharedAppSecret = readEnvString('META_APP_SECRET')
+
+    if (channel === 'instagram') {
+        return {
+            appId: readEnvString('META_INSTAGRAM_APP_ID') || sharedAppId,
+            appSecret: readEnvString('META_INSTAGRAM_APP_SECRET') || sharedAppSecret
+        }
+    }
+
+    return {
+        appId: readEnvString('META_WHATSAPP_APP_ID') || sharedAppId,
+        appSecret: readEnvString('META_WHATSAPP_APP_SECRET') || sharedAppSecret
+    }
+}
+
+export function resolveMetaOAuthStateSecret() {
+    return readEnvString('META_OAUTH_STATE_SECRET')
+        || readEnvString('META_APP_SECRET')
+        || readEnvString('META_INSTAGRAM_APP_SECRET')
+        || readEnvString('META_WHATSAPP_APP_SECRET')
+}
+
 function includeBusinessManagementForWhatsApp() {
     const raw = process.env.META_WHATSAPP_INCLUDE_BUSINESS_MANAGEMENT
     if (!raw) return false
@@ -58,10 +90,13 @@ export function resolveMetaChannelsReturnPath(locale: string, returnToPath: stri
     return candidate
 }
 
-interface MetaGraphErrorResponse {
+interface MetaOAuthErrorResponse {
     error?: {
         message?: string
     }
+    error_message?: string
+    error_description?: string
+    message?: string
 }
 
 interface MetaGraphListResponse {
@@ -85,6 +120,13 @@ function asString(value: unknown): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function asIdentifierString(value: unknown): string | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value)
+    }
+    return asString(value)
 }
 
 function toBase64Url(value: string) {
@@ -119,12 +161,9 @@ export function getMetaOAuthScopes(channel: MetaChannelType) {
     }
 
     return [
-        'instagram_basic',
-        'instagram_manage_messages',
-        'pages_manage_metadata',
-        'pages_messaging',
-        'pages_show_list',
-        'business_management'
+        'instagram_business_basic',
+        'instagram_business_manage_comments',
+        'instagram_business_manage_messages'
     ]
 }
 
@@ -168,6 +207,22 @@ export function decodeMetaOAuthState(value: string, secret: string): MetaOAuthSt
 }
 
 export function buildMetaAuthorizeUrl(options: MetaAuthorizeUrlOptions) {
+    if (options.channel === 'instagram') {
+        const url = new URL(INSTAGRAM_BIZ_LOGIN_OAUTH_BASE)
+        const params = {
+            client_id: options.appId,
+            redirect_uri: options.redirectUri,
+            response_type: 'code',
+            state: options.state,
+            scope: getMetaOAuthScopes(options.channel).join('-')
+        }
+
+        url.searchParams.set('flow', 'ig_biz_login_oauth')
+        url.searchParams.set('params_json', JSON.stringify(params))
+        url.searchParams.set('source', 'oauth_permissions_page_www')
+        return url.toString()
+    }
+
     const url = new URL(META_OAUTH_BASE)
     url.searchParams.set('client_id', options.appId)
     url.searchParams.set('redirect_uri', options.redirectUri)
@@ -203,6 +258,22 @@ export function pickInstagramConnectionCandidate(payload: unknown): InstagramCon
     }
 
     return null
+}
+
+function pickInstagramBusinessProfileCandidate(payload: unknown, userAccessToken: string): InstagramConnectionCandidate | null {
+    if (!isRecord(payload)) return null
+
+    const instagramBusinessAccountId = asIdentifierString(payload.id) || asIdentifierString(payload.user_id)
+    if (!instagramBusinessAccountId) return null
+
+    const instagramUsername = asString(payload.username)
+    return {
+        pageId: instagramBusinessAccountId,
+        pageName: instagramUsername || instagramBusinessAccountId,
+        pageAccessToken: userAccessToken,
+        instagramBusinessAccountId,
+        instagramUsername
+    }
 }
 
 export function pickWhatsAppConnectionCandidate(payload: unknown): WhatsAppConnectionCandidate | null {
@@ -272,9 +343,27 @@ async function requestMetaGraph<T>(url: URL): Promise<T> {
     const response = await fetch(url.toString(), {
         method: 'GET'
     })
-    const payload = await response.json() as T & MetaGraphErrorResponse
+    const payload = await response.json() as T & MetaOAuthErrorResponse
     if (!response.ok) {
-        const detail = payload?.error?.message || `Meta Graph API request failed with status ${response.status}`
+        const detail = payload?.error?.message
+            || payload?.error_message
+            || payload?.error_description
+            || payload?.message
+            || `Meta Graph API request failed with status ${response.status}`
+        throw new Error(`${detail} [${url.pathname}]`)
+    }
+    return payload
+}
+
+async function requestMetaOAuth<T>(url: URL, init: RequestInit): Promise<T> {
+    const response = await fetch(url.toString(), init)
+    const payload = await response.json() as T & MetaOAuthErrorResponse
+    if (!response.ok) {
+        const detail = payload?.error?.message
+            || payload?.error_message
+            || payload?.error_description
+            || payload?.message
+            || `Meta OAuth request failed with status ${response.status}`
         throw new Error(`${detail} [${url.pathname}]`)
     }
     return payload
@@ -285,7 +374,32 @@ export async function exchangeMetaCodeForToken(params: {
     appSecret: string
     redirectUri: string
     code: string
+    channel?: MetaChannelType
 }) {
+    if (params.channel === 'instagram') {
+        const url = new URL('https://api.instagram.com/oauth/access_token')
+        const body = new URLSearchParams({
+            client_id: params.appId,
+            client_secret: params.appSecret,
+            grant_type: 'authorization_code',
+            redirect_uri: params.redirectUri,
+            code: params.code
+        })
+
+        const payload = await requestMetaOAuth<{ access_token?: string }>(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: body.toString()
+        })
+        const accessToken = asString(payload.access_token)
+        if (!accessToken) {
+            throw new Error('Meta OAuth token response is missing access token')
+        }
+        return accessToken
+    }
+
     const url = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
     url.searchParams.set('client_id', params.appId)
     url.searchParams.set('client_secret', params.appSecret)
@@ -304,7 +418,24 @@ export async function exchangeMetaForLongLivedToken(params: {
     appId: string
     appSecret: string
     shortLivedToken: string
+    channel?: MetaChannelType
 }) {
+    if (params.channel === 'instagram') {
+        const url = new URL('https://graph.instagram.com/access_token')
+        url.searchParams.set('grant_type', 'ig_exchange_token')
+        url.searchParams.set('client_secret', params.appSecret)
+        url.searchParams.set('access_token', params.shortLivedToken)
+
+        const payload = await requestMetaOAuth<{ access_token?: string }>(url, {
+            method: 'GET'
+        })
+        const accessToken = asString(payload.access_token)
+        if (!accessToken) {
+            throw new Error('Meta long-lived token response is missing access token')
+        }
+        return accessToken
+    }
+
     const url = new URL('https://graph.facebook.com/v21.0/oauth/access_token')
     url.searchParams.set('grant_type', 'fb_exchange_token')
     url.searchParams.set('client_id', params.appId)
@@ -324,6 +455,44 @@ export async function fetchMetaInstagramPages(userAccessToken: string) {
     url.searchParams.set('access_token', userAccessToken)
     url.searchParams.set('fields', 'id,name,access_token,instagram_business_account{id,username}')
     return requestMetaGraph<unknown>(url)
+}
+
+async function fetchMetaInstagramBusinessProfile(userAccessToken: string) {
+    const candidates = [
+        'https://graph.instagram.com/v25.0/me?fields=user_id,username',
+        'https://graph.instagram.com/v21.0/me?fields=user_id,username',
+        'https://graph.instagram.com/me?fields=user_id,username',
+        'https://graph.facebook.com/v21.0/me?fields=id,username'
+    ]
+
+    for (const endpoint of candidates) {
+        const url = new URL(endpoint)
+        url.searchParams.set('access_token', userAccessToken)
+
+        try {
+            return await requestMetaGraph<unknown>(url)
+        } catch {
+            // Continue trying known Instagram business profile endpoints.
+        }
+    }
+
+    return null
+}
+
+export async function resolveMetaInstagramConnectionCandidate(userAccessToken: string) {
+    const profilePayload = await fetchMetaInstagramBusinessProfile(userAccessToken)
+    if (profilePayload) {
+        const profileCandidate = pickInstagramBusinessProfileCandidate(profilePayload, userAccessToken)
+        if (profileCandidate) return profileCandidate
+    }
+
+    try {
+        const pagesPayload = await fetchMetaInstagramPages(userAccessToken)
+        return pickInstagramConnectionCandidate(pagesPayload)
+    } catch {
+        // Fall through: Instagram business profile + page graph discovery both unavailable.
+        return null
+    }
 }
 
 export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string) {

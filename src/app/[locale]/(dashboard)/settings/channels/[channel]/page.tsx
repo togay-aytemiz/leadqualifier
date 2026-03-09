@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 
 import { ChannelPlaceholderOnboardingPage } from '@/components/channels/ChannelPlaceholderOnboardingPage'
 import { getChannelCatalogEntry, type ChannelCardType } from '@/components/channels/channelCatalog'
+import { InstagramOnboardingPage } from '@/components/channels/InstagramOnboardingPage'
 import { TelegramOnboardingPage } from '@/components/channels/TelegramOnboardingPage'
 import { WhatsAppOnboardingPage } from '@/components/channels/WhatsAppOnboardingPage'
 import { getChannels } from '@/lib/channels/actions'
@@ -64,6 +65,16 @@ export default async function ChannelSetupPage({ params }: ChannelSetupPageProps
     if (catalogEntry.type === 'telegram') {
         return (
             <TelegramOnboardingPage
+                organizationId={organizationId}
+                channel={selectedChannel}
+                isReadOnly={isReadOnly}
+            />
+        )
+    }
+
+    if (catalogEntry.type === 'instagram') {
+        return (
+            <InstagramOnboardingPage
                 organizationId={organizationId}
                 channel={selectedChannel}
                 isReadOnly={isReadOnly}

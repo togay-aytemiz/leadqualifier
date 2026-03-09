@@ -6,12 +6,13 @@ import {
     decodeMetaOAuthState,
     exchangeMetaCodeForToken,
     exchangeMetaForLongLivedToken,
-    fetchMetaInstagramPages,
     fetchMetaWhatsAppBusinessAccounts,
     fetchMetaWhatsAppBusinessAccountsFromDebugToken,
     hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers,
+    resolveMetaAppCredentials,
     resolveMetaChannelsReturnPath,
-    pickInstagramConnectionCandidate,
+    resolveMetaInstagramConnectionCandidate,
+    resolveMetaOAuthStateSecret,
     pickWhatsAppConnectionCandidate
 } from '@/lib/channels/meta-oauth'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
@@ -80,13 +81,11 @@ export async function GET(req: NextRequest) {
     const stateValue = req.nextUrl.searchParams.get('state')
     const code = req.nextUrl.searchParams.get('code')
 
-    const appId = process.env.META_APP_ID
-    const appSecret = process.env.META_APP_SECRET
-    const stateSecret = process.env.META_OAUTH_STATE_SECRET || appSecret
+    const stateSecret = resolveMetaOAuthStateSecret()
     const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || null
     const popup = req.nextUrl.searchParams.get('popup') === '1'
 
-    if (!appId || !appSecret || !stateSecret) {
+    if (!stateSecret) {
         return redirectToChannels(req, 'tr', 'missing_meta_env', 'unknown', null, popup)
     }
 
@@ -97,6 +96,11 @@ export async function GET(req: NextRequest) {
     const state = decodeMetaOAuthState(stateValue, stateSecret)
     if (!state) {
         return redirectToChannels(req, 'tr', 'invalid_state', 'unknown', null, popup)
+    }
+
+    const credentials = resolveMetaAppCredentials(state.channel)
+    if (!credentials.appId || !credentials.appSecret) {
+        return redirectToChannels(req, 'tr', 'missing_meta_env', state.channel, state.returnToPath, popup)
     }
 
     const locale = normalizeLocale(state.locale)
@@ -132,26 +136,27 @@ export async function GET(req: NextRequest) {
 
     try {
         const shortLivedToken = await exchangeMetaCodeForToken({
-            appId,
-            appSecret,
+            appId: credentials.appId,
+            appSecret: credentials.appSecret,
             redirectUri: callbackUrl.toString(),
-            code
+            code,
+            channel: state.channel
         })
 
         let userAccessToken = shortLivedToken
         try {
             userAccessToken = await exchangeMetaForLongLivedToken({
-                appId,
-                appSecret,
-                shortLivedToken
+                appId: credentials.appId,
+                appSecret: credentials.appSecret,
+                shortLivedToken,
+                channel: state.channel
             })
         } catch (error) {
             console.warn('Meta OAuth: long-lived token exchange failed, falling back to short-lived token', error)
         }
 
         if (state.channel === 'instagram') {
-            const pagesPayload = await fetchMetaInstagramPages(userAccessToken)
-            const candidate = pickInstagramConnectionCandidate(pagesPayload)
+            const candidate = await resolveMetaInstagramConnectionCandidate(userAccessToken)
             if (!candidate) {
                 return redirectToChannels(req, locale, 'missing_instagram_assets', state.channel, returnToPath, popup)
             }
@@ -212,8 +217,8 @@ export async function GET(req: NextRequest) {
             try {
                 const debugTokenPayload = await fetchMetaWhatsAppBusinessAccountsFromDebugToken({
                     userAccessToken,
-                    appId,
-                    appSecret
+                    appId: credentials.appId,
+                    appSecret: credentials.appSecret
                 })
                 candidate = pickWhatsAppConnectionCandidate(debugTokenPayload)
             } catch (debugFallbackError) {

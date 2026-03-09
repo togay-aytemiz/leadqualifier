@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Alert, Button, Modal } from '@/design'
+import { Button, Modal } from '@/design'
 import { useTranslations } from 'next-intl'
 
 interface ConnectInstagramModalProps {
@@ -31,17 +31,8 @@ export function ConnectInstagramModal({ isOpen, onClose, onConnect }: ConnectIns
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={t('connectInstagramTitle')}>
             <div className="space-y-5">
-                <Alert variant="info">
-                    <p className="font-medium mb-2">{t('connectInstagramHelpTitle')}</p>
-                    <ol className="list-decimal list-inside space-y-1 text-blue-700">
-                        <li>{t('connectInstagramSteps.step1')}</li>
-                        <li>{t('connectInstagramSteps.step2')}</li>
-                        <li>{t('connectInstagramSteps.step3')}</li>
-                    </ol>
-                </Alert>
-
                 <p className="text-sm text-gray-600">
-                    {t('oauthConnectDescription')}
+                    {t('oauthConnectDescriptionInstagram')}
                 </p>
 
                 <div className="space-y-3">
@@ -53,7 +44,7 @@ export function ConnectInstagramModal({ isOpen, onClose, onConnect }: ConnectIns
                         {t('actions.cancel')}
                     </Button>
                     <Button type="button" onClick={handleConnect} disabled={isConnecting}>
-                        {isConnecting ? t('redirecting') : t('connectWithMeta')}
+                        {isConnecting ? t('redirecting') : t('connectWithInstagram')}
                     </Button>
                 </div>
             </div>
