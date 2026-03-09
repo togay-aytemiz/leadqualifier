@@ -1,43 +1,66 @@
 'use client'
 
-import { Channel } from '@/types/database'
 import { useState } from 'react'
 import { Bug, FileText } from 'lucide-react'
-import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
+
 import { Button, Badge } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
-import { useTranslations } from 'next-intl'
-import type { ChannelCardType } from '@/components/channels/channelCards'
-import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
+import type {
+    ChannelCardBadge,
+    ChannelCardTone,
+    ChannelCardType
+} from '@/components/channels/channelCatalog'
 import { WhatsAppTemplateModal } from '@/components/channels/WhatsAppTemplateModal'
+import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
+import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
+import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
+import type { Channel } from '@/types/database'
 
 interface ChannelCardProps {
     channel?: Channel
     type: ChannelCardType
+    tone: ChannelCardTone
+    badge?: ChannelCardBadge
     onConnect: () => void
     isComingSoon?: boolean
     isReadOnly?: boolean
 }
 
-function getChannelSurfaceClasses(type: ChannelCardType) {
-    if (type === 'telegram') return 'bg-blue-50'
-    if (type === 'whatsapp') return 'bg-green-50'
-    if (type === 'instagram') return 'bg-pink-50'
-    return 'bg-[#0084FF]/10'
+function getChannelSurfaceClasses(tone: ChannelCardTone) {
+    if (tone === 'emerald') {
+        return 'border-slate-200 bg-[linear-gradient(135deg,rgba(22,163,74,0.06)_0%,rgba(255,255,255,0)_42%),linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,249,0.98))] hover:border-slate-300'
+    }
+    if (tone === 'sky') {
+        return 'border-slate-200 bg-[linear-gradient(135deg,rgba(37,99,235,0.06)_0%,rgba(255,255,255,0)_42%),linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.98))] hover:border-slate-300'
+    }
+    if (tone === 'sunset') {
+        return 'border-slate-200 bg-[linear-gradient(135deg,rgba(244,114,182,0.05)_0%,rgba(255,255,255,0)_42%),linear-gradient(180deg,rgba(255,255,255,1),rgba(252,248,250,0.98))] hover:border-slate-300'
+    }
+    return 'border-slate-200 bg-[linear-gradient(135deg,rgba(99,102,241,0.05)_0%,rgba(255,255,255,0)_42%),linear-gradient(180deg,rgba(255,255,255,1),rgba(248,249,252,0.98))] hover:border-slate-300'
 }
 
-function getChannelIcon(type: ChannelCardType) {
-    return (
-        <img
-            alt=""
-            aria-hidden
-            className="h-7 w-7"
-            src={getChannelPlatformIconSrc(type)}
-        />
-    )
+function getBadgeVariant(badge?: ChannelCardBadge) {
+    if (badge === 'popular') return 'success'
+    if (badge === 'comingSoon') return 'info'
+    return 'neutral'
 }
 
-export function ChannelCard({ channel, type, onConnect, isComingSoon = false, isReadOnly = false }: ChannelCardProps) {
+function getStatusVariant(isConnected: boolean, isComingSoon: boolean) {
+    if (isConnected) return 'success'
+    if (isComingSoon) return 'info'
+    return 'neutral'
+}
+
+export function ChannelCard({
+    channel,
+    type,
+    tone,
+    badge,
+    onConnect,
+    isComingSoon = false,
+    isReadOnly = false
+}: ChannelCardProps) {
     const t = useTranslations('Channels')
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
@@ -52,16 +75,17 @@ export function ChannelCard({ channel, type, onConnect, isComingSoon = false, is
             : type === 'whatsapp'
                 ? await debugWhatsAppChannel(channel.id)
                 : await debugInstagramChannel(channel.id)
+
         if (result.success) {
             alert(t('debug.webhookInfo', { info: JSON.stringify(result.info, null, 2) }))
-        } else {
-            alert(t('debug.webhookFailed', { error: result.error }))
+            return
         }
+
+        alert(t('debug.webhookFailed', { error: result.error }))
     }
 
     const handleDisconnect = async () => {
-        if (isReadOnly) return
-        if (!channel) return
+        if (isReadOnly || !channel) return
 
         setIsDisconnecting(true)
         try {
@@ -75,80 +99,116 @@ export function ChannelCard({ channel, type, onConnect, isComingSoon = false, is
     }
 
     const isConnected = !!channel
-    const connectLabel = isComingSoon ? t('actions.comingSoon') : t('actions.connect')
-    const statusVariant = isConnected ? 'success' : 'neutral'
-    const statusLabel = isConnected ? t('status.active') : t('status.notConnected')
+    const connectLabel = isComingSoon ? t('actions.learnMore') : t('actions.connect')
+    const statusLabel = isConnected
+        ? t('status.active')
+        : isComingSoon
+            ? t('actions.comingSoon')
+            : t('status.notConnected')
 
     return (
         <>
-            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-4 sm:flex-1 min-w-0">
-                    <div className={`w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center ${getChannelSurfaceClasses(type)}`}>
-                        {getChannelIcon(type)}
+            <article
+                className={cn(
+                    'group relative flex min-h-[212px] flex-col overflow-hidden rounded-[22px] border p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+                    getChannelSurfaceClasses(tone)
+                )}
+            >
+                {badge && (
+                    <div className="absolute left-4 top-4">
+                        <Badge variant={getBadgeVariant(badge)}>
+                            {t(`gallery.badges.${badge}`)}
+                        </Badge>
                     </div>
+                )}
 
-                    <div className="min-w-0 flex-1 text-left">
-                        <h3 className="text-base font-semibold text-gray-900">{t(`types.${type}`)}</h3>
-                        {isConnected ? (
-                            <p className="text-sm text-gray-600 mt-1 break-words">{channel.name}</p>
-                        ) : (
-                            <p className="text-sm text-gray-500 mt-1">{t('status.notConnected')}</p>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-3 sm:items-end sm:ml-auto sm:shrink-0">
-                    <Badge variant={statusVariant}>{statusLabel}</Badge>
-
-                    {isConnected ? (
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <Button
-                                onClick={() => setShowConfirm(true)}
-                                disabled={isDisconnecting || isReadOnly}
-                                variant="danger"
-                                className="w-full sm:w-auto sm:min-w-[160px]"
-                            >
-                                {t('actions.disconnect')}
-                            </Button>
-
-                            {type === 'whatsapp' && (
-                                <Button
-                                    onClick={() => setShowTemplateModal(true)}
-                                    disabled={isReadOnly}
-                                    variant="outline"
-                                    size="icon"
-                                    title={t('templateTools.openAction')}
-                                    aria-label={t('templateTools.openAction')}
-                                >
-                                    <FileText size={16} />
-                                </Button>
+                <div className="flex min-h-0 flex-1 flex-col pt-6">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 pr-3">
+                            <h3 className="text-[16px] font-semibold leading-[1.25] tracking-tight text-slate-900 sm:text-[17px]">
+                                {t(`types.${type}`)}
+                            </h3>
+                            <p className="mt-2 max-w-[40ch] text-[13px] leading-5 text-slate-600">
+                                {t(`gallery.cards.${type}.description`)}
+                            </p>
+                            {isConnected && (
+                                <p className="mt-3 text-xs font-medium text-slate-700">
+                                    {t('gallery.connectedAs', { name: channel.name })}
+                                </p>
                             )}
+                        </div>
 
-                            {type !== 'messenger' && (
+                        <img
+                            alt=""
+                            aria-hidden
+                            className="h-11 w-11 shrink-0 object-contain"
+                            src={getChannelPlatformIconSrc(type)}
+                        />
+                    </div>
+
+                    <div className="mt-auto pt-4">
+                        <div className="h-px w-full bg-slate-200/90" />
+                        <div className="flex items-center justify-between gap-3 pt-3">
+                            <div className="min-w-0">
+                                {isConnected && (
+                                    <Badge variant={getStatusVariant(isConnected, isComingSoon)}>
+                                        {statusLabel}
+                                    </Badge>
+                                )}
+                            </div>
+
+                            {isConnected ? (
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    {type === 'whatsapp' && (
+                                        <Button
+                                            onClick={() => setShowTemplateModal(true)}
+                                            disabled={isReadOnly}
+                                            variant="outline"
+                                            size="icon"
+                                            title={t('templateTools.openAction')}
+                                            aria-label={t('templateTools.openAction')}
+                                        >
+                                            <FileText size={16} />
+                                        </Button>
+                                    )}
+
+                                    {type !== 'messenger' && (
+                                        <Button
+                                            onClick={handleDebug}
+                                            disabled={isReadOnly}
+                                            variant="outline"
+                                            size="icon"
+                                            title={t('debug.tooltip')}
+                                            aria-label={t('debug.tooltip')}
+                                        >
+                                            <Bug size={16} />
+                                        </Button>
+                                    )}
+
+                                    <Button
+                                        onClick={() => setShowConfirm(true)}
+                                        disabled={isDisconnecting || isReadOnly}
+                                        variant="danger"
+                                        size="sm"
+                                    >
+                                        {t('actions.disconnect')}
+                                    </Button>
+                                </div>
+                            ) : (
                                 <Button
-                                    onClick={handleDebug}
+                                    onClick={onConnect}
                                     disabled={isReadOnly}
-                                    variant="outline"
-                                    size="icon"
-                                    title={t('debug.tooltip')}
-                                    aria-label={t('debug.tooltip')}
+                                    variant="secondary"
+                                    size="sm"
+                                    className="min-w-[112px] bg-white"
                                 >
-                                    <Bug size={16} />
+                                    {connectLabel}
                                 </Button>
                             )}
                         </div>
-                    ) : (
-                        <Button
-                            onClick={onConnect}
-                            disabled={isReadOnly || isComingSoon}
-                            variant="secondary"
-                            className="w-full sm:w-auto sm:min-w-[160px]"
-                        >
-                            {connectLabel}
-                        </Button>
-                    )}
+                    </div>
                 </div>
-            </div>
+            </article>
 
             {!isReadOnly && (
                 <ConfirmDialog

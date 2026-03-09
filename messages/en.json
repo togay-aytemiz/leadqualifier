@@ -591,11 +591,93 @@
             "active": "Active",
             "notConnected": "Not connected"
         },
+        "gallery": {
+            "category": "Business Messaging",
+            "statusLabel": "Status",
+            "connectedAs": "Connected as {name}",
+            "badges": {
+                "popular": "Popular",
+                "comingSoon": "Soon"
+            },
+            "cards": {
+                "whatsapp": {
+                    "description": "Connect WhatsApp Business via Meta so Qualy can reply with AI and qualify leads from one shared inbox."
+                },
+                "telegram": {
+                    "description": "Connect your Telegram bot to capture new inquiries and answer messages in real time."
+                },
+                "messenger": {
+                    "description": "Connect Facebook Messenger when your Meta page messaging assets are ready for this workspace."
+                },
+                "instagram": {
+                    "description": "Connect Instagram messaging once your Meta business assets are ready for direct messages."
+                }
+            }
+        },
         "actions": {
             "connect": "Connect",
+            "learnMore": "Learn more",
             "comingSoon": "Coming Soon",
             "disconnect": "Disconnect",
             "cancel": "Cancel"
+        },
+        "onboarding": {
+            "pageTitle": "{channel} setup",
+            "back": "Back",
+            "resourcesTitle": "Additional resources",
+            "resources": {
+                "whatsappOverview": "Everything you need to know about WhatsApp Business Platform",
+                "whatsappMigration": "Migrate from WhatsApp Personal or WhatsApp Business App",
+                "whatsappPricing": "WhatsApp pricing",
+                "telegramOverview": "Everything you need to know about Telegram bots",
+                "instagramOverview": "Everything you need to know about Instagram messaging",
+                "messengerOverview": "Learn more about Messenger customer chat"
+            },
+            "placeholder": {
+                "comingSoon": "This onboarding flow is not open for new workspaces yet. Use the resources on the left to prepare your assets first.",
+                "connectedBanner": "{channel} is already connected on this workspace."
+            },
+            "whatsapp": {
+                "sidebarTitle": "WhatsApp Business Platform (API)",
+                "sidebarDescription": "Connect WhatsApp Business Platform so Qualy can answer with AI, qualify leads, and keep everything in one inbox.",
+                "supportBanner": "Need help with connecting WhatsApp? Pick the right setup path first, then open Meta only when the account and number are ready.",
+                "supportBannerPrefix": "Need help with connecting WhatsApp?",
+                "supportBannerCta": "Talk to our support team",
+                "heading": "Connect WhatsApp Business Platform (API)",
+                "subheading": "Start with the API path that matches your business today. If you already use the WhatsApp Business app, move into the migration flow instead of opening the wrong Meta setup.",
+                "connectedHeading": "Manage your connected WhatsApp channel",
+                "connectedDescription": "Your WhatsApp channel is already active. Use the actions below to manage templates, debug webhook health, or disconnect it safely.",
+                "connectedBanner": "{name} is connected and ready to receive conversations."
+            },
+            "telegram": {
+                "sidebarTitle": "Telegram",
+                "sidebarDescription": "Connect your Telegram bot to receive new conversations, answer instantly, and keep lead intake in the same inbox.",
+                "heading": "Connect Telegram Bot",
+                "subheading": "Start by creating a new bot or connecting an existing bot token from BotFather.",
+                "options": {
+                    "new": "Create a new bot",
+                    "existing": "Connect an existing bot"
+                },
+                "newDescription": "If you do not have a bot yet, create one in BotFather first and paste the new token below.",
+                "existingDescription": "If you already have a working Telegram bot, paste its token below to connect it to this workspace.",
+                "connectedHeading": "Manage your connected Telegram bot",
+                "connectedDescription": "Your Telegram bot is already active. You can check webhook health or disconnect it from this workspace.",
+                "connectedBanner": "{name} is connected and ready to receive conversations."
+            },
+            "instagram": {
+                "sidebarTitle": "Instagram",
+                "sidebarDescription": "Prepare your Instagram messaging setup so direct messages can eventually flow into Qualy.",
+                "heading": "Instagram onboarding",
+                "subheading": "This channel is visible in the gallery, but new workspace onboarding is still paused.",
+                "body": "Instagram connect is currently launch-gated for new workspaces. Use the documentation on the left to prepare your Page, professional account, and messaging permissions before rollout opens again."
+            },
+            "messenger": {
+                "sidebarTitle": "Facebook Messenger",
+                "sidebarDescription": "Prepare your Messenger business assets and website chat presence before onboarding opens for this workspace.",
+                "heading": "Messenger onboarding",
+                "subheading": "Messenger is listed here for discovery, but onboarding is not open on this workspace yet.",
+                "body": "Messenger connect is still a placeholder in MVP. Use the resource on the left to understand the asset requirements and customer entry points before we open the channel."
+            }
         },
         "templateTools": {
             "openAction": "Template tools",
@@ -682,6 +764,10 @@
         "whatsappConnect": {
             "choosePathDescription": "Choose the setup path that matches your business. Most businesses should start with guided Meta setup, not the legacy asset flow.",
             "back": "Back",
+            "getStarted": "Get started",
+            "skipAndConnect": "Skip and connect via Facebook",
+            "businessAppPrompt": "Need to connect WhatsApp Business App?",
+            "businessAppLink": "Click here",
             "connecting": "Connecting...",
             "startEmbeddedSignup": "Start guided Meta setup",
             "startLegacyConnect": "Continue with existing Meta assets",
@@ -692,12 +778,77 @@
             "embeddedSignupFailedReason": "WhatsApp setup failed: {reason}",
             "embeddedSignupSuccess": "WhatsApp connected successfully.",
             "options": {
-                "existingTitle": "Keep my current WhatsApp Business number",
-                "existingDescription": "Use this if you already talk to customers from WhatsApp Business app and want to keep that number.",
-                "newTitle": "Use a new number",
-                "newDescription": "Use this if you will connect a fresh number dedicated to API messaging.",
-                "assetsTitle": "I already have Meta Cloud API assets",
-                "assetsDescription": "Use this only if you already set up a WhatsApp Business Account and phone number inside Meta."
+                "newApi": {
+                    "title": "Create and connect a new WhatsApp API account",
+                    "description": "Select this option if you want to create a new WhatsApp Business Platform (API) account and connect it with a new phone number."
+                },
+                "existingApi": {
+                    "title": "Connect an existing WhatsApp API account",
+                    "description": "Select this option if you have created a WhatsApp Business Platform (API) account before."
+                },
+                "businessApp": {
+                    "title": "Migrate and connect my existing WhatsApp Business app number",
+                    "description": "Use this if you do not have a WhatsApp API account yet and want to move your active WhatsApp Business app number to the API while keeping the same number.",
+                    "badge": "Beta"
+                }
+            },
+            "existingApi": {
+                "heading": "Connect WhatsApp Business Platform (API)",
+                "description": "Choose how you want to connect to WhatsApp Business Platform (API).",
+                "next": "Next",
+                "choices": {
+                    "metaAssets": {
+                        "title": "An existing WhatsApp Business Platform (API) account in Meta",
+                        "description": "Select this option if your WhatsApp Business Account and phone number already exist in Meta and you only need to connect those assets to Qualy."
+                    },
+                    "otherBsp": {
+                        "title": "An existing WhatsApp Business Platform (API) account from another BSP",
+                        "description": "Select this option if your account is currently managed by another WhatsApp Business Solution Provider and you want to migrate it to Qualy."
+                    }
+                }
+            },
+            "eligibility": {
+                "heading": "Let's Get Started With A Simple Eligibility Check",
+                "question": "Do you have a valid phone number that can send and receive SMS? You will need a phone number to connect WhatsApp Business Platform (API).",
+                "steps": {
+                    "phone": "Valid Phone Number",
+                    "meta": "Meta Business Manager Access"
+                },
+                "choices": {
+                    "newNumber": "I have a new phone number (not tied to any WhatsApp account)",
+                    "personalAccount": "I have a phone number tied to a WhatsApp Personal Account",
+                    "noNewNumber": "I do not have a new number"
+                },
+                "next": "Next",
+                "skip": "Skip eligibility check"
+            },
+            "migrationWarning": {
+                "description": "To use a phone number currently linked to a WhatsApp Personal Account or WhatsApp Business App with the WhatsApp Business Platform (API), you'll need to disconnect that number from the WhatsApp app first. Before doing so, back up chat history if you need to keep those conversations.",
+                "linkLabel": "Learn how to migrate from WhatsApp Personal Account or WhatsApp Business App.",
+                "primary": "I will migrate the number",
+                "secondary": "I will use a new number instead"
+            },
+            "metaAccess": {
+                "heading": "Let's Confirm Your Meta Business Manager Access",
+                "description": "Do you have access to the Meta Business Manager account associated with your company? If you do not have one yet, you can create it during the connection process.",
+                "checklistTitle": "Good to know - You will need the following information to create a WhatsApp Business Account (WABA):",
+                "checklist": {
+                    "step1": "The name of your company as customers should see it.",
+                    "step2": "The legal company name.",
+                    "step3": "The company's official address."
+                },
+                "primary": "Yes, I have access",
+                "secondary": "I will create one later"
+            },
+            "businessApp": {
+                "heading": "Connect WhatsApp Business App",
+                "description": "Keep your current WhatsApp Business number and continue through the guided Meta flow built for existing app numbers.",
+                "badge": "Beta"
+            },
+            "connectReady": {
+                "heading": "Connect WhatsApp Business Platform (API)",
+                "description": "After clicking Connect with Facebook, you will be redirected to Facebook to select the account you want to connect. Follow the instructions to create, set up, and configure your WhatsApp Business Platform (API). Once completed, you will be redirected back to this page.",
+                "connectWithFacebook": "Connect with Facebook"
             },
             "existingChecklistTitle": "Before you continue",
             "existingDescriptionLong": "Meta may ask you to confirm setup from the main phone and complete business portfolio steps during signup. This path is for existing WhatsApp Business numbers.",
@@ -715,11 +866,25 @@
                 "step3": "Be ready to create or select a Meta business portfolio during setup."
             },
             "assetsChecklistTitle": "Use this path only if",
-            "assetsDescriptionLong": "This fallback path only discovers existing Meta Cloud API assets that are already visible to your Meta user. It does not onboard a new number or migrate an existing WhatsApp Business app number.",
+            "assetsDescriptionLong": "After clicking Connect with Facebook, you will be redirected to Meta to select the existing account you want to connect. Use this path only when your WhatsApp Business Account and phone number are already present in Meta.",
             "assetsChecklist": {
                 "step1": "You already have a WhatsApp Business Account in Meta.",
                 "step2": "That WABA already has a phone number connected and visible to your Meta user.",
                 "step3": "You only need this app to discover and connect those existing assets."
+            },
+            "bspMigration": {
+                "heading": "Migrate your WhatsApp Business Platform (API) account",
+                "description": "To proceed with the migration, ensure that you have understood the requirements.",
+                "banner": "Your display name, quality rating, messaging limits, Official Business Account status, and any approved high-quality message templates will be migrated.",
+                "cta": "Migrate with Facebook",
+                "requirements": {
+                    "twoStepTitle": "Your two-step verification is deactivated",
+                    "twoStepBody": "Before you migrate, disable two-step verification for the WhatsApp number in Meta Business Manager or with your current provider if they control that setting.",
+                    "verificationTitle": "Your current business is verified and the WhatsApp assets are approved",
+                    "verificationBody": "Make sure the current business verification, phone number display name, and WABA approval state are all in good standing before you continue.",
+                    "popupsTitle": "Allow pop-ups in your browser",
+                    "popupsBody": "The Meta migration flow opens in a pop-up window. If your browser blocks pop-ups, the migration cannot continue."
+                }
             }
         },
         "connectWhatsAppHelpTitle": "Meta Cloud API setup checklist:",

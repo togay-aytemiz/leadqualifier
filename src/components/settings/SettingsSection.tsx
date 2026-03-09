@@ -18,7 +18,7 @@ const layoutClasses = {
     },
     wide: {
         left: 'lg:col-span-3 w-full lg:max-w-[300px]',
-        right: 'lg:col-span-9 w-full lg:max-w-[840px]'
+        right: 'lg:col-span-9 w-full max-w-none'
     }
 }
 

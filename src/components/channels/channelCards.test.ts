@@ -15,14 +15,30 @@ const WHATSAPP_CHANNEL: Channel = {
 }
 
 describe('getChannelCardConfigs', () => {
-    it('marks instagram and messenger cards as coming soon', () => {
+    it('builds gallery cards with expected order, tones, and badges', () => {
         const configs = getChannelCardConfigs([WHATSAPP_CHANNEL])
+
+        expect(configs.map(config => config.type)).toEqual([
+            'whatsapp',
+            'telegram',
+            'messenger',
+            'instagram'
+        ])
 
         const instagramCard = configs.find(config => config.type === 'instagram')
         const messengerCard = configs.find(config => config.type === 'messenger')
+        const telegramCard = configs.find(config => config.type === 'telegram')
         const whatsappCard = configs.find(config => config.type === 'whatsapp')
 
+        expect(whatsappCard?.badge).toBe('popular')
+        expect(whatsappCard?.tone).toBe('emerald')
+        expect(telegramCard?.tone).toBe('sky')
+        expect(telegramCard?.badge).toBeUndefined()
+        expect(messengerCard?.badge).toBe('comingSoon')
+        expect(messengerCard?.tone).toBe('indigo')
         expect(instagramCard?.isComingSoon).toBe(true)
+        expect(instagramCard?.badge).toBe('comingSoon')
+        expect(instagramCard?.tone).toBe('sunset')
         expect(messengerCard?.isComingSoon).toBe(true)
         expect(whatsappCard?.isComingSoon).toBe(false)
     })
@@ -36,11 +52,12 @@ describe('getChannelCardConfigs', () => {
         expect(whatsappCard?.channel?.id).toBe('whatsapp-1')
     })
 
-    it('returns vertical list classes for channels layout', () => {
+    it('returns responsive grid classes for gallery layout', () => {
         const classes = getChannelsListLayoutClasses()
 
-        expect(classes).toContain('flex')
-        expect(classes).toContain('flex-col')
-        expect(classes).not.toContain('grid-cols')
+        expect(classes).toContain('grid')
+        expect(classes).toContain('md:grid-cols-2')
+        expect(classes).toContain('xl:grid-cols-3')
+        expect(classes).not.toContain('2xl:grid-cols-4')
     })
 })

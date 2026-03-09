@@ -1,14 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
 import { getChannels } from '@/lib/channels/actions'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ChannelsList } from '@/components/channels/ChannelsList'
-import { PageHeader, Button } from '@/design'
-import { SettingsSection } from '@/components/settings/SettingsSection'
+import { PageHeader } from '@/design'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function ChannelsPage() {
-    const supabase = await createClient()
     const locale = await getLocale()
     const tChannels = await getTranslations('Channels')
 
@@ -40,30 +37,25 @@ export default async function ChannelsPage() {
 
     return (
         <>
-            <PageHeader
-                title={tChannels('title')}
-                actions={
-                    <Button disabled>
-                        {tChannels('save')}
-                    </Button>
-                }
-            />
+            <PageHeader title={tChannels('title')} />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-5xl">
-                    <SettingsSection
-                        title={tChannels('title')}
-                        description={tChannels('description')}
-                        summary={tChannels('summary', { connected: connectedChannels, total: totalChannels })}
-                        layout="wide"
-                    >
-                        <ChannelsList
-                            channels={channels || []}
-                            organizationId={organizationId}
-                            showDescription={false}
-                            isReadOnly={orgContext?.readOnlyTenantMode ?? false}
-                        />
-                    </SettingsSection>
+                <div className="mx-auto max-w-6xl">
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-slate-500">
+                            {tChannels('description')}
+                        </p>
+                        <p className="text-sm font-medium text-slate-500">
+                            {tChannels('summary', { connected: connectedChannels, total: totalChannels })}
+                        </p>
+                    </div>
+
+                    <ChannelsList
+                        channels={channels || []}
+                        organizationId={organizationId}
+                        showDescription={false}
+                        isReadOnly={orgContext?.readOnlyTenantMode ?? false}
+                    />
                 </div>
             </div>
         </>

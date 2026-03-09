@@ -591,11 +591,93 @@
             "active": "Aktif",
             "notConnected": "Bağlı değil"
         },
+        "gallery": {
+            "category": "İşletme Mesajlaşması",
+            "statusLabel": "Durum",
+            "connectedAs": "Bağlı hesap: {name}",
+            "badges": {
+                "popular": "Popüler",
+                "comingSoon": "Yakında"
+            },
+            "cards": {
+                "whatsapp": {
+                    "description": "Meta üzerinden WhatsApp Business bağlayın; Qualy aynı gelen kutusunda AI ile cevap verip lead kalifikasyonu yapsın."
+                },
+                "telegram": {
+                    "description": "Telegram botunuzu bağlayın; yeni talepleri toplayın ve mesajlara gerçek zamanlı yanıt verin."
+                },
+                "messenger": {
+                    "description": "Bu workspace için Meta sayfa mesajlaşma asset'leriniz hazır olduğunda Facebook Messenger'ı bağlayın."
+                },
+                "instagram": {
+                    "description": "Meta business asset'leriniz hazır olduğunda Instagram DM mesajlaşmasını bağlayın."
+                }
+            }
+        },
         "actions": {
             "connect": "Bağla",
+            "learnMore": "Detayları Gör",
             "comingSoon": "Çok Yakında",
             "disconnect": "Bağlantıyı Kes",
             "cancel": "İptal"
+        },
+        "onboarding": {
+            "pageTitle": "{channel} kurulumu",
+            "back": "Geri",
+            "resourcesTitle": "Ek kaynaklar",
+            "resources": {
+                "whatsappOverview": "WhatsApp Business Platform hakkında bilmeniz gerekenler",
+                "whatsappMigration": "WhatsApp Personal veya WhatsApp Business uygulamasından taşıma rehberi",
+                "whatsappPricing": "WhatsApp fiyatlandırması",
+                "telegramOverview": "Telegram botları hakkında bilmeniz gerekenler",
+                "instagramOverview": "Instagram mesajlaşması hakkında bilmeniz gerekenler",
+                "messengerOverview": "Messenger müşteri sohbeti hakkında bilgi alın"
+            },
+            "placeholder": {
+                "comingSoon": "Bu onboarding akışı yeni workspace'ler için henüz açılmadı. Önce soldaki kaynaklarla gerekli asset'leri hazırlayın.",
+                "connectedBanner": "{channel} bu workspace'te zaten bağlı."
+            },
+            "whatsapp": {
+                "sidebarTitle": "WhatsApp Business Platform (API)",
+                "sidebarDescription": "WhatsApp Business Platform bağlayın; Qualy AI ile cevap versin, lead kalifikasyonu yapsın ve her şeyi tek gelen kutusunda toplasın.",
+                "supportBanner": "WhatsApp bağlarken yardıma mı ihtiyacınız var? Önce doğru kurulum yolunu seçin, hesap ve numara hazır olduğunda Meta'yı açın.",
+                "supportBannerPrefix": "WhatsApp bağlarken yardıma mı ihtiyacınız var?",
+                "supportBannerCta": "Ekiple konuş",
+                "heading": "WhatsApp Business Platform (API) bağla",
+                "subheading": "Bugünkü durumunuza uyan API yoluyla başlayın. WhatsApp Business uygulamasını zaten kullanıyorsanız, yanlış Meta kurulumunu açmak yerine taşıma akışına geçin.",
+                "connectedHeading": "Bağlı WhatsApp kanalınızı yönetin",
+                "connectedDescription": "WhatsApp kanalınız zaten aktif. Aşağıdaki aksiyonlarla şablonları yönetin, webhook sağlığını kontrol edin veya güvenle bağlantıyı kesin.",
+                "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır."
+            },
+            "telegram": {
+                "sidebarTitle": "Telegram",
+                "sidebarDescription": "Telegram botunuzu bağlayın; yeni konuşmaları alın, anında yanıt verin ve lead toplama akışını aynı gelen kutusunda yönetin.",
+                "heading": "Telegram botu bağla",
+                "subheading": "Yeni bir bot oluşturarak ya da mevcut BotFather token'ınızı bağlayarak başlayın.",
+                "options": {
+                    "new": "Yeni bot oluştur",
+                    "existing": "Mevcut botu bağla"
+                },
+                "newDescription": "Henüz bir botunuz yoksa önce BotFather'da oluşturun, sonra yeni token'ı aşağıya yapıştırın.",
+                "existingDescription": "Zaten çalışan bir Telegram botunuz varsa token'ını aşağıya yapıştırıp bu workspace'e bağlayın.",
+                "connectedHeading": "Bağlı Telegram botunuzu yönetin",
+                "connectedDescription": "Telegram botunuz zaten aktif. Webhook sağlığını kontrol edebilir veya bu workspace'ten bağlantısını kesebilirsiniz.",
+                "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır."
+            },
+            "instagram": {
+                "sidebarTitle": "Instagram",
+                "sidebarDescription": "Instagram DM mesajlarının ileride Qualy'ye akabilmesi için mesajlaşma kurulumunuzu hazırlayın.",
+                "heading": "Instagram kurulumu",
+                "subheading": "Bu kanal galeride görünüyor, ancak yeni workspace onboarding'i şu anda duraklatılmış durumda.",
+                "body": "Instagram bağlantısı yeni workspace'ler için şu anda açılmadı. Açılış tekrar aktif olmadan önce soldaki dokümantasyonla Sayfa, profesyonel hesap ve mesajlaşma izinlerinizi hazırlayın."
+            },
+            "messenger": {
+                "sidebarTitle": "Facebook Messenger",
+                "sidebarDescription": "Messenger onboarding açılmadan önce business asset'lerinizi ve müşteri giriş noktalarınızı hazırlayın.",
+                "heading": "Messenger kurulumu",
+                "subheading": "Messenger burada keşif için listeleniyor, ancak bu workspace'te onboarding henüz açık değil.",
+                "body": "Messenger bağlantısı MVP'de hâlâ placeholder durumunda. Kanalı açmadan önce gerekli asset'leri ve müşteri giriş noktalarını anlamak için soldaki kaynağı inceleyin."
+            }
         },
         "templateTools": {
             "openAction": "Şablon araçları",
@@ -682,6 +764,10 @@
         "whatsappConnect": {
             "choosePathDescription": "İşletmenize uygun kurulum yolunu seçin. Çoğu işletme önce yönlendirmeli Meta kurulumu ile başlamalı; eski asset akışı varsayılan yol değildir.",
             "back": "Geri",
+            "getStarted": "Başla",
+            "skipAndConnect": "Atla ve Facebook ile bağlan",
+            "businessAppPrompt": "WhatsApp Business uygulamasını mı bağlamanız gerekiyor?",
+            "businessAppLink": "Buraya tıklayın",
             "connecting": "Bağlanıyor...",
             "startEmbeddedSignup": "Yönlendirmeli Meta kurulumunu başlat",
             "startLegacyConnect": "Mevcut Meta asset'leri ile devam et",
@@ -692,12 +778,77 @@
             "embeddedSignupFailedReason": "WhatsApp kurulumu başarısız: {reason}",
             "embeddedSignupSuccess": "WhatsApp başarıyla bağlandı.",
             "options": {
-                "existingTitle": "Mevcut WhatsApp Business numaramı koruyacağım",
-                "existingDescription": "Müşterilerle zaten WhatsApp Business uygulamasından konuşuyorsanız ve aynı numarayı korumak istiyorsanız bunu seçin.",
-                "newTitle": "Yeni bir numara kullanacağım",
-                "newDescription": "API mesajlaşması için sıfır bir numara bağlayacaksanız bunu seçin.",
-                "assetsTitle": "Meta Cloud API asset'lerim zaten hazır",
-                "assetsDescription": "Bunu yalnızca Meta içinde WhatsApp Business Account ve bağlı numaranız zaten varsa kullanın."
+                "newApi": {
+                    "title": "Yeni bir WhatsApp API hesabı oluşturup bağla",
+                    "description": "Yeni bir WhatsApp Business Platform (API) hesabı oluşturup bunu yeni bir telefon numarasıyla bağlamak istiyorsanız bu seçeneği kullanın."
+                },
+                "existingApi": {
+                    "title": "Mevcut WhatsApp API hesabını bağla",
+                    "description": "Daha önce bir WhatsApp Business Platform (API) hesabı oluşturduysanız bu seçeneği kullanın."
+                },
+                "businessApp": {
+                    "title": "WhatsApp Business uygulamasındaki mevcut numaramı taşıyarak bağla",
+                    "description": "Henüz WhatsApp API hesabınız yoksa ama WhatsApp Business uygulamasında aktif kullandığınız numarayı aynı numarayla API'ye geçirmek istiyorsanız bu seçeneği kullanın.",
+                    "badge": "Beta"
+                }
+            },
+            "existingApi": {
+                "heading": "WhatsApp Business Platform (API) bağla",
+                "description": "WhatsApp Business Platform (API) bağlantısını nasıl kurmak istediğinizi seçin.",
+                "next": "İleri",
+                "choices": {
+                    "metaAssets": {
+                        "title": "Meta içinde mevcut bir WhatsApp Business Platform (API) hesabı",
+                        "description": "WhatsApp Business Account ve telefon numaranız Meta içinde zaten mevcutsa ve bu asset'leri yalnızca Qualy'ye bağlamak istiyorsanız bu seçeneği kullanın."
+                    },
+                    "otherBsp": {
+                        "title": "Başka bir BSP üzerindeki mevcut WhatsApp Business Platform (API) hesabı",
+                        "description": "Hesabınız şu anda başka bir WhatsApp Business Solution Provider tarafından yönetiliyorsa ve Qualy'ye taşımak istiyorsanız bu seçeneği kullanın."
+                    }
+                }
+            },
+            "eligibility": {
+                "heading": "Basit Bir Uygunluk Kontrolü ile Başlayalım",
+                "question": "SMS gönderip alabilen geçerli bir telefon numaranız var mı? WhatsApp Business Platform (API) bağlamak için bir telefon numarasına ihtiyacınız olacak.",
+                "steps": {
+                    "phone": "Geçerli Telefon Numarası",
+                    "meta": "Meta Business Manager Erişimi"
+                },
+                "choices": {
+                    "newNumber": "Yeni bir telefon numaram var (herhangi bir WhatsApp hesabına bağlı değil)",
+                    "personalAccount": "WhatsApp Personal hesabına bağlı bir telefon numaram var",
+                    "noNewNumber": "Yeni bir numaram yok"
+                },
+                "next": "İleri",
+                "skip": "Uygunluk kontrolünü atla"
+            },
+            "migrationWarning": {
+                "description": "Şu anda WhatsApp Personal Account veya WhatsApp Business App'e bağlı bir numarayı WhatsApp Business Platform (API) ile kullanmak için, önce bu numarayı WhatsApp uygulamasından ayırmanız gerekir. Bu işlemden önce sohbet geçmişini korumak istiyorsanız yedekleyin.",
+                "linkLabel": "WhatsApp Personal Account veya WhatsApp Business App'ten nasıl taşıma yapılacağını öğrenin.",
+                "primary": "Numarayı taşıyacağım",
+                "secondary": "Bunun yerine yeni numara kullanacağım"
+            },
+            "metaAccess": {
+                "heading": "Meta Business Manager Erişiminizi Doğrulayalım",
+                "description": "Şirketinizle ilişkili Meta Business Manager hesabına erişiminiz var mı? Eğer henüz yoksa, bağlantı sırasında bir hesap oluşturabilirsiniz.",
+                "checklistTitle": "Bilmenizde fayda var: Bir WhatsApp Business Account (WABA) oluşturmak için şu bilgilere ihtiyacınız olacak:",
+                "checklist": {
+                    "step1": "Müşterilere görünecek şirket adı.",
+                    "step2": "Resmi şirket/unvan adı.",
+                    "step3": "Şirketin resmi adresi."
+                },
+                "primary": "Evet, erişimim var",
+                "secondary": "Daha sonra oluşturacağım"
+            },
+            "businessApp": {
+                "heading": "WhatsApp Business Uygulamasını Bağla",
+                "description": "Mevcut WhatsApp Business numaranızı koruyun ve var olan uygulama numaraları için hazırlanan yönlendirmeli Meta akışıyla devam edin.",
+                "badge": "Beta"
+            },
+            "connectReady": {
+                "heading": "WhatsApp Business Platform (API) bağla",
+                "description": "Facebook ile Bağlan butonuna tıkladıktan sonra, bağlamak istediğiniz hesabı seçmek için Facebook'a yönlendirilirsiniz. Açılan akışta WhatsApp Business Platform (API) hesabınızı oluşturma, kurma ve yapılandırma adımlarını tamamlayın. İşlem bitince tekrar bu sayfaya döneceksiniz.",
+                "connectWithFacebook": "Facebook ile Bağlan"
             },
             "existingChecklistTitle": "Devam etmeden önce",
             "existingDescriptionLong": "Meta, kurulum sırasında ana telefondan onay vermenizi ve business portfolio adımlarını tamamlamanızı isteyebilir. Bu yol mevcut WhatsApp Business numaraları içindir.",
@@ -715,11 +866,25 @@
                 "step3": "Kurulum sırasında bir Meta business portfolio oluşturma veya seçme adımına hazır olun."
             },
             "assetsChecklistTitle": "Bu yolu yalnızca şu durumda kullanın",
-            "assetsDescriptionLong": "Bu fallback yol yalnızca Meta kullanıcınıza zaten görünür olan mevcut Meta Cloud API asset'lerini keşfeder. Yeni numara açmaz ve mevcut WhatsApp Business uygulama numarasını taşımaz.",
+            "assetsDescriptionLong": "Facebook ile Bağlan butonuna tıkladıktan sonra, bağlamak istediğiniz mevcut hesabı seçmek için Meta'ya yönlendirilirsiniz. Bu yolu yalnızca WhatsApp Business Account ve telefon numaranız zaten Meta içinde mevcutsa kullanın.",
             "assetsChecklist": {
                 "step1": "Meta içinde zaten bir WhatsApp Business Account'unuz var.",
                 "step2": "Bu WABA içinde bağlı telefon numarası var ve Meta kullanıcınız bu numarayı görebiliyor.",
                 "step3": "Bu uygulamanın yapması gereken tek şey mevcut asset'leri keşfedip bağlamak."
+            },
+            "bspMigration": {
+                "heading": "WhatsApp Business Platform (API) hesabınızı taşıyın",
+                "description": "Taşıma işlemine devam etmeden önce gereksinimleri anladığınızdan emin olun.",
+                "banner": "Görünen adınız, kalite puanınız, mesajlaşma limitleriniz, Official Business Account durumunuz ve onaylı yüksek kaliteli şablonlarınız taşınır.",
+                "cta": "Facebook ile taşı",
+                "requirements": {
+                    "twoStepTitle": "İki adımlı doğrulama kapatılmış olmalı",
+                    "twoStepBody": "Taşımaya başlamadan önce WhatsApp numarası için iki adımlı doğrulamayı Meta Business Manager'dan veya bu ayarı yöneten mevcut sağlayıcınızdan kapatın.",
+                    "verificationTitle": "Mevcut işletme doğrulanmış ve WhatsApp asset'leri onaylı olmalı",
+                    "verificationBody": "Devam etmeden önce mevcut business verification, telefon numarası görünen adı ve WABA onay durumunun sorunsuz olduğundan emin olun.",
+                    "popupsTitle": "Tarayıcınızda pop-up'lara izin verin",
+                    "popupsBody": "Meta taşıma akışı ayrı bir pop-up pencerede açılır. Tarayıcı pop-up'ı engellerse taşıma devam edemez."
+                }
             }
         },
         "connectWhatsAppHelpTitle": "Meta Cloud API kurulum kontrol listesi:",
