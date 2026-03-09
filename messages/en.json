@@ -616,6 +616,7 @@
         },
         "actions": {
             "connect": "Connect",
+            "manage": "Manage",
             "learnMore": "Learn more",
             "comingSoon": "Coming Soon",
             "disconnect": "Disconnect",

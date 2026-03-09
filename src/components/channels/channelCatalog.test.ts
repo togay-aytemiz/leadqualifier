@@ -31,7 +31,7 @@ describe('channelCatalog', () => {
         const instagram = getChannelCatalogEntry('instagram')
         const messenger = getChannelCatalogEntry('messenger')
 
-        expect(whatsapp?.badge).toBe('popular')
+        expect(whatsapp?.badge).toBeUndefined()
         expect(whatsapp?.onboardingSurface).toBe('interactive')
         expect(whatsapp?.resources.length).toBeGreaterThan(0)
         expect(whatsapp?.resources.map((resource) => resource.labelKey)).toContain('whatsappMigration')

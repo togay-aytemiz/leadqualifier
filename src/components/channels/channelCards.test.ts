@@ -30,7 +30,7 @@ describe('getChannelCardConfigs', () => {
         const telegramCard = configs.find(config => config.type === 'telegram')
         const whatsappCard = configs.find(config => config.type === 'whatsapp')
 
-        expect(whatsappCard?.badge).toBe('popular')
+        expect(whatsappCard?.badge).toBeUndefined()
         expect(whatsappCard?.tone).toBe('emerald')
         expect(telegramCard?.tone).toBe('sky')
         expect(telegramCard?.badge).toBeUndefined()

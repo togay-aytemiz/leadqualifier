@@ -89,6 +89,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - template picker UI is compact/mobile-first: underline tab navigation, refresh action only on WhatsApp tab, inset-aligned select chevrons, and smooth modal height transition when switching tabs
   - 24-hour expired fallback keeps direct official template send flow (separate modal/action)
 - Meta OAuth channel connect starts in a separate popup and returns success/error status to the existing Channels page context (main app tab remains stable)
+- Meta OAuth popup return should tolerate `window.opener` loss or dropped popup query markers after cross-origin OAuth hops by using same-origin fallback bridges (`window.name` popup-context detection + `storage` event), so popup closes and the main Channels view still refreshes with result state.
 - Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
 - Meta OAuth callback diagnostic hint (`meta_oauth_error`) is propagated from popup to main Channels URL for production support troubleshooting.
 - Meta channel credentials can be configured per channel: Instagram prefers `META_INSTAGRAM_APP_ID/SECRET`, WhatsApp prefers `META_WHATSAPP_APP_ID/SECRET`, and both fall back to shared `META_APP_ID/SECRET` for backward compatibility.
@@ -97,6 +98,10 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Instagram business-profile discovery for Instagram Login tokens should prefer `https://graph.instagram.com/v25.0/me?fields=user_id,username` and keep fallback endpoints only for compatibility.
 - Instagram onboarding connect state should stay minimal (single heading, short helper copy, one `Continue with Instagram` CTA) to reduce setup friction.
 - Instagram onboarding helper copy should explicitly explain redirect-to-Instagram account selection and partner-permission approval in one short paragraph.
+- Instagram debug/readback diagnostics should use the same Instagram Login token-resolution path as channel connect (not a direct Graph Facebook IG-node read) to avoid token-format false negatives.
+- Connected channel cards in Settings > Channels should show `Manage` (navigate to `/settings/channels/<channel>`) instead of a destructive `Disconnect` CTA; destructive disconnect remains in channel detail pages.
+- Channel card platform icons should stay visually anchored to the top-right corner.
+- Channel gallery top-left marketing badges are removed for launch clarity; `Soon` appears only in the action row (same line as `Learn more`) on placeholder cards.
 - WhatsApp OAuth candidate discovery supports fallback via `me/businesses` + business WABA edges when direct user node field access is unavailable in Graph.
 - WhatsApp OAuth scope request is limited to `whatsapp_business_management` + `whatsapp_business_messaging` (do not request `business_management` in the WhatsApp connect flow).
 - WhatsApp OAuth candidate resolution accepts WABA payloads without `name` as long as `id` + `phone_numbers` are present.

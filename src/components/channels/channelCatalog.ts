@@ -25,7 +25,6 @@ const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
         type: 'whatsapp',
         href: '/settings/channels/whatsapp',
         tone: 'emerald',
-        badge: 'popular',
         onboardingSurface: 'interactive',
         resources: [
             {

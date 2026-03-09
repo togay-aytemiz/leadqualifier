@@ -8,6 +8,7 @@ const {
     getPhoneNumberMock,
     getMessageTemplatesMock,
     revalidatePathMock,
+    resolveMetaInstagramConnectionCandidateMock,
     sendTemplateMock,
     whatsAppCtorMock
 } = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ const {
     getPhoneNumberMock: vi.fn(),
     getMessageTemplatesMock: vi.fn(),
     revalidatePathMock: vi.fn(),
+    resolveMetaInstagramConnectionCandidateMock: vi.fn(),
     sendTemplateMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
 }))
@@ -36,7 +38,8 @@ vi.mock('@/lib/organizations/active-context', () => ({
 
 vi.mock('@/lib/channels/meta-oauth', () => ({
     exchangeMetaCodeForToken: exchangeMetaCodeForTokenMock,
-    exchangeMetaForLongLivedToken: exchangeMetaForLongLivedTokenMock
+    exchangeMetaForLongLivedToken: exchangeMetaForLongLivedTokenMock,
+    resolveMetaInstagramConnectionCandidate: resolveMetaInstagramConnectionCandidateMock
 }))
 
 vi.mock('@/lib/whatsapp/client', () => ({
@@ -54,6 +57,7 @@ vi.mock('@/lib/whatsapp/client', () => ({
 import {
     completeWhatsAppEmbeddedSignupChannel,
     connectWhatsAppChannel,
+    debugInstagramChannel,
     debugWhatsAppChannel,
     listWhatsAppMessageTemplates,
     sendWhatsAppTemplateMessage
@@ -135,6 +139,13 @@ describe('channels actions: WhatsApp core flows', () => {
         })
         sendTemplateMock.mockResolvedValue({
             messages: [{ id: 'wamid.template.1' }]
+        })
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue({
+            pageId: '17841444965056435',
+            pageName: 'itsalinayalin',
+            pageAccessToken: 'token-ig-1',
+            instagramBusinessAccountId: '17841444965056435',
+            instagramUsername: 'itsalinayalin'
         })
     })
 
@@ -295,6 +306,38 @@ describe('channels actions: WhatsApp core flows', () => {
                 display_phone_number: '+90 555 111 22 33',
                 verified_name: 'Qualy',
                 quality_rating: 'GREEN'
+            }
+        })
+    })
+
+    it('returns normalized debug info for Instagram channel via oauth resolver', async () => {
+        const { supabase, eqMock } = createDebugSupabaseMock({
+            id: 'channel-ig-1',
+            type: 'instagram',
+            config: {
+                page_access_token: 'token-ig-1',
+                instagram_business_account_id: '17841444965056435',
+                verify_token: 'verify-ig-1',
+                page_id: '17841444965056435'
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await debugInstagramChannel('channel-ig-1')
+
+        expect(eqMock).toHaveBeenCalledWith('id', 'channel-ig-1')
+        expect(resolveMetaInstagramConnectionCandidateMock).toHaveBeenCalledWith('token-ig-1')
+        expect(result).toEqual({
+            success: true,
+            info: {
+                instagram_business_account_id: '17841444965056435',
+                page_id: '17841444965056435',
+                verify_token_set: true,
+                username: 'itsalinayalin',
+                page_name: 'itsalinayalin',
+                resolved_instagram_business_account_id: '17841444965056435',
+                resolved_page_id: '17841444965056435',
+                token_subject_matches_channel: true
             }
         })
     })

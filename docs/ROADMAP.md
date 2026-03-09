@@ -88,6 +88,8 @@
   - [x] First bot reply starts only after inbound customer message
   - [x] One-click connect from channel card (no intermediate "continue with Meta" modal)
   - [x] OAuth popup flow mirrors WhatsApp and keeps main app context stable during Meta auth
+  - [x] OAuth popup return bridge hardened with `localStorage` fallback so the popup still closes and main page refreshes when `window.opener` is dropped by cross-origin browser policy
+  - [x] Instagram debug action now validates token/account via Instagram Login resolver instead of direct Graph Facebook account-read call, preventing false `Cannot parse access token` debug failures on Instagram Login tokens
   - [x] Channels card connect CTA is temporarily disabled and shown as `Çok Yakında` for non-connected orgs
   - [x] Meta channel credentials now support channel-specific env overrides (`META_INSTAGRAM_APP_ID/SECRET`, `META_WHATSAPP_APP_ID/SECRET`) with backward-compatible fallback to shared `META_APP_ID/SECRET`
 - [x] **Facebook Messenger (Placeholder)**
@@ -103,6 +105,9 @@
   - [x] Compact channel onboarding detail pages (WhatsApp/Telegram/placeholders) to app-consistent spacing, typography, and icon treatment
   - [x] Remove the extra `Business Messaging` heading in channel gallery and use direct route push on `Connect` to reduce click-to-open delay for onboarding pages
   - [x] Make channel cards more compact: reduce card title size, move icons tighter to top-right, and decrease whitespace before divider
+  - [x] For connected channels, replace card-level destructive `Disconnect` CTA with navigational `Manage` CTA that opens the channel detail page; keep disconnect action inside the dedicated channel setup page
+  - [x] Channel platform logos are now anchored tighter to top-right on cards for respond.io-like visual balance
+  - [x] Remove top-left gallery badges for launch simplicity (drop WhatsApp `Popular`), and render Messenger `Soon` badge in footer action row on the same line as `Learn more`
   - [x] Refine onboarding detail readability and support CTA: smaller inner headings/body text, visible wizard step numbers in selected state, support banner `Ekiple konuş` mail action, and temporary no-op migration info link
   - [x] Left-align channel onboarding detail content container instead of centering it
 - [x] **Shared Inbound AI Pipeline**

@@ -4,14 +4,13 @@ import { useState } from 'react'
 import { Bug, FileText } from 'lucide-react'
 
 import { Button, Badge } from '@/design'
-import { ConfirmDialog } from '@/design/primitives'
 import type {
     ChannelCardBadge,
     ChannelCardTone,
     ChannelCardType
 } from '@/components/channels/channelCatalog'
 import { WhatsAppTemplateModal } from '@/components/channels/WhatsAppTemplateModal'
-import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel, disconnectChannel } from '@/lib/channels/actions'
+import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel } from '@/lib/channels/actions'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
@@ -40,12 +39,6 @@ function getChannelSurfaceClasses(tone: ChannelCardTone) {
     return 'border-slate-200 bg-[linear-gradient(135deg,rgba(99,102,241,0.05)_0%,rgba(255,255,255,0)_42%),linear-gradient(180deg,rgba(255,255,255,1),rgba(248,249,252,0.98))] hover:border-slate-300'
 }
 
-function getBadgeVariant(badge?: ChannelCardBadge) {
-    if (badge === 'popular') return 'success'
-    if (badge === 'comingSoon') return 'info'
-    return 'neutral'
-}
-
 function getStatusVariant(isConnected: boolean, isComingSoon: boolean) {
     if (isConnected) return 'success'
     if (isComingSoon) return 'info'
@@ -62,8 +55,6 @@ export function ChannelCard({
     isReadOnly = false
 }: ChannelCardProps) {
     const t = useTranslations('Channels')
-    const [isDisconnecting, setIsDisconnecting] = useState(false)
-    const [showConfirm, setShowConfirm] = useState(false)
     const [showTemplateModal, setShowTemplateModal] = useState(false)
 
     const handleDebug = async () => {
@@ -84,25 +75,13 @@ export function ChannelCard({
         alert(t('debug.webhookFailed', { error: result.error }))
     }
 
-    const handleDisconnect = async () => {
-        if (isReadOnly || !channel) return
-
-        setIsDisconnecting(true)
-        try {
-            await disconnectChannel(channel.id)
-            setShowConfirm(false)
-        } catch {
-            console.error('Failed to disconnect')
-        } finally {
-            setIsDisconnecting(false)
-        }
-    }
-
     const isConnected = !!channel
     const connectLabel = isComingSoon ? t('actions.learnMore') : t('actions.connect')
+    const showComingSoonBadge = !isConnected && (badge === 'comingSoon' || isComingSoon)
+    const showFooterBadge = isConnected || showComingSoonBadge
     const statusLabel = isConnected
         ? t('status.active')
-        : isComingSoon
+        : showComingSoonBadge
             ? t('actions.comingSoon')
             : t('status.notConnected')
 
@@ -114,44 +93,34 @@ export function ChannelCard({
                     getChannelSurfaceClasses(tone)
                 )}
             >
-                {badge && (
-                    <div className="absolute left-4 top-4">
-                        <Badge variant={getBadgeVariant(badge)}>
-                            {t(`gallery.badges.${badge}`)}
-                        </Badge>
-                    </div>
-                )}
+                <img
+                    alt=""
+                    aria-hidden
+                    className="pointer-events-none absolute right-4 top-4 h-11 w-11 shrink-0 object-contain"
+                    src={getChannelPlatformIconSrc(type)}
+                />
 
-                <div className="flex min-h-0 flex-1 flex-col pt-6">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 pr-3">
-                            <h3 className="text-[16px] font-semibold leading-[1.25] tracking-tight text-slate-900 sm:text-[17px]">
-                                {t(`types.${type}`)}
-                            </h3>
-                            <p className="mt-2 max-w-[40ch] text-[13px] leading-5 text-slate-600">
-                                {t(`gallery.cards.${type}.description`)}
+                <div className="flex min-h-0 flex-1 flex-col pt-2">
+                    <div className="min-w-0 pr-14">
+                        <h3 className="text-[16px] font-semibold leading-[1.25] tracking-tight text-slate-900 sm:text-[17px]">
+                            {t(`types.${type}`)}
+                        </h3>
+                        <p className="mt-2 max-w-[40ch] text-[13px] leading-5 text-slate-600">
+                            {t(`gallery.cards.${type}.description`)}
+                        </p>
+                        {isConnected && (
+                            <p className="mt-3 text-xs font-medium text-slate-700">
+                                {t('gallery.connectedAs', { name: channel.name })}
                             </p>
-                            {isConnected && (
-                                <p className="mt-3 text-xs font-medium text-slate-700">
-                                    {t('gallery.connectedAs', { name: channel.name })}
-                                </p>
-                            )}
-                        </div>
-
-                        <img
-                            alt=""
-                            aria-hidden
-                            className="h-11 w-11 shrink-0 object-contain"
-                            src={getChannelPlatformIconSrc(type)}
-                        />
+                        )}
                     </div>
 
                     <div className="mt-auto pt-4">
                         <div className="h-px w-full bg-slate-200/90" />
                         <div className="flex items-center justify-between gap-3 pt-3">
                             <div className="min-w-0">
-                                {isConnected && (
-                                    <Badge variant={getStatusVariant(isConnected, isComingSoon)}>
+                                {showFooterBadge && (
+                                    <Badge variant={getStatusVariant(isConnected, showComingSoonBadge)}>
                                         {statusLabel}
                                     </Badge>
                                 )}
@@ -186,12 +155,12 @@ export function ChannelCard({
                                     )}
 
                                     <Button
-                                        onClick={() => setShowConfirm(true)}
-                                        disabled={isDisconnecting || isReadOnly}
-                                        variant="danger"
+                                        onClick={onConnect}
+                                        variant="secondary"
                                         size="sm"
+                                        className="min-w-[112px] bg-white"
                                     >
-                                        {t('actions.disconnect')}
+                                        {t('actions.manage')}
                                     </Button>
                                 </div>
                             ) : (
@@ -209,20 +178,6 @@ export function ChannelCard({
                     </div>
                 </div>
             </article>
-
-            {!isReadOnly && (
-                <ConfirmDialog
-                    isOpen={showConfirm}
-                    title={t('confirmDisconnectTitle')}
-                    description={t('confirmDisconnectDesc')}
-                    confirmText={t('actions.disconnect')}
-                    cancelText={t('actions.cancel')}
-                    isDestructive
-                    isLoading={isDisconnecting}
-                    onConfirm={handleDisconnect}
-                    onCancel={() => setShowConfirm(false)}
-                />
-            )}
 
             {channel && type === 'whatsapp' && (
                 <WhatsAppTemplateModal

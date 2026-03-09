@@ -6,7 +6,11 @@ import { revalidatePath } from 'next/cache'
 import { TelegramClient } from '@/lib/telegram/client'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
 import { InstagramClient } from '@/lib/instagram/client'
-import { exchangeMetaCodeForToken, exchangeMetaForLongLivedToken } from '@/lib/channels/meta-oauth'
+import {
+    exchangeMetaCodeForToken,
+    exchangeMetaForLongLivedToken,
+    resolveMetaInstagramConnectionCandidate
+} from '@/lib/channels/meta-oauth'
 import { v4 as uuidv4 } from 'uuid'
 import type { Json } from '@/types/database'
 
@@ -608,17 +612,22 @@ export async function debugInstagramChannel(channelId: string): Promise<Instagra
     }
 
     try {
-        const client = new InstagramClient(pageAccessToken)
-        const accountDetails = await client.getBusinessAccount(instagramBusinessAccountId)
+        const candidate = await resolveMetaInstagramConnectionCandidate(pageAccessToken)
+        if (!candidate) {
+            return { success: false, error: 'Unable to resolve Instagram account from current access token' }
+        }
+
         return {
             success: true,
             info: {
                 instagram_business_account_id: instagramBusinessAccountId,
                 page_id: pageId,
                 verify_token_set: Boolean(verifyToken),
-                username: accountDetails.username ?? null,
-                name: accountDetails.name ?? null,
-                profile_picture_url: accountDetails.profile_picture_url ?? null
+                username: candidate.instagramUsername ?? null,
+                page_name: candidate.pageName,
+                resolved_instagram_business_account_id: candidate.instagramBusinessAccountId,
+                resolved_page_id: candidate.pageId,
+                token_subject_matches_channel: candidate.instagramBusinessAccountId === instagramBusinessAccountId
             }
         }
     } catch (error: unknown) {

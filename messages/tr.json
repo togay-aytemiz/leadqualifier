@@ -616,6 +616,7 @@
         },
         "actions": {
             "connect": "Bağla",
+            "manage": "Yönet",
             "learnMore": "Detayları Gör",
             "comingSoon": "Çok Yakında",
             "disconnect": "Bağlantıyı Kes",
