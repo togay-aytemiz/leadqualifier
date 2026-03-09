@@ -77,7 +77,7 @@
   - [x] Skill-match failures fail open to KB/fallback instead of dropping reply flow
 - [x] **Instagram (Meta Messaging)**
   - [x] Channel connect via Meta OAuth + webhook verification
-  - [x] OAuth start URL moved to direct Instagram consent flow (`https://www.instagram.com/consent`, `flow=ig_biz_login_oauth`) with business scopes
+  - [x] OAuth start URL now uses Instagram Business Login authorize endpoint (`https://www.instagram.com/oauth/authorize`) with `force_reauth=true` and business scopes
   - [x] OAuth callback token exchange switched to Instagram Login endpoints (`api.instagram.com/oauth/access_token` -> `graph.instagram.com/access_token` with `ig_exchange_token`)
   - [x] Instagram business-profile discovery now prioritizes `graph.instagram.com/v25.0/me` (with fallback chain) for Instagram Login tokens
   - [x] Instagram onboarding/connect UI copy now says `Continue with Instagram` and no longer instructs Facebook Page selection in setup text

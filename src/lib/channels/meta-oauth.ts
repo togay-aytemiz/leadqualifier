@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 const META_OAUTH_BASE = 'https://www.facebook.com/v21.0/dialog/oauth'
-const INSTAGRAM_BIZ_LOGIN_OAUTH_BASE = 'https://www.instagram.com/consent/'
+const INSTAGRAM_BIZ_LOGIN_OAUTH_BASE = 'https://www.instagram.com/oauth/authorize'
 
 export type MetaChannelType = 'whatsapp' | 'instagram'
 
@@ -209,17 +209,12 @@ export function decodeMetaOAuthState(value: string, secret: string): MetaOAuthSt
 export function buildMetaAuthorizeUrl(options: MetaAuthorizeUrlOptions) {
     if (options.channel === 'instagram') {
         const url = new URL(INSTAGRAM_BIZ_LOGIN_OAUTH_BASE)
-        const params = {
-            client_id: options.appId,
-            redirect_uri: options.redirectUri,
-            response_type: 'code',
-            state: options.state,
-            scope: getMetaOAuthScopes(options.channel).join('-')
-        }
-
-        url.searchParams.set('flow', 'ig_biz_login_oauth')
-        url.searchParams.set('params_json', JSON.stringify(params))
-        url.searchParams.set('source', 'oauth_permissions_page_www')
+        url.searchParams.set('force_reauth', 'true')
+        url.searchParams.set('client_id', options.appId)
+        url.searchParams.set('redirect_uri', options.redirectUri)
+        url.searchParams.set('response_type', 'code')
+        url.searchParams.set('state', options.state)
+        url.searchParams.set('scope', getMetaOAuthScopes(options.channel).join(','))
         return url.toString()
     }
 

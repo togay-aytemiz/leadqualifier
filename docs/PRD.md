@@ -92,7 +92,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Meta OAuth origin resolution prioritizes canonical app URL and supports forwarded-host fallback for Netlify routing consistency.
 - Meta OAuth callback diagnostic hint (`meta_oauth_error`) is propagated from popup to main Channels URL for production support troubleshooting.
 - Meta channel credentials can be configured per channel: Instagram prefers `META_INSTAGRAM_APP_ID/SECRET`, WhatsApp prefers `META_WHATSAPP_APP_ID/SECRET`, and both fall back to shared `META_APP_ID/SECRET` for backward compatibility.
-- Instagram channel OAuth start URL uses direct Instagram consent flow (`https://www.instagram.com/consent`, `flow=ig_biz_login_oauth`) and sends business scopes via `params_json.scope`.
+- Instagram channel OAuth start URL uses Instagram Business Login authorize endpoint (`https://www.instagram.com/oauth/authorize`) with `force_reauth=true` and business scopes in `scope`.
 - Instagram OAuth callback exchange uses Instagram Login endpoints (`https://api.instagram.com/oauth/access_token` for code->short token, `https://graph.instagram.com/access_token` with `grant_type=ig_exchange_token` for short->long token); do not use Facebook Graph OAuth exchange endpoints for Instagram Login channel connect.
 - Instagram business-profile discovery for Instagram Login tokens should prefer `https://graph.instagram.com/v25.0/me?fields=user_id,username` and keep fallback endpoints only for compatibility.
 - Instagram onboarding connect state should stay minimal (single heading, short helper copy, one `Continue with Instagram` CTA) to reduce setup friction.

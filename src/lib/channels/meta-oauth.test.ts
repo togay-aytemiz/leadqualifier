@@ -111,7 +111,7 @@ describe('meta oauth helpers', () => {
         expect(resolveMetaChannelsReturnPath('tr', '/api/channels/meta/start')).toBe('/settings/channels')
     })
 
-    it('builds instagram business-login consent url with expected params_json payload', () => {
+    it('builds instagram business-login oauth authorize url with expected params', () => {
         const url = buildMetaAuthorizeUrl({
             appId: 'app-1',
             redirectUri: 'https://example.com/api/channels/meta/callback',
@@ -121,17 +121,13 @@ describe('meta oauth helpers', () => {
 
         const parsedUrl = new URL(url)
         expect(parsedUrl.origin).toBe('https://www.instagram.com')
-        expect(parsedUrl.pathname).toBe('/consent/')
-        expect(parsedUrl.searchParams.get('flow')).toBe('ig_biz_login_oauth')
-
-        const paramsJson = parsedUrl.searchParams.get('params_json')
-        expect(paramsJson).toBeTruthy()
-        const params = JSON.parse(paramsJson ?? '{}') as Record<string, string>
-        expect(params.client_id).toBe('app-1')
-        expect(params.redirect_uri).toBe('https://example.com/api/channels/meta/callback')
-        expect(params.response_type).toBe('code')
-        expect(params.state).toBe('state-1')
-        expect(params.scope).toBe(getMetaOAuthScopes('instagram').join('-'))
+        expect(parsedUrl.pathname).toBe('/oauth/authorize')
+        expect(parsedUrl.searchParams.get('force_reauth')).toBe('true')
+        expect(parsedUrl.searchParams.get('client_id')).toBe('app-1')
+        expect(parsedUrl.searchParams.get('redirect_uri')).toBe('https://example.com/api/channels/meta/callback')
+        expect(parsedUrl.searchParams.get('response_type')).toBe('code')
+        expect(parsedUrl.searchParams.get('state')).toBe('state-1')
+        expect(parsedUrl.searchParams.get('scope')).toBe(getMetaOAuthScopes('instagram').join(','))
     })
 
     it('builds facebook oauth url for whatsapp', () => {
