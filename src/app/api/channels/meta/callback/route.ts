@@ -175,6 +175,8 @@ export async function GET(req: NextRequest) {
                     config: {
                         page_id: candidate.pageId,
                         instagram_business_account_id: candidate.instagramBusinessAccountId,
+                        instagram_user_id: candidate.instagramBusinessAccountId,
+                        instagram_app_scoped_id: candidate.instagramAppScopedId,
                         page_access_token: candidate.pageAccessToken,
                         verify_token: globalVerifyToken || randomUUID(),
                         connected_via: 'oauth',

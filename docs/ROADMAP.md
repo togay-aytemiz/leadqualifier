@@ -115,6 +115,7 @@
   - [x] Extend Instagram webhook parser to ingest inbound text events from both `messaging` and `standby` payload arrays to avoid missing DM-request traffic
   - [x] Surface Instagram request-folder traffic in Inbox by storing `instagram_event_source` metadata and showing `Request/İstek` badge for `standby` messages
   - [x] Expand Instagram webhook coverage for all inbound messaging payloads and shapes (`entry.messaging` / `entry.standby` plus `entry.changes` messaging fields): normalize non-text events (`attachments`, `postback`, `referral`, `reaction`, `read/seen`, `optin`, `handover`) into inbox-visible contact rows, relax strict recipient-id filtering for request-folder compatibility, and skip AI auto-reply for these system/media events
+  - [x] Fix Instagram webhook identity mismatch by persisting both `instagram_user_id` and `instagram_app_scoped_id`, prioritizing `user_id` in Instagram Login profile resolution, and allowing webhook channel lookup + auto-reconcile across both identifiers
   - [x] Refine onboarding detail readability and support CTA: smaller inner headings/body text, visible wizard step numbers in selected state, support banner `Ekiple konuş` mail action, and temporary no-op migration info link
   - [x] Left-align channel onboarding detail content container instead of centering it
 - [x] **Shared Inbound AI Pipeline**

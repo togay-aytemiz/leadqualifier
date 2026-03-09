@@ -26,6 +26,7 @@ export interface InstagramConnectionCandidate {
     pageName: string
     pageAccessToken: string
     instagramBusinessAccountId: string
+    instagramAppScopedId: string | null
     instagramUsername: string | null
 }
 
@@ -248,6 +249,7 @@ export function pickInstagramConnectionCandidate(payload: unknown): InstagramCon
             pageName,
             pageAccessToken,
             instagramBusinessAccountId,
+            instagramAppScopedId: null,
             instagramUsername
         }
     }
@@ -258,15 +260,17 @@ export function pickInstagramConnectionCandidate(payload: unknown): InstagramCon
 function pickInstagramBusinessProfileCandidate(payload: unknown, userAccessToken: string): InstagramConnectionCandidate | null {
     if (!isRecord(payload)) return null
 
-    const instagramBusinessAccountId = asIdentifierString(payload.id) || asIdentifierString(payload.user_id)
+    const instagramBusinessAccountId = asIdentifierString(payload.user_id) || asIdentifierString(payload.id)
     if (!instagramBusinessAccountId) return null
 
+    const instagramAppScopedId = asIdentifierString(payload.id)
     const instagramUsername = asString(payload.username)
     return {
         pageId: instagramBusinessAccountId,
         pageName: instagramUsername || instagramBusinessAccountId,
         pageAccessToken: userAccessToken,
         instagramBusinessAccountId,
+        instagramAppScopedId,
         instagramUsername
     }
 }

@@ -5,6 +5,7 @@ import { InstagramClient } from '@/lib/instagram/client'
 import { extractInstagramInboundEvents, isValidMetaSignature } from '@/lib/instagram/webhook'
 import { normalizeOutboundMessage } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
+import { resolveMetaInstagramConnectionCandidate } from '@/lib/channels/meta-oauth'
 
 export const runtime = 'nodejs'
 
@@ -72,6 +73,80 @@ function summarizeInstagramPayloadShape(payload: unknown) {
         entryCount: payload.entry.length,
         entryShapes
     }
+}
+
+function channelLookupFilter(instagramAccountId: string) {
+    return [
+        `config->>instagram_business_account_id.eq.${instagramAccountId}`,
+        `config->>instagram_user_id.eq.${instagramAccountId}`,
+        `config->>instagram_app_scoped_id.eq.${instagramAccountId}`
+    ].join(',')
+}
+
+async function findActiveInstagramChannelByAccountId(
+    supabase: any,
+    instagramAccountId: string
+) {
+    const { data } = await supabase
+        .from('channels')
+        .select('id, organization_id, config')
+        .eq('type', 'instagram')
+        .eq('status', 'active')
+        .or(channelLookupFilter(instagramAccountId))
+        .maybeSingle()
+
+    return data as InstagramChannelRecord | null
+}
+
+async function reconcileChannelByInstagramAccountId(
+    supabase: any,
+    instagramAccountId: string
+) {
+    const { data: channels } = await supabase
+        .from('channels')
+        .select('id, organization_id, config')
+        .eq('type', 'instagram')
+        .eq('status', 'active')
+
+    for (const row of channels ?? []) {
+        const channel = row as InstagramChannelRecord
+        const pageAccessToken = readConfigString(channel.config, 'page_access_token')
+        if (!pageAccessToken) continue
+
+        try {
+            const candidate = await resolveMetaInstagramConnectionCandidate(pageAccessToken)
+            if (!candidate) continue
+
+            const isMatch =
+                candidate.instagramBusinessAccountId === instagramAccountId
+                || candidate.instagramAppScopedId === instagramAccountId
+
+            if (!isMatch) continue
+
+            const nextConfig = {
+                ...asConfigRecord(channel.config),
+                instagram_business_account_id: candidate.instagramBusinessAccountId,
+                instagram_user_id: candidate.instagramBusinessAccountId,
+                instagram_app_scoped_id: candidate.instagramAppScopedId,
+                page_id: candidate.pageId,
+                username: candidate.instagramUsername ?? readConfigString(channel.config, 'username')
+            }
+
+            await supabase
+                .from('channels')
+                .update({ config: nextConfig })
+                .eq('id', channel.id)
+
+            return {
+                ...channel,
+                config: nextConfig
+            } as InstagramChannelRecord
+        } catch (error) {
+            console.warn('Instagram Webhook: Channel reconciliation failed for channel', channel.id, error)
+        }
+    }
+
+    return null
 }
 
 export async function GET(req: NextRequest) {
@@ -163,20 +238,21 @@ export async function POST(req: NextRequest) {
         let client = clientCache.get(event.instagramBusinessAccountId)
 
         if (!channel) {
-            const { data } = await supabase
-                .from('channels')
-                .select('id, organization_id, config')
-                .eq('type', 'instagram')
-                .eq('status', 'active')
-                .eq('config->>instagram_business_account_id', event.instagramBusinessAccountId)
-                .maybeSingle()
+            const directChannel = await findActiveInstagramChannelByAccountId(
+                supabase,
+                event.instagramBusinessAccountId
+            )
+            const resolvedChannel = directChannel || await reconcileChannelByInstagramAccountId(
+                supabase,
+                event.instagramBusinessAccountId
+            )
 
-            if (!data) {
+            if (!resolvedChannel) {
                 console.warn('Instagram Webhook: Channel not found for business account id', event.instagramBusinessAccountId)
                 continue
             }
 
-            channel = data as InstagramChannelRecord
+            channel = resolvedChannel
             const appSecret = process.env.META_INSTAGRAM_APP_SECRET
                 || process.env.META_APP_SECRET
                 || readConfigString(channel.config, 'app_secret')

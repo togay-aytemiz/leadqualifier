@@ -294,6 +294,7 @@ describe('meta oauth helpers', () => {
             pageName: 'Leadqualifier Page',
             pageAccessToken: 'page-token-1',
             instagramBusinessAccountId: 'ig-1',
+            instagramAppScopedId: null,
             instagramUsername: 'leadqualifier'
         })
     })
@@ -304,7 +305,8 @@ describe('meta oauth helpers', () => {
                 ok: true,
                 status: 200,
                 json: async () => ({
-                    id: '17841444965056435',
+                    id: '26160270836990969',
+                    user_id: '17841444965056435',
                     username: 'itsalinayalin'
                 })
             })
@@ -317,6 +319,7 @@ describe('meta oauth helpers', () => {
             pageName: 'itsalinayalin',
             pageAccessToken: 'token-1',
             instagramBusinessAccountId: '17841444965056435',
+            instagramAppScopedId: '26160270836990969',
             instagramUsername: 'itsalinayalin'
         })
 
@@ -375,6 +378,7 @@ describe('meta oauth helpers', () => {
             pageName: 'Leadqualifier Page',
             pageAccessToken: 'page-token-1',
             instagramBusinessAccountId: 'ig-1',
+            instagramAppScopedId: null,
             instagramUsername: 'leadqualifier'
         })
 
