@@ -317,6 +317,7 @@
         "queueOperatorsTitle": "Operatörler",
         "queueUnassignedSummary": "Atanmamış: {count}",
         "queueNoOperators": "Operatör bulunamadı",
+        "instagramRequestBadge": "İstek",
         "noMessages": "Mesaj yok",
         "noMessagesDesc": "Yeni konuşmalar mesaj aldığınızda burada görünecektir.",
         "noMessagesYet": "Henüz mesaj yok",
@@ -590,6 +591,9 @@
         "status": {
             "active": "Aktif",
             "notConnected": "Bağlı değil"
+        },
+        "trust": {
+            "metaProvider": "Resmi Meta Tech Provider"
         },
         "gallery": {
             "category": "İşletme Mesajlaşması",

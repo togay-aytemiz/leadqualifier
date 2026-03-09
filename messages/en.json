@@ -317,6 +317,7 @@
         "queueOperatorsTitle": "Operators",
         "queueUnassignedSummary": "Unassigned: {count}",
         "queueNoOperators": "No operators found",
+        "instagramRequestBadge": "Request",
         "noMessages": "No messages",
         "noMessagesDesc": "New conversations will appear here when you receive messages.",
         "noMessagesYet": "No messages yet",
@@ -590,6 +591,9 @@
         "status": {
             "active": "Active",
             "notConnected": "Not connected"
+        },
+        "trust": {
+            "metaProvider": "Official Meta Tech Provider"
         },
         "gallery": {
             "category": "Business Messaging",

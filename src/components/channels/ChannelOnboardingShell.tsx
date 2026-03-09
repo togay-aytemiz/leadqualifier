@@ -1,6 +1,11 @@
+'use client'
+
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
+import { MetaProviderBadge } from '@/components/channels/MetaProviderBadge'
+import { getChannelPlatformIconSrc, type ChannelPlatformIconType } from '@/lib/channels/platform-icons'
 import { PageHeader } from '@/design'
 
 interface ChannelOnboardingShellResource {
@@ -9,6 +14,7 @@ interface ChannelOnboardingShellResource {
 }
 
 interface ChannelOnboardingShellProps {
+    channelType: ChannelPlatformIconType
     pageTitle: string
     sidebarTitle?: string
     sidebarDescription?: string
@@ -22,7 +28,12 @@ interface ChannelOnboardingShellProps {
     onBack?: () => void
 }
 
+function isMetaProductChannel(channelType: ChannelPlatformIconType) {
+    return channelType === 'whatsapp' || channelType === 'instagram' || channelType === 'messenger'
+}
+
 export function ChannelOnboardingShell({
+    channelType,
     pageTitle,
     backHref,
     backLabel,
@@ -30,6 +41,8 @@ export function ChannelOnboardingShell({
     children,
     onBack
 }: ChannelOnboardingShellProps) {
+    const t = useTranslations('Channels')
+
     return (
         <>
             <PageHeader title={pageTitle} />
@@ -57,7 +70,21 @@ export function ChannelOnboardingShell({
                         </Link>
                     )}
 
-                    <main className="mt-5">
+                    <img
+                        alt=""
+                        aria-hidden
+                        className="pointer-events-none mt-3 h-11 w-11 shrink-0 object-contain"
+                        src={getChannelPlatformIconSrc(channelType)}
+                    />
+                    {isMetaProductChannel(channelType) && (
+                        <MetaProviderBadge
+                            label={t('trust.metaProvider')}
+                            className="mt-2"
+                            size="sm"
+                        />
+                    )}
+
+                    <main className="mt-4">
                         {children}
                     </main>
                 </div>

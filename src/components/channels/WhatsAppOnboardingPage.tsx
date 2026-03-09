@@ -899,6 +899,7 @@ export function WhatsAppOnboardingPage({
     return (
         <>
             <ChannelOnboardingShell
+                channelType="whatsapp"
                 pageTitle={t('onboarding.pageTitle', { channel: t('types.whatsapp') })}
                 backHref={getLocalizedHref(locale, '/settings/channels')}
                 backLabel={t('onboarding.back')}

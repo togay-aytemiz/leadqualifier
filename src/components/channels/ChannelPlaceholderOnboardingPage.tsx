@@ -30,6 +30,7 @@ export function ChannelPlaceholderOnboardingPage({
 
     return (
         <ChannelOnboardingShell
+            channelType={type}
             pageTitle={t('onboarding.pageTitle', { channel: t(`types.${type}`) })}
             backHref={getLocalizedHref(locale, '/settings/channels')}
             backLabel={t('onboarding.back')}

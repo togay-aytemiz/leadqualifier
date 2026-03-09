@@ -137,6 +137,7 @@ export function InstagramOnboardingPage({
     return (
         <>
             <ChannelOnboardingShell
+                channelType="instagram"
                 pageTitle={t('onboarding.pageTitle', { channel: t('types.instagram') })}
                 backHref={getLocalizedHref(locale, '/settings/channels')}
                 backLabel={t('onboarding.back')}

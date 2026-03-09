@@ -57,7 +57,9 @@ import {
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 import {
+    normalizeMainSidebarBotMode,
     resolveMainSidebarBotMode,
+    resolveMainSidebarInitialBotModeState,
     resolveMainSidebarBotModeTone
 } from '@/design/main-sidebar-bot-mode'
 import {
@@ -189,7 +191,12 @@ export function MainSidebar({
     const [organizationOptions, setOrganizationOptions] = useState<ActiveOrganizationSummary[]>(sortOrganizations(organizations))
     const [isLoadingOrganizationOptions, setIsLoadingOrganizationOptions] = useState(false)
     const [hasLoadedOrganizationOptions, setHasLoadedOrganizationOptions] = useState(!isSystemAdmin)
-    const [botMode, setBotMode] = useState<AiBotMode>('active')
+    const initialBotModeState = resolveMainSidebarInitialBotModeState({
+        organizationId: activeOrganizationId,
+        initialBotMode: null
+    })
+    const [botMode, setBotMode] = useState<AiBotMode>(initialBotModeState.botMode)
+    const [isBotModeLoading, setIsBotModeLoading] = useState(initialBotModeState.isLoading)
     const [isBotModeDropdownOpen, setIsBotModeDropdownOpen] = useState(false)
     const [isUpdatingBotMode, setIsUpdatingBotMode] = useState(false)
     const [botModeUpdateError, setBotModeUpdateError] = useState<string | null>(null)
@@ -300,16 +307,10 @@ export function MainSidebar({
 
         if (error) {
             console.error('Failed to load bot mode', error)
-            return
+            return 'active' as AiBotMode
         }
 
-        const mode = data?.bot_mode
-        if (mode === 'active' || mode === 'shadow' || mode === 'off') {
-            setBotMode(mode)
-        } else {
-            setBotMode('active')
-        }
-        setBotModeUpdateError(null)
+        return normalizeMainSidebarBotMode(data?.bot_mode)
     }, [supabase])
 
     const refreshBillingSnapshot = useCallback(async (orgId: string) => {
@@ -431,10 +432,13 @@ export function MainSidebar({
     }, [isOrgPickerOpen, isSystemAdmin, loadOrganizationOptions])
 
     useEffect(() => {
+        let isMounted = true
+
         if (!organizationId) {
             setHasUnread(false)
             setHasPendingSuggestions(false)
             setBotMode('active')
+            setIsBotModeLoading(false)
             setIsBotModeDropdownOpen(false)
             setIsUpdatingBotMode(false)
             setBotModeUpdateError(null)
@@ -443,10 +447,29 @@ export function MainSidebar({
             return
         }
 
+        const initialBotModeState = resolveMainSidebarInitialBotModeState({
+            organizationId,
+            initialBotMode: null
+        })
+        setBotMode(initialBotModeState.botMode)
+        setIsBotModeLoading(initialBotModeState.isLoading)
+
         refreshUnread(organizationId)
-        fetchBotMode(organizationId)
         refreshPendingSuggestions(organizationId)
         refreshBillingSnapshot(organizationId)
+
+        const loadBotMode = async () => {
+            const nextBotMode = await fetchBotMode(organizationId)
+            if (!isMounted) return
+            setBotMode(nextBotMode)
+            setIsBotModeLoading(false)
+            setBotModeUpdateError(null)
+        }
+        void loadBotMode()
+
+        return () => {
+            isMounted = false
+        }
     }, [fetchBotMode, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread])
 
     useEffect(() => {
@@ -536,9 +559,22 @@ export function MainSidebar({
 
     useEffect(() => {
         if (!organizationId) return
-        const handler = () => fetchBotMode(organizationId)
+        let isMounted = true
+        const handler = () => {
+            const loadBotMode = async () => {
+                const nextBotMode = await fetchBotMode(organizationId)
+                if (!isMounted) return
+                setBotMode(nextBotMode)
+                setIsBotModeLoading(false)
+                setBotModeUpdateError(null)
+            }
+            void loadBotMode()
+        }
         window.addEventListener('ai-settings-updated', handler)
-        return () => window.removeEventListener('ai-settings-updated', handler)
+        return () => {
+            isMounted = false
+            window.removeEventListener('ai-settings-updated', handler)
+        }
     }, [fetchBotMode, organizationId])
 
     useEffect(() => {
@@ -753,12 +789,23 @@ export function MainSidebar({
             hover: 'hover:border-rose-200 hover:bg-rose-50/60'
         }
     } as const
-    const currentBotModeToneClasses = botModeToneClassMap[botModeTone]
+    const loadingBotModeToneClasses = {
+        surface: 'border-slate-200 bg-slate-100/85 text-slate-700',
+        badge: 'bg-slate-200 text-slate-700',
+        dot: 'bg-slate-400',
+        selected: 'border-slate-300 bg-slate-100',
+        selectedIcon: 'bg-slate-200 text-slate-700',
+        hover: 'hover:border-slate-200 hover:bg-slate-100'
+    } as const
+    const currentBotModeToneClasses = isBotModeLoading
+        ? loadingBotModeToneClasses
+        : botModeToneClassMap[botModeTone]
     const botModeLabel = useMemo(() => {
+        if (isBotModeLoading) return tCommon('loading')
         if (effectiveBotMode === 'shadow') return tSidebar('botStatusShadow')
         if (effectiveBotMode === 'off') return tSidebar('botStatusOff')
         return tSidebar('botStatusActive')
-    }, [effectiveBotMode, tSidebar])
+    }, [effectiveBotMode, isBotModeLoading, tCommon, tSidebar])
     const botModeOptions = useMemo<Array<{ value: AiBotMode; label: string; description: string }>>(() => {
         return [
             {
@@ -778,7 +825,10 @@ export function MainSidebar({
             }
         ]
     }, [tAiSettings])
-    const canQuickSwitchBotMode = Boolean(organizationId) && !shouldRestrictToBilling && !readOnlyTenantMode
+    const canQuickSwitchBotMode = Boolean(organizationId)
+        && !shouldRestrictToBilling
+        && !readOnlyTenantMode
+        && !isBotModeLoading
     const handleQuickBotModeChange = useCallback(async (nextBotMode: AiBotMode) => {
         if (!organizationId || isUpdatingBotMode || !canQuickSwitchBotMode) {
             return
@@ -813,17 +863,25 @@ export function MainSidebar({
         tSidebar
     ])
     const botModeQuickSwitchHelperText = useMemo(() => {
+        if (isBotModeLoading) return tSidebar('botStatusQuickSwitchSaving')
         if (readOnlyTenantMode) return tSidebar('botStatusQuickSwitchReadOnly')
         if (shouldRestrictToBilling) return tSidebar('botStatusQuickSwitchLocked')
         return tSidebar('botStatusQuickSwitchHelp')
-    }, [readOnlyTenantMode, shouldRestrictToBilling, tSidebar])
+    }, [isBotModeLoading, readOnlyTenantMode, shouldRestrictToBilling, tSidebar])
     const currentBotModeOption = useMemo(() => {
+        if (isBotModeLoading) {
+            return {
+                value: 'active' as const,
+                label: tCommon('loading'),
+                description: tSidebar('botStatusQuickSwitchSaving')
+            }
+        }
         return botModeOptions.find((option) => option.value === effectiveBotMode) ?? {
             value: 'active' as const,
             label: tAiSettings('botModeActive'),
             description: tAiSettings('botModeActiveDescription')
         }
-    }, [botModeOptions, effectiveBotMode, tAiSettings])
+    }, [botModeOptions, effectiveBotMode, isBotModeLoading, tAiSettings, tCommon, tSidebar])
     const canAccessTenantModules = !isSystemAdmin || Boolean(organizationId)
     const settingsNavState = resolveBillingLockedNavItem(
         {
@@ -1246,16 +1304,20 @@ export function MainSidebar({
                     >
                         <DropdownMenu
                             fullWidth={!collapsed}
-                            onOpenChange={setIsBotModeDropdownOpen}
+                            onOpenChange={(open) => {
+                                setIsBotModeDropdownOpen(isBotModeLoading ? false : open)
+                            }}
                         >
                             <DropdownMenuTrigger asChild>
                                 <button
                                     type="button"
+                                    disabled={isBotModeLoading}
                                     title={collapsed ? undefined : `${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                                     aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                                     className={cn(
                                         'group w-full rounded-xl border shadow-sm transition-colors duration-150 motion-reduce:transition-none',
                                         currentBotModeToneClasses.surface,
+                                        isBotModeLoading && 'cursor-wait',
                                         collapsed
                                             ? 'mx-auto flex h-11 w-11 items-center justify-center p-0'
                                             : 'flex items-center gap-2 px-3 py-2.5 text-left'
@@ -1264,12 +1326,12 @@ export function MainSidebar({
                                     {collapsed ? (
                                         <>
                                             <span
-                                                className={cn(
-                                                    'h-3 w-3 rounded-full',
-                                                    currentBotModeToneClasses.dot,
-                                                    effectiveBotMode === 'active' && 'animate-pulse'
-                                                )}
-                                            />
+                                                    className={cn(
+                                                        'h-3 w-3 rounded-full',
+                                                        currentBotModeToneClasses.dot,
+                                                        !isBotModeLoading && effectiveBotMode === 'active' && 'animate-pulse'
+                                                    )}
+                                                />
                                             <span className="sr-only">{`${tSidebar('botStatusLabel')}: ${botModeLabel}`}</span>
                                         </>
                                     ) : (
@@ -1284,7 +1346,7 @@ export function MainSidebar({
                                                     className={cn(
                                                         'h-2.5 w-2.5 rounded-full',
                                                         currentBotModeToneClasses.dot,
-                                                        effectiveBotMode === 'active' && 'animate-pulse'
+                                                        !isBotModeLoading && effectiveBotMode === 'active' && 'animate-pulse'
                                                     )}
                                                 />
                                             </span>

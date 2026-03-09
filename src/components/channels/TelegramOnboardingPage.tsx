@@ -105,6 +105,7 @@ export function TelegramOnboardingPage({
     return (
         <>
             <ChannelOnboardingShell
+                channelType="telegram"
                 pageTitle={t('onboarding.pageTitle', { channel: t('types.telegram') })}
                 backHref={getLocalizedHref(locale, '/settings/channels')}
                 backLabel={t('onboarding.back')}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { InstagramClient } from '@/lib/instagram/client'
-import { extractInstagramTextMessages, isValidMetaSignature } from '@/lib/instagram/webhook'
+import { extractInstagramInboundEvents, isValidMetaSignature } from '@/lib/instagram/webhook'
 import { normalizeOutboundMessage } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 
@@ -12,6 +12,10 @@ interface InstagramChannelRecord {
     id: string
     organization_id: string
     config: Json
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function asConfigRecord(value: Json): Record<string, Json | undefined> {
@@ -24,6 +28,50 @@ function readConfigString(config: Json, key: string): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function isInstagramWebhookDebugEnabled() {
+    const value = process.env.INSTAGRAM_WEBHOOK_DEBUG
+    if (!value) return false
+    const normalized = value.trim().toLowerCase()
+    return normalized === '1' || normalized === 'true' || normalized === 'yes'
+}
+
+function summarizeInstagramPayloadShape(payload: unknown) {
+    if (!isRecord(payload) || !Array.isArray(payload.entry)) {
+        return {
+            hasEntryArray: false
+        }
+    }
+
+    const entryShapes = payload.entry
+        .slice(0, 3)
+        .map((entry) => {
+            if (!isRecord(entry)) return { kind: 'non_record' }
+
+            const changes = Array.isArray(entry.changes) ? entry.changes : []
+            const changeFields = changes
+                .map((change) => {
+                    if (!isRecord(change)) return null
+                    const field = change.field
+                    return typeof field === 'string' ? field : null
+                })
+                .filter((field): field is string => Boolean(field))
+
+            return {
+                keys: Object.keys(entry).sort(),
+                hasMessaging: Array.isArray(entry.messaging),
+                hasStandby: Array.isArray(entry.standby),
+                hasChanges: changes.length > 0,
+                changeFields
+            }
+        })
+
+    return {
+        hasEntryArray: true,
+        entryCount: payload.entry.length,
+        entryShapes
+    }
 }
 
 export async function GET(req: NextRequest) {
@@ -71,6 +119,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const debugEnabled = isInstagramWebhookDebugEnabled()
     const signatureHeader = req.headers.get('x-hub-signature-256')
     const rawBody = await req.text()
 
@@ -81,9 +130,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    const events = extractInstagramTextMessages(payload)
+    const events = extractInstagramInboundEvents(payload)
     if (events.length === 0) {
+        if (debugEnabled) {
+            console.info('Instagram Webhook: No extractable events', summarizeInstagramPayloadShape(payload))
+        }
         return NextResponse.json({ ok: true })
+    }
+
+    if (debugEnabled) {
+        const counts = events.reduce<Record<string, number>>((acc, event) => {
+            const key = `${event.eventSource}:${event.eventType}`
+            acc[key] = (acc[key] ?? 0) + 1
+            return acc
+        }, {})
+        console.info('Instagram Webhook: Extracted inbound events', {
+            event_count: events.length,
+            counts
+        })
     }
 
     const supabase = createClient(
@@ -148,8 +212,11 @@ export async function POST(req: NextRequest) {
             inboundMessageMetadata: {
                 instagram_message_id: event.messageId,
                 instagram_timestamp: event.timestamp,
-                instagram_business_account_id: event.instagramBusinessAccountId
+                instagram_business_account_id: event.instagramBusinessAccountId,
+                instagram_event_source: event.eventSource,
+                instagram_event_type: event.eventType
             },
+            skipAutomation: event.skipAutomation,
             sendOutbound: async (content) => {
                 const normalized = normalizeOutboundMessage(content)
                 await client.sendText({

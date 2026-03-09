@@ -159,6 +159,15 @@ function resolveOutboundDeliveryState(metadata: unknown): 'sending' | 'failed' |
     return null
 }
 
+function resolveInstagramEventSource(metadata: unknown): 'messaging' | 'standby' | null {
+    const parsed = parseMessageMetadataRecord(metadata)
+    if (!parsed) return null
+
+    const value = parsed.instagram_event_source
+    if (value === 'messaging' || value === 'standby') return value
+    return null
+}
+
 function makePendingAttachmentId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID()
@@ -1574,6 +1583,9 @@ export function InboxContainer({
                             media: t('mediaPreview.media')
                         }
                     })
+                    const isInstagramRequestPreview = c.platform === 'instagram'
+                        && c.messages?.[0]?.sender_type === 'contact'
+                        && resolveInstagramEventSource(c.messages?.[0]?.metadata) === 'standby'
 
                     return (
                         <div
@@ -1625,6 +1637,11 @@ export function InboxContainer({
                                         </div>
                                     </div>
                                     <p className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
+                                        {isInstagramRequestPreview && (
+                                            <span className="inline-flex shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
+                                                {t('instagramRequestBadge')}
+                                            </span>
+                                        )}
                                         {c.messages?.[0] && (
                                             c.messages[0].sender_type === 'contact'
                                                 ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
@@ -2397,6 +2414,9 @@ export function InboxContainer({
                                     const mediaPreviewLabel = media
                                         ? resolveMediaPreviewLabel(media.type)
                                         : null
+                                    const isInstagramRequestMessage = selectedConversation?.platform === 'instagram'
+                                        && m.sender_type === 'contact'
+                                        && resolveInstagramEventSource(m.metadata) === 'standby'
                                     const shouldHideMessageText = Boolean(media && media.isPlaceholder && !media.caption)
                                     const renderMessageText = shouldHideMessageText
                                         ? ''
@@ -2547,7 +2567,14 @@ export function InboxContainer({
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <span className="text-xs text-gray-400 ml-1">{format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}</span>
+                                                        <span className="ml-1 flex items-center gap-1.5 text-xs text-gray-400">
+                                                            {isInstagramRequestMessage && (
+                                                                <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
+                                                                    {t('instagramRequestBadge')}
+                                                                </span>
+                                                            )}
+                                                            {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
