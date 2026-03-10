@@ -457,7 +457,7 @@ async function resolveConversationWhatsAppContext(
 > {
     const { data: conversation } = await supabase
         .from('conversations')
-        .select('platform, contact_phone, organization_id')
+        .select('platform, contact_phone, organization_id, tags')
         .eq('id', conversationId)
         .single()
 
@@ -1171,7 +1171,7 @@ export async function sendMessage(
     // 1. Get conversation details to know platform and recipient
     const { data: conversation } = await supabase
         .from('conversations')
-        .select('platform, contact_phone, organization_id')
+        .select('platform, contact_phone, organization_id, tags')
         .eq('id', conversationId)
         .single()
 
@@ -1317,7 +1317,39 @@ export async function sendMessage(
     if (error) throw error
     if (!data) throw new Error('Failed to send message')
 
-    return data as { message: Message; conversation: Conversation }
+    let response = data as { message: Message; conversation: Conversation }
+
+    if (conversation.platform === 'instagram' && Array.isArray(conversation.tags)) {
+        const normalizedTags = conversation.tags
+            .filter((tag): tag is string => typeof tag === 'string')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        const hasRequestTag = normalizedTags.some((tag) => tag.toLowerCase() === 'instagram_request')
+
+        if (hasRequestTag) {
+            const nextTags = normalizedTags.filter((tag) => tag.toLowerCase() !== 'instagram_request')
+            const { data: updatedConversation, error: updateConversationError } = await supabase
+                .from('conversations')
+                .update({
+                    tags: nextTags,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', conversationId)
+                .select('*')
+                .single()
+
+            if (updateConversationError) {
+                console.error('Failed to clear instagram_request tag after outbound reply:', updateConversationError)
+            } else if (updatedConversation) {
+                response = {
+                    ...response,
+                    conversation: updatedConversation as Conversation
+                }
+            }
+        }
+    }
+
+    return response
 }
 
 function mapMediaContextReason(reason: InboxWhatsAppTemplateFailureReason): InboxWhatsAppMediaFailureReason {

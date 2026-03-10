@@ -55,6 +55,42 @@ describe('instagramRequestState helpers', () => {
         expect(isInstagramRequestConversation(conversation)).toBe(true)
     })
 
+    it('does not keep instagram_request tag active when latest message is outbound', () => {
+        const conversation = buildConversation({
+            tags: ['instagram_request']
+        })
+        const history = [
+            buildMessage({
+                sender_type: 'contact',
+                metadata: { instagram_event_source: 'standby' },
+                content: 'Merhaba'
+            }),
+            buildMessage({
+                id: 'msg-2',
+                sender_type: 'user',
+                metadata: {},
+                content: 'Selam'
+            })
+        ]
+
+        expect(isInstagramRequestConversation(conversation, history)).toBe(false)
+    })
+
+    it('does not treat latest messaging-source contact event as request even when tag exists', () => {
+        const conversation = buildConversation({
+            tags: ['instagram_request']
+        })
+        const history = [
+            buildMessage({
+                sender_type: 'contact',
+                metadata: { instagram_event_source: 'messaging' },
+                content: 'Selam'
+            })
+        ]
+
+        expect(isInstagramRequestConversation(conversation, history)).toBe(false)
+    })
+
     it('treats standby preview metadata as request-origin conversation', () => {
         const conversation = buildConversation({
             tags: [],

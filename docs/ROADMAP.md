@@ -209,7 +209,8 @@
   - [x] WhatsApp conversations now show a compact in-input `Send Template` action (document icon + text) aligned to the composer’s far-right area
   - [x] Inbox composer send/template controls now collapse to icon-first mode on constrained widths, and reply input stays fixed single-line (scrollbar hidden) to prevent overflow/layout drift
   - [x] Inbox composer error state no longer shifts send-button alignment: error text renders below the row and non-attachment send failures now use channel-aware copy (instead of attachment-specific error wording)
-  - [x] Instagram `seen` webhook events now render as compact read-status indicators (`Seen/Görüldü`) in Inbox timeline/list instead of contact-style inbound message bubbles, with parenthesized relative time shown only on the latest `seen` event (`Seen (just now)` / `Görüldü (az önce)`)
+  - [x] Instagram `seen` webhook events now render as compact eye-icon read indicators in Inbox timeline/list instead of contact-style inbound message bubbles; chat timeline shows the icon inline on outbound message footer (next to time), not as a separate message row
+  - [x] Outbound Instagram replies now clear stale `instagram_request` conversation tag so `Request/İstek` badge is removed once the request thread is accepted/answered
   - [x] Inbox template picker now supports two-tab WhatsApp flow (`Hazır mesajlar` + `WhatsApp şablonları`) and single-tab predefined flow on non-WhatsApp conversations
   - [x] Inbox users can create, edit, delete, and select organization-scoped predefined templates, then insert selected content into `Write a reply` composer without auto-send
   - [x] Inbox template picker tabs now use compact underline navigation; refresh action is shown only on WhatsApp tab, select chevrons use inset alignment, and tab switching animates modal height smoothly (mobile + desktop)

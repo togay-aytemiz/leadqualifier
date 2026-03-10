@@ -50,6 +50,17 @@ function resolveMessageCandidates(
     return Array.isArray(conversation.messages) ? conversation.messages : []
 }
 
+function resolveLatestMessageCandidate(
+    candidates: MessageMetadataHolder[],
+    messageHistory: Array<Pick<Message, 'sender_type' | 'metadata'>> | null | undefined
+) {
+    if (candidates.length === 0) return null
+    if (Array.isArray(messageHistory) && messageHistory.length > 0) {
+        return candidates[candidates.length - 1] ?? null
+    }
+    return candidates[0] ?? null
+}
+
 function hasInstagramRequestTag(tags: unknown): boolean {
     if (!Array.isArray(tags)) return false
     return tags.some((tag) => typeof tag === 'string' && tag.trim().toLowerCase() === 'instagram_request')
@@ -83,15 +94,32 @@ export function isInstagramRequestConversation(
     messageHistory?: Array<Pick<Message, 'sender_type' | 'metadata'>>
 ): boolean {
     if (conversation.platform !== 'instagram') return false
-    if (hasInstagramRequestTag(conversation.tags)) return true
 
     const candidates = resolveMessageCandidates(conversation, messageHistory)
+    const latestCandidate = resolveLatestMessageCandidate(candidates, messageHistory)
+    const hasOutboundReply = candidates.some((message) => message.sender_type === 'user' || message.sender_type === 'bot')
+    const latestEventSource = latestCandidate
+        ? resolveInstagramEventSource(latestCandidate.metadata)
+        : null
+
+    if (latestCandidate?.sender_type && latestCandidate.sender_type !== 'contact') return false
+    if (latestEventSource === 'messaging') return false
+    if (latestCandidate && isInstagramRequestMessage(
+        conversation.platform,
+        latestCandidate.sender_type,
+        latestCandidate.metadata
+    )) {
+        return true
+    }
+
+    if (hasInstagramRequestTag(conversation.tags) && !hasOutboundReply) return true
+
     const hasStandbySignal = candidates.some((message) => isInstagramRequestMessage(
         conversation.platform,
         message.sender_type,
         message.metadata
     ))
-    if (hasStandbySignal) return true
+    if (hasStandbySignal && !hasOutboundReply) return true
 
     const fallbackName = readTrimmedString(conversation.contact_name)
         || readTrimmedString(conversation.contact_phone)
@@ -108,10 +136,7 @@ export function isInstagramRequestConversation(
     })
     if (hasResolvedIdentity) return false
 
-    if (Array.isArray(messageHistory) && messageHistory.length > 0) {
-        const hasOutboundReply = messageHistory.some((message) => message.sender_type === 'user')
-        if (hasOutboundReply) return false
-    }
+    if (hasOutboundReply) return false
 
     return true
 }

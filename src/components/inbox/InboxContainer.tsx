@@ -1605,7 +1605,7 @@ export function InboxContainer({
                             ? t('queueAttentionReasonHotLead')
                             : null
                     const previewContent = isLatestInstagramSeenEvent
-                        ? t('instagramSeenStatus')
+                        ? ''
                         : resolveMessagePreviewContent({
                             content: latestMessage?.content,
                             metadata: latestMessage?.metadata,
@@ -1683,7 +1683,7 @@ export function InboxContainer({
                                                     ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
                                                     : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
                                         )}
-                                        <span className="truncate">{previewContent}</span>
+                                        {previewContent && <span className="truncate">{previewContent}</span>}
                                     </p>
                                     <div className="mt-0.5 flex items-center justify-between">
                                         <span className="text-xs text-gray-400">
@@ -1734,6 +1734,34 @@ export function InboxContainer({
         () => buildInboxImageGalleryLookup(visibleMessages),
         [visibleMessages]
     )
+    const instagramSeenIndicatorByMessageId = useMemo(() => {
+        const map = new Map<string, { seenAt: string }>()
+        if (selectedConversation?.platform !== 'instagram') return map
+        if (visibleMessages.length === 0) return map
+
+        let latestOutboundUserMessageId: string | null = null
+        for (const message of visibleMessages) {
+            if (message.sender_type === 'user') {
+                latestOutboundUserMessageId = message.id
+                continue
+            }
+
+            if (!isInstagramSeenEventMessage({
+                platform: 'instagram',
+                senderType: message.sender_type,
+                metadata: message.metadata,
+                content: message.content
+            })) {
+                continue
+            }
+
+            if (latestOutboundUserMessageId) {
+                map.set(latestOutboundUserMessageId, { seenAt: message.created_at })
+            }
+        }
+
+        return map
+    }, [selectedConversation?.platform, visibleMessages])
     const isWhatsAppConversation = selectedConversation?.platform === 'whatsapp'
     const latestWhatsAppInboundAt = isWhatsAppConversation && !showConversationSkeleton
         ? getLatestContactMessageAt(visibleMessages)
@@ -2460,13 +2488,8 @@ export function InboxContainer({
                                         metadata: m.metadata,
                                         content: m.content
                                     })
-                                    const isLatestVisibleMessage = visibleMessages[visibleMessages.length - 1]?.id === m.id
-                                    const instagramSeenRelativeTime = isLatestVisibleMessage
-                                        ? formatRelativeTimeFromBase({
-                                            targetIso: m.created_at,
-                                            baseDate: relativeTimeBaseDate,
-                                            locale: dateLocale
-                                        })
+                                    const instagramSeenIndicator = isMe && !isBot
+                                        ? instagramSeenIndicatorByMessageId.get(m.id) ?? null
                                         : null
                                     const outboundDeliveryState = isMe && !isBot
                                         ? resolveOutboundDeliveryState(m.metadata)
@@ -2572,19 +2595,11 @@ export function InboxContainer({
                                     }
 
                                     if (isInstagramSeenEvent) {
-                                        return (
-                                            <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                        return dateSeparator ? (
+                                            <div key={m.id} className="space-y-3">
                                                 {dateSeparator}
-                                                <div className="flex justify-end">
-                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
-                                                        <Eye size={12} className="text-slate-400" />
-                                                        {instagramSeenRelativeTime
-                                                            ? t('instagramSeenStatusWithRelative', { time: instagramSeenRelativeTime })
-                                                            : t('instagramSeenStatus')}
-                                                    </span>
-                                                </div>
                                             </div>
-                                        )
+                                        ) : null
                                     }
 
                                     if (!isMe && !isBot) {
@@ -2680,6 +2695,19 @@ export function InboxContainer({
                                                             <span className="text-xs text-gray-400">
                                                                 {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(galleryTimestamp), 'HH:mm', { locale: dateLocale })}
                                                             </span>
+                                                            {!isBot && instagramSeenIndicator && (
+                                                                <span
+                                                                    className="inline-flex items-center text-gray-400"
+                                                                    title={formatRelativeTimeFromBase({
+                                                                        targetIso: instagramSeenIndicator.seenAt,
+                                                                        baseDate: relativeTimeBaseDate,
+                                                                        locale: dateLocale
+                                                                    }) ?? undefined}
+                                                                    aria-label={t('instagramSeenIconAria')}
+                                                                >
+                                                                    <Eye size={12} />
+                                                                </span>
+                                                            )}
                                                             {!isBot && outboundDeliveryState === 'sending' && (
                                                                 <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
                                                                     <Loader2 size={12} className="animate-spin" />
@@ -2755,6 +2783,19 @@ export function InboxContainer({
                                                         <span className="text-xs text-gray-400">
                                                             {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                         </span>
+                                                        {!isBot && instagramSeenIndicator && (
+                                                            <span
+                                                                className="inline-flex items-center text-gray-400"
+                                                                title={formatRelativeTimeFromBase({
+                                                                    targetIso: instagramSeenIndicator.seenAt,
+                                                                    baseDate: relativeTimeBaseDate,
+                                                                    locale: dateLocale
+                                                                }) ?? undefined}
+                                                                aria-label={t('instagramSeenIconAria')}
+                                                            >
+                                                                <Eye size={12} />
+                                                            </span>
+                                                        )}
                                                         {!isBot && outboundDeliveryState === 'sending' && (
                                                             <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
                                                                 <Loader2 size={12} className="animate-spin" />
