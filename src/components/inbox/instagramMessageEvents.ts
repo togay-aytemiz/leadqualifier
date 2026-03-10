@@ -8,6 +8,12 @@ type SeenEventCandidate = {
     content?: string | null
 }
 
+type ConversationPreviewCandidate = {
+    sender_type?: MessageSenderType
+    metadata?: unknown
+    content?: string | null
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -53,4 +59,24 @@ export function isInstagramSeenEventMessage(candidate: SeenEventCandidate): bool
     if (eventType && eventType !== 'seen') return false
 
     return isLegacySeenContent(candidate.content)
+}
+
+export function resolveLatestNonSeenPreviewMessage(
+    platform: ConversationListItem['platform'],
+    messages: ConversationPreviewCandidate[] | null | undefined
+): ConversationPreviewCandidate | null {
+    if (!Array.isArray(messages) || messages.length === 0) return null
+
+    for (const message of messages) {
+        if (!isInstagramSeenEventMessage({
+            platform,
+            senderType: message.sender_type,
+            metadata: message.metadata,
+            content: message.content
+        })) {
+            return message
+        }
+    }
+
+    return null
 }

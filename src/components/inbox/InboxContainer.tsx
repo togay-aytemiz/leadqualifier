@@ -84,7 +84,10 @@ import {
     isInstagramRequestMessage,
     resolveInboxContactDisplayName
 } from '@/components/inbox/instagramRequestState'
-import { isInstagramSeenEventMessage } from '@/components/inbox/instagramMessageEvents'
+import {
+    isInstagramSeenEventMessage,
+    resolveLatestNonSeenPreviewMessage
+} from '@/components/inbox/instagramMessageEvents'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 
@@ -1579,15 +1582,7 @@ export function InboxContainer({
             ) : (
                 filteredConversations.map(c => {
                     const contactDisplayName = resolveInboxContactDisplayName(c)
-                    const latestMessage = c.messages?.[0]
-                    const isLatestInstagramSeenEvent = latestMessage
-                        ? isInstagramSeenEventMessage({
-                            platform: c.platform,
-                            senderType: latestMessage.sender_type,
-                            metadata: latestMessage.metadata,
-                            content: latestMessage.content
-                        })
-                        : false
+                    const previewMessage = resolveLatestNonSeenPreviewMessage(c.platform, c.messages)
                     const leadStatus = c.leads?.[0]?.status
                     const leadStatusLabel = leadStatus
                         ? (leadStatusLabels[leadStatus] ?? leadStatus)
@@ -1604,21 +1599,19 @@ export function InboxContainer({
                         : c.human_attention_reason === 'hot_lead'
                             ? t('queueAttentionReasonHotLead')
                             : null
-                    const previewContent = isLatestInstagramSeenEvent
-                        ? ''
-                        : resolveMessagePreviewContent({
-                            content: latestMessage?.content,
-                            metadata: latestMessage?.metadata,
-                            fallbackNoMessage: t('noMessagesYet'),
-                            labels: {
-                                image: t('mediaPreview.image'),
-                                document: t('mediaPreview.document'),
-                                audio: t('mediaPreview.audio'),
-                                video: t('mediaPreview.video'),
-                                sticker: t('mediaPreview.sticker'),
-                                media: t('mediaPreview.media')
-                            }
-                        })
+                    const previewContent = resolveMessagePreviewContent({
+                        content: previewMessage?.content,
+                        metadata: previewMessage?.metadata,
+                        fallbackNoMessage: t('noMessagesYet'),
+                        labels: {
+                            image: t('mediaPreview.image'),
+                            document: t('mediaPreview.document'),
+                            audio: t('mediaPreview.audio'),
+                            video: t('mediaPreview.video'),
+                            sticker: t('mediaPreview.sticker'),
+                            media: t('mediaPreview.media')
+                        }
+                    })
                     const isInstagramRequestPreview = isInstagramRequestConversation(c)
 
                     return (
@@ -1676,12 +1669,10 @@ export function InboxContainer({
                                         </div>
                                     </div>
                                     <p className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
-                                        {latestMessage && (
-                                            isLatestInstagramSeenEvent
-                                                ? <Eye className="shrink-0 text-gray-400" size={11} />
-                                                : latestMessage.sender_type === 'contact'
-                                                    ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
-                                                    : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
+                                        {previewMessage && (
+                                            previewMessage.sender_type === 'contact'
+                                                ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
+                                                : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
                                         )}
                                         {previewContent && <span className="truncate">{previewContent}</span>}
                                     </p>

@@ -279,6 +279,79 @@ describe('getConversations', () => {
         expect(result[0]?.leads?.[0]?.status).toBe('warm')
         expect(result[0]?.assignee?.email).toBe('operator@example.com')
     })
+
+    it('keeps multiple fallback preview messages so list UI can skip instagram seen events', async () => {
+        const baseConversation = createConversation({
+            platform: 'instagram',
+            contact_phone: '1400879865404973',
+            contact_name: 'togayaytemiz',
+            assignee_id: null
+        })
+
+        const supabaseMock = createSupabaseMock({
+            conversations: [
+                createQueryBuilder({
+                    rangeResult: {
+                        data: null,
+                        error: { message: 'PGRST100 nested query failed' }
+                    }
+                }),
+                createQueryBuilder({
+                    rangeResult: {
+                        data: [baseConversation],
+                        error: null
+                    }
+                })
+            ],
+            messages: [
+                createQueryBuilder({
+                    orderResult: {
+                        data: [
+                            {
+                                conversation_id: baseConversation.id,
+                                content: '[Instagram seen]',
+                                created_at: '2026-02-08T10:05:00.000Z',
+                                sender_type: 'contact',
+                                metadata: { instagram_event_type: 'seen' }
+                            },
+                            {
+                                conversation_id: baseConversation.id,
+                                content: 'Merhaba',
+                                created_at: '2026-02-08T10:04:00.000Z',
+                                sender_type: 'contact',
+                                metadata: { instagram_event_type: 'message' }
+                            }
+                        ],
+                        error: null
+                    }
+                }),
+                createQueryBuilder({
+                    inResult: {
+                        data: [],
+                        error: null
+                    }
+                })
+            ],
+            leads: [
+                createQueryBuilder({
+                    inResult: {
+                        data: [],
+                        error: null
+                    }
+                })
+            ],
+            profiles: []
+        })
+
+        createClientMock.mockResolvedValue(supabaseMock)
+
+        const result = await getConversations('org-1')
+
+        expect(result).toHaveLength(1)
+        expect(result[0]?.messages).toHaveLength(2)
+        expect(result[0]?.messages?.[0]?.content).toBe('[Instagram seen]')
+        expect(result[0]?.messages?.[1]?.content).toBe('Merhaba')
+    })
 })
 
 function createConversationTemplateSupabaseMock(options: {

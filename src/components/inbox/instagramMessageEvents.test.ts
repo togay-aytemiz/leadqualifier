@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { isInstagramSeenEventMessage, resolveInstagramMessageEventType } from './instagramMessageEvents'
+import {
+    isInstagramSeenEventMessage,
+    resolveInstagramMessageEventType,
+    resolveLatestNonSeenPreviewMessage
+} from './instagramMessageEvents'
 
 describe('instagramMessageEvents helpers', () => {
     it('resolves instagram event type from metadata', () => {
@@ -45,5 +49,28 @@ describe('instagramMessageEvents helpers', () => {
             senderType: 'user',
             metadata: { instagram_event_type: 'seen' }
         })).toBe(false)
+    })
+
+    it('resolves latest preview message by skipping instagram seen events', () => {
+        expect(resolveLatestNonSeenPreviewMessage('instagram', [
+            {
+                sender_type: 'contact',
+                content: '[Instagram seen]',
+                metadata: { instagram_event_type: 'seen' }
+            },
+            {
+                sender_type: 'contact',
+                content: 'Merhaba',
+                metadata: { instagram_event_type: 'message' }
+            }
+        ])).toMatchObject({ content: 'Merhaba' })
+
+        expect(resolveLatestNonSeenPreviewMessage('instagram', [
+            {
+                sender_type: 'contact',
+                content: '[Instagram seen]',
+                metadata: { instagram_event_type: 'seen' }
+            }
+        ])).toBeNull()
     })
 })

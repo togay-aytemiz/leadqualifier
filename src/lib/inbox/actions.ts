@@ -173,6 +173,7 @@ type ConversationAssigneePreview = { full_name?: string | null; email?: string |
 type ConversationPreviewMessageRow = Pick<Message, 'conversation_id' | 'content' | 'created_at' | 'sender_type' | 'metadata'>
 type ConversationLeadPreviewRow = { conversation_id: string; status?: string | null }
 type ConversationAssigneePreviewRow = { id: string; full_name?: string | null; email?: string | null }
+const CONVERSATION_PREVIEW_MESSAGE_LIMIT = 5
 const SUMMARY_MAX_OUTPUT_TOKENS = 180
 const LEAD_REASONING_MAX_OUTPUT_TOKENS = 220
 
@@ -518,15 +519,18 @@ function buildConversationListItemsFromFallback(
     leadRows: ConversationLeadPreviewRow[],
     assigneeRows: ConversationAssigneePreviewRow[]
 ): ConversationListItem[] {
-    const messageByConversationId = new Map<string, ConversationPreviewMessage>()
+    const messageByConversationId = new Map<string, ConversationPreviewMessage[]>()
     for (const message of messageRows) {
-        if (messageByConversationId.has(message.conversation_id)) continue
-        messageByConversationId.set(message.conversation_id, {
+        const existingMessages = messageByConversationId.get(message.conversation_id) ?? []
+        if (existingMessages.length >= CONVERSATION_PREVIEW_MESSAGE_LIMIT) continue
+
+        existingMessages.push({
             content: message.content,
             created_at: message.created_at,
             sender_type: message.sender_type,
             metadata: message.metadata
         })
+        messageByConversationId.set(message.conversation_id, existingMessages)
     }
 
     const leadByConversationId = new Map<string, ConversationLeadPreview>()
@@ -544,7 +548,7 @@ function buildConversationListItemsFromFallback(
     }
 
     return conversations.map((conversation) => {
-        const latestMessage = messageByConversationId.get(conversation.id)
+        const previewMessages = messageByConversationId.get(conversation.id) ?? []
         const lead = leadByConversationId.get(conversation.id)
         const assignee = conversation.assignee_id
             ? (assigneeById.get(conversation.assignee_id) ?? null)
@@ -552,7 +556,7 @@ function buildConversationListItemsFromFallback(
 
         return {
             ...conversation,
-            messages: latestMessage ? [latestMessage] : [],
+            messages: previewMessages,
             leads: lead ? [lead] : [],
             assignee
         }
@@ -594,7 +598,7 @@ export async function getConversations(
         .eq('organization_id', organizationId)
         .order('last_message_at', { ascending: false })
         .order('created_at', { foreignTable: 'messages', ascending: false })
-        .limit(1, { foreignTable: 'messages' })
+        .limit(CONVERSATION_PREVIEW_MESSAGE_LIMIT, { foreignTable: 'messages' })
         .limit(1, { foreignTable: 'leads' })
         .range(from, to)
 
