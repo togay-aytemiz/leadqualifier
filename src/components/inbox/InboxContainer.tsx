@@ -79,6 +79,11 @@ import {
     summarizeConversationQueueCounts,
     type InboxQueueTab
 } from '@/components/inbox/conversationQueueFilters'
+import {
+    isInstagramRequestConversation,
+    isInstagramRequestMessage,
+    resolveInboxContactDisplayName
+} from '@/components/inbox/instagramRequestState'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 
@@ -156,15 +161,6 @@ function resolveOutboundDeliveryState(metadata: unknown): 'sending' | 'failed' |
     const value = parsed.whatsapp_outbound_status
     if (value === 'sending') return 'sending'
     if (value === 'failed') return 'failed'
-    return null
-}
-
-function resolveInstagramEventSource(metadata: unknown): 'messaging' | 'standby' | null {
-    const parsed = parseMessageMetadataRecord(metadata)
-    if (!parsed) return null
-
-    const value = parsed.instagram_event_source
-    if (value === 'messaging' || value === 'standby') return value
     return null
 }
 
@@ -272,6 +268,7 @@ export function InboxContainer({
     const pendingAttachmentsRef = useRef<PendingAttachment[]>([])
     const attachmentInputRef = useRef<HTMLInputElement | null>(null)
     const imageInputRef = useRef<HTMLInputElement | null>(null)
+    const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
     const leadStatusLabels: Record<string, string> = {
         hot: t('leadStatusHot'),
         warm: t('leadStatusWarm'),
@@ -751,6 +748,21 @@ export function InboxContainer({
         }, 120)
         return () => clearTimeout(timer)
     }, [messages, selectedId, syncScrollToLatestVisibility])
+
+    const syncComposerTextareaHeight = useCallback(() => {
+        const textarea = composerTextareaRef.current
+        if (!textarea) return
+
+        textarea.style.height = '24px'
+        const maxHeight = 144
+        const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
+        textarea.style.height = `${nextHeight}px`
+        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    }, [])
+
+    useLayoutEffect(() => {
+        syncComposerTextareaHeight()
+    }, [input, selectedId, syncComposerTextareaHeight])
 
     useEffect(() => {
         const composer = composerContainerRef.current
@@ -1554,6 +1566,7 @@ export function InboxContainer({
                 </div>
             ) : (
                 filteredConversations.map(c => {
+                    const contactDisplayName = resolveInboxContactDisplayName(c)
                     const leadStatus = c.leads?.[0]?.status
                     const leadStatusLabel = leadStatus
                         ? (leadStatusLabels[leadStatus] ?? leadStatus)
@@ -1583,9 +1596,7 @@ export function InboxContainer({
                             media: t('mediaPreview.media')
                         }
                     })
-                    const isInstagramRequestPreview = c.platform === 'instagram'
-                        && c.messages?.[0]?.sender_type === 'contact'
-                        && resolveInstagramEventSource(c.messages?.[0]?.metadata) === 'standby'
+                    const isInstagramRequestPreview = isInstagramRequestConversation(c)
 
                     return (
                         <div
@@ -1595,7 +1606,7 @@ export function InboxContainer({
                         >
                             <div className="flex items-start gap-3">
                                 <div className="relative shrink-0">
-                                    <Avatar name={c.contact_name} size="sm" />
+                                    <Avatar name={contactDisplayName} size="sm" />
                                     <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
                                         <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
                                             {c.platform !== 'simulator' ? (
@@ -1609,9 +1620,14 @@ export function InboxContainer({
                                 <div className="min-w-0 flex-1 pr-1">
                                     <div className="flex items-center gap-2">
                                         <span className={`truncate text-sm font-semibold ${c.unread_count > 0 ? "text-gray-900" : "text-gray-700"}`}>
-                                            {c.contact_name}
+                                            {contactDisplayName}
                                         </span>
                                         <div className="ml-auto flex items-center gap-1.5">
+                                            {isInstagramRequestPreview && (
+                                                <span className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                                    {t('instagramRequestBadge')}
+                                                </span>
+                                            )}
                                             {leadStatusLabel && (
                                                 <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${leadChipClassName}`}>
                                                     {leadStatusLabel}
@@ -1637,11 +1653,6 @@ export function InboxContainer({
                                         </div>
                                     </div>
                                     <p className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
-                                        {isInstagramRequestPreview && (
-                                            <span className="inline-flex shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
-                                                {t('instagramRequestBadge')}
-                                            </span>
-                                        )}
                                         {c.messages?.[0] && (
                                             c.messages[0].sender_type === 'contact'
                                                 ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
@@ -1679,6 +1690,12 @@ export function InboxContainer({
     const selectedConversation = conversations.find(c => c.id === selectedId)
     const showConversationSkeleton = shouldShowConversationSkeleton(selectedConversation?.id ?? null, loadedConversationId)
     const visibleMessages = showConversationSkeleton ? [] : messages
+    const selectedConversationDisplayName = selectedConversation
+        ? resolveInboxContactDisplayName(selectedConversation, visibleMessages)
+        : ''
+    const isSelectedConversationInstagramRequest = selectedConversation
+        ? isInstagramRequestConversation(selectedConversation, visibleMessages)
+        : false
     const messageDateSeparatorById = new Map(
         buildMessageDateSeparators({
             messages: visibleMessages,
@@ -2131,7 +2148,12 @@ export function InboxContainer({
                                         {t('platformSimulatorShort')}
                                     </span>
                                 )}
-                                <h2 className="min-w-0 truncate font-bold text-gray-900 text-lg">{selectedConversation.contact_name}</h2>
+                                <h2 className="min-w-0 truncate font-bold text-gray-900 text-lg">{selectedConversationDisplayName}</h2>
+                                {isSelectedConversationInstagramRequest && (
+                                    <span className="hidden shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 sm:inline-flex">
+                                        {t('instagramRequestBadge')}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-2">
                                 <span
@@ -2208,9 +2230,16 @@ export function InboxContainer({
                                 ) : (
                                     <>
                                         <div className="mb-3 flex items-center gap-3">
-                                            <Avatar name={selectedConversation.contact_name} size="sm" />
+                                            <Avatar name={selectedConversationDisplayName} size="sm" />
                                             <div>
-                                                <p className="text-sm font-semibold text-gray-900">{selectedConversation.contact_name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-semibold text-gray-900">{selectedConversationDisplayName}</p>
+                                                    {isSelectedConversationInstagramRequest && (
+                                                        <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
+                                                            {t('instagramRequestBadge')}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-gray-500">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                                             </div>
                                         </div>
@@ -2414,9 +2443,11 @@ export function InboxContainer({
                                     const mediaPreviewLabel = media
                                         ? resolveMediaPreviewLabel(media.type)
                                         : null
-                                    const isInstagramRequestMessage = selectedConversation?.platform === 'instagram'
-                                        && m.sender_type === 'contact'
-                                        && resolveInstagramEventSource(m.metadata) === 'standby'
+                                    const isInstagramRequestInboundMessage = isInstagramRequestMessage(
+                                        selectedConversation?.platform ?? 'simulator',
+                                        m.sender_type,
+                                        m.metadata
+                                    )
                                     const shouldHideMessageText = Boolean(media && media.isPlaceholder && !media.caption)
                                     const renderMessageText = shouldHideMessageText
                                         ? ''
@@ -2507,7 +2538,7 @@ export function InboxContainer({
                                                 <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                     {dateSeparator}
                                                     <div className="flex items-end gap-3">
-                                                        <Avatar name={selectedConversation.contact_name} size="md" />
+                                                        <Avatar name={selectedConversationDisplayName} size="md" />
                                                         <div className="flex flex-col gap-1 max-w-[80%]">
                                                             <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none p-2.5">
                                                                 {renderGalleryGrid(false)}
@@ -2525,7 +2556,7 @@ export function InboxContainer({
                                             <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                 {dateSeparator}
                                                 <div className="flex items-end gap-3">
-                                                    <Avatar name={selectedConversation.contact_name} size="md" />
+                                                    <Avatar name={selectedConversationDisplayName} size="md" />
                                                     <div className="flex flex-col gap-1 max-w-[80%]">
                                                         <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
                                                             {media && (
@@ -2568,7 +2599,7 @@ export function InboxContainer({
                                                             )}
                                                         </div>
                                                         <span className="ml-1 flex items-center gap-1.5 text-xs text-gray-400">
-                                                            {isInstagramRequestMessage && (
+                                                            {isInstagramRequestInboundMessage && (
                                                                 <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
                                                                     {t('instagramRequestBadge')}
                                                                 </span>
@@ -2895,8 +2926,8 @@ export function InboxContainer({
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2 lg:gap-3">
-                                <div className="relative flex-1">
+                            <div className="flex min-w-0 items-center gap-2 lg:gap-3">
+                                <div className="relative min-w-0 flex-1">
                                     <input
                                         ref={attachmentInputRef}
                                         type="file"
@@ -2977,7 +3008,7 @@ export function InboxContainer({
                                             </div>
                                         )}
                                         <div className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex min-w-0 items-center gap-2">
                                         <IconButton
                                             icon={Paperclip}
                                             size="sm"
@@ -2994,6 +3025,7 @@ export function InboxContainer({
                                         />
                                         <div className="h-6 w-px bg-gray-200 mx-1" />
                                         <textarea
+                                            ref={composerTextareaRef}
                                             value={input}
                                             onChange={(e) => setInput(e.target.value)}
                                             onPaste={handleInputPaste}
@@ -3005,7 +3037,7 @@ export function InboxContainer({
                                                 }
                                             }}
                                             rows={1}
-                                            className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 h-6 min-h-[24px]"
+                                            className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 min-h-[24px] max-h-36 overflow-hidden"
                                             placeholder={inputPlaceholder}
                                         />
                                         <div className="h-6 w-px bg-gray-200" />
@@ -3013,10 +3045,12 @@ export function InboxContainer({
                                             type="button"
                                             onClick={() => setIsTemplatePickerModalOpen(true)}
                                             disabled={isTemplatePickerDisabled}
-                                            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            title={t('templatePickerAction')}
+                                            aria-label={t('templatePickerAction')}
+                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto xl:gap-1.5 xl:px-2"
                                         >
                                             <HiOutlineDocumentText size={15} />
-                                            <span>{t('templatePickerAction')}</span>
+                                            <span className="hidden xl:inline">{t('templatePickerAction')}</span>
                                         </button>
                                     </div>
                                     </div>
@@ -3030,14 +3064,17 @@ export function InboxContainer({
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!canSend}
+                                    aria-label={isSending ? t('composerAttachments.sending') : t('sendButton')}
                                     title={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
-                                    className={`h-11 flex items-center gap-2 px-4 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${canSend
+                                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl px-0 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed xl:w-auto xl:gap-2 xl:px-4 ${canSend
                                         ? 'bg-blue-500 text-white hover:bg-blue-600'
                                         : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
                                         }`}
                                 >
-                                    {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                                    <span className="hidden sm:inline">{isSending ? t('composerAttachments.sending') : t('sendButton')}</span>
+                                    <span className="inline-flex items-center justify-center">
+                                        {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                    </span>
+                                    <span className="hidden xl:inline">{isSending ? t('composerAttachments.sending') : t('sendButton')}</span>
                                 </button>
                             </div>
                         </div>
@@ -3104,8 +3141,15 @@ export function InboxContainer({
                             ) : (
                                 <>
                                     <div className="flex flex-col items-center text-center">
-                                        <Avatar name={selectedConversation.contact_name} size="lg" className="mb-3 text-base" />
-                                        <h3 className="text-lg font-bold text-gray-900">{selectedConversation.contact_name}</h3>
+                                        <Avatar name={selectedConversationDisplayName} size="lg" className="mb-3 text-base" />
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-lg font-bold text-gray-900">{selectedConversationDisplayName}</h3>
+                                            {isSelectedConversationInstagramRequest && (
+                                                <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                                    {t('instagramRequestBadge')}
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-sm text-gray-500 mt-1">{selectedConversation.contact_phone || t('noPhoneNumber')}</p>
                                     </div>
 

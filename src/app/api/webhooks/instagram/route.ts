@@ -15,6 +15,11 @@ interface InstagramChannelRecord {
     config: Json
 }
 
+interface InstagramContactIdentity {
+    contactName: string | null
+    username: string | null
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -26,6 +31,12 @@ function asConfigRecord(value: Json): Record<string, Json | undefined> {
 
 function readConfigString(config: Json, key: string): string | null {
     const value = asConfigRecord(config)[key]
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+function readTrimmedString(value: unknown): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
@@ -232,6 +243,7 @@ export async function POST(req: NextRequest) {
 
     const channelCache = new Map<string, InstagramChannelRecord>()
     const clientCache = new Map<string, InstagramClient>()
+    const contactIdentityCache = new Map<string, InstagramContactIdentity>()
 
     for (const event of events) {
         let channel = channelCache.get(event.instagramBusinessAccountId)
@@ -275,13 +287,52 @@ export async function POST(req: NextRequest) {
 
         if (!channel || !client) continue
 
+        const identityCacheKey = `${event.instagramBusinessAccountId}:${event.contactId}`
+        let contactIdentity = contactIdentityCache.get(identityCacheKey) ?? null
+
+        if (!contactIdentity) {
+            const webhookContactName = readTrimmedString(event.contactName)
+            if (webhookContactName) {
+                contactIdentity = {
+                    contactName: webhookContactName,
+                    username: null
+                }
+            } else {
+                try {
+                    const profile = await client.getUserProfile(event.contactId)
+                    const username = readTrimmedString(profile.username)
+                    const resolvedName = username || readTrimmedString(profile.name)
+                    contactIdentity = {
+                        contactName: resolvedName,
+                        username
+                    }
+                } catch (error) {
+                    if (debugEnabled) {
+                        console.info('Instagram Webhook: Failed to resolve sender profile', {
+                            instagram_business_account_id: event.instagramBusinessAccountId,
+                            instagram_contact_id: event.contactId,
+                            error: error instanceof Error ? error.message : String(error)
+                        })
+                    }
+                    contactIdentity = {
+                        contactName: null,
+                        username: null
+                    }
+                }
+            }
+
+            contactIdentityCache.set(identityCacheKey, contactIdentity)
+        }
+
+        if (!contactIdentity) continue
+
         await processInboundAiPipeline({
             supabase,
             organizationId: channel.organization_id,
             platform: 'instagram',
             source: 'instagram',
             contactId: event.contactId,
-            contactName: event.contactName,
+            contactName: contactIdentity.contactName,
             text: event.text,
             inboundMessageId: event.messageId,
             inboundMessageIdMetadataKey: 'instagram_message_id',
@@ -290,7 +341,9 @@ export async function POST(req: NextRequest) {
                 instagram_timestamp: event.timestamp,
                 instagram_business_account_id: event.instagramBusinessAccountId,
                 instagram_event_source: event.eventSource,
-                instagram_event_type: event.eventType
+                instagram_event_type: event.eventType,
+                instagram_contact_name: contactIdentity.contactName,
+                instagram_contact_username: contactIdentity.username
             },
             skipAutomation: event.skipAutomation,
             sendOutbound: async (content) => {

@@ -14,6 +14,13 @@ export interface InstagramBusinessAccountDetails {
     profile_picture_url?: string
 }
 
+export interface InstagramUserProfile {
+    id: string
+    username?: string
+    name?: string
+    profile_picture_url?: string
+}
+
 export class InstagramClient {
     private accessToken: string
     private graphVersion: string
@@ -63,6 +70,15 @@ export class InstagramClient {
     async getBusinessAccount(instagramBusinessAccountId: string): Promise<InstagramBusinessAccountDetails> {
         return this.request<InstagramBusinessAccountDetails>(
             `${instagramBusinessAccountId}?fields=id,username,name,profile_picture_url`,
+            {
+                method: 'GET'
+            }
+        )
+    }
+
+    async getUserProfile(instagramUserId: string): Promise<InstagramUserProfile> {
+        return this.request<InstagramUserProfile>(
+            `${instagramUserId}?fields=id,username,name,profile_picture_url`,
             {
                 method: 'GET'
             }

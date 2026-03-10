@@ -478,6 +478,76 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(resolveOrganizationUsageEntitlementMock).not.toHaveBeenCalled()
     })
 
+    it('marks instagram standby inbound conversations with instagram_request tag', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'instagram',
+            tags: []
+        }))
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: null,
+            inboundMessageId: 'igmid-1',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-1',
+                instagram_event_source: 'standby'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            tags: ['instagram_request']
+        }))
+    })
+
+    it('preserves existing conversation tags while appending instagram_request tag', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'instagram',
+            tags: ['vip']
+        }))
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: null,
+            inboundMessageId: 'igmid-2',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-2',
+                instagram_event_source: 'standby'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            tags: ['vip', 'instagram_request']
+        }))
+    })
+
     it('halts token-consuming flow when billing usage is locked', async () => {
         const sendOutbound = vi.fn()
         const dedupe = createDedupeBuilder(null)

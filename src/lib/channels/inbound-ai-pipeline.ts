@@ -35,6 +35,7 @@ import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/skill-actions'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
+const INSTAGRAM_REQUEST_TAG = 'instagram_request'
 
 export interface InboundAiPipelineInput {
     supabase: SupabaseClient
@@ -58,8 +59,33 @@ export interface InboundAiPipelineInput {
     logPrefix: string
 }
 
+function readStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+}
+
+function shouldMarkInstagramRequest(input: InboundAiPipelineInput) {
+    if (input.platform !== 'instagram') return false
+    const eventSource = input.inboundMessageMetadata.instagram_event_source
+    return eventSource === 'standby'
+}
+
+function mergeConversationTags(existingTags: unknown, ensureTag: string | null): string[] {
+    const normalized = readStringArray(existingTags)
+    if (!ensureTag) return normalized
+
+    const hasTag = normalized.some((tag) => tag.toLowerCase() === ensureTag.toLowerCase())
+    if (hasTag) return normalized
+
+    return [...normalized, ensureTag]
+}
+
 export async function processInboundAiPipeline(options: InboundAiPipelineInput) {
     const orgId = options.organizationId
+    const markInstagramRequest = shouldMarkInstagramRequest(options)
 
     const dedupeFilter = `metadata->>${options.inboundMessageIdMetadataKey}`
     const { data: existingInboundData } = await options.supabase
@@ -82,6 +108,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         .maybeSingle()
 
     if (!conversation) {
+        const conversationTags = mergeConversationTags([], markInstagramRequest ? INSTAGRAM_REQUEST_TAG : null)
         const { data: newConversation, error: createConversationError } = await options.supabase
             .from('conversations')
             .insert({
@@ -91,7 +118,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 contact_name: options.contactName || options.contactId,
                 contact_phone: options.contactId,
                 status: 'open',
-                unread_count: 0
+                unread_count: 0,
+                tags: conversationTags
             })
             .select()
             .single()
@@ -119,6 +147,11 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
     if (!conversation) return
 
+    const updatedConversationTags = mergeConversationTags(
+        conversation.tags,
+        markInstagramRequest ? INSTAGRAM_REQUEST_TAG : null
+    )
+
     const { error: inboundInsertError } = await options.supabase
         .from('messages')
         .insert({
@@ -140,6 +173,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         .from('conversations')
         .update({
             contact_name: options.contactName || conversation.contact_name,
+            tags: updatedConversationTags,
             last_message_at: new Date().toISOString(),
             unread_count: (conversation.unread_count ?? 0) + 1,
             updated_at: new Date().toISOString()

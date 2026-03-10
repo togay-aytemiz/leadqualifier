@@ -53,6 +53,26 @@ describe('InstagramClient', () => {
         )
     })
 
+    it('fetches instagram user profile details for sender identity resolution', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ id: 'ig-user-1', username: 'itsalinayalin', name: 'Alina Yalin' })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new InstagramClient('token-1')
+        const result = await client.getUserProfile('ig-user-1')
+
+        expect(result.id).toBe('ig-user-1')
+        expect(result.username).toBe('itsalinayalin')
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.facebook.com/v21.0/ig-user-1?fields=id,username,name,profile_picture_url',
+            expect.objectContaining({
+                method: 'GET'
+            })
+        )
+    })
+
     it('throws normalized error when graph api returns non-ok response', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: false,
