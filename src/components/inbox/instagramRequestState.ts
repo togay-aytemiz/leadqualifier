@@ -79,18 +79,41 @@ export function isInstagramRequestMessage(
 }
 
 export function isInstagramRequestConversation(
-    conversation: Pick<ConversationListItem, 'platform' | 'tags' | 'messages'>,
+    conversation: Pick<ConversationListItem, 'platform' | 'tags' | 'messages' | 'contact_name' | 'contact_phone'>,
     messageHistory?: Array<Pick<Message, 'sender_type' | 'metadata'>>
 ): boolean {
     if (conversation.platform !== 'instagram') return false
     if (hasInstagramRequestTag(conversation.tags)) return true
 
     const candidates = resolveMessageCandidates(conversation, messageHistory)
-    return candidates.some((message) => isInstagramRequestMessage(
+    const hasStandbySignal = candidates.some((message) => isInstagramRequestMessage(
         conversation.platform,
         message.sender_type,
         message.metadata
     ))
+    if (hasStandbySignal) return true
+
+    const fallbackName = readTrimmedString(conversation.contact_name)
+        || readTrimmedString(conversation.contact_phone)
+        || ''
+    if (!isInstagramScopedId(fallbackName)) return false
+
+    const hasInboundContactMessage = candidates.some((message) => message.sender_type === 'contact')
+    if (!hasInboundContactMessage) return false
+
+    const hasResolvedIdentity = candidates.some((message) => {
+        if (message.sender_type !== 'contact') return false
+        const displayName = readInstagramContactDisplayName(message.metadata)
+        return Boolean(displayName && !isInstagramScopedId(displayName))
+    })
+    if (hasResolvedIdentity) return false
+
+    if (Array.isArray(messageHistory) && messageHistory.length > 0) {
+        const hasOutboundReply = messageHistory.some((message) => message.sender_type === 'user')
+        if (hasOutboundReply) return false
+    }
+
+    return true
 }
 
 export function resolveInboxContactDisplayName(

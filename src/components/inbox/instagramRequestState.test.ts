@@ -71,6 +71,50 @@ describe('instagramRequestState helpers', () => {
         expect(isInstagramRequestConversation(conversation)).toBe(true)
     })
 
+    it('falls back to request-origin when instagram contact is unresolved numeric id', () => {
+        const conversation = buildConversation({
+            tags: [],
+            contact_name: '1400879865404973',
+            messages: [{
+                sender_type: 'contact',
+                content: 'Merhaba',
+                created_at: '2026-03-10T12:45:00.000Z',
+                metadata: {}
+            }]
+        })
+
+        expect(isInstagramRequestConversation(conversation)).toBe(true)
+    })
+
+    it('does not apply unresolved-id fallback when conversation already has outbound replies', () => {
+        const conversation = buildConversation({
+            tags: [],
+            contact_name: '1400879865404973',
+            messages: [{
+                sender_type: 'contact',
+                content: 'Merhaba',
+                created_at: '2026-03-10T12:45:00.000Z',
+                metadata: {}
+            }]
+        })
+
+        const history = [
+            buildMessage({
+                sender_type: 'contact',
+                metadata: {},
+                content: 'Merhaba'
+            }),
+            buildMessage({
+                id: 'msg-2',
+                sender_type: 'user',
+                metadata: {},
+                content: 'Selam'
+            })
+        ]
+
+        expect(isInstagramRequestConversation(conversation, history)).toBe(false)
+    })
+
     it('prefers instagram username from message metadata when contact name is numeric id', () => {
         const conversation = buildConversation()
         const messages = [

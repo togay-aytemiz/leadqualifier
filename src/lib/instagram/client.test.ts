@@ -66,7 +66,45 @@ describe('InstagramClient', () => {
         expect(result.id).toBe('ig-user-1')
         expect(result.username).toBe('itsalinayalin')
         expect(fetchMock).toHaveBeenCalledWith(
-            'https://graph.facebook.com/v21.0/ig-user-1?fields=id,username,name,profile_picture_url',
+            'https://graph.instagram.com/v21.0/ig-user-1?fields=id,username,name',
+            expect.objectContaining({
+                method: 'GET'
+            })
+        )
+    })
+
+    it('falls back to graph.facebook profile endpoint when instagram graph profile request fails', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockImplementationOnce(async () => ({
+                ok: false,
+                json: async () => ({
+                    error: {
+                        message: 'Temporary instagram graph failure'
+                    }
+                })
+            }))
+            .mockImplementationOnce(async () => ({
+                ok: true,
+                json: async () => ({ id: 'ig-user-2', username: 'fallback-user', name: 'Fallback User' })
+            })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new InstagramClient('token-1')
+        const result = await client.getUserProfile('ig-user-2')
+
+        expect(result.username).toBe('fallback-user')
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(fetchMock).toHaveBeenNthCalledWith(
+            1,
+            'https://graph.instagram.com/v21.0/ig-user-2?fields=id,username,name',
+            expect.objectContaining({
+                method: 'GET'
+            })
+        )
+        expect(fetchMock).toHaveBeenNthCalledWith(
+            2,
+            'https://graph.facebook.com/v21.0/ig-user-2?fields=id,username,name',
             expect.objectContaining({
                 method: 'GET'
             })

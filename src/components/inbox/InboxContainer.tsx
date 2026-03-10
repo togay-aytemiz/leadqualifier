@@ -754,11 +754,16 @@ export function InboxContainer({
         if (!textarea) return
 
         textarea.style.height = '24px'
+        if (input.trim().length === 0) {
+            textarea.style.overflowY = 'hidden'
+            return
+        }
+
         const maxHeight = 144
         const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
         textarea.style.height = `${nextHeight}px`
         textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, [])
+    }, [input])
 
     useLayoutEffect(() => {
         syncComposerTextareaHeight()
@@ -3047,10 +3052,10 @@ export function InboxContainer({
                                             disabled={isTemplatePickerDisabled}
                                             title={t('templatePickerAction')}
                                             aria-label={t('templatePickerAction')}
-                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto xl:gap-1.5 xl:px-2"
+                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 2xl:w-auto 2xl:gap-1.5 2xl:px-2"
                                         >
                                             <HiOutlineDocumentText size={15} />
-                                            <span className="hidden xl:inline">{t('templatePickerAction')}</span>
+                                            <span className="hidden 2xl:inline">{t('templatePickerAction')}</span>
                                         </button>
                                     </div>
                                     </div>
@@ -3066,7 +3071,7 @@ export function InboxContainer({
                                     disabled={!canSend}
                                     aria-label={isSending ? t('composerAttachments.sending') : t('sendButton')}
                                     title={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
-                                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl px-0 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed xl:w-auto xl:gap-2 xl:px-4 ${canSend
+                                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl px-0 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed 2xl:w-auto 2xl:gap-2 2xl:px-4 ${canSend
                                         ? 'bg-blue-500 text-white hover:bg-blue-600'
                                         : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
                                         }`}
@@ -3074,7 +3079,7 @@ export function InboxContainer({
                                     <span className="inline-flex items-center justify-center">
                                         {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                                     </span>
-                                    <span className="hidden xl:inline">{isSending ? t('composerAttachments.sending') : t('sendButton')}</span>
+                                    <span className="hidden 2xl:inline">{isSending ? t('composerAttachments.sending') : t('sendButton')}</span>
                                 </button>
                             </div>
                         </div>

@@ -22,6 +22,7 @@ import {
     type WhatsAppOutboundAttachment
 } from '@/lib/inbox/outbound-media'
 import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholders'
+import { InstagramClient } from '@/lib/instagram/client'
 import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -205,6 +206,16 @@ function readConfigString(config: Json, key: string): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function readTrimmedString(value: unknown): string | null {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+function isInstagramScopedId(value: string) {
+    return /^\d{10,}$/.test(value)
+}
+
 function sanitizePathSegment(value: string) {
     return value.replace(/[^a-zA-Z0-9._-]/g, '_')
 }
@@ -278,6 +289,129 @@ function normalizeInboxPredefinedTemplateSummary(value: unknown): InboxPredefine
         title: titleValue,
         content: contentValue
     }
+}
+
+async function resolveActiveInstagramChannelToken(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    organizationId: string
+): Promise<string | null> {
+    const { data, error } = await supabase
+        .from('channels')
+        .select('config, updated_at')
+        .eq('organization_id', organizationId)
+        .eq('type', 'instagram')
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (error || !data) return null
+    return readConfigString(data.config, 'page_access_token')
+}
+
+async function hydrateInstagramConversationContactNames(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    organizationId: string,
+    conversations: ConversationListItem[]
+): Promise<ConversationListItem[]> {
+    const unresolved = conversations.filter((conversation) => {
+        if (conversation.platform !== 'instagram') return false
+        const contactId = readTrimmedString(conversation.contact_phone)
+        const contactName = readTrimmedString(conversation.contact_name)
+        if (!contactId || !contactName) return false
+        return isInstagramScopedId(contactId) && isInstagramScopedId(contactName)
+    })
+
+    if (unresolved.length === 0) return conversations
+
+    const accessToken = await resolveActiveInstagramChannelToken(supabase, organizationId)
+    if (!accessToken) return conversations
+
+    const graphVersion = process.env.INSTAGRAM_GRAPH_API_VERSION
+        || process.env.WHATSAPP_GRAPH_API_VERSION
+        || 'v25.0'
+    const client = new InstagramClient(accessToken, graphVersion)
+    const updatedConversationNames = new Map<string, string>()
+
+    for (const conversation of unresolved.slice(0, 6)) {
+        const contactId = readTrimmedString(conversation.contact_phone)
+        if (!contactId) continue
+
+        try {
+            const profile = await client.getUserProfile(contactId)
+            const resolvedName = readTrimmedString(profile.username) || readTrimmedString(profile.name)
+            if (!resolvedName || isInstagramScopedId(resolvedName)) continue
+            updatedConversationNames.set(conversation.id, resolvedName)
+        } catch {
+            continue
+        }
+    }
+
+    if (updatedConversationNames.size === 0) return conversations
+
+    await Promise.all(Array.from(updatedConversationNames.entries()).map(([conversationId, contactName]) =>
+        supabase
+            .from('conversations')
+            .update({
+                contact_name: contactName,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', conversationId)
+    ))
+
+    return conversations.map((conversation) => {
+        const hydratedName = updatedConversationNames.get(conversation.id)
+        if (!hydratedName) return conversation
+        return {
+            ...conversation,
+            contact_name: hydratedName
+        }
+    })
+}
+
+async function annotateInstagramRequestFallback(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    organizationId: string,
+    conversations: ConversationListItem[]
+): Promise<ConversationListItem[]> {
+    const instagramConversationIds = conversations
+        .filter((conversation) => conversation.platform === 'instagram')
+        .map((conversation) => conversation.id)
+    if (instagramConversationIds.length === 0) return conversations
+
+    const { data, error } = await supabase
+        .from('messages')
+        .select('conversation_id')
+        .eq('organization_id', organizationId)
+        .eq('sender_type', 'user')
+        .in('conversation_id', instagramConversationIds)
+
+    if (error) return conversations
+
+    const outboundReplyConversationIds = new Set(
+        (data ?? [])
+            .map((row) => readTrimmedString((row as { conversation_id?: string }).conversation_id))
+            .filter((value): value is string => Boolean(value))
+    )
+
+    return conversations.map((conversation) => {
+        if (conversation.platform !== 'instagram') return conversation
+        if (outboundReplyConversationIds.has(conversation.id)) return conversation
+
+        const latestMessage = Array.isArray(conversation.messages) ? conversation.messages[0] : null
+        if (!latestMessage || latestMessage.sender_type !== 'contact') return conversation
+
+        const tags = Array.isArray(conversation.tags)
+            ? conversation.tags.filter((tag): tag is string => typeof tag === 'string')
+            : []
+        const hasRequestTag = tags.some((tag) => tag.toLowerCase() === 'instagram_request')
+        if (hasRequestTag) return conversation
+
+        return {
+            ...conversation,
+            tags: [...tags, 'instagram_request']
+        }
+    })
 }
 
 async function resolveConversationOrganizationContext(
@@ -465,7 +599,9 @@ export async function getConversations(
         .range(from, to)
 
     if (!error) {
-        return normalizeConversationListItems((data ?? []) as unknown[])
+        const normalized = normalizeConversationListItems((data ?? []) as unknown[])
+        const withRequestFallback = await annotateInstagramRequestFallback(supabase, organizationId, normalized)
+        return hydrateInstagramConversationContactNames(supabase, organizationId, withRequestFallback)
     }
 
     console.warn('Error fetching conversations with nested query, using fallback:', error)
@@ -531,12 +667,14 @@ export async function getConversations(
     const leadRows = (leadsResult.data ?? []) as ConversationLeadPreviewRow[]
     const assigneeRows = (assigneesResult.data ?? []) as ConversationAssigneePreviewRow[]
 
-    return normalizeConversationListItems(buildConversationListItemsFromFallback(
+    const normalizedFallback = normalizeConversationListItems(buildConversationListItemsFromFallback(
         conversations,
         messageRows,
         leadRows,
         assigneeRows
     ))
+    const withRequestFallback = await annotateInstagramRequestFallback(supabase, organizationId, normalizedFallback)
+    return hydrateInstagramConversationContactNames(supabase, organizationId, withRequestFallback)
 }
 
 export async function getMessages(conversationId: string) {

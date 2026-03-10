@@ -118,6 +118,7 @@
   - [x] Fix Instagram webhook identity mismatch by persisting both `instagram_user_id` and `instagram_app_scoped_id`, prioritizing `user_id` in Instagram Login profile resolution, and allowing webhook channel lookup + auto-reconcile across both identifiers
   - [x] Persist Instagram request-origin state at conversation level (`instagram_request` tag on `standby` inbound) and surface `Request/İstek` badge across Inbox list, conversation header, and details
   - [x] Resolve Instagram sender identity via Graph profile lookup during webhook ingest (`/{CONTACT_ID}?fields=id,username,name`) and persist metadata/contact-name fallback so Inbox prefers username over numeric IG IDs
+  - [x] Add Inbox-side request fallback annotation for Instagram conversations with no outbound replies yet (latest inbound from contact), so `Request/İstek` badge remains visible even when legacy payloads miss explicit `standby` markers
   - [x] Refine onboarding detail readability and support CTA: smaller inner headings/body text, visible wizard step numbers in selected state, support banner `Ekiple konuş` mail action, and temporary no-op migration info link
   - [x] Left-align channel onboarding detail content container instead of centering it
 - [x] **Shared Inbound AI Pipeline**
@@ -205,7 +206,7 @@
   - [x] Closing and reopening summary panel now regenerates summary without requiring manual refresh
   - [x] WhatsApp conversations now show a far-right 24-hour reply-window indicator only when blocked (`reply unavailable`) next to the summary control, with tooltip reason
   - [x] WhatsApp conversations now show a compact in-input `Send Template` action (document icon + text) aligned to the composer’s far-right area
-  - [x] Inbox composer send/template controls now collapse to icon-first mode on constrained widths (`xl` and below), and reply textarea now auto-resizes (up to a safe max height) to prevent overflow and default single-line scrollbar artifacts
+  - [x] Inbox composer send/template controls now collapse to icon-first mode on constrained widths, and reply textarea now auto-resizes (up to a safe max height) to prevent overflow and default single-line scrollbar artifacts
   - [x] Inbox template picker now supports two-tab WhatsApp flow (`Hazır mesajlar` + `WhatsApp şablonları`) and single-tab predefined flow on non-WhatsApp conversations
   - [x] Inbox users can create, edit, delete, and select organization-scoped predefined templates, then insert selected content into `Write a reply` composer without auto-send
   - [x] Inbox template picker tabs now use compact underline navigation; refresh action is shown only on WhatsApp tab, select chevrons use inset alignment, and tab switching animates modal height smoothly (mobile + desktop)

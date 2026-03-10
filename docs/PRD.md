@@ -84,7 +84,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - WhatsApp template send is available only as an explicit manual utility (Settings > Channels and Inbox expired-window action) for review/operational continuation, not as automated conversation runtime behavior.
 - Skill replies in WhatsApp can include quick-action buttons; each button either deterministically triggers another skill (`trigger_skill`) or sends a configured URL (`open_url`) as a bot reply text, and WhatsApp displays only the first 3 actions.
 - Inbox WhatsApp conversations expose template access as a compact in-composer action (right-aligned document icon + label) to keep manual actions in one interaction zone.
-- Inbox composer controls should degrade gracefully on constrained widths: template/send actions collapse to icon-first buttons (labels visible from `xl` and up), and the reply textarea auto-resizes up to a capped height so default single-line mode does not show a native scrollbar.
+- Inbox composer controls should degrade gracefully on constrained widths: template/send actions collapse to icon-first buttons, and the reply textarea auto-resizes up to a capped height so default single-line mode does not show a native scrollbar.
 - Inbox template picker behavior:
   - all platforms can open predefined templates and insert selected content into composer (`Write a reply`) without auto-send
   - WhatsApp conversations additionally show official WhatsApp template tab in the same picker
@@ -113,6 +113,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Instagram Login identity persistence should store both webhook-stable `instagram_user_id` and profile `instagram_app_scoped_id`; connect-time resolution must prioritize `user_id` when both exist, and webhook channel lookup should accept either identifier (with token-based reconciliation fallback) to avoid silently dropping delivered events.
 - Inbox should treat Instagram request-folder origin as conversation state (not only latest-message preview): `standby` inbound events persist `instagram_request` tag and request badge visibility should remain in list/header/details even after later outbound replies.
 - Instagram inbound ingest should attempt sender-profile resolution (`/{contact_id}?fields=id,username,name`) when webhook payload lacks sender name, persist resolved `instagram_contact_username`/`instagram_contact_name` metadata, and update conversation contact name so numeric Instagram IDs are replaced by readable handles where possible.
+- For legacy Instagram conversations where explicit `standby` markers are missing, Inbox list should apply a safe fallback request annotation when there are no outbound replies yet and latest preview message is inbound contact traffic.
 - WhatsApp OAuth candidate discovery supports fallback via `me/businesses` + business WABA edges when direct user node field access is unavailable in Graph.
 - WhatsApp OAuth scope request is limited to `whatsapp_business_management` + `whatsapp_business_messaging` (do not request `business_management` in the WhatsApp connect flow).
 - WhatsApp OAuth candidate resolution accepts WABA payloads without `name` as long as `id` + `phone_numbers` are present.

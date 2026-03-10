@@ -1,4 +1,5 @@
-const INSTAGRAM_GRAPH_API_BASE = 'https://graph.facebook.com'
+const INSTAGRAM_MESSAGING_GRAPH_API_BASE = 'https://graph.facebook.com'
+const INSTAGRAM_LOGIN_GRAPH_API_BASE = 'https://graph.instagram.com'
 const DEFAULT_GRAPH_API_VERSION = 'v21.0'
 
 type GraphApiErrorResponse = {
@@ -30,8 +31,8 @@ export class InstagramClient {
         this.graphVersion = graphVersion || DEFAULT_GRAPH_API_VERSION
     }
 
-    private async request<T>(path: string, init: RequestInit): Promise<T> {
-        const response = await fetch(`${INSTAGRAM_GRAPH_API_BASE}/${this.graphVersion}/${path}`, {
+    private async requestToBase<T>(baseUrl: string, path: string, init: RequestInit): Promise<T> {
+        const response = await fetch(`${baseUrl}/${this.graphVersion}/${path}`, {
             ...init,
             headers: {
                 Authorization: `Bearer ${this.accessToken}`,
@@ -46,6 +47,14 @@ export class InstagramClient {
         }
 
         return payload
+    }
+
+    private async request<T>(path: string, init: RequestInit): Promise<T> {
+        return this.requestToBase<T>(INSTAGRAM_MESSAGING_GRAPH_API_BASE, path, init)
+    }
+
+    private async requestInstagramLogin<T>(path: string, init: RequestInit): Promise<T> {
+        return this.requestToBase<T>(INSTAGRAM_LOGIN_GRAPH_API_BASE, path, init)
     }
 
     async sendText(params: {
@@ -77,11 +86,24 @@ export class InstagramClient {
     }
 
     async getUserProfile(instagramUserId: string): Promise<InstagramUserProfile> {
-        return this.request<InstagramUserProfile>(
-            `${instagramUserId}?fields=id,username,name,profile_picture_url`,
-            {
-                method: 'GET'
+        try {
+            return await this.requestInstagramLogin<InstagramUserProfile>(
+                `${instagramUserId}?fields=id,username,name`,
+                {
+                    method: 'GET'
+                }
+            )
+        } catch (instagramLoginError) {
+            try {
+                return await this.request<InstagramUserProfile>(
+                    `${instagramUserId}?fields=id,username,name`,
+                    {
+                        method: 'GET'
+                    }
+                )
+            } catch {
+                throw instagramLoginError
             }
-        )
+        }
     }
 }
