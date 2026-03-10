@@ -1300,7 +1300,8 @@ export async function sendMessage(
                 })
             } catch (error) {
                 console.error('Failed to send Instagram message:', error)
-                throw new Error('Failed to send message to Instagram API')
+                const reason = error instanceof Error ? error.message : String(error)
+                throw new Error(`Failed to send message to Instagram API: ${reason}`)
             }
         } else {
             console.warn('No active Instagram channel found for this organization')

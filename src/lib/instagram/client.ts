@@ -26,7 +26,12 @@ export class InstagramClient {
     private accessToken: string
     private graphVersion: string
 
-    constructor(accessToken: string, graphVersion: string = process.env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_API_VERSION) {
+    constructor(
+        accessToken: string,
+        graphVersion: string = process.env.INSTAGRAM_GRAPH_API_VERSION
+            || process.env.WHATSAPP_GRAPH_API_VERSION
+            || DEFAULT_GRAPH_API_VERSION
+    ) {
         this.accessToken = accessToken
         this.graphVersion = graphVersion || DEFAULT_GRAPH_API_VERSION
     }
@@ -62,18 +67,32 @@ export class InstagramClient {
         to: string
         text: string
     }) {
-        return this.request<{ message_id?: string }>(`${params.instagramBusinessAccountId}/messages`, {
-            method: 'POST',
-            body: JSON.stringify({
-                messaging_product: 'instagram',
-                recipient: {
-                    id: params.to
-                },
-                message: {
-                    text: params.text
-                }
+        const path = `${params.instagramBusinessAccountId}/messages`
+        const payload = {
+            messaging_product: 'instagram',
+            recipient: {
+                id: params.to
+            },
+            message: {
+                text: params.text
+            }
+        }
+
+        try {
+            return await this.requestInstagramLogin<{ message_id?: string }>(path, {
+                method: 'POST',
+                body: JSON.stringify(payload)
             })
-        })
+        } catch (instagramLoginError) {
+            try {
+                return await this.request<{ message_id?: string }>(path, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                })
+            } catch {
+                throw instagramLoginError
+            }
+        }
     }
 
     async getBusinessAccount(instagramBusinessAccountId: string): Promise<InstagramBusinessAccountDetails> {

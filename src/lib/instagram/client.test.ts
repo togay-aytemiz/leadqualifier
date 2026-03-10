@@ -23,7 +23,7 @@ describe('InstagramClient', () => {
 
         expect(fetchMock).toHaveBeenCalledTimes(1)
         expect(fetchMock).toHaveBeenCalledWith(
-            'https://graph.facebook.com/v21.0/ig-business-1/messages',
+            'https://graph.instagram.com/v21.0/ig-business-1/messages',
             expect.objectContaining({
                 method: 'POST',
                 headers: expect.objectContaining({
@@ -31,6 +31,44 @@ describe('InstagramClient', () => {
                     'Content-Type': 'application/json'
                 })
             })
+        )
+    })
+
+    it('falls back to graph.facebook send endpoint when instagram graph send fails', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockImplementationOnce(async () => ({
+                ok: false,
+                json: async () => ({
+                    error: {
+                        message: 'Temporary instagram graph send failure'
+                    }
+                })
+            }))
+            .mockImplementationOnce(async () => ({
+                ok: true,
+                json: async () => ({ message_id: 'igmid.fallback.1' })
+            })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new InstagramClient('token-1')
+        const result = await client.sendText({
+            instagramBusinessAccountId: 'ig-business-1',
+            to: 'ig-user-1',
+            text: 'Merhaba'
+        })
+
+        expect(result.message_id).toBe('igmid.fallback.1')
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(fetchMock).toHaveBeenNthCalledWith(
+            1,
+            'https://graph.instagram.com/v21.0/ig-business-1/messages',
+            expect.objectContaining({ method: 'POST' })
+        )
+        expect(fetchMock).toHaveBeenNthCalledWith(
+            2,
+            'https://graph.facebook.com/v21.0/ig-business-1/messages',
+            expect.objectContaining({ method: 'POST' })
         )
     })
 

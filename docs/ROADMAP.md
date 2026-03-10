@@ -81,6 +81,7 @@
   - [x] OAuth start URL now uses Instagram Business Login authorize endpoint (`https://www.instagram.com/oauth/authorize`) with `force_reauth=true` and business scopes
   - [x] OAuth callback token exchange switched to Instagram Login endpoints (`api.instagram.com/oauth/access_token` -> `graph.instagram.com/access_token` with `ig_exchange_token`)
   - [x] Instagram business-profile discovery now prioritizes `graph.instagram.com/v25.0/me` (with fallback chain) for Instagram Login tokens
+  - [x] Instagram outbound operator replies now call Instagram Login graph host first (`graph.instagram.com/{IG_ID}/messages`) with compatibility fallback to `graph.facebook.com`, preventing `Cannot parse access token` failures on Instagram Login tokens
   - [x] Instagram onboarding/connect UI copy now says `Continue with Instagram` and no longer instructs Facebook Page selection in setup text
   - [x] Instagram onboarding helper text now uses concise respond.io-style redirect + permission guidance copy
   - [x] Instagram onboarding connect state simplified to a minimal respond.io-like layout: heading, short helper text, and single `Continue with Instagram` CTA
@@ -206,7 +207,9 @@
   - [x] Closing and reopening summary panel now regenerates summary without requiring manual refresh
   - [x] WhatsApp conversations now show a far-right 24-hour reply-window indicator only when blocked (`reply unavailable`) next to the summary control, with tooltip reason
   - [x] WhatsApp conversations now show a compact in-input `Send Template` action (document icon + text) aligned to the composer’s far-right area
-  - [x] Inbox composer send/template controls now collapse to icon-first mode on constrained widths, and reply textarea now auto-resizes (up to a safe max height) to prevent overflow and default single-line scrollbar artifacts
+  - [x] Inbox composer send/template controls now collapse to icon-first mode on constrained widths, and reply input stays fixed single-line (scrollbar hidden) to prevent overflow/layout drift
+  - [x] Inbox composer error state no longer shifts send-button alignment: error text renders below the row and non-attachment send failures now use channel-aware copy (instead of attachment-specific error wording)
+  - [x] Instagram `seen` webhook events now render as compact read-status indicators (`Seen/Görüldü`) in Inbox timeline/list instead of contact-style inbound message bubbles, with parenthesized relative time shown only on the latest `seen` event (`Seen (just now)` / `Görüldü (az önce)`)
   - [x] Inbox template picker now supports two-tab WhatsApp flow (`Hazır mesajlar` + `WhatsApp şablonları`) and single-tab predefined flow on non-WhatsApp conversations
   - [x] Inbox users can create, edit, delete, and select organization-scoped predefined templates, then insert selected content into `Write a reply` composer without auto-send
   - [x] Inbox template picker tabs now use compact underline navigation; refresh action is shown only on WhatsApp tab, select chevrons use inset alignment, and tab switching animates modal height smoothly (mobile + desktop)

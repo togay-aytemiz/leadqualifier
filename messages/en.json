@@ -318,6 +318,8 @@
         "queueUnassignedSummary": "Unassigned: {count}",
         "queueNoOperators": "No operators found",
         "instagramRequestBadge": "Request",
+        "instagramSeenStatus": "Seen",
+        "instagramSeenStatusWithRelative": "Seen ({time})",
         "noMessages": "No messages",
         "noMessagesDesc": "New conversations will appear here when you receive messages.",
         "noMessagesYet": "No messages yet",
@@ -340,6 +342,11 @@
         "readOnlyMode": "Read-only mode: admin impersonation cannot send or modify conversation data.",
         "sendShortcut": "⌘ Enter to send",
         "sendButton": "Send Reply",
+        "sendErrors": {
+            "generic": "Message could not be sent. Please try again.",
+            "instagramTokenInvalid": "Instagram token is invalid or expired. Reconnect the Instagram channel.",
+            "instagramPermission": "Instagram did not allow this message yet. Accept the request in Instagram or check messaging permissions."
+        },
         "templatePickerAction": "Templates",
         "summary": {
             "button": "Conversation Summary",

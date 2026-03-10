@@ -318,6 +318,8 @@
         "queueUnassignedSummary": "Atanmamış: {count}",
         "queueNoOperators": "Operatör bulunamadı",
         "instagramRequestBadge": "İstek",
+        "instagramSeenStatus": "Görüldü",
+        "instagramSeenStatusWithRelative": "Görüldü ({time})",
         "noMessages": "Mesaj yok",
         "noMessagesDesc": "Yeni konuşmalar mesaj aldığınızda burada görünecektir.",
         "noMessagesYet": "Henüz mesaj yok",
@@ -340,6 +342,11 @@
         "readOnlyMode": "Salt okunur mod: admin impersonation konuşma üzerinde gönderim/değişiklik yapamaz.",
         "sendShortcut": "Göndermek için ⌘ Enter",
         "sendButton": "Yanıtı Gönder",
+        "sendErrors": {
+            "generic": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
+            "instagramTokenInvalid": "Instagram token geçersiz veya süresi dolmuş. Instagram kanalını yeniden bağlayın.",
+            "instagramPermission": "Instagram bu mesajı henüz göndermeye izin vermedi. İsteği Instagram'da kabul edin veya mesajlaşma izinlerini kontrol edin."
+        },
         "templatePickerAction": "Şablonlar",
         "summary": {
             "button": "Konuşma Özeti",

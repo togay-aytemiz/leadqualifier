@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } fr
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
 import {
     Inbox, ChevronDown,
-    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp, X, Loader2, FileText
+    Paperclip, Image, Zap, Bot, Trash2, MoreHorizontal, LogOut, Send, RotateCw, ArrowLeft, ArrowDown, CircleHelp, X, Loader2, FileText, Eye
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
 import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
@@ -84,6 +84,7 @@ import {
     isInstagramRequestMessage,
     resolveInboxContactDisplayName
 } from '@/components/inbox/instagramRequestState'
+import { isInstagramSeenEventMessage } from '@/components/inbox/instagramMessageEvents'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 
@@ -268,7 +269,6 @@ export function InboxContainer({
     const pendingAttachmentsRef = useRef<PendingAttachment[]>([])
     const attachmentInputRef = useRef<HTMLInputElement | null>(null)
     const imageInputRef = useRef<HTMLInputElement | null>(null)
-    const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
     const leadStatusLabels: Record<string, string> = {
         hot: t('leadStatusHot'),
         warm: t('leadStatusWarm'),
@@ -748,26 +748,6 @@ export function InboxContainer({
         }, 120)
         return () => clearTimeout(timer)
     }, [messages, selectedId, syncScrollToLatestVisibility])
-
-    const syncComposerTextareaHeight = useCallback(() => {
-        const textarea = composerTextareaRef.current
-        if (!textarea) return
-
-        textarea.style.height = '24px'
-        if (input.trim().length === 0) {
-            textarea.style.overflowY = 'hidden'
-            return
-        }
-
-        const maxHeight = 144
-        const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
-        textarea.style.height = `${nextHeight}px`
-        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, [input])
-
-    useLayoutEffect(() => {
-        syncComposerTextareaHeight()
-    }, [input, selectedId, syncComposerTextareaHeight])
 
     useEffect(() => {
         const composer = composerContainerRef.current
@@ -1278,6 +1258,29 @@ export function InboxContainer({
         return t('composerAttachments.errors.sendFailed')
     }
 
+    const resolveTextSendErrorMessage = (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error ?? '')
+        const normalized = message.toLowerCase()
+
+        if (normalized.includes('cannot parse access token') || normalized.includes('invalid oauth access token')) {
+            return t('sendErrors.instagramTokenInvalid')
+        }
+
+        if (
+            normalized.includes('permission')
+            || normalized.includes('not authorized')
+            || normalized.includes('thread control')
+            || normalized.includes('cannot send message')
+            || normalized.includes('not allowed')
+            || normalized.includes('request thread')
+            || normalized.includes('recipient')
+        ) {
+            return t('sendErrors.instagramPermission')
+        }
+
+        return t('sendErrors.generic')
+    }
+
     const handleSendMessage = async () => {
         if (isReadOnly) return
         if (!selectedId || isSending || isWhatsAppReplyBlocked) return
@@ -1442,7 +1445,11 @@ export function InboxContainer({
             await refreshMessages(conversationId)
         } catch (error) {
             console.error('Failed to send message', error)
-            setComposerErrorMessage(t('composerAttachments.errors.sendFailed'))
+            setComposerErrorMessage(
+                selectedAttachments.length > 0
+                    ? t('composerAttachments.errors.sendFailed')
+                    : resolveTextSendErrorMessage(error)
+            )
             markOptimisticMessagesAsFailed(optimisticMessages.map((message) => message.id))
         } finally {
             setIsSending(false)
@@ -1572,6 +1579,15 @@ export function InboxContainer({
             ) : (
                 filteredConversations.map(c => {
                     const contactDisplayName = resolveInboxContactDisplayName(c)
+                    const latestMessage = c.messages?.[0]
+                    const isLatestInstagramSeenEvent = latestMessage
+                        ? isInstagramSeenEventMessage({
+                            platform: c.platform,
+                            senderType: latestMessage.sender_type,
+                            metadata: latestMessage.metadata,
+                            content: latestMessage.content
+                        })
+                        : false
                     const leadStatus = c.leads?.[0]?.status
                     const leadStatusLabel = leadStatus
                         ? (leadStatusLabels[leadStatus] ?? leadStatus)
@@ -1588,19 +1604,21 @@ export function InboxContainer({
                         : c.human_attention_reason === 'hot_lead'
                             ? t('queueAttentionReasonHotLead')
                             : null
-                    const previewContent = resolveMessagePreviewContent({
-                        content: c.messages?.[0]?.content,
-                        metadata: c.messages?.[0]?.metadata,
-                        fallbackNoMessage: t('noMessagesYet'),
-                        labels: {
-                            image: t('mediaPreview.image'),
-                            document: t('mediaPreview.document'),
-                            audio: t('mediaPreview.audio'),
-                            video: t('mediaPreview.video'),
-                            sticker: t('mediaPreview.sticker'),
-                            media: t('mediaPreview.media')
-                        }
-                    })
+                    const previewContent = isLatestInstagramSeenEvent
+                        ? t('instagramSeenStatus')
+                        : resolveMessagePreviewContent({
+                            content: latestMessage?.content,
+                            metadata: latestMessage?.metadata,
+                            fallbackNoMessage: t('noMessagesYet'),
+                            labels: {
+                                image: t('mediaPreview.image'),
+                                document: t('mediaPreview.document'),
+                                audio: t('mediaPreview.audio'),
+                                video: t('mediaPreview.video'),
+                                sticker: t('mediaPreview.sticker'),
+                                media: t('mediaPreview.media')
+                            }
+                        })
                     const isInstagramRequestPreview = isInstagramRequestConversation(c)
 
                     return (
@@ -1658,10 +1676,12 @@ export function InboxContainer({
                                         </div>
                                     </div>
                                     <p className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
-                                        {c.messages?.[0] && (
-                                            c.messages[0].sender_type === 'contact'
-                                                ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
-                                                : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
+                                        {latestMessage && (
+                                            isLatestInstagramSeenEvent
+                                                ? <Eye className="shrink-0 text-gray-400" size={11} />
+                                                : latestMessage.sender_type === 'contact'
+                                                    ? <FaArrowTurnDown className="shrink-0 text-gray-400" size={10} />
+                                                    : <FaArrowTurnUp className="shrink-0 text-gray-400" size={10} />
                                         )}
                                         <span className="truncate">{previewContent}</span>
                                     </p>
@@ -2434,6 +2454,20 @@ export function InboxContainer({
                                     const isMe = m.sender_type === 'user'
                                     const isBot = m.sender_type === 'bot'
                                     const isSystem = m.sender_type === 'system'
+                                    const isInstagramSeenEvent = isInstagramSeenEventMessage({
+                                        platform: selectedConversation?.platform ?? 'simulator',
+                                        senderType: m.sender_type,
+                                        metadata: m.metadata,
+                                        content: m.content
+                                    })
+                                    const isLatestVisibleMessage = visibleMessages[visibleMessages.length - 1]?.id === m.id
+                                    const instagramSeenRelativeTime = isLatestVisibleMessage
+                                        ? formatRelativeTimeFromBase({
+                                            targetIso: m.created_at,
+                                            baseDate: relativeTimeBaseDate,
+                                            locale: dateLocale
+                                        })
+                                        : null
                                     const outboundDeliveryState = isMe && !isBot
                                         ? resolveOutboundDeliveryState(m.metadata)
                                         : null
@@ -2531,6 +2565,22 @@ export function InboxContainer({
                                                 <div className="flex items-center justify-center w-full py-2">
                                                     <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                                                         {m.content}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+
+                                    if (isInstagramSeenEvent) {
+                                        return (
+                                            <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
+                                                {dateSeparator}
+                                                <div className="flex justify-end">
+                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                                                        <Eye size={12} className="text-slate-400" />
+                                                        {instagramSeenRelativeTime
+                                                            ? t('instagramSeenStatusWithRelative', { time: instagramSeenRelativeTime })
+                                                            : t('instagramSeenStatus')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -2931,156 +2981,155 @@ export function InboxContainer({
                                 </div>
                             )}
 
-                            <div className="flex min-w-0 items-center gap-2 lg:gap-3">
-                                <div className="relative min-w-0 flex-1">
-                                    <input
-                                        ref={attachmentInputRef}
-                                        type="file"
-                                        multiple
-                                        accept={WHATSAPP_UPLOAD_ACCEPT}
-                                        className="hidden"
-                                        onChange={handleAttachmentInputChange}
-                                    />
-                                    <input
-                                        ref={imageInputRef}
-                                        type="file"
-                                        multiple
-                                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                                        className="hidden"
-                                        onChange={handleAttachmentInputChange}
-                                    />
-                                    {pendingAttachments.length > 0 && (
-                                        <div className="mb-2 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-sm">
-                                            <div className="flex gap-2 overflow-x-auto pb-1">
-                                                {pendingAttachments.map((attachment) => (
-                                                    <button
-                                                        key={attachment.id}
-                                                        type="button"
-                                                        onClick={() => setPreviewAttachmentId(attachment.id)}
-                                                        className="group relative flex min-w-[120px] max-w-[160px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-left"
-                                                    >
-                                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-100">
-                                                            {attachment.mediaType === 'image' && attachment.previewUrl ? (
-                                                                // eslint-disable-next-line @next/next/no-img-element
-                                                                <img
-                                                                    src={attachment.previewUrl}
-                                                                    alt={attachment.name}
-                                                                    className="h-full w-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <FileText size={16} className="text-gray-500" />
-                                                            )}
-                                                        </span>
-                                                        <span className="min-w-0">
-                                                            <span className="block truncate text-xs font-medium text-gray-800">
-                                                                {attachment.name}
-                                                            </span>
-                                                            <span className="block text-[11px] text-gray-500">
-                                                                {formatAttachmentSize(attachment.sizeBytes)}
-                                                            </span>
-                                                        </span>
-                                                        <span
-                                                            role="button"
-                                                            tabIndex={0}
-                                                            onClick={(event) => {
-                                                                event.preventDefault()
-                                                                event.stopPropagation()
-                                                                handleRemovePendingAttachment(attachment.id)
-                                                            }}
-                                                            onKeyDown={(event) => {
-                                                                if (event.key !== 'Enter' && event.key !== ' ') return
-                                                                event.preventDefault()
-                                                                event.stopPropagation()
-                                                                handleRemovePendingAttachment(attachment.id)
-                                                            }}
-                                                            className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-gray-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
-                                                            aria-label={t('composerAttachments.remove')}
+                            <div className="space-y-2">
+                                <div className="flex min-w-0 items-end gap-2 lg:gap-3">
+                                    <div className="relative min-w-0 flex-1">
+                                        <input
+                                            ref={attachmentInputRef}
+                                            type="file"
+                                            multiple
+                                            accept={WHATSAPP_UPLOAD_ACCEPT}
+                                            className="hidden"
+                                            onChange={handleAttachmentInputChange}
+                                        />
+                                        <input
+                                            ref={imageInputRef}
+                                            type="file"
+                                            multiple
+                                            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                                            className="hidden"
+                                            onChange={handleAttachmentInputChange}
+                                        />
+                                        {pendingAttachments.length > 0 && (
+                                            <div className="mb-2 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-sm">
+                                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                                    {pendingAttachments.map((attachment) => (
+                                                        <button
+                                                            key={attachment.id}
+                                                            type="button"
+                                                            onClick={() => setPreviewAttachmentId(attachment.id)}
+                                                            className="group relative flex min-w-[120px] max-w-[160px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-left"
                                                         >
-                                                            <X size={12} />
-                                                        </span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <p className="mt-1 text-[11px] text-gray-500">
-                                                {t('composerAttachments.limitHint', { count: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS })}
-                                            </p>
-                                        </div>
-                                    )}
-                                    <div className="relative">
-                                        {isWhatsAppMissingInbound && (
-                                            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border border-amber-200 bg-white/90 px-3 text-center text-xs font-medium text-amber-900">
-                                                {whatsappComposerOverlayMessage}
+                                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+                                                                {attachment.mediaType === 'image' && attachment.previewUrl ? (
+                                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                                    <img
+                                                                        src={attachment.previewUrl}
+                                                                        alt={attachment.name}
+                                                                        className="h-full w-full object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <FileText size={16} className="text-gray-500" />
+                                                                )}
+                                                            </span>
+                                                            <span className="min-w-0">
+                                                                <span className="block truncate text-xs font-medium text-gray-800">
+                                                                    {attachment.name}
+                                                                </span>
+                                                                <span className="block text-[11px] text-gray-500">
+                                                                    {formatAttachmentSize(attachment.sizeBytes)}
+                                                                </span>
+                                                            </span>
+                                                            <span
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onClick={(event) => {
+                                                                    event.preventDefault()
+                                                                    event.stopPropagation()
+                                                                    handleRemovePendingAttachment(attachment.id)
+                                                                }}
+                                                                onKeyDown={(event) => {
+                                                                    if (event.key !== 'Enter' && event.key !== ' ') return
+                                                                    event.preventDefault()
+                                                                    event.stopPropagation()
+                                                                    handleRemovePendingAttachment(attachment.id)
+                                                                }}
+                                                                className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-gray-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                                                                aria-label={t('composerAttachments.remove')}
+                                                            >
+                                                                <X size={12} />
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <p className="mt-1 text-[11px] text-gray-500">
+                                                    {t('composerAttachments.limitHint', { count: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS })}
+                                                </p>
                                             </div>
                                         )}
-                                        <div className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
-                                            <div className="flex min-w-0 items-center gap-2">
-                                        <IconButton
-                                            icon={Paperclip}
-                                            size="sm"
-                                            onClick={handleOpenAttachmentPicker}
-                                            disabled={isAttachmentPickerDisabled}
-                                            className="disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                        <IconButton
-                                            icon={Image}
-                                            size="sm"
-                                            onClick={handleOpenImagePicker}
-                                            disabled={isAttachmentPickerDisabled}
-                                            className="disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                        <div className="h-6 w-px bg-gray-200 mx-1" />
-                                        <textarea
-                                            ref={composerTextareaRef}
-                                            value={input}
-                                            onChange={(e) => setInput(e.target.value)}
-                                            onPaste={handleInputPaste}
-                                            disabled={isComposerDisabled}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault()
-                                                    handleSendMessage()
-                                                }
-                                            }}
-                                            rows={1}
-                                            className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none leading-6 min-h-[24px] max-h-36 overflow-hidden"
-                                            placeholder={inputPlaceholder}
-                                        />
-                                        <div className="h-6 w-px bg-gray-200" />
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsTemplatePickerModalOpen(true)}
-                                            disabled={isTemplatePickerDisabled}
-                                            title={t('templatePickerAction')}
-                                            aria-label={t('templatePickerAction')}
-                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 2xl:w-auto 2xl:gap-1.5 2xl:px-2"
-                                        >
-                                            <HiOutlineDocumentText size={15} />
-                                            <span className="hidden 2xl:inline">{t('templatePickerAction')}</span>
-                                        </button>
+                                        <div className="relative">
+                                            {isWhatsAppMissingInbound && (
+                                                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border border-amber-200 bg-white/90 px-3 text-center text-xs font-medium text-amber-900">
+                                                    {whatsappComposerOverlayMessage}
+                                                </div>
+                                            )}
+                                            <div className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <IconButton
+                                                        icon={Paperclip}
+                                                        size="sm"
+                                                        onClick={handleOpenAttachmentPicker}
+                                                        disabled={isAttachmentPickerDisabled}
+                                                        className="disabled:cursor-not-allowed disabled:opacity-50"
+                                                    />
+                                                    <IconButton
+                                                        icon={Image}
+                                                        size="sm"
+                                                        onClick={handleOpenImagePicker}
+                                                        disabled={isAttachmentPickerDisabled}
+                                                        className="disabled:cursor-not-allowed disabled:opacity-50"
+                                                    />
+                                                    <div className="h-6 w-px bg-gray-200 mx-1" />
+                                                    <textarea
+                                                        value={input}
+                                                        onChange={(e) => setInput(e.target.value)}
+                                                        onPaste={handleInputPaste}
+                                                        disabled={isComposerDisabled}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                                e.preventDefault()
+                                                                handleSendMessage()
+                                                            }
+                                                        }}
+                                                        rows={1}
+                                                        className="h-6 min-h-[24px] max-h-[24px] min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-sm leading-6 text-gray-900 placeholder-gray-400 focus:outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                                        placeholder={inputPlaceholder}
+                                                    />
+                                                    <div className="h-6 w-px bg-gray-200" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsTemplatePickerModalOpen(true)}
+                                                        disabled={isTemplatePickerDisabled}
+                                                        title={t('templatePickerAction')}
+                                                        aria-label={t('templatePickerAction')}
+                                                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        <HiOutlineDocumentText size={15} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    </div>
-                                    </div>
-                                    {composerErrorMessage && (
-                                        <p className="mt-2 text-xs font-medium text-red-600">
-                                            {composerErrorMessage}
-                                        </p>
-                                    )}
+                                    <button
+                                        onClick={handleSendMessage}
+                                        disabled={!canSend}
+                                        aria-label={isSending ? t('composerAttachments.sending') : t('sendButton')}
+                                        title={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
+                                        className={`inline-flex h-11 w-11 shrink-0 self-end items-center justify-center rounded-xl px-0 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${canSend
+                                            ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                            : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        <span className="inline-flex items-center justify-center">
+                                            {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                        </span>
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleSendMessage}
-                                    disabled={!canSend}
-                                    aria-label={isSending ? t('composerAttachments.sending') : t('sendButton')}
-                                    title={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
-                                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl px-0 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed 2xl:w-auto 2xl:gap-2 2xl:px-4 ${canSend
-                                        ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                        : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
-                                        }`}
-                                >
-                                    <span className="inline-flex items-center justify-center">
-                                        {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                                    </span>
-                                    <span className="hidden 2xl:inline">{isSending ? t('composerAttachments.sending') : t('sendButton')}</span>
-                                </button>
+                                {composerErrorMessage && (
+                                    <p className="text-xs font-medium text-red-600">
+                                        {composerErrorMessage}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>
