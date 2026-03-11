@@ -34,6 +34,21 @@ describe('applyBotMessageDisclaimer', () => {
         expect(result).toBe('Merhaba\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
     })
 
+    it('formats Instagram disclaimer with a separator line above the quote', () => {
+        const result = applyBotMessageDisclaimer({
+            message: 'Merhaba',
+            responseLanguage: 'tr',
+            platform: 'instagram',
+            settings: {
+                bot_disclaimer_enabled: true,
+                bot_disclaimer_message_tr: 'Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',
+                bot_disclaimer_message_en: 'Unused'
+            }
+        })
+
+        expect(result).toBe('Merhaba\n\n------\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+    })
+
     it('falls back to EN default message when english custom text is blank', () => {
         const result = applyBotMessageDisclaimer({
             message: 'Hello there',

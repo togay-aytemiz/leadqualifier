@@ -194,6 +194,7 @@ export async function POST(req: NextRequest) {
     const aiSettings = await getOrgAiSettings(orgId, { supabase })
     const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
         message: content,
+        platform: 'telegram',
         responseLanguage,
         settings: aiSettings
     })

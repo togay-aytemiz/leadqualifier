@@ -226,6 +226,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const aiSettings = await getOrgAiSettings(orgId, { supabase: options.supabase })
     const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
         message: content,
+        platform: options.platform,
         responseLanguage,
         settings: aiSettings
     })

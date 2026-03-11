@@ -4,7 +4,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function splitBotMessageDisclaimer(content: string) {
     const normalized = content.replace(/\r\n/g, '\n')
-    const markerMatch = normalized.match(/\n\s*>\s*([^\n]+)\s*$/)
+    const markerMatch = normalized.match(/\n\s*(?:-{4,}\s*\n\s*)?>\s*([^\n]+)\s*$/)
     const markerIndex = markerMatch?.index ?? -1
     const disclaimerLine = markerMatch?.[1]?.trim() ?? ''
     if (markerIndex <= 0 || !disclaimerLine) {

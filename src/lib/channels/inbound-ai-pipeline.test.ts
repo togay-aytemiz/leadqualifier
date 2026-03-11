@@ -619,6 +619,48 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
+    it('uses instagram disclaimer formatting for instagram bot replies', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({ platform: 'instagram' }))
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-1'
+            }
+        }))
+
+        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\n------\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(botInsert.insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sender_type: 'bot',
+                content: 'Skill response\n\n------\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+            })
+        )
+    })
+
     it('sends matched skill reply with interactive buttons when skill actions exist', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)

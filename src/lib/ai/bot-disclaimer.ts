@@ -8,6 +8,8 @@ type BotDisclaimerSettings = Pick<
     'bot_disclaimer_enabled' | 'bot_disclaimer_message_tr' | 'bot_disclaimer_message_en'
 >
 
+type BotDisclaimerPlatform = 'whatsapp' | 'telegram' | 'instagram'
+
 function resolveDisclaimerMessage(
     responseLanguage: 'tr' | 'en',
     settings: BotDisclaimerSettings
@@ -24,9 +26,18 @@ function resolveDisclaimerMessage(
         : DEFAULT_BOT_DISCLAIMER_MESSAGE_EN
 }
 
+function formatDisclaimerBlock(platform: BotDisclaimerPlatform | undefined, disclaimerMessage: string) {
+    if (platform === 'instagram') {
+        return `------\n> ${disclaimerMessage}`
+    }
+
+    return `> ${disclaimerMessage}`
+}
+
 export function applyBotMessageDisclaimer(options: {
     message: string
     responseLanguage: 'tr' | 'en'
+    platform?: BotDisclaimerPlatform
     settings: BotDisclaimerSettings
 }) {
     const baseMessage = options.message.trim()
@@ -37,5 +48,5 @@ export function applyBotMessageDisclaimer(options: {
     }
 
     const disclaimerMessage = resolveDisclaimerMessage(options.responseLanguage, options.settings)
-    return `${baseMessage}\n\n> ${disclaimerMessage}`
+    return `${baseMessage}\n\n${formatDisclaimerBlock(options.platform, disclaimerMessage)}`
 }

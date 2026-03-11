@@ -43,6 +43,13 @@ describe('splitBotMessageDisclaimer', () => {
         expect(parsed.body).toBe('Merhaba')
         expect(parsed.disclaimer).toBe('Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
     })
+
+    it('splits instagram disclaimer when separator line appears above the quote', () => {
+        const parsed = splitBotMessageDisclaimer('Merhaba\n\n------\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+
+        expect(parsed.body).toBe('Merhaba')
+        expect(parsed.disclaimer).toBe('Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+    })
 })
 
 describe('extractSkillTitleFromMetadata', () => {
