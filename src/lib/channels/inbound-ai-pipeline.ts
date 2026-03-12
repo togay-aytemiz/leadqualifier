@@ -44,6 +44,7 @@ export interface InboundAiPipelineInput {
     source: 'whatsapp' | 'telegram' | 'instagram'
     contactId: string
     contactName: string | null
+    contactAvatarUrl?: string | null
     text: string
     inboundMessageId: string
     inboundMessageIdMetadataKey: string
@@ -67,6 +68,19 @@ function readStringArray(value: unknown): string[] {
         .filter(Boolean)
 }
 
+function readTrimmedString(value: unknown): string | null {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeContactAvatarUrl(value: unknown): string | null {
+    const trimmed = readTrimmedString(value)
+    if (!trimmed) return null
+    if (!/^https?:\/\//i.test(trimmed)) return null
+    return trimmed
+}
+
 function shouldMarkInstagramRequest(input: InboundAiPipelineInput) {
     if (input.platform !== 'instagram') return false
     const eventSource = input.inboundMessageMetadata.instagram_event_source
@@ -86,6 +100,7 @@ function mergeConversationTags(existingTags: unknown, ensureTag: string | null):
 export async function processInboundAiPipeline(options: InboundAiPipelineInput) {
     const orgId = options.organizationId
     const markInstagramRequest = shouldMarkInstagramRequest(options)
+    const contactAvatarUrl = normalizeContactAvatarUrl(options.contactAvatarUrl)
 
     const dedupeFilter = `metadata->>${options.inboundMessageIdMetadataKey}`
     const { data: existingInboundData } = await options.supabase
@@ -116,6 +131,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 organization_id: orgId,
                 platform: options.platform,
                 contact_name: options.contactName || options.contactId,
+                contact_avatar_url: contactAvatarUrl,
                 contact_phone: options.contactId,
                 status: 'open',
                 unread_count: 0,
@@ -173,6 +189,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         .from('conversations')
         .update({
             contact_name: options.contactName || conversation.contact_name,
+            contact_avatar_url: contactAvatarUrl || conversation.contact_avatar_url || null,
             tags: updatedConversationTags,
             last_message_at: new Date().toISOString(),
             unread_count: (conversation.unread_count ?? 0) + 1,

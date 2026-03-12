@@ -4,12 +4,20 @@ const {
     assertTenantWriteAllowedMock,
     createClientMock,
     getMessageTemplatesMock,
+    instagramCtorMock,
+    instagramSendImageMock,
+    instagramSendTextMock,
+    instagramGetUserProfileMock,
     sendTemplateMock,
     whatsAppCtorMock
 } = vi.hoisted(() => ({
     assertTenantWriteAllowedMock: vi.fn(),
     createClientMock: vi.fn(),
     getMessageTemplatesMock: vi.fn(),
+    instagramCtorMock: vi.fn(),
+    instagramSendImageMock: vi.fn(),
+    instagramSendTextMock: vi.fn(),
+    instagramGetUserProfileMock: vi.fn(),
     sendTemplateMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
 }))
@@ -39,12 +47,25 @@ vi.mock('@/lib/whatsapp/client', () => ({
     }
 }))
 
+vi.mock('@/lib/instagram/client', () => ({
+    InstagramClient: class {
+        constructor(token: string, graphVersion?: string) {
+            instagramCtorMock(token, graphVersion)
+        }
+
+        sendText = instagramSendTextMock
+        sendImage = instagramSendImageMock
+        getUserProfile = instagramGetUserProfileMock
+    }
+}))
+
 import {
     getConversations,
     createConversationPredefinedTemplate,
     deleteConversationPredefinedTemplate,
     listConversationWhatsAppTemplates,
     listConversationPredefinedTemplates,
+    sendConversationInstagramImageBatch,
     sendConversationWhatsAppTemplateMessage,
     setConversationAgent,
     setConversationAiProcessingPaused,
@@ -109,6 +130,7 @@ function createConversation(overrides: Partial<Conversation> = {}): Conversation
         id: 'conv-1',
         organization_id: 'org-1',
         contact_name: 'Test Contact',
+        contact_avatar_url: null,
         contact_phone: '+905555555555',
         platform: 'whatsapp',
         status: 'open',
@@ -127,6 +149,8 @@ function createConversation(overrides: Partial<Conversation> = {}): Conversation
 describe('getConversations', () => {
     beforeEach(() => {
         createClientMock.mockReset()
+        instagramCtorMock.mockReset()
+        instagramGetUserProfileMock.mockReset()
         assertTenantWriteAllowedMock.mockResolvedValue(undefined)
         getMessageTemplatesMock.mockResolvedValue({
             data: [
@@ -213,6 +237,45 @@ describe('getConversations', () => {
         expect(result[0]?.leads?.[0]?.status).toBe('cold')
     })
 
+    it('derives missing social avatar urls from preview message metadata', async () => {
+        const rawConversation = {
+            ...createConversation({
+                platform: 'telegram',
+                contact_avatar_url: null
+            }),
+            assignee: {
+                full_name: 'Test User',
+                email: 'test@example.com'
+            },
+            leads: [],
+            messages: [{
+                content: 'Merhaba',
+                created_at: '2026-02-08T10:00:00.000Z',
+                sender_type: 'contact',
+                metadata: {
+                    telegram_contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/avatar.jpg'
+                }
+            }]
+        }
+
+        const supabaseMock = createSupabaseMock({
+            conversations: [
+                createQueryBuilder({
+                    rangeResult: {
+                        data: [rawConversation],
+                        error: null
+                    }
+                })
+            ]
+        })
+
+        createClientMock.mockResolvedValue(supabaseMock)
+
+        const result = await getConversations('org-1')
+
+        expect(result[0]?.contact_avatar_url).toBe('https://api.telegram.org/file/bottoken-1/photos/avatar.jpg')
+    })
+
     it('falls back to flat queries when primary nested query fails', async () => {
         const baseConversation = createConversation()
 
@@ -285,6 +348,7 @@ describe('getConversations', () => {
             platform: 'instagram',
             contact_phone: '1400879865404973',
             contact_name: 'togayaytemiz',
+            contact_avatar_url: 'https://cdn.example.com/existing-avatar.jpg',
             assignee_id: null
         })
 
@@ -352,7 +416,95 @@ describe('getConversations', () => {
         expect(result[0]?.messages?.[0]?.content).toBe('[Instagram seen]')
         expect(result[0]?.messages?.[1]?.content).toBe('Merhaba')
     })
+
+    it('hydrates missing instagram avatar urls alongside contact names', async () => {
+        const baseConversation = createConversation({
+            platform: 'instagram',
+            contact_phone: '1400879865404973',
+            contact_name: '1400879865404973',
+            contact_avatar_url: null,
+            assignee_id: null
+        })
+        const conversationUpdate = createConversationUpdateBuilder()
+        const channelLookup = createInstagramChannelLookupBuilder('ig-token-1')
+
+        const supabaseMock = createSupabaseMock({
+            conversations: [
+                createQueryBuilder({
+                    rangeResult: {
+                        data: [baseConversation],
+                        error: null
+                    }
+                }),
+                conversationUpdate.builder
+            ],
+            messages: [
+                createQueryBuilder({
+                    inResult: {
+                        data: [],
+                        error: null
+                    }
+                })
+            ],
+            channels: [channelLookup.builder]
+        })
+
+        instagramGetUserProfileMock.mockResolvedValueOnce({
+            id: '1400879865404973',
+            username: 'itsalinayalin',
+            name: 'Alina Yalin',
+            profile_picture_url: 'https://cdn.example.com/ig-avatar.jpg'
+        })
+        createClientMock.mockResolvedValue(supabaseMock)
+
+        const result = await getConversations('org-1')
+
+        expect(instagramCtorMock).toHaveBeenCalledWith('ig-token-1', 'v25.0')
+        expect(instagramGetUserProfileMock).toHaveBeenCalledWith('1400879865404973')
+        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'itsalinayalin',
+            contact_avatar_url: 'https://cdn.example.com/ig-avatar.jpg'
+        }))
+        expect(result[0]?.contact_name).toBe('itsalinayalin')
+        expect(result[0]?.contact_avatar_url).toBe('https://cdn.example.com/ig-avatar.jpg')
+    })
 })
+
+function createConversationUpdateBuilder() {
+    const eqMock = vi.fn(async () => ({ error: null }))
+    const updateMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            update: updateMock
+        },
+        updateMock
+    }
+}
+
+function createInstagramChannelLookupBuilder(accessToken: string) {
+    const maybeSingleMock = vi.fn(async () => ({
+        data: {
+            config: {
+                page_access_token: accessToken
+            },
+            updated_at: '2026-03-11T10:00:00.000Z'
+        },
+        error: null
+    }))
+    const limitMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+    const orderMock = vi.fn(() => ({ limit: limitMock }))
+    const eqStatusMock = vi.fn(() => ({ order: orderMock }))
+    const eqTypeMock = vi.fn(() => ({ eq: eqStatusMock }))
+    const eqOrgMock = vi.fn(() => ({ eq: eqTypeMock }))
+    const selectMock = vi.fn(() => ({ eq: eqOrgMock }))
+
+    return {
+        builder: {
+            select: selectMock
+        }
+    }
+}
 
 function createConversationTemplateSupabaseMock(options: {
     conversation: {
@@ -424,6 +576,8 @@ describe('inbox WhatsApp template actions', () => {
     beforeEach(() => {
         createClientMock.mockReset()
         assertTenantWriteAllowedMock.mockResolvedValue(undefined)
+        instagramSendTextMock.mockReset()
+        instagramSendImageMock.mockReset()
         getMessageTemplatesMock.mockResolvedValue({
             data: [
                 {
@@ -503,6 +657,147 @@ describe('inbox WhatsApp template actions', () => {
             p_conversation_id: 'conv-1',
             p_content: 'Template: appointment_reminder'
         })
+    })
+})
+
+describe('inbox instagram image actions', () => {
+    beforeEach(() => {
+        createClientMock.mockReset()
+        assertTenantWriteAllowedMock.mockResolvedValue(undefined)
+        instagramSendTextMock.mockReset()
+        instagramSendImageMock.mockReset()
+        instagramSendImageMock.mockResolvedValue({
+            message_id: 'igmid.outbound.image.1'
+        })
+    })
+
+    it('sends instagram image attachments and persists instagram media metadata', async () => {
+        const conversationSingleMock = vi.fn(async () => ({
+            data: {
+                platform: 'instagram',
+                contact_phone: '17841400000000000',
+                organization_id: 'org-1'
+            },
+            error: null
+        }))
+        const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+        const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+        const inboundCountEqSenderMock = vi.fn(async () => ({
+            count: 1,
+            error: null
+        }))
+        const inboundCountEqConversationMock = vi.fn(() => ({ eq: inboundCountEqSenderMock }))
+        const inboundCountSelectMock = vi.fn(() => ({ eq: inboundCountEqConversationMock }))
+
+        const updatedMessageRow = {
+            id: 'msg-1',
+            conversation_id: 'conv-1',
+            sender_type: 'user',
+            content: '[Instagram image]',
+            metadata: {
+                instagram_outbound_status: 'sent'
+            },
+            created_at: '2026-03-11T10:10:01.000Z'
+        }
+        const messageSingleMock = vi.fn(async () => ({
+            data: updatedMessageRow,
+            error: null
+        }))
+        const messageSelectAfterUpdateMock = vi.fn(() => ({ single: messageSingleMock }))
+        const messageEqConversationIdMock = vi.fn(() => ({ select: messageSelectAfterUpdateMock }))
+        const messageEqIdMock = vi.fn(() => ({ eq: messageEqConversationIdMock }))
+        const messageUpdateMock = vi.fn(() => ({ eq: messageEqIdMock }))
+
+        const channelSingleMock = vi.fn(async () => ({
+            data: {
+                config: {
+                    page_access_token: 'ig-token-1',
+                    instagram_business_account_id: 'ig-business-1'
+                }
+            },
+            error: null
+        }))
+        const channelEqStatusMock = vi.fn(() => ({ single: channelSingleMock }))
+        const channelEqTypeMock = vi.fn(() => ({ eq: channelEqStatusMock }))
+        const channelEqOrgMock = vi.fn(() => ({ eq: channelEqTypeMock }))
+        const channelSelectMock = vi.fn(() => ({ eq: channelEqOrgMock }))
+
+        const rpcMock = vi.fn(async () => ({
+            data: {
+                message: {
+                    id: 'msg-1'
+                },
+                conversation: {
+                    id: 'conv-1',
+                    assignee_id: 'profile-1'
+                }
+            },
+            error: null
+        }))
+
+        const messagesBuilders = [
+            { select: inboundCountSelectMock },
+            { update: messageUpdateMock }
+        ]
+
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table === 'conversations') return { select: conversationSelectMock }
+                if (table === 'messages') {
+                    const next = messagesBuilders.shift()
+                    if (!next) {
+                        throw new Error('Unexpected extra messages query')
+                    }
+                    return next
+                }
+                if (table === 'channels') return { select: channelSelectMock }
+                throw new Error(`Unexpected query for table: ${table}`)
+            }),
+            rpc: rpcMock
+        }
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await sendConversationInstagramImageBatch({
+            conversationId: 'conv-1',
+            text: '',
+            attachments: [{
+                id: 'ig-attachment-1',
+                name: 'price-shot.jpg',
+                mimeType: 'image/jpeg',
+                sizeBytes: 2048,
+                mediaType: 'image',
+                storagePath: 'org-1/ig-business-1/outbound/price-shot.jpg',
+                uploadToken: 'ignored-in-send-test',
+                publicUrl: 'https://cdn.example.com/outbound/price-shot.jpg'
+            }]
+        })
+
+        expect(result.ok).toBe(true)
+        if (!result.ok) return
+
+        expect(instagramCtorMock).toHaveBeenCalledWith('ig-token-1', undefined)
+        expect(instagramSendImageMock).toHaveBeenCalledWith({
+            instagramBusinessAccountId: 'ig-business-1',
+            to: '17841400000000000',
+            imageUrl: 'https://cdn.example.com/outbound/price-shot.jpg'
+        })
+        expect(rpcMock).toHaveBeenCalledWith('send_operator_message', {
+            p_conversation_id: 'conv-1',
+            p_content: '[Instagram image]'
+        })
+        expect(messageUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                instagram_message_id: 'igmid.outbound.image.1',
+                instagram_media_type: 'image',
+                instagram_outbound_attachment_id: 'ig-attachment-1',
+                instagram_is_media_placeholder: true,
+                instagram_media: expect.objectContaining({
+                    type: 'image',
+                    storage_url: 'https://cdn.example.com/outbound/price-shot.jpg'
+                })
+            })
+        }))
     })
 })
 

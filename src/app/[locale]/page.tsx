@@ -4,7 +4,7 @@ import { resolveActiveOrganizationContext } from '@/lib/organizations/active-con
 import { resolveDefaultHomeRoute } from '@/lib/navigation/default-home-route'
 import { hasSupabaseAuthCookie } from '@/lib/auth/supabase-auth-cookie'
 
-export default async function Home() {
+export default async function LocaleEntryPage() {
     const cookieStore = await cookies()
     if (!hasSupabaseAuthCookie(cookieStore.getAll())) {
         redirect('/login')

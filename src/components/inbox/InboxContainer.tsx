@@ -12,7 +12,9 @@ import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
     getMessagesPage,
+    prepareConversationInstagramImageUploads,
     sendMessage,
+    sendConversationInstagramImageBatch,
     prepareConversationWhatsAppMediaUploads,
     sendConversationWhatsAppMediaBatch,
     getConversations,
@@ -26,6 +28,7 @@ import {
     refreshConversationLead,
     setConversationAiProcessingPaused,
     type ConversationListItem,
+    type ConversationInstagramOutboundImageUploadTarget,
     type ConversationWhatsAppOutboundAttachmentUploadTarget
 } from '@/lib/inbox/actions'
 import { createClient } from '@/lib/supabase/client'
@@ -67,10 +70,13 @@ import {
     shouldLoadOlderMessages
 } from '@/components/inbox/messagePagination'
 import {
+    MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS,
+    MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES,
     MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
     MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
     MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES,
     resolveOutboundMediaCaption,
+    validateInstagramOutboundImageAttachments,
     validateWhatsAppOutboundAttachments,
     type WhatsAppOutboundMediaType
 } from '@/lib/inbox/outbound-media'
@@ -90,6 +96,7 @@ import {
 } from '@/components/inbox/instagramMessageEvents'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
+import { extractSocialContactAvatarUrl } from '@/lib/inbox/contact-avatar'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -108,7 +115,7 @@ interface InboxContainerProps {
 type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 const SUMMARY_PANEL_ID = 'conversation-summary-panel'
-const WHATSAPP_MEDIA_BUCKET = 'whatsapp-media'
+const INBOX_MEDIA_BUCKET = 'whatsapp-media'
 const MESSAGES_PAGE_SIZE = 50
 const MESSAGE_HISTORY_TOP_THRESHOLD = 96
 const WHATSAPP_UPLOAD_ACCEPT = [
@@ -121,6 +128,13 @@ const WHATSAPP_UPLOAD_ACCEPT = [
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain'
+].join(',')
+const INSTAGRAM_UPLOAD_ACCEPT = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif'
 ].join(',')
 
 type PendingAttachment = {
@@ -153,7 +167,7 @@ function parseMessageMetadataRecord(metadata: unknown) {
 function extractOutboundAttachmentId(metadata: unknown) {
     const parsed = parseMessageMetadataRecord(metadata)
     if (!parsed) return null
-    const value = parsed.whatsapp_outbound_attachment_id
+    const value = parsed.whatsapp_outbound_attachment_id ?? parsed.instagram_outbound_attachment_id
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
@@ -162,7 +176,7 @@ function extractOutboundAttachmentId(metadata: unknown) {
 function resolveOutboundDeliveryState(metadata: unknown): 'sending' | 'failed' | null {
     const parsed = parseMessageMetadataRecord(metadata)
     if (!parsed) return null
-    const value = parsed.whatsapp_outbound_status
+    const value = parsed.whatsapp_outbound_status ?? parsed.instagram_outbound_status
     if (value === 'sending') return 'sending'
     if (value === 'failed') return 'failed'
     return null
@@ -304,12 +318,15 @@ export function InboxContainer({
         setMessages((previous) => previous.map((message) => {
             if (!tempMessageIds.includes(message.id)) return message
             const metadataRecord = parseMessageMetadataRecord(message.metadata) ?? {}
+            const statusKey = metadataRecord.instagram_outbound_attachment_id
+                ? 'instagram_outbound_status'
+                : 'whatsapp_outbound_status'
             return {
                 ...message,
                 metadata: {
                     ...metadataRecord,
-                    whatsapp_outbound_status: 'failed'
-                }
+                    [statusKey]: 'failed'
+                } as Message['metadata']
             }
         }))
     }, [])
@@ -317,6 +334,7 @@ export function InboxContainer({
     const resolveAttachmentValidationErrorMessage = useCallback((args: {
         validationResult: ReturnType<typeof validateWhatsAppOutboundAttachments>
         drafts: Array<{ id: string; mimeType: string }>
+        platform: 'whatsapp' | 'instagram'
     }) => {
         if (args.validationResult.ok) return null
         const { validationResult } = args
@@ -324,15 +342,22 @@ export function InboxContainer({
             return t('composerAttachments.errors.maxCount', { count: validationResult.maxCount })
         }
         if (validationResult.reason === 'invalid_mime_type') {
-            return t('composerAttachments.errors.invalidType')
+            return args.platform === 'instagram'
+                ? t('composerAttachments.errors.invalidTypeInstagram')
+                : t('composerAttachments.errors.invalidType')
         }
         if (validationResult.reason !== 'file_too_large') {
-            return t('composerAttachments.errors.invalidType')
+            return args.platform === 'instagram'
+                ? t('composerAttachments.errors.invalidTypeInstagram')
+                : t('composerAttachments.errors.invalidType')
         }
 
         const draft = args.drafts.find((item) => item.id === validationResult.attachmentId)
         if (draft?.mimeType.startsWith('image/')) {
-            return t('composerAttachments.errors.maxImageSize', { sizeMb: Math.floor(MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES / (1024 * 1024)) })
+            const maxSizeBytes = args.platform === 'instagram'
+                ? MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES
+                : MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES
+            return t('composerAttachments.errors.maxImageSize', { sizeMb: Math.floor(maxSizeBytes / (1024 * 1024)) })
         }
         return t('composerAttachments.errors.maxDocumentSize', { sizeMb: Math.floor(MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES / (1024 * 1024)) })
     }, [t])
@@ -821,6 +846,9 @@ export function InboxContainer({
                 }, (payload) => {
                     const newMsg = payload.new as Message
                     console.log('Realtime Message received:', newMsg)
+                    const inboundContactAvatarUrl = newMsg.sender_type === 'contact'
+                        ? extractSocialContactAvatarUrl(newMsg.metadata)
+                        : null
 
                     // 1. Update active chat if it matches selectedId
                     if (newMsg.conversation_id === selectedIdRef.current) {
@@ -868,6 +896,7 @@ export function InboxContainer({
                             return {
                                 ...c,
                                 last_message_at: newMsg.created_at,
+                                contact_avatar_url: c.contact_avatar_url ?? inboundContactAvatarUrl,
                                 // Only increment unread if it's NOT the currently open chat
                                 unread_count: newMsg.conversation_id !== selectedIdRef.current
                                     ? (shouldIncrementUnread ? c.unread_count + 1 : c.unread_count)
@@ -1131,7 +1160,7 @@ export function InboxContainer({
     const handleOpenAttachmentPicker = () => {
         if (isReadOnly) return
         if (!isWhatsAppConversation) {
-            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+            setComposerErrorMessage(t('composerAttachments.errors.notSupportedPlatform'))
             return
         }
         attachmentInputRef.current?.click()
@@ -1139,8 +1168,8 @@ export function InboxContainer({
 
     const handleOpenImagePicker = () => {
         if (isReadOnly) return
-        if (!isWhatsAppConversation) {
-            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+        if (!supportsImageAttachments) {
+            setComposerErrorMessage(t('composerAttachments.errors.notSupportedPlatform'))
             return
         }
         imageInputRef.current?.click()
@@ -1166,18 +1195,18 @@ export function InboxContainer({
         }
     ) => {
         if (files.length === 0) return
-        if (!isWhatsAppConversation) {
-            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+        if (!supportsImageAttachments) {
+            setComposerErrorMessage(t('composerAttachments.errors.notSupportedPlatform'))
             return
         }
 
-        const availableSlots = Math.max(0, MAX_WHATSAPP_OUTBOUND_ATTACHMENTS - pendingAttachments.length)
+        const availableSlots = Math.max(0, maxAttachmentCount - pendingAttachments.length)
         const selectedFiles = options?.truncateToAvailableSlots
             ? files.slice(0, availableSlots)
             : files
 
         if (selectedFiles.length === 0) {
-            setComposerErrorMessage(t('composerAttachments.errors.maxCount', { count: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS }))
+            setComposerErrorMessage(t('composerAttachments.errors.maxCount', { count: maxAttachmentCount }))
             return
         }
 
@@ -1194,16 +1223,26 @@ export function InboxContainer({
             sizeBytes: file.size
         }))
 
-        const validationResult = validateWhatsAppOutboundAttachments([
+        const validationResult = (isInstagramConversation
+            ? validateInstagramOutboundImageAttachments([
+                ...existingDrafts,
+                ...incomingDrafts
+            ])
+            : validateWhatsAppOutboundAttachments([
             ...existingDrafts,
             ...incomingDrafts
-        ])
+            ]))
         if (!validationResult.ok) {
             const message = resolveAttachmentValidationErrorMessage({
                 validationResult,
-                drafts: [...existingDrafts, ...incomingDrafts]
+                drafts: [...existingDrafts, ...incomingDrafts],
+                platform: isInstagramConversation ? 'instagram' : 'whatsapp'
             })
-            setComposerErrorMessage(message ?? t('composerAttachments.errors.invalidType'))
+            setComposerErrorMessage(message ?? (
+                isInstagramConversation
+                    ? t('composerAttachments.errors.invalidTypeInstagram')
+                    : t('composerAttachments.errors.invalidType')
+            ))
             return
         }
 
@@ -1236,7 +1275,7 @@ export function InboxContainer({
     }
 
     const handleInputPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-        if (isReadOnly || isComposerDisabled || !isWhatsAppConversation) return
+        if (isReadOnly || isComposerDisabled || !supportsImageAttachments) return
 
         const pastedImages = extractImageFilesFromClipboard(event)
         if (pastedImages.length === 0) return
@@ -1248,15 +1287,24 @@ export function InboxContainer({
     }
 
     const resolveMediaSendErrorMessage = (reason: string, maxAllowed?: number) => {
-        if (reason === 'missing_channel') return t('composerAttachments.errors.missingChannel')
+        if (reason === 'missing_channel') {
+            return isInstagramConversation
+                ? t('composerAttachments.errors.missingInstagramChannel')
+                : t('composerAttachments.errors.missingChannel')
+        }
         if (reason === 'billing_locked') return t('composerAttachments.errors.billingLocked')
         if (reason === 'reply_blocked') return t('composerAttachments.errors.replyWindowBlocked')
+        if (reason === 'missing_inbound') return t('composerAttachments.errors.instagramInboundRequired')
         if (reason === 'too_many_attachments') {
             return t('composerAttachments.errors.maxCount', {
-                count: maxAllowed ?? MAX_WHATSAPP_OUTBOUND_ATTACHMENTS
+                count: maxAllowed ?? maxAttachmentCount
             })
         }
-        if (reason === 'invalid_attachment') return t('composerAttachments.errors.invalidType')
+        if (reason === 'invalid_attachment') {
+            return isInstagramConversation
+                ? t('composerAttachments.errors.invalidTypeInstagram')
+                : t('composerAttachments.errors.invalidType')
+        }
         if (reason === 'validation') return t('composerAttachments.errors.validation')
         return t('composerAttachments.errors.sendFailed')
     }
@@ -1291,8 +1339,8 @@ export function InboxContainer({
         const normalizedInput = input.trim()
         const selectedAttachments = [...pendingAttachments]
         if (!normalizedInput && selectedAttachments.length === 0) return
-        if (selectedAttachments.length > 0 && !isWhatsAppConversation) {
-            setComposerErrorMessage(t('composerAttachments.errors.notWhatsApp'))
+        if (selectedAttachments.length > 0 && !supportsImageAttachments) {
+            setComposerErrorMessage(t('composerAttachments.errors.notSupportedPlatform'))
             return
         }
 
@@ -1303,40 +1351,76 @@ export function InboxContainer({
 
         const conversationId = selectedId
         const optimisticMessages: Message[] = selectedAttachments.length > 0
-            ? selectedAttachments.map((attachment, index) => {
-                const caption = resolveOutboundMediaCaption(normalizedInput, index)
-                const content = caption ?? (attachment.mediaType === 'image'
-                    ? t('composerAttachments.outboundPlaceholderImage')
-                    : t('composerAttachments.outboundPlaceholderDocument'))
-
-                return {
-                    id: `temp-media-${Date.now()}-${index}`,
-                    conversation_id: conversationId,
-                    sender_type: 'user',
-                    content,
-                    metadata: {
-                        whatsapp_outbound_status: 'sending',
-                        whatsapp_outbound_attachment_id: attachment.id,
-                        whatsapp_is_media_placeholder: !caption,
-                        whatsapp_media: {
-                            type: attachment.mediaType,
-                            mime_type: attachment.mimeType,
-                            caption,
-                            filename: attachment.name,
-                            storage_path: null,
-                            storage_url: attachment.previewUrl,
-                            download_status: 'sending'
+            ? [
+                ...selectedAttachments.map((attachment, index) => {
+                    if (isInstagramConversation) {
+                        return {
+                            id: `temp-media-${Date.now()}-${index}`,
+                            conversation_id: conversationId,
+                            sender_type: 'user' as const,
+                            content: t('composerAttachments.outboundPlaceholderImage'),
+                            metadata: {
+                                instagram_outbound_status: 'sending',
+                                instagram_outbound_attachment_id: attachment.id,
+                                instagram_is_media_placeholder: true,
+                                instagram_media: {
+                                    type: 'image',
+                                    mime_type: attachment.mimeType,
+                                    caption: null,
+                                    filename: attachment.name,
+                                    storage_path: null,
+                                    storage_url: attachment.previewUrl,
+                                    download_status: 'sending'
+                                }
+                            } as Message['metadata'],
+                            created_at: new Date(Date.now() + index).toISOString()
                         }
-                    },
-                    created_at: new Date(Date.now() + index).toISOString()
-                }
-            })
+                    }
+
+                    const caption = resolveOutboundMediaCaption(normalizedInput, index)
+                    const content = caption ?? (attachment.mediaType === 'image'
+                        ? t('composerAttachments.outboundPlaceholderImage')
+                        : t('composerAttachments.outboundPlaceholderDocument'))
+
+                    return {
+                        id: `temp-media-${Date.now()}-${index}`,
+                        conversation_id: conversationId,
+                        sender_type: 'user' as const,
+                        content,
+                        metadata: {
+                            whatsapp_outbound_status: 'sending',
+                            whatsapp_outbound_attachment_id: attachment.id,
+                            whatsapp_is_media_placeholder: !caption,
+                            whatsapp_media: {
+                                type: attachment.mediaType,
+                                mime_type: attachment.mimeType,
+                                caption,
+                                filename: attachment.name,
+                                storage_path: null,
+                                storage_url: attachment.previewUrl,
+                                download_status: 'sending'
+                            }
+                        } as Message['metadata'],
+                        created_at: new Date(Date.now() + index).toISOString()
+                    }
+                }),
+                ...(isInstagramConversation && normalizedInput
+                    ? [{
+                        id: `temp-text-${Date.now()}`,
+                        conversation_id: conversationId,
+                        sender_type: 'user' as const,
+                        content: normalizedInput,
+                        metadata: {} as Message['metadata'],
+                        created_at: new Date(Date.now() + selectedAttachments.length).toISOString()
+                    }]
+                    : [])
+            ]
             : [{
                 id: `temp-${Date.now()}`,
                 conversation_id: conversationId,
-                sender_type: 'user',
+                sender_type: 'user' as const,
                 content: normalizedInput,
-                metadata: {},
+                metadata: {} as Message['metadata'],
                 created_at: nowIso
             }]
         const optimisticPreviewMessage: Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'> = selectedAttachments.length > 0
@@ -1373,15 +1457,25 @@ export function InboxContainer({
         setIsSending(true)
         try {
             if (selectedAttachments.length > 0) {
-                const prepareResult = await prepareConversationWhatsAppMediaUploads({
-                    conversationId,
-                    attachments: selectedAttachments.map((attachment) => ({
-                        id: attachment.id,
-                        name: attachment.name,
-                        mimeType: attachment.mimeType,
-                        sizeBytes: attachment.sizeBytes
-                    }))
-                })
+                const prepareResult = isInstagramConversation
+                    ? await prepareConversationInstagramImageUploads({
+                        conversationId,
+                        attachments: selectedAttachments.map((attachment) => ({
+                            id: attachment.id,
+                            name: attachment.name,
+                            mimeType: attachment.mimeType,
+                            sizeBytes: attachment.sizeBytes
+                        }))
+                    })
+                    : await prepareConversationWhatsAppMediaUploads({
+                        conversationId,
+                        attachments: selectedAttachments.map((attachment) => ({
+                            id: attachment.id,
+                            name: attachment.name,
+                            mimeType: attachment.mimeType,
+                            sizeBytes: attachment.sizeBytes
+                        }))
+                    })
 
                 if (!prepareResult.ok) {
                     setComposerErrorMessage(resolveMediaSendErrorMessage(prepareResult.reason, prepareResult.maxAllowed))
@@ -1390,7 +1484,10 @@ export function InboxContainer({
                 }
 
                 const uploadTargetsById = new Map(prepareResult.uploads.map((upload) => [upload.id, upload]))
-                const uploadedAttachments: ConversationWhatsAppOutboundAttachmentUploadTarget[] = []
+                const uploadedAttachments: Array<
+                    ConversationInstagramOutboundImageUploadTarget
+                    | ConversationWhatsAppOutboundAttachmentUploadTarget
+                > = []
 
                 for (const attachment of selectedAttachments) {
                     const uploadTarget = uploadTargetsById.get(attachment.id)
@@ -1399,7 +1496,7 @@ export function InboxContainer({
                     }
 
                     const { error: uploadError } = await supabase.storage
-                        .from(WHATSAPP_MEDIA_BUCKET)
+                        .from(INBOX_MEDIA_BUCKET)
                         .uploadToSignedUrl(uploadTarget.storagePath, uploadTarget.uploadToken, attachment.file)
                     if (uploadError) {
                         throw uploadError
@@ -1407,11 +1504,17 @@ export function InboxContainer({
                     uploadedAttachments.push(uploadTarget)
                 }
 
-                const batchResult = await sendConversationWhatsAppMediaBatch({
-                    conversationId,
-                    text: normalizedInput,
-                    attachments: uploadedAttachments
-                })
+                const batchResult = isInstagramConversation
+                    ? await sendConversationInstagramImageBatch({
+                        conversationId,
+                        text: normalizedInput,
+                        attachments: uploadedAttachments as ConversationInstagramOutboundImageUploadTarget[]
+                    })
+                    : await sendConversationWhatsAppMediaBatch({
+                        conversationId,
+                        text: normalizedInput,
+                        attachments: uploadedAttachments as ConversationWhatsAppOutboundAttachmentUploadTarget[]
+                    })
                 if (!batchResult.ok) {
                     setComposerErrorMessage(resolveMediaSendErrorMessage(batchResult.reason))
                     markOptimisticMessagesAsFailed(optimisticMessages.map((message) => message.id))
@@ -1622,7 +1725,7 @@ export function InboxContainer({
                         >
                             <div className="flex items-start gap-3">
                                 <div className="relative shrink-0">
-                                    <Avatar name={contactDisplayName} size="sm" />
+                                    <Avatar name={contactDisplayName} src={c.contact_avatar_url} size="sm" />
                                     <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
                                         <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
                                             {c.platform !== 'simulator' ? (
@@ -1709,6 +1812,7 @@ export function InboxContainer({
     const selectedConversationDisplayName = selectedConversation
         ? resolveInboxContactDisplayName(selectedConversation, visibleMessages)
         : ''
+    const selectedConversationAvatarUrl = selectedConversation?.contact_avatar_url ?? null
     const isSelectedConversationInstagramRequest = selectedConversation
         ? isInstagramRequestConversation(selectedConversation, visibleMessages)
         : false
@@ -1754,6 +1858,11 @@ export function InboxContainer({
         return map
     }, [selectedConversation?.platform, visibleMessages])
     const isWhatsAppConversation = selectedConversation?.platform === 'whatsapp'
+    const isInstagramConversation = selectedConversation?.platform === 'instagram'
+    const supportsImageAttachments = isWhatsAppConversation || isInstagramConversation
+    const maxAttachmentCount = isInstagramConversation
+        ? MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS
+        : MAX_WHATSAPP_OUTBOUND_ATTACHMENTS
     const latestWhatsAppInboundAt = isWhatsAppConversation && !showConversationSkeleton
         ? getLatestContactMessageAt(visibleMessages)
         : null
@@ -1877,7 +1986,8 @@ export function InboxContainer({
     })
     const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
     const isComposerDisabled = isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked
-    const isAttachmentPickerDisabled = isComposerDisabled || !isWhatsAppConversation
+    const isAttachmentPickerDisabled = isComposerDisabled || !supportsImageAttachments
+    const isDocumentAttachmentPickerDisabled = isComposerDisabled || !isWhatsAppConversation
     const isTemplatePickerDisabled = isReadOnly || showConversationSkeleton || (isWhatsAppConversation && isWhatsAppReplyBlocked)
     const hasMessageInput = Boolean(input.trim())
     const hasPendingAttachments = pendingAttachments.length > 0
@@ -2274,7 +2384,7 @@ export function InboxContainer({
                                 ) : (
                                     <>
                                         <div className="mb-3 flex items-center gap-3">
-                                            <Avatar name={selectedConversationDisplayName} size="sm" />
+                                            <Avatar name={selectedConversationDisplayName} src={selectedConversationAvatarUrl} size="sm" />
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <p className="text-sm font-semibold text-gray-900">{selectedConversationDisplayName}</p>
@@ -2599,7 +2709,7 @@ export function InboxContainer({
                                                 <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                     {dateSeparator}
                                                     <div className="flex items-end gap-3">
-                                                        <Avatar name={selectedConversationDisplayName} size="md" />
+                                                        <Avatar name={selectedConversationDisplayName} src={selectedConversationAvatarUrl} size="md" />
                                                         <div className="flex flex-col gap-1 max-w-[80%]">
                                                             <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none p-2.5">
                                                                 {renderGalleryGrid(false)}
@@ -2617,7 +2727,7 @@ export function InboxContainer({
                                             <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                 {dateSeparator}
                                                 <div className="flex items-end gap-3">
-                                                    <Avatar name={selectedConversationDisplayName} size="md" />
+                                                    <Avatar name={selectedConversationDisplayName} src={selectedConversationAvatarUrl} size="md" />
                                                     <div className="flex flex-col gap-1 max-w-[80%]">
                                                         <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
                                                             {media && (
@@ -3028,7 +3138,7 @@ export function InboxContainer({
                                             ref={imageInputRef}
                                             type="file"
                                             multiple
-                                            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                                            accept={INSTAGRAM_UPLOAD_ACCEPT}
                                             className="hidden"
                                             onChange={handleAttachmentInputChange}
                                         />
@@ -3085,7 +3195,7 @@ export function InboxContainer({
                                                     ))}
                                                 </div>
                                                 <p className="mt-1 text-[11px] text-gray-500">
-                                                    {t('composerAttachments.limitHint', { count: MAX_WHATSAPP_OUTBOUND_ATTACHMENTS })}
+                                                    {t('composerAttachments.limitHint', { count: maxAttachmentCount })}
                                                 </p>
                                             </div>
                                         )}
@@ -3097,13 +3207,15 @@ export function InboxContainer({
                                             )}
                                             <div className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}>
                                                 <div className="flex min-w-0 items-center gap-2">
-                                                    <IconButton
-                                                        icon={Paperclip}
-                                                        size="sm"
-                                                        onClick={handleOpenAttachmentPicker}
-                                                        disabled={isAttachmentPickerDisabled}
-                                                        className="disabled:cursor-not-allowed disabled:opacity-50"
-                                                    />
+                                                    {isWhatsAppConversation && (
+                                                        <IconButton
+                                                            icon={Paperclip}
+                                                            size="sm"
+                                                            onClick={handleOpenAttachmentPicker}
+                                                            disabled={isDocumentAttachmentPickerDisabled}
+                                                            className="disabled:cursor-not-allowed disabled:opacity-50"
+                                                        />
+                                                    )}
                                                     <IconButton
                                                         icon={Image}
                                                         size="sm"
@@ -3227,7 +3339,7 @@ export function InboxContainer({
                             ) : (
                                 <>
                                     <div className="flex flex-col items-center text-center">
-                                        <Avatar name={selectedConversationDisplayName} size="lg" className="mb-3 text-base" />
+                                        <Avatar name={selectedConversationDisplayName} src={selectedConversationAvatarUrl} size="lg" className="mb-3 text-base" />
                                         <div className="flex items-center gap-2">
                                             <h3 className="text-lg font-bold text-gray-900">{selectedConversationDisplayName}</h3>
                                             {isSelectedConversationInstagramRequest && (

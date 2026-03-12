@@ -1,5 +1,6 @@
 import { Conversation } from '@/types/database'
 import { useTranslations } from 'next-intl'
+import { Avatar } from '@/design'
 
 interface DetailsPanelProps {
     conversation: Conversation
@@ -18,9 +19,7 @@ export function DetailsPanel({ conversation }: DetailsPanelProps) {
 
             <div className="p-5 space-y-6">
                 <div className="text-center">
-                    <div className="h-20 w-20 mx-auto rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-600 mb-3">
-                        {conversation.contact_name.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar name={conversation.contact_name} src={conversation.contact_avatar_url} size="lg" className="mx-auto mb-3 h-20 w-20 text-2xl" />
                     <h3 className="font-bold text-gray-900">{conversation.contact_name}</h3>
                     <p className="text-sm text-gray-500">{conversation.contact_phone || t('noPhoneNumber')}</p>
                 </div>

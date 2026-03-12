@@ -42,6 +42,29 @@ describe('extractMediaFromMessageMetadata', () => {
         })
     })
 
+    it('extracts instagram media details from metadata object', () => {
+        const media = extractMediaFromMessageMetadata({
+            instagram_media: {
+                type: 'image',
+                storage_url: 'https://cdn.example.com/instagram-image.jpg',
+                mime_type: 'image/jpeg',
+                caption: null,
+                download_status: 'remote'
+            },
+            instagram_is_media_placeholder: true
+        })
+
+        expect(media).toEqual({
+            type: 'image',
+            url: 'https://cdn.example.com/instagram-image.jpg',
+            fileName: null,
+            mimeType: 'image/jpeg',
+            caption: null,
+            isPlaceholder: true,
+            downloadStatus: 'remote'
+        })
+    })
+
     it('returns null when no whatsapp media metadata exists', () => {
         expect(extractMediaFromMessageMetadata({})).toBeNull()
         expect(extractMediaFromMessageMetadata(null)).toBeNull()

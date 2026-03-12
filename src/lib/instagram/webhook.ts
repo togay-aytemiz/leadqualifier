@@ -21,6 +21,12 @@ export interface InstagramInboundEvent {
     eventSource: 'messaging' | 'standby'
     eventType: InstagramInboundEventType
     skipAutomation: boolean
+    media?: {
+        type: 'image'
+        url: string | null
+        mimeType: string | null
+        caption: string | null
+    }
 }
 
 const CHANGE_MESSAGING_FIELDS = new Set([
@@ -43,6 +49,25 @@ function asString(value: unknown): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function extractInstagramImageAttachment(attachments: unknown[]) {
+    for (const attachment of attachments) {
+        if (!isRecord(attachment)) continue
+        if (asString(attachment.type) !== 'image') continue
+
+        const payload = isRecord(attachment.payload) ? attachment.payload : null
+        const url = payload ? asString(payload.url) : null
+        const mimeType = payload ? asString(payload.mime_type) : null
+
+        return {
+            type: 'image' as const,
+            url,
+            mimeType
+        }
+    }
+
+    return null
 }
 
 function buildSyntheticMessageId(params: {
@@ -95,6 +120,28 @@ function extractInboundEventsFromItems(
                 index
             })
             const text = asString(message.text)
+            const attachments = Array.isArray(message.attachments) ? message.attachments : []
+            const imageAttachment = extractInstagramImageAttachment(attachments)
+
+            if (imageAttachment) {
+                const caption = text
+                events.push({
+                    instagramBusinessAccountId: entryId,
+                    contactId,
+                    contactName,
+                    messageId,
+                    text: caption || '[Instagram image]',
+                    timestamp,
+                    eventSource,
+                    eventType: 'attachment',
+                    skipAutomation: !caption,
+                    media: {
+                        ...imageAttachment,
+                        caption
+                    }
+                })
+                continue
+            }
 
             if (text) {
                 events.push({
@@ -111,7 +158,6 @@ function extractInboundEventsFromItems(
                 continue
             }
 
-            const attachments = Array.isArray(message.attachments) ? message.attachments : []
             if (attachments.length > 0) {
                 const attachmentTypes = attachments
                     .map((attachment) => {

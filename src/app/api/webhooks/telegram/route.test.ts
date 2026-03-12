@@ -13,6 +13,8 @@ const {
     resolveOrganizationUsageEntitlementMock,
     runLeadExtractionMock,
     telegramCtorMock,
+    telegramGetFileMock,
+    telegramGetUserProfilePhotosMock,
     telegramSendMessageMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
@@ -26,6 +28,8 @@ const {
     resolveOrganizationUsageEntitlementMock: vi.fn(),
     runLeadExtractionMock: vi.fn(),
     telegramCtorMock: vi.fn(),
+    telegramGetFileMock: vi.fn(),
+    telegramGetUserProfilePhotosMock: vi.fn(),
     telegramSendMessageMock: vi.fn()
 }))
 
@@ -82,10 +86,12 @@ vi.mock('@/lib/inbox/operator-state', () => ({
 
 vi.mock('@/lib/telegram/client', () => ({
     TelegramClient: class {
-        constructor() {
-            telegramCtorMock()
+        constructor(token: string) {
+            telegramCtorMock(token)
         }
 
+        getFile = telegramGetFileMock
+        getUserProfilePhotos = telegramGetUserProfilePhotosMock
         sendMessage = telegramSendMessageMock
     }
 }))
@@ -140,6 +146,7 @@ function createConversationLookupBuilder(overrides: Record<string, unknown> = {}
             organization_id: 'org-1',
             platform: 'telegram',
             contact_name: 'Ayse',
+            contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/existing.jpg',
             contact_phone: '123',
             status: 'open',
             assignee_id: null,
@@ -186,7 +193,8 @@ function createInsertMessageBuilder() {
     return {
         builder: {
             insert: insertMock
-        }
+        },
+        insertMock
     }
 }
 
@@ -259,6 +267,14 @@ describe('Telegram webhook route', () => {
             membershipState: null,
             snapshot: null
         })
+        telegramGetUserProfilePhotosMock.mockResolvedValue({
+            total_count: 0,
+            photos: []
+        })
+        telegramGetFileMock.mockResolvedValue({
+            file_id: 'file-1',
+            file_path: 'photos/avatar.jpg'
+        })
     })
 
     it('stores inbound message and skips AI flow when conversation processing is paused', async () => {
@@ -301,6 +317,64 @@ describe('Telegram webhook route', () => {
         expect(isOperatorActiveMock).not.toHaveBeenCalled()
         expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
         expect(telegramCtorMock).not.toHaveBeenCalled()
+    })
+
+    it('hydrates missing telegram avatar urls from bot api profile photos', async () => {
+        const channelLookup = createChannelLookupBuilder()
+        const conversationLookup = createConversationLookupBuilder({
+            ai_processing_paused: true,
+            contact_avatar_url: null
+        })
+        const dedupeLookup = createInboundDedupeBuilder()
+        const inboundInsert = createInsertMessageBuilder()
+        const conversationUpdate = createConversationUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            channels: [channelLookup.builder],
+            conversations: [conversationLookup.builder, conversationUpdate.builder],
+            messages: [dedupeLookup.builder, inboundInsert.builder]
+        })
+
+        telegramGetUserProfilePhotosMock.mockResolvedValueOnce({
+            total_count: 1,
+            photos: [[{ file_id: 'file-1' }]]
+        })
+        createClientMock.mockReturnValue(supabase)
+
+        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                update_id: 1005,
+                message: {
+                    message_id: 15,
+                    text: 'Merhaba',
+                    chat: { id: 123 },
+                    from: { id: 456, first_name: 'Ayse' }
+                }
+            })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(telegramCtorMock).toHaveBeenCalledWith('token-1')
+        expect(telegramGetUserProfilePhotosMock).toHaveBeenCalledWith(456, { limit: 1 })
+        expect(telegramGetFileMock).toHaveBeenCalledWith('file-1')
+        expect(inboundInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                telegram_message_id: '15',
+                telegram_contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/avatar.jpg'
+            })
+        }))
+        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'Ayse',
+            contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/avatar.jpg'
+        }))
+        expect(telegramSendMessageMock).not.toHaveBeenCalled()
     })
 
     it('runs lead extraction but does not auto-reply in shadow mode', async () => {

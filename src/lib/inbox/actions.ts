@@ -14,15 +14,19 @@ import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
 import { sortMessagesChronologically } from '@/lib/inbox/message-order'
 import {
+    MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS,
+    MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES,
     MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
     MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
     MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES,
     resolveOutboundMediaCaption,
+    validateInstagramOutboundImageAttachments,
     validateWhatsAppOutboundAttachments,
     type WhatsAppOutboundAttachment
 } from '@/lib/inbox/outbound-media'
 import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholders'
 import { InstagramClient } from '@/lib/instagram/client'
+import { resolveConversationContactAvatarUrl } from '@/lib/inbox/contact-avatar'
 import { Conversation, Lead, Message, Json } from '@/types/database'
 
 export type ConversationSummaryResult =
@@ -113,7 +117,9 @@ export type DeleteConversationPredefinedTemplateResult =
     | { ok: true }
     | { ok: false; reason: InboxPredefinedTemplateFailureReason }
 
-const WHATSAPP_MEDIA_BUCKET = process.env.WHATSAPP_MEDIA_BUCKET?.trim() || 'whatsapp-media'
+const INBOX_MEDIA_BUCKET = process.env.INBOX_MEDIA_BUCKET?.trim()
+    || process.env.WHATSAPP_MEDIA_BUCKET?.trim()
+    || 'whatsapp-media'
 
 type InboxWhatsAppMediaFailureReason =
     | InboxWhatsAppTemplateFailureReason
@@ -166,6 +172,54 @@ export interface SendConversationWhatsAppMediaBatchInput {
 export type SendConversationWhatsAppMediaBatchResult =
     | { ok: true; messages: Message[]; conversation: Conversation | null }
     | { ok: false; reason: InboxWhatsAppMediaFailureReason; attachmentId?: string }
+
+type InboxInstagramMediaFailureReason =
+    | 'validation'
+    | 'missing_conversation'
+    | 'not_instagram'
+    | 'missing_contact'
+    | 'missing_channel'
+    | 'billing_locked'
+    | 'invalid_attachment'
+    | 'too_many_attachments'
+    | 'missing_inbound'
+    | 'request_failed'
+
+export interface ConversationInstagramOutboundImageUploadTarget extends ConversationWhatsAppOutboundAttachmentDraft {
+    mediaType: 'image'
+    storagePath: string
+    uploadToken: string
+    publicUrl: string
+}
+
+export interface PrepareConversationInstagramImageUploadsInput {
+    conversationId: string
+    attachments: ConversationWhatsAppOutboundAttachmentDraft[]
+}
+
+export type PrepareConversationInstagramImageUploadsResult =
+    | {
+        ok: true
+        maxAttachmentCount: number
+        maxImageBytes: number
+        uploads: ConversationInstagramOutboundImageUploadTarget[]
+    }
+    | {
+        ok: false
+        reason: InboxInstagramMediaFailureReason
+        attachmentId?: string
+        maxAllowed?: number
+    }
+
+export interface SendConversationInstagramImageBatchInput {
+    conversationId: string
+    text: string
+    attachments: ConversationInstagramOutboundImageUploadTarget[]
+}
+
+export type SendConversationInstagramImageBatchResult =
+    | { ok: true; messages: Message[]; conversation: Conversation | null }
+    | { ok: false; reason: InboxInstagramMediaFailureReason; attachmentId?: string }
 
 type ConversationPreviewMessage = Pick<Message, 'content' | 'created_at' | 'sender_type' | 'metadata'>
 type ConversationLeadPreview = { status?: string | null }
@@ -245,14 +299,18 @@ function extensionFromMimeType(mimeType: string) {
 
 function buildOutboundMediaStoragePath(args: {
     organizationId: string
-    phoneNumberId: string
+    channelResourceId: string
     attachmentId: string
     extension: string
 }) {
     const orgSegment = sanitizePathSegment(args.organizationId)
-    const phoneSegment = sanitizePathSegment(args.phoneNumberId)
+    const phoneSegment = sanitizePathSegment(args.channelResourceId)
     const fileSegment = sanitizePathSegment(`${Date.now()}-${args.attachmentId}-${crypto.randomUUID().slice(0, 8)}`)
     return `${orgSegment}/${phoneSegment}/outbound/${fileSegment}.${args.extension}`
+}
+
+function resolveInstagramImagePlaceholder() {
+    return '[Instagram image]'
 }
 
 function normalizeInboxWhatsAppTemplateSummary(value: unknown): InboxWhatsAppTemplateSummary | null {
@@ -319,8 +377,13 @@ async function hydrateInstagramConversationContactNames(
         if (conversation.platform !== 'instagram') return false
         const contactId = readTrimmedString(conversation.contact_phone)
         const contactName = readTrimmedString(conversation.contact_name)
-        if (!contactId || !contactName) return false
-        return isInstagramScopedId(contactId) && isInstagramScopedId(contactName)
+        const avatarUrl = readTrimmedString(conversation.contact_avatar_url)
+        if (!contactId) return false
+        const needsNameHydration = contactName
+            ? isInstagramScopedId(contactId) && isInstagramScopedId(contactName)
+            : false
+        const needsAvatarHydration = !avatarUrl
+        return needsNameHydration || needsAvatarHydration
     })
 
     if (unresolved.length === 0) return conversations
@@ -332,7 +395,10 @@ async function hydrateInstagramConversationContactNames(
         || process.env.WHATSAPP_GRAPH_API_VERSION
         || 'v25.0'
     const client = new InstagramClient(accessToken, graphVersion)
-    const updatedConversationNames = new Map<string, string>()
+    const updatedConversationProfiles = new Map<string, {
+        contactName?: string
+        contactAvatarUrl?: string
+    }>()
 
     for (const conversation of unresolved.slice(0, 6)) {
         const contactId = readTrimmedString(conversation.contact_phone)
@@ -341,31 +407,52 @@ async function hydrateInstagramConversationContactNames(
         try {
             const profile = await client.getUserProfile(contactId)
             const resolvedName = readTrimmedString(profile.username) || readTrimmedString(profile.name)
-            if (!resolvedName || isInstagramScopedId(resolvedName)) continue
-            updatedConversationNames.set(conversation.id, resolvedName)
+            const avatarUrl = readTrimmedString(profile.profile_picture_url)
+            const profileUpdate: {
+                contactName?: string
+                contactAvatarUrl?: string
+            } = {}
+
+            if (resolvedName && !isInstagramScopedId(resolvedName)) {
+                profileUpdate.contactName = resolvedName
+            }
+            if (avatarUrl) {
+                profileUpdate.contactAvatarUrl = avatarUrl
+            }
+
+            if (!profileUpdate.contactName && !profileUpdate.contactAvatarUrl) continue
+            updatedConversationProfiles.set(conversation.id, profileUpdate)
         } catch {
             continue
         }
     }
 
-    if (updatedConversationNames.size === 0) return conversations
+    if (updatedConversationProfiles.size === 0) return conversations
 
-    await Promise.all(Array.from(updatedConversationNames.entries()).map(([conversationId, contactName]) =>
-        supabase
+    await Promise.all(Array.from(updatedConversationProfiles.entries()).map(([conversationId, profile]) => {
+        const updatePayload: Record<string, string> = {
+            updated_at: new Date().toISOString()
+        }
+        if (profile.contactName) {
+            updatePayload.contact_name = profile.contactName
+        }
+        if (profile.contactAvatarUrl) {
+            updatePayload.contact_avatar_url = profile.contactAvatarUrl
+        }
+
+        return supabase
             .from('conversations')
-            .update({
-                contact_name: contactName,
-                updated_at: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq('id', conversationId)
-    ))
+    }))
 
     return conversations.map((conversation) => {
-        const hydratedName = updatedConversationNames.get(conversation.id)
-        if (!hydratedName) return conversation
+        const hydratedProfile = updatedConversationProfiles.get(conversation.id)
+        if (!hydratedProfile) return conversation
         return {
             ...conversation,
-            contact_name: hydratedName
+            contact_name: hydratedProfile.contactName ?? conversation.contact_name,
+            contact_avatar_url: hydratedProfile.contactAvatarUrl ?? conversation.contact_avatar_url ?? null
         }
     })
 }
@@ -496,6 +583,60 @@ async function resolveConversationWhatsAppContext(
     }
 }
 
+async function resolveConversationInstagramContext(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    conversationId: string
+): Promise<
+    | {
+        ok: true
+        organizationId: string
+        contactPhone: string
+        accessToken: string
+        instagramBusinessAccountId: string
+    }
+    | {
+        ok: false
+        reason: Exclude<InboxInstagramMediaFailureReason, 'invalid_attachment' | 'too_many_attachments' | 'missing_inbound'>
+    }
+> {
+    const { data: conversation } = await supabase
+        .from('conversations')
+        .select('platform, contact_phone, organization_id')
+        .eq('id', conversationId)
+        .single()
+
+    if (!conversation) return { ok: false, reason: 'missing_conversation' }
+    if (conversation.platform !== 'instagram') return { ok: false, reason: 'not_instagram' }
+    if (!conversation.contact_phone) return { ok: false, reason: 'missing_contact' }
+
+    if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+        return { ok: false, reason: 'billing_locked' }
+    }
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('config')
+        .eq('organization_id', conversation.organization_id)
+        .eq('type', 'instagram')
+        .eq('status', 'active')
+        .single()
+
+    const accessToken = channel ? readConfigString(channel.config as Json, 'page_access_token') : null
+    const instagramBusinessAccountId = channel ? readConfigString(channel.config as Json, 'instagram_business_account_id') : null
+
+    if (!accessToken || !instagramBusinessAccountId) {
+        return { ok: false, reason: 'missing_channel' }
+    }
+
+    return {
+        ok: true,
+        organizationId: conversation.organization_id,
+        contactPhone: conversation.contact_phone,
+        accessToken,
+        instagramBusinessAccountId
+    }
+}
+
 function normalizeConversationListItems(items: unknown[]): ConversationListItem[] {
     return items.map((item) => {
         const normalized = item as ConversationListItem & {
@@ -504,11 +645,14 @@ function normalizeConversationListItems(items: unknown[]): ConversationListItem[
             messages?: MaybeArray<ConversationPreviewMessage>
         }
 
+        const messages = toArray(normalized.messages)
+
         return {
             ...normalized,
             assignee: toSingle(normalized.assignee),
             leads: toArray(normalized.leads),
-            messages: toArray(normalized.messages)
+            messages,
+            contact_avatar_url: resolveConversationContactAvatarUrl(normalized.contact_avatar_url, messages)
         }
     })
 }
@@ -1366,6 +1510,12 @@ function mapMediaContextReason(reason: InboxWhatsAppTemplateFailureReason): Inbo
     return 'request_failed'
 }
 
+function mapInstagramMediaContextReason(
+    reason: Exclude<InboxInstagramMediaFailureReason, 'invalid_attachment' | 'too_many_attachments' | 'missing_inbound'>
+): InboxInstagramMediaFailureReason {
+    return reason
+}
+
 export async function prepareConversationWhatsAppMediaUploads(
     input: PrepareConversationWhatsAppMediaUploadsInput
 ): Promise<PrepareConversationWhatsAppMediaUploadsResult> {
@@ -1426,7 +1576,7 @@ export async function prepareConversationWhatsAppMediaUploads(
 
     try {
         const serviceClient = createServiceClient(supabaseUrl, serviceRoleKey)
-        const storage = serviceClient.storage.from(WHATSAPP_MEDIA_BUCKET)
+        const storage = serviceClient.storage.from(INBOX_MEDIA_BUCKET)
         const uploads: ConversationWhatsAppOutboundAttachmentUploadTarget[] = []
 
         for (const attachment of validationResult.attachments) {
@@ -1435,7 +1585,7 @@ export async function prepareConversationWhatsAppMediaUploads(
                 || 'bin'
             const storagePath = buildOutboundMediaStoragePath({
                 organizationId: context.organizationId,
-                phoneNumberId: context.phoneNumberId,
+                channelResourceId: context.phoneNumberId,
                 attachmentId: attachment.id,
                 extension
             })
@@ -1472,6 +1622,109 @@ export async function prepareConversationWhatsAppMediaUploads(
         }
     } catch (error) {
         console.error('Failed to prepare WhatsApp outbound media uploads', error)
+        return { ok: false, reason: 'request_failed' }
+    }
+}
+
+export async function prepareConversationInstagramImageUploads(
+    input: PrepareConversationInstagramImageUploadsInput
+): Promise<PrepareConversationInstagramImageUploadsResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    if (!conversationId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const draftAttachments = (input.attachments ?? []).map((attachment) => ({
+        id: attachment.id.trim(),
+        name: attachment.name.trim(),
+        mimeType: attachment.mimeType.trim().toLowerCase(),
+        sizeBytes: Number(attachment.sizeBytes)
+    }))
+
+    const validationResult = validateInstagramOutboundImageAttachments(draftAttachments)
+    if (!validationResult.ok) {
+        if (validationResult.reason === 'too_many_attachments') {
+            return {
+                ok: false,
+                reason: 'too_many_attachments',
+                maxAllowed: validationResult.maxCount
+            }
+        }
+
+        return {
+            ok: false,
+            reason: 'invalid_attachment',
+            attachmentId: validationResult.attachmentId,
+            maxAllowed: validationResult.reason === 'file_too_large' ? validationResult.maxSizeBytes : undefined
+        }
+    }
+
+    if (validationResult.attachments.length === 0) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const context = await resolveConversationInstagramContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: mapInstagramMediaContextReason(context.reason) }
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    if (!supabaseUrl || !serviceRoleKey) {
+        console.error('Missing Supabase env for Instagram media upload target generation')
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    try {
+        const serviceClient = createServiceClient(supabaseUrl, serviceRoleKey)
+        const storage = serviceClient.storage.from(INBOX_MEDIA_BUCKET)
+        const uploads: ConversationInstagramOutboundImageUploadTarget[] = []
+
+        for (const attachment of validationResult.attachments) {
+            const extension = extensionFromFilename(attachment.name)
+                || extensionFromMimeType(attachment.mimeType)
+                || 'bin'
+            const storagePath = buildOutboundMediaStoragePath({
+                organizationId: context.organizationId,
+                channelResourceId: context.instagramBusinessAccountId,
+                attachmentId: attachment.id,
+                extension
+            })
+
+            const { data: signedUploadData, error: signedUploadError } = await storage.createSignedUploadUrl(storagePath)
+            if (signedUploadError || !signedUploadData?.token) {
+                throw signedUploadError ?? new Error('Missing signed upload token')
+            }
+
+            const { data: publicUrlData } = storage.getPublicUrl(storagePath)
+            const publicUrl = publicUrlData?.publicUrl?.trim() ?? ''
+            if (!publicUrl) {
+                throw new Error('Could not resolve public URL for Instagram media upload')
+            }
+
+            uploads.push({
+                id: attachment.id,
+                name: attachment.name,
+                mimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
+                mediaType: 'image',
+                storagePath,
+                uploadToken: signedUploadData.token,
+                publicUrl
+            })
+        }
+
+        return {
+            ok: true,
+            maxAttachmentCount: MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS,
+            maxImageBytes: MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES,
+            uploads
+        }
+    } catch (error) {
+        console.error('Failed to prepare Instagram outbound media uploads', error)
         return { ok: false, reason: 'request_failed' }
     }
 }
@@ -1659,6 +1912,195 @@ export async function sendConversationWhatsAppMediaBatch(
         }
     } catch (error) {
         console.error('Failed to send WhatsApp media batch:', error)
+        return {
+            ok: false,
+            reason: 'request_failed',
+            attachmentId: activeAttachmentId
+        }
+    }
+}
+
+export async function sendConversationInstagramImageBatch(
+    input: SendConversationInstagramImageBatchInput
+): Promise<SendConversationInstagramImageBatchResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const conversationId = input.conversationId.trim()
+    if (!conversationId) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const normalizedText = input.text.trim()
+    const normalizedAttachments = (input.attachments ?? []).map((attachment) => ({
+        ...attachment,
+        id: attachment.id.trim(),
+        name: attachment.name.trim(),
+        mimeType: attachment.mimeType.trim().toLowerCase(),
+        storagePath: attachment.storagePath.trim(),
+        publicUrl: attachment.publicUrl.trim(),
+        sizeBytes: Number(attachment.sizeBytes)
+    }))
+
+    if (normalizedAttachments.length === 0) {
+        return { ok: false, reason: 'validation' }
+    }
+
+    const validationResult = validateInstagramOutboundImageAttachments(
+        normalizedAttachments.map((attachment) => ({
+            id: attachment.id,
+            name: attachment.name,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes
+        }))
+    )
+    if (!validationResult.ok) {
+        if (validationResult.reason === 'too_many_attachments') {
+            return { ok: false, reason: 'too_many_attachments' }
+        }
+
+        return {
+            ok: false,
+            reason: 'invalid_attachment',
+            attachmentId: validationResult.attachmentId
+        }
+    }
+
+    const attachmentById = new Map(normalizedAttachments.map((attachment) => [attachment.id, attachment]))
+    for (const attachment of normalizedAttachments) {
+        if (!attachment.publicUrl || !attachment.storagePath) {
+            return {
+                ok: false,
+                reason: 'invalid_attachment',
+                attachmentId: attachment.id
+            }
+        }
+    }
+
+    const context = await resolveConversationInstagramContext(supabase, conversationId)
+    if (!context.ok) {
+        return { ok: false, reason: mapInstagramMediaContextReason(context.reason) }
+    }
+
+    const { count: inboundCount, error: inboundCountError } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId)
+        .eq('sender_type', 'contact')
+
+    if (inboundCountError) {
+        console.error('Failed to validate Instagram inbound-first rule for media send:', inboundCountError)
+        return { ok: false, reason: 'request_failed' }
+    }
+
+    if ((inboundCount ?? 0) < 1) {
+        return { ok: false, reason: 'missing_inbound' }
+    }
+
+    const persistedMessages: Message[] = []
+    let conversationSnapshot: Conversation | null = null
+    let activeAttachmentId: string | undefined
+
+    try {
+        const client = new InstagramClient(context.accessToken)
+
+        for (const validatedAttachment of validationResult.attachments) {
+            activeAttachmentId = validatedAttachment.id
+            const attachment = attachmentById.get(validatedAttachment.id)
+            if (!attachment) {
+                return {
+                    ok: false,
+                    reason: 'invalid_attachment',
+                    attachmentId: validatedAttachment.id
+                }
+            }
+
+            const response = await client.sendImage({
+                instagramBusinessAccountId: context.instagramBusinessAccountId,
+                to: context.contactPhone,
+                imageUrl: attachment.publicUrl
+            })
+
+            const { data, error } = await supabase.rpc('send_operator_message', {
+                p_conversation_id: conversationId,
+                p_content: resolveInstagramImagePlaceholder()
+            })
+            if (error || !data) {
+                throw error ?? new Error('Failed to persist outbound Instagram image message')
+            }
+
+            const persisted = data as { message: Message; conversation: Conversation }
+            conversationSnapshot = persisted.conversation
+
+            const metadata: Json = {
+                instagram_message_id: response.message_id?.trim() || null,
+                instagram_message_type: 'image',
+                instagram_media_type: 'image',
+                instagram_media_mime_type: attachment.mimeType,
+                instagram_media_filename: attachment.name,
+                instagram_is_media_placeholder: true,
+                instagram_outbound_status: 'sent',
+                instagram_outbound_attachment_id: validatedAttachment.id,
+                instagram_media: {
+                    type: 'image',
+                    mime_type: attachment.mimeType,
+                    caption: null,
+                    filename: attachment.name,
+                    storage_path: attachment.storagePath,
+                    storage_url: attachment.publicUrl,
+                    download_status: 'stored'
+                }
+            }
+
+            const { data: updatedMessage, error: updateError } = await supabase
+                .from('messages')
+                .update({
+                    metadata
+                })
+                .eq('id', persisted.message.id)
+                .eq('conversation_id', conversationId)
+                .select()
+                .single()
+
+            if (updateError || !updatedMessage) {
+                throw updateError ?? new Error('Failed to update outbound Instagram media metadata')
+            }
+
+            persistedMessages.push(updatedMessage as Message)
+        }
+
+        if (normalizedText) {
+            const textResponse = await client.sendText({
+                instagramBusinessAccountId: context.instagramBusinessAccountId,
+                to: context.contactPhone,
+                text: normalizedText
+            })
+
+            const { data, error } = await supabase.rpc('send_operator_message', {
+                p_conversation_id: conversationId,
+                p_content: normalizedText
+            })
+            if (error || !data) {
+                throw error ?? new Error('Failed to persist outbound Instagram text message')
+            }
+
+            const persisted = data as { message: Message; conversation: Conversation }
+            conversationSnapshot = persisted.conversation
+            persistedMessages.push({
+                ...persisted.message,
+                metadata: textResponse.message_id
+                    ? { instagram_message_id: textResponse.message_id }
+                    : persisted.message.metadata
+            } as Message)
+        }
+
+        return {
+            ok: true,
+            messages: persistedMessages,
+            conversation: conversationSnapshot
+        }
+    } catch (error) {
+        console.error('Failed to send Instagram image batch:', error)
         return {
             ok: false,
             reason: 'request_failed',

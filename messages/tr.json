@@ -454,12 +454,16 @@
                 "validation": "Bir mesaj veya en az bir ek ekleyin.",
                 "maxCount": "Tek seferde en fazla {count} dosya ekleyebilirsiniz.",
                 "invalidType": "Yalnızca WhatsApp'ın desteklediği görsel ve belge türleri eklenebilir.",
+                "invalidTypeInstagram": "Instagram konuşmalarında yalnızca görsel gönderilebilir.",
                 "maxImageSize": "Görsel dosya boyutu limiti aşıyor ({sizeMb} MB).",
                 "maxDocumentSize": "Belge dosya boyutu limiti aşıyor ({sizeMb} MB).",
                 "sendFailed": "Ekler gönderilemedi. Lütfen tekrar deneyin.",
                 "missingChannel": "Aktif WhatsApp kanal yapılandırması eksik.",
+                "missingInstagramChannel": "Aktif Instagram kanal yapılandırması eksik.",
                 "billingLocked": "Kullanım kilitli olduğu için ek gönderilemiyor.",
                 "replyWindowBlocked": "Bu konuşmada WhatsApp yanıt penceresi kapalı.",
+                "instagramInboundRequired": "Instagram'da görsel göndermek için konuşmayı önce müşteri başlatmalı.",
+                "notSupportedPlatform": "Ek gönderimi şu anda yalnızca WhatsApp ve Instagram konuşmalarında destekleniyor.",
                 "notWhatsApp": "Ek gönderimi şu anda yalnızca WhatsApp konuşmalarında destekleniyor."
             }
         },

@@ -18,6 +18,7 @@ interface InstagramChannelRecord {
 interface InstagramContactIdentity {
     contactName: string | null
     username: string | null
+    avatarUrl: string | null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -292,32 +293,27 @@ export async function POST(req: NextRequest) {
 
         if (!contactIdentity) {
             const webhookContactName = readTrimmedString(event.contactName)
-            if (webhookContactName) {
+            try {
+                const profile = await client.getUserProfile(event.contactId)
+                const username = readTrimmedString(profile.username)
+                const resolvedName = username || readTrimmedString(profile.name) || webhookContactName
+                contactIdentity = {
+                    contactName: resolvedName,
+                    username,
+                    avatarUrl: readTrimmedString(profile.profile_picture_url)
+                }
+            } catch (error) {
+                if (debugEnabled) {
+                    console.info('Instagram Webhook: Failed to resolve sender profile', {
+                        instagram_business_account_id: event.instagramBusinessAccountId,
+                        instagram_contact_id: event.contactId,
+                        error: error instanceof Error ? error.message : String(error)
+                    })
+                }
                 contactIdentity = {
                     contactName: webhookContactName,
-                    username: null
-                }
-            } else {
-                try {
-                    const profile = await client.getUserProfile(event.contactId)
-                    const username = readTrimmedString(profile.username)
-                    const resolvedName = username || readTrimmedString(profile.name)
-                    contactIdentity = {
-                        contactName: resolvedName,
-                        username
-                    }
-                } catch (error) {
-                    if (debugEnabled) {
-                        console.info('Instagram Webhook: Failed to resolve sender profile', {
-                            instagram_business_account_id: event.instagramBusinessAccountId,
-                            instagram_contact_id: event.contactId,
-                            error: error instanceof Error ? error.message : String(error)
-                        })
-                    }
-                    contactIdentity = {
-                        contactName: null,
-                        username: null
-                    }
+                    username: null,
+                    avatarUrl: null
                 }
             }
 
@@ -333,6 +329,7 @@ export async function POST(req: NextRequest) {
             source: 'instagram',
             contactId: event.contactId,
             contactName: contactIdentity.contactName,
+            contactAvatarUrl: contactIdentity.avatarUrl,
             text: event.text,
             inboundMessageId: event.messageId,
             inboundMessageIdMetadataKey: 'instagram_message_id',
@@ -343,7 +340,23 @@ export async function POST(req: NextRequest) {
                 instagram_event_source: event.eventSource,
                 instagram_event_type: event.eventType,
                 instagram_contact_name: contactIdentity.contactName,
-                instagram_contact_username: contactIdentity.username
+                instagram_contact_username: contactIdentity.username,
+                instagram_contact_avatar_url: contactIdentity.avatarUrl,
+                ...(event.media
+                    ? {
+                        instagram_media_type: event.media.type,
+                        instagram_is_media_placeholder: !readTrimmedString(event.media.caption),
+                        instagram_media: {
+                            type: event.media.type,
+                            mime_type: event.media.mimeType,
+                            caption: event.media.caption,
+                            filename: null,
+                            storage_path: null,
+                            storage_url: event.media.url,
+                            download_status: event.media.url ? 'remote' : 'missing'
+                        }
+                    }
+                    : {})
             },
             skipAutomation: event.skipAutomation,
             sendOutbound: async (content) => {

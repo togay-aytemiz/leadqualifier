@@ -299,6 +299,7 @@ export interface Conversation {
     id: string
     organization_id: string
     contact_name: string
+    contact_avatar_url?: string | null
     contact_phone: string | null
     platform: ConversationPlatform
     status: ConversationStatus

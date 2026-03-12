@@ -174,11 +174,17 @@ describe('instagram webhook utilities', () => {
             contactId: 'ig-user-3',
             contactName: 'tester',
             messageId: 'igmid-attachment-1',
-            text: '[Instagram attachment: image]',
+            text: '[Instagram image]',
             timestamp: '1738000010',
             eventSource: 'messaging',
             eventType: 'attachment',
-            skipAutomation: true
+            skipAutomation: true,
+            media: {
+                type: 'image',
+                url: 'https://example.com/a.jpg',
+                mimeType: null,
+                caption: null
+            }
         }, {
             instagramBusinessAccountId: 'ig-business-1',
             contactId: 'ig-user-3',
@@ -239,6 +245,48 @@ describe('instagram webhook utilities', () => {
             eventSource: 'messaging',
             eventType: 'handover',
             skipAutomation: true
+        }])
+    })
+
+    it('keeps caption text alongside instagram image attachment metadata', () => {
+        const payload = {
+            object: 'instagram',
+            entry: [{
+                id: 'ig-business-1',
+                messaging: [{
+                    sender: { id: 'ig-user-10' },
+                    recipient: { id: 'ig-business-1' },
+                    timestamp: 1738000020,
+                    message: {
+                        mid: 'igmid-image-caption-1',
+                        text: 'Fiyatı bunun için merak ediyorum',
+                        attachments: [{
+                            type: 'image',
+                            payload: { url: 'https://example.com/with-caption.jpg' }
+                        }]
+                    }
+                }]
+            }]
+        }
+
+        const events = extractInstagramInboundEvents(payload)
+
+        expect(events).toEqual([{
+            instagramBusinessAccountId: 'ig-business-1',
+            contactId: 'ig-user-10',
+            contactName: null,
+            messageId: 'igmid-image-caption-1',
+            text: 'Fiyatı bunun için merak ediyorum',
+            timestamp: '1738000020',
+            eventSource: 'messaging',
+            eventType: 'attachment',
+            skipAutomation: false,
+            media: {
+                type: 'image',
+                url: 'https://example.com/with-caption.jpg',
+                mimeType: null,
+                caption: 'Fiyatı bunun için merak ediyorum'
+            }
         }])
     })
 

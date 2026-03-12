@@ -67,8 +67,13 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
     const parsedMetadata = parseMetadata(metadata)
     if (!parsedMetadata) return null
 
-    const mediaNode = isRecord(parsedMetadata.whatsapp_media) ? parsedMetadata.whatsapp_media : null
+    const whatsappMediaNode = isRecord(parsedMetadata.whatsapp_media) ? parsedMetadata.whatsapp_media : null
+    const instagramMediaNode = isRecord(parsedMetadata.instagram_media) ? parsedMetadata.instagram_media : null
+    const mediaNode = whatsappMediaNode || instagramMediaNode
     if (!mediaNode) return null
+
+    const isPlaceholder = parsedMetadata.whatsapp_is_media_placeholder === true
+        || parsedMetadata.instagram_is_media_placeholder === true
 
     return {
         type: normalizeMediaType(mediaNode.type),
@@ -76,7 +81,7 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
         fileName: toNullableString(mediaNode.filename),
         mimeType: toNullableString(mediaNode.mime_type),
         caption: toNullableString(mediaNode.caption),
-        isPlaceholder: parsedMetadata.whatsapp_is_media_placeholder === true,
+        isPlaceholder,
         downloadStatus: toNullableString(mediaNode.download_status)
     }
 }

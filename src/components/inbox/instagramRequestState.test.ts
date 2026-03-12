@@ -76,7 +76,7 @@ describe('instagramRequestState helpers', () => {
         expect(isInstagramRequestConversation(conversation, history)).toBe(false)
     })
 
-    it('does not treat latest messaging-source contact event as request even when tag exists', () => {
+    it('keeps instagram_request tag active when latest inbound metadata is messaging but no outbound reply exists', () => {
         const conversation = buildConversation({
             tags: ['instagram_request']
         })
@@ -88,7 +88,7 @@ describe('instagramRequestState helpers', () => {
             })
         ]
 
-        expect(isInstagramRequestConversation(conversation, history)).toBe(false)
+        expect(isInstagramRequestConversation(conversation, history)).toBe(true)
     })
 
     it('treats standby preview metadata as request-origin conversation', () => {

@@ -454,12 +454,16 @@
                 "validation": "Add a message or at least one attachment.",
                 "maxCount": "You can attach up to {count} files at once.",
                 "invalidType": "Only WhatsApp-supported images and documents can be attached.",
+                "invalidTypeInstagram": "Only images can be attached in Instagram conversations.",
                 "maxImageSize": "Image file exceeds the limit ({sizeMb} MB).",
                 "maxDocumentSize": "Document file exceeds the limit ({sizeMb} MB).",
                 "sendFailed": "Attachments could not be sent. Please try again.",
                 "missingChannel": "Active WhatsApp channel configuration is missing.",
+                "missingInstagramChannel": "Active Instagram channel configuration is missing.",
                 "billingLocked": "Usage is locked. Attachments cannot be sent.",
                 "replyWindowBlocked": "WhatsApp reply window is blocked for this conversation.",
+                "instagramInboundRequired": "Instagram image messages can only be sent after the customer starts the conversation.",
+                "notSupportedPlatform": "Attachments are currently available only in WhatsApp and Instagram conversations.",
                 "notWhatsApp": "Attachments are currently available only in WhatsApp conversations."
             }
         },

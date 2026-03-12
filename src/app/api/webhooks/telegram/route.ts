@@ -36,6 +36,45 @@ import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
+function readTrimmedString(value: unknown): string | null {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+}
+
+async function resolveTelegramContactAvatarUrl(args: {
+    botToken: string | null
+    telegramUserId: number | string | null | undefined
+    currentAvatarUrl: string | null | undefined
+}) {
+    const existingAvatarUrl = readTrimmedString(args.currentAvatarUrl)
+    if (existingAvatarUrl) return existingAvatarUrl
+    if (!args.botToken || args.telegramUserId === null || args.telegramUserId === undefined) {
+        return null
+    }
+
+    try {
+        const client = new TelegramClient(args.botToken)
+        const profilePhotos = await client.getUserProfilePhotos(args.telegramUserId, { limit: 1 })
+        const firstPhoto = Array.isArray(profilePhotos.photos) ? profilePhotos.photos[0] : null
+        const largestPhoto = Array.isArray(firstPhoto) ? firstPhoto[firstPhoto.length - 1] : null
+        const fileId = readTrimmedString(largestPhoto?.file_id)
+        if (!fileId) return null
+
+        const file = await client.getFile(fileId)
+        const filePath = readTrimmedString(file.file_path)
+        if (!filePath) return null
+
+        return `https://api.telegram.org/file/bot${args.botToken}/${filePath}`
+    } catch (error) {
+        console.warn('Telegram Webhook: Failed to resolve contact avatar', {
+            telegramUserId: args.telegramUserId,
+            error
+        })
+        return null
+    }
+}
+
 export async function POST(req: NextRequest) {
     const headerSecret = req.headers.get('x-telegram-bot-api-secret-token')
     const querySecret = req.nextUrl.searchParams.get('secret')
@@ -92,6 +131,8 @@ export async function POST(req: NextRequest) {
     }
 
     const orgId = channel.organization_id
+    const botToken = readTrimmedString(channel.config?.bot_token)
+    const resolvedContactName = `${from.first_name} ${from.last_name || ''}`.trim()
 
     // 3. Find or Create Conversation
     // 3. Find or Create Conversation
@@ -104,6 +145,12 @@ export async function POST(req: NextRequest) {
         .limit(1)
         .maybeSingle()
 
+    const contactAvatarUrl = await resolveTelegramContactAvatarUrl({
+        botToken,
+        telegramUserId: from?.id ?? null,
+        currentAvatarUrl: conversation?.contact_avatar_url
+    })
+
     if (!conversation) {
         console.log('Telegram Webhook: Creating new conversation (not found)')
         const { data: newConv, error } = await supabase
@@ -112,7 +159,8 @@ export async function POST(req: NextRequest) {
                 id: uuidv4(),
                 organization_id: orgId,
                 platform: 'telegram',
-                contact_name: `${from.first_name} ${from.last_name || ''}`.trim(),
+                contact_name: resolvedContactName,
+                contact_avatar_url: contactAvatarUrl,
                 contact_phone: chatId.toString(),
                 status: 'open',
                 unread_count: 0
@@ -209,7 +257,10 @@ export async function POST(req: NextRequest) {
         organization_id: orgId,
         sender_type: 'contact',
         content: text,
-        metadata: { telegram_message_id: telegramMessageId }
+        metadata: {
+            telegram_message_id: telegramMessageId,
+            telegram_contact_avatar_url: contactAvatarUrl
+        }
     })
 
     if (msgError) {
@@ -220,6 +271,8 @@ export async function POST(req: NextRequest) {
         // Update conversation: Bump timestamp + increment unread count for user messages
         await supabase.from('conversations')
             .update({
+                contact_name: resolvedContactName,
+                contact_avatar_url: contactAvatarUrl || conversation.contact_avatar_url || null,
                 last_message_at: new Date().toISOString(),
                 unread_count: conversation.unread_count + 1,
                 updated_at: new Date().toISOString()
@@ -309,7 +362,11 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ ok: true })
     }
-    const client = new TelegramClient(channel.config.bot_token)
+    if (!botToken) {
+        console.warn('Telegram Webhook: Missing bot token for outbound reply')
+        return NextResponse.json({ ok: true })
+    }
+    const client = new TelegramClient(botToken)
 
     const persistBotMessage = async (content: string, metadata: Record<string, unknown>) => {
         await supabase.from('messages').insert({

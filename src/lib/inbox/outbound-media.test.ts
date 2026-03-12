@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+    MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS,
+    MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES,
     MAX_WHATSAPP_OUTBOUND_ATTACHMENTS,
     MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES,
     MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES,
+    validateInstagramOutboundImageAttachments,
     resolveOutboundMediaCaption,
     resolveWhatsAppOutboundMediaType,
     validateWhatsAppOutboundAttachments
@@ -142,5 +145,83 @@ describe('resolveOutboundMediaCaption', () => {
 
     it('returns null for blank text', () => {
         expect(resolveOutboundMediaCaption('   ', 0)).toBeNull()
+    })
+})
+
+describe('validateInstagramOutboundImageAttachments', () => {
+    it('accepts valid image attachments', () => {
+        const result = validateInstagramOutboundImageAttachments([
+            {
+                id: 'ig-a-1',
+                name: 'photo.jpg',
+                mimeType: 'image/jpeg',
+                sizeBytes: 2048
+            }
+        ])
+
+        expect(result).toEqual({
+            ok: true,
+            attachments: [
+                {
+                    id: 'ig-a-1',
+                    name: 'photo.jpg',
+                    mimeType: 'image/jpeg',
+                    mediaType: 'image',
+                    sizeBytes: 2048
+                }
+            ]
+        })
+    })
+
+    it('rejects more than max instagram image count', () => {
+        const files = Array.from({ length: MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS + 1 }, (_, index) => ({
+            id: `ig-a-${index + 1}`,
+            name: `photo-${index + 1}.jpg`,
+            mimeType: 'image/jpeg',
+            sizeBytes: 1024
+        }))
+
+        const result = validateInstagramOutboundImageAttachments(files)
+
+        expect(result).toEqual({
+            ok: false,
+            reason: 'too_many_attachments',
+            maxCount: MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS
+        })
+    })
+
+    it('rejects non-image mime types for instagram uploads', () => {
+        const result = validateInstagramOutboundImageAttachments([
+            {
+                id: 'ig-a-1',
+                name: 'brochure.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: 1024
+            }
+        ])
+
+        expect(result).toEqual({
+            ok: false,
+            reason: 'invalid_mime_type',
+            attachmentId: 'ig-a-1'
+        })
+    })
+
+    it('rejects images above the instagram size limit', () => {
+        const result = validateInstagramOutboundImageAttachments([
+            {
+                id: 'ig-a-1',
+                name: 'oversized.jpg',
+                mimeType: 'image/jpeg',
+                sizeBytes: MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES + 1
+            }
+        ])
+
+        expect(result).toEqual({
+            ok: false,
+            reason: 'file_too_large',
+            attachmentId: 'ig-a-1',
+            maxSizeBytes: MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES
+        })
     })
 })

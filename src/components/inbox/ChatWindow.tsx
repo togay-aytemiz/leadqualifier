@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { getInboxMessageBubbleClasses } from '@/components/inbox/chatWindowStyles'
+import { Avatar } from '@/design'
 
 interface ChatWindowProps {
     conversation: Conversation
@@ -38,11 +39,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
             {/* Header */}
             <header className="h-16 flex-shrink-0 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
                 <div className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${conversation.platform === 'whatsapp' ? 'bg-green-500' :
-                            conversation.platform === 'telegram' ? 'bg-blue-400' : conversation.platform === 'instagram' ? 'bg-pink-500' : 'bg-purple-500'
-                        }`}>
-                        {conversation.contact_name.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar name={conversation.contact_name} src={conversation.contact_avatar_url} size="sm" />
                     <div>
                         <h1 className="font-bold text-gray-900">{conversation.contact_name}</h1>
                         <p className="text-xs text-gray-500 capitalize">{conversation.platform} • {conversation.status}</p>
@@ -77,10 +74,17 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
 
                     return (
                         <div key={msg.id} className={`flex items-start space-x-3 ${isMe || isBot ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                            <div className={`h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs text-white ${isBot ? 'bg-purple-600' : isMe ? 'bg-blue-600' : 'bg-gray-400'
-                                }`}>
-                                {isBot ? t('botName') : isMe ? t('you') : conversation.contact_name.charAt(0)}
-                            </div>
+                            {isBot ? (
+                                <div className="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center bg-purple-600 text-xs text-white">
+                                    {t('botName')}
+                                </div>
+                            ) : isMe ? (
+                                <div className="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center bg-blue-600 text-xs text-white">
+                                    {t('you')}
+                                </div>
+                            ) : (
+                                <Avatar name={conversation.contact_name} src={conversation.contact_avatar_url} size="sm" />
+                            )}
 
                             <div className={`flex flex-col space-y-1 max-w-xl ${isMe || isBot ? 'items-end' : ''}`}>
                                 <div className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${getInboxMessageBubbleClasses(msg.sender_type)}`}>

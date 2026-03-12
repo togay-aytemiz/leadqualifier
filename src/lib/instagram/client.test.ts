@@ -72,6 +72,42 @@ describe('InstagramClient', () => {
         )
     })
 
+    it('sends image messages with attachment payload url', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ message_id: 'igmid.image.1' })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new InstagramClient('token-1')
+        await client.sendImage({
+            instagramBusinessAccountId: 'ig-business-1',
+            to: 'ig-user-1',
+            imageUrl: 'https://cdn.example.com/outbound-image.jpg'
+        })
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.instagram.com/v21.0/ig-business-1/messages',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    messaging_product: 'instagram',
+                    recipient: {
+                        id: 'ig-user-1'
+                    },
+                    message: {
+                        attachment: {
+                            type: 'image',
+                            payload: {
+                                url: 'https://cdn.example.com/outbound-image.jpg'
+                            }
+                        }
+                    }
+                })
+            })
+        )
+    })
+
     it('fetches instagram business account details for health checks', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,
@@ -94,7 +130,12 @@ describe('InstagramClient', () => {
     it('fetches instagram user profile details for sender identity resolution', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,
-            json: async () => ({ id: 'ig-user-1', username: 'itsalinayalin', name: 'Alina Yalin' })
+            json: async () => ({
+                id: 'ig-user-1',
+                username: 'itsalinayalin',
+                name: 'Alina Yalin',
+                profile_pic: 'https://cdn.example.com/ig-user-1.jpg'
+            })
         })) as unknown as typeof fetch
         vi.stubGlobal('fetch', fetchMock)
 
@@ -103,8 +144,9 @@ describe('InstagramClient', () => {
 
         expect(result.id).toBe('ig-user-1')
         expect(result.username).toBe('itsalinayalin')
+        expect(result.profile_picture_url).toBe('https://cdn.example.com/ig-user-1.jpg')
         expect(fetchMock).toHaveBeenCalledWith(
-            'https://graph.instagram.com/v21.0/ig-user-1?fields=id,username,name',
+            'https://graph.instagram.com/v21.0/ig-user-1?fields=id,username,name,profile_pic',
             expect.objectContaining({
                 method: 'GET'
             })
@@ -135,14 +177,14 @@ describe('InstagramClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
         expect(fetchMock).toHaveBeenNthCalledWith(
             1,
-            'https://graph.instagram.com/v21.0/ig-user-2?fields=id,username,name',
+            'https://graph.instagram.com/v21.0/ig-user-2?fields=id,username,name,profile_pic',
             expect.objectContaining({
                 method: 'GET'
             })
         )
         expect(fetchMock).toHaveBeenNthCalledWith(
             2,
-            'https://graph.facebook.com/v21.0/ig-user-2?fields=id,username,name',
+            'https://graph.facebook.com/v21.0/ig-user-2?fields=id,username,name,profile_pic',
             expect.objectContaining({
                 method: 'GET'
             })

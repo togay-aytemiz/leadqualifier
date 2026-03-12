@@ -67,11 +67,12 @@ export function Badge({ children, variant = 'neutral' }: BadgeProps) {
 // --- Avatar ---
 interface AvatarProps {
     name: string
+    src?: string | null
     size?: 'sm' | 'md' | 'lg'
     className?: string
 }
 
-export function Avatar({ name, size = 'md', className }: AvatarProps) {
+export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
     const sizeClass = size === 'sm' ? "h-8 w-8 text-[11px]" : size === 'lg' ? "h-12 w-12 text-sm" : "h-8 w-8 text-xs"
     const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     const colors = [
@@ -85,15 +86,28 @@ export function Avatar({ name, size = 'md', className }: AvatarProps) {
         "bg-pink-100 text-pink-600",
     ]
     const colorClass = colors[name.length % colors.length]
+    const normalizedSrc = typeof src === 'string' && /^https?:\/\//i.test(src.trim()) ? src.trim() : null
+    const [imageFailed, setImageFailed] = useState(false)
+
+    useEffect(() => {
+        setImageFailed(false)
+    }, [normalizedSrc])
 
     return (
         <div className={cn(
-            "flex shrink-0 items-center justify-center rounded-full font-bold border border-white shadow-sm ring-1 ring-gray-100",
-            colorClass,
+            "flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold border border-white shadow-sm ring-1 ring-gray-100",
+            normalizedSrc && !imageFailed ? "bg-gray-100 text-transparent" : colorClass,
             sizeClass,
             className
         )}>
-            {initials}
+            {normalizedSrc && !imageFailed ? (
+                <img
+                    alt={name}
+                    className="h-full w-full object-cover"
+                    src={normalizedSrc}
+                    onError={() => setImageFailed(true)}
+                />
+            ) : initials}
         </div>
     )
 }

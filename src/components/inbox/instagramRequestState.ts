@@ -103,6 +103,7 @@ export function isInstagramRequestConversation(
         : null
 
     if (latestCandidate?.sender_type && latestCandidate.sender_type !== 'contact') return false
+    if (hasInstagramRequestTag(conversation.tags) && !hasOutboundReply) return true
     if (latestEventSource === 'messaging') return false
     if (latestCandidate && isInstagramRequestMessage(
         conversation.platform,
@@ -111,8 +112,6 @@ export function isInstagramRequestConversation(
     )) {
         return true
     }
-
-    if (hasInstagramRequestTag(conversation.tags) && !hasOutboundReply) return true
 
     const hasStandbySignal = candidates.some((message) => isInstagramRequestMessage(
         conversation.platform,

@@ -1,11 +1,21 @@
 const INSTAGRAM_MESSAGING_GRAPH_API_BASE = 'https://graph.facebook.com'
 const INSTAGRAM_LOGIN_GRAPH_API_BASE = 'https://graph.instagram.com'
 const DEFAULT_GRAPH_API_VERSION = 'v21.0'
+const INSTAGRAM_USER_PROFILE_FIELDS_WITH_AVATAR = 'id,username,name,profile_pic'
+const INSTAGRAM_USER_PROFILE_FIELDS_BASIC = 'id,username,name'
 
 type GraphApiErrorResponse = {
     error?: {
         message?: string
     }
+}
+
+type InstagramUserProfileResponse = {
+    id: string
+    username?: string
+    name?: string
+    profile_pic?: string
+    profile_picture_url?: string
 }
 
 export interface InstagramBusinessAccountDetails {
@@ -62,6 +72,49 @@ export class InstagramClient {
         return this.requestToBase<T>(INSTAGRAM_LOGIN_GRAPH_API_BASE, path, init)
     }
 
+    private normalizeUserProfile(payload: InstagramUserProfileResponse): InstagramUserProfile {
+        return {
+            id: payload.id,
+            username: payload.username,
+            name: payload.name,
+            profile_picture_url: payload.profile_picture_url || payload.profile_pic
+        }
+    }
+
+    private async requestUserProfileWithFields(
+        instagramUserId: string,
+        fields: string
+    ): Promise<InstagramUserProfile> {
+        try {
+            const payload = await this.requestInstagramLogin<InstagramUserProfileResponse>(
+                `${instagramUserId}?fields=${fields}`,
+                {
+                    method: 'GET'
+                }
+            )
+            return this.normalizeUserProfile(payload)
+        } catch (instagramLoginError) {
+            try {
+                const payload = await this.request<InstagramUserProfileResponse>(
+                    `${instagramUserId}?fields=${fields}`,
+                    {
+                        method: 'GET'
+                    }
+                )
+                return this.normalizeUserProfile(payload)
+            } catch {
+                throw instagramLoginError
+            }
+        }
+    }
+
+    private shouldRetryUserProfileWithoutAvatarField(error: unknown) {
+        const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+        return message.includes('profile_picture_url')
+            || message.includes('profile_pic')
+            || message.includes('unsupported')
+    }
+
     async sendText(params: {
         instagramBusinessAccountId: string
         to: string
@@ -95,6 +148,44 @@ export class InstagramClient {
         }
     }
 
+    async sendImage(params: {
+        instagramBusinessAccountId: string
+        to: string
+        imageUrl: string
+    }) {
+        const path = `${params.instagramBusinessAccountId}/messages`
+        const payload = {
+            messaging_product: 'instagram',
+            recipient: {
+                id: params.to
+            },
+            message: {
+                attachment: {
+                    type: 'image',
+                    payload: {
+                        url: params.imageUrl
+                    }
+                }
+            }
+        }
+
+        try {
+            return await this.requestInstagramLogin<{ message_id?: string }>(path, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            })
+        } catch (instagramLoginError) {
+            try {
+                return await this.request<{ message_id?: string }>(path, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                })
+            } catch {
+                throw instagramLoginError
+            }
+        }
+    }
+
     async getBusinessAccount(instagramBusinessAccountId: string): Promise<InstagramBusinessAccountDetails> {
         return this.request<InstagramBusinessAccountDetails>(
             `${instagramBusinessAccountId}?fields=id,username,name,profile_picture_url`,
@@ -106,23 +197,19 @@ export class InstagramClient {
 
     async getUserProfile(instagramUserId: string): Promise<InstagramUserProfile> {
         try {
-            return await this.requestInstagramLogin<InstagramUserProfile>(
-                `${instagramUserId}?fields=id,username,name`,
-                {
-                    method: 'GET'
-                }
+            return await this.requestUserProfileWithFields(
+                instagramUserId,
+                INSTAGRAM_USER_PROFILE_FIELDS_WITH_AVATAR
             )
-        } catch (instagramLoginError) {
-            try {
-                return await this.request<InstagramUserProfile>(
-                    `${instagramUserId}?fields=id,username,name`,
-                    {
-                        method: 'GET'
-                    }
-                )
-            } catch {
-                throw instagramLoginError
+        } catch (error) {
+            if (!this.shouldRetryUserProfileWithoutAvatarField(error)) {
+                throw error
             }
+
+            return this.requestUserProfileWithFields(
+                instagramUserId,
+                INSTAGRAM_USER_PROFILE_FIELDS_BASIC
+            )
         }
     }
 }

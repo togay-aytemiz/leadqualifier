@@ -1,6 +1,7 @@
 import { Conversation } from '@/types/database'
 import { formatDistanceToNow } from 'date-fns'
 import { useTranslations } from 'next-intl'
+import { Avatar } from '@/design'
 
 interface ConversationListProps {
     conversations: Conversation[]
@@ -40,11 +41,7 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                     >
                         <div className="flex justify-between items-start mb-1">
                             <div className="flex items-center space-x-2">
-                                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${conv.platform === 'whatsapp' ? 'bg-green-500' :
-                                        conv.platform === 'telegram' ? 'bg-blue-400' : conv.platform === 'instagram' ? 'bg-pink-500' : 'bg-purple-500'
-                                    }`}>
-                                    {conv.contact_name.charAt(0).toUpperCase()}
-                                </div>
+                                <Avatar name={conv.contact_name} src={conv.contact_avatar_url} size="sm" />
                                 <div>
                                     <span className="font-semibold text-sm text-gray-900 block">{conv.contact_name}</span>
                                     {conv.platform !== 'simulator' && (

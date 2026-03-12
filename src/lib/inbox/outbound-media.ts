@@ -2,6 +2,8 @@ export const MAX_WHATSAPP_OUTBOUND_ATTACHMENTS = 10
 export const MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES = 5 * 1024 * 1024
 // NOTE: Kept in sync with whatsapp-media bucket file_size_limit.
 export const MAX_WHATSAPP_OUTBOUND_DOCUMENT_BYTES = 15 * 1024 * 1024
+export const MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS = 10
+export const MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES = MAX_WHATSAPP_OUTBOUND_IMAGE_BYTES
 
 const WHATSAPP_IMAGE_MIME_TYPES = new Set([
     'image/jpeg',
@@ -105,6 +107,50 @@ export function validateWhatsAppOutboundAttachments(
                 reason: 'file_too_large',
                 attachmentId: attachment.id,
                 maxSizeBytes
+            }
+        }
+
+        normalized.push({
+            ...attachment,
+            mediaType
+        })
+    }
+
+    return {
+        ok: true,
+        attachments: normalized
+    }
+}
+
+export function validateInstagramOutboundImageAttachments(
+    attachments: WhatsAppOutboundAttachmentDraft[]
+): OutboundAttachmentValidationResult {
+    if (attachments.length > MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS) {
+        return {
+            ok: false,
+            reason: 'too_many_attachments',
+            maxCount: MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS
+        }
+    }
+
+    const normalized: WhatsAppOutboundAttachment[] = []
+
+    for (const attachment of attachments) {
+        const mediaType = resolveWhatsAppOutboundMediaType(attachment.mimeType)
+        if (mediaType !== 'image') {
+            return {
+                ok: false,
+                reason: 'invalid_mime_type',
+                attachmentId: attachment.id
+            }
+        }
+
+        if (attachment.sizeBytes > MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES) {
+            return {
+                ok: false,
+                reason: 'file_too_large',
+                attachmentId: attachment.id,
+                maxSizeBytes: MAX_INSTAGRAM_OUTBOUND_IMAGE_BYTES
             }
         }
 

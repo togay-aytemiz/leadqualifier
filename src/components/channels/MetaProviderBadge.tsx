@@ -22,7 +22,7 @@ export function MetaProviderBadge({
             )}
         >
             <RiMetaFill
-                aria-hidden="true"
+                aria-hidden
                 className={cn(
                     'text-[#0866FF]',
                     size === 'sm' ? 'h-4 w-4' : 'h-5 w-5'

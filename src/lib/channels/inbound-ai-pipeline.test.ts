@@ -231,6 +231,7 @@ function createConversation(overrides: Record<string, unknown> = {}) {
         id: 'conv-1',
         organization_id: 'org-1',
         contact_name: 'Test Contact',
+        contact_avatar_url: null,
         contact_phone: '905551112233',
         platform: 'whatsapp',
         status: 'open',
@@ -265,6 +266,7 @@ function buildInputBase(supabase: unknown, sendOutbound: ReturnType<typeof vi.fn
         source: 'whatsapp' as const,
         contactId: '905551112233',
         contactName: 'Ayse',
+        contactAvatarUrl: null,
         text: 'Merhaba',
         inboundMessageId: 'wamid-1',
         inboundMessageIdMetadataKey: 'whatsapp_message_id',
@@ -545,6 +547,42 @@ describe('processInboundAiPipeline guardrails', () => {
 
         expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
             tags: ['vip', 'instagram_request']
+        }))
+    })
+
+    it('persists contact avatar url when inbound profile data provides one', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'instagram',
+            contact_avatar_url: null
+        }))
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: 'itsalinayalin',
+            contactAvatarUrl: 'https://cdn.example.com/instagram-avatar.jpg',
+            inboundMessageId: 'igmid-avatar-1',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-avatar-1'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'itsalinayalin',
+            contact_avatar_url: 'https://cdn.example.com/instagram-avatar.jpg'
         }))
     })
 
