@@ -14,6 +14,8 @@ describe('main sidebar integration', () => {
         expect(fs.existsSync(sidebarPath)).toBe(true)
         const sidebarContent = fs.readFileSync(sidebarPath, 'utf8')
         expect(sidebarContent.includes('export function MainSidebar')).toBe(true)
+        expect(sidebarContent.includes('userAvatarUrl')).toBe(true)
+        expect(sidebarContent.includes('<Avatar')).toBe(true)
 
         const designIndex = fs.readFileSync(path.join(root, 'src', 'design', 'index.ts'), 'utf8')
         expect(designIndex.includes('MainSidebar')).toBe(true)
@@ -23,5 +25,6 @@ describe('main sidebar integration', () => {
             'utf8'
         )
         expect(dashboardLayout.includes('MainSidebar')).toBe(true)
+        expect(dashboardLayout.includes('userAvatarUrl')).toBe(true)
     })
 })

@@ -68,6 +68,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger
 } from '@/design/Dropdown'
+import { Avatar } from '@/design/primitives'
 
 const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -160,6 +161,7 @@ function SidebarHoverTooltip({
 
 interface MainSidebarProps {
     userName?: string
+    userAvatarUrl?: string | null
     isSystemAdmin?: boolean
     organizations?: ActiveOrganizationSummary[]
     activeOrganizationId?: string | null
@@ -169,6 +171,7 @@ interface MainSidebarProps {
 
 export function MainSidebar({
     userName,
+    userAvatarUrl = null,
     isSystemAdmin = false,
     organizations = [],
     activeOrganizationId = null,
@@ -1815,9 +1818,12 @@ export function MainSidebar({
                         title={userName}
                         type="button"
                     >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
-                            {(userName?.[0] || tCommon('defaultUserInitial')).toUpperCase()}
-                        </div>
+                        <Avatar
+                            name={userName || tCommon('defaultUserName')}
+                            src={userAvatarUrl}
+                            size="sm"
+                            className="border border-white/80 ring-1 ring-slate-200"
+                        />
                         <div
                             className={cn(
                                 'min-w-0 flex-1 transition-all duration-200 motion-reduce:transition-none',

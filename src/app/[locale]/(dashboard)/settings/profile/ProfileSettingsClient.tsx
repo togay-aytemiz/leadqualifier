@@ -4,24 +4,40 @@ import { useActionState, useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
-import { updateProfile } from '@/lib/profile/actions'
+import { createClient } from '@/lib/supabase/client'
+import {
+    prepareProfileAvatarUpload,
+    saveProfileAvatarUpload,
+    updateProfile
+} from '@/lib/profile/actions'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
 import { requestPasswordReset } from '@/lib/auth/actions'
+import { ProfileAvatarCard } from './ProfileAvatarCard'
+import {
+    PROFILE_AVATAR_INPUT_ACCEPT,
+    convertProfileAvatarToWebP,
+    validateProfileAvatarFile
+} from '@/lib/profile/avatar-client'
 
 interface ProfileSettingsClientProps {
     initialName: string
     email: string
+    initialAvatarUrl: string | null
 }
 
-export default function ProfileSettingsClient({ initialName, email }: ProfileSettingsClientProps) {
+export default function ProfileSettingsClient({ initialName, email, initialAvatarUrl }: ProfileSettingsClientProps) {
     const t = useTranslations('profileSettings')
     const tUnsaved = useTranslations('unsavedChanges')
     const locale = useLocale()
-    const [baseline, setBaseline] = useState({ name: initialName })
+    const [baseline, setBaseline] = useState({ name: initialName, avatarUrl: initialAvatarUrl })
     const [name, setName] = useState(initialName)
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
     const [isSaving, setIsSaving] = useState(false)
+    const [isAvatarUploading, setIsAvatarUploading] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
+    const [avatarError, setAvatarError] = useState<string | null>(null)
+    const [avatarStatus, setAvatarStatus] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
     const [cooldown, setCooldown] = useState(0)
     const [resetState, resetAction, resetPending] = useActionState(
@@ -30,6 +46,7 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
         },
         null
     )
+    const supabase = useMemo(() => createClient(), [])
 
     const isDirty = useMemo(() => name !== baseline.name, [name, baseline])
 
@@ -46,6 +63,14 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
         }, 2500)
         return () => window.clearTimeout(timeout)
     }, [saved])
+
+    useEffect(() => {
+        if (!avatarStatus) return
+        const timeout = window.setTimeout(() => {
+            setAvatarStatus(null)
+        }, 2500)
+        return () => window.clearTimeout(timeout)
+    }, [avatarStatus])
 
     useEffect(() => {
         if (resetState?.success) {
@@ -66,7 +91,10 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
         setSaved(false)
         try {
             await updateProfile(name)
-            setBaseline({ name })
+            setBaseline((current) => ({
+                ...current,
+                name
+            }))
             setSaved(true)
             return true
         } catch (error) {
@@ -82,6 +110,54 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
         setName(baseline.name)
         setSaveError(null)
         setSaved(false)
+    }
+
+    const handleAvatarSelect = async (file: File | null) => {
+        if (!file || isAvatarUploading) return
+
+        const validationError = validateProfileAvatarFile(file)
+        if (validationError) {
+            setAvatarStatus(null)
+            setAvatarError(
+                validationError === 'file_too_large'
+                    ? t('avatarFileTooLarge')
+                    : t('avatarInvalidType')
+            )
+            return
+        }
+
+        setIsAvatarUploading(true)
+        setAvatarError(null)
+        setAvatarStatus(null)
+
+        try {
+            const convertedFile = await convertProfileAvatarToWebP(file)
+            const prepareResult = await prepareProfileAvatarUpload()
+            if (!prepareResult.ok) {
+                throw new Error('Failed to prepare avatar upload')
+            }
+
+            const { error: uploadError } = await supabase.storage
+                .from(prepareResult.bucket)
+                .uploadToSignedUrl(prepareResult.storagePath, prepareResult.uploadToken, convertedFile)
+
+            if (uploadError) {
+                throw uploadError
+            }
+
+            const savedAvatar = await saveProfileAvatarUpload(prepareResult.storagePath)
+            setAvatarUrl(savedAvatar.avatarUrl)
+            setBaseline((current) => ({
+                ...current,
+                avatarUrl: savedAvatar.avatarUrl
+            }))
+            setAvatarStatus(t('avatarSaved'))
+        } catch (error) {
+            console.error(error)
+            setAvatarError(t('avatarSaveError'))
+        } finally {
+            setIsAvatarUploading(false)
+        }
     }
 
     const guard = useUnsavedChangesGuard({
@@ -112,6 +188,26 @@ export default function ProfileSettingsClient({ initialName, email }: ProfileSet
                 </div>
 
                 <div className="max-w-5xl">
+                    <div className="mb-6">
+                        <ProfileAvatarCard
+                            name={name}
+                            email={email}
+                            avatarUrl={avatarUrl}
+                            title={t('avatarTitle')}
+                            description={t('avatarDescription')}
+                            formatHint={t('avatarFormatHint')}
+                            uploadLabel={t('avatarUpload')}
+                            replaceLabel={t('avatarReplace')}
+                            savingLabel={t('avatarUploading')}
+                            inputLabel={t('avatarInputLabel')}
+                            inputAccept={PROFILE_AVATAR_INPUT_ACCEPT}
+                            isUploading={isAvatarUploading}
+                            errorMessage={avatarError}
+                            statusMessage={avatarStatus}
+                            onSelectFile={handleAvatarSelect}
+                        />
+                    </div>
+
                     <SettingsSection
                         title={t('nameTitle')}
                         description={t('nameDescription')}

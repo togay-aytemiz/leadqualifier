@@ -26,6 +26,7 @@ export default async function DashboardLayout({
     })
 
     const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
+    const userAvatarUrl = orgContext?.userAvatarUrl ?? null
 
     return (
         <NextIntlClientProvider locale={locale} messages={messages}>
@@ -34,6 +35,7 @@ export default async function DashboardLayout({
                 <div className="hidden lg:flex">
                     <MainSidebar
                         userName={userName}
+                        userAvatarUrl={userAvatarUrl}
                         isSystemAdmin={orgContext?.isSystemAdmin ?? false}
                         organizations={orgContext?.accessibleOrganizations ?? []}
                         activeOrganizationId={sidebarOrganizationId}

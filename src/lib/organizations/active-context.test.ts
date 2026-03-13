@@ -233,4 +233,45 @@ describe('resolveActiveOrganizationContext', () => {
         ])
         expect(context?.activeOrganizationId).toBe('org-a')
     })
+
+    it('includes the current user avatar in the resolved context', async () => {
+        const profileBuilder = createQueryBuilder({
+            singleResult: {
+                data: {
+                    is_system_admin: false,
+                    full_name: 'Test User',
+                    email: 'user@example.com',
+                    avatar_url: 'https://cdn.example.com/avatar.webp'
+                },
+                error: null
+            }
+        })
+        const membershipBuilder = createQueryBuilder({
+            eqResult: {
+                data: [{
+                    organization_id: 'org-1',
+                    organizations: {
+                        id: 'org-1',
+                        name: 'Alpha',
+                        slug: 'alpha'
+                    }
+                }],
+                error: null
+            }
+        })
+
+        const supabaseMock = createSupabaseMock({
+            profiles: [profileBuilder],
+            organization_members: [membershipBuilder]
+        })
+
+        cookiesMock.mockResolvedValue({
+            get: vi.fn(() => undefined)
+        })
+
+        const context = await resolveActiveOrganizationContext(supabaseMock as never)
+
+        expect(context?.userAvatarUrl).toBe('https://cdn.example.com/avatar.webp')
+        expect((profileBuilder.select as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('is_system_admin, full_name, email, avatar_url')
+    })
 })

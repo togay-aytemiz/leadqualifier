@@ -101,6 +101,8 @@ import {
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 import { extractSocialContactAvatarUrl } from '@/lib/inbox/contact-avatar'
+import { KualiaAvatar } from '@/components/inbox/KualiaAvatar'
+import { resolveMessageSenderIdentity, type InboxSenderProfile } from '@/components/inbox/message-sender'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -116,8 +118,9 @@ interface InboxContainerProps {
     isReadOnly?: boolean
 }
 
-type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email'>
+type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'>
 type Assignee = Pick<Profile, 'full_name' | 'email'>
+type SenderProfile = InboxSenderProfile
 const SUMMARY_PANEL_ID = 'conversation-summary-panel'
 const INBOX_MEDIA_BUCKET = 'whatsapp-media'
 const MESSAGES_PAGE_SIZE = 50
@@ -264,6 +267,7 @@ export function InboxContainer({
     const [isMobileBotModeSheetVisible, setIsMobileBotModeSheetVisible] = useState(false)
     const [isMobileBotModeUpdating, setIsMobileBotModeUpdating] = useState(false)
     const [mobileBotModeUpdateError, setMobileBotModeUpdateError] = useState<string | null>(null)
+    const [senderProfilesById, setSenderProfilesById] = useState<Record<string, SenderProfile>>({})
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -284,6 +288,7 @@ export function InboxContainer({
     const refreshInFlightRef = useRef(false)
     const refreshRequestRef = useRef<string | null>(null)
     const assigneeCacheRef = useRef<Record<string, Assignee>>({})
+    const senderProfilesRef = useRef<Record<string, SenderProfile>>({})
     const selectedIdRef = useRef(selectedId)
     const leadRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const leadAutoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -324,6 +329,60 @@ export function InboxContainer({
             return []
         })
     }, [revokeAttachmentPreviewUrl])
+
+    const mergeSenderProfiles = useCallback((profiles: SenderProfile[]) => {
+        if (profiles.length === 0) return
+
+        setSenderProfilesById((previous) => {
+            let hasChanges = false
+            const next = { ...previous }
+
+            for (const profile of profiles) {
+                const id = profile.id?.trim()
+                if (!id) continue
+
+                const previousProfile = next[id]
+                if (
+                    previousProfile?.full_name === profile.full_name
+                    && previousProfile?.email === profile.email
+                    && previousProfile?.avatar_url === profile.avatar_url
+                ) {
+                    continue
+                }
+
+                next[id] = profile
+                hasChanges = true
+            }
+
+            if (!hasChanges) return previous
+            senderProfilesRef.current = next
+            return next
+        })
+    }, [])
+
+    const hydrateSenderProfiles = useCallback(async (messageList: Message[]) => {
+        const missingIds = Array.from(new Set(
+            messageList
+                .filter((message) => message.sender_type === 'user')
+                .map((message) => (typeof message.created_by === 'string' ? message.created_by.trim() : ''))
+                .filter((id) => id.length > 0)
+                .filter((id) => !senderProfilesRef.current[id])
+        ))
+
+        if (missingIds.length === 0) return
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .in('id', missingIds)
+
+        if (error || !data) {
+            console.error('Failed to hydrate sender profiles', error)
+            return
+        }
+
+        mergeSenderProfiles((data ?? []) as SenderProfile[])
+    }, [mergeSenderProfiles, supabase])
 
     const markOptimisticMessagesAsFailed = useCallback((tempMessageIds: string[]) => {
         if (tempMessageIds.length === 0) return
@@ -560,6 +619,7 @@ export function InboxContainer({
                 if (selectedIdRef.current !== nextId) continue
                 pendingPrependScrollRestoreRef.current = null
                 isLoadingMessageHistoryRef.current = false
+                await hydrateSenderProfiles(pageResult.messages)
                 setMessages(pageResult.messages)
                 setMessageOffset(pageResult.fetchedCount)
                 setHasMoreMessageHistory(pageResult.hasMore)
@@ -580,7 +640,7 @@ export function InboxContainer({
         } finally {
             refreshInFlightRef.current = false
         }
-    }, [refreshLead])
+    }, [hydrateSenderProfiles, refreshLead])
 
     const loadOlderMessages = useCallback(async () => {
         const conversationId = selectedIdRef.current
@@ -605,6 +665,7 @@ export function InboxContainer({
                 pendingPrependScrollRestoreRef.current = restoreSnapshot
             }
 
+            await hydrateSenderProfiles(pageResult.messages)
             setMessages((previousMessages) => {
                 const merged = prependOlderMessages({
                     currentMessages: previousMessages,
@@ -626,7 +687,7 @@ export function InboxContainer({
             }
             isLoadingMessageHistoryRef.current = false
         }
-    }, [hasMoreMessageHistory, messageOffset])
+    }, [hasMoreMessageHistory, hydrateSenderProfiles, messageOffset])
 
     const resolveAssignee = useCallback(async (assigneeId: string | null) => {
         if (!assigneeId) return null
@@ -675,6 +736,10 @@ export function InboxContainer({
     }, [lead])
 
     useEffect(() => {
+        senderProfilesRef.current = senderProfilesById
+    }, [senderProfilesById])
+
+    useEffect(() => {
         let isMounted = true
 
         const loadProfile = async () => {
@@ -683,7 +748,7 @@ export function InboxContainer({
 
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, full_name, email')
+                .select('id, full_name, email, avatar_url')
                 .eq('id', user.id)
                 .single()
 
@@ -692,13 +757,15 @@ export function InboxContainer({
             const profile: ProfileLite = {
                 id: data.id,
                 full_name: data.full_name,
-                email: data.email
+                email: data.email,
+                avatar_url: data.avatar_url
             }
 
             assigneeCacheRef.current[data.id] = {
                 full_name: data.full_name,
                 email: data.email
             }
+            mergeSenderProfiles([profile])
             setCurrentUserProfile(profile)
         }
 
@@ -707,7 +774,7 @@ export function InboxContainer({
         return () => {
             isMounted = false
         }
-    }, [supabase])
+    }, [mergeSenderProfiles, supabase])
 
     useEffect(() => {
         if (!selectedId) {
@@ -874,6 +941,9 @@ export function InboxContainer({
                     const inboundContactAvatarUrl = newMsg.sender_type === 'contact'
                         ? extractSocialContactAvatarUrl(newMsg.metadata)
                         : null
+                    if (newMsg.sender_type === 'user') {
+                        void hydrateSenderProfiles([newMsg])
+                    }
 
                     // 1. Update active chat if it matches selectedId
                     if (newMsg.conversation_id === selectedIdRef.current) {
@@ -1048,7 +1118,7 @@ export function InboxContainer({
                 supabase.removeChannel(leadsChannel)
             }
         }
-    }, [organizationId, refreshMessages, resolveAssignee, scheduleLeadAutoRefresh, supabase])
+    }, [hydrateSenderProfiles, organizationId, refreshMessages, resolveAssignee, scheduleLeadAutoRefresh, supabase])
 
     const handleFetchSummary = async () => {
         if (!selectedId || summaryStatus === 'loading') return
@@ -1383,6 +1453,7 @@ export function InboxContainer({
                             id: `temp-media-${Date.now()}-${index}`,
                             conversation_id: conversationId,
                             sender_type: 'user' as const,
+                            created_by: currentUserProfile?.id ?? null,
                             content: t('composerAttachments.outboundPlaceholderImage'),
                             metadata: {
                                 instagram_outbound_status: 'sending',
@@ -1411,6 +1482,7 @@ export function InboxContainer({
                         id: `temp-media-${Date.now()}-${index}`,
                         conversation_id: conversationId,
                         sender_type: 'user' as const,
+                        created_by: currentUserProfile?.id ?? null,
                         content,
                         metadata: {
                             whatsapp_outbound_status: 'sending',
@@ -1434,6 +1506,7 @@ export function InboxContainer({
                         id: `temp-text-${Date.now()}`,
                         conversation_id: conversationId,
                         sender_type: 'user' as const,
+                        created_by: currentUserProfile?.id ?? null,
                         content: normalizedInput,
                         metadata: {} as Message['metadata'],
                         created_at: new Date(Date.now() + selectedAttachments.length).toISOString()
@@ -1444,6 +1517,7 @@ export function InboxContainer({
                 id: `temp-${Date.now()}`,
                 conversation_id: conversationId,
                 sender_type: 'user' as const,
+                created_by: currentUserProfile?.id ?? null,
                 content: normalizedInput,
                 metadata: {} as Message['metadata'],
                 created_at: nowIso
@@ -2628,6 +2702,16 @@ export function InboxContainer({
                                         ? splitBotMessageDisclaimer(m.content)
                                         : { body: m.content, disclaimer: null as string | null }
                                     const visibleMessageContent = parsedBotContent.body
+                                    const senderIdentity = resolveMessageSenderIdentity({
+                                        message: m,
+                                        currentUserId,
+                                        currentUserProfile,
+                                        senderProfilesById,
+                                        contactName: selectedConversationDisplayName,
+                                        contactAvatarUrl: selectedConversationAvatarUrl,
+                                        youLabel: t('you'),
+                                        botName: botName ?? t('botName')
+                                    })
                                     const matchedSkillTitle = isBot
                                         ? extractSkillTitleFromMetadata(m.metadata)
                                         : null
@@ -2738,7 +2822,7 @@ export function InboxContainer({
                                                 <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                     {dateSeparator}
                                                     <div className="flex items-end gap-3">
-                                                        <Avatar name={selectedConversationDisplayName} src={selectedConversationAvatarUrl} size="md" />
+                                                        <Avatar name={senderIdentity.displayName} src={senderIdentity.avatarUrl} size="md" />
                                                         <div className="flex flex-col gap-1 max-w-[80%]">
                                                             <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none p-2.5">
                                                                 {renderGalleryGrid(false)}
@@ -2756,7 +2840,7 @@ export function InboxContainer({
                                             <div key={m.id} className={messageDateSeparator ? 'space-y-3' : undefined}>
                                                 {dateSeparator}
                                                 <div className="flex items-end gap-3">
-                                                    <Avatar name={selectedConversationDisplayName} src={selectedConversationAvatarUrl} size="md" />
+                                                    <Avatar name={senderIdentity.displayName} src={senderIdentity.avatarUrl} size="md" />
                                                     <div className="flex flex-col gap-1 max-w-[80%]">
                                                         <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
                                                             {media && (
@@ -2818,12 +2902,12 @@ export function InboxContainer({
                                                 {dateSeparator}
                                                 <div className="flex items-end gap-3 justify-end">
                                                     <div className="flex flex-col gap-1 items-end max-w-[80%]">
-                                                        <div className={`rounded-2xl rounded-br-none p-2.5 ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
+                                                        <div className={`rounded-2xl rounded-br-none p-2.5 ${isBot ? 'bg-slate-900 text-white' : 'bg-gray-900 text-white'}`}>
                                                             {renderGalleryGrid(true)}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 mr-1">
                                                             <span className="text-xs text-gray-400">
-                                                                {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(galleryTimestamp), 'HH:mm', { locale: dateLocale })}
+                                                                {senderIdentity.footerLabel} · {format(new Date(galleryTimestamp), 'HH:mm', { locale: dateLocale })}
                                                             </span>
                                                             {!isBot && instagramSeenIndicator && (
                                                                 <span
@@ -2859,6 +2943,11 @@ export function InboxContainer({
                                                             )}
                                                         </div>
                                                     </div>
+                                                    {isBot ? (
+                                                        <KualiaAvatar size="sm" />
+                                                    ) : (
+                                                        <Avatar name={senderIdentity.displayName} src={senderIdentity.avatarUrl} size="md" />
+                                                    )}
                                                 </div>
                                             </div>
                                         )
@@ -2869,7 +2958,7 @@ export function InboxContainer({
                                             {dateSeparator}
                                             <div className="flex items-end gap-3 justify-end">
                                                 <div className="flex flex-col gap-1 items-end max-w-[80%]">
-                                                    <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-purple-700 text-white' : 'bg-gray-900 text-white'}`}>
+                                                    <div className={`rounded-2xl rounded-br-none px-4 py-3 text-sm leading-relaxed text-right ${isBot ? 'bg-slate-900 text-white' : 'bg-gray-900 text-white'}`}>
                                                         {media && (
                                                             <div className="space-y-2 text-left">
                                                                 {media.type === 'image' && media.url ? (
@@ -2911,7 +3000,7 @@ export function InboxContainer({
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mr-1">
                                                         <span className="text-xs text-gray-400">
-                                                            {isBot ? (botName ?? t('botName')) : t('you')} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                                                            {senderIdentity.footerLabel} · {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
                                                         </span>
                                                         {!isBot && instagramSeenIndicator && (
                                                             <span
@@ -2947,6 +3036,11 @@ export function InboxContainer({
                                                         )}
                                                     </div>
                                                 </div>
+                                                {isBot ? (
+                                                    <KualiaAvatar size="sm" />
+                                                ) : (
+                                                    <Avatar name={senderIdentity.displayName} src={senderIdentity.avatarUrl} size="md" />
+                                                )}
                                             </div>
                                         </div>
                                     )

@@ -19,11 +19,12 @@ export default async function ProfileSettingsPage() {
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name, email')
+        .select('full_name, email, avatar_url')
         .eq('id', orgContext.userId)
         .single()
 
     const initialName = profile?.full_name ?? ''
     const email = profile?.email ?? ''
-    return <ProfileSettingsClient initialName={initialName} email={email} />
+    const initialAvatarUrl = profile?.avatar_url ?? null
+    return <ProfileSettingsClient initialName={initialName} email={email} initialAvatarUrl={initialAvatarUrl} />
 }

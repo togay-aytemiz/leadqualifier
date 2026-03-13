@@ -325,7 +325,9 @@ export interface Conversation {
 export interface Message {
     id: string
     conversation_id: string
+    organization_id?: string
     sender_type: MessageSenderType
+    created_by?: string | null
     content: string
     metadata: Json
     created_at: string
