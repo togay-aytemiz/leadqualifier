@@ -1,5 +1,7 @@
 'use server'
 
+import { createHmac } from 'node:crypto'
+
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
@@ -126,6 +128,46 @@ function normalizeTemplateSummary(value: unknown): WhatsAppTemplateSummary | nul
     }
 }
 
+function resolveConfiguredAppUrl() {
+    const candidates = [
+        process.env.NEXT_PUBLIC_APP_URL,
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+        process.env.URL
+    ]
+
+    for (const candidate of candidates) {
+        if (typeof candidate !== 'string') continue
+        const trimmed = candidate.trim().replace(/\/+$/, '')
+        if (trimmed) return trimmed
+    }
+
+    return null
+}
+
+function createWhatsAppTwoStepVerificationPin(params: {
+    organizationId: string
+    businessAccountId: string
+    phoneNumberId: string
+    appSecret: string
+}) {
+    const digest = createHmac('sha256', params.appSecret)
+        .update(`${params.organizationId}:${params.businessAccountId}:${params.phoneNumberId}`)
+        .digest('hex')
+
+    const numericValue = parseInt(digest.slice(0, 12), 16)
+    return String((numericValue % 900000) + 100000)
+}
+
+function resolveWhatsAppWebhookSubscriptionOverrides(globalVerifyToken: string | null) {
+    const appUrl = resolveConfiguredAppUrl()
+    if (!appUrl || !globalVerifyToken) return undefined
+
+    return {
+        overrideCallbackUri: `${appUrl}/api/webhooks/whatsapp`,
+        verifyToken: globalVerifyToken
+    }
+}
+
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
@@ -139,11 +181,7 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
         const webhookSecret = uuidv4()
 
         // 2. Set Webhook if APP_URL is defined
-        let appUrl = process.env.NEXT_PUBLIC_APP_URL
-        if (!appUrl) {
-            if (process.env.VERCEL_URL) appUrl = `https://${process.env.VERCEL_URL}`
-            else if (process.env.URL) appUrl = process.env.URL // Netlify
-        }
+        const appUrl = resolveConfiguredAppUrl()
 
         if (appUrl) {
             console.log('Setting Telegram Webhook to:', `${appUrl}/api/webhooks/telegram`)
@@ -341,6 +379,19 @@ export async function completeWhatsAppEmbeddedSignupChannel(
         })
 
         const client = new WhatsAppClient(permanentAccessToken)
+        const twoStepVerificationPin = createWhatsAppTwoStepVerificationPin({
+            organizationId,
+            businessAccountId,
+            phoneNumberId,
+            appSecret
+        })
+
+        await client.registerPhoneNumber(phoneNumberId, twoStepVerificationPin)
+        await client.subscribeAppToBusinessAccount(
+            businessAccountId,
+            resolveWhatsAppWebhookSubscriptionOverrides(globalVerifyToken)
+        )
+
         const phoneDetails = await client.getPhoneNumber(phoneNumberId)
 
         const displayPhoneNumber = (phoneDetails.display_phone_number ?? '').trim()
@@ -362,6 +413,7 @@ export async function completeWhatsAppEmbeddedSignupChannel(
                     verify_token: globalVerifyToken || uuidv4(),
                     connected_via: 'embedded_signup',
                     oauth_connected_at: new Date().toISOString(),
+                    two_step_verification_pin: twoStepVerificationPin,
                     display_phone_number: displayPhoneNumber,
                     webhook_verified_at: null
                 }

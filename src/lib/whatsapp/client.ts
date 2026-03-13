@@ -36,6 +36,15 @@ export interface WhatsAppMediaMetadata {
     file_size?: number
 }
 
+export interface WhatsAppProvisioningSuccessResponse {
+    success: boolean
+}
+
+export interface WhatsAppWebhookSubscriptionOverrides {
+    overrideCallbackUri?: string
+    verifyToken?: string
+}
+
 export interface WhatsAppReplyButton {
     id: string
     title: string
@@ -270,6 +279,35 @@ export class WhatsAppClient {
     async getPhoneNumber(phoneNumberId: string): Promise<WhatsAppPhoneNumberDetails> {
         return this.request<WhatsAppPhoneNumberDetails>(`${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating`, {
             method: 'GET'
+        })
+    }
+
+    async registerPhoneNumber(
+        phoneNumberId: string,
+        pin: string
+    ): Promise<WhatsAppProvisioningSuccessResponse> {
+        return this.request<WhatsAppProvisioningSuccessResponse>(`${phoneNumberId}/register`, {
+            method: 'POST',
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                pin
+            })
+        })
+    }
+
+    async subscribeAppToBusinessAccount(
+        businessAccountId: string,
+        overrides?: WhatsAppWebhookSubscriptionOverrides
+    ): Promise<WhatsAppProvisioningSuccessResponse> {
+        const hasOverride = Boolean(overrides?.overrideCallbackUri && overrides?.verifyToken)
+        return this.request<WhatsAppProvisioningSuccessResponse>(`${businessAccountId}/subscribed_apps`, {
+            method: 'POST',
+            body: hasOverride
+                ? JSON.stringify({
+                    override_callback_uri: overrides?.overrideCallbackUri,
+                    verify_token: overrides?.verifyToken
+                })
+                : undefined
         })
     }
 

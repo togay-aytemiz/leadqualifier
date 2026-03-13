@@ -117,6 +117,55 @@ describe('WhatsAppClient', () => {
         )
     })
 
+    it('registers a business phone number for cloud api use', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ success: true })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        const result = await client.registerPhoneNumber('phone-1', '123456')
+
+        expect(result).toEqual({ success: true })
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.facebook.com/v21.0/phone-1/register',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    pin: '123456'
+                })
+            })
+        )
+    })
+
+    it('subscribes the app to a business account and can override callback settings', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ success: true })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        const result = await client.subscribeAppToBusinessAccount('waba-1', {
+            overrideCallbackUri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+            verifyToken: 'verify-token-1'
+        })
+
+        expect(result).toEqual({ success: true })
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.facebook.com/v21.0/waba-1/subscribed_apps',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    override_callback_uri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+                    verify_token: 'verify-token-1'
+                })
+            })
+        )
+    })
+
     it('fetches message templates for a business account', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

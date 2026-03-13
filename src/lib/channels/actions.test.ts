@@ -8,8 +8,10 @@ const {
     getPhoneNumberMock,
     getMessageTemplatesMock,
     revalidatePathMock,
+    registerPhoneNumberMock,
     resolveMetaInstagramConnectionCandidateMock,
     sendTemplateMock,
+    subscribeAppToBusinessAccountMock,
     whatsAppCtorMock
 } = vi.hoisted(() => ({
     assertTenantWriteAllowedMock: vi.fn(),
@@ -19,8 +21,10 @@ const {
     getPhoneNumberMock: vi.fn(),
     getMessageTemplatesMock: vi.fn(),
     revalidatePathMock: vi.fn(),
+    registerPhoneNumberMock: vi.fn(),
     resolveMetaInstagramConnectionCandidateMock: vi.fn(),
     sendTemplateMock: vi.fn(),
+    subscribeAppToBusinessAccountMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
 }))
 
@@ -50,7 +54,9 @@ vi.mock('@/lib/whatsapp/client', () => ({
 
         getPhoneNumber = getPhoneNumberMock
         getMessageTemplates = getMessageTemplatesMock
+        registerPhoneNumber = registerPhoneNumberMock
         sendTemplate = sendTemplateMock
+        subscribeAppToBusinessAccount = subscribeAppToBusinessAccountMock
     }
 }))
 
@@ -118,6 +124,7 @@ describe('channels actions: WhatsApp core flows', () => {
         process.env.META_APP_ID = 'meta-app-1'
         process.env.META_APP_SECRET = 'meta-secret-1'
         process.env.META_WEBHOOK_VERIFY_TOKEN = 'global-verify-token'
+        process.env.NEXT_PUBLIC_APP_URL = 'https://app.askqualy.com'
         assertTenantWriteAllowedMock.mockResolvedValue(undefined)
         exchangeMetaCodeForTokenMock.mockResolvedValue('short-token-1')
         exchangeMetaForLongLivedTokenMock.mockResolvedValue('long-token-1')
@@ -126,6 +133,7 @@ describe('channels actions: WhatsApp core flows', () => {
             verified_name: 'Qualy',
             quality_rating: 'GREEN'
         })
+        registerPhoneNumberMock.mockResolvedValue({ success: true })
         getMessageTemplatesMock.mockResolvedValue({
             data: [
                 {
@@ -140,6 +148,7 @@ describe('channels actions: WhatsApp core flows', () => {
         sendTemplateMock.mockResolvedValue({
             messages: [{ id: 'wamid.template.1' }]
         })
+        subscribeAppToBusinessAccountMock.mockResolvedValue({ success: true })
         resolveMetaInstagramConnectionCandidateMock.mockResolvedValue({
             pageId: '17841444965056435',
             pageName: 'itsalinayalin',
@@ -232,6 +241,15 @@ describe('channels actions: WhatsApp core flows', () => {
             shortLivedToken: 'short-token-1'
         })
         expect(whatsAppCtorMock).toHaveBeenCalledWith('long-token-1')
+        expect(registerPhoneNumberMock).toHaveBeenCalledTimes(1)
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledTimes(1)
+        const generatedPin = registerPhoneNumberMock.mock.calls[0]?.[1]
+        expect(generatedPin).toMatch(/^\d{6}$/)
+        expect(registerPhoneNumberMock).toHaveBeenCalledWith('phone-1', generatedPin)
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledWith('waba-1', {
+            overrideCallbackUri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+            verifyToken: 'global-verify-token'
+        })
         expect(getPhoneNumberMock).toHaveBeenCalledWith('phone-1')
         expect(upsertMock).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -245,6 +263,7 @@ describe('channels actions: WhatsApp core flows', () => {
                     permanent_access_token: 'long-token-1',
                     verify_token: 'global-verify-token',
                     connected_via: 'embedded_signup',
+                    two_step_verification_pin: generatedPin,
                     display_phone_number: '+90 555 111 22 33',
                     webhook_verified_at: null
                 })
@@ -280,6 +299,24 @@ describe('channels actions: WhatsApp core flows', () => {
             redirectUri: '',
             code: 'auth-code-1'
         })
+    })
+
+    it('subscribes without callback override when app url or verify token are unavailable', async () => {
+        delete process.env.NEXT_PUBLIC_APP_URL
+        delete process.env.URL
+        delete process.env.VERCEL_URL
+        delete process.env.META_WEBHOOK_VERIFY_TOKEN
+
+        const { supabase } = createUpsertSupabaseMock()
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        await completeWhatsAppEmbeddedSignupChannel('org-1', {
+            authCode: 'auth-code-1',
+            phoneNumberId: 'phone-1',
+            businessAccountId: 'waba-1'
+        })
+
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledWith('waba-1', undefined)
     })
 
     it('returns normalized debug info for WhatsApp channel', async () => {
