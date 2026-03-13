@@ -126,4 +126,18 @@ describe('analyzeRequiredIntakeState', () => {
         expect(state.noProgressStreak).toBe(true)
         expect(state.suppressIntakeQuestions).toBe(true)
     })
+
+    it('blocks phone/contact re-asks when prior ask used number wording drift', () => {
+        const state = analyzeRequiredIntakeState({
+            requiredFields: ['Telefon Numarası', 'Bütçe'],
+            recentCustomerMessages: ['Bu bilgiyi paylaşmak istemiyorum.', 'Şimdilik bilmiyorum.'],
+            recentAssistantMessages: [
+                'Size ulaşabileceğimiz bir numara paylaşabilir misiniz?',
+                'Şimdilik sadece numara yeterli olur mu?'
+            ]
+        })
+
+        expect(state.blockedReaskFields).toContain('Telefon Numarası')
+        expect(state.suppressIntakeQuestions).toBe(true)
+    })
 })

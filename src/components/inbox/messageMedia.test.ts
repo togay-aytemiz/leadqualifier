@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    collectOptimisticPreviewUrls,
     extractMediaFromMessageMetadata,
     resolveMessagePreviewContent
 } from './messageMedia'
@@ -111,5 +112,46 @@ describe('resolveMessagePreviewContent', () => {
         })
 
         expect(preview).toBe('Merhaba')
+    })
+})
+
+describe('collectOptimisticPreviewUrls', () => {
+    it('collects blob preview urls only for sending media messages', () => {
+        const previewUrls = collectOptimisticPreviewUrls([
+            {
+                metadata: {
+                    instagram_media: {
+                        type: 'image',
+                        storage_url: 'blob:instagram-preview-1',
+                        download_status: 'sending'
+                    },
+                    instagram_outbound_status: 'sending'
+                }
+            },
+            {
+                metadata: {
+                    whatsapp_media: {
+                        type: 'image',
+                        storage_url: 'https://cdn.example.com/stored.jpg',
+                        download_status: 'stored'
+                    }
+                }
+            },
+            {
+                metadata: {
+                    whatsapp_media: {
+                        type: 'image',
+                        storage_url: 'blob:whatsapp-preview-2',
+                        download_status: 'sending'
+                    },
+                    whatsapp_outbound_status: 'sending'
+                }
+            }
+        ])
+
+        expect(previewUrls).toEqual([
+            'blob:instagram-preview-1',
+            'blob:whatsapp-preview-2'
+        ])
     })
 })

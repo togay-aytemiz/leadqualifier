@@ -1,28 +1,7 @@
 import { isLikelyTurkishMessage, type MvpResponseLanguage } from '@/lib/ai/language'
+import { messageMentionsField } from '@/lib/ai/intake-field-match'
 
 const ENGLISH_SIGNAL_PATTERN = /\b(i|we|you|your|can|could|would|should|please|continue|clarify|available|options|share|details|information|service|appointment|cancel|contact|support|team|next|step|understood|meanwhile)\b/i
-const COMBINING_MARKS = /[\u0300-\u036f]/g
-const FIELD_TOKEN_STOPWORDS = new Set([
-    've',
-    'ile',
-    'icin',
-    'için',
-    'bilgi',
-    'detay',
-    'alan',
-    'field',
-    'required',
-    'zorunlu',
-    'the',
-    'for',
-    'of',
-    'to',
-    'your',
-    'hangi',
-    'nedir',
-    'what',
-    'which'
-])
 
 const EXTERNAL_CONTACT_REDIRECT_PATTERNS = [
     /\bweb\s*site\b/i,
@@ -33,7 +12,7 @@ const EXTERNAL_CONTACT_REDIRECT_PATTERNS = [
     /\bcontact details\b/i,
     /\btelefon\b/i,
     /\bara(?:yin|yın)?\b/i,
-    /\bnumara(?:m[iı]z)?\b/i,
+    /\bnumaram[iı]z\b/i,
     /\bileti[sş]im bilgileri(?:nizi)?\b/i
 ]
 
@@ -143,47 +122,6 @@ function splitIntoSentenceLikeChunks(message: string) {
 function hasQuestionIntent(value: string) {
     if (value.includes('?')) return true
     return /\b(ne|nas[iı]l|neden|hangi|kim|nereye|ne zaman|how|why|what|which|when|can|could|would|should)\b/i.test(value)
-}
-
-function normalizeForFieldMatch(value: string) {
-    return value
-        .trim()
-        .replace(/\s+/g, ' ')
-        .normalize('NFKD')
-        .replace(COMBINING_MARKS, '')
-        .toLowerCase()
-}
-
-function escapeRegExp(value: string) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function tokenizeFieldLabel(field: string) {
-    return normalizeForFieldMatch(field)
-        .split(' ')
-        .map((token) => token.trim())
-        .filter((token) => token.length >= 3 && !FIELD_TOKEN_STOPWORDS.has(token))
-}
-
-function messageMentionsField(field: string, message: string) {
-    const normalizedMessage = normalizeForFieldMatch(message)
-    if (!normalizedMessage) return false
-
-    const tokens = tokenizeFieldLabel(field)
-    if (tokens.length === 0) return false
-
-    let tokenHits = 0
-    let hasStrongTokenHit = false
-    for (const token of tokens) {
-        const matched = new RegExp(`\\b${escapeRegExp(token)}\\b`, 'i').test(normalizedMessage)
-            || normalizedMessage.includes(token)
-        if (!matched) continue
-        tokenHits += 1
-        if (token.length >= 5) hasStrongTokenHit = true
-    }
-    if (tokens.length === 1) return tokenHits >= 1
-    if (tokenHits >= Math.min(2, tokens.length)) return true
-    return hasStrongTokenHit && tokenHits >= 1
 }
 
 function hasRefusalSignal(value: string) {

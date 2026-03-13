@@ -101,3 +101,16 @@ export function resolveMessagePreviewContent(args: {
     if (normalized.length > 0) return args.content as string
     return args.fallbackNoMessage
 }
+
+export function collectOptimisticPreviewUrls(messages: Array<{ metadata?: unknown }>) {
+    const urls = new Set<string>()
+
+    for (const message of messages) {
+        const media = extractMediaFromMessageMetadata(message.metadata)
+        if (!media?.url) continue
+        if (!media.url.startsWith('blob:')) continue
+        urls.add(media.url)
+    }
+
+    return Array.from(urls)
+}

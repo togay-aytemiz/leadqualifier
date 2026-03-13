@@ -62,6 +62,17 @@ describe('response guards', () => {
         expect(response.toLowerCase()).not.toContain('telefonla')
     })
 
+    it('does not treat phone-number intake question as external-contact redirect', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Size ulaşabileceğimiz bir numara paylaşabilir misiniz?',
+            userMessage: 'Fiyat bilgisi alabilir miyim?',
+            responseLanguage: 'tr',
+            recentAssistantMessages: []
+        })
+
+        expect(response).toBe('Size ulaşabileceğimiz bir numara paylaşabilir misiniz?')
+    })
+
     it('strips intake-like question after explicit refusal', () => {
         const response = applyLiveAssistantResponseGuards({
             response: 'Anladım. Bütçe aralığınızı paylaşabilir misiniz?',
@@ -84,6 +95,19 @@ describe('response guards', () => {
 
         expect(response).toContain('Anladım.')
         expect(response).not.toContain('Öğrenci yaşını paylaşabilir misiniz')
+    })
+
+    it('strips blocked phone/contact re-asks when response uses number wording drift', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Peki. Size ulaşabileceğimiz bir numara paylaşabilir misiniz?',
+            userMessage: 'Şimdilik bilmiyorum.',
+            responseLanguage: 'tr',
+            blockedReaskFields: ['Telefon Numarası'],
+            recentAssistantMessages: []
+        })
+
+        expect(response).toContain('Anladım.')
+        expect(response).not.toContain('ulaşabileceğimiz bir numara paylaşabilir misiniz')
     })
 
     it('strips intake questions when intake suppression is active', () => {

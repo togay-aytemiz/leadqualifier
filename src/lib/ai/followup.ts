@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
+import { messageMentionsField } from '@/lib/ai/intake-field-match'
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
 
@@ -15,30 +16,6 @@ interface RequiredIntakeFollowupPayload {
 
 export type LiveRequestMode = 'lead_qualification' | 'general_information' | 'policy_or_procedure'
 const COMBINING_MARKS = /[\u0300-\u036f]/g
-const FIELD_TOKEN_STOPWORDS = new Set([
-    've',
-    'ile',
-    'icin',
-    'için',
-    'bilgi',
-    'detay',
-    'alan',
-    'field',
-    'required',
-    'zorunlu',
-    'lütfen',
-    'lutfen',
-    'please',
-    'the',
-    'for',
-    'of',
-    'to',
-    'your',
-    'hangi',
-    'nedir',
-    'what',
-    'which'
-])
 const FIELD_PRIORITY_RULES: Array<{ pattern: RegExp, weight: number }> = [
     { pattern: /\b(hizmet|service|paket|package|urun|ürün|problem|konu|talep|ihtiyac)\b/i, weight: 120 },
     { pattern: /\b(tarih|date|zaman|time|saat|day|gun|gün|availability|uygunluk)\b/i, weight: 110 },
@@ -155,47 +132,6 @@ function hasRefusalSignal(message: string) {
 
 function hasNoProgressSignal(message: string) {
     return NO_PROGRESS_PATTERNS.some((pattern) => pattern.test(message))
-}
-
-function normalizeForFieldMatch(value: string) {
-    return value
-        .trim()
-        .replace(/\s+/g, ' ')
-        .normalize('NFKD')
-        .replace(COMBINING_MARKS, '')
-        .toLowerCase()
-}
-
-function escapeRegExp(value: string) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function tokenizeFieldLabel(field: string) {
-    return normalizeForFieldMatch(field)
-        .split(' ')
-        .map((token) => token.trim())
-        .filter((token) => token.length >= 3 && !FIELD_TOKEN_STOPWORDS.has(token))
-}
-
-function messageMentionsField(field: string, message: string) {
-    const normalizedMessage = normalizeForFieldMatch(message)
-    if (!normalizedMessage) return false
-
-    const tokens = tokenizeFieldLabel(field)
-    if (tokens.length === 0) return false
-
-    let tokenHits = 0
-    let hasStrongTokenHit = false
-    for (const token of tokens) {
-        const matched = new RegExp(`\\b${escapeRegExp(token)}\\b`, 'i').test(normalizedMessage)
-            || normalizedMessage.includes(token)
-        if (!matched) continue
-        tokenHits += 1
-        if (token.length >= 4) hasStrongTokenHit = true
-    }
-    if (tokens.length === 1) return tokenHits >= 1
-    if (tokenHits >= Math.min(2, tokens.length)) return true
-    return hasStrongTokenHit && tokenHits >= 1
 }
 
 function resolveDynamicMinimumRequiredFieldCount(totalFields: number, customerTurnCount: number) {

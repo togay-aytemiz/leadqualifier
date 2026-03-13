@@ -7,6 +7,7 @@ import { resolveActiveOrganizationContext } from '@/lib/organizations/active-con
 export interface LeadWithConversation extends Lead {
     conversation: {
         contact_name: string
+        contact_avatar_url: string | null
         platform: ConversationPlatform
     }
 }
@@ -68,6 +69,7 @@ export async function getLeads(params: GetLeadsParams = {}, organizationIdOverri
             *,
             conversation:conversations!inner(
                 contact_name,
+                contact_avatar_url,
                 platform
             )
         `, { count: 'exact' })

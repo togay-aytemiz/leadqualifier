@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { DataTable, TableBody, TableRow, TableCell, Badge, Button } from '@/design'
+import { Avatar, DataTable, TableBody, TableRow, TableCell, Badge, Button } from '@/design'
 import { LeadWithConversation } from '@/lib/leads/list-actions'
 import type { ConversationPlatform } from '@/types/database'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
@@ -219,6 +219,12 @@ export function LeadsTable({
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
+                                        <Avatar
+                                            name={lead.conversation.contact_name}
+                                            src={lead.conversation.contact_avatar_url}
+                                            size="sm"
+                                            className="h-[18px] w-[18px] text-[8px]"
+                                        />
                                         <span className="shrink-0">
                                             {getPlatformIcon(lead.conversation.platform)}
                                         </span>
@@ -305,6 +311,12 @@ export function LeadsTable({
                                 {/* Name & Platform merged */}
                                 <TableCell>
                                     <div className="flex min-w-0 items-center gap-3">
+                                        <Avatar
+                                            name={lead.conversation.contact_name}
+                                            src={lead.conversation.contact_avatar_url}
+                                            size="sm"
+                                            className="h-[18px] w-[18px] text-[8px]"
+                                        />
                                         <div className="shrink-0">
                                             {getPlatformIcon(lead.conversation.platform)}
                                         </div>

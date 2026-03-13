@@ -62,7 +62,11 @@ import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
 import { buildMessageDateSeparators } from '@/components/inbox/messageDateSeparators'
 import { extractSkillTitleFromMetadata, splitBotMessageDisclaimer } from '@/components/inbox/botMessageContent'
-import { extractMediaFromMessageMetadata, resolveMessagePreviewContent } from '@/components/inbox/messageMedia'
+import {
+    collectOptimisticPreviewUrls,
+    extractMediaFromMessageMetadata,
+    resolveMessagePreviewContent
+} from '@/components/inbox/messageMedia'
 import { buildInboxImageGalleryLookup } from '@/components/inbox/message-image-groups'
 import {
     prependOlderMessages,
@@ -284,6 +288,7 @@ export function InboxContainer({
     const leadRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const leadAutoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const pendingAttachmentsRef = useRef<PendingAttachment[]>([])
+    const optimisticPreviewUrlsRef = useRef<Set<string>>(new Set())
     const attachmentInputRef = useRef<HTMLInputElement | null>(null)
     const imageInputRef = useRef<HTMLInputElement | null>(null)
     const leadStatusLabels: Record<string, string> = {
@@ -305,9 +310,17 @@ export function InboxContainer({
         URL.revokeObjectURL(previewUrl)
     }, [])
 
-    const clearPendingAttachments = useCallback(() => {
+    const clearPendingAttachments = useCallback((options?: {
+        preservePreviewUrls?: string[]
+    }) => {
+        const preservedPreviewUrls = new Set(
+            (options?.preservePreviewUrls ?? []).filter((previewUrl): previewUrl is string => Boolean(previewUrl))
+        )
         setPendingAttachments((previous) => {
-            previous.forEach((attachment) => revokeAttachmentPreviewUrl(attachment.previewUrl))
+            previous.forEach((attachment) => {
+                if (attachment.previewUrl && preservedPreviewUrls.has(attachment.previewUrl)) return
+                revokeAttachmentPreviewUrl(attachment.previewUrl)
+            })
             return []
         })
     }, [revokeAttachmentPreviewUrl])
@@ -371,8 +384,20 @@ export function InboxContainer({
     }, [pendingAttachments])
 
     useEffect(() => {
+        const activePreviewUrls = new Set(collectOptimisticPreviewUrls(messages))
+
+        optimisticPreviewUrlsRef.current.forEach((previewUrl) => {
+            if (activePreviewUrls.has(previewUrl)) return
+            revokeAttachmentPreviewUrl(previewUrl)
+        })
+
+        optimisticPreviewUrlsRef.current = activePreviewUrls
+    }, [messages, revokeAttachmentPreviewUrl])
+
+    useEffect(() => {
         return () => {
             pendingAttachmentsRef.current.forEach((attachment) => revokeAttachmentPreviewUrl(attachment.previewUrl))
+            optimisticPreviewUrlsRef.current.forEach((previewUrl) => revokeAttachmentPreviewUrl(previewUrl))
         }
     }, [revokeAttachmentPreviewUrl])
 
@@ -1452,7 +1477,11 @@ export function InboxContainer({
         ).sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()))
 
         setInput('')
-        clearPendingAttachments()
+        clearPendingAttachments({
+            preservePreviewUrls: selectedAttachments
+                .map((attachment) => attachment.previewUrl)
+                .filter((previewUrl): previewUrl is string => Boolean(previewUrl))
+        })
         setComposerErrorMessage(null)
         setIsSending(true)
         try {
