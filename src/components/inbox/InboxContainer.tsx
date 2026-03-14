@@ -57,6 +57,7 @@ import { applyLeadStatusToConversationList } from '@/components/inbox/conversati
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { getLatestContactMessageAt, resolveWhatsAppReplyWindowState } from '@/lib/whatsapp/reply-window'
 import { sortMessagesChronologically } from '@/lib/inbox/message-order'
+import { dispatchInboxUnreadUpdated } from '@/lib/inbox/unread-events'
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
 import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
@@ -629,6 +630,7 @@ export function InboxContainer({
                     c.id === nextId ? { ...c, unread_count: 0 } : c
                 ))
                 await markConversationRead(nextId)
+                dispatchInboxUnreadUpdated({ organizationId })
                 await refreshLead(nextId)
             }
         } catch (error) {
@@ -640,7 +642,7 @@ export function InboxContainer({
         } finally {
             refreshInFlightRef.current = false
         }
-    }, [hydrateSenderProfiles, refreshLead])
+    }, [hydrateSenderProfiles, organizationId, refreshLead])
 
     const loadOlderMessages = useCallback(async () => {
         const conversationId = selectedIdRef.current

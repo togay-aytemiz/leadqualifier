@@ -4,6 +4,10 @@ import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import {
+    listenForInboxUnreadUpdates,
+    shouldRefreshInboxUnreadIndicator
+} from '@/lib/inbox/unread-events'
 import { buildTabDocumentTitle, resolveTabRouteId, type TabRouteId } from '@/lib/tab-title'
 
 interface TabTitleSyncProps {
@@ -123,6 +127,15 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
             }
         }
     }, [organizationId, refreshUnread, routeId, supabase])
+
+    useEffect(() => {
+        if (routeId !== 'inbox' || !organizationId) return
+
+        return listenForInboxUnreadUpdates((detail) => {
+            if (!shouldRefreshInboxUnreadIndicator(organizationId, detail)) return
+            void refreshUnread()
+        })
+    }, [organizationId, refreshUnread, routeId])
 
     useEffect(() => {
         const pageTitle = routeId ? titleMap[routeId] : null

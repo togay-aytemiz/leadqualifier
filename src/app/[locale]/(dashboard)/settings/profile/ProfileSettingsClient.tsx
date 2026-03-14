@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
+import { startTransition, useActionState, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
@@ -19,6 +20,7 @@ import {
     convertProfileAvatarToWebP,
     validateProfileAvatarFile
 } from '@/lib/profile/avatar-client'
+import { commitProfileAvatarSave } from '@/lib/profile/avatar-state'
 
 interface ProfileSettingsClientProps {
     initialName: string
@@ -30,6 +32,7 @@ export default function ProfileSettingsClient({ initialName, email, initialAvata
     const t = useTranslations('profileSettings')
     const tUnsaved = useTranslations('unsavedChanges')
     const locale = useLocale()
+    const router = useRouter()
     const [baseline, setBaseline] = useState({ name: initialName, avatarUrl: initialAvatarUrl })
     const [name, setName] = useState(initialName)
     const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
@@ -146,12 +149,18 @@ export default function ProfileSettingsClient({ initialName, email, initialAvata
             }
 
             const savedAvatar = await saveProfileAvatarUpload(prepareResult.storagePath)
-            setAvatarUrl(savedAvatar.avatarUrl)
-            setBaseline((current) => ({
-                ...current,
-                avatarUrl: savedAvatar.avatarUrl
-            }))
-            setAvatarStatus(t('avatarSaved'))
+            commitProfileAvatarSave({
+                avatarUrl: savedAvatar.avatarUrl,
+                successMessage: t('avatarSaved'),
+                setAvatarUrl,
+                setBaseline,
+                setAvatarStatus,
+                refreshLayout: () => {
+                    startTransition(() => {
+                        router.refresh()
+                    })
+                }
+            })
         } catch (error) {
             console.error(error)
             setAvatarError(t('avatarSaveError'))
@@ -200,6 +209,8 @@ export default function ProfileSettingsClient({ initialName, email, initialAvata
                             replaceLabel={t('avatarReplace')}
                             savingLabel={t('avatarUploading')}
                             inputLabel={t('avatarInputLabel')}
+                            previewLabel={t('avatarPreview')}
+                            previewTitle={t('avatarPreviewTitle')}
                             inputAccept={PROFILE_AVATAR_INPUT_ACCEPT}
                             isUploading={isAvatarUploading}
                             errorMessage={avatarError}

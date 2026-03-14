@@ -127,4 +127,50 @@ describe('profile avatar actions', () => {
         }))
         expect(storageRemoveMock).toHaveBeenCalledWith(['user-1/avatar-old.webp'])
     })
+
+    it('removes the newly uploaded avatar object when profile persistence fails', async () => {
+        const currentSupabase = createAuthSupabaseMock()
+        const profileMaybeSingleMock = vi.fn(async () => ({
+            data: {
+                avatar_url: null
+            },
+            error: null
+        }))
+        const profileEqForSelectMock = vi.fn(() => ({ maybeSingle: profileMaybeSingleMock }))
+
+        const profileUpdateEqMock = vi.fn(async () => ({
+            error: {
+                message: 'Row update failed'
+            }
+        }))
+        const profileUpdateMock = vi.fn(() => ({ eq: profileUpdateEqMock }))
+
+        currentSupabase.from = vi.fn((table: string) => {
+            if (table !== 'profiles') throw new Error(`Unexpected table ${table}`)
+
+            if (profileEqForSelectMock.mock.calls.length === 0) {
+                return {
+                    select: vi.fn(() => ({ eq: profileEqForSelectMock }))
+                }
+            }
+
+            return {
+                update: profileUpdateMock
+            }
+        })
+
+        createClientMock.mockResolvedValue(currentSupabase)
+        storageGetPublicUrlMock.mockReturnValue({
+            data: {
+                publicUrl: 'https://project.supabase.co/storage/v1/object/public/profile-avatars/user-1/avatar-new.webp'
+            }
+        })
+        storageRemoveMock.mockResolvedValue({
+            data: null,
+            error: null
+        })
+
+        await expect(saveProfileAvatarUpload('user-1/avatar-new.webp')).rejects.toThrow('Row update failed')
+        expect(storageRemoveMock).toHaveBeenCalledWith(['user-1/avatar-new.webp'])
+    })
 })

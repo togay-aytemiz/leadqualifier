@@ -63,6 +63,10 @@ import {
     resolveMainSidebarBotModeTone
 } from '@/design/main-sidebar-bot-mode'
 import {
+    listenForInboxUnreadUpdates,
+    shouldRefreshInboxUnreadIndicator
+} from '@/lib/inbox/unread-events'
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -482,6 +486,12 @@ export function MainSidebar({
     }, [billingRefreshSignal, organizationId, refreshBillingSnapshot])
 
     useEffect(() => {
+        if (!organizationId) return
+        if (pathWithoutLocale !== '/inbox') return
+        void refreshUnread(organizationId)
+    }, [organizationId, pathWithoutLocale, refreshUnread])
+
+    useEffect(() => {
         if (billingSnapshot?.membershipState !== 'premium_active') {
             setIsBillingDetailsExpanded(false)
         }
@@ -593,6 +603,14 @@ export function MainSidebar({
         window.addEventListener(BILLING_UPDATED_EVENT, handler)
         return () => window.removeEventListener(BILLING_UPDATED_EVENT, handler)
     }, [organizationId, refreshBillingSnapshot])
+
+    useEffect(() => {
+        if (!organizationId) return
+        return listenForInboxUnreadUpdates((detail) => {
+            if (!shouldRefreshInboxUnreadIndicator(organizationId, detail)) return
+            void refreshUnread(organizationId)
+        })
+    }, [organizationId, refreshUnread])
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch('app-shell')) return

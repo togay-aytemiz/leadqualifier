@@ -102,38 +102,53 @@ export async function saveProfileAvatarUpload(storagePath: string) {
         throw new Error('Could not resolve avatar public URL')
     }
 
-    const { data: currentProfile, error: currentProfileError } = await supabase
-        .from('profiles')
-        .select('avatar_url')
-        .eq('id', user.id)
-        .maybeSingle()
+    let profileUpdated = false
 
-    if (currentProfileError) {
-        console.error('Failed to load current profile avatar:', currentProfileError)
-        throw new Error(currentProfileError.message)
-    }
+    try {
+        const { data: currentProfile, error: currentProfileError } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', user.id)
+            .maybeSingle()
 
-    const previousStoragePath = extractProfileAvatarStoragePathFromUrl(currentProfile?.avatar_url)
-
-    const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
-
-    if (updateError) {
-        console.error('Failed to save profile avatar:', updateError)
-        throw new Error(updateError.message)
-    }
-
-    if (previousStoragePath && previousStoragePath !== normalizedStoragePath) {
-        const { error: removeError } = await storage.remove([previousStoragePath])
-        if (removeError) {
-            console.warn('Failed to remove previous profile avatar object:', removeError)
+        if (currentProfileError) {
+            console.error('Failed to load current profile avatar:', currentProfileError)
+            throw new Error(currentProfileError.message)
         }
-    }
 
-    return { avatarUrl }
+        const previousStoragePath = extractProfileAvatarStoragePathFromUrl(currentProfile?.avatar_url)
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+                avatar_url: avatarUrl,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
+
+        if (updateError) {
+            console.error('Failed to save profile avatar:', updateError)
+            throw new Error(updateError.message)
+        }
+
+        profileUpdated = true
+
+        if (previousStoragePath && previousStoragePath !== normalizedStoragePath) {
+            const { error: removeError } = await storage.remove([previousStoragePath])
+            if (removeError) {
+                console.warn('Failed to remove previous profile avatar object:', removeError)
+            }
+        }
+
+        return { avatarUrl }
+    } catch (error) {
+        if (!profileUpdated) {
+            const { error: cleanupError } = await storage.remove([normalizedStoragePath])
+            if (cleanupError) {
+                console.warn('Failed to clean up uploaded profile avatar object after persistence error:', cleanupError)
+            }
+        }
+
+        throw error
+    }
 }
