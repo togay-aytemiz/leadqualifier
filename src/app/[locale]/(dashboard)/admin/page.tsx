@@ -1,9 +1,10 @@
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Badge, DataTable, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
 import { Link } from '@/i18n/navigation'
-import { Activity, Building2, Database, Sparkles, Users, Wallet } from 'lucide-react'
+import { Activity, Building2, Clock3, Database, Sparkles, Users, Wallet } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import {
+    getAdminAiLatencySummary,
     getAdminBillingPlanMetricsSummary,
     getAdminDashboardSummary,
     getAdminUsageMetricsSummary
@@ -41,12 +42,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         ? (activeOrganization?.id ?? null)
         : null
     const requestedUsagePeriod = resolveAdminMetricPeriodKey(search.usagePeriod)
-    const [usageMetrics, billingPlanMetrics] = await Promise.all([
+    const [usageMetrics, billingPlanMetrics, aiLatencySummary] = await Promise.all([
         getAdminUsageMetricsSummary({
             organizationId: scopedOrganizationId,
             periodKey: requestedUsagePeriod
         }, supabase),
-        getAdminBillingPlanMetricsSummary(scopedOrganizationId, supabase)
+        getAdminBillingPlanMetricsSummary(scopedOrganizationId, supabase),
+        getAdminAiLatencySummary({
+            organizationId: scopedOrganizationId,
+            periodKey: requestedUsagePeriod
+        }, supabase)
     ])
     const recentLeadsResult = activeOrganization
         ? await getLeads(
@@ -82,6 +87,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         currency: 'TRY',
         maximumFractionDigits: 2
     })
+    const decimalFormatter = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    })
     const creditFormatter = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1
     })
@@ -108,6 +117,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         return monthFormatter.format(new Date(Date.UTC(year, monthIndex, 1)))
     }
     const selectedPeriodLabel = formatPeriodLabel(usageMetrics.periodKey)
+    const formatDurationLabel = (durationMs: number) => {
+        if (durationMs >= 1000) {
+            return t('latency.units.seconds', {
+                value: decimalFormatter.format(durationMs / 1000)
+            })
+        }
+
+        return t('latency.units.milliseconds', {
+            value: formatter.format(durationMs)
+        })
+    }
     const periodKeyCandidates = buildRecentAdminMetricMonthKeys({ months: 12 })
     if (
         usageMetrics.periodKey !== ADMIN_METRIC_PERIOD_ALL
@@ -222,6 +242,32 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             value: creditFormatter.format(billingPlanMetrics.monthlyTopupCreditsPurchased)
         }
     ]
+    const latencyCards = [
+        {
+            key: 'leadExtractionAvg',
+            title: t('latency.cards.leadExtractionAvg'),
+            value: formatDurationLabel(aiLatencySummary.leadExtraction.averageMs),
+            samples: aiLatencySummary.leadExtraction.sampleCount
+        },
+        {
+            key: 'leadExtractionP95',
+            title: t('latency.cards.leadExtractionP95'),
+            value: formatDurationLabel(aiLatencySummary.leadExtraction.p95Ms),
+            samples: aiLatencySummary.leadExtraction.sampleCount
+        },
+        {
+            key: 'llmResponseAvg',
+            title: t('latency.cards.llmResponseAvg'),
+            value: formatDurationLabel(aiLatencySummary.llmResponse.averageMs),
+            samples: aiLatencySummary.llmResponse.sampleCount
+        },
+        {
+            key: 'llmResponseP95',
+            title: t('latency.cards.llmResponseP95'),
+            value: formatDurationLabel(aiLatencySummary.llmResponse.p95Ms),
+            samples: aiLatencySummary.llmResponse.sampleCount
+        }
+    ]
     const billingScopeText = dashboardOrgContext.hasExplicitSelection
         ? t('planMetrics.scopeActiveOrganization', { organization: activeOrganization?.name ?? '-' })
         : t('planMetrics.scopePlatform')
@@ -295,6 +341,36 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                                 </div>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="mb-4 flex items-start gap-3">
+                            <div className="rounded-lg bg-sky-50 p-2">
+                                <Clock3 className="text-sky-600" size={18} />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-semibold text-gray-900">{t('latency.title')}</h2>
+                                <p className="text-sm text-gray-500">{t('latency.description')}</p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {t('stats.period.current', { period: selectedPeriodLabel })}
+                                </p>
+                            </div>
+                        </div>
+                        {latencyCards.every((card) => card.samples === 0) ? (
+                            <p className="text-sm text-gray-500">{t('latency.empty')}</p>
+                        ) : (
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                {latencyCards.map((card) => (
+                                    <div key={card.key} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                        <p className="text-xs font-medium text-gray-500">{card.title}</p>
+                                        <p className="mt-2 text-2xl font-semibold text-gray-900">{card.value}</p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {t('latency.samples', { count: formatter.format(card.samples) })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">

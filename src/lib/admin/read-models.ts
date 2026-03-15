@@ -20,6 +20,11 @@ import {
     resolveAdminMetricPeriodKey,
     resolveAdminMetricPeriodRange
 } from '@/lib/admin/dashboard-metric-period'
+import {
+    buildAdminAiLatencySummary,
+    type AdminAiLatencyRowLike,
+    type AdminAiLatencySummary
+} from '@/lib/admin/ai-latency-summary'
 import { summarizeUsageMetricRows } from '@/lib/admin/dashboard-usage-metrics'
 import {
     getCountByOrganization as loadCountByOrganization,
@@ -605,6 +610,50 @@ async function getUsageTotalsForRange(
     }
 }
 
+async function getAiLatencyRowsForRange(
+    supabase: SupabaseClient,
+    options: {
+        organizationId?: string
+        dateRange?: AdminUsageDateRange | null
+    }
+): Promise<AdminAiLatencyRowLike[]> {
+    const pageSize = 1000
+    let offset = 0
+    const rows: AdminAiLatencyRowLike[] = []
+
+    while (true) {
+        let query = supabase
+            .from('organization_ai_latency_events')
+            .select('organization_id, metric_key, duration_ms')
+            .order('created_at', { ascending: true })
+            .range(offset, offset + pageSize - 1)
+
+        if (options.organizationId) {
+            query = query.eq('organization_id', options.organizationId)
+        }
+
+        if (options.dateRange) {
+            query = query
+                .gte('created_at', options.dateRange.monthStartIso)
+                .lt('created_at', options.dateRange.nextMonthStartIso)
+        }
+
+        const { data, error } = await query
+        if (error) {
+            console.error('Failed to load AI latency rows for admin dashboard:', error)
+            return rows
+        }
+
+        const batch = (data ?? []) as AdminAiLatencyRowLike[]
+        rows.push(...batch)
+
+        if (batch.length < pageSize) break
+        offset += pageSize
+    }
+
+    return rows
+}
+
 export async function getAdminUsageMetricsSummary(
     options: {
         organizationId: string | null
@@ -668,6 +717,37 @@ export async function getAdminUsageMetricsSummary(
         totalTokenCount: usageTotals.totalTokenCount,
         totalCreditUsage: usageTotals.totalCreditUsage
     }
+}
+
+export async function getAdminAiLatencySummary(
+    options: {
+        organizationId: string | null
+        periodKey?: string | null
+    },
+    supabaseOverride?: SupabaseClient
+): Promise<AdminAiLatencySummary> {
+    const supabase = supabaseOverride ?? await createClient()
+    const periodKey = resolveAdminMetricPeriodKey(options.periodKey)
+    const dateRange = resolveAdminMetricPeriodRange(periodKey)
+    const organizationId = options.organizationId ?? undefined
+
+    let rows = await getAiLatencyRowsForRange(supabase, {
+        organizationId,
+        dateRange
+    })
+
+    if (!organizationId) {
+        const excludedOrganizationIds = new Set(await getExcludedAdminOrganizationIds(supabase))
+        if (excludedOrganizationIds.size > 0) {
+            rows = rows.filter((row) => !excludedOrganizationIds.has(row.organization_id))
+        }
+    }
+
+    return buildAdminAiLatencySummary({
+        periodKey,
+        isAllTime: periodKey === ADMIN_METRIC_PERIOD_ALL,
+        rows
+    })
 }
 
 export async function getAdminCreditUsageTotal(

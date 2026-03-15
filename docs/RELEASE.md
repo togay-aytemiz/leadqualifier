@@ -7,12 +7,23 @@
 ## [Unreleased]
 
 ### Added
+
+- Added operator workflow editing inside Inbox Details: teams can now manually overwrite `Important info` fields with AI/manual source tracking and `Return to AI`, manage editable freeform conversation tags, and keep one shared private note with updater metadata (`src/components/inbox/ImportantInfoEditor.tsx`, `src/components/inbox/ConversationTagsEditor.tsx`, `src/components/inbox/ConversationPrivateNoteEditor.tsx`, `src/components/inbox/InboxContainer.tsx`, `src/lib/inbox/actions.ts`, `src/lib/inbox/conversation-tags.ts`, `src/lib/leads/required-intake.ts`, `src/lib/leads/extraction.ts`, `src/types/database.ts`, `supabase/migrations/00092_conversation_private_notes.sql`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`, `docs/plans/2026-03-15-operator-workflow-details-panel-design.md`, `docs/plans/2026-03-15-operator-workflow-details-panel-implementation-plan.md`).
+- Added a GTM prelaunch audit document with repo review, official competitor scan, and prioritized `P0 / P1 / deliberate defer` recommendations for pilot launch readiness (`docs/plans/2026-03-15-gtm-prelaunch-audit.md`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Added a concurrent-user WhatsApp stress-test runner for realistic webhook pressure: `npm run test:load:users` now simulates distinct contacts sending multi-turn messages, reports p50/p95/p99 latency plus timeout/transport-error counts, supports optional signed live-app execution via `LOAD_BASE_URL` + `LOAD_APP_SECRET`, and ships with helper coverage + an implementation plan (`scripts/load/whatsapp-webhook.scenario.mjs`, `scripts/load/whatsapp-webhook.scenario-helpers.mjs`, `scripts/load/whatsapp-webhook.scenario-helpers.test.mjs`, `package.json`, `docs/plans/phase-9-load-test-thresholds.md`, `docs/plans/2026-03-15-concurrent-whatsapp-stress-test-plan.md`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Added admin AI latency analytics for real load testing: runtime now persists lead-extraction completion durations and successful LLM user-response durations into a dedicated latency-event table, and the Admin dashboard surfaces average + p95 cards scoped by selected organization and reporting period (`supabase/migrations/00091_organization_ai_latency_events.sql`, `src/lib/ai/latency.ts`, `src/lib/ai/latency.test.ts`, `src/lib/admin/ai-latency-summary.ts`, `src/lib/admin/ai-latency-summary.test.ts`, `src/lib/admin/read-models.ts`, `src/lib/leads/extraction.ts`, `src/lib/channels/inbound-ai-pipeline.ts`, `src/app/api/webhooks/telegram/route.ts`, `src/app/[locale]/(dashboard)/admin/page.tsx`, `src/types/database.ts`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`, `docs/plans/2026-03-15-admin-ai-latency-analytics-plan.md`).
 - Added per-user profile avatars: `Settings > Profile` now validates supported images, converts them to square WebP before upload, stores them in the public `profile-avatars` bucket, persists the final URL on `profiles.avatar_url`, and reuses that avatar in the main sidebar user chip with initials fallback when no upload exists (`src/lib/profile/avatar.ts`, `src/lib/profile/avatar-client.ts`, `src/lib/profile/actions.ts`, `src/app/[locale]/(dashboard)/settings/profile/page.tsx`, `src/app/[locale]/(dashboard)/settings/profile/ProfileSettingsClient.tsx`, `src/app/[locale]/(dashboard)/settings/profile/ProfileAvatarCard.tsx`, `src/lib/organizations/active-context.ts`, `src/design/MainSidebar.tsx`, `supabase/migrations/00088_profile_avatar_bucket.sql`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Added best-effort social contact avatars in Inbox: conversations now persist `contact_avatar_url`, Instagram and Telegram runtimes hydrate customer profile photos when channel APIs expose them, shared Inbox avatars render photos across list/chat/details, and WhatsApp safely falls back to initials because current customer-facing Meta surfaces do not provide a supported avatar source (`supabase/migrations/00087_conversation_contact_avatar.sql`, `src/lib/instagram/client.ts`, `src/lib/telegram/client.ts`, `src/app/api/webhooks/instagram/route.ts`, `src/app/api/webhooks/telegram/route.ts`, `src/lib/channels/inbound-ai-pipeline.ts`, `src/lib/inbox/actions.ts`, `src/design/primitives.tsx`, `src/components/inbox/InboxContainer.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Added Instagram Inbox image support end-to-end: inbound DM image attachments now persist `instagram_media` metadata so previews and chat bubbles can render the image, while the shared composer can upload and send outbound Instagram images with image-only validation and signed Supabase upload targets before the Instagram Messaging API call (`src/lib/instagram/webhook.ts`, `src/app/api/webhooks/instagram/route.ts`, `src/components/inbox/messageMedia.ts`, `src/lib/instagram/client.ts`, `src/lib/inbox/outbound-media.ts`, `src/lib/inbox/actions.ts`, `src/components/inbox/InboxContainer.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`, `docs/plans/2026-03-11-instagram-inbox-image-support-plan.md`).
 - Added AI copywriter-ready static launch asset brief that inlines repo terminology, PRD scope, roadmap status, and release-note-backed product truths into a single source document for Turkish visual-generation workflows (`docs/launch-static-asset-copywriter-brief.md`, `docs/PRD.md`, `docs/ROADMAP.md`).
 
 ### Changed
+
+- Changed Inbox lead-details behavior from read-only extraction display to operator-editable details: manual required-intake values now survive future extraction reruns, and GTM/Pilot docs no longer treat important-info overwrite or lightweight notes/tags as pending gaps (`src/components/inbox/InboxContainer.tsx`, `src/lib/leads/extraction.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed Details operator layout to a denser, wrapper-light presentation: tags and private note now sit below lead extraction, tag input is hidden until `Add` is opened, and the shared note editor uses a more compact footprint (`src/components/inbox/InboxContainer.tsx`, `src/components/inbox/ConversationTagsEditor.tsx`, `src/components/inbox/ConversationPrivateNoteEditor.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed PRD and Roadmap pilot-launch guidance so GTM readiness is explicit: before scaling beyond the first 5 pilots, focus on activation/conversion, operator workflow essentials, abuse controls, and KPI instrumentation, while keeping campaigns/broadcasts and other full-suite parity items outside the pilot-critical path (`docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed Phase 9 load-test documentation to separate raw webhook throughput checks from realistic 8-10 concurrent-contact stress runs, including the live signed-webhook prerequisites for local/staging execution (`docs/plans/phase-9-load-test-thresholds.md`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed Admin observability so load/performance reviews no longer rely only on token usage rows: admin can now inspect average and p95 latency for both lead extraction and bot-generated LLM replies directly from the dashboard (`src/app/[locale]/(dashboard)/admin/page.tsx`, `src/lib/admin/read-models.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed profile-photo copy and UX in `Settings > Profile`: user-facing text now says `profile photo / profil fotoğrafı` instead of `avatar`, clarifies that the image is used only inside Qualy, removes the visible WebP note, and lets users preview the current uploaded photo by clicking it (`src/app/[locale]/(dashboard)/settings/profile/ProfileAvatarCard.tsx`, `src/app/[locale]/(dashboard)/settings/profile/ProfileAvatarCard.test.tsx`, `src/app/[locale]/(dashboard)/settings/profile/ProfileSettingsClient.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed Inbox outgoing identity rendering to persist `messages.created_by` on manual operator sends and resolve outgoing user bubbles from the actual author profile instead of the current viewer; operator messages now show uploaded avatars or initials fallback, while bot replies use a branded Kualia avatar treatment (`src/components/inbox/InboxContainer.tsx`, `src/components/inbox/message-sender.ts`, `src/components/inbox/KualiaAvatar.tsx`, `src/types/database.ts`, `supabase/migrations/00089_messages_created_by.sql`, `supabase/migrations/00090_send_operator_message_with_created_by.sql`, `docs/PRD.md`, `docs/ROADMAP.md`, `docs/plans/2026-03-13-profile-avatar-inbox-identity-plan.md`).
 - Changed WhatsApp Embedded Signup completion to run the required post-auth Meta provisioning steps before marking the channel active: the server now registers the returned business phone number for Cloud API use, subscribes the app to the customer WABA webhooks (with callback override when app URL + verify token are available), and persists a managed two-step verification PIN in channel config for deterministic retries/reconnects (`src/lib/whatsapp/client.ts`, `src/lib/whatsapp/client.test.ts`, `src/lib/channels/actions.ts`, `src/lib/channels/actions.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`, `docs/plans/2026-03-13-whatsapp-embedded-signup-provisioning-plan.md`).
@@ -50,6 +61,7 @@
 - Changed channel onboarding detail typography and helper UX for consistency/readability: reduced inner section heading/body text scale across WhatsApp/Telegram/placeholder pages, replaced WhatsApp support banner text with explicit `Ekiple konuş`/`Talk to support` email CTA (`mailto:askqualy@gmail.com`), and set migration-help anchor target to temporary placeholder (`#`) until final guide URL is approved (`src/components/channels/WhatsAppOnboardingPage.tsx`, `src/components/channels/TelegramOnboardingPage.tsx`, `src/components/channels/ChannelPlaceholderOnboardingPage.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
 
 ### Fixed
+
 - Fixed stale Inbox unread indicators after opening/reading a conversation: Inbox mark-read now dispatches a shared unread-update browser event, and the main sidebar plus Inbox tab-title listeners force an immediate unread recount instead of waiting for realtime sync (`src/lib/inbox/unread-events.ts`, `src/lib/inbox/unread-events.test.ts`, `src/components/inbox/InboxContainer.tsx`, `src/design/MainSidebar.tsx`, `src/components/common/TabTitleSync.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Fixed live intake guard drift for phone/contact fields by moving follow-up analysis and runtime blocked-field stripping onto the same field-mention matcher, so refusal/no-progress protection now catches wording such as `Telefon Numarası` vs `ulaşabileceğimiz numara`; also narrowed external-contact redirect sanitization so ordinary customer-number intake questions are no longer rewritten into generic chat-first fallback text (`src/lib/ai/intake-field-match.ts`, `src/lib/ai/followup.ts`, `src/lib/ai/response-guards.ts`, `src/lib/ai/followup.test.ts`, `src/lib/ai/response-guards.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`, `docs/plans/2026-03-13-critical-intake-reask-regression-plan.md`).
 - Fixed a Next.js 16.1.6 Turbopack dev runtime overlay on the locale entry route by renaming the root redirect page component from `Home` to `LocaleEntryPage`, avoiding the internal `performance.measure(...): 'Home' cannot have a negative time stamp` crash (`src/app/[locale]/page.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
@@ -63,6 +75,8 @@
 - Changed channel onboarding detail pages to a compact app-consistent scale: reduced shell spacing, smaller back-link typography, aligned section heading sizes across WhatsApp/Telegram/placeholder pages, and tighter content card paddings so setup screens no longer feel oversized vs the rest of Settings (`src/components/channels/ChannelOnboardingShell.tsx`, `src/components/channels/WhatsAppOnboardingPage.tsx`, `src/components/channels/TelegramOnboardingPage.tsx`, `src/components/channels/ChannelPlaceholderOnboardingPage.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
 
 ### Fixed
+
+- Fixed operator-details workflow gaps: missing required fields now still appear as editable blank rows in `Important info`, private-note stale conflicts are keyed to `private_note_updated_at` instead of broad conversation updates, and Details editors no longer remount on unrelated `updated_at` refreshes that could drop in-progress drafts (`src/lib/leads/required-intake.ts`, `src/components/inbox/ImportantInfoEditor.tsx`, `src/components/inbox/ConversationPrivateNoteEditor.tsx`, `src/components/inbox/InboxContainer.tsx`, `src/lib/inbox/actions.ts`, `src/lib/inbox/actions.test.ts`, `src/lib/leads/required-intake.test.ts`).
 - Fixed sidebar profile-photo staleness after upload: a successful profile photo save now refreshes the dashboard layout immediately so the sidebar user chip reflects the new image without a manual page reload (`src/app/[locale]/(dashboard)/settings/profile/ProfileSettingsClient.tsx`, `src/lib/profile/avatar-state.ts`, `src/lib/profile/avatar-state.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Fixed profile-avatar failure cleanup: if avatar upload succeeds but saving `profiles.avatar_url` fails afterward, the server now removes the freshly uploaded `profile-avatars` object so retry/error paths do not leave orphaned files in storage (`src/lib/profile/actions.ts`, `src/lib/profile/actions.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Fixed WhatsApp eligibility wizard step-pill number contrast so active-step numeric badges remain visible (no white-on-white rendering on selected step) (`src/components/channels/WhatsAppOnboardingPage.tsx`).
@@ -110,6 +124,7 @@
 - Changed Settings > Usage storage section copy to remove the technical approximation footnote line for a cleaner card-only summary (`src/app/[locale]/(dashboard)/settings/billing/page.tsx`, `messages/en.json`, `messages/tr.json`).
 
 ### Fixed
+
 - Fixed Iyzico callback finalization so failed `retrieve` responses from subscription/top-up checkout no longer bubble up as route-level 500s; callback now catches provider failures, marks pending records as failed, and redirects back to Plans with the normalized checkout error state (`src/app/api/billing/iyzico/callback/route.ts`, `src/app/api/billing/iyzico/callback/route.test.ts`, `src/lib/billing/providers/iyzico/client.ts`, `src/lib/billing/providers/iyzico/error-map.ts`, `src/lib/billing/providers/iyzico/error-map.test.ts`, `src/lib/billing/mock-checkout.ts`, `src/lib/billing/mock-checkout.test.ts`, `src/app/[locale]/(dashboard)/settings/plans/page.tsx`, `messages/en.json`, `messages/tr.json`).
 - Fixed blank in-app Iyzico hosted checkout on repeated plan attempts within the same SPA session by clearing stale `iyzi*` globals and previously injected checkout bundle scripts before remount/unmount of the hosted checkout surface, with descriptor-safe fallback so non-configurable `window.iyzi*` globals no longer throw runtime errors (`src/lib/billing/providers/iyzico/checkout-embed.ts`, `src/lib/billing/providers/iyzico/checkout-embed.test.ts`, `src/app/[locale]/(dashboard)/settings/plans/subscription-checkout/[recordId]/SubscriptionCheckoutEmbed.tsx`).
 - Fixed stale `Settings > Plans` error/success banners persisting after the underlying billing state was already corrected: checkout/renewal banners are now dismissible and clear transient `checkout_*` / `renewal_*` query params in place (`src/app/[locale]/(dashboard)/settings/plans/PlansStatusBanner.tsx`, `src/app/[locale]/(dashboard)/settings/plans/status-query.ts`, `src/app/[locale]/(dashboard)/settings/plans/status-query.test.ts`, `src/app/[locale]/(dashboard)/settings/plans/page.tsx`, `messages/en.json`, `messages/tr.json`, `docs/PRD.md`, `docs/ROADMAP.md`).
@@ -131,6 +146,7 @@
 - Fixed WhatsApp media storage usage showing `0 B` despite uploaded files by making storage aggregation bucket-config aware (`target_media_bucket_ids`) and adding runtime reconciliation from storage object listing when RPC media values are empty (`supabase/migrations/00080_storage_usage_media_bucket_param.sql`, `src/lib/billing/usage.ts`, `src/lib/billing/usage.test.ts`, `src/lib/admin/organization-metrics.ts`, `src/lib/admin/organization-metrics.test.ts`).
 
 ### Added
+
 - Added WhatsApp interactive reply-button transport support (`sendReplyButtons`) plus webhook interactive-event parsing for inbound `button_reply` payloads, with focused regression coverage for client payload shape, webhook parsing, route handoff, and deterministic skill-action execution (`src/lib/whatsapp/client.ts`, `src/lib/whatsapp/client.test.ts`, `src/lib/whatsapp/webhook.ts`, `src/lib/whatsapp/webhook.test.ts`, `src/app/api/webhooks/whatsapp/route.test.ts`, `src/lib/channels/inbound-ai-pipeline.test.ts`, `src/lib/skills/skill-actions.test.ts`).
 - Added shadow-mode regression coverage for inbound runtimes to lock expected behavior: bot replies stay fully suppressed while lead extraction continues (`src/lib/channels/inbound-ai-pipeline.test.ts`, `src/app/api/webhooks/telegram/route.test.ts`).
 - Added in-app hosted subscription checkout surface for Iyzico checkout-form HTML embedding at `Settings > Plans` flow (`/[locale]/settings/plans/subscription-checkout/[recordId]`) so users can complete recurring checkout without leaving app context (`src/app/[locale]/(dashboard)/settings/plans/subscription-checkout/[recordId]/page.tsx`, `src/app/[locale]/(dashboard)/settings/plans/subscription-checkout/[recordId]/SubscriptionCheckoutEmbed.tsx`).
@@ -319,6 +335,7 @@
 - Human escalation labels now use `Bot mesajı` / `Bot message` in AI Settings and Skills read-only preview (replacing `Asistan Sözü` / `Assistant's Promise`).
 
 ### Changed
+
 - Changed Inbox bot-message rendering to keep main bubble text clean: trailing disclaimer quote (`\n\n> ...`) is hidden from Inbox UI (not rendered in bubble/footer) while outbound channel payload remains unchanged (`src/components/inbox/InboxContainer.tsx`, `src/components/inbox/botMessageContent.ts`).
 - Changed Inbox bot footer metadata to show matched skill title when available (`metadata.skill_title`); non-skill replies still show only bot name + time (`src/components/inbox/InboxContainer.tsx`, `src/lib/channels/inbound-ai-pipeline.ts`, `src/app/api/webhooks/telegram/route.ts`).
 - Changed AI Settings layout so `Lead extraction during operator` moved from `Behavior and Logic` to `Escalation`, grouping operator takeover behavior with escalation controls (`src/app/[locale]/(dashboard)/settings/ai/AiSettingsForm.tsx`, `src/app/[locale]/(dashboard)/settings/ai/AiSettingsForm.test.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
@@ -366,7 +383,7 @@
 - Changed AI QA Lab finalize-stage intake/judge consistency: per-scenario required-intake scope now uses empty requirements for `general_information` (in addition to `policy_or_procedure`), judge consistency filtering now drops generic missing-intake findings when cited case-level coverage already indicates sufficient progression, and scenario-level normalization clears generic missing-intake issues under the same consistency conditions (`src/lib/qa-lab/executor.ts`, `src/lib/qa-lab/executor.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed AI QA Lab assistant response behavior for final stabilization: direct-question replies now enforce answer-first ordering, intake-style questions are stripped in `general_information`/`policy_or_procedure` modes and refusal turns, and a two-turn no-progress guard now switches to a concise status + minimum-next-field + soft next-step response to prevent repetitive qualification loops (`src/lib/qa-lab/executor.ts`, `src/lib/qa-lab/executor.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed AI QA Lab intake/judge consistency calibration for recent false-positive regressions: broad semantic fallback now applies only to generic fields (preventing timeline/business-size false fulfillment), intake field category parsing recognizes judge wording like `timing` / `business size`, repetitive-question citation checks prefer the judge-declared target field category over multi-field assistant question ambiguity, and cold+resistant `general_information` scenario fails can be downgraded to `warn` when intake handoff readiness is already `pass` (`src/lib/qa-lab/intake-coverage.ts`, `src/lib/qa-lab/executor.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
-- Changed AI QA Lab sector-agnostic intake/judge fidelity for recent cross-sector regressions: intake coverage and responder field-state logic now infer *type-like* required fields (e.g. `... türü`, `... cinsi`, `segment`) from natural entity cues (`kedim için`, `...yım`, `my X`) without sector hardcoding, request-mode routing now prioritizes explicit general-information intent over generic service-word matches (and suppresses forced intake follow-ups outside qualification mode), and Judge consistency guards now normalize/drop quoted field-name mismatches in findings/scenario summaries against case-level intake coverage (`src/lib/qa-lab/intake-coverage.ts`, `src/lib/qa-lab/intake-coverage.test.ts`, `src/lib/qa-lab/executor.ts`, `src/lib/qa-lab/executor.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
+- Changed AI QA Lab sector-agnostic intake/judge fidelity for recent cross-sector regressions: intake coverage and responder field-state logic now infer _type-like_ required fields (e.g. `... türü`, `... cinsi`, `segment`) from natural entity cues (`kedim için`, `...yım`, `my X`) without sector hardcoding, request-mode routing now prioritizes explicit general-information intent over generic service-word matches (and suppresses forced intake follow-ups outside qualification mode), and Judge consistency guards now normalize/drop quoted field-name mismatches in findings/scenario summaries against case-level intake coverage (`src/lib/qa-lab/intake-coverage.ts`, `src/lib/qa-lab/intake-coverage.test.ts`, `src/lib/qa-lab/executor.ts`, `src/lib/qa-lab/executor.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed AI QA Lab per-scenario intake evaluation to support sector-agnostic effective required-field scoping: QA execution now computes `request_mode` + `effective_required_intake_fields` per scenario and passes case-level required-field overrides into intake coverage, so policy/procedure cases (e.g. cancellation/privacy/procedure questions) are not penalized against unrelated global lead-qualification requirements (`src/lib/qa-lab/executor.ts`, `src/lib/qa-lab/executor.test.ts`, `src/lib/qa-lab/intake-coverage.ts`, `src/lib/qa-lab/intake-coverage.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed AI QA Lab responder/judge sector-agnostic consistency: explicit field refusals no longer count as fulfilled intake fields, responder now de-prioritizes forced intake follow-ups on policy/procedure requests and uses category-based missing-field question wording (instead of domain-specific phrasing), and Judge consistency filters now drop missing-field findings/scenario-issues when case-level intake coverage shows that field was not actually missing (`src/lib/qa-lab/intake-coverage.ts`, `src/lib/qa-lab/intake-coverage.test.ts`, `src/lib/qa-lab/executor.ts`, `src/lib/qa-lab/executor.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Changed AI QA Lab manual-run launch behavior to avoid FIFO queue surprises: after enqueueing a run, the UI now triggers execution for that exact newly created run ID instead of calling the `batch=1` queue worker (which could claim an older queued run first), while preserving queue-first persistence and lifecycle tracking (`src/app/[locale]/(dashboard)/settings/qa-lab/QaLabSettingsClient.tsx`, `src/lib/qa-lab/runs.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
@@ -579,6 +596,7 @@
 - Mobile “Diğer > Ayarlar” shortcut now opens `/settings` (settings list landing) instead of jumping directly to Channels.
 
 ### Fixed
+
 - Fixed slow-feeling auth navigation by stopping signed-out `Login` and `Register` screens from manually prefetching protected dashboard routes (`/inbox`, `/skills`, `/settings/ai`) before a session exists; auth pages now warm only adjacent auth routes, which removes unnecessary auth/org/data reads on auth open and after signout redirects (`src/design/manual-prefetch.ts`, `src/design/manual-prefetch.test.ts`, `src/components/auth/LoginForm.tsx`, `src/components/auth/RegisterForm.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Fixed general app-shell slowness by disabling bulk manual prefetch on mount for desktop sidebar, mobile nav, settings shell, and legacy rail; these surfaces now rely on visible `Link` prefetch instead of flooding protected routes (`/inbox`, `/leads`, `/skills`, `/knowledge`, `/settings/*`, `/admin/*`) with duplicate warmups during normal page opens (`src/design/manual-prefetch.ts`, `src/design/manual-prefetch.test.ts`, `src/design/MainSidebar.tsx`, `src/design/MobileBottomNav.tsx`, `src/components/settings/SettingsResponsiveShell.tsx`, `src/design/GlobalRail.tsx`, `docs/PRD.md`, `docs/ROADMAP.md`).
 - Fixed auth-page payload bloat by moving `NextIntlClientProvider` out of the shared locale root and scoping auth layouts to only the namespaces they need (`auth`, `common`, `nav`, `mainSidebar`), while dashboard keeps the full catalog; this avoids shipping the entire app translation bundle to login/register surfaces (`src/app/[locale]/layout.tsx`, `src/app/[locale]/(auth)/layout.tsx`, `src/app/[locale]/(dashboard)/layout.tsx`, `src/i18n/messages.ts`, `src/i18n/messages.test.ts`, `docs/PRD.md`, `docs/ROADMAP.md`).
@@ -653,6 +671,7 @@
 - Removed unused `NavIconComponent` type in `MainSidebar` to keep admin-related lint checks clean.
 
 ### Added
+
 - Offering Profile AI Suggestions accordion header now shows a compact pending badge (dot + count) while collapsed.
 - Knowledge Base “Review/İncele” CTA now deep-links to Organization settings and auto-expands the Offering Profile AI Suggestions accordion.
 - Offering Profile AI Suggestions now surface pending indicators inside the accordion content/tabs in addition to sidebar/header indicators.
@@ -754,11 +773,13 @@
 - Inbox unread indicators now appear in the main sidebar and conversation list.
 
 ### Added
+
 - **v0.5.0: Knowledge Base Parity**
   - **Simulator RAG Fallback:** Implemented RAG (Retrieval-Augmented Generation) in the `ChatSimulator`. It now falls back to the Knowledge Base (OpenAI + Embeddings) if no skill matches, mirroring the production Telegram behavior.
   - **Documentation:** Updated PRD and Roadmap to reflect current status.
 
 ### Added
+
 - **v0.4.0: Active Agent & Realtime Inbox**
   - **Explicit Active State**: Added `active_agent` column ('bot' | 'operator') to prevent AI interference.
   - **Double-Lock Logic**: AI is now blocked if `active_agent === 'operator'` OR `assignee_id` is present.
@@ -770,6 +791,7 @@
 - **Workflow**: Agents must always include a commit message in responses.
 
 ### Changed
+
 - Collapsed sidebar header brand icon (`/public/icon-black.svg`) now renders at `44px` so it visually matches the active navigation pill footprint.
 - Sidebar navigation accent palette now uses ink `#242A40` (replacing blue) for active pills, indicators, and focus rings in `MainSidebar`, `GlobalRail`, and `KnowledgeSidebar`.
 - Skills and Knowledge Base primary CTA buttons now use ink `#242A40` (replacing blue) across create/save actions, including modal and empty-state CTAs.
@@ -843,6 +865,7 @@
 - Offering Profile summary now syncs from approved suggestions after review/archive/manual-approved actions.
 
 ### Fixed
+
 - AI Settings now repairs localized handover message defaults so Turkish UI shows the Turkish bot handover message instead of the English default when legacy/default data is mismatched.
 - AI Settings prompt textarea now applies locale-aware default repair so Turkish UI shows Turkish prompt instructions instead of English default text, including legacy long EN default prompt variants.
 - Inbox realtime subscriptions now recover auth tokens via session refresh and keep realtime auth synced on auth state changes, preventing stale live message streams that required manual page refresh.
@@ -881,6 +904,7 @@
 - Lead extraction now prioritizes customer messages and avoids assistant-only service inference.
 
 ### Fixed
+
 - TypeScript build errors in Telegram webhook + Simulator history typing and KB router/chunking index guards.
 - Inbox now refreshes messages on conversation updates to surface bot/contact replies in realtime.
 - Manual replies atomically assign the current operator to prevent "Unassigned" state until refresh.
@@ -896,12 +920,12 @@
 
 ## Version History
 
-| Version | Date | Summary |
-|---------|------|---------|
-| 0.5.0 | 2026-02-02 | Knowledge Base Parity (Simulator RAG) |
-| 0.4.0 | 2026-02-02 | Active Agent State, Realtime Inbox, & Assignee System |
-| 0.3.5 | 2026-01-31 | Phase 3.5: WhatsApp Simulator & Dynamic Thresholds |
-| 0.3.0 | 2026-01-31 | Phase 3: Skill System |
-| 0.2.0 | 2026-01-31 | Phase 1: Multi-tenant infrastructure + auth |
-| 0.1.0 | 2026-01-31 | Phase 0: Project setup complete |
-| 0.0.0 | 2026-01-31 | Project kickoff, documentation created |
+| Version | Date       | Summary                                               |
+| ------- | ---------- | ----------------------------------------------------- |
+| 0.5.0   | 2026-02-02 | Knowledge Base Parity (Simulator RAG)                 |
+| 0.4.0   | 2026-02-02 | Active Agent State, Realtime Inbox, & Assignee System |
+| 0.3.5   | 2026-01-31 | Phase 3.5: WhatsApp Simulator & Dynamic Thresholds    |
+| 0.3.0   | 2026-01-31 | Phase 3: Skill System                                 |
+| 0.2.0   | 2026-01-31 | Phase 1: Multi-tenant infrastructure + auth           |
+| 0.1.0   | 2026-01-31 | Phase 0: Project setup complete                       |
+| 0.0.0   | 2026-01-31 | Project kickoff, documentation created                |

@@ -33,6 +33,7 @@ import {
 } from '@/lib/ai/language'
 import { v4 as uuidv4 } from 'uuid'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
+import { recordAiLatencyEvent } from '@/lib/ai/latency'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -517,6 +518,7 @@ export async function POST(req: NextRequest) {
 
     // 7. Fallback: Check Knowledge Base (RAG)
     console.log('Telegram Webhook: No eligible skill match, searching Knowledge Base...')
+    const llmResponseStartedAt = Date.now()
 
     try {
         const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions') // Dynamically import to avoid circular dep if any
@@ -710,6 +712,20 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                             is_rag: true,
                             sources: chunks.map(r => r.document_id).filter(Boolean)
                         })
+                        await recordAiLatencyEvent({
+                            organizationId: orgId,
+                            conversationId: conversation.id,
+                            metricKey: 'llm_response',
+                            durationMs: Date.now() - llmResponseStartedAt,
+                            source: 'telegram',
+                            metadata: {
+                                response_kind: 'rag',
+                                platform: 'telegram',
+                                document_count: kbResults.length
+                            }
+                        }, {
+                            supabase
+                        })
 
                         await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 
@@ -755,6 +771,19 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     await client.sendMessage(chatId, formattedFallbackReply)
 
     await persistBotMessage(formattedFallbackReply, { is_fallback: true })
+    await recordAiLatencyEvent({
+        organizationId: orgId,
+        conversationId: conversation.id,
+        metricKey: 'llm_response',
+        durationMs: Date.now() - llmResponseStartedAt,
+        source: 'telegram',
+        metadata: {
+            response_kind: 'fallback',
+            platform: 'telegram'
+        }
+    }, {
+        supabase
+    })
     await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 
     return NextResponse.json({ ok: true })

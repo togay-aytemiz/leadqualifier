@@ -2,8 +2,14 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
+import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
+import {
+    normalizeRequiredIntakeFieldKey,
+    normalizeRequiredIntakeFieldValue,
+    type RequiredIntakeOverrideMetaEntry
+} from '@/lib/leads/required-intake'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
@@ -556,6 +562,8 @@ export interface NormalizedLeadExtraction {
     intent_signals: string[]
     risk_signals: string[]
     required_intake_collected: Record<string, string>
+    required_intake_overrides: Record<string, string>
+    required_intake_override_meta: Record<string, RequiredIntakeOverrideMetaEntry>
     non_business: boolean
     summary: string | null
     score: number
@@ -573,6 +581,8 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
             intent_signals: [],
             risk_signals: [],
             required_intake_collected: {},
+            required_intake_overrides: {},
+            required_intake_override_meta: {},
             non_business: false,
             summary: null,
             score: 0,
@@ -610,6 +620,8 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
         required_intake_collected: normalizeCollectedFieldValues(
             payloadRecord.required_intake_collected ?? payloadRecord.requiredIntakeCollected
         ),
+        required_intake_overrides: {},
+        required_intake_override_meta: {},
         non_business: nonBusiness,
         summary: typeof payloadRecord.summary === 'string' ? payloadRecord.summary.trim() || null : null,
         score,
@@ -641,6 +653,45 @@ function normalizeExistingExtractedFields(value: unknown) {
     return value as Record<string, unknown>
 }
 
+function normalizeRequiredIntakeOverrideMeta(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {} as Record<string, RequiredIntakeOverrideMetaEntry>
+    }
+
+    const normalized: Record<string, RequiredIntakeOverrideMetaEntry> = {}
+
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+        const normalizedKey = normalizeRequiredIntakeFieldKey(key)
+        if (!normalizedKey || !entry || typeof entry !== 'object' || Array.isArray(entry)) continue
+
+        const record = entry as Record<string, unknown>
+        normalized[normalizedKey] = {
+            updated_at: typeof record.updated_at === 'string' ? record.updated_at : null,
+            updated_by: typeof record.updated_by === 'string' ? record.updated_by : null,
+            source: 'manual'
+        }
+    }
+
+    return normalized
+}
+
+function normalizeOverrideValues(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {} as Record<string, string>
+    }
+
+    const normalized: Record<string, string> = {}
+
+    for (const [key, rawValue] of Object.entries(value as Record<string, unknown>)) {
+        const normalizedKey = normalizeRequiredIntakeFieldKey(key)
+        const normalizedValue = normalizeRequiredIntakeFieldValue(rawValue)
+        if (!normalizedKey || !normalizedValue) continue
+        normalized[normalizedKey] = normalizedValue
+    }
+
+    return normalized
+}
+
 export function mergeExtractionWithExisting(
     incoming: NormalizedLeadExtraction,
     existingLead?: {
@@ -652,6 +703,23 @@ export function mergeExtractionWithExisting(
     const existingExtracted = normalizeExistingExtractedFields(existingLead?.extracted_fields)
     const existingCollected = normalizeCollectedFieldValues(existingExtracted.required_intake_collected)
     const incomingCollected = normalizeCollectedFieldValues(incoming.required_intake_collected)
+    const existingOverrides = normalizeOverrideValues(
+        existingExtracted.required_intake_overrides ?? existingExtracted.manual_required_intake
+    )
+    const incomingOverrides = normalizeOverrideValues(incoming.required_intake_overrides)
+    const mergedOverrides = {
+        ...existingOverrides,
+        ...incomingOverrides
+    }
+    const existingOverrideMeta = normalizeRequiredIntakeOverrideMeta(existingExtracted.required_intake_override_meta)
+    const incomingOverrideMeta = normalizeRequiredIntakeOverrideMeta(incoming.required_intake_override_meta)
+    const mergedOverrideMetaEntries = {
+        ...existingOverrideMeta,
+        ...incomingOverrideMeta
+    }
+    const mergedOverrideMeta = Object.fromEntries(
+        Object.entries(mergedOverrideMetaEntries).filter(([key]) => Boolean(mergedOverrides[key]))
+    ) as Record<string, RequiredIntakeOverrideMetaEntry>
     const incomingServices = normalizeServiceCatalogNames([
         ...incoming.services,
         ...(incoming.service_type ? [incoming.service_type] : [])
@@ -675,6 +743,8 @@ export function mergeExtractionWithExisting(
             ...existingCollected,
             ...incomingCollected
         },
+        required_intake_overrides: mergedOverrides,
+        required_intake_override_meta: mergedOverrideMeta,
         non_business: incoming.non_business,
         summary: incoming.summary,
         score: incoming.score,
@@ -749,6 +819,7 @@ export async function runLeadExtraction(options: {
     source?: 'telegram' | 'whatsapp' | 'instagram'
 }) {
     const supabase = options.supabase ?? await createClient()
+    const latencyStartedAt = Date.now()
 
     const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }, { data: existingLead }] = await Promise.all([
         supabase
@@ -943,7 +1014,9 @@ export async function runLeadExtraction(options: {
             budget_signals: normalizedExtracted.budget_signals,
             intent_signals: normalizedExtracted.intent_signals,
             risk_signals: normalizedExtracted.risk_signals,
-            required_intake_collected: normalizedExtracted.required_intake_collected
+            required_intake_collected: normalizedExtracted.required_intake_collected,
+            required_intake_overrides: normalizedExtracted.required_intake_overrides,
+            required_intake_override_meta: normalizedExtracted.required_intake_override_meta
         },
         last_message_at: new Date().toISOString()
     }, { onConflict: 'conversation_id' })
@@ -956,6 +1029,20 @@ export async function runLeadExtraction(options: {
         outputTokens: usageTotals.outputTokens,
         totalTokens: usageTotals.totalTokens,
         metadata: { conversation_id: options.conversationId, source: options.source },
+        supabase
+    })
+
+    await recordAiLatencyEvent({
+        organizationId: options.organizationId,
+        conversationId: options.conversationId,
+        metricKey: 'lead_extraction',
+        durationMs: Date.now() - latencyStartedAt,
+        source: options.source ?? 'unknown',
+        metadata: {
+            locale: extractionLocale,
+            model: 'gpt-4o-mini'
+        }
+    }, {
         supabase
     })
 }

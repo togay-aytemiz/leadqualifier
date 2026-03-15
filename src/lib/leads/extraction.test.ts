@@ -92,6 +92,8 @@ describe('mergeExtractionWithExisting', () => {
                 intent_signals: [],
                 risk_signals: ['indecisive'],
                 required_intake_collected: {},
+                required_intake_overrides: {},
+                required_intake_override_meta: {},
                 non_business: true,
                 summary: null,
                 score: 0,
@@ -141,6 +143,8 @@ describe('mergeExtractionWithExisting', () => {
                 required_intake_collected: {
                     Telefon: '05551112233'
                 },
+                required_intake_overrides: {},
+                required_intake_override_meta: {},
                 non_business: false,
                 summary: 'Müşteri tarihi güncelledi.',
                 score: 8,
@@ -168,6 +172,56 @@ describe('mergeExtractionWithExisting', () => {
         expect(merged.required_intake_collected).toEqual({
             Telefon: '05551112233',
             'Doğum Tarihi': '1 Mart'
+        })
+    })
+
+    it('keeps required intake overrides and metadata when AI extraction reruns', () => {
+        const merged = mergeExtractionWithExisting(
+            {
+                service_type: 'Yenidoğan çekimi',
+                services: ['Yenidoğan çekimi'],
+                desired_date: '5 Nisan',
+                location: null,
+                budget_signals: [],
+                intent_signals: [],
+                risk_signals: [],
+                required_intake_collected: {
+                    Telefon: '05550000000'
+                },
+                required_intake_overrides: {},
+                required_intake_override_meta: {},
+                non_business: false,
+                summary: 'Yeni özet',
+                score: 7,
+                status: 'warm'
+            },
+            {
+                extracted_fields: {
+                    required_intake_collected: {
+                        Telefon: '05550000000'
+                    },
+                    required_intake_overrides: {
+                        telefon: '05551112233'
+                    },
+                    required_intake_override_meta: {
+                        telefon: {
+                            updated_at: '2026-03-15T10:00:00.000Z',
+                            updated_by: 'profile-1'
+                        }
+                    }
+                }
+            }
+        )
+
+        expect(merged.required_intake_overrides).toEqual({
+            telefon: '05551112233'
+        })
+        expect(merged.required_intake_override_meta).toEqual({
+            telefon: {
+                updated_at: '2026-03-15T10:00:00.000Z',
+                updated_by: 'profile-1',
+                source: 'manual'
+            }
         })
     })
 })

@@ -1,6 +1,9 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
-> **Last Updated:** 2026-03-14 (Inbox contact avatars now persist and render best-effort social profile photos when Instagram or Telegram APIs expose them, while WhatsApp continues to fall back to initials because current customer-facing Meta surfaces do not provide a supported contact-avatar source; Leads rows/cards now reuse the same conversation avatar data so the contact avatar appears immediately before the existing social platform icon; Instagram Inbox now persists/renders inbound image attachments from DM webhook metadata and the composer can upload/send outbound Instagram images with image-only validation while optional text is sent as a separate follow-up message; Instagram request badges now stay visible for tagged request-origin conversations until an outbound reply clears request state, even if the latest inbound metadata is `messaging`; Instagram bot disclaimers now use a separated footer plus quoted line so AI notices still read like a quoted block even though Instagram does not natively style `> ...` like WhatsApp; Inbox bubble rendering now strips both the standard quote disclaimer and the Instagram separator variant from visible bot text; Auth route warmup is now signed-out safe: login/register pages prefetch only auth sibling routes and do not warm protected dashboard pages before a session exists, reducing slow-feeling opens and post-signout redirects; dashboard/settings shells also stop bulk manual route prefetch on mount and rely on visible-link prefetch instead, reducing general page-open latency from unnecessary protected-route warmups; auth layouts now receive only auth-scoped translation namespaces instead of the full app message catalog, significantly reducing auth payload size; password-reset base URL fallback now supports Netlify `URL` when explicit site URL config is absent; product docs and stack decisions now reflect Netlify as the active hosting platform; Iyzico billing provider integration still covers recurring lifecycle sync as well as checkout initiation: hosted checkout remains hardened for repeated SPA attempts, callback redirects remain locale-aware `as-needed`, pre-payment legal consent is server-enforced, first premium activation still preserves unused trial credits as persistent extra-credit balance, and a new provider-backed lifecycle layer now handles self-serve cancellation + webhook-driven renewal success/failure/cancellation sync; provider-backed cancellation now turns off renewal immediately but keeps workspace access active until the paid `current_period_end`, successful recurring renewals refresh monthly package credits without rolling over prior package balance, renewal success persistence is now applied through a single DB RPC to keep subscription/account/ledger state atomic across retries, premium expiry now uses a one-hour grace window after `current_period_end` to reduce false lockouts on delayed provider webhooks, failed renewals move the workspace to `past_due` and pause usage until payment is resolved, sandbox validation now covers direct success/decline card scenarios plus provider-backed cancel flow, checkout failures map provider error codes to specific user-facing reasons instead of generic request failures, Plans surfaces show explicit scheduled-cancel and past-due warning states, SQL entitlement/usage guards reject premium access after the grace window even if the billing row has not yet been hard-finalized to `canceled`, Settings > Channels now uses a calmer respond.io-style gallery with a direct grid layout, max 3 desktop columns, and route-prefetched channel setup pages for faster opens, channel onboarding detail pages now use compact spacing, app-consistent heading scale, and wrapper-free icon treatment, WhatsApp onboarding now surfaces the `WhatsApp Business app number` migration path as an explicit third landing option, channel gallery no longer renders an extra section heading while connect CTA navigation uses direct push for faster click-to-open transitions, channel cards now use smaller headings with tighter top-right icon placement and reduced whitespace before footer divider, onboarding detail screens now use smaller inner heading/body scale with explicit support email CTA, clearer wizard step number contrast, and temporary placeholder migration link behavior, onboarding detail shells keep content left-aligned instead of center-aligned, Meta channel auth/webhook runtime now supports channel-specific app credentials (`META_INSTAGRAM_APP_ID/SECRET`, `META_WHATSAPP_APP_ID/SECRET`) with fallback to shared `META_APP_ID/SECRET`, Instagram OAuth connect now starts with Instagram Business Login consent flow (`ig_biz_login_oauth`) plus business scope payload instead of Facebook dialog URL, Instagram OAuth callback token exchange now uses Instagram Login endpoints (`api.instagram.com/oauth/access_token` + `graph.instagram.com/access_token` with `ig_exchange_token`) while WhatsApp continues to use Graph Facebook exchange, Instagram onboarding/connect UI copy now uses Instagram-specific wording (`Continue with Instagram`) instead of generic Meta wording, Instagram request-folder conversations now persist `instagram_request` tags for stable Inbox request labeling, Instagram sender-profile lookup now backfills `username`/`name` so Inbox can show readable Instagram handles instead of numeric IDs when available, and WhatsApp Embedded Signup completion now performs the required post-auth Cloud API provisioning steps by registering the phone number, subscribing the app to the customer WABA webhooks, and persisting the managed two-step verification PIN in channel config.)  
+> **Last Updated:** 2026-03-15 (Inbox contact avatars now persist and render best-effort social profile photos when Instagram or Telegram APIs expose them, while WhatsApp continues to fall back to initials because current customer-facing Meta surfaces do not provide a supported contact-avatar source; Leads rows/cards now reuse the same conversation avatar data so the contact avatar appears immediately before the existing social platform icon; Instagram Inbox now persists/renders inbound image attachments from DM webhook metadata and the composer can upload/send outbound Instagram images with image-only validation while optional text is sent as a separate follow-up message; Instagram request badges now stay visible for tagged request-origin conversations until an outbound reply clears request state, even if the latest inbound metadata is `messaging`; Instagram bot disclaimers now use a separated footer plus quoted line so AI notices still read like a quoted block even though Instagram does not natively style `> ...` like WhatsApp; Inbox bubble rendering now strips both the standard quote disclaimer and the Instagram separator variant from visible bot text; Auth route warmup is now signed-out safe: login/register pages prefetch only auth sibling routes and do not warm protected dashboard pages before a session exists, reducing slow-feeling opens and post-signout redirects; dashboard/settings shells also stop bulk manual route prefetch on mount and rely on visible-link prefetch instead, reducing general page-open latency from unnecessary protected-route warmups; auth layouts now receive only auth-scoped translation namespaces instead of the full app message catalog, significantly reducing auth payload size; password-reset base URL fallback now supports Netlify `URL` when explicit site URL config is absent; product docs and stack decisions now reflect Netlify as the active hosting platform; Iyzico billing provider integration still covers recurring lifecycle sync as well as checkout initiation: hosted checkout remains hardened for repeated SPA attempts, callback redirects remain locale-aware `as-needed`, pre-payment legal consent is server-enforced, first premium activation still preserves unused trial credits as persistent extra-credit balance, and a new provider-backed lifecycle layer now handles self-serve cancellation + webhook-driven renewal success/failure/cancellation sync; provider-backed cancellation now turns off renewal immediately but keeps workspace access active until the paid `current_period_end`, successful recurring renewals refresh monthly package credits without rolling over prior package balance, renewal success persistence is now applied through a single DB RPC to keep subscription/account/ledger state atomic across retries, premium expiry now uses a one-hour grace window after `current_period_end` to reduce false lockouts on delayed provider webhooks, failed renewals move the workspace to `past_due` and pause usage until payment is resolved, sandbox validation now covers direct success/decline card scenarios plus provider-backed cancel flow, checkout failures map provider error codes to specific user-facing reasons instead of generic request failures, Plans surfaces show explicit scheduled-cancel and past-due warning states, SQL entitlement/usage guards reject premium access after the grace window even if the billing row has not yet been hard-finalized to `canceled`, Settings > Channels now uses a calmer respond.io-style gallery with a direct grid layout, max 3 desktop columns, and route-prefetched channel setup pages for faster opens, channel onboarding detail pages now use compact spacing, app-consistent heading scale, and wrapper-free icon treatment, WhatsApp onboarding now surfaces the `WhatsApp Business app number` migration path as an explicit third landing option, channel gallery no longer renders an extra section heading while connect CTA navigation uses direct push for faster click-to-open transitions, channel cards now use smaller headings with tighter top-right icon placement and reduced whitespace before footer divider, onboarding detail screens now use smaller inner heading/body scale with explicit support email CTA, clearer wizard step number contrast, and temporary placeholder migration link behavior, onboarding detail shells keep content left-aligned instead of center-aligned, Meta channel auth/webhook runtime now supports channel-specific app credentials (`META_INSTAGRAM_APP_ID/SECRET`, `META_WHATSAPP_APP_ID/SECRET`) with fallback to shared `META_APP_ID/SECRET`, Instagram OAuth connect now starts with Instagram Business Login consent flow (`ig_biz_login_oauth`) plus business scope payload instead of Facebook dialog URL, Instagram OAuth callback token exchange now uses Instagram Login endpoints (`api.instagram.com/oauth/access_token` + `graph.instagram.com/access_token` with `ig_exchange_token`) while WhatsApp continues to use Graph Facebook exchange, Instagram onboarding/connect UI copy now uses Instagram-specific wording (`Continue with Instagram`) instead of generic Meta wording, Instagram request-folder conversations now persist `instagram_request` tags for stable Inbox request labeling, Instagram sender-profile lookup now backfills `username`/`name` so Inbox can show readable Instagram handles instead of numeric IDs when available, and WhatsApp Embedded Signup completion now performs the required post-auth Cloud API provisioning steps by registering the phone number, subscribing the app to the customer WABA webhooks, and persisting the managed two-step verification PIN in channel config.)  
+> **Update Note (2026-03-15):** Added a GTM prelaunch audit (`docs/plans/2026-03-15-gtm-prelaunch-audit.md`) to distinguish launch-critical pilot work from competitor-parity items; pre-pilot focus is now activation/conversion, operator workflow essentials, abuse controls, and pilot KPI visibility rather than full-suite parity.
+> **Update Note (2026-03-15):** Admin now records durable AI latency events separately from token/cost usage so real load tests can track average and p95 lead-extraction completion plus successful LLM user-response times per organization and reporting period.
+> **Update Note (2026-03-15):** Phase 9 QA now includes a second load-test layer for realistic webhook traffic: `npm run test:load:messages` remains the raw `autocannon` baseline, while `npm run test:load:users` simulates concurrent WhatsApp contacts with configurable multi-turn traffic, latency percentile reporting, timeout/transport-error counts, and optional signed execution against a real app URL.
 > **Update Note (2026-03-14):** Inbox mark-read now emits a shared unread-update client event so the main sidebar dot and Inbox tab title refresh immediately instead of waiting for realtime state to catch up.
 > **Update Note (2026-03-14):** Successful profile photo saves now trigger an immediate dashboard-layout refresh so the sidebar user chip reflects the new image without a manual reload.
 > **Update Note (2026-03-14):** Profile settings now use `profile photo / profil fotoğrafı` wording in user-facing copy, clarify that the uploaded image is used only inside Qualy, and let users preview the current photo by clicking it.
@@ -20,13 +23,17 @@
 ## 1. Problem & Goal
 
 ### Problem
+
 Turkish SMBs (beauty centers, photographers, clinics) struggle with WhatsApp:
+
 - Too many repetitive questions
 - Time wasted on unqualified leads
 - No systematic message tracking
 
 ### Goal
+
 Automate WhatsApp message handling:
+
 - **Auto-respond** using Skills & Knowledge Base
 - **Qualify leads** with AI-powered extraction & scoring
 - **Surface only serious leads** for human follow-up
@@ -35,11 +42,11 @@ Automate WhatsApp message handling:
 
 ## 2. Target Users
 
-| Segment | Profile |
-|---------|---------|
-| Beauty centers | Solo owner or small team |
-| Photographers | Newborn / maternity specialists |
-| Future | Dental clinics, real estate offices |
+| Segment        | Profile                             |
+| -------------- | ----------------------------------- |
+| Beauty centers | Solo owner or small team            |
+| Photographers  | Newborn / maternity specialists     |
+| Future         | Dental clinics, real estate offices |
 
 **Common traits:** Non-technical, 1-3 person team, WhatsApp-heavy operations.
 
@@ -48,21 +55,23 @@ Automate WhatsApp message handling:
 ## 3. MVP Scope
 
 ### ✅ In Scope (Target MVP)
-| Feature | Description | Status (2026-02-10) |
-|---------|-------------|--------------------|
-| WhatsApp Integration | Single number per org | Implemented (Meta Cloud API MVP: OAuth channel setup, popup-based connect UX, webhook verification, inbound text + media (`image`/`document`) processing, and reactive outbound replies) |
-| Instagram Integration | Single business account per org | Implemented (Meta OAuth channel setup, popup-based connect UX, webhook verification, inbound text + image processing, reactive outbound text + image replies; separate channel from WhatsApp) |
-| AI Auto-Reply | Skill-based + KB fallback | Implemented for Telegram + WhatsApp + Instagram + Simulator |
-| User-Generated Skills | Custom intent → response mappings | Implemented |
-| Knowledge Base (RAG) | FAQ, packages, policies | Implemented |
-| Lead Extraction | AI summary + score (0-10) | Implemented (Telegram + WhatsApp + Instagram; Inbox manual overwrite UI for important-info fields pending) |
-| Human Takeover | Bot pauses when business replies | Implemented (active_agent + assignee lock) |
-| Multi-Tenant | Organization-based isolation | Implemented |
-| Admin Panel | Leads, Skills, KB, Channels management | Partial (Dashboard + Leads + Skills/KB/Inbox/Settings/Channels implemented; organization-level billing audit history is visible in org detail; pending: `Open in WhatsApp` quick action and cross-org billing audit tooling) |
-| Public Legal Center | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json` | Implemented |
-| **Inbox UI** | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle, and cumulative per-conversation AI credit usage in details** | Implemented |
+
+| Feature               | Description                                                                                                                                                                                                                                                                 | Status (2026-02-10)                                                                                                                                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WhatsApp Integration  | Single number per org                                                                                                                                                                                                                                                       | Implemented (Meta Cloud API MVP: OAuth channel setup, popup-based connect UX, webhook verification, inbound text + media (`image`/`document`) processing, and reactive outbound replies)                                     |
+| Instagram Integration | Single business account per org                                                                                                                                                                                                                                             | Implemented (Meta OAuth channel setup, popup-based connect UX, webhook verification, inbound text + image processing, reactive outbound text + image replies; separate channel from WhatsApp)                                |
+| AI Auto-Reply         | Skill-based + KB fallback                                                                                                                                                                                                                                                   | Implemented for Telegram + WhatsApp + Instagram + Simulator                                                                                                                                                                  |
+| User-Generated Skills | Custom intent → response mappings                                                                                                                                                                                                                                           | Implemented                                                                                                                                                                                                                  |
+| Knowledge Base (RAG)  | FAQ, packages, policies                                                                                                                                                                                                                                                     | Implemented                                                                                                                                                                                                                  |
+| Lead Extraction       | AI summary + score (0-10)                                                                                                                                                                                                                                                   | Implemented (Telegram + WhatsApp + Instagram; Inbox details now supports manual overwrite for important-info fields with AI/manual source tracking and return-to-AI reset)                                                   |
+| Human Takeover        | Bot pauses when business replies                                                                                                                                                                                                                                            | Implemented (active_agent + assignee lock)                                                                                                                                                                                   |
+| Multi-Tenant          | Organization-based isolation                                                                                                                                                                                                                                                | Implemented                                                                                                                                                                                                                  |
+| Admin Panel           | Leads, Skills, KB, Channels management                                                                                                                                                                                                                                      | Partial (Dashboard + Leads + Skills/KB/Inbox/Settings/Channels implemented; organization-level billing audit history is visible in org detail; pending: `Open in WhatsApp` quick action and cross-org billing audit tooling) |
+| Public Legal Center   | Landing legal docs (`/legal`, `/terms`, `/privacy`) rendered from versioned markdown and exposed via `public/legal_versions.json`                                                                                                                                           | Implemented                                                                                                                                                                                                                  |
+| **Inbox UI**          | **Real-time chat, history, manual reply, delete, assignee system, unread indicators, on-demand summary, glowing AI summary trigger + inline chevron toggle, mobile list→conversation flow with details toggle, and cumulative per-conversation AI credit usage in details** | Implemented                                                                                                                                                                                                                  |
 
 ### ❌ Out of Scope (Intentional)
+
 - Calendar integration
 - Auto follow-up sequences
 - Campaigns / broadcasts
@@ -75,6 +84,7 @@ Automate WhatsApp message handling:
 ### 4.1 Messaging Auto-Reply Engine (Telegram + WhatsApp + Instagram MVP)
 
 **Flow:**
+
 ```
 Customer Message → Skill Match? → Yes → Skill Response
                               → No  → KB Match? → Yes → RAG Response
@@ -82,6 +92,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 ```
 
 **Rules:**
+
 - Skill/KB answers are grounded in stored content; fallback uses configured prompt + topic list
 - No hallucination — if unsure, ask a single clarifying question (or suggest topics)
 - MVP reply language policy: if customer message is Turkish, reply in Turkish; otherwise reply in English.
@@ -155,9 +166,9 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Inbox conversation view should only render message content after selected-thread data is loaded; while loading, show skeletons to avoid stale previous-thread visuals.
 - Inbox message timeline must render date separators from message timestamps (`Today`, `Yesterday`, or localized full date) in viewer-local time.
 - Simulator includes token usage visibility for debugging
- - Token usage is shown per message and as a conversation total in the simulator
- - Simulator chat visuals are channel-agnostic (no WhatsApp-specific brand mimicry)
- - If no skill/KB match, bot suggests available topics using existing skills/KB titles
+- Token usage is shown per message and as a conversation total in the simulator
+- Simulator chat visuals are channel-agnostic (no WhatsApp-specific brand mimicry)
+- If no skill/KB match, bot suggests available topics using existing skills/KB titles
 - Org-level AI settings control strict/flexible modes, a single sensitivity threshold, and prompt-driven fallback behavior
 - In Settings IA, `Sensitivity` is placed under `Behavior and Logic` so matching logic controls are grouped together.
 - In Settings IA, `Lead extraction during operator` is placed under `Escalation` so operator handover/extraction rules are grouped in one place.
@@ -191,12 +202,14 @@ Customer Message → Skill Match? → Yes → Skill Response
 | `requires_human_handover` | If true, always switch to operator after this skill response |
 
 **Routing Logic:**
+
 1. User message → embedding
 2. Compare with skill embeddings (top-5 similarity)
 3. LLM re-rank → `skill_id` + `confidence` (0-1)
 4. If `confidence < threshold` → fallback to KB or topic-guided fallback response
 
 **Embedding Source:**
+
 - Skill embeddings are generated from both `title` and `trigger_examples` (not triggers only).
 
 ---
@@ -204,21 +217,23 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 4.3 Knowledge Base (RAG)
 
 **Content Types:**
+
 - FAQ entries
 - Package/pricing info
 - Policies (delivery, cancellation, payment)
 
 **Behavior:**
+
 - Triggered when no skill matches
 - AI generates response strictly from KB
 - If KB has no answer → topic-guided fallback response
- - Documents are chunked with overlap and embedded per chunk
- - Retrieval is chunk-level with context budgets to avoid long prompts
- - Follow-up questions are rewritten into standalone KB queries via LLM routing
- - LLM routing receives the latest bot reply plus the last 5 user messages with timestamps
- - Router uses definition-style question heuristics to avoid missing KB lookups
- - Chunk overlap aligns to paragraph/sentence boundaries to preserve context
- - Keyword fallback is used when embedding search fails or returns no matches
+- Documents are chunked with overlap and embedded per chunk
+- Retrieval is chunk-level with context budgets to avoid long prompts
+- Follow-up questions are rewritten into standalone KB queries via LLM routing
+- LLM routing receives the latest bot reply plus the last 5 user messages with timestamps
+- Router uses definition-style question heuristics to avoid missing KB lookups
+- Chunk overlap aligns to paragraph/sentence boundaries to preserve context
+- Keyword fallback is used when embedding search fails or returns no matches
 
 ---
 
@@ -246,9 +261,11 @@ Customer Message → Skill Match? → Yes → Skill Response
 | Far-future date | -1 |
 
 **AI Summary (auto-generated):**
+
 > "User wants newborn shoot. Considering mid-October, budget-conscious. Manual follow-up recommended."
 
 **Rules:**
+
 - Extraction runs asynchronously on every new customer message (conversation snapshot update).
 - Intent signals are extracted by the LLM (no deterministic keyword fallback while LLM scoring is active).
 - Inbox can request an on-demand score reasoning summary grounded only in extracted signals and scoring inputs.
@@ -298,7 +315,10 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Leads list required-field columns/cards use the same required-intake resolver as Inbox details so `required_intake_collected` values stay consistent across both surfaces.
 - Leads service column/cards show AI-extracted `services[]` values from `extracted_fields.services`; if empty, UI falls back to `service_type`.
 - Required-info resolution supports manual override precedence (`extracted_fields.required_intake_overrides`) for future editable lead workflows.
-- Manual overwrite UI for "Important info" is intentionally deferred; planned behavior is per-field edit in Inbox with source tracking (AI vs manual) and filter-ready structured persistence.
+- Inbox "Important info" now supports per-field manual overwrite in Details; saved values are locked against future extraction reruns, marked with `AI / Manual` source state, can be reset per field with `Return to AI`, and missing required fields still render as editable rows so operators can fill blanks manually.
+- Manual required-intake corrections persist in `extracted_fields.required_intake_overrides` with lightweight metadata in `required_intake_override_meta` (`updated_at`, `updated_by`, `source=manual`).
+- Inbox Details now includes lightweight operator CRM context: editable freeform conversation tags plus one shared private note with last-updated metadata.
+- Tags and private note live as compact plain sections below lead extraction in Details; tag input stays hidden until the operator explicitly opens add mode, and private-note stale protection is keyed to `private_note_updated_at` so unrelated conversation updates do not create false conflicts.
 - Non-business conversations are excluded from lead scoring and kept at low-score `cold` (while preserving `non_business=true` as metadata when applicable).
 - Manual lead refresh from Inbox is blocked when conversation-level AI pause is enabled for that contact.
 
@@ -307,7 +327,8 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 4.5 Human Takeover
 
 **Trigger:** Business owner sends ANY message from their WhatsApp OR claims via Inbox.
- **Behavior:**
+**Behavior:**
+
 - **Explicit State:** `active_agent` switches to 'operator'.
 - **Assignee Ownership:** Operator is assigned (`assignee_id`) for ownership/visibility and claim tracking.
 - **Inbox Queue Visibility:** Inbox list is segmented into `Me`, `Unassigned`, and `All` queues for faster takeover routing.
@@ -321,28 +342,34 @@ Customer Message → Skill Match? → Yes → Skill Response
 ### 4.6 Human Escalation Policy (Implemented for Telegram)
 
 **Triggers:**
+
 - Skill-level mandatory handover (`requires_human_handover = true`)
 - Lead-score handover (`lead.total_score >= hot_lead_score_threshold`)
 
 **Precedence:**
+
 - `skill override > hot lead score > no escalation`
 
 **Actions:**
+
 - `notify_only`: notify owner/team, keep AI active
 - `switch_to_operator`: lock conversation to operator (`active_agent='operator'`)
 
 **Attention Queue Persistence:**
+
 - On escalation (`skill_handover` or `hot_lead`), runtime sets `conversations.human_attention_required=true`, records reason, and stamps `human_attention_requested_at`.
 - On operator ownership/send, runtime resolves queue state with `human_attention_required=false`, clears reason, and stamps `human_attention_resolved_at`.
 - Inbox `Me` and `Unassigned` tabs show red counters for rows where `human_attention_required=true`.
 
 **Bot Message (Handover):**
+
 - Handover message is appended only when escalation switches the conversation to operator (`switch_to_operator`) or when a skill forces handover.
 - Handover message is locale-aware (TR/EN in AI Settings; UI locale selects which message is edited/shown).
 - Legacy/default mismatch repair ensures TR UI does not show EN default handover text.
 - `notify_only` keeps AI active and does not emit a customer-facing handover promise; only `switch_to_operator` toggles runtime AI silence via `active_agent`.
 
 **Skill Override Rule (validated):**
+
 - Skill-triggered handover always uses `switch_to_operator` + `assistant_promise`.
 - Bot message text is configured in AI Settings and shown as read-only in skill form with a deep link to edit.
 
@@ -353,20 +380,24 @@ Customer Message → Skill Match? → Yes → Skill Response
 **Goal:** provide safe day-1 behavior for every organization without requiring setup.
 
 **Default skills (enabled for all orgs):**
+
 - Human support request (`requires_human_handover = true`)
 - Complaint / dissatisfaction (`requires_human_handover = true`)
 - Urgent / critical request (`requires_human_handover = true`)
 - Privacy / consent / deletion request (`requires_human_handover = true`)
 
 **Provisioning behavior:**
+
 - Default guardrail skills are seeded automatically when an organization first loads Skills and has no skills yet.
 - Skills appear in the same unified list as user-created skills (no Core/Custom split).
 
 **Message behavior:**
+
 - Each guardrail skill uses a dedicated localized bot message (TR/EN).
 - Guardrail skills escalate via existing skill handover policy (`switch_to_operator`).
 
 **Important scope decision (MVP):**
+
 - Do not apply low-confidence automatic handover.
 - Do not apply "no safe KB answer" automatic handover.
 - Ambiguous/general requests continue to route through existing `Skill -> KB -> fallback`.
@@ -376,6 +407,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 ## 5. Admin Panel
 
 ### 5.1 Lead List (Partially Implemented)
+
 - Name, phone, status (Hot/Warm/Cold)
 - Score, AI Summary, last message time
 - "Open in WhatsApp" button
@@ -384,6 +416,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Required-field values in lead rows are resolved from the same normalized source used by Inbox details (`required_intake_collected` + fallback logic) for parity.
 
 ### 5.2 Skills Management (Implemented; Simulator-First Testing)
+
 - CRUD operations
 - Enable/disable toggle
 - `Requires Human Handover` toggle with read-only bot message preview and AI Settings deep-link
@@ -394,14 +427,16 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Simulator is the canonical skill-testing surface for MVP; a separate per-skill playground is intentionally out of scope.
 
 ### 5.3 Knowledge Base (Implemented)
+
 - CRUD with folders
 - Rich text editor
- - Show indexing status (Ready / Processing / Error)
- - Sidebar shows uncategorized items (max 10 with expand) and accurate all-content counts
+- Show indexing status (Ready / Processing / Error)
+- Sidebar shows uncategorized items (max 10 with expand) and accurate all-content counts
 - Mobile UX uses a single-pane flow (Knowledge sidebar hidden on mobile; content/files shown as responsive cards)
 - Mobile edit-content header uses compact labels (`Düzenle`, `Kaydet`) and icon-only back affordance to prevent header wrap on small screens.
 
 ### 5.4 Channels (Telegram, WhatsApp, Instagram Implemented; Messenger Placeholder)
+
 - Telegram bot connection + webhook status/debug
 - WhatsApp Meta Cloud connection via Meta OAuth + webhook status/debug
 - Instagram Messaging connection via Meta OAuth + webhook status/debug
@@ -419,6 +454,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Inbox/Leads surfaces channel-specific platform indicators for all three channels
 
 ### 5.5 AI Settings (Implemented)
+
 - Always-on Flexible mode (no mode selection)
 - Single sensitivity threshold (applies to Skill + KB)
 - Single prompt field (used as the base prompt for fallback responses)
@@ -445,6 +481,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Prompt textarea defaults are locale-aware (TR UI shows Turkish default prompt when stored value is legacy/default English prompt text, including older long EN default variants)
 
 ### 5.6 Profile & Organization Settings
+
 - Profile: name and email visibility (email is read-only)
 - Profile: per-user avatar upload is supported; accepted images are client-converted to square `512x512` WebP before upload, and the final public URL is stored in `profiles.avatar_url`.
 - Profile: the settings card uses `profile photo / profil fotoğrafı` wording in user-facing copy, clarifies that the image is used only inside Qualy, and allows click-to-preview for the currently uploaded photo.
@@ -491,6 +528,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Required Fields has its own AI toggle and keeps manual + AI chips together.
 
 ### 5.7 Usage & Billing (Implemented)
+
 - Usage totals are credit-based and sourced from `organization_credit_ledger` (`entry_type='usage_debit'`) so Usage and Plans surfaces stay consistent.
 - Monthly usage follows calendar month boundaries in `Europe/Istanbul` (not UTC month boundaries).
 - Usage cards show credit-only values (`X,X kredi` / `X.X credits`) for monthly and all-time totals.
@@ -506,6 +544,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - Usage summary loading must paginate `organization_credit_ledger` usage-debit rows and batch `organization_ai_usage` metadata joins; single-page reads are not valid for high-volume organizations.
 
 ### 5.8 Platform Admin Workspace (Implemented v1, Read-Only)
+
 - **Searchable Organization Switcher (System Admin):**
   - System admin sees current organization in sidebar and uses explicit `Select/Change` action to open a searchable modal picker.
   - Active org context is persisted via server cookie and applied across tenant modules (Inbox, Leads, Skills, Knowledge Base, Settings, Simulator).
@@ -566,6 +605,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - Advanced filters/sorting for admin tables
 
 ### 5.9 Monetization & Subscription (Planned, Pre-Pilot)
+
 - **Pricing Strategy:**
   - Plan tiers and overage behavior are now locked for v1: `Starter/Growth/Scale` with `upgrade-first` positioning and burst-oriented top-up ladder.
   - Annual discount policy is still pending (post-baseline decision).
@@ -575,21 +615,23 @@ Customer Message → Skill Match? → Yes → Skill Response
   - v1 package controls are admin-managed with TRY+USD values per tier (`Starter/Growth/Scale`) and per top-up pack (`250/500/1000`).
   - Current baseline package prices:
 
-    | Plan | TRY | USD |
-    |------|-----|-----|
-    | Starter | 349 | 9.99 |
-    | Growth | 649 | 17.99 |
-    | Scale | 949 | 26.99 |
+    | Plan    | TRY | USD   |
+    | ------- | --- | ----- |
+    | Starter | 349 | 9.99  |
+    | Growth  | 649 | 17.99 |
+    | Scale   | 949 | 26.99 |
 
   - Current baseline extra-credit prices:
 
-    | Pack | TRY | USD |
-    |------|-----|-----|
-    | 250 credits | 99 | 2.99 |
-    | 500 credits | 189 | 5.49 |
+    | Pack         | TRY | USD  |
+    | ------------ | --- | ---- |
+    | 250 credits  | 99  | 2.99 |
+    | 500 credits  | 189 | 5.49 |
     | 1000 credits | 349 | 9.99 |
+
   - Lock v1 package policy: monthly included credits are non-rollover.
   - Finalize feature gates by plan (channels, AI limits, seats, and premium-only controls).
+
 - **Plan Purchase (Online Payment):**
   - Iyzico is selected as the first live provider for Turkey-first recurring and one-time checkout rollout.
   - Recurring monthly premium checkout now initializes via Iyzico `subscription checkout form` and finalizes state/credits on callback token retrieval.
@@ -638,6 +680,7 @@ Customer Message → Skill Match? → Yes → Skill Response
   - **Implementation status (v1.25):** One-trial-per-business policy is now enforced via `trial_business_fingerprints`: Sign Up pre-checks company/domain identity (`check_trial_business_identity`), org billing initialization claims/validates business fingerprint, and WhatsApp connect enforces additional WABA + normalized phone signals (`enforce_org_trial_business_policy`) to lock duplicate-trial organizations into subscription-required state.
 
 ### 5.10 AI QA Lab (Implemented v1.2, Manual Trigger + Auto Background Worker)
+
 - A dedicated Admin `AI QA Lab` surface (`/admin/qa-lab`) will run simulator-only quality tests before rollout decisions.
 - **Implementation status (v1.2):** `Admin > AI QA Lab` can manually trigger `Quick` / `Regression` runs with a single CTA, enqueue immutable run snapshots in `qa_runs`, and execute runs via lifecycle (`queued` -> `running` -> `completed` / `failed` / `budget_stopped`). The launch flow now dispatches execution for the newly created run ID directly (still queue-first for persistence), which avoids FIFO `batch=1` worker selection accidentally running an older queued job first.
 - **Access policy:** QA Lab is restricted to an allowlisted identity (`togayaytemiz@gmail.com`) with `admin` authorization on tenant surfaces; non-allowlisted users (including other admins/system-admins) are blocked from QA Lab routes and run-trigger server actions.
@@ -678,7 +721,7 @@ Customer Message → Skill Match? → Yes → Skill Response
 - QA request-mode routing now prioritizes explicit "general information" intent phrasing (e.g., "genel bilgi", "hakkında bilgi") over generic service-word matches, reducing false qualification-mode routing in cold/resistant informational scenarios.
 - QA execution now computes per-scenario effective required-intake fields; policy/procedure and general-information scenarios can legitimately use an empty required-field set so global lead-qualification fields do not create false penalties.
 - Intake fulfillment analysis now includes a sector-agnostic semantic rule: when a field was asked and the next customer turn provides a plausible contextual value, the field can be counted as fulfilled even without exact keyword echo.
-- Intake fulfillment analysis also infers sector-agnostic *type-like* fields (for example `... türü`, `... cinsi`, `segment`) from natural entity cues such as possessive nouns (`kedim için`) or self-identification (`freelance yazılımcıyım`) without hardcoding specific sectors.
+- Intake fulfillment analysis also infers sector-agnostic _type-like_ fields (for example `... türü`, `... cinsi`, `segment`) from natural entity cues such as possessive nouns (`kedim için`) or self-identification (`freelance yazılımcıyım`) without hardcoding specific sectors.
 - Broad semantic fallback (\"asked previous turn + informative reply\") is now restricted to truly generic custom fields; categorized fields like budget/timeline/business size must match their own category signals to avoid false fulfillment.
 - Explicit refusal/deflection replies (for example "şu an paylaşmak istemiyorum") do not count as fulfillment for that same field.
 - QA responder now applies a final blocked-field guard: questions that re-ask `fulfilled` or `deferred` intake fields are stripped from final assistant output.
@@ -753,43 +796,65 @@ Customer Message → Skill Match? → Yes → Skill Response
 
 ## 6. Multi-Tenant Architecture
 
-| Concept | Implementation |
-|---------|----------------|
-| Organization | 1 customer = 1 org |
-| Data Isolation | All tables have `organization_id` |
+| Concept        | Implementation                                                                                                                                                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organization   | 1 customer = 1 org                                                                                                                                                                                                                        |
+| Data Isolation | All tables have `organization_id`                                                                                                                                                                                                         |
 | Platform Admin | System admin dashboard, org/user lists, searchable org switcher, read-only cross-org impersonation for tenant surfaces, and billing default/override controls with reason capture implemented; advanced audit tooling UI remains deferred |
 
 ---
 
 ## 7. Success Metrics
 
-| Metric | Target |
-|--------|--------|
+| Metric                        | Target       |
+| ----------------------------- | ------------ |
 | Daily messages handled by bot | Track growth |
-| Lead → Hot conversion | > 20% |
-| Human takeover rate | < 30% |
-| FAQ coverage by bot | > 70% |
-| 7-day lead follow-up rate | Track |
+| Lead → Hot conversion         | > 20%        |
+| Human takeover rate           | < 30%        |
+| FAQ coverage by bot           | > 70%        |
+| 7-day lead follow-up rate     | Track        |
 
 ---
 
 ## 8. MVP Exit Criteria
 
 MVP is successful when:
+
 - [ ] 5 pilot customers actively using
 - [ ] ≥50% of daily inbound messages handled by bot
 - [ ] Users report "time saved"
 
 ---
 
+## 8.5 GTM Readiness Before Pilot Scale
+
+Before expanding beyond the first 5 pilot customers, the product should prioritize:
+
+- **Activation & Conversion:** finalize feature gating by plan, in-product upgrade prompts, annual-pricing posture, and a clear pilot offer path that turns trial usage into paid conversion.
+- **Operator Workflow Essentials:** close remaining day-to-day workflow gaps such as manual overwrite for collected `Important info`, `Open in WhatsApp` shortcuts in lead-management surfaces, and lightweight editable conversation tags/private notes for operator context.
+- **Abuse Controls & Ops:** add disposable-email / VOIP / repeated device-IP risk controls, a suspicious-signup review flow, and a complete admin audit trail for manual plan/quota overrides.
+- **Pilot KPI Visibility:** track the business path from `signup -> channel connected -> first AI reply -> first hot lead -> operator takeover -> paid conversion`, not only infrastructure latency and token/credit usage.
+
+Common competitor capabilities that are visible in the market but intentionally not treated as pre-pilot blockers:
+
+- Campaigns / broadcasts
+- Website widget / live chat
+- Marketplace-style third-party integrations
+- Dedicated mobile app or PWA push-notification layer
+- Full CRM / pipeline expansion
+
+**Product decision:** for initial Turkish SMB GTM, prioritize proof of value, operator speed, safety, and conversion over full-suite parity. Campaigns/broadcasts, full CRM expansion, and flow-builder-style automation remain deferred unless pilot evidence proves they are necessary for retention or close-rate.
+
+---
+
 ## 9. Future Roadmap (Post-MVP)
 
-| Feature | Priority |
-|---------|----------|
-| Calendar/Booking | High |
-| Flow Builder | Medium |
-| Auto Follow-up | Medium |
-| Vertical Preset Marketplace | Low |
+| Feature                     | Priority |
+| --------------------------- | -------- |
+| Calendar/Booking            | High     |
+| Flow Builder                | Medium   |
+| Auto Follow-up              | Medium   |
+| Vertical Preset Marketplace | Low      |
 
 ---
 
@@ -814,6 +879,7 @@ MVP is successful when:
 - **Usage Persistence Reliability (Implementation v1.17):** `recordAiUsage` is fail-fast; insert failures must surface as errors (no silent swallow) to prevent unnoticed billing/reporting drift.
 - **Embedding Cost Visibility (Implementation v1.17):** Embedding calls for skill matching and knowledge retrieval/indexing are recorded in `organization_ai_usage` under `embedding` category for credit/report parity.
 - **Usage Breakdown Attribution (Implementation v1.27):** `Settings > Usage` must map embedding/query/indexing costs into visible business buckets (`AI replies` or `Content processing`) so row totals reconcile with ledger-backed credit consumption.
+- **AI Latency Telemetry Separation (Implementation v1.36):** Lead-extraction and successful LLM reply durations are stored in a dedicated `organization_ai_latency_events` table instead of `organization_ai_usage` so admin dashboards can compute clean latency percentiles without coupling performance analytics to billing/token accounting.
 - **Runtime Lock Enforcement (Implementation v1.17):** Shared inbound pipeline and Telegram webhook re-check billing entitlement before each token-consuming AI stage (router, RAG, fallback, extraction follow-ups) and stop processing when locked.
 - **Document-Processing Lock Policy (Implementation v1.17):** Offering-profile suggestion, service-catalog candidate generation, and required-intake AI extraction are blocked while billing usage is locked.
 - **Premium Usage Debit Trigger Safety (Implementation v1.13):** `handle_ai_usage_credit_debit` must cast premium-branch `credit_pool` CASE outputs to `billing_credit_pool_type` enum to avoid `42804` insert failures that would silently stop `organization_ai_usage` writes and conversation credit accumulation.
@@ -840,6 +906,8 @@ MVP is successful when:
 - **Tab Icon Source:** Browser tab icon metadata points to `/icon-black.svg`, and app-level icon file is `src/app/icon.svg` for consistent favicon output.
 - **Tab Title Strategy:** Browser tab title follows active route using `<Page> | Qualy`; Inbox title adds `(●)` when unread conversations exist, without numeric unread count in the title.
 - **Sidebar Navigation:** Group primary navigation under eyebrow labels (Workspace, AI Tools, Other) for faster scanning.
+- **GTM Focus Decision (2026-03-15):** Before broad pilot expansion, prioritize activation/conversion, operator workflow, abuse prevention, and pilot KPI reporting over parity with omni-channel suite competitors.
+- **Competitor Parity Decision (2026-03-15):** Common market features currently missing from Qualy include campaigns/broadcasts, website widget/live chat, integrations, dedicated mobile/PWA alerts, and richer CRM tooling; only lightweight CRM notes/tags and reporting are near-term pilot priorities, while the rest remain post-pilot unless customer evidence changes the order.
 - **Sidebar Bot-Mode Loading Safety (Implementation v1.29):** Main sidebar bot-status indicator must render neutral loading state until organization bot mode is fetched to avoid transient incorrect `Active`/green display on hard refresh.
 - **Social Avatar Persistence (Implementation v1.30):** Customer avatars are stored on the conversation record (`contact_avatar_url`) so Inbox surfaces stay channel-agnostic; hydrate only from supported channel APIs (Instagram/Telegram) and keep initials fallback for WhatsApp.
 - **Social Avatar Fallback (Implementation v1.31):** When conversation-level avatar persistence is missing or not yet deployed on an environment, Inbox may recover social avatars from recent inbound message metadata so existing/live threads still show profile photos.
@@ -1156,7 +1224,7 @@ MVP is successful when:
 - **Terminology (TR):** Replace "Lead" with "Kişi" in Turkish UI copy for clarity.
 - **Launch Copy Positioning (Implementation v1.34):** For launch and marketing assets, position Qualy around one inbox, conversation clarity, person extraction, operator control, and visible credit usage; avoid English `lead`/`qualification` terminology and avoid team-based primary framing in Turkish copy.
 - **Quality Gate Discipline:** Keep lint free of errors (warnings tracked separately), avoid explicit `any` in core product modules, and require green `test` + `build` before closing iterations.
-- **Phase 9 QA Strategy (Implemented):** Phase 9 now runs Vitest-based core/unit + WhatsApp webhook integration coverage, Playwright admin smoke E2E, and a reproducible message-handling load baseline (`autocannon`) via `npm run test:unit:core`, `npm run test:integration:whatsapp`, `npm run test:e2e:admin`, and `npm run test:load:messages`.
+- **Phase 9 QA Strategy (Implemented):** Phase 9 now runs Vitest-based core/unit + WhatsApp webhook integration coverage, Playwright admin smoke E2E, a reproducible message-handling throughput baseline (`autocannon`), and a concurrent-user webhook stress scenario via `npm run test:unit:core`, `npm run test:integration:whatsapp`, `npm run test:e2e:admin`, `npm run test:load:messages`, and `npm run test:load:users`.
 - **AI QA Lab Strategy (Implemented v1.4):** Manual admin-triggered, simulator-only, two-model (`Generator` + `Judge`) QA loop with non-hardcoded scenario generation, 150+ line noisy KB fixtures, full-text evidence logging, findings-first reports, and critical-fail release gate. Current implementation includes queue-first run launch with automatic background worker execution, lifecycle persistence (`queued/running/completed/failed/budget_stopped`), full artifact-chain visibility in run details, Judge-to-pipeline action-set reporting, generator retry diagnostics, increased Quick preset token budget (`100k`), and QA-local responder execution that is tenant-independent (`synthetic context`, `no skill layer`, `generated KB + fallback only`).
 - **AI QA Generator Retry Decision (Implemented v1.3):** Generator stage retries failed attempts up to `3` times with explicit retry feedback and stores per-attempt diagnostics (`finish_reason`, usage, output snippets, validation error) in `report.error.details` for failed runs.
 - **Next.js Interceptor Convention:** Use `src/proxy.ts` (not `src/middleware.ts`) for locale interception on Next.js 16+.
@@ -1171,19 +1239,20 @@ MVP is successful when:
 - **Meta Data Deletion Compliance (Landing):** For Facebook/Meta App Review, publish a public `Data Deletion Instructions URL` page with explicit deletion steps, scope, SLA, and support channel; initial deletion scope is contact-level records, while full organization deletion remains out of MVP self-service scope.
 - **In-App Self-Service Deletion Scope (MVP):** `Settings > Organization` allows admins/owners to delete organization contact-level records after account-password confirmation in a modal; deletion removes conversations, cascaded messages/leads, and conversation-linked AI usage metadata rows.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Frontend | **Next.js (App Router)** | Best DX for React, pairs well with Supabase |
-| Backend | **Supabase Edge Functions** | Serverless, TypeScript, integrated with DB |
-| Database | **Supabase (PostgreSQL + pgvector)** | Multi-tenant RLS, vector search built-in |
-| Auth | **Supabase Auth (Email/Password)** | Simple for MVP, can add OAuth later |
-| WhatsApp | **Meta Cloud API** | Free tier (1000 conv/mo), direct integration |
-| AI/LLM | **OpenAI GPT-4o-mini** | Cost-effective, good Turkish support |
-| Embeddings | **OpenAI + Supabase pgvector** | All-in-one, no extra services |
-| Realtime | **Supabase Realtime** | Live inbox updates (Postgres changes) |
-| Hosting | **Netlify** | Matches current deployment platform and runtime environment |
-| i18n | **TR + EN from day one** | Avoid retrofit pain |
-| Onboarding | **Embedded Signup first (MVP)** | Guided self-serve WhatsApp setup for real business numbers, with concierge fallback for blocked pilot cases |
-| Inbox Updates | **Atomic send RPC + realtime fallback** | Prevents unassigned state and keeps bot/user messages visible |
-| Dev Workflow | **Always provide commit message** | Ensures consistent handoff across iterations |
-| Dev Workflow | Add subagent-driven-development skill | Standardizes subagent-based execution of implementation plans |
+| Decision      | Choice                                  | Rationale                                                                                                                               |
+| ------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend      | **Next.js (App Router)**                | Best DX for React, pairs well with Supabase                                                                                             |
+| Backend       | **Supabase Edge Functions**             | Serverless, TypeScript, integrated with DB                                                                                              |
+| Database      | **Supabase (PostgreSQL + pgvector)**    | Multi-tenant RLS, vector search built-in                                                                                                |
+| Auth          | **Supabase Auth (Email/Password)**      | Simple for MVP, can add OAuth later                                                                                                     |
+| WhatsApp      | **Meta Cloud API**                      | Free tier (1000 conv/mo), direct integration                                                                                            |
+| AI/LLM        | **OpenAI GPT-4o-mini**                  | Cost-effective, good Turkish support                                                                                                    |
+| Embeddings    | **OpenAI + Supabase pgvector**          | All-in-one, no extra services                                                                                                           |
+| Realtime      | **Supabase Realtime**                   | Live inbox updates (Postgres changes)                                                                                                   |
+| Hosting       | **Netlify**                             | Matches current deployment platform and runtime environment                                                                             |
+| Load Testing  | **Two-layer webhook checks**            | Keep `autocannon` for raw throughput baseline and a concurrent-user scenario runner for realistic multi-turn latency/error measurement. |
+| i18n          | **TR + EN from day one**                | Avoid retrofit pain                                                                                                                     |
+| Onboarding    | **Embedded Signup first (MVP)**         | Guided self-serve WhatsApp setup for real business numbers, with concierge fallback for blocked pilot cases                             |
+| Inbox Updates | **Atomic send RPC + realtime fallback** | Prevents unassigned state and keeps bot/user messages visible                                                                           |
+| Dev Workflow  | **Always provide commit message**       | Ensures consistent handoff across iterations                                                                                            |
+| Dev Workflow  | Add subagent-driven-development skill   | Standardizes subagent-based execution of implementation plans                                                                           |

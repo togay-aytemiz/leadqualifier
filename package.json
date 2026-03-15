@@ -13,6 +13,7 @@
     "test:integration:whatsapp": "vitest run src/app/api/webhooks/whatsapp/route.test.ts",
     "test:e2e:admin": "playwright test tests/e2e/admin-panel.spec.ts",
     "test:load:messages": "node scripts/load/whatsapp-webhook.autocannon.mjs",
+    "test:load:users": "node scripts/load/whatsapp-webhook.scenario.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {

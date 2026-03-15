@@ -33,6 +33,7 @@ import {
 } from '@/lib/ai/language'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/skill-actions'
+import { recordAiLatencyEvent } from '@/lib/ai/latency'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
@@ -609,6 +610,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         return
     }
 
+    const llmResponseStartedAt = Date.now()
+
     try {
         const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions')
         const [{ data: recentMessages, error: historyError }, { data: leadSnapshot, error: leadError }] = await Promise.all([
@@ -794,6 +797,20 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         is_rag: true,
                         sources: chunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
+                    await recordAiLatencyEvent({
+                        organizationId: orgId,
+                        conversationId: conversation.id,
+                        metricKey: 'llm_response',
+                        durationMs: Date.now() - llmResponseStartedAt,
+                        source: options.source,
+                        metadata: {
+                            response_kind: 'rag',
+                            platform: options.platform,
+                            document_count: kbResults.length
+                        }
+                    }, {
+                        supabase: options.supabase
+                    })
                     await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
                     return
                 }
@@ -830,5 +847,18 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
     await options.sendOutbound(formattedFallbackReply)
     await persistBotMessage(formattedFallbackReply, { is_fallback: true })
+    await recordAiLatencyEvent({
+        organizationId: orgId,
+        conversationId: conversation.id,
+        metricKey: 'llm_response',
+        durationMs: Date.now() - llmResponseStartedAt,
+        source: options.source,
+        metadata: {
+            response_kind: 'fallback',
+            platform: options.platform
+        }
+    }, {
+        supabase: options.supabase
+    })
     await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
 }

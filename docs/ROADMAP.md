@@ -1,6 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-03-14 (Inbox contact avatars now persist best-effort social profile photos for Instagram and Telegram conversations and render them across list/chat/details, while WhatsApp continues to use initials fallback because current customer-facing Meta surfaces do not expose a supported contact-avatar source; Leads rows/cards now mirror Inbox identity treatment by showing the compact contact avatar immediately before the existing social platform icon when `contact_avatar_url` is available; Instagram Inbox now renders inbound DM image attachments from stored metadata and the composer can upload/send outbound Instagram images with image-only validation while optional text is sent as a separate follow-up message; Instagram request badges now stay visible for tagged request-origin conversations until an outbound reply actually clears request state, even if the latest inbound metadata is `messaging`; Instagram bot disclaimers now render with a separator + quote footer where native WhatsApp-style quote formatting is unavailable, while Inbox parsing strips both the standard quote variant and the Instagram separator variant from visible bot bubbles; Auth pages now prefetch only auth-safe sibling routes instead of protected dashboard pages, removing unnecessary signed-out auth/org/data warmups that made login/register openings and post-signout redirects feel slow; dashboard and settings shells no longer bulk-prefetch protected routes on mount and now rely on visible `Link` prefetch instead of eager route floods, reducing slow-feeling page opens across the app; auth layouts now load only the translation namespaces they actually need instead of shipping the full app message catalog to login/register surfaces, significantly shrinking auth payload; password-reset base URL fallback now supports Netlify `URL` when explicit site URL config is absent; project docs and stack references now reflect Netlify as the active hosting platform; Iyzico subscription lifecycle remains provider-backed beyond initial checkout: self-serve cancel calls Iyzico cancel API, turns off renewal, and keeps access active until the paid `current_period_end`; a new `/api/billing/iyzico/webhook` route syncs recurring renewal success/failure/cancellation events; recurring renewal success is now applied through a dedicated DB RPC so subscription/account/ledger updates stay atomic and retry-safe; premium expiry now includes a one-hour grace window after `current_period_end` to reduce false lockouts when provider webhooks are delayed; failed renewals still move accounts to `past_due` and pause usage until payment is resolved; Plans now shows explicit scheduled-cancel and past-due states, without exposing an in-app undo/resume CTA after cancellation; hosted checkout remount remains hardened for repeated SPA attempts; billing redirects remain locale-aware `as-needed`; checkout legal consent stays server-enforced; first premium activation still converts unused trial credits into persistent extra-credit balance while monthly package credits remain non-rollover; sandbox validation now covers direct Iyzico success/decline card matrix plus provider-backed cancel flow; provider payment failures map to specific user-facing checkout errors instead of generic request failures; SQL entitlement/usage guards now reject premium access after the grace window even if provider cancellation was only finalized locally in metadata; Settings > Channels now uses a calmer respond.io-style business-messaging gallery with a direct grid layout, max 3 desktop columns, and route-prefetched channel setup pages for faster opens; channel onboarding detail pages now use compact spacing and consistent heading scale with icon wrappers removed so they match the rest of the app; WhatsApp onboarding now surfaces the `WhatsApp Business app number` migration path as an explicit third landing option instead of a hidden link; channel gallery cards removed the extra `Business Messaging` section title while `Connect` now navigates with direct push for faster perceived open; channel card typography/spacing is now more compact with smaller titles, tighter icon top-right placement, and reduced divider gap; onboarding detail screens now use smaller inner headings/body text, support banner CTA opens an email draft to support, wizard step numbers stay visible in active state, and migration guide link is temporarily placeholder-only; onboarding detail shell content is now left-aligned (not centered) for denser, faster scanning; Meta channel auth/webhook runtime now supports channel-specific app credentials (`META_INSTAGRAM_APP_ID/SECRET`, `META_WHATSAPP_APP_ID/SECRET`) with shared `META_APP_ID/SECRET` fallback so Instagram and WhatsApp can run on separate Meta apps; Instagram OAuth start now uses direct Instagram Business Login consent flow (`ig_biz_login_oauth`) with business scopes instead of Facebook dialog URL; Instagram callback token exchange now uses Instagram Login endpoints (`api.instagram.com/oauth/access_token` + `graph.instagram.com/access_token` with `ig_exchange_token`) while WhatsApp keeps Graph Facebook token exchange; Instagram onboarding/connect CTA copy now uses Instagram-specific wording instead of generic Meta wording; Instagram `standby` events now persist conversation-level request tags for stable Inbox request labeling; Instagram webhook ingest now resolves sender profile username/name and stores it so numeric IG IDs are replaced with human-readable contact names when available; and WhatsApp Embedded Signup completion now finishes the required post-auth provisioning by registering the phone number for Cloud API use, subscribing app webhooks on the customer WABA, and persisting the managed two-step verification PIN.)  
+> **Last Updated:** 2026-03-15 (Inbox contact avatars now persist best-effort social profile photos for Instagram and Telegram conversations and render them across list/chat/details, while WhatsApp continues to use initials fallback because current customer-facing Meta surfaces do not expose a supported contact-avatar source; Leads rows/cards now mirror Inbox identity treatment by showing the compact contact avatar immediately before the existing social platform icon when `contact_avatar_url` is available; Instagram Inbox now renders inbound DM image attachments from stored metadata and the composer can upload/send outbound Instagram images with image-only validation while optional text is sent as a separate follow-up message; Instagram request badges now stay visible for tagged request-origin conversations until an outbound reply actually clears request state, even if the latest inbound metadata is `messaging`; Instagram bot disclaimers now render with a separator + quote footer where native WhatsApp-style quote formatting is unavailable, while Inbox parsing strips both the standard quote variant and the Instagram separator variant from visible bot bubbles; Auth pages now prefetch only auth-safe sibling routes instead of protected dashboard pages, removing unnecessary signed-out auth/org/data warmups that made login/register openings and post-signout redirects feel slow; dashboard and settings shells no longer bulk-prefetch protected routes on mount and now rely on visible `Link` prefetch instead of eager route floods, reducing slow-feeling page opens across the app; auth layouts now load only the translation namespaces they actually need instead of shipping the full app message catalog to login/register surfaces, significantly shrinking auth payload; password-reset base URL fallback now supports Netlify `URL` when explicit site URL config is absent; project docs and stack references now reflect Netlify as the active hosting platform; Iyzico subscription lifecycle remains provider-backed beyond initial checkout: self-serve cancel calls Iyzico cancel API, turns off renewal, and keeps access active until the paid `current_period_end`; a new `/api/billing/iyzico/webhook` route syncs recurring renewal success/failure/cancellation events; recurring renewal success is now applied through a dedicated DB RPC so subscription/account/ledger updates stay atomic and retry-safe; premium expiry now includes a one-hour grace window after `current_period_end` to reduce false lockouts when provider webhooks are delayed; failed renewals still move accounts to `past_due` and pause usage until payment is resolved; Plans now shows explicit scheduled-cancel and past-due states, without exposing an in-app undo/resume CTA after cancellation; hosted checkout remount remains hardened for repeated SPA attempts; billing redirects remain locale-aware `as-needed`; checkout legal consent stays server-enforced; first premium activation still converts unused trial credits into persistent extra-credit balance while monthly package credits remain non-rollover; sandbox validation now covers direct Iyzico success/decline card matrix plus provider-backed cancel flow; provider payment failures map to specific user-facing checkout errors instead of generic request failures; SQL entitlement/usage guards now reject premium access after the grace window even if provider cancellation was only finalized locally in metadata; Settings > Channels now uses a calmer respond.io-style business-messaging gallery with a direct grid layout, max 3 desktop columns, and route-prefetched channel setup pages for faster opens; channel onboarding detail pages now use compact spacing and consistent heading scale with icon wrappers removed so they match the rest of the app; WhatsApp onboarding now surfaces the `WhatsApp Business app number` migration path as an explicit third landing option instead of a hidden link; channel gallery cards removed the extra `Business Messaging` section title while `Connect` now navigates with direct push for faster perceived open; channel card typography/spacing is now more compact with smaller titles, tighter icon top-right placement, and reduced divider gap; onboarding detail screens now use smaller inner headings/body text, support banner CTA opens an email draft to support, wizard step numbers stay visible in active state, and migration guide link is temporarily placeholder-only; onboarding detail shell content is now left-aligned (not centered) for denser, faster scanning; Meta channel auth/webhook runtime now supports channel-specific app credentials (`META_INSTAGRAM_APP_ID/SECRET`, `META_WHATSAPP_APP_ID/SECRET`) with shared `META_APP_ID/SECRET` fallback so Instagram and WhatsApp can run on separate Meta apps; Instagram OAuth start now uses direct Instagram Business Login consent flow (`ig_biz_login_oauth`) with business scopes instead of Facebook dialog URL; Instagram callback token exchange now uses Instagram Login endpoints (`api.instagram.com/oauth/access_token` + `graph.instagram.com/access_token` with `ig_exchange_token`) while WhatsApp keeps Graph Facebook token exchange; Instagram onboarding/connect CTA copy now uses Instagram-specific wording instead of generic Meta wording; Instagram `standby` events now persist conversation-level request tags for stable Inbox request labeling; Instagram webhook ingest now resolves sender profile username/name and stores it so numeric IG IDs are replaced with human-readable contact names when available; and WhatsApp Embedded Signup completion now finishes the required post-auth provisioning by registering the phone number for Cloud API use, subscribing app webhooks on the customer WABA, and persisting the managed two-step verification PIN.)  
+> **Update Note (2026-03-15):** Added a GTM prelaunch audit (`docs/plans/2026-03-15-gtm-prelaunch-audit.md`) and expanded Pilot Launch scope so pre-pilot work explicitly covers activation/conversion, operator workflow polish, abuse controls, and a deliberate stance on competitor-parity gaps such as campaigns, widgets, integrations, and mobile alerts.
+> **Update Note (2026-03-15):** Phase 9 load testing now distinguishes raw webhook throughput from realistic conversation pressure: `npm run test:load:messages` keeps the `autocannon` baseline, while `npm run test:load:users` simulates concurrent WhatsApp contacts with configurable multi-turn traffic, latency percentiles, timeout/transport-error reporting, and optional signed live-app execution against a real webhook URL.
+> **Update Note (2026-03-15):** Admin now tracks durable AI latency analytics via dedicated event logs: lead-extraction completion and LLM-generated user-response durations are recorded at runtime and surfaced on the Admin dashboard as average + p95 cards scoped by selected organization and reporting period.
 > **Update Note (2026-03-14):** Inbox mark-read flow now emits a shared unread-update browser event, so the main sidebar unread dot and browser tab title refresh immediately instead of waiting for realtime reconciliation.
 > **Update Note (2026-03-14):** Main sidebar user identity now refreshes immediately after a successful profile photo save, so the new photo appears without requiring a manual page reload.
 > **Update Note (2026-03-14):** Profile settings copy now uses `profil fotoğrafı / profile photo` wording, clarifies that the image is used only inside Qualy, and uploaded photos can be previewed by clicking the current image.
@@ -18,6 +21,7 @@
 ---
 
 ## Phase 0: Project Setup ✅
+
 - [x] Initialize project repository
 - [x] Set up development environment
 - [x] Choose and configure tech stack
@@ -32,6 +36,7 @@
 ---
 
 ## Phase 1: Core Infrastructure ✅
+
 - [x] **Multi-Tenant Foundation**
   - [x] Create organization model
   - [x] Implement `organization_id` isolation
@@ -49,6 +54,7 @@
 ---
 
 ## Phase 2: Messaging Channels
+
 - [x] **WhatsApp (Meta Cloud API)**
   - [x] Choose provider (Meta Cloud API selected for MVP)
   - [x] Finalize MVP scope (OAuth channel setup, inbound text + media (`image`/`document`) handling, reactive replies only)
@@ -149,6 +155,7 @@
 ---
 
 ## Phase 3: Skill System ✅
+
 - [x] **Skill CRUD**
   - [x] Create skill model
   - [x] Admin UI for skill management
@@ -165,6 +172,7 @@
   - [x] Simulator is the canonical skill testing surface for MVP (no separate per-skill playground)
 
 ## Phase 3.5: Chat Simulator (Neutral Chatbot UI) ✅
+
 - [x] **Chat Interface**
   - [x] Neutral chatbot UI (channel-agnostic bubbles, header, and input)
   - [x] Org-specific simulator URL
@@ -181,6 +189,7 @@
 - [x] **Fallback Guidance:** Offer topic suggestions from skills/KB when no match is found
 
 ## Phase 3.6: Refinements & Inbox ✅
+
 - [x] **Profile Settings**
   - [x] Settings > Profile now supports per-user avatar upload with client-side square WebP conversion before storage upload
 - [x] **Inbox UI**
@@ -337,6 +346,7 @@
 ---
 
 ## Phase 4: Knowledge Base (RAG) ✅
+
 - [x] **KB CRUD**
   - [x] Create KB entry model
   - [x] Category support
@@ -375,6 +385,7 @@
 ---
 
 ## Phase 5: AI Auto-Reply Engine ✅
+
 - [x] **Reply Router**
   - [x] Skill → KB → Topic-guided fallback response
   - [x] Response formatting
@@ -505,6 +516,7 @@
 ---
 
 ## Phase 6: Lead Extraction & Qualification
+
 - [x] **Lead Model**
   - [x] Create lead schema
   - [x] Link to conversations
@@ -592,7 +604,8 @@
   - [x] Show collected "Required Fields" values in lead details using Organization > Required Fields definitions
   - [x] Present collected required fields in an "Important info" card section with plain label-value rows inside
   - [x] Required-info resolver supports manual override precedence for future lead-edit workflows
-  - [ ] Manual overwrite UI for "Important info" values in Inbox (per field edit + save source tracking)
+  - [x] Manual overwrite UI for "Important info" values in Inbox (per field edit + save source tracking)
+  - [x] Important info editor now renders missing required fields as editable blank rows so operators can fill AI gaps manually
 - [x] **Lead List UX**
   - [x] Mobile leads list now uses compact card rows with reduced spacing while preserving the existing desktop table layout
   - [x] Desktop leads table keeps status chips on a single line and truncates long contact names to a single line
@@ -600,10 +613,12 @@
   - [x] Leads service column/cards now render AI-extracted `services[]` values from `extracted_fields.services` (fallback to `service_type` for legacy rows)
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
+  - [x] Compact Details operator tools: tags/private note now render as plain sections below lead extraction, tag input is collapsed by default, and private-note conflict checks ignore unrelated conversation updates
 
 ---
 
 ## Phase 7: Admin Panel
+
 - [x] **Dashboard**
   - [x] Overview stats
   - [x] Recent leads
@@ -628,6 +643,7 @@
 ---
 
 ## Phase 8: Platform Admin Features
+
 - [x] System admin dashboard + organizations/users/leads lists
 - [x] Organization switcher
   - [x] Searchable org switcher in main sidebar (system admin)
@@ -677,6 +693,7 @@
 ---
 
 ## Phase 8.5: Monetization & Subscription (Pre-Pilot)
+
 - [ ] **Pricing Strategy**
   - [x] Define plan tiers, quotas, and overage policy
   - [x] Confirm launch pricing posture: low-entry starter around ~USD 10 equivalent (TRY-localized) to reduce first-purchase friction
@@ -764,6 +781,7 @@
 ---
 
 ## Phase 8.6: Public Legal Center
+
 - [x] Add markdown legal source folder (`legal/*.md`) with required version metadata (`id`, `version`, `last_updated`, `document_title`)
 - [x] Add legal routing and rendering for `/legal`, `/terms`, `/privacy` on landing app
 - [x] Add build-time legal manifest generation (`scripts/generate-legal-assets.mjs` -> `public/legal_versions.json`)
@@ -777,6 +795,7 @@
 ---
 
 ## Phase 9: Testing & QA
+
 - [x] Address strict TypeScript build errors (router history typing + indexed access guards)
 - [x] Stabilize test + lint + build quality gates after troubleshooting sweep
 - [x] Remove `no-explicit-any` debt in critical modules (AI, Inbox, Knowledge Base, Leads, Channels, shared types)
@@ -854,12 +873,20 @@
 - [x] Unit tests for core logic
 - [x] Integration tests for WhatsApp flow
 - [x] E2E tests for admin panel
-- [x] Load testing for message handling
+- [x] Baseline webhook load testing for message handling (`autocannon`)
+- [x] Concurrent-user WhatsApp stress scenario runner with configurable signed live-webhook mode, multi-turn contact simulation, and latency/error summaries
+- [x] Admin AI latency analytics for load testing: record lead-extraction completion time and LLM reply latency, then surface average + p95 metrics on the Admin dashboard
 
 ---
 
 ## Phase 10: Pilot Launch
+
 - [x] Prepare AI copywriter-ready static launch asset brief grounded in repo + PRD + roadmap + release notes, with Turkish-first terminology and non-team positioning guardrails
+- [ ] Finish GTM readiness hardening before expanding beyond the first 5 pilots
+  - [ ] Close remaining P0 product gaps tracked elsewhere: Leads `Open in WhatsApp`, cross-org admin audit trail, plan feature gating, upgrade prompts, and trial-abuse controls
+  - [ ] Add pilot KPI instrumentation and weekly review cadence (`signup -> channel connected -> first AI reply -> first hot lead -> operator takeover -> paid conversion`)
+  - [x] Add lightweight operator CRM tooling for pilot teams (editable conversation tags and private notes)
+  - [ ] Decide the post-pilot parity roadmap for website widget/live chat, third-party integrations, tenant-facing reports, and mobile/PWA alerts while keeping campaigns/broadcasts out of pilot scope
 - [ ] Onboard 5 pilot customers
 - [ ] Monitor success metrics
 - [ ] Collect feedback
@@ -868,6 +895,7 @@
 ---
 
 ## Post-MVP (Future)
+
 - [ ] Calendar / booking integration
 - [ ] Flow builder
 - [ ] Auto follow-up sequences

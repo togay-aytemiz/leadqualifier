@@ -49,6 +49,19 @@ export interface OrganizationAiUsage {
     created_at: string
 }
 
+export type AiLatencyMetricKey = 'lead_extraction' | 'llm_response'
+
+export interface OrganizationAiLatencyEvent {
+    id: string
+    organization_id: string
+    conversation_id: string | null
+    metric_key: AiLatencyMetricKey
+    duration_ms: number
+    source: string
+    metadata: Json
+    created_at: string
+}
+
 export interface QaLabRun {
     id: string
     organization_id: string
@@ -318,6 +331,9 @@ export interface Conversation {
     ai_usage_count?: number
     ai_usage_total_credits?: number
     tags: string[]
+    private_note?: string | null
+    private_note_updated_at?: string | null
+    private_note_updated_by?: string | null
     created_at: string
     updated_at: string
 }
@@ -501,6 +517,11 @@ export interface Database {
                 Row: OrganizationAiUsage
                 Insert: Omit<OrganizationAiUsage, 'id' | 'created_at'>
                 Update: Partial<Omit<OrganizationAiUsage, 'id' | 'organization_id' | 'created_at'>>
+            }
+            organization_ai_latency_events: {
+                Row: OrganizationAiLatencyEvent
+                Insert: Omit<OrganizationAiLatencyEvent, 'id' | 'created_at'>
+                Update: Partial<Omit<OrganizationAiLatencyEvent, 'id' | 'organization_id' | 'created_at'>>
             }
             qa_runs: {
                 Row: QaLabRun
