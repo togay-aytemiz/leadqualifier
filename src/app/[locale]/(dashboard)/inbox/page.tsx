@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getConversations } from '@/lib/inbox/actions'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getRequiredIntakeFields } from '@/lib/ai/followup'
+import { getServiceCatalogItems } from '@/lib/leads/settings'
 import { InboxContainer } from '@/components/inbox/InboxContainer'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { redirect } from 'next/navigation'
@@ -40,10 +41,11 @@ export default async function InboxPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const [conversations, aiSettings, requiredIntakeFields] = await Promise.all([
+    const [conversations, aiSettings, requiredIntakeFields, serviceCatalogItems] = await Promise.all([
         getConversations(organizationId),
         getOrgAiSettings(organizationId, { supabase }),
-        getRequiredIntakeFields({ organizationId, supabase })
+        getRequiredIntakeFields({ organizationId, supabase }),
+        getServiceCatalogItems(organizationId)
     ])
 
     return (
@@ -55,6 +57,7 @@ export default async function InboxPage() {
             botMode={aiSettings.bot_mode}
             allowLeadExtractionDuringOperator={aiSettings.allow_lead_extraction_during_operator}
             requiredIntakeFields={requiredIntakeFields}
+            serviceCatalogNames={serviceCatalogItems.map((item) => item.name)}
             isReadOnly={orgContext?.readOnlyTenantMode ?? false}
         />
     )

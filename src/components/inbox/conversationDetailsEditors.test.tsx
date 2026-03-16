@@ -27,6 +27,29 @@ describe('conversation details editors', () => {
     expect(markup).not.toContain('No tags')
   })
 
+  it('keeps an empty private note collapsed until add mode is opened', () => {
+    const markup = renderToStaticMarkup(
+      <ConversationPrivateNoteEditor
+        note=""
+        knownPrivateNoteUpdatedAt={null}
+        isReadOnly={false}
+        labels={{
+          placeholder: 'Add internal context for your team...',
+          add: 'Add note',
+          cancel: 'Cancel',
+          save: 'Save note',
+          requestFailed: 'Save failed.',
+          staleConflict: 'This note changed in another session.',
+        }}
+        onSave={async () => ({ ok: true })}
+      />
+    )
+
+    expect(markup).toContain('Add note')
+    expect(markup).not.toContain('<textarea')
+    expect(markup).not.toContain('Add internal context for your team...')
+  })
+
   it('renders shared note metadata', () => {
     const updatedByText = 'Ayşe'
     const updatedAtText = '16 Mar 2026 12:24'
@@ -39,6 +62,8 @@ describe('conversation details editors', () => {
         isReadOnly={false}
         labels={{
           placeholder: 'Add internal context for your team...',
+          add: 'Add note',
+          cancel: 'Cancel',
           save: 'Save note',
           requestFailed: 'Save failed.',
           staleConflict: 'This note changed in another session.',

@@ -7,6 +7,8 @@ type ConversationPrivateNoteEditorResult =
   | { ok: false; reason: 'stale_conflict' | 'validation' | 'request_failed' }
 
 interface ConversationPrivateNoteEditorLabels {
+  add: string
+  cancel: string
   placeholder: string
   save: string
   requestFailed: string
@@ -35,8 +37,10 @@ export function ConversationPrivateNoteEditor({
   labels,
   onSave,
 }: ConversationPrivateNoteEditorProps) {
+  const hasPersistedNote = note.trim().length > 0
   const [draft, setDraft] = useState(note)
   const [knownUpdatedAt, setKnownUpdatedAt] = useState<string | null>(knownPrivateNoteUpdatedAt)
+  const [isExpanded, setIsExpanded] = useState(hasPersistedNote)
   const [isSaving, setIsSaving] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -45,6 +49,7 @@ export function ConversationPrivateNoteEditor({
     (nextNote: string, nextKnownUpdatedAt: string | null) => {
       setDraft(nextNote)
       setKnownUpdatedAt(nextKnownUpdatedAt)
+      setIsExpanded(nextNote.trim().length > 0)
       setErrorMessage(null)
     }
   )
@@ -74,6 +79,30 @@ export function ConversationPrivateNoteEditor({
     setIsDirty(false)
   }
 
+  const handleCollapse = () => {
+    setDraft(note)
+    setKnownUpdatedAt(knownPrivateNoteUpdatedAt)
+    setIsDirty(false)
+    setErrorMessage(null)
+    setIsExpanded(false)
+  }
+
+  if (!isExpanded && !hasPersistedNote) {
+    if (isReadOnly) {
+      return null
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => setIsExpanded(true)}
+        className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
+      >
+        {labels.add}
+      </button>
+    )
+  }
+
   return (
     <div className="space-y-2">
       <textarea
@@ -98,16 +127,28 @@ export function ConversationPrivateNoteEditor({
           <span />
         )}
 
-        {!isReadOnly && (
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={isSaving || !isDirty}
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {labels.save}
-          </button>
-        )}
+        {!isReadOnly ? (
+          <div className="flex items-center gap-2">
+            {!hasPersistedNote && (
+              <button
+                type="button"
+                onClick={handleCollapse}
+                disabled={isSaving}
+                className="text-xs font-semibold text-gray-500 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {labels.cancel}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving || !isDirty}
+              className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {labels.save}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {errorMessage && <p className="text-xs text-red-600">{errorMessage}</p>}

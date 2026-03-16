@@ -69,6 +69,7 @@ import {
   sendConversationInstagramImageBatch,
   sendConversationWhatsAppTemplateMessage,
   setConversationRequiredIntakeOverride,
+  setConversationLeadServiceOverride,
   setConversationAgent,
   setConversationAiProcessingPaused,
   updateConversationPrivateNote,
@@ -1105,6 +1106,21 @@ function createLeadUpdateBuilder(updatedLead: Lead | null) {
   }
 }
 
+function createServiceCatalogReadBuilder(items: Array<{ name: string }> = []) {
+  const eqActiveMock = vi.fn(async () => ({
+    data: items,
+    error: null,
+  }))
+  const eqOrgMock = vi.fn(() => ({ eq: eqActiveMock }))
+  const selectMock = vi.fn(() => ({ eq: eqOrgMock }))
+
+  return {
+    builder: {
+      select: selectMock,
+    },
+  }
+}
+
 function createConversationReadBuilder(conversation: Record<string, unknown> | null) {
   const maybeSingleMock = vi.fn(async () => ({
     data: conversation,
@@ -1307,6 +1323,69 @@ describe('operator workflow actions', () => {
           required_intake_override_meta: {
             butce: expect.any(Object),
           },
+        }),
+      })
+    )
+  })
+
+  it('stores a manual service override selected from the active catalog', async () => {
+    const existingLead = createLead({
+      extracted_fields: {
+        services: ['Yenidoğan çekimi'],
+      },
+    })
+    const updatedLead = createLead({
+      service_type: 'Hamile çekimi',
+      updated_at: '2026-03-16T10:05:00.000Z',
+      extracted_fields: {
+        services: ['Yenidoğan çekimi'],
+        service_override: 'Hamile çekimi',
+        service_override_meta: {
+          updated_at: '2026-03-16T10:05:00.000Z',
+          updated_by: 'profile-1',
+          source: 'manual',
+        },
+      },
+    })
+    const leadRead = createLeadReadBuilder(existingLead)
+    const catalogRead = createServiceCatalogReadBuilder([
+      { name: 'Yenidoğan çekimi' },
+      { name: 'Hamile çekimi' },
+    ])
+    const leadUpdate = createLeadUpdateBuilder(updatedLead)
+    const leadBuilders = [leadRead.builder, leadUpdate.builder]
+
+    createClientMock.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'leads') {
+          const next = leadBuilders.shift()
+          if (!next) throw new Error('Unexpected extra leads query')
+          return next
+        }
+        if (table === 'service_catalog') {
+          return catalogRead.builder
+        }
+        throw new Error(`Unexpected table: ${table}`)
+      }),
+    })
+
+    const result = await setConversationLeadServiceOverride({
+      conversationId: 'conv-1',
+      organizationId: 'org-1',
+      service: 'Hamile çekimi',
+      knownLeadUpdatedAt: '2026-03-15T10:00:00.000Z',
+    })
+
+    expect(result).toEqual({ ok: true, lead: updatedLead })
+    expect(leadUpdate.updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service_type: 'Hamile çekimi',
+        extracted_fields: expect.objectContaining({
+          service_override: 'Hamile çekimi',
+          service_override_meta: expect.objectContaining({
+            updated_by: 'profile-1',
+            source: 'manual',
+          }),
         }),
       })
     )

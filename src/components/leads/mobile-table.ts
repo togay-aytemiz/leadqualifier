@@ -1,4 +1,5 @@
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
+import { resolveLeadService } from '@/lib/leads/service'
 
 export const MOBILE_SUMMARY_MAX_CHARS = 88
 export const MOBILE_REQUIRED_FIELDS_MAX = 2
@@ -44,11 +45,15 @@ export function getLeadRequiredFieldHints(
 ): MobileRequiredFieldHint[] {
     const extracted = asExtractedFields(lead.extracted_fields)
     if (!extracted) return []
+    const resolvedLeadService = resolveLeadService({
+        service_type: lead.service_type ?? null,
+        extracted_fields: lead.extracted_fields
+    })
 
     const resolved = resolveCollectedRequiredIntake({
         requiredFields,
         extractedFields: extracted,
-        serviceType: lead.service_type ?? null
+        serviceType: resolvedLeadService.value
     })
     const resolvedMap = new Map(resolved.map((item) => [item.field, item.value]))
 

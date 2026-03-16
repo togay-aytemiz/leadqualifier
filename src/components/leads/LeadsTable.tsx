@@ -12,6 +12,7 @@ import { useLocale } from 'next-intl'
 import * as Popover from '@radix-ui/react-popover'
 import { useState } from 'react'
 import { getConversationPlatformIconSrc } from '@/lib/channels/platform-icons'
+import { resolveLeadServiceNames } from '@/lib/leads/service'
 import {
     getLeadRequiredFieldValue,
     getMobileRequiredFieldHints,
@@ -35,40 +36,11 @@ const statusVariants: Record<string, 'error' | 'warning' | 'neutral'> = {
     cold: 'neutral'
 }
 
-function normalizeServiceName(value: unknown): string | null {
-    if (typeof value !== 'string') return null
-    const normalized = value.trim()
-    return normalized || null
-}
-
 function getLeadServiceNames(lead: LeadWithConversation): string[] {
-    const extractedFields = lead.extracted_fields
-    const extractedServices = (
-        extractedFields
-        && typeof extractedFields === 'object'
-        && !Array.isArray(extractedFields)
-        && Array.isArray((extractedFields as Record<string, unknown>).services)
-            ? (extractedFields as Record<string, unknown>).services as unknown[]
-            : []
-    )
-        .map((service) => normalizeServiceName(service))
-        .filter((service): service is string => Boolean(service))
-
-    const fallbackService = normalizeServiceName(lead.service_type)
-    const combinedServices = fallbackService
-        ? [...extractedServices, fallbackService]
-        : extractedServices
-
-    const dedupedServices: string[] = []
-    const seen = new Set<string>()
-    for (const service of combinedServices) {
-        const normalizedKey = service.toLocaleLowerCase()
-        if (seen.has(normalizedKey)) continue
-        seen.add(normalizedKey)
-        dedupedServices.push(service)
-    }
-
-    return dedupedServices
+    return resolveLeadServiceNames({
+        service_type: lead.service_type,
+        extracted_fields: lead.extracted_fields
+    })
 }
 
 // Summary Cell Component with Hover Popover

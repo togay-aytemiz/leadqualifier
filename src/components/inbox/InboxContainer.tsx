@@ -13,7 +13,6 @@ import {
   Trash2,
   MoreHorizontal,
   LogOut,
-  Send,
   RotateCw,
   ArrowLeft,
   ArrowDown,
@@ -24,10 +23,11 @@ import {
   Eye,
 } from 'lucide-react'
 import { FaArrowTurnDown, FaArrowTurnUp } from 'react-icons/fa6'
-import { HiMiniSparkles, HiOutlineDocumentText } from 'react-icons/hi2'
+import { HiMiniSparkles } from 'react-icons/hi2'
 import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
   clearConversationRequiredIntakeOverride,
+  clearConversationLeadServiceOverride,
   getMessagesPage,
   prepareConversationInstagramImageUploads,
   sendMessage,
@@ -43,6 +43,7 @@ import {
   getConversationLead,
   getLeadScoreReasoning,
   refreshConversationLead,
+  setConversationLeadServiceOverride,
   setConversationRequiredIntakeOverride,
   setConversationAiProcessingPaused,
   updateConversationPrivateNote,
@@ -129,15 +130,19 @@ import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 import { extractSocialContactAvatarUrl } from '@/lib/inbox/contact-avatar'
 import { mergeConversationTags, splitConversationTags } from '@/lib/inbox/conversation-tags'
+import { resolveLeadService } from '@/lib/leads/service'
 import { KualiaAvatar } from '@/components/inbox/KualiaAvatar'
 import {
   resolveMessageSenderIdentity,
   type InboxSenderProfile,
 } from '@/components/inbox/message-sender'
 import { ImportantInfoEditor } from '@/components/inbox/ImportantInfoEditor'
-import { ImportantInfoSummary } from '@/components/inbox/ImportantInfoSummary'
 import { ConversationTagsEditor } from '@/components/inbox/ConversationTagsEditor'
 import { ConversationPrivateNoteEditor } from '@/components/inbox/ConversationPrivateNoteEditor'
+import { LeadServiceEditor } from '@/components/inbox/LeadServiceEditor'
+import { InboxDetailsSection } from '@/components/inbox/InboxDetailsSection'
+import { InboxComposerActionBar } from '@/components/inbox/InboxComposerActionBar'
+import { LeadRequiredInfoBlock } from '@/components/inbox/LeadRequiredInfoBlock'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -150,6 +155,7 @@ interface InboxContainerProps {
   botMode?: AiBotMode
   allowLeadExtractionDuringOperator?: boolean
   requiredIntakeFields?: string[]
+  serviceCatalogNames?: string[]
   isReadOnly?: boolean
 }
 
@@ -160,6 +166,8 @@ const SUMMARY_PANEL_ID = 'conversation-summary-panel'
 const INBOX_MEDIA_BUCKET = 'whatsapp-media'
 const MESSAGES_PAGE_SIZE = 50
 const MESSAGE_HISTORY_TOP_THRESHOLD = 96
+const MOBILE_DETAILS_SECTION_SPACING_CLASSNAME = 'mt-4 border-t border-gray-100 pt-4'
+const DESKTOP_DETAILS_SECTION_SPACING_CLASSNAME = 'mt-6 border-t border-gray-100 pt-6'
 const WHATSAPP_UPLOAD_ACCEPT = [
   'image/jpeg',
   'image/jpg',
@@ -187,6 +195,19 @@ type PendingAttachment = {
   sizeBytes: number
   mediaType: WhatsAppOutboundMediaType
   previewUrl: string | null
+}
+
+type DetailsSectionKey =
+  | 'conversationInfo'
+  | 'lead'
+  | 'tags'
+  | 'privateNote'
+
+const DEFAULT_DETAILS_SECTION_STATE: Record<DetailsSectionKey, boolean> = {
+  conversationInfo: true,
+  lead: true,
+  tags: true,
+  privateNote: true,
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -247,6 +268,7 @@ export function InboxContainer({
   botMode,
   allowLeadExtractionDuringOperator,
   requiredIntakeFields = [],
+  serviceCatalogNames = [],
   isReadOnly = false,
 }: InboxContainerProps) {
   const t = useTranslations('inbox')
@@ -301,6 +323,9 @@ export function InboxContainer({
   const [loadingMore, setLoadingMore] = useState(false)
   const [isDetailsMenuOpen, setIsDetailsMenuOpen] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
+  const [detailsSectionState, setDetailsSectionState] = useState(
+    DEFAULT_DETAILS_SECTION_STATE
+  )
   const [currentUserProfile, setCurrentUserProfile] = useState<ProfileLite | null>(null)
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, isLoading: false })
   const [isMobileConversationOpen, setIsMobileConversationOpen] = useState(false)
@@ -347,6 +372,12 @@ export function InboxContainer({
   const optimisticPreviewUrlsRef = useRef<Set<string>>(new Set())
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const toggleDetailsSection = useCallback((section: DetailsSectionKey) => {
+    setDetailsSectionState((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }, [])
   const leadStatusLabels: Record<string, string> = {
     hot: t('leadStatusHot'),
     warm: t('leadStatusWarm'),
@@ -358,10 +389,14 @@ export function InboxContainer({
     !Array.isArray(lead.extracted_fields)
       ? (lead.extracted_fields as Record<string, unknown>)
       : {}
+  const resolvedLeadService = resolveLeadService({
+    service_type: lead?.service_type,
+    extracted_fields: lead?.extracted_fields,
+  })
   const collectedRequiredIntake = resolveCollectedRequiredIntake({
     requiredFields: requiredIntakeFields,
     extractedFields: leadExtractedFields,
-    serviceType: lead?.service_type,
+    serviceType: resolvedLeadService.value,
     includeEmpty: true,
   })
 
@@ -1497,6 +1532,63 @@ export function InboxContainer({
     [organizationId, selectedId]
   )
 
+  const handleSaveLeadService = useCallback(
+    async (input: { service: string; knownLeadUpdatedAt: string | null }) => {
+      if (!selectedId) return { ok: false as const, reason: 'request_failed' as const }
+
+      try {
+        const result = await setConversationLeadServiceOverride({
+          conversationId: selectedId,
+          organizationId,
+          service: input.service,
+          knownLeadUpdatedAt: input.knownLeadUpdatedAt,
+        })
+
+        if (!result.ok) {
+          return result
+        }
+
+        setLead(result.lead)
+        setConversations((previous) =>
+          applyLeadStatusToConversationList(previous, selectedId, result.lead.status)
+        )
+        return { ok: true as const }
+      } catch (error) {
+        console.error('Failed to save lead service override', error)
+        return { ok: false as const, reason: 'request_failed' as const }
+      }
+    },
+    [organizationId, selectedId]
+  )
+
+  const handleReturnLeadServiceToAi = useCallback(
+    async (input: { knownLeadUpdatedAt: string | null }) => {
+      if (!selectedId) return { ok: false as const, reason: 'request_failed' as const }
+
+      try {
+        const result = await clearConversationLeadServiceOverride({
+          conversationId: selectedId,
+          organizationId,
+          knownLeadUpdatedAt: input.knownLeadUpdatedAt,
+        })
+
+        if (!result.ok) {
+          return result
+        }
+
+        setLead(result.lead)
+        setConversations((previous) =>
+          applyLeadStatusToConversationList(previous, selectedId, result.lead.status)
+        )
+        return { ok: true as const }
+      } catch (error) {
+        console.error('Failed to clear lead service override', error)
+        return { ok: false as const, reason: 'request_failed' as const }
+      }
+    },
+    [organizationId, selectedId]
+  )
+
   const handleSaveConversationTags = useCallback(
     async (userTags: string[]) => {
       if (!selectedId) return { ok: false as const, reason: 'request_failed' as const }
@@ -2298,6 +2390,18 @@ export function InboxContainer({
     empty: t('leadRequiredInfoEmpty'),
     missing: t('leadRequiredInfoMissing'),
   }
+  const leadServiceEditorLabels = {
+    empty: t('leadUnknown'),
+    edit: t('leadServiceEdit'),
+    save: t('leadServiceSave'),
+    cancel: t('cancel'),
+    selectPlaceholder: t('leadServiceSelectPlaceholder'),
+    returnToAi: t('leadRequiredInfoReturnToAi'),
+    noCatalog: t('leadServiceNoCatalog'),
+    requestFailed: t('leadServiceSaveError'),
+    staleConflict: t('leadServiceConflict'),
+    validation: t('leadServiceValidation'),
+  }
   const tagEditorLabels = {
     noTags: t('noTags'),
     add: t('addTag'),
@@ -2308,6 +2412,8 @@ export function InboxContainer({
     requestFailed: t('tagSaveError'),
   }
   const privateNoteLabels = {
+    add: t('privateNoteAdd'),
+    cancel: t('cancel'),
     placeholder: t('privateNotePlaceholder'),
     save: t('privateNoteSave'),
     requestFailed: t('privateNoteSaveError'),
@@ -2696,25 +2802,15 @@ export function InboxContainer({
       </div>
     )
 
-    if (isMobileVariant) {
-      return (
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
-          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wide text-gray-900">
-            {t('keyInfo')}
-          </h4>
-          {rows}
-        </div>
-      )
-    }
-
     return (
-      <>
-        <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-4">
-          {t('keyInfo')}
-        </h4>
+      <InboxDetailsSection
+        title={t('keyInfo')}
+        isExpanded={detailsSectionState.conversationInfo}
+        onToggle={() => toggleDetailsSection('conversationInfo')}
+        className={isMobileVariant ? 'rounded-lg border border-gray-200 bg-white px-3 py-3' : ''}
+      >
         {rows}
-        <hr className="border-gray-100/60 my-6" />
-      </>
+      </InboxDetailsSection>
     )
   }
 
@@ -2924,245 +3020,278 @@ export function InboxContainer({
                   mobileDetailsPanelClasses
                 )}
               >
-                <div className="max-h-[54vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white px-3 py-3 shadow-lg">
-                  {showConversationSkeleton ? (
-                    <div className="space-y-3">
-                      <div className="mb-3 flex items-center gap-3">
-                        <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-                        <div className="w-full space-y-2">
-                          <Skeleton className="h-4 w-28" />
-                          <Skeleton className="h-3 w-24" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Skeleton className="h-16 w-full rounded-lg" />
-                        <Skeleton className="h-16 w-full rounded-lg" />
-                      </div>
-                      <Skeleton className="h-20 w-full rounded-lg" />
-                      <Skeleton className="h-24 w-full rounded-lg" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="mb-3 flex items-center gap-3">
-                        <Avatar
-                          name={selectedConversationDisplayName}
-                          src={selectedConversationAvatarUrl}
-                          size="sm"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {selectedConversationDisplayName}
-                            </p>
-                            {isSelectedConversationInstagramRequest && (
-                              <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
-                                {t('instagramRequestBadge')}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            {selectedConversation.contact_phone || t('noPhoneNumber')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="my-3 h-px bg-gray-100" />
-
-                      {renderConversationKeyInfoSection('mobile')}
-
-                      {!conversationAiPaused && (
-                        <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-900">
-                                {t('leadTitle')}
-                              </h4>
-                              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-500">
-                                {t('leadAiExtraction')}
-                              </span>
+                <div className="max-h-[60vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
+                  <div className="flex max-h-[60vh] flex-col">
+                    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                      {showConversationSkeleton ? (
+                        <div className="space-y-3">
+                          <div className="mb-3 flex items-center gap-3">
+                            <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+                            <div className="w-full space-y-2">
+                              <Skeleton className="h-4 w-28" />
+                              <Skeleton className="h-3 w-24" />
                             </div>
-                            {isLeadUpdating && (
-                              <span className="text-xs font-semibold text-emerald-600">
-                                {t('leadUpdating')}
-                              </span>
-                            )}
                           </div>
-
-                          {leadExtractionPaused && (
-                            <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                              <div className="space-y-1">
-                                <p className="text-xs font-semibold text-amber-900">
-                                  {t('leadPausedTitle')}
+                          <div className="grid grid-cols-2 gap-3">
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                          </div>
+                          <Skeleton className="h-20 w-full rounded-lg" />
+                          <Skeleton className="h-24 w-full rounded-lg" />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mb-3 flex items-center gap-3">
+                            <Avatar
+                              name={selectedConversationDisplayName}
+                              src={selectedConversationAvatarUrl}
+                              size="sm"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {selectedConversationDisplayName}
                                 </p>
-                                <p className="text-xs text-amber-800">{pauseReasonText}</p>
-                                {leadRefreshStatus === 'error' && (
-                                  <p className="text-xs text-red-600">{leadRefreshMessage}</p>
-                                )}
-                                {leadRefreshStatus === 'success' && (
-                                  <p className="text-xs text-green-700">
-                                    {t('leadRefreshSuccess')}
-                                  </p>
+                                {isSelectedConversationInstagramRequest && (
+                                  <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-indigo-700">
+                                    {t('instagramRequestBadge')}
+                                  </span>
                                 )}
                               </div>
-                              <button
-                                type="button"
-                                onClick={handleRefreshLead}
-                                disabled={leadRefreshStatus === 'loading' || conversationAiPaused}
-                                className={cn(
-                                  'shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100',
-                                  (leadRefreshStatus === 'loading' || conversationAiPaused) &&
-                                    'cursor-not-allowed opacity-60'
-                                )}
-                              >
-                                {leadRefreshStatus === 'loading'
-                                  ? t('leadRefreshLoading')
-                                  : t('leadRefresh')}
-                              </button>
+                              <p className="text-xs text-gray-500">
+                                {selectedConversation.contact_phone || t('noPhoneNumber')}
+                              </p>
                             </div>
-                          )}
+                          </div>
+                          <div className="my-3 h-px bg-gray-100" />
 
-                          {lead ? (
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-[92px_1fr] items-start gap-3">
-                                <span className="pt-0.5 text-xs text-gray-500">
-                                  {t('leadStatus')}
-                                </span>
-                                <div className="flex items-center gap-2 text-sm text-gray-900">
-                                  <span
-                                    className={cn(
-                                      'h-2 w-2 rounded-full',
-                                      lead.status === 'hot'
-                                        ? 'bg-red-500'
-                                        : lead.status === 'warm'
-                                          ? 'bg-amber-500'
-                                          : 'bg-gray-400'
-                                    )}
-                                  />
-                                  <span>{leadStatusLabels[lead.status] ?? lead.status}</span>
-                                </div>
-                              </div>
+                          {renderConversationKeyInfoSection('mobile')}
 
-                              <div className="grid grid-cols-[92px_1fr] items-start gap-3">
-                                <span className="pt-0.5 text-xs text-gray-500">
-                                  {t('leadScore')}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-900">{lead.total_score}</span>
-                                  <button
-                                    type="button"
-                                    onClick={handleOpenScoreReason}
-                                    disabled={scoreReasonStatus === 'loading'}
-                                    className={cn(
-                                      'text-xs font-medium text-blue-600 hover:text-blue-700',
-                                      scoreReasonStatus === 'loading' &&
-                                        'cursor-not-allowed opacity-60'
-                                    )}
-                                  >
-                                    {t('scoreReason')}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-[92px_1fr] items-start gap-3">
-                                <span className="pt-0.5 text-xs text-gray-500">
-                                  {t('leadService')}
-                                </span>
-                                <span className="text-sm text-gray-900">
-                                  {lead.service_type || t('leadUnknown')}
-                                </span>
-                              </div>
-
-                              {lead.summary && (
-                                <div className="grid grid-cols-[92px_1fr] items-start gap-3">
-                                  <span className="pt-0.5 text-xs text-gray-500">
-                                    {t('leadSummary')}
+                          {!conversationAiPaused && (
+                            <div className={MOBILE_DETAILS_SECTION_SPACING_CLASSNAME}>
+                              <InboxDetailsSection
+                                title={t('leadTitle')}
+                                isExpanded={detailsSectionState.lead}
+                                onToggle={() => toggleDetailsSection('lead')}
+                                titleAdornment={
+                                  <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-500">
+                                    {t('leadAiExtraction')}
                                   </span>
-                                  <span className="whitespace-pre-wrap text-sm text-gray-900">
-                                    {lead.summary}
-                                  </span>
-                                </div>
-                              )}
+                                }
+                                headerAction={
+                                  isLeadUpdating ? (
+                                    <span className="text-xs font-semibold text-emerald-600">
+                                      {t('leadUpdating')}
+                                    </span>
+                                  ) : null
+                                }
+                              >
+                                {leadExtractionPaused && (
+                                  <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-semibold text-amber-900">
+                                        {t('leadPausedTitle')}
+                                      </p>
+                                      <p className="text-xs text-amber-800">{pauseReasonText}</p>
+                                      {leadRefreshStatus === 'error' && (
+                                        <p className="text-xs text-red-600">
+                                          {leadRefreshMessage}
+                                        </p>
+                                      )}
+                                      {leadRefreshStatus === 'success' && (
+                                        <p className="text-xs text-green-700">
+                                          {t('leadRefreshSuccess')}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleRefreshLead}
+                                      disabled={
+                                        leadRefreshStatus === 'loading' || conversationAiPaused
+                                      }
+                                      className={cn(
+                                        'shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100',
+                                        (leadRefreshStatus === 'loading' ||
+                                          conversationAiPaused) &&
+                                          'cursor-not-allowed opacity-60'
+                                      )}
+                                    >
+                                      {leadRefreshStatus === 'loading'
+                                        ? t('leadRefreshLoading')
+                                        : t('leadRefresh')}
+                                    </button>
+                                  </div>
+                                )}
 
-                              {requiredIntakeFields.length > 0 && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50/40 px-3 py-3">
-                                  <div className="mb-2 flex items-center justify-between gap-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                      {t('leadRequiredInfo')}
-                                    </p>
-                                    {!isReadOnly && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setIsImportantInfoModalOpen(true)}
-                                        className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
-                                      >
-                                        {t('leadRequiredInfoEdit')}
-                                      </button>
+                                {lead ? (
+                                  <div className="space-y-3">
+                                    <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                      <span className="pt-0.5 text-xs text-gray-500">
+                                        {t('leadStatus')}
+                                      </span>
+                                      <div className="flex items-center gap-2 text-sm text-gray-900">
+                                        <span
+                                          className={cn(
+                                            'h-2 w-2 rounded-full',
+                                            lead.status === 'hot'
+                                              ? 'bg-red-500'
+                                              : lead.status === 'warm'
+                                                ? 'bg-amber-500'
+                                                : 'bg-gray-400'
+                                          )}
+                                        />
+                                        <span>{leadStatusLabels[lead.status] ?? lead.status}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                      <span className="pt-0.5 text-xs text-gray-500">
+                                        {t('leadScore')}
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-900">
+                                          {lead.total_score}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={handleOpenScoreReason}
+                                          disabled={scoreReasonStatus === 'loading'}
+                                          className={cn(
+                                            'text-xs font-medium text-blue-600 hover:text-blue-700',
+                                            scoreReasonStatus === 'loading' &&
+                                              'cursor-not-allowed opacity-60'
+                                          )}
+                                        >
+                                          {t('scoreReason')}
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                      <span className="pt-0.5 text-xs text-gray-500">
+                                        {t('leadService')}
+                                      </span>
+                                      <LeadServiceEditor
+                                        currentService={resolvedLeadService.value}
+                                        currentSource={resolvedLeadService.source}
+                                        catalogServices={serviceCatalogNames}
+                                        knownLeadUpdatedAt={lead.updated_at}
+                                        isReadOnly={isReadOnly}
+                                        labels={leadServiceEditorLabels}
+                                        onSave={handleSaveLeadService}
+                                        onReturnToAi={handleReturnLeadServiceToAi}
+                                      />
+                                    </div>
+
+                                    {requiredIntakeFields.length > 0 && (
+                                      <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                        <span className="pt-0.5 text-xs text-gray-500">
+                                          {t('leadRequiredInfo')}
+                                        </span>
+                                        <LeadRequiredInfoBlock
+                                          editLabel={!isReadOnly ? t('leadRequiredInfoEdit') : undefined}
+                                          onEdit={
+                                            !isReadOnly
+                                              ? () => setIsImportantInfoModalOpen(true)
+                                              : undefined
+                                          }
+                                          items={collectedRequiredIntake}
+                                          labels={importantInfoSummaryLabels}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {lead.summary && (
+                                      <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                        <span className="pt-0.5 text-xs text-gray-500">
+                                          {t('leadSummary')}
+                                        </span>
+                                        <span className="whitespace-pre-wrap text-sm text-gray-900">
+                                          {lead.summary}
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    {lead.updated_at && (
+                                      <div className="grid grid-cols-[92px_1fr] items-start gap-3">
+                                        <span className="pt-0.5 text-xs text-gray-500">
+                                          {t('leadUpdated')}
+                                        </span>
+                                        <span className="text-sm text-gray-900">
+                                          {format(new Date(lead.updated_at), 'PP p', {
+                                            locale: dateLocale,
+                                          })}
+                                        </span>
+                                      </div>
                                     )}
                                   </div>
-                                  <ImportantInfoSummary
-                                    items={collectedRequiredIntake}
-                                    labels={importantInfoSummaryLabels}
-                                  />
-                                </div>
-                              )}
-
-                              {lead.updated_at && (
-                                <div className="grid grid-cols-[92px_1fr] items-start gap-3">
-                                  <span className="pt-0.5 text-xs text-gray-500">
-                                    {t('leadUpdated')}
-                                  </span>
-                                  <span className="text-sm text-gray-900">
-                                    {format(new Date(lead.updated_at), 'PP p', {
-                                      locale: dateLocale,
-                                    })}
-                                  </span>
-                                </div>
-                              )}
+                                ) : (
+                                  <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
+                                )}
+                              </InboxDetailsSection>
                             </div>
-                          ) : (
-                            <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
                           )}
-                        </div>
+
+                          <div className={MOBILE_DETAILS_SECTION_SPACING_CLASSNAME}>
+                            <InboxDetailsSection
+                              title={t('tags')}
+                              isExpanded={detailsSectionState.tags}
+                              onToggle={() => toggleDetailsSection('tags')}
+                            >
+                              <ConversationTagsEditor
+                                key={`mobile-tags-${selectedId ?? 'none'}`}
+                                tags={editableConversationTags}
+                                isReadOnly={isReadOnly}
+                                labels={tagEditorLabels}
+                                onSave={handleSaveConversationTags}
+                              />
+                            </InboxDetailsSection>
+                          </div>
+
+                          <div className={MOBILE_DETAILS_SECTION_SPACING_CLASSNAME}>
+                            <InboxDetailsSection
+                              title={t('privateNote')}
+                              isExpanded={detailsSectionState.privateNote}
+                              onToggle={() => toggleDetailsSection('privateNote')}
+                            >
+                              <ConversationPrivateNoteEditor
+                                key={`mobile-note-${selectedId ?? 'none'}`}
+                                note={selectedConversationPrivateNote}
+                                knownPrivateNoteUpdatedAt={selectedConversationPrivateNoteUpdatedAt}
+                                updatedByText={privateNoteUpdatedByLabel}
+                                updatedAtText={privateNoteUpdatedAtText}
+                                isReadOnly={isReadOnly}
+                                labels={privateNoteLabels}
+                                onSave={handleSaveConversationPrivateNote}
+                              />
+                            </InboxDetailsSection>
+                          </div>
+                        </>
                       )}
+                    </div>
 
-                      <div className="mt-4 border-t border-gray-100 pt-4">
-                        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-900">
-                          {t('tags')}
-                        </h4>
-                        <ConversationTagsEditor
-                          key={`mobile-tags-${selectedId ?? 'none'}`}
-                          tags={editableConversationTags}
-                          isReadOnly={isReadOnly}
-                          labels={tagEditorLabels}
-                          onSave={handleSaveConversationTags}
-                        />
+                    {!showConversationSkeleton && activeAgent === 'operator' && (
+                      <div className="shrink-0 border-t border-gray-100 bg-white px-3 py-3 shadow-[0_-10px_24px_-18px_rgba(15,23,42,0.28)]">
+                        <button
+                          onClick={handleLeaveConversation}
+                          disabled={isLeaving || isReadOnly}
+                          className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isLeaving ? t('leaving') : t('leaveConversation')}
+                        </button>
                       </div>
-
-                      <div className="mt-4">
-                        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-900">
-                          {t('privateNote')}
-                        </h4>
-                        <ConversationPrivateNoteEditor
-                          key={`mobile-note-${selectedId ?? 'none'}`}
-                          note={selectedConversationPrivateNote}
-                          knownPrivateNoteUpdatedAt={selectedConversationPrivateNoteUpdatedAt}
-                          updatedByText={privateNoteUpdatedByLabel}
-                          updatedAtText={privateNoteUpdatedAtText}
-                          isReadOnly={isReadOnly}
-                          labels={privateNoteLabels}
-                          onSave={handleSaveConversationPrivateNote}
-                        />
-                      </div>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {!showConversationSkeleton && activeAgent === 'operator' && (
-                <div className="border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
+              {!showConversationSkeleton && activeAgent === 'operator' && !isMobileDetailsOpen && (
+                <div className="border-b border-gray-200 bg-white/95 px-4 py-3 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.4)] backdrop-blur lg:hidden">
                   <button
                     onClick={handleLeaveConversation}
                     disabled={isLeaving || isReadOnly}
-                    className="w-full rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isLeaving ? t('leaving') : t('leaveConversation')}
                   </button>
@@ -3848,7 +3977,7 @@ export function InboxContainer({
                 )}
 
                 <div className="space-y-2">
-                  <div className="flex min-w-0 items-end gap-2 lg:gap-3">
+                  <div className="flex min-w-0 items-stretch gap-2 lg:gap-3">
                     <div className="relative min-w-0 flex-1">
                       <input
                         ref={attachmentInputRef}
@@ -3930,7 +4059,7 @@ export function InboxContainer({
                           </div>
                         )}
                         <div
-                          className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}
+                          className={`rounded-2xl border border-gray-200 bg-gray-50/60 px-3 shadow-sm transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 ${isWhatsAppMissingInbound ? 'opacity-60' : ''}`}
                         >
                           <div className="flex min-w-0 items-center gap-2">
                             {isWhatsAppConversation && (
@@ -3949,7 +4078,7 @@ export function InboxContainer({
                               disabled={isAttachmentPickerDisabled}
                               className="disabled:cursor-not-allowed disabled:opacity-50"
                             />
-                            <div className="h-6 w-px bg-gray-200 mx-1" />
+                            <div className="mx-1 h-5 w-px shrink-0 bg-gray-200" />
                             <textarea
                               value={input}
                               onChange={(e) => setInput(e.target.value)}
@@ -3962,43 +4091,26 @@ export function InboxContainer({
                                 }
                               }}
                               rows={1}
-                              className="h-6 min-h-[24px] max-h-[24px] min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-sm leading-6 text-gray-900 placeholder-gray-400 focus:outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                              className="h-11 min-h-[44px] max-h-[44px] min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-[11px] text-sm leading-5 text-gray-900 placeholder-gray-400 focus:outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                               placeholder={inputPlaceholder}
                             />
-                            <div className="h-6 w-px bg-gray-200" />
-                            <button
-                              type="button"
-                              onClick={() => setIsTemplatePickerModalOpen(true)}
-                              disabled={isTemplatePickerDisabled}
-                              title={t('templatePickerAction')}
-                              aria-label={t('templatePickerAction')}
-                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <HiOutlineDocumentText size={15} />
-                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!canSend}
-                      aria-label={isSending ? t('composerAttachments.sending') : t('sendButton')}
-                      title={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
-                      className={`inline-flex h-11 w-11 shrink-0 self-end items-center justify-center rounded-xl px-0 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                        canSend
-                          ? 'bg-blue-500 text-white hover:bg-blue-600'
-                          : 'bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700'
-                      }`}
-                    >
-                      <span className="inline-flex items-center justify-center">
-                        {isSending ? (
-                          <Loader2 size={18} className="animate-spin" />
-                        ) : (
-                          <Send size={18} />
-                        )}
-                      </span>
-                    </button>
+                    <InboxComposerActionBar
+                      templateLabel={t('templatePickerAction')}
+                      sendLabel={t('sendButton')}
+                      isTemplateDisabled={isTemplatePickerDisabled}
+                      isSendDisabled={!canSend}
+                      isSending={isSending}
+                      onTemplateClick={() => setIsTemplatePickerModalOpen(true)}
+                      onSendClick={handleSendMessage}
+                      sendAriaLabel={
+                        isSending ? t('composerAttachments.sending') : t('sendButton')
+                      }
+                      sendTitle={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
+                    />
                   </div>
                   {composerErrorMessage && (
                     <p className="text-xs font-medium text-red-600">{composerErrorMessage}</p>
@@ -4042,231 +4154,245 @@ export function InboxContainer({
                   )}
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+              <div className="flex-1 min-h-0 flex flex-col">
                 {showConversationSkeleton ? (
-                  <div className="space-y-6">
-                    <div className="flex flex-col items-center text-center">
-                      <Skeleton className="mb-3 h-16 w-16 rounded-full" />
-                      <Skeleton className="h-5 w-32" />
-                      <Skeleton className="mt-2 h-4 w-24" />
-                    </div>
-                    <hr className="border-gray-100 my-6" />
-                    <div className="space-y-4">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-12 w-full rounded-lg" />
-                      <Skeleton className="h-12 w-full rounded-lg" />
-                      <Skeleton className="h-12 w-full rounded-lg" />
-                    </div>
-                    <hr className="border-gray-100 my-6" />
-                    <div className="space-y-4">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-14 w-full rounded-lg" />
-                      <Skeleton className="h-14 w-full rounded-lg" />
-                      <Skeleton className="h-20 w-full rounded-lg" />
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="space-y-6">
+                      <div className="flex flex-col items-center text-center">
+                        <Skeleton className="mb-3 h-16 w-16 rounded-full" />
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="mt-2 h-4 w-24" />
+                      </div>
+                      <hr className="border-gray-100 my-6" />
+                      <div className="space-y-4">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-12 w-full rounded-lg" />
+                        <Skeleton className="h-12 w-full rounded-lg" />
+                        <Skeleton className="h-12 w-full rounded-lg" />
+                      </div>
+                      <hr className="border-gray-100 my-6" />
+                      <div className="space-y-4">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-14 w-full rounded-lg" />
+                        <Skeleton className="h-14 w-full rounded-lg" />
+                        <Skeleton className="h-20 w-full rounded-lg" />
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div className="flex flex-col items-center text-center">
-                      <Avatar
-                        name={selectedConversationDisplayName}
-                        src={selectedConversationAvatarUrl}
-                        size="lg"
-                        className="mb-3 text-base"
-                      />
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {selectedConversationDisplayName}
-                        </h3>
-                        {isSelectedConversationInstagramRequest && (
-                          <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                            {t('instagramRequestBadge')}
-                          </span>
-                        )}
+                    <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                      <div className="flex flex-col items-center text-center">
+                        <Avatar
+                          name={selectedConversationDisplayName}
+                          src={selectedConversationAvatarUrl}
+                          size="lg"
+                          className="mb-3 text-base"
+                        />
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {selectedConversationDisplayName}
+                          </h3>
+                          {isSelectedConversationInstagramRequest && (
+                            <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                              {t('instagramRequestBadge')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {selectedConversation.contact_phone || t('noPhoneNumber')}
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {selectedConversation.contact_phone || t('noPhoneNumber')}
-                      </p>
-                    </div>
 
-                    <hr className="border-gray-100 my-6" />
+                      <hr className="my-6 border-gray-100" />
 
-                    <div className="flex-1">
                       {renderConversationKeyInfoSection('desktop')}
 
                       {!conversationAiPaused && (
-                        <div className="mt-6">
-                          <div className="mb-4 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-                                {t('leadTitle')}
-                              </h4>
-                              <span className="text-[10px] uppercase tracking-wide text-gray-500 border border-gray-200 bg-gray-50 px-2 py-0.5 rounded-full">
+                        <div className={DESKTOP_DETAILS_SECTION_SPACING_CLASSNAME}>
+                          <InboxDetailsSection
+                            title={t('leadTitle')}
+                            isExpanded={detailsSectionState.lead}
+                            onToggle={() => toggleDetailsSection('lead')}
+                            titleAdornment={
+                              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-500">
                                 {t('leadAiExtraction')}
                               </span>
-                            </div>
-                            {isLeadUpdating && (
-                              <span className="text-xs font-semibold text-emerald-600">
-                                {t('leadUpdating')}
-                              </span>
-                            )}
-                          </div>
-                          {leadExtractionPaused && (
-                            <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 flex items-start justify-between gap-3">
-                              <div className="space-y-1">
-                                <p className="text-xs font-semibold text-amber-900">
-                                  {t('leadPausedTitle')}
-                                </p>
-                                <p className="text-xs text-amber-800">{pauseReasonText}</p>
-                                {leadRefreshStatus === 'error' && (
-                                  <p className="text-xs text-red-600">{leadRefreshMessage}</p>
-                                )}
-                                {leadRefreshStatus === 'success' && (
-                                  <p className="text-xs text-green-700">
-                                    {t('leadRefreshSuccess')}
-                                  </p>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={handleRefreshLead}
-                                disabled={leadRefreshStatus === 'loading' || conversationAiPaused}
-                                className={`shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 transition-colors ${leadRefreshStatus === 'loading' || conversationAiPaused ? 'opacity-60 cursor-not-allowed' : ''}`}
-                              >
-                                {leadRefreshStatus === 'loading'
-                                  ? t('leadRefreshLoading')
-                                  : t('leadRefresh')}
-                              </button>
-                            </div>
-                          )}
-                          {lead ? (
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                <span className="text-sm text-gray-500">{t('leadStatus')}</span>
-                                <div className="flex items-center gap-2 text-sm text-gray-900">
-                                  <span
-                                    className={`h-2 w-2 rounded-full ${
-                                      lead.status === 'hot'
-                                        ? 'bg-red-500'
-                                        : lead.status === 'warm'
-                                          ? 'bg-amber-500'
-                                          : 'bg-gray-400'
-                                    }`}
-                                  />
-                                  <span>{leadStatusLabels[lead.status] ?? lead.status}</span>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                <span className="text-sm text-gray-500">{t('leadScore')}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-900">{lead.total_score}</span>
-                                  <button
-                                    type="button"
-                                    onClick={handleOpenScoreReason}
-                                    disabled={scoreReasonStatus === 'loading'}
-                                    className={`text-xs font-medium text-blue-600 hover:text-blue-700 ${scoreReasonStatus === 'loading' ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                  >
-                                    {t('scoreReason')}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                <span className="text-sm text-gray-500">{t('leadService')}</span>
-                                <span className="text-sm text-gray-900">
-                                  {lead.service_type || t('leadUnknown')}
+                            }
+                            headerAction={
+                              isLeadUpdating ? (
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  {t('leadUpdating')}
                                 </span>
-                              </div>
-                              {lead.summary && (
-                                <div className="grid grid-cols-[100px_1fr] gap-4 items-start">
-                                  <span className="text-sm text-gray-500">{t('leadSummary')}</span>
-                                  <span className="text-sm text-gray-900 whitespace-pre-wrap">
-                                    {lead.summary}
-                                  </span>
-                                </div>
-                              )}
-                              {requiredIntakeFields.length > 0 && (
-                                <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                  <div className="mb-2 flex items-center justify-between gap-3">
-                                    <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">
-                                      {t('leadRequiredInfo')}
+                              ) : null
+                            }
+                          >
+                            {leadExtractionPaused && (
+                              <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold text-amber-900">
+                                    {t('leadPausedTitle')}
+                                  </p>
+                                  <p className="text-xs text-amber-800">{pauseReasonText}</p>
+                                  {leadRefreshStatus === 'error' && (
+                                    <p className="text-xs text-red-600">{leadRefreshMessage}</p>
+                                  )}
+                                  {leadRefreshStatus === 'success' && (
+                                    <p className="text-xs text-green-700">
+                                      {t('leadRefreshSuccess')}
                                     </p>
-                                    {!isReadOnly && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setIsImportantInfoModalOpen(true)}
-                                        className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
-                                      >
-                                        {t('leadRequiredInfoEdit')}
-                                      </button>
-                                    )}
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleRefreshLead}
+                                  disabled={leadRefreshStatus === 'loading' || conversationAiPaused}
+                                  className={`shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 ${leadRefreshStatus === 'loading' || conversationAiPaused ? 'cursor-not-allowed opacity-60' : ''}`}
+                                >
+                                  {leadRefreshStatus === 'loading'
+                                    ? t('leadRefreshLoading')
+                                    : t('leadRefresh')}
+                                </button>
+                              </div>
+                            )}
+
+                            {lead ? (
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                                  <span className="text-sm text-gray-500">{t('leadStatus')}</span>
+                                  <div className="flex items-center gap-2 text-sm text-gray-900">
+                                    <span
+                                      className={`h-2 w-2 rounded-full ${
+                                        lead.status === 'hot'
+                                          ? 'bg-red-500'
+                                          : lead.status === 'warm'
+                                            ? 'bg-amber-500'
+                                            : 'bg-gray-400'
+                                      }`}
+                                    />
+                                    <span>{leadStatusLabels[lead.status] ?? lead.status}</span>
                                   </div>
-                                  <ImportantInfoSummary
-                                    items={collectedRequiredIntake}
-                                    labels={importantInfoSummaryLabels}
+                                </div>
+                                <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                                  <span className="text-sm text-gray-500">{t('leadScore')}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-900">{lead.total_score}</span>
+                                    <button
+                                      type="button"
+                                      onClick={handleOpenScoreReason}
+                                      disabled={scoreReasonStatus === 'loading'}
+                                      className={`text-xs font-medium text-blue-600 hover:text-blue-700 ${scoreReasonStatus === 'loading' ? 'cursor-not-allowed opacity-60' : ''}`}
+                                    >
+                                      {t('scoreReason')}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+                                  <span className="text-sm text-gray-500">{t('leadService')}</span>
+                                  <LeadServiceEditor
+                                    currentService={resolvedLeadService.value}
+                                    currentSource={resolvedLeadService.source}
+                                    catalogServices={serviceCatalogNames}
+                                    knownLeadUpdatedAt={lead.updated_at}
+                                    isReadOnly={isReadOnly}
+                                    labels={leadServiceEditorLabels}
+                                    onSave={handleSaveLeadService}
+                                    onReturnToAi={handleReturnLeadServiceToAi}
                                   />
                                 </div>
-                              )}
-                              {lead.updated_at && (
-                                <div className="grid grid-cols-[100px_1fr] gap-4 items-center">
-                                  <span className="text-sm text-gray-500">{t('leadUpdated')}</span>
-                                  <span className="text-sm text-gray-900">
-                                    {format(new Date(lead.updated_at), 'PP p', {
-                                      locale: dateLocale,
-                                    })}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
-                          )}
+                                {requiredIntakeFields.length > 0 && (
+                                  <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+                                    <span className="text-sm text-gray-500">
+                                      {t('leadRequiredInfo')}
+                                    </span>
+                                    <LeadRequiredInfoBlock
+                                      editLabel={
+                                        !isReadOnly ? t('leadRequiredInfoEdit') : undefined
+                                      }
+                                      onEdit={
+                                        !isReadOnly
+                                          ? () => setIsImportantInfoModalOpen(true)
+                                          : undefined
+                                      }
+                                      items={collectedRequiredIntake}
+                                      labels={importantInfoSummaryLabels}
+                                    />
+                                  </div>
+                                )}
+                                {lead.summary && (
+                                  <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+                                    <span className="text-sm text-gray-500">{t('leadSummary')}</span>
+                                    <span className="whitespace-pre-wrap text-sm text-gray-900">
+                                      {lead.summary}
+                                    </span>
+                                  </div>
+                                )}
+                                {lead.updated_at && (
+                                  <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+                                    <span className="text-sm text-gray-500">{t('leadUpdated')}</span>
+                                    <span className="text-sm text-gray-900">
+                                      {format(new Date(lead.updated_at), 'PP p', {
+                                        locale: dateLocale,
+                                      })}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
+                            )}
+                          </InboxDetailsSection>
                         </div>
                       )}
 
-                      <div className="mt-6 border-t border-gray-100 pt-6">
-                        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-900">
-                          {t('tags')}
-                        </h4>
-                        <ConversationTagsEditor
-                          key={`desktop-tags-${selectedId ?? 'none'}`}
-                          tags={editableConversationTags}
-                          isReadOnly={isReadOnly}
-                          labels={tagEditorLabels}
-                          onSave={handleSaveConversationTags}
-                        />
+                      <div className={DESKTOP_DETAILS_SECTION_SPACING_CLASSNAME}>
+                        <InboxDetailsSection
+                          title={t('tags')}
+                          isExpanded={detailsSectionState.tags}
+                          onToggle={() => toggleDetailsSection('tags')}
+                        >
+                          <ConversationTagsEditor
+                            key={`desktop-tags-${selectedId ?? 'none'}`}
+                            tags={editableConversationTags}
+                            isReadOnly={isReadOnly}
+                            labels={tagEditorLabels}
+                            onSave={handleSaveConversationTags}
+                          />
+                        </InboxDetailsSection>
                       </div>
 
-                      <div className="mt-6">
-                        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-900">
-                          {t('privateNote')}
-                        </h4>
-                        <ConversationPrivateNoteEditor
-                          key={`desktop-note-${selectedId ?? 'none'}`}
-                          note={selectedConversationPrivateNote}
-                          knownPrivateNoteUpdatedAt={selectedConversationPrivateNoteUpdatedAt}
-                          updatedByText={privateNoteUpdatedByLabel}
-                          updatedAtText={privateNoteUpdatedAtText}
-                          isReadOnly={isReadOnly}
-                          labels={privateNoteLabels}
-                          onSave={handleSaveConversationPrivateNote}
-                        />
+                      <div className={DESKTOP_DETAILS_SECTION_SPACING_CLASSNAME}>
+                        <InboxDetailsSection
+                          title={t('privateNote')}
+                          isExpanded={detailsSectionState.privateNote}
+                          onToggle={() => toggleDetailsSection('privateNote')}
+                        >
+                          <ConversationPrivateNoteEditor
+                            key={`desktop-note-${selectedId ?? 'none'}`}
+                            note={selectedConversationPrivateNote}
+                            knownPrivateNoteUpdatedAt={selectedConversationPrivateNoteUpdatedAt}
+                            updatedByText={privateNoteUpdatedByLabel}
+                            updatedAtText={privateNoteUpdatedAtText}
+                            isReadOnly={isReadOnly}
+                            labels={privateNoteLabels}
+                            onSave={handleSaveConversationPrivateNote}
+                          />
+                        </InboxDetailsSection>
                       </div>
                     </div>
 
-                    <hr className="border-gray-100 my-6" />
-
-                    <div className="mt-auto">
-                      {!showConversationSkeleton && activeAgent === 'operator' && (
+                    {!showConversationSkeleton && activeAgent === 'operator' && (
+                      <div className="shrink-0 border-t border-gray-100 bg-white px-6 py-4 shadow-[0_-12px_24px_-20px_rgba(15,23,42,0.28)]">
                         <button
                           onClick={handleLeaveConversation}
                           disabled={isLeaving || isReadOnly}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <LogOut size={18} />
                           {isLeaving ? t('leaving') : t('leaveConversation')}
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

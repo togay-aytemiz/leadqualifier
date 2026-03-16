@@ -7,7 +7,7 @@ import { withBotNamePrompt } from '@/lib/ai/prompts'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
-import { matchesCatalog } from '@/lib/leads/catalog'
+import { matchesCatalog, normalizeServiceName } from '@/lib/leads/catalog'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
@@ -65,6 +65,10 @@ type ImportantInfoMutationFailureReason =
   | 'request_failed'
 
 export type UpdateConversationRequiredIntakeResult =
+  | { ok: true; lead: Lead }
+  | { ok: false; reason: ImportantInfoMutationFailureReason }
+
+export type UpdateConversationLeadServiceResult =
   | { ok: true; lead: Lead }
   | { ok: false; reason: ImportantInfoMutationFailureReason }
 
@@ -342,6 +346,17 @@ function normalizeRequiredIntakeOverrideMeta(value: unknown) {
   }
 
   return normalized
+}
+
+function normalizeServiceOverrideMeta(value: unknown): RequiredIntakeOverrideMetaEntry | null {
+  const record = asObjectRecord(value)
+  if (Object.keys(record).length === 0) return null
+
+  return {
+    updated_at: typeof record.updated_at === 'string' ? record.updated_at : null,
+    updated_by: typeof record.updated_by === 'string' ? record.updated_by : null,
+    source: 'manual',
+  }
 }
 
 function readConfigString(config: Json, key: string): string | null {
@@ -2700,6 +2715,151 @@ export async function clearConversationRequiredIntakeOverride(input: {
         required_intake_overrides: overrides,
         required_intake_override_meta: overrideMeta,
       },
+      updated_at: now,
+    })
+    .eq('organization_id', input.organizationId)
+    .eq('conversation_id', input.conversationId)
+    .select('*')
+    .maybeSingle()
+
+  if (updateError || !updatedLead) {
+    return { ok: false, reason: 'request_failed' }
+  }
+
+  return { ok: true, lead: updatedLead as Lead }
+}
+
+export async function setConversationLeadServiceOverride(input: {
+  conversationId: string
+  organizationId: string
+  service: string
+  knownLeadUpdatedAt: string | null
+}): Promise<UpdateConversationLeadServiceResult> {
+  const supabase = await createClient()
+
+  let userId: string | null = null
+  try {
+    const context = await assertTenantWriteAllowed(supabase)
+    userId = context.userId
+  } catch {
+    return { ok: false, reason: 'request_failed' }
+  }
+
+  const requestedService = readTrimmedString(input.service)
+  if (!requestedService) {
+    return { ok: false, reason: 'validation' }
+  }
+
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('conversation_id', input.conversationId)
+    .eq('organization_id', input.organizationId)
+    .maybeSingle()
+
+  if (error || !lead) {
+    return { ok: false, reason: 'missing_lead' }
+  }
+
+  if (input.knownLeadUpdatedAt && lead.updated_at !== input.knownLeadUpdatedAt) {
+    return { ok: false, reason: 'stale_conflict' }
+  }
+
+  const { data: catalogItems, error: catalogError } = await supabase
+    .from('service_catalog')
+    .select('name')
+    .eq('organization_id', input.organizationId)
+    .eq('active', true)
+
+  if (catalogError) {
+    return { ok: false, reason: 'request_failed' }
+  }
+
+  const matchedService =
+    (catalogItems ?? []).find((item) => {
+      const catalogName = readTrimmedString(item.name)
+      return catalogName && normalizeServiceName(catalogName) === normalizeServiceName(requestedService)
+    }) ?? null
+
+  const resolvedService = readTrimmedString(matchedService?.name)
+  if (!resolvedService) {
+    return { ok: false, reason: 'validation' }
+  }
+
+  const extractedFields = asObjectRecord(lead.extracted_fields)
+  const existingOverrideMeta = normalizeServiceOverrideMeta(extractedFields.service_override_meta)
+  const now = new Date().toISOString()
+  const nextOverrideMeta: RequiredIntakeOverrideMetaEntry = {
+    updated_at: now,
+    updated_by: userId ?? existingOverrideMeta?.updated_by ?? null,
+    source: 'manual',
+  }
+
+  const { data: updatedLead, error: updateError } = await supabase
+    .from('leads')
+    .update({
+      service_type: resolvedService,
+      extracted_fields: {
+        ...extractedFields,
+        service_override: resolvedService,
+        service_override_meta: nextOverrideMeta,
+      },
+      updated_at: now,
+    })
+    .eq('organization_id', input.organizationId)
+    .eq('conversation_id', input.conversationId)
+    .select('*')
+    .maybeSingle()
+
+  if (updateError || !updatedLead) {
+    return { ok: false, reason: 'request_failed' }
+  }
+
+  return { ok: true, lead: updatedLead as Lead }
+}
+
+export async function clearConversationLeadServiceOverride(input: {
+  conversationId: string
+  organizationId: string
+  knownLeadUpdatedAt: string | null
+}): Promise<UpdateConversationLeadServiceResult> {
+  const supabase = await createClient()
+
+  try {
+    await assertTenantWriteAllowed(supabase)
+  } catch {
+    return { ok: false, reason: 'request_failed' }
+  }
+
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('conversation_id', input.conversationId)
+    .eq('organization_id', input.organizationId)
+    .maybeSingle()
+
+  if (error || !lead) {
+    return { ok: false, reason: 'missing_lead' }
+  }
+
+  if (input.knownLeadUpdatedAt && lead.updated_at !== input.knownLeadUpdatedAt) {
+    return { ok: false, reason: 'stale_conflict' }
+  }
+
+  const extractedFields = asObjectRecord(lead.extracted_fields)
+  const extractedServices = Array.isArray(extractedFields.services)
+    ? extractedFields.services.map((service) => readTrimmedString(service)).filter(Boolean)
+    : []
+  const nextServiceType = extractedServices[0] ?? null
+  const now = new Date().toISOString()
+  const { service_override: _removedServiceOverride, service_override_meta: _removedServiceMeta, ...nextExtractedFields } =
+    extractedFields
+
+  const { data: updatedLead, error: updateError } = await supabase
+    .from('leads')
+    .update({
+      service_type: nextServiceType,
+      extracted_fields: nextExtractedFields,
       updated_at: now,
     })
     .eq('organization_id', input.organizationId)

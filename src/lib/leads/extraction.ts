@@ -556,6 +556,8 @@ function hasJsonKey(value: string, key: string) {
 export interface NormalizedLeadExtraction {
     service_type: string | null
     services: string[]
+    service_override?: string | null
+    service_override_meta?: RequiredIntakeOverrideMetaEntry | null
     desired_date: string | null
     location: string | null
     budget_signals: string[]
@@ -575,6 +577,8 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
         return {
             service_type: null,
             services: [],
+            service_override: null,
+            service_override_meta: null,
             desired_date: null,
             location: null,
             budget_signals: [],
@@ -611,6 +615,8 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
     return {
         service_type: rawServiceType ?? normalizedServices[0] ?? null,
         services: normalizedServices,
+        service_override: null,
+        service_override_meta: null,
         desired_date:
             typeof payloadRecord.desired_date === 'string' ? payloadRecord.desired_date.trim() || null : null,
         location: typeof payloadRecord.location === 'string' ? payloadRecord.location.trim() || null : null,
@@ -692,6 +698,19 @@ function normalizeOverrideValues(value: unknown) {
     return normalized
 }
 
+function normalizeServiceOverrideMeta(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null
+    }
+
+    const record = value as Record<string, unknown>
+    return {
+        updated_at: typeof record.updated_at === 'string' ? record.updated_at : null,
+        updated_by: typeof record.updated_by === 'string' ? record.updated_by : null,
+        source: 'manual'
+    } satisfies RequiredIntakeOverrideMetaEntry
+}
+
 export function mergeExtractionWithExisting(
     incoming: NormalizedLeadExtraction,
     existingLead?: {
@@ -724,10 +743,24 @@ export function mergeExtractionWithExisting(
         ...incoming.services,
         ...(incoming.service_type ? [incoming.service_type] : [])
     ])
+    const mergedServiceOverride = normalizeOptionalString(incoming.service_override)
+        ?? normalizeOptionalString(existingExtracted.service_override)
+        ?? null
+    const mergedServiceOverrideMeta = mergedServiceOverride
+        ? (normalizeServiceOverrideMeta(incoming.service_override_meta)
+            ?? normalizeServiceOverrideMeta(existingExtracted.service_override_meta)
+            ?? {
+                updated_at: null,
+                updated_by: null,
+                source: 'manual'
+            })
+        : null
 
     return {
-        service_type: incomingServices[0] ?? null,
+        service_type: mergedServiceOverride ?? incomingServices[0] ?? null,
         services: incomingServices,
+        service_override: mergedServiceOverride,
+        service_override_meta: mergedServiceOverrideMeta,
         desired_date: incoming.desired_date ?? normalizeOptionalString(existingExtracted.desired_date) ?? null,
         location: incoming.location ?? normalizeOptionalString(existingExtracted.location) ?? null,
         budget_signals: incoming.budget_signals.length > 0
@@ -1009,6 +1042,8 @@ export async function runLeadExtraction(options: {
         summary: normalizedExtracted.summary,
         extracted_fields: {
             services: normalizedExtracted.services,
+            service_override: normalizedExtracted.service_override ?? null,
+            service_override_meta: normalizedExtracted.service_override_meta ?? null,
             desired_date: normalizedExtracted.desired_date,
             location: normalizedExtracted.location,
             budget_signals: normalizedExtracted.budget_signals,

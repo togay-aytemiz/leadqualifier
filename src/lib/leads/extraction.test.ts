@@ -224,6 +224,48 @@ describe('mergeExtractionWithExisting', () => {
             }
         })
     })
+
+    it('keeps a manual service override authoritative across AI reruns', () => {
+        const merged = mergeExtractionWithExisting(
+            {
+                service_type: 'Yenidoğan çekimi',
+                services: ['Yenidoğan çekimi'],
+                desired_date: null,
+                location: null,
+                budget_signals: [],
+                intent_signals: [],
+                risk_signals: [],
+                required_intake_collected: {},
+                required_intake_overrides: {},
+                required_intake_override_meta: {},
+                non_business: false,
+                summary: 'Yeni özet',
+                score: 6,
+                status: 'warm'
+            },
+            {
+                service_type: 'Hamile çekimi',
+                extracted_fields: {
+                    services: ['Yenidoğan çekimi'],
+                    service_override: 'Hamile çekimi',
+                    service_override_meta: {
+                        updated_at: '2026-03-16T09:00:00.000Z',
+                        updated_by: 'profile-1',
+                        source: 'manual'
+                    }
+                }
+            }
+        )
+
+        expect(merged.service_type).toBe('Hamile çekimi')
+        expect(merged.services).toEqual(['Yenidoğan çekimi'])
+        expect(merged.service_override).toBe('Hamile çekimi')
+        expect(merged.service_override_meta).toEqual({
+            updated_at: '2026-03-16T09:00:00.000Z',
+            updated_by: 'profile-1',
+            source: 'manual'
+        })
+    })
 })
 
 describe('resolveLeadExtractionLocale', () => {
