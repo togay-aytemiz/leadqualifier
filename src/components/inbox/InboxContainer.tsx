@@ -128,12 +128,14 @@ import {
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 import { extractSocialContactAvatarUrl } from '@/lib/inbox/contact-avatar'
+import { mergeConversationTags, splitConversationTags } from '@/lib/inbox/conversation-tags'
 import { KualiaAvatar } from '@/components/inbox/KualiaAvatar'
 import {
   resolveMessageSenderIdentity,
   type InboxSenderProfile,
 } from '@/components/inbox/message-sender'
 import { ImportantInfoEditor } from '@/components/inbox/ImportantInfoEditor'
+import { ImportantInfoSummary } from '@/components/inbox/ImportantInfoSummary'
 import { ConversationTagsEditor } from '@/components/inbox/ConversationTagsEditor'
 import { ConversationPrivateNoteEditor } from '@/components/inbox/ConversationPrivateNoteEditor'
 
@@ -306,6 +308,7 @@ export function InboxContainer({
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const [isTemplatePickerModalOpen, setIsTemplatePickerModalOpen] = useState(false)
   const [isWhatsAppTemplateModalOpen, setIsWhatsAppTemplateModalOpen] = useState(false)
+  const [isImportantInfoModalOpen, setIsImportantInfoModalOpen] = useState(false)
   const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
   const [aiPauseError, setAiPauseError] = useState(false)
   const [activeQueueTab, setActiveQueueTab] = useState<InboxQueueTab>('all')
@@ -1495,14 +1498,21 @@ export function InboxContainer({
   )
 
   const handleSaveConversationTags = useCallback(
-    async (tags: string[]) => {
+    async (userTags: string[]) => {
       if (!selectedId) return { ok: false as const, reason: 'request_failed' as const }
+      const currentConversation = conversations.find(
+        (conversation) => conversation.id === selectedId
+      )
+      const preservedSystemTags = splitConversationTags(currentConversation?.tags ?? []).systemTags
 
       try {
         const result = await updateConversationTags({
           conversationId: selectedId,
           organizationId,
-          tags,
+          tags: mergeConversationTags({
+            systemTags: preservedSystemTags,
+            userTags,
+          }),
         })
 
         if (!result.ok) {
@@ -1519,7 +1529,7 @@ export function InboxContainer({
         return { ok: false as const, reason: 'request_failed' as const }
       }
     },
-    [organizationId, selectedId, updateConversationDetailsLocally]
+    [conversations, organizationId, selectedId, updateConversationDetailsLocally]
   )
 
   const handleSaveConversationPrivateNote = useCallback(
@@ -2273,14 +2283,20 @@ export function InboxContainer({
   const importantInfoEditorLabels = {
     ai: t('leadRequiredInfoAi'),
     manual: t('leadRequiredInfoManual'),
+    add: t('leadRequiredInfoAdd'),
     edit: t('leadRequiredInfoEdit'),
     save: t('leadRequiredInfoSave'),
     cancel: t('cancel'),
     returnToAi: t('leadRequiredInfoReturnToAi'),
     empty: t('leadRequiredInfoEmpty'),
+    missing: t('leadRequiredInfoMissing'),
     validation: t('leadRequiredInfoValidation'),
     requestFailed: t('leadRequiredInfoSaveError'),
     staleConflict: t('leadRequiredInfoConflict'),
+  }
+  const importantInfoSummaryLabels = {
+    empty: t('leadRequiredInfoEmpty'),
+    missing: t('leadRequiredInfoMissing'),
   }
   const tagEditorLabels = {
     noTags: t('noTags'),
@@ -2297,6 +2313,7 @@ export function InboxContainer({
     requestFailed: t('privateNoteSaveError'),
     staleConflict: t('privateNoteConflict'),
   }
+  const editableConversationTags = splitConversationTags(selectedConversation?.tags ?? []).userTags
   const privateNoteUpdatedByLabel = (() => {
     const updatedById = selectedConversation?.private_note_updated_by?.trim()
     if (!updatedById) return null
@@ -2313,19 +2330,12 @@ export function InboxContainer({
     }
     return updatedById
   })()
-  const privateNoteUpdatedMetaText = (() => {
+  const privateNoteUpdatedAtText = (() => {
     const updatedAt = selectedConversation?.private_note_updated_at
     if (!updatedAt) return null
     const parsed = new Date(updatedAt)
     if (Number.isNaN(parsed.getTime())) return null
-    const formattedAt = format(parsed, 'PP p', { locale: dateLocale })
-    if (privateNoteUpdatedByLabel) {
-      return t('privateNoteSavedBy', {
-        name: privateNoteUpdatedByLabel,
-        time: formattedAt,
-      })
-    }
-    return t('privateNoteSavedAt', { time: formattedAt })
+    return format(parsed, 'PP p', { locale: dateLocale })
   })()
   const isSelectedConversationInstagramRequest = selectedConversation
     ? isInstagramRequestConversation(selectedConversation, visibleMessages)
@@ -3074,20 +3084,24 @@ export function InboxContainer({
 
                               {requiredIntakeFields.length > 0 && (
                                 <div className="rounded-lg border border-gray-200 bg-gray-50/40 px-3 py-3">
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                    {t('leadRequiredInfo')}
-                                  </p>
-                                  <div className="mt-2">
-                                    <ImportantInfoEditor
-                                      key={`mobile-important-info-${selectedId ?? 'none'}`}
-                                      items={collectedRequiredIntake}
-                                      isReadOnly={isReadOnly}
-                                      knownLeadUpdatedAt={lead?.updated_at ?? null}
-                                      labels={importantInfoEditorLabels}
-                                      onSave={handleSaveRequiredInfo}
-                                      onReturnToAi={handleReturnRequiredInfoToAi}
-                                    />
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                      {t('leadRequiredInfo')}
+                                    </p>
+                                    {!isReadOnly && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsImportantInfoModalOpen(true)}
+                                        className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
+                                      >
+                                        {t('leadRequiredInfoEdit')}
+                                      </button>
+                                    )}
                                   </div>
+                                  <ImportantInfoSummary
+                                    items={collectedRequiredIntake}
+                                    labels={importantInfoSummaryLabels}
+                                  />
                                 </div>
                               )}
 
@@ -3116,7 +3130,7 @@ export function InboxContainer({
                         </h4>
                         <ConversationTagsEditor
                           key={`mobile-tags-${selectedId ?? 'none'}`}
-                          tags={selectedConversation.tags ?? []}
+                          tags={editableConversationTags}
                           isReadOnly={isReadOnly}
                           labels={tagEditorLabels}
                           onSave={handleSaveConversationTags}
@@ -3131,7 +3145,8 @@ export function InboxContainer({
                           key={`mobile-note-${selectedId ?? 'none'}`}
                           note={selectedConversationPrivateNote}
                           knownPrivateNoteUpdatedAt={selectedConversationPrivateNoteUpdatedAt}
-                          updatedMetaText={privateNoteUpdatedMetaText}
+                          updatedByText={privateNoteUpdatedByLabel}
+                          updatedAtText={privateNoteUpdatedAtText}
                           isReadOnly={isReadOnly}
                           labels={privateNoteLabels}
                           onSave={handleSaveConversationPrivateNote}
@@ -4171,20 +4186,24 @@ export function InboxContainer({
                               )}
                               {requiredIntakeFields.length > 0 && (
                                 <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                  <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">
-                                    {t('leadRequiredInfo')}
-                                  </p>
-                                  <div className="mt-2">
-                                    <ImportantInfoEditor
-                                      key={`desktop-important-info-${selectedId ?? 'none'}`}
-                                      items={collectedRequiredIntake}
-                                      isReadOnly={isReadOnly}
-                                      knownLeadUpdatedAt={lead?.updated_at ?? null}
-                                      labels={importantInfoEditorLabels}
-                                      onSave={handleSaveRequiredInfo}
-                                      onReturnToAi={handleReturnRequiredInfoToAi}
-                                    />
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">
+                                      {t('leadRequiredInfo')}
+                                    </p>
+                                    {!isReadOnly && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsImportantInfoModalOpen(true)}
+                                        className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700"
+                                      >
+                                        {t('leadRequiredInfoEdit')}
+                                      </button>
+                                    )}
                                   </div>
+                                  <ImportantInfoSummary
+                                    items={collectedRequiredIntake}
+                                    labels={importantInfoSummaryLabels}
+                                  />
                                 </div>
                               )}
                               {lead.updated_at && (
@@ -4210,7 +4229,7 @@ export function InboxContainer({
                         </h4>
                         <ConversationTagsEditor
                           key={`desktop-tags-${selectedId ?? 'none'}`}
-                          tags={selectedConversation.tags ?? []}
+                          tags={editableConversationTags}
                           isReadOnly={isReadOnly}
                           labels={tagEditorLabels}
                           onSave={handleSaveConversationTags}
@@ -4225,7 +4244,8 @@ export function InboxContainer({
                           key={`desktop-note-${selectedId ?? 'none'}`}
                           note={selectedConversationPrivateNote}
                           knownPrivateNoteUpdatedAt={selectedConversationPrivateNoteUpdatedAt}
-                          updatedMetaText={privateNoteUpdatedMetaText}
+                          updatedByText={privateNoteUpdatedByLabel}
+                          updatedAtText={privateNoteUpdatedAtText}
                           isReadOnly={isReadOnly}
                           labels={privateNoteLabels}
                           onSave={handleSaveConversationPrivateNote}
@@ -4424,6 +4444,28 @@ export function InboxContainer({
         isDestructive
         isLoading={deleteDialog.isLoading}
       />
+
+      <Modal
+        isOpen={isImportantInfoModalOpen}
+        onClose={() => setIsImportantInfoModalOpen(false)}
+        title={t('leadRequiredInfoModalTitle')}
+      >
+        {lead ? (
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <ImportantInfoEditor
+              key={`modal-important-info-${selectedId ?? 'none'}`}
+              items={collectedRequiredIntake}
+              isReadOnly={isReadOnly}
+              knownLeadUpdatedAt={lead?.updated_at ?? null}
+              labels={importantInfoEditorLabels}
+              onSave={handleSaveRequiredInfo}
+              onReturnToAi={handleReturnRequiredInfoToAi}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">{t('leadEmpty')}</p>
+        )}
+      </Modal>
 
       <Modal
         isOpen={isScoreReasonOpen}

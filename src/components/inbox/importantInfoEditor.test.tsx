@@ -27,11 +27,13 @@ describe('ImportantInfoEditor', () => {
         labels={{
           ai: 'AI',
           manual: 'Manual',
+          add: 'Add',
           edit: 'Edit',
           save: 'Save',
           cancel: 'Cancel',
           returnToAi: 'Return to AI',
           empty: 'No important info collected yet.',
+          missing: 'Not added yet',
           validation: 'Enter a value.',
           requestFailed: 'Save failed.',
           staleConflict: 'This info changed in another session.',
@@ -45,5 +47,7 @@ describe('ImportantInfoEditor', () => {
     expect(markup).toContain('Return to AI')
     expect(markup).toContain('Edit')
     expect(markup).toContain('Bütçe')
+    expect(markup).toContain('Add')
+    expect(markup).toContain('Not added yet')
   })
 })

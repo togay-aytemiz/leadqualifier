@@ -13,11 +13,13 @@ type ImportantInfoEditorFailureReason = Extract<ImportantInfoEditorResult, { ok:
 interface ImportantInfoEditorLabels {
   ai: string
   manual: string
+  add: string
   edit: string
   save: string
   cancel: string
   returnToAi: string
   empty: string
+  missing: string
   validation: string
   requestFailed: string
   staleConflict: string
@@ -133,7 +135,7 @@ export function ImportantInfoEditor({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="divide-y divide-gray-100">
       {items.map((item) => {
         const isEditing = editingField === item.field
         const isSaving = savingField === item.field
@@ -144,11 +146,13 @@ export function ImportantInfoEditor({
             : 'border-gray-200 bg-gray-50 text-gray-600'
 
         return (
-          <div key={item.field} className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+          <div key={item.field} className="py-3 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-2">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">{item.field}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {item.field}
+                  </span>
                   {item.source && (
                     <span
                       className={cn(
@@ -166,24 +170,28 @@ export function ImportantInfoEditor({
                     value={draftValue}
                     onChange={(event) => setDraftValue(event.target.value)}
                     rows={2}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+                    className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
                   />
                 ) : item.value ? (
-                  <p className="break-words text-sm text-gray-900">{item.value}</p>
+                  <p className="mt-1 break-words text-sm text-gray-900">{item.value}</p>
                 ) : (
-                  <p className="text-sm text-gray-400">-</p>
+                  <p className="mt-1 text-sm text-gray-400">{labels.missing}</p>
+                )}
+
+                {errorField === item.field && errorMessage && (
+                  <p className="mt-2 text-xs text-red-600">{errorMessage}</p>
                 )}
               </div>
 
               {!isReadOnly && (
-                <div className="shrink-0">
+                <div className="flex shrink-0 items-center gap-3 pt-0.5">
                   {isEditing ? (
-                    <div className="flex items-center gap-2">
+                    <>
                       <button
                         type="button"
                         onClick={() => void handleSave(item.field)}
                         disabled={isSaving}
-                        className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {labels.save}
                       </button>
@@ -191,40 +199,36 @@ export function ImportantInfoEditor({
                         type="button"
                         onClick={cancelEditing}
                         disabled={isSaving}
-                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="text-xs font-semibold text-gray-500 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {labels.cancel}
                       </button>
-                    </div>
+                    </>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <>
                       <button
                         type="button"
                         onClick={() => startEditing(item)}
                         disabled={isSaving}
-                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="text-xs font-semibold text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {labels.edit}
+                        {item.value ? labels.edit : labels.add}
                       </button>
                       {item.source === 'manual' && (
                         <button
                           type="button"
                           onClick={() => void handleReturnToAi(item.field)}
                           disabled={isSaving}
-                          className="rounded-md border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {labels.returnToAi}
                         </button>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
               )}
             </div>
-
-            {errorField === item.field && errorMessage && (
-              <p className="mt-2 text-xs text-red-600">{errorMessage}</p>
-            )}
           </div>
         )
       })}

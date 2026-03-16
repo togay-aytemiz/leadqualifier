@@ -21,6 +21,7 @@ interface ConversationTagsEditorProps {
   tags: string[]
   isReadOnly: boolean
   labels: ConversationTagsEditorLabels
+  resolveDisplayLabel?: (tag: string) => string
   onSave: (tags: string[]) => Promise<ConversationTagsEditorResult>
 }
 
@@ -35,6 +36,7 @@ export function ConversationTagsEditor({
   tags,
   isReadOnly,
   labels,
+  resolveDisplayLabel,
   onSave,
 }: ConversationTagsEditorProps) {
   const [localTags, setLocalTags] = useState(tags)
@@ -93,7 +95,7 @@ export function ConversationTagsEditor({
                 key={tag}
                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700"
               >
-                <span>{tag}</span>
+                <span>{resolveDisplayLabel ? resolveDisplayLabel(tag) : tag}</span>
                 {!isReadOnly && (
                   <button
                     type="button"
@@ -107,9 +109,7 @@ export function ConversationTagsEditor({
               </span>
             ))}
           </>
-        ) : (
-          <p className="text-sm text-gray-500">{labels.noTags}</p>
-        )}
+        ) : null}
 
         {!isReadOnly && !isComposerOpen && (
           <button

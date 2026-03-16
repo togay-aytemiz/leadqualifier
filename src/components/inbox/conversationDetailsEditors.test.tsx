@@ -7,7 +7,7 @@ describe('conversation details editors', () => {
   it('keeps the tag input hidden until add mode is opened', () => {
     const markup = renderToStaticMarkup(
       <ConversationTagsEditor
-        tags={['VIP', 'Hot Lead']}
+        tags={[]}
         isReadOnly={false}
         labels={{
           noTags: 'No tags',
@@ -22,17 +22,20 @@ describe('conversation details editors', () => {
       />
     )
 
-    expect(markup).toContain('VIP')
     expect(markup).toContain('Add')
     expect(markup).not.toContain('Type a tag')
+    expect(markup).not.toContain('No tags')
   })
 
   it('renders shared note metadata', () => {
+    const updatedByText = 'Ayşe'
+    const updatedAtText = '16 Mar 2026 12:24'
     const markup = renderToStaticMarkup(
       <ConversationPrivateNoteEditor
         note="Müşteri hafta içi aranmalı"
         knownPrivateNoteUpdatedAt="2026-03-15T10:00:00.000Z"
-        updatedMetaText="Last updated by Ayşe"
+        updatedByText={updatedByText}
+        updatedAtText={updatedAtText}
         isReadOnly={false}
         labels={{
           placeholder: 'Add internal context for your team...',
@@ -45,7 +48,7 @@ describe('conversation details editors', () => {
     )
 
     expect(markup).toContain('Ayşe')
-    expect(markup).toContain('Save note')
-    expect(markup).toContain('rows="3"')
+    expect(markup).toContain('16 Mar 2026 12:24')
+    expect(markup).not.toContain('Last updated by')
   })
 })

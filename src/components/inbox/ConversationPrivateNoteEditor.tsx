@@ -16,7 +16,8 @@ interface ConversationPrivateNoteEditorLabels {
 interface ConversationPrivateNoteEditorProps {
   note: string
   knownPrivateNoteUpdatedAt: string | null
-  updatedMetaText?: string | null
+  updatedByText?: string | null
+  updatedAtText?: string | null
   isReadOnly: boolean
   labels: ConversationPrivateNoteEditorLabels
   onSave: (input: {
@@ -28,7 +29,8 @@ interface ConversationPrivateNoteEditorProps {
 export function ConversationPrivateNoteEditor({
   note,
   knownPrivateNoteUpdatedAt,
-  updatedMetaText,
+  updatedByText,
+  updatedAtText,
   isReadOnly,
   labels,
   onSave,
@@ -87,7 +89,14 @@ export function ConversationPrivateNoteEditor({
       />
 
       <div className="flex items-center justify-between gap-3">
-        {updatedMetaText ? <p className="text-xs text-gray-500">{updatedMetaText}</p> : <span />}
+        {updatedByText || updatedAtText ? (
+          <div className="space-y-0.5">
+            {updatedByText ? <p className="text-xs text-gray-500">{updatedByText}</p> : null}
+            {updatedAtText ? <p className="text-xs text-gray-400">{updatedAtText}</p> : null}
+          </div>
+        ) : (
+          <span />
+        )}
 
         {!isReadOnly && (
           <button
