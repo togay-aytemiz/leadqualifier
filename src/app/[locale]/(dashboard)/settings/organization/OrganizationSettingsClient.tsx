@@ -534,7 +534,7 @@ export default function OrganizationSettingsClient({
         <>
             <PageHeader
                 title={t('pageTitle')}
-                actions={
+                actions={(
                     <Button
                         onClick={handleSave}
                         disabled={!isDirty || isSaving}
@@ -542,7 +542,7 @@ export default function OrganizationSettingsClient({
                     >
                         {saved ? t('saved') : isSaving ? t('saving') : t('save')}
                     </Button>
-                }
+                )}
             />
 
             <div className="flex-1 overflow-auto p-8">
@@ -692,6 +692,7 @@ export default function OrganizationSettingsClient({
                                         </div>
                                     </SettingsSection>
                                 )}
+
                             </>
                         )}
                     </SettingsTabs>

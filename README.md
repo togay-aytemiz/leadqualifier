@@ -38,11 +38,29 @@ cp .env.local.example .env.local
 # Fill in your credentials in .env.local
 # - NEXT_PUBLIC_SUPABASE_URL
 # - NEXT_PUBLIC_SUPABASE_ANON_KEY
+# - SUPABASE_SERVICE_ROLE_KEY
 # - OPENAI_API_KEY
+# - NEXT_PUBLIC_APP_URL
+# - GOOGLE_CLIENT_ID
+# - GOOGLE_CLIENT_SECRET
+# - GOOGLE_CALENDAR_REDIRECT_URI
+# - GOOGLE_CALENDAR_STATE_SECRET
 
 # Run development server
 npm run dev
 ```
+
+### Calendar Integration Environment
+
+Calendar / booking works without Google, but Google Calendar connection requires:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_CALENDAR_REDIRECT_URI`
+- `GOOGLE_CALENDAR_STATE_SECRET`
+- `SUPABASE_SERVICE_ROLE_KEY` for encrypted provider-secret storage in the private schema
+
+The implemented v1 model keeps Qualy as the internal booking source of truth and uses Google as an optional busy overlay plus controlled write-through mirror.
 
 ### Available Scripts
 

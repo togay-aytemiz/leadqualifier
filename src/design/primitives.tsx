@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft } from 'lucide-react'
+import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft, ChevronDown } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useEffect, useState } from 'react'
@@ -393,6 +393,36 @@ export function TextArea({ label, error, className, onChange, ...props }: TextAr
     )
 }
 
+// --- Select ---
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+    label?: string
+    error?: string
+}
+
+export function Select({ label, error, className, children, ...props }: SelectProps) {
+    return (
+        <div>
+            {label && <label className="mb-2 block text-sm font-medium text-gray-700">{label}</label>}
+            <div className="relative">
+                <select
+                    {...props}
+                    className={cn(
+                        "w-full appearance-none rounded-2xl border bg-white px-3 pr-12 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                        error ? "border-red-300" : "border-gray-300",
+                        className
+                    )}
+                >
+                    {children}
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-gray-500">
+                    <ChevronDown size={18} />
+                </span>
+            </div>
+            {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        </div>
+    )
+}
+
 // --- Modal ---
 interface ModalProps {
     isOpen: boolean
@@ -400,9 +430,11 @@ interface ModalProps {
     title: string
     headerActions?: React.ReactNode
     children: React.ReactNode
+    panelClassName?: string
+    bodyClassName?: string
 }
 
-export function Modal({ isOpen, onClose, title, headerActions, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, headerActions, children, panelClassName, bodyClassName }: ModalProps) {
     const [shouldRender, setShouldRender] = useState(isOpen)
     const [isVisible, setIsVisible] = useState(isOpen)
 
@@ -441,7 +473,8 @@ export function Modal({ isOpen, onClose, title, headerActions, children }: Modal
             <div
                 className={cn(
                     "bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden pointer-events-auto transition-all duration-200",
-                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.98]"
+                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.98]",
+                    panelClassName
                 )}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -454,7 +487,7 @@ export function Modal({ isOpen, onClose, title, headerActions, children }: Modal
                         </button>
                     </div>
                 </div>
-                <div className="p-6">
+                <div className={cn("p-6", bodyClassName)}>
                     {children}
                 </div>
             </div>

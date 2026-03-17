@@ -9,8 +9,10 @@ import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
     HiOutlineBanknotes,
     HiOutlineBriefcase,
+    HiOutlineCalendarDays,
     HiOutlineChatBubbleLeftRight,
     HiOutlineCreditCard,
+    HiOutlinePuzzlePiece,
     HiOutlineSparkles,
     HiOutlineUserCircle
 } from 'react-icons/hi2'
@@ -89,12 +91,28 @@ export function SettingsResponsiveShell({
                 active: activeItem === 'ai'
             },
             {
+                id: 'calendar',
+                group: 'preferences',
+                label: tSidebar('calendar'),
+                href: getLocalizedHref(locale, '/settings/calendar'),
+                icon: <HiOutlineCalendarDays size={18} />,
+                active: activeItem === 'calendar'
+            },
+            {
                 id: 'channels',
                 group: 'integrations',
                 label: tSidebar('channels'),
                 href: getLocalizedHref(locale, '/settings/channels'),
                 icon: <HiOutlineChatBubbleLeftRight size={18} />,
                 active: activeItem === 'channels'
+            },
+            {
+                id: 'apps',
+                group: 'integrations',
+                label: tSidebar('apps'),
+                href: getLocalizedHref(locale, '/settings/apps'),
+                icon: <HiOutlinePuzzlePiece size={18} />,
+                active: activeItem === 'apps'
             },
             {
                 id: 'plans',

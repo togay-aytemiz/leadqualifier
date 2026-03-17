@@ -12,9 +12,13 @@ describe('resolveMobileNavActiveItem', () => {
         expect(resolveMobileNavActiveItem('/leads')).toBe('contacts')
     })
 
-    it('marks skills and knowledge routes under ai tab', () => {
-        expect(resolveMobileNavActiveItem('/skills')).toBe('ai')
-        expect(resolveMobileNavActiveItem('/knowledge/123')).toBe('ai')
+    it('marks calendar route as calendar tab', () => {
+        expect(resolveMobileNavActiveItem('/calendar')).toBe('calendar')
+    })
+
+    it('marks skills and knowledge routes under other tab', () => {
+        expect(resolveMobileNavActiveItem('/skills')).toBe('other')
+        expect(resolveMobileNavActiveItem('/knowledge/123')).toBe('other')
     })
 
     it('marks simulator and settings routes under other tab', () => {

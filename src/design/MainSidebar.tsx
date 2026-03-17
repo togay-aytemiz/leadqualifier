@@ -17,6 +17,8 @@ import {
 import { buildBillingRefreshSignal } from '@/lib/billing/refresh-signal'
 import { BILLING_UPDATED_EVENT } from '@/lib/billing/events'
 import {
+    HiMiniCalendarDays,
+    HiOutlineCalendarDays,
     HiMiniChatBubbleBottomCenterText,
     HiOutlineChatBubbleBottomCenterText,
     HiMiniSquares2X2,
@@ -617,6 +619,7 @@ export function MainSidebar({
 
         const routesToPrefetch = [
             '/inbox',
+            '/calendar',
             '/leads',
             '/simulator',
             '/skills',
@@ -660,6 +663,13 @@ export function MainSidebar({
                         label: tNav('inbox'),
                         icon: HiOutlineChatBubbleBottomCenterText,
                         activeIcon: HiMiniChatBubbleBottomCenterText,
+                    },
+                    {
+                        id: 'calendar',
+                        href: '/calendar',
+                        label: tNav('calendar'),
+                        icon: HiOutlineCalendarDays,
+                        activeIcon: HiMiniCalendarDays,
                     },
                     {
                         id: 'leads',

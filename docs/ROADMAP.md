@@ -1,6 +1,16 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Last Updated:** 2026-03-17 (Manual operator outbound sends now queue a pending inbox message before provider dispatch and finalize the same row to `sent`/`failed`, so Inbox delivery state stays durable across text, template, and media paths.)  
+> **Last Updated:** 2026-03-17 (Calendar / scheduling / booking now ships with a full-width `/calendar` workspace, `Tercihler > Takvim` for booking rules, `Entegrasyonlar > Uygulamalar` for Google Calendar management, compact business-hour rows, inline timing help, simplified Google connection cards, a single calendar-settings entry in the workspace header, client-side buffered calendar navigation for faster day/week/month switching, mutation-time cache invalidation, AI scheduling continuity across follow-up availability questions, stricter booking-intent gating, deterministic human handoff on scheduling failures, minimum-notice enforcement across slot generation + exact-slot checks + booking writes, safe Google disconnect cleanup for mirrored future events, per-booking duration override and customer-email capture in the booking modal, shared select-field visual cleanup, Turkish-first copy cleanup, and the existing org-scoped booking / Google boundary foundation.)
+> **Update Note (2026-03-17):** The new/edit booking modal now lets operators override duration per booking, captures customer email as first-class booking data, and routes calendar selects through a shared primitive so dropdown chevrons stay consistently inset instead of hugging the right edge.
+> **Update Note (2026-03-17):** `/calendar` view/date switches now stay client-side inside a buffered booking window instead of full route transitions on every click. Week/day/month/agenda changes update the URL with history state and only fetch a new window when the operator moves outside the loaded range.
+> **Update Note (2026-03-17):** AI scheduling now keeps the booking thread alive across follow-up turns like `Cuma var mı?` without forcing the user to repeat the service or the word `randevu`. Booking-change requests such as reschedule/cancel stay intentionally human-routed in v1 instead of auto-mutating existing bookings.
+> **Update Note (2026-03-17):** Calendar hardening now enforces `booking_enabled` on backend availability and booking creation, replaces weekly availability rules through one atomic RPC, keeps already-mirrored Google events in sync/cleanup paths even after write-through is turned off, and makes `no slot` plus implied reschedule AI branches trigger real operator handoff.
+> **Update Note (2026-03-17):** Calendar review follow-ups are now closed: minimum notice is enforced consistently for generated slots, exact requested slots, and booking writes; disconnecting Google Calendar cleans mirrored future events before dropping the provider link; scheduling exceptions fail safe into operator handoff instead of generic AI fallback; generic suitability language such as `Bu bana uygun mu?` no longer counts as booking intent; and post-mutation calendar caches are dirtied so stale weeks/months are not reused.
+> **Update Note (2026-03-17):** The `/calendar` workspace no longer repeats `Takvim ayarları` inside summary cards. The header action is now the only settings entry so the operator surface stays simpler.
+> **Update Note (2026-03-17):** `Settings > Calendar` business-hour rows are now deliberately denser: each day keeps open/closed state, start time, and end time on one horizontal line, while slot interval / earliest booking / before-after gap rules expose inline `i` help instead of unexplained jargon. `Settings > Applications` also drops the redundant Google badge and uses a shorter `Bağla` CTA on the provider card.
+> **Update Note (2026-03-17):** Calendar settings IA was simplified again: `/calendar` now routes users into dedicated settings pages instead of a modal, booking rules/business hours/service durations live under `Settings > Calendar`, and Google Calendar connection controls live under `Settings > Applications`.
+> **Update Note (2026-03-17):** Calendar route now uses a neutral page component name instead of `CalendarPage`, preventing the Next.js 16.1.6 Turbopack dev overlay crash class (`'... cannot have a negative time stamp'`) on `/calendar`.
+> **Update Note (2026-03-17):** Calendar moved out of the deferred backlog on purpose. The implemented scope is intentionally controlled: internal source of truth, existing service catalog reuse, org-level booking rules, Google busy overlay + optional write-through mirroring, and no fake claim of full two-way sync or multi-staff scheduling yet.
 > **Update Note (2026-03-16):** Inbox Details sections are now collapsible, the top metadata block is renamed `Konuşma detayları`, required fields now live inside `Kişi` instead of a second standalone `Önemli bilgiler` section, the leave-conversation CTA sits in a dedicated footer region instead of blending into note content, and the composer now shows visible `Şablonlar / Gönder` actions with matched control heights.
 > **Update Note (2026-03-15):** Added a GTM prelaunch audit (`docs/plans/2026-03-15-gtm-prelaunch-audit.md`) and expanded Pilot Launch scope so pre-pilot work explicitly covers activation/conversion, operator workflow polish, abuse controls, and a deliberate stance on competitor-parity gaps such as campaigns, widgets, integrations, and mobile alerts.
 > **Update Note (2026-03-15):** Phase 9 load testing now distinguishes raw webhook throughput from realistic conversation pressure: `npm run test:load:messages` keeps the `autocannon` baseline, while `npm run test:load:users` simulates concurrent WhatsApp contacts with configurable multi-turn traffic, latency percentiles, timeout/transport-error reporting, and optional signed live-app execution against a real webhook URL.
@@ -886,6 +896,28 @@
 
 ---
 
+## Phase 9.5: Calendar / Scheduling / Booking ✅
+
+- [x] Deliberately promote calendar / booking from post-MVP backlog into pilot-operational scope with a controlled v1 boundary
+- [x] Add first-class `/calendar` route with desktop sidebar access and mobile bottom-nav access
+- [x] Convert `/calendar` into a full-width operator workspace and move heavy settings editing behind a dedicated `Takvim ayarları` entry instead of a bottom-of-page settings wall
+- [x] Ship day / week / month / agenda views plus quick `today / this week` summaries and filterable booking lists
+- [x] Add org-scoped booking settings: timezone, fallback duration, slot interval, minimum notice, and before/after buffers
+- [x] Add weekly availability-rule management and service-duration management on top of the existing service catalog
+- [x] Move durable calendar configuration into top-level `Settings > Calendar` and keep Google Calendar integration controls under `Settings > Applications`
+- [x] Polish calendar settings density and clarity: compact per-day business-hour rows, inline timing-rule help, and a simpler Google provider status card
+- [x] Keep `/calendar` interactions fast by moving view/date switching into client-local cached navigation instead of full route pushes on every click
+- [x] Add booking persistence foundation with overlap protection, conversation/lead/service metadata, and organization isolation
+- [x] Add Google Calendar OAuth connection boundary with free/busy overlay and optional write-through mirroring
+- [x] Add AI scheduling behavior for service clarification, real alternative slot suggestions, and confirmed booking creation
+- [x] Extend AI scheduling continuity across follow-up availability questions and hand booking-change requests to operators instead of auto-rescheduling
+- [x] Harden calendar correctness boundaries: enforce disabled-booking backend guards, replace availability rules atomically, keep existing Google mirrors clean after write-through opt-out, and escalate no-slot / implied-reschedule AI turns into real human handoff
+- [x] Close calendar review follow-ups: enforce minimum notice consistently, clean mirrored future events on Google disconnect, fail scheduling exceptions safe into handoff, tighten booking-intent detection, and invalidate cached calendar windows after mutations
+- [x] Let operators override booking duration per appointment, capture customer email in the modal + booking record, and standardize calendar dropdown spacing through a shared select primitive
+- [x] Add targeted tests for service duration fallback, availability computation, booking intent, scheduling flow, and mobile nav access
+
+---
+
 ## Phase 10: Pilot Launch
 
 - [x] Prepare AI copywriter-ready static launch asset brief grounded in repo + PRD + roadmap + release notes, with Turkish-first terminology and non-team positioning guardrails
@@ -905,7 +937,7 @@
 
 ## Post-MVP (Future)
 
-- [ ] Calendar / booking integration
+- [x] Calendar / booking integration foundation promoted to Phase 9.5 and implemented as v1
 - [ ] Flow builder
 - [ ] Auto follow-up sequences
 - [ ] Vertical preset marketplace

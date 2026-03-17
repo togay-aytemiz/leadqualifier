@@ -232,6 +232,7 @@
     "settings": "Ayarlar",
     "billing": "Faturalandırma",
     "inbox": "Gelen Kutusu",
+    "calendar": "Takvim",
     "simulator": "Simülatör",
     "ai": "AI",
     "other": "Diğer",
@@ -977,9 +978,11 @@
     "profile": "Profil",
     "organization": "Organizasyon",
     "ai": "Qualy AI",
+    "calendar": "Takvim",
     "qaLab": "AI QA Lab",
     "integrations": "Entegrasyonlar",
     "channels": "Kanallar",
+    "apps": "Uygulamalar",
     "billing": "Faturalandırma",
     "plans": "Planlar",
     "receipts": "Kullanım",
@@ -2248,6 +2251,240 @@
           "joined": "Katılım"
         }
       }
+    }
+  },
+  "calendar": {
+    "title": "Takvim",
+    "readOnlyBanner": "Salt okunur mod: yönetici bu takvim verilerini inceleyebilir ama randevu veya ayar değiştiremez.",
+    "minutesShort": "dk",
+    "minutesLabel": "dakika",
+    "actions": {
+      "newBooking": "Yeni randevu",
+      "openSettings": "Takvim ayarları",
+      "openCalendarWorkspace": "Takvimi aç",
+      "editBooking": "Randevuyu düzenle",
+      "cancelBooking": "Randevuyu iptal et",
+      "connect": "Bağla",
+      "disconnect": "Bağlantıyı kes",
+      "connectGoogle": "Google Calendar bağla",
+      "disconnectGoogle": "Google Calendar bağlantısını kes",
+      "previousRange": "Önceki aralık",
+      "nextRange": "Sonraki aralık",
+      "goToday": "Bugün",
+      "saveSettings": "Ayarları kaydet",
+      "saveAvailability": "Müsaitliği kaydet",
+      "saveServiceDurations": "Süreleri kaydet",
+      "close": "Kapat",
+      "saving": "Kaydediliyor...",
+      "saveBooking": "Randevuyu kaydet"
+    },
+    "summary": {
+      "today": "Bugün",
+      "todayHint": "Bugün ne var sorusuna hızlı yanıt.",
+      "thisWeek": "Bu hafta",
+      "weekHint": "Mevcut haftadaki yaklaşan iş yükü.",
+      "upcoming": "Yaklaşan",
+      "noUpcoming": "Yaklaşan randevu yok",
+      "calendarSettings": "Takvim ayarları",
+      "settingsHint": "{days} açık gün, {services} özel hizmet süresi.",
+      "googleCalendar": "Google Calendar",
+      "connected": "Bağlı",
+      "notConnected": "Bağlı değil"
+    },
+    "views": {
+      "day": "Gün",
+      "week": "Hafta",
+      "month": "Ay",
+      "agenda": "Ajanda"
+    },
+    "filters": {
+      "allStatuses": "Tüm durumlar",
+      "allServices": "Tüm hizmetler",
+      "allSources": "Tüm kaynaklar",
+      "allChannels": "Tüm kanallar"
+    },
+    "statuses": {
+      "pending": "Bekliyor",
+      "confirmed": "Onaylı",
+      "completed": "Tamamlandı",
+      "no_show": "Gelmedi",
+      "canceled": "İptal edildi"
+    },
+    "sources": {
+      "manual": "Manuel",
+      "operator": "Operatör",
+      "ai": "Yapay zeka"
+    },
+    "channels": {
+      "manual": "Manuel",
+      "whatsapp": "WhatsApp",
+      "instagram": "Instagram",
+      "telegram": "Telegram",
+      "simulator": "Simülatör"
+    },
+    "labels": {
+      "bookingsCount": "randevu",
+      "moreBookings": "daha"
+    },
+    "emptyStates": {
+      "untitledBooking": "İsimsiz randevu",
+      "customerPending": "Müşteri bilgisi bekleniyor",
+      "noBookingsInRange": "Seçili aralık ve filtrelerde randevu bulunmuyor.",
+      "noBookingsOnDay": "Bu gün için henüz randevu yok.",
+      "noBookingsShort": "Boş"
+    },
+    "detail": {
+      "title": "Randevu detayları",
+      "empty": "Hizmeti, zamanı, senkron durumunu ve sonraki adımları görmek için bir randevu seçin.",
+      "when": "Zaman",
+      "duration": "Süre",
+      "origin": "Kaynak",
+      "notes": "Notlar"
+    },
+    "durationSource": {
+      "service_catalog": "Hizmete özel süre kullanılıyor.",
+      "organization_default": "Organizasyonun varsayılan süresi kullanılıyor.",
+      "manual_override": "Bu randevu için süre manuel olarak güncellendi."
+    },
+    "syncStatus": {
+      "not_synced": "Yalnızca Qualy içinde kayıtlı.",
+      "pending": "Senkron bekleniyor.",
+      "synced": "Bağlı takvimle senkronlandı.",
+      "error": "Takvim senkronu dikkat istiyor."
+    },
+    "google": {
+      "title": "Google Calendar",
+      "description": "Google Calendar bağlantısını isteğe bağlı yoğunluk katmanı olarak kullanın. Ana kayıt kaynağı yine Qualy'dir.",
+      "modeWriteThrough": "Google yoğunluk kontrolü ve Google'a yansıtma açık.",
+      "modeBusyOverlay": "Yalnızca Google yoğunluk kontrolü açık.",
+      "help": "Bağlı takvim yalnızca destekleyici katmandır; asıl kayıt yine Qualy'de tutulur."
+    },
+    "googleStatus": {
+      "success": "Google Calendar başarıyla bağlandı.",
+      "missing_google_env": "Google Calendar bilgileri ortam değişkenlerinde eksik.",
+      "forbidden": "Bu çalışma alanı şu anda takvim bağlantısı değiştirmeye izin vermiyor.",
+      "missing_org": "Google Calendar kurulumuna başlamadan önce aktif bir organizasyon seçin.",
+      "org_mismatch": "Google Calendar kurulumu sırasında organizasyon bağlamı değişti. Mevcut çalışma alanından tekrar deneyin.",
+      "oauth_cancelled": "İzin verilmeden önce Google Calendar kurulumu iptal edildi.",
+      "missing_state": "Google Calendar callback beklenen imzalı state değerini içermiyor.",
+      "invalid_state": "Google Calendar callback state doğrulanamadı.",
+      "missing_code": "Google Calendar yetkilendirme kodu döndürmedi.",
+      "connect_failed": "Google Calendar bağlanamadı. Callback detaylarını kontrol edip tekrar deneyin."
+    },
+    "settings": {
+      "title": "Takvim ayarları",
+      "description": "Qualy ve operatörlerin randevu önermeden veya oluşturmadan önce uyması gereken kuralları tanımlayın.",
+      "tabs": {
+        "general": "Genel akış",
+        "availability": "Çalışma saatleri",
+        "serviceDurations": "Hizmet süreleri"
+      },
+      "bookingSectionTitle": "Randevu kuralları",
+      "bookingSectionDescription": "Randevu akışının açık olup olmadığını, zaman dilimini ve temel zaman kurallarını buradan yönetin.",
+      "bookingEnabled": "Randevu aktif",
+      "bookingEnabledHelp": "Kapalıyken sistem yeni randevu önermeyi ve oluşturmayı durdurur.",
+      "timezone": "Saat dilimi",
+      "defaultDuration": "Varsayılan hizmet süresi",
+      "slotInterval": "Randevu aralığı",
+      "minimumNotice": "En erken randevu süresi",
+      "bufferBefore": "Randevu öncesi boşluk",
+      "bufferAfter": "Randevu sonrası boşluk",
+      "fieldHints": {
+        "slotInterval": "Müsait saatler müşteriye bu dakika adımlarıyla gösterilir.",
+        "minimumNotice": "Şu andan itibaren en az ne kadar sonrasına randevu verilebileceğini belirler.",
+        "bufferBefore": "Her randevudan önce hazırlık için otomatik boş bırakılan süredir.",
+        "bufferAfter": "Her randevudan sonra toparlanma veya not alma için otomatik boş bırakılan süredir."
+      },
+      "googleBusyOverlay": "Google meşguliyetlerini dikkate al",
+      "googleBusyOverlayHelp": "Google Calendar üzerindeki dolu zamanlar uygunluk hesabına dahil edilir.",
+      "googleWriteThrough": "Oluşan ve güncellenen randevuları Google'a yansıt",
+      "googleWriteThroughHelp": "Qualy içinde oluşturulan randevular aynı anda Google Calendar'a da yazılır.",
+      "help": "Bu modül kontrollü bir v1 uygular: ana kayıt kaynağı Qualy'dir, Google Calendar ise destekleyici katmandır.",
+      "summaryBooking": "Randevu",
+      "summaryEnabled": "Açık",
+      "summaryDisabled": "Kapalı",
+      "summaryHours": "Çalışma günleri",
+      "summaryHoursHint": "Açık gün sayısı",
+      "summaryServices": "Özel süreler",
+      "summaryServicesHint": "Hizmete özel süre tanımlı kayıt",
+      "summaryGoogle": "Google Calendar",
+      "connectionTitle": "Bağlı uygulama durumu",
+      "connectionDescription": "Takvim sayfasında yalnızca bağlantı durumunu gösteriyoruz. Google Calendar bağlantısını ve senkron davranışını Uygulamalar sayfasından yönetin.",
+      "openApplications": "Uygulamalara git",
+      "connectionDisconnected": "Henüz bağlı bir Google Calendar hesabı yok."
+    },
+    "apps": {
+      "googleTitle": "Google Calendar",
+      "googleDescription": "Harici takvim uygulamalarını buradan yönetin. Bugün Google Calendar, ileride başka uygulamalar da aynı yüzeyde yer alacak.",
+      "googleDisconnected": "Google Calendar şu anda bağlı değil. Bağladıktan sonra meşguliyet katmanını ve iki yönlü yazma davranışını burada yönetebilirsiniz."
+    },
+    "availability": {
+      "title": "Çalışma saatleri",
+      "description": "Her gün için açık veya kapalı durumu ve kabul edilen saat aralığını belirleyin.",
+      "help": "Bu saatlerin dışındaki randevular hem operatör hem de yapay zeka için kapalı sayılır.",
+      "dayOpen": "Bugün randevu kabul ediliyor",
+      "dayClosed": "Bugün randevu kabul edilmiyor",
+      "dayEnabled": "Açık",
+      "dayDisabled": "Kapalı",
+      "startTime": "Başlangıç",
+      "endTime": "Bitiş"
+    },
+    "services": {
+      "title": "Hizmet süreleri",
+      "description": "Mevcut hizmet kataloğunu kullanarak her hizmet için süre tanımlayın. Ayrı bir randevu listesi oluşturmanız gerekmez.",
+      "empty": "Henüz aktif hizmet yok. Önce hizmet ekleyin veya senkronlayın, sonra randevu süresi tanımlayın.",
+      "openOrganizationSettings": "Organizasyon ayarlarını aç",
+      "customDurationActive": "Bu hizmet için özel süre aktif.",
+      "usingFallback": "Varsayılan organizasyon süresi olan {minutes} dakika kullanılıyor.",
+      "help": "Varsayılan organizasyon süresini kullanmak için alanı boş bırakın.",
+      "customDurationBadge": "Özel",
+      "defaultDurationBadge": "Varsayılan",
+      "durationInputLabel": "Süre"
+    },
+    "bookingForm": {
+      "validationDateTime": "Randevuyu kaydetmeden önce hem tarih hem saat seçin.",
+      "validationDuration": "Randevu süresi sıfırdan büyük bir dakika değeri olmalıdır.",
+      "service": "Hizmet",
+      "serviceOptional": "Bağlı hizmet yok",
+      "date": "Tarih",
+      "time": "Saat",
+      "durationPreview": "Beklenen süre: {minutes} dakika",
+      "durationMinutes": "Beklenen süre (dakika)",
+      "durationDefaultHint": "Servis seçimine göre önerilen süre: {minutes} dakika.",
+      "customerName": "Müşteri adı",
+      "customerEmail": "Müşteri e-postası",
+      "customerPhone": "Müşteri telefonu",
+      "source": "Kaynak",
+      "channel": "Kanal",
+      "status": "Durum",
+      "notes": "Notlar"
+    },
+    "messages": {
+      "bookingUpdated": "Randevu güncellendi.",
+      "bookingCreated": "Randevu oluşturuldu.",
+      "bookingCanceled": "Randevu iptal edildi.",
+      "settingsSaved": "Takvim ayarları kaydedildi.",
+      "availabilitySaved": "Müsaitlik kuralları kaydedildi.",
+      "serviceDurationsSaved": "Hizmet süreleri kaydedildi.",
+      "googleDisconnected": "Google Calendar bağlantısı kesildi.",
+      "invalidTimezone": "Europe/Istanbul gibi geçerli bir IANA saat dilimi girin.",
+      "invalidNumericSettings": "Süre alanları geçerli ve negatif olmayan değerler olmalıdır.",
+      "invalidAvailabilityWindow": "Her aktif çalışma saati penceresi başlangıcından sonra bitmelidir.",
+      "invalidServiceDuration": "Hizmet süreleri pozitif sayı olmalı ya da varsayılan süre için boş bırakılmalıdır.",
+      "saveFailed": "Değişiklikler kaydedilemedi. Lütfen tekrar deneyin."
+    },
+    "days": {
+      "monday": "Pazartesi",
+      "tuesday": "Salı",
+      "wednesday": "Çarşamba",
+      "thursday": "Perşembe",
+      "friday": "Cuma",
+      "saturday": "Cumartesi",
+      "sunday": "Pazar"
+    },
+    "noOrganization": {
+      "title": "Aktif organizasyon yok",
+      "description": "Randevu kurallarını, bağlı takvimleri ve randevuları yönetmek için bir organizasyon seçin."
     }
   },
   "leads": {

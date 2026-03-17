@@ -17,6 +17,13 @@ export type HumanEscalationAction = 'notify_only' | 'switch_to_operator'
 export type QaLabRunPreset = 'quick' | 'regression'
 export type QaLabRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'budget_stopped'
 export type QaLabRunResult = 'pending' | 'fail_critical' | 'pass_with_findings' | 'pass_clean'
+export type CalendarProvider = 'google'
+export type CalendarConnectionStatus = 'disconnected' | 'pending' | 'active' | 'error'
+export type CalendarSyncMode = 'busy_overlay' | 'write_through'
+export type CalendarBookingStatus = 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no_show'
+export type CalendarBookingSource = 'manual' | 'operator' | 'ai'
+export type CalendarBookingSyncStatus = 'not_synced' | 'pending' | 'synced' | 'error'
+export type BookingDurationSource = 'service_catalog' | 'organization_default' | 'manual_override'
 
 export interface OrganizationAiSettings {
     organization_id: string
@@ -374,6 +381,84 @@ export interface Channel {
 export type LeadStatus = 'hot' | 'warm' | 'cold'
 export type ServiceCandidateStatus = 'pending' | 'approved' | 'rejected'
 
+export interface BookingSettings {
+    organization_id: string
+    booking_enabled: boolean
+    timezone: string
+    default_booking_duration_minutes: number
+    slot_interval_minutes: number
+    minimum_notice_minutes: number
+    buffer_before_minutes: number
+    buffer_after_minutes: number
+    google_busy_overlay_enabled: boolean
+    google_write_through_enabled: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface BookingAvailabilityRule {
+    id: string
+    organization_id: string
+    day_of_week: number
+    start_minute: number
+    end_minute: number
+    label: string | null
+    active: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface CalendarConnection {
+    id: string
+    organization_id: string
+    provider: CalendarProvider
+    status: CalendarConnectionStatus
+    sync_mode: CalendarSyncMode
+    external_account_id: string | null
+    external_account_email: string | null
+    primary_calendar_id: string | null
+    scopes: string[]
+    last_sync_at: string | null
+    last_sync_status: 'ok' | 'pending' | 'error' | null
+    last_sync_error: string | null
+    connected_by: string | null
+    connected_at: string | null
+    disconnected_at: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface CalendarBooking {
+    id: string
+    organization_id: string
+    resource_key: string
+    conversation_id: string | null
+    lead_id: string | null
+    service_catalog_id: string | null
+    service_name_snapshot: string | null
+    status: CalendarBookingStatus
+    source: CalendarBookingSource
+    channel: ConversationPlatform | 'manual' | null
+    starts_at: string
+    ends_at: string
+    timezone: string
+    duration_minutes: number
+    duration_source: BookingDurationSource
+    customer_name: string | null
+    customer_email: string | null
+    customer_phone: string | null
+    provider: CalendarProvider | null
+    provider_connection_id: string | null
+    provider_event_id: string | null
+    sync_status: CalendarBookingSyncStatus
+    notes: string | null
+    metadata: Json
+    created_by: string | null
+    canceled_at: string | null
+    created_at: string
+    updated_at: string
+}
+
 export interface OfferingProfile {
     organization_id: string
     summary: string
@@ -421,6 +506,8 @@ export interface ServiceCatalogItem {
     organization_id: string
     name: string
     aliases: string[]
+    duration_minutes: number | null
+    duration_updated_at: string | null
     active: boolean
     created_at: string
     updated_at: string
@@ -507,6 +594,26 @@ export interface Database {
                 Row: InboxPredefinedTemplate
                 Insert: Omit<InboxPredefinedTemplate, 'id' | 'created_at' | 'updated_at'>
                 Update: Partial<Omit<InboxPredefinedTemplate, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            booking_settings: {
+                Row: BookingSettings
+                Insert: Omit<BookingSettings, 'created_at' | 'updated_at'>
+                Update: Partial<Omit<BookingSettings, 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            booking_availability_rules: {
+                Row: BookingAvailabilityRule
+                Insert: Omit<BookingAvailabilityRule, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<BookingAvailabilityRule, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            calendar_connections: {
+                Row: CalendarConnection
+                Insert: Omit<CalendarConnection, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<CalendarConnection, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            calendar_bookings: {
+                Row: CalendarBooking
+                Insert: Omit<CalendarBooking, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<CalendarBooking, 'id' | 'organization_id' | 'created_at' | 'updated_at'>>
             }
             channels: {
                 Row: Channel

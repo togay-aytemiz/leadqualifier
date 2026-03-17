@@ -5,7 +5,9 @@ export type SettingsNavItemId =
     | 'profile'
     | 'organization'
     | 'ai'
+    | 'calendar'
     | 'channels'
+    | 'apps'
     | 'plans'
     | 'billing'
 
@@ -13,7 +15,9 @@ const SETTINGS_NAV_ITEMS = new Set<SettingsNavItemId>([
     'profile',
     'organization',
     'ai',
+    'calendar',
     'channels',
+    'apps',
     'plans',
     'billing'
 ])

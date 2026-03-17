@@ -35,6 +35,7 @@ import {
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/skill-actions'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
+import { maybeHandleSchedulingRequest } from '@/lib/ai/booking'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
@@ -651,6 +652,79 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     }
 
     const llmResponseStartedAt = Date.now()
+
+    try {
+        const schedulingResult = await maybeHandleSchedulingRequest({
+            supabase: options.supabase,
+            organizationId: orgId,
+            conversationId: conversation.id,
+            message: options.text,
+            platform: options.platform,
+            customerName: conversation.contact_name ?? null,
+            customerPhone: conversation.contact_phone ?? null,
+            responseLanguage,
+            formatOutboundBotMessage,
+            sendOutbound: async (content) => {
+                await options.sendOutbound(content)
+            },
+            persistBotMessage
+        })
+        const schedulingHandled = typeof schedulingResult === 'object'
+            ? schedulingResult.handled
+            : schedulingResult
+        const schedulingRequiresHumanHandover = typeof schedulingResult === 'object'
+            ? Boolean(schedulingResult.requiresHumanHandover)
+            : false
+
+        if (schedulingHandled) {
+            if (schedulingRequiresHumanHandover) {
+                await applyEscalationAfterReply({ skillRequiresHumanHandover: true })
+            }
+            await recordAiLatencyEvent({
+                organizationId: orgId,
+                conversationId: conversation.id,
+                metricKey: 'llm_response',
+                durationMs: Date.now() - llmResponseStartedAt,
+                source: options.source,
+                metadata: {
+                    response_kind: 'calendar',
+                    platform: options.platform
+                }
+            }, {
+                supabase: options.supabase
+            })
+            return
+        }
+    } catch (error) {
+        console.error(`${options.logPrefix}: Scheduling branch failed`, error)
+
+        const schedulingFailureReply = responseLanguage === 'tr'
+            ? 'Takvim işlemini şu anda tamamlayamadım. Ekibimiz buradan devam edecek.'
+            : 'I could not complete the calendar action right now. Our team will continue from here.'
+        const formattedSchedulingFailureReply = formatOutboundBotMessage(schedulingFailureReply)
+        await options.sendOutbound(formattedSchedulingFailureReply)
+        await persistBotMessage(formattedSchedulingFailureReply, {
+            is_booking_response: true,
+            booking_action: 'handoff',
+            booking_error: 'scheduling_branch_failure'
+        })
+        await applyEscalationAfterReply({ skillRequiresHumanHandover: true })
+
+        await recordAiLatencyEvent({
+            organizationId: orgId,
+            conversationId: conversation.id,
+            metricKey: 'llm_response',
+            durationMs: Date.now() - llmResponseStartedAt,
+            source: options.source,
+            metadata: {
+                response_kind: 'calendar',
+                platform: options.platform
+            }
+        }, {
+            supabase: options.supabase
+        })
+        return
+    }
 
     const matchedSkills = await matchSkillsSafely({
         matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),

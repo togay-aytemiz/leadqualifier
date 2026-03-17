@@ -232,6 +232,7 @@
     "settings": "Settings",
     "billing": "Billing",
     "inbox": "Inbox",
+    "calendar": "Calendar",
     "simulator": "Simulator",
     "ai": "AI",
     "other": "Other",
@@ -977,9 +978,11 @@
     "profile": "Profile",
     "organization": "Organization",
     "ai": "Qualy AI",
+    "calendar": "Calendar",
     "qaLab": "AI QA Lab",
     "integrations": "Integrations",
     "channels": "Channels",
+    "apps": "Applications",
     "billing": "Billing",
     "plans": "Plans",
     "receipts": "Usage",
@@ -2248,6 +2251,240 @@
           "joined": "Joined"
         }
       }
+    }
+  },
+  "calendar": {
+    "title": "Calendar",
+    "readOnlyBanner": "Read-only mode: admin impersonation can review calendar data but cannot modify bookings or settings.",
+    "minutesShort": "min",
+    "minutesLabel": "minutes",
+    "actions": {
+      "newBooking": "New booking",
+      "openSettings": "Calendar settings",
+      "openCalendarWorkspace": "Open calendar",
+      "editBooking": "Edit booking",
+      "cancelBooking": "Cancel booking",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "connectGoogle": "Connect Google Calendar",
+      "disconnectGoogle": "Disconnect Google Calendar",
+      "previousRange": "Previous range",
+      "nextRange": "Next range",
+      "goToday": "Today",
+      "saveSettings": "Save settings",
+      "saveAvailability": "Save availability",
+      "saveServiceDurations": "Save service durations",
+      "close": "Close",
+      "saving": "Saving...",
+      "saveBooking": "Save booking"
+    },
+    "summary": {
+      "today": "Today",
+      "todayHint": "Quick answer to what is booked today.",
+      "thisWeek": "This week",
+      "weekHint": "Upcoming workload across the current week.",
+      "upcoming": "Upcoming",
+      "noUpcoming": "No upcoming bookings",
+      "calendarSettings": "Calendar settings",
+      "settingsHint": "{days} open days, {services} custom service durations.",
+      "googleCalendar": "Google Calendar",
+      "connected": "Connected",
+      "notConnected": "Not connected"
+    },
+    "views": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "agenda": "Agenda"
+    },
+    "filters": {
+      "allStatuses": "All statuses",
+      "allServices": "All services",
+      "allSources": "All sources",
+      "allChannels": "All channels"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "completed": "Completed",
+      "no_show": "No show",
+      "canceled": "Canceled"
+    },
+    "sources": {
+      "manual": "Manual",
+      "operator": "Operator",
+      "ai": "AI"
+    },
+    "channels": {
+      "manual": "Manual",
+      "whatsapp": "WhatsApp",
+      "instagram": "Instagram",
+      "telegram": "Telegram",
+      "simulator": "Simulator"
+    },
+    "labels": {
+      "bookingsCount": "bookings",
+      "moreBookings": "more"
+    },
+    "emptyStates": {
+      "untitledBooking": "Untitled booking",
+      "customerPending": "Customer details pending",
+      "noBookingsInRange": "No bookings match the current range and filters.",
+      "noBookingsOnDay": "Nothing is booked on this day yet.",
+      "noBookingsShort": "Empty"
+    },
+    "detail": {
+      "title": "Booking details",
+      "empty": "Select a booking to inspect the service, timing, sync state, and follow-up actions.",
+      "when": "When",
+      "duration": "Duration",
+      "origin": "Origin",
+      "notes": "Notes"
+    },
+    "durationSource": {
+      "service_catalog": "Uses the service-specific duration.",
+      "organization_default": "Uses the organization fallback duration.",
+      "manual_override": "This booking duration was adjusted manually."
+    },
+    "syncStatus": {
+      "not_synced": "Stored only inside Qualy.",
+      "pending": "Waiting to sync.",
+      "synced": "Synced with the connected calendar.",
+      "error": "Calendar sync needs attention."
+    },
+    "google": {
+      "title": "Google Calendar",
+      "description": "Use Google Calendar as an optional busy-time layer. Qualy remains the source of truth.",
+      "modeWriteThrough": "Google busy-time check and mirroring are enabled.",
+      "modeBusyOverlay": "Only Google busy-time checking is enabled.",
+      "help": "The connected calendar is only a supporting layer; the authoritative booking record still lives in Qualy."
+    },
+    "googleStatus": {
+      "success": "Google Calendar was connected successfully.",
+      "missing_google_env": "Google Calendar credentials are missing in the environment.",
+      "forbidden": "This workspace does not currently allow changing calendar connections.",
+      "missing_org": "Select an active organization before starting Google Calendar setup.",
+      "org_mismatch": "Organization context changed during Google Calendar setup. Please try again from the current workspace.",
+      "oauth_cancelled": "Google Calendar setup was canceled before permission was granted.",
+      "missing_state": "Google Calendar callback is missing the expected signed state.",
+      "invalid_state": "Google Calendar callback state could not be verified.",
+      "missing_code": "Google Calendar did not return an authorization code.",
+      "connect_failed": "Google Calendar could not be connected. Check the callback details and try again."
+    },
+    "settings": {
+      "title": "Calendar settings",
+      "description": "Define the rules that Qualy and operators must respect before suggesting or creating appointments.",
+      "tabs": {
+        "general": "General flow",
+        "availability": "Business hours",
+        "serviceDurations": "Service durations"
+      },
+      "bookingSectionTitle": "Booking rules",
+      "bookingSectionDescription": "Control whether booking is active, which time zone is used, and the core timing rules for new appointments.",
+      "bookingEnabled": "Booking enabled",
+      "bookingEnabledHelp": "When disabled, the system stops suggesting and creating new bookings.",
+      "timezone": "Time zone",
+      "defaultDuration": "Default service duration",
+      "slotInterval": "Booking interval",
+      "minimumNotice": "Minimum notice (minutes)",
+      "bufferBefore": "Gap before appointment",
+      "bufferAfter": "Gap after appointment",
+      "fieldHints": {
+        "slotInterval": "Available times are offered to customers in these minute increments.",
+        "minimumNotice": "Sets how far in advance a booking must be from the current moment.",
+        "bufferBefore": "Automatically reserves prep time before each booking.",
+        "bufferAfter": "Automatically leaves recovery or note-taking time after each booking."
+      },
+      "googleBusyOverlay": "Consider Google busy times",
+      "googleBusyOverlayHelp": "Busy ranges from Google Calendar are included in availability checks.",
+      "googleWriteThrough": "Mirror created and updated bookings to Google",
+      "googleWriteThroughHelp": "Bookings created in Qualy are also written to Google Calendar.",
+      "help": "This module keeps a controlled v1 boundary: Qualy is authoritative and Google Calendar stays supportive.",
+      "summaryBooking": "Booking",
+      "summaryEnabled": "Enabled",
+      "summaryDisabled": "Disabled",
+      "summaryHours": "Open days",
+      "summaryHoursHint": "Days currently available",
+      "summaryServices": "Custom durations",
+      "summaryServicesHint": "Services with their own duration",
+      "summaryGoogle": "Google Calendar",
+      "connectionTitle": "Connected app status",
+      "connectionDescription": "This page only shows connection status inside calendar preferences. Manage Google Calendar connectivity and sync behavior from Applications.",
+      "openApplications": "Open applications",
+      "connectionDisconnected": "There is no connected Google Calendar account yet."
+    },
+    "apps": {
+      "googleTitle": "Google Calendar",
+      "googleDescription": "Manage external calendar apps from here. Google Calendar is first, and other applications can join this surface later.",
+      "googleDisconnected": "Google Calendar is not connected yet. Once connected, you can manage busy-time checks and write-through behavior here."
+    },
+    "availability": {
+      "title": "Business hours",
+      "description": "Define whether each day is open and which hours accept appointments.",
+      "help": "Bookings outside these hours stay unavailable for both operators and AI.",
+      "dayOpen": "Appointments are accepted on this day",
+      "dayClosed": "Appointments are blocked on this day",
+      "dayEnabled": "Open",
+      "dayDisabled": "Closed",
+      "startTime": "Start time",
+      "endTime": "End time"
+    },
+    "services": {
+      "title": "Service durations",
+      "description": "Use the existing service catalog and set a duration for each service without creating a second appointment-only list.",
+      "empty": "No active services yet. Add or sync services first, then define durations for booking logic.",
+      "openOrganizationSettings": "Open Organization settings",
+      "customDurationActive": "Custom duration is active for this service.",
+      "usingFallback": "Uses the organization fallback duration of {minutes} minutes.",
+      "help": "Leave a duration blank to keep the organization default.",
+      "customDurationBadge": "Custom",
+      "defaultDurationBadge": "Default",
+      "durationInputLabel": "Duration"
+    },
+    "bookingForm": {
+      "validationDateTime": "Choose both a date and a time before saving the booking.",
+      "validationDuration": "Booking duration must be greater than zero minutes.",
+      "service": "Service",
+      "serviceOptional": "No linked service",
+      "date": "Date",
+      "time": "Time",
+      "durationPreview": "Expected duration: {minutes} minutes",
+      "durationMinutes": "Expected duration (minutes)",
+      "durationDefaultHint": "Suggested duration for the selected service: {minutes} minutes.",
+      "customerName": "Customer name",
+      "customerEmail": "Customer email",
+      "customerPhone": "Customer phone",
+      "source": "Source",
+      "channel": "Channel",
+      "status": "Status",
+      "notes": "Notes"
+    },
+    "messages": {
+      "bookingUpdated": "Booking updated.",
+      "bookingCreated": "Booking created.",
+      "bookingCanceled": "Booking canceled.",
+      "settingsSaved": "Calendar settings saved.",
+      "availabilitySaved": "Availability rules saved.",
+      "serviceDurationsSaved": "Service durations saved.",
+      "googleDisconnected": "Google Calendar disconnected.",
+      "invalidTimezone": "Enter a valid IANA time zone such as Europe/Istanbul.",
+      "invalidNumericSettings": "Duration values must be valid and non-negative.",
+      "invalidAvailabilityWindow": "Every active business-hour window must end after it starts.",
+      "invalidServiceDuration": "Service durations must be positive numbers or left blank for the default duration.",
+      "saveFailed": "Changes could not be saved. Please try again."
+    },
+    "days": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "noOrganization": {
+      "title": "No active organization",
+      "description": "Select an organization to manage booking rules, connected calendars, and appointments."
     }
   },
   "leads": {
