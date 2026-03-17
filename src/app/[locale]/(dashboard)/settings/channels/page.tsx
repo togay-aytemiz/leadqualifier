@@ -40,7 +40,7 @@ export default async function ChannelsPage() {
             <PageHeader title={tChannels('title')} />
 
             <div className="flex-1 overflow-auto p-8">
-                <div className="mx-auto max-w-6xl">
+                <div className="w-full">
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                         <p className="text-sm text-slate-500">
                             {tChannels('description')}

@@ -58,6 +58,6 @@ describe('getChannelCardConfigs', () => {
         expect(classes).toContain('grid')
         expect(classes).toContain('md:grid-cols-2')
         expect(classes).toContain('xl:grid-cols-3')
-        expect(classes).not.toContain('2xl:grid-cols-4')
+        expect(classes).toContain('2xl:grid-cols-4')
     })
 })
