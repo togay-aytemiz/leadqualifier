@@ -81,6 +81,7 @@ import {
   resolveWhatsAppReplyWindowState,
 } from '@/lib/whatsapp/reply-window'
 import { sortMessagesChronologically } from '@/lib/inbox/message-order'
+import { parseOutboundDeliveryStatus } from '@/lib/inbox/outbound-delivery'
 import { dispatchInboxUnreadUpdated } from '@/lib/inbox/unread-events'
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
 import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
@@ -239,8 +240,8 @@ function extractOutboundAttachmentId(metadata: unknown) {
 function resolveOutboundDeliveryState(metadata: unknown): 'sending' | 'failed' | null {
   const parsed = parseMessageMetadataRecord(metadata)
   if (!parsed) return null
-  const value = parsed.whatsapp_outbound_status ?? parsed.instagram_outbound_status
-  if (value === 'sending') return 'sending'
+  const value = parseOutboundDeliveryStatus(parsed)
+  if (value === 'pending') return 'sending'
   if (value === 'failed') return 'failed'
   return null
 }
@@ -491,14 +492,20 @@ export function InboxContainer({
       previous.map((message) => {
         if (!tempMessageIds.includes(message.id)) return message
         const metadataRecord = parseMessageMetadataRecord(message.metadata) ?? {}
-        const statusKey = metadataRecord.instagram_outbound_attachment_id
-          ? 'instagram_outbound_status'
-          : 'whatsapp_outbound_status'
+        const statusKey =
+          metadataRecord.instagram_outbound_attachment_id ||
+          metadataRecord.outbound_channel === 'instagram'
+            ? 'instagram_outbound_status'
+            : metadataRecord.whatsapp_outbound_attachment_id ||
+                metadataRecord.outbound_channel === 'whatsapp'
+              ? 'whatsapp_outbound_status'
+              : null
         return {
           ...message,
           metadata: {
             ...metadataRecord,
-            [statusKey]: 'failed',
+            outbound_delivery_status: 'failed',
+            ...(statusKey ? { [statusKey]: 'failed' } : {}),
           } as Message['metadata'],
         }
       })
@@ -1863,6 +1870,8 @@ export function InboxContainer({
                   created_by: currentUserProfile?.id ?? null,
                   content: t('composerAttachments.outboundPlaceholderImage'),
                   metadata: {
+                    outbound_delivery_status: 'pending',
+                    outbound_channel: 'instagram',
                     instagram_outbound_status: 'sending',
                     instagram_outbound_attachment_id: attachment.id,
                     instagram_is_media_placeholder: true,
@@ -1894,6 +1903,8 @@ export function InboxContainer({
                 created_by: currentUserProfile?.id ?? null,
                 content,
                 metadata: {
+                  outbound_delivery_status: 'pending',
+                  outbound_channel: 'whatsapp',
                   whatsapp_outbound_status: 'sending',
                   whatsapp_outbound_attachment_id: attachment.id,
                   whatsapp_is_media_placeholder: !caption,
@@ -1918,7 +1929,10 @@ export function InboxContainer({
                     sender_type: 'user' as const,
                     created_by: currentUserProfile?.id ?? null,
                     content: normalizedInput,
-                    metadata: {} as Message['metadata'],
+                    metadata: {
+                      outbound_delivery_status: 'pending',
+                      outbound_channel: 'instagram',
+                    } as Message['metadata'],
                     created_at: new Date(Date.now() + selectedAttachments.length).toISOString(),
                   },
                 ]
@@ -1931,7 +1945,10 @@ export function InboxContainer({
               sender_type: 'user' as const,
               created_by: currentUserProfile?.id ?? null,
               content: normalizedInput,
-              metadata: {} as Message['metadata'],
+              metadata: {
+                outbound_delivery_status: 'pending',
+                outbound_channel: isInstagramConversation ? 'instagram' : 'whatsapp',
+              } as Message['metadata'],
               created_at: nowIso,
             },
           ]

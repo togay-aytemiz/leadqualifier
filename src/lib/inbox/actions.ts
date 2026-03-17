@@ -28,6 +28,7 @@ import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholde
 import { InstagramClient } from '@/lib/instagram/client'
 import { resolveConversationContactAvatarUrl } from '@/lib/inbox/contact-avatar'
 import { normalizeConversationTags } from '@/lib/inbox/conversation-tags'
+import { buildOutboundDeliveryMetadata } from '@/lib/inbox/outbound-delivery'
 import {
   normalizeRequiredIntakeFieldKey,
   normalizeRequiredIntakeFieldValue,
@@ -1111,6 +1112,104 @@ async function isOrganizationWorkspaceLocked(
   return !entitlement.isUsageAllowed
 }
 
+type OperatorOutboundChannel = 'whatsapp' | 'instagram' | 'telegram'
+
+type QueuedOperatorMessage = {
+  message: Message
+  conversation: Conversation
+}
+
+async function queueOperatorMessage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    conversationId: string
+    content: string
+    channel: OperatorOutboundChannel
+    metadata?: Json
+  }
+): Promise<QueuedOperatorMessage> {
+  const metadata = buildOutboundDeliveryMetadata(input.metadata, {
+    outbound_channel: input.channel,
+    outbound_delivery_status: 'pending',
+  })
+  const { data, error } = await supabase.rpc('queue_operator_message', {
+    p_conversation_id: input.conversationId,
+    p_content: input.content,
+    p_metadata: metadata,
+  })
+
+  if (error) throw error
+  if (!data) throw new Error('Failed to queue operator message')
+
+  return data as QueuedOperatorMessage
+}
+
+async function updateQueuedOperatorMessageMetadata(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    messageId: string
+    conversationId: string
+    metadata: Json
+  }
+) {
+  const { data, error } = await supabase
+    .from('messages')
+    .update({
+      metadata: input.metadata,
+    })
+    .eq('id', input.messageId)
+    .eq('conversation_id', input.conversationId)
+    .select()
+    .single()
+
+  if (error || !data) {
+    throw error ?? new Error('Failed to update queued operator message metadata')
+  }
+
+  return data as Message
+}
+
+async function finalizeQueuedOperatorMessageAsSent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    queued: QueuedOperatorMessage
+    channel: OperatorOutboundChannel
+    providerMessageId?: string | null
+    metadata?: Json
+  }
+) {
+  return updateQueuedOperatorMessageMetadata(supabase, {
+    messageId: input.queued.message.id,
+    conversationId: input.queued.message.conversation_id,
+    metadata: buildOutboundDeliveryMetadata(input.metadata ?? input.queued.message.metadata, {
+      outbound_channel: input.channel,
+      outbound_delivery_status: 'sent',
+      outbound_provider_message_id: input.providerMessageId ?? null,
+      outbound_error_code: null,
+    }),
+  })
+}
+
+async function finalizeQueuedOperatorMessageAsFailed(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: {
+    queued: QueuedOperatorMessage
+    channel: OperatorOutboundChannel
+    errorCode: string
+    metadata?: Json
+  }
+) {
+  return updateQueuedOperatorMessageMetadata(supabase, {
+    messageId: input.queued.message.id,
+    conversationId: input.queued.message.conversation_id,
+    metadata: buildOutboundDeliveryMetadata(input.metadata ?? input.queued.message.metadata, {
+      outbound_channel: input.channel,
+      outbound_delivery_status: 'failed',
+      outbound_error_code: input.errorCode,
+    }),
+  })
+}
+
 export async function getConversationSummary(
   conversationId: string,
   organizationId: string,
@@ -1513,7 +1612,6 @@ export async function sendMessage(
 
   // 2. If Telegram, send via API
   if (conversation.platform === 'telegram') {
-    // Find the active telegram channel for this org
     const { data: channel } = await supabase
       .from('channels')
       .select('config')
@@ -1523,17 +1621,31 @@ export async function sendMessage(
       .single()
 
     const botToken = channel ? readConfigString(channel.config as Json, 'bot_token') : null
-    if (botToken) {
-      try {
-        const { TelegramClient } = await import('@/lib/telegram/client')
-        const client = new TelegramClient(botToken)
-        await client.sendMessage(conversation.contact_phone, content)
-      } catch (error) {
-        console.error('Failed to send Telegram message:', error)
-        throw new Error('Failed to send message to Telegram API')
-      }
-    } else {
-      console.warn('No active Telegram channel found for this organization')
+    if (!botToken) throw new Error('No active Telegram channel found for this organization')
+
+    const queued = await queueOperatorMessage(supabase, {
+      conversationId,
+      content,
+      channel: 'telegram',
+    })
+
+    try {
+      const { TelegramClient } = await import('@/lib/telegram/client')
+      const client = new TelegramClient(botToken)
+      await client.sendMessage(conversation.contact_phone, content)
+      const message = await finalizeQueuedOperatorMessageAsSent(supabase, {
+        queued,
+        channel: 'telegram',
+      })
+      return { message, conversation: queued.conversation }
+    } catch (error) {
+      console.error('Failed to send Telegram message:', error)
+      await finalizeQueuedOperatorMessageAsFailed(supabase, {
+        queued,
+        channel: 'telegram',
+        errorCode: 'provider_send_failed',
+      })
+      throw new Error('Failed to send message to Telegram API')
     }
   }
 
@@ -1553,21 +1665,38 @@ export async function sendMessage(
       ? readConfigString(channel.config as Json, 'phone_number_id')
       : null
 
-    if (accessToken && phoneNumberId) {
-      try {
-        const { WhatsAppClient } = await import('@/lib/whatsapp/client')
-        const client = new WhatsAppClient(accessToken)
-        await client.sendText({
-          phoneNumberId,
-          to: conversation.contact_phone,
-          text: content,
-        })
-      } catch (error) {
-        console.error('Failed to send WhatsApp message:', error)
-        throw new Error('Failed to send message to WhatsApp API')
-      }
-    } else {
-      console.warn('No active WhatsApp channel found for this organization')
+    if (!accessToken || !phoneNumberId) {
+      throw new Error('No active WhatsApp channel found for this organization')
+    }
+
+    const queued = await queueOperatorMessage(supabase, {
+      conversationId,
+      content,
+      channel: 'whatsapp',
+    })
+
+    try {
+      const { WhatsAppClient } = await import('@/lib/whatsapp/client')
+      const client = new WhatsAppClient(accessToken)
+      const providerResponse = await client.sendText({
+        phoneNumberId,
+        to: conversation.contact_phone,
+        text: content,
+      })
+      const message = await finalizeQueuedOperatorMessageAsSent(supabase, {
+        queued,
+        channel: 'whatsapp',
+        providerMessageId: providerResponse.messages?.[0]?.id?.trim() || null,
+      })
+      return { message, conversation: queued.conversation }
+    } catch (error) {
+      console.error('Failed to send WhatsApp message:', error)
+      await finalizeQueuedOperatorMessageAsFailed(supabase, {
+        queued,
+        channel: 'whatsapp',
+        errorCode: 'provider_send_failed',
+      })
+      throw new Error('Failed to send message to WhatsApp API')
     }
   }
 
@@ -1603,70 +1732,86 @@ export async function sendMessage(
       ? readConfigString(channel.config as Json, 'instagram_business_account_id')
       : null
 
-    if (pageAccessToken && instagramBusinessAccountId) {
-      try {
-        const { InstagramClient } = await import('@/lib/instagram/client')
-        const client = new InstagramClient(pageAccessToken)
-        await client.sendText({
-          instagramBusinessAccountId,
-          to: conversation.contact_phone,
-          text: content,
-        })
-      } catch (error) {
-        console.error('Failed to send Instagram message:', error)
-        const reason = error instanceof Error ? error.message : String(error)
-        throw new Error(`Failed to send message to Instagram API: ${reason}`)
-      }
-    } else {
-      console.warn('No active Instagram channel found for this organization')
+    if (!pageAccessToken || !instagramBusinessAccountId) {
+      throw new Error('No active Instagram channel found for this organization')
     }
-  }
 
-  // 3. Save to DB + assign operator atomically
-  const { data, error } = await supabase.rpc('send_operator_message', {
-    p_conversation_id: conversationId,
-    p_content: content,
-  })
+    const queued = await queueOperatorMessage(supabase, {
+      conversationId,
+      content,
+      channel: 'instagram',
+    })
 
-  if (error) throw error
-  if (!data) throw new Error('Failed to send message')
+    let response: { message: Message; conversation: Conversation } = {
+      message: queued.message,
+      conversation: queued.conversation,
+    }
 
-  let response = data as { message: Message; conversation: Conversation }
+    try {
+      const { InstagramClient } = await import('@/lib/instagram/client')
+      const client = new InstagramClient(pageAccessToken)
+      const providerResponse = await client.sendText({
+        instagramBusinessAccountId,
+        to: conversation.contact_phone,
+        text: content,
+      })
+      const message = await finalizeQueuedOperatorMessageAsSent(supabase, {
+        queued,
+        channel: 'instagram',
+        providerMessageId: providerResponse.message_id?.trim() || null,
+      })
+      response = {
+        message,
+        conversation: queued.conversation,
+      }
+    } catch (error) {
+      console.error('Failed to send Instagram message:', error)
+      await finalizeQueuedOperatorMessageAsFailed(supabase, {
+        queued,
+        channel: 'instagram',
+        errorCode: 'provider_send_failed',
+      })
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to send message to Instagram API: ${reason}`)
+    }
 
-  if (conversation.platform === 'instagram' && Array.isArray(conversation.tags)) {
-    const normalizedTags = conversation.tags
+    if (Array.isArray(conversation.tags)) {
+      const normalizedTags = conversation.tags
       .filter((tag): tag is string => typeof tag === 'string')
       .map((tag) => tag.trim())
       .filter(Boolean)
-    const hasRequestTag = normalizedTags.some((tag) => tag.toLowerCase() === 'instagram_request')
+      const hasRequestTag = normalizedTags.some((tag) => tag.toLowerCase() === 'instagram_request')
 
-    if (hasRequestTag) {
-      const nextTags = normalizedTags.filter((tag) => tag.toLowerCase() !== 'instagram_request')
-      const { data: updatedConversation, error: updateConversationError } = await supabase
-        .from('conversations')
-        .update({
-          tags: nextTags,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
-        .select('*')
-        .single()
+      if (hasRequestTag) {
+        const nextTags = normalizedTags.filter((tag) => tag.toLowerCase() !== 'instagram_request')
+        const { data: updatedConversation, error: updateConversationError } = await supabase
+          .from('conversations')
+          .update({
+            tags: nextTags,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', conversationId)
+          .select('*')
+          .single()
 
-      if (updateConversationError) {
-        console.error(
-          'Failed to clear instagram_request tag after outbound reply:',
-          updateConversationError
-        )
-      } else if (updatedConversation) {
-        response = {
-          ...response,
-          conversation: updatedConversation as Conversation,
+        if (updateConversationError) {
+          console.error(
+            'Failed to clear instagram_request tag after outbound reply:',
+            updateConversationError
+          )
+        } else if (updatedConversation) {
+          response = {
+            ...response,
+            conversation: updatedConversation as Conversation,
+          }
         }
       }
     }
+
+    return response
   }
 
-  return response
+  throw new Error('Unsupported conversation platform')
 }
 
 function mapMediaContextReason(
@@ -2017,47 +2162,14 @@ export async function sendConversationWhatsAppMediaBatch(
       const caption = resolveOutboundMediaCaption(normalizedText, index)
       const messageContent =
         caption ?? resolveWhatsAppMediaPlaceholder(validatedAttachment.mediaType)
-
-      let whatsappMessageId: string | null = null
-      if (validatedAttachment.mediaType === 'image') {
-        const response = await client.sendImage({
-          phoneNumberId: context.phoneNumberId,
-          to: context.contactPhone,
-          imageUrl: attachment.publicUrl,
-          caption: caption ?? undefined,
-        })
-        whatsappMessageId = response.messages?.[0]?.id?.trim() || null
-      } else {
-        const response = await client.sendDocument({
-          phoneNumberId: context.phoneNumberId,
-          to: context.contactPhone,
-          documentUrl: attachment.publicUrl,
-          caption: caption ?? undefined,
-          filename: attachment.name || undefined,
-        })
-        whatsappMessageId = response.messages?.[0]?.id?.trim() || null
-      }
-
-      const { data, error } = await supabase.rpc('send_operator_message', {
-        p_conversation_id: conversationId,
-        p_content: messageContent,
-      })
-      if (error || !data) {
-        throw error ?? new Error('Failed to persist outbound media message')
-      }
-
-      const persisted = data as { message: Message; conversation: Conversation }
-      conversationSnapshot = persisted.conversation
-
-      const metadata: Json = {
-        whatsapp_message_id: whatsappMessageId,
+      const baseMetadata: Json = {
         whatsapp_message_type: validatedAttachment.mediaType,
         whatsapp_media_type: validatedAttachment.mediaType,
         whatsapp_media_mime_type: attachment.mimeType,
         whatsapp_media_caption: caption,
         whatsapp_media_filename: attachment.name,
         whatsapp_is_media_placeholder: !caption,
-        whatsapp_outbound_status: 'sent',
+        whatsapp_outbound_status: 'sending',
         whatsapp_outbound_attachment_id: validatedAttachment.id,
         whatsapp_media: {
           type: validatedAttachment.mediaType,
@@ -2069,22 +2181,60 @@ export async function sendConversationWhatsAppMediaBatch(
           download_status: 'stored',
         },
       }
+      const queued = await queueOperatorMessage(supabase, {
+        conversationId,
+        content: messageContent,
+        channel: 'whatsapp',
+        metadata: baseMetadata,
+      })
+      conversationSnapshot = queued.conversation
 
-      const { data: updatedMessage, error: updateError } = await supabase
-        .from('messages')
-        .update({
-          metadata,
+      try {
+        let whatsappMessageId: string | null = null
+        if (validatedAttachment.mediaType === 'image') {
+          const response = await client.sendImage({
+            phoneNumberId: context.phoneNumberId,
+            to: context.contactPhone,
+            imageUrl: attachment.publicUrl,
+            caption: caption ?? undefined,
+          })
+          whatsappMessageId = response.messages?.[0]?.id?.trim() || null
+        } else {
+          const response = await client.sendDocument({
+            phoneNumberId: context.phoneNumberId,
+            to: context.contactPhone,
+            documentUrl: attachment.publicUrl,
+            caption: caption ?? undefined,
+            filename: attachment.name || undefined,
+          })
+          whatsappMessageId = response.messages?.[0]?.id?.trim() || null
+        }
+
+        const updatedMessage = await finalizeQueuedOperatorMessageAsSent(supabase, {
+          queued,
+          channel: 'whatsapp',
+          providerMessageId: whatsappMessageId,
+          metadata: {
+            ...baseMetadata,
+            whatsapp_message_id: whatsappMessageId,
+            whatsapp_outbound_status: 'sent',
+          },
         })
-        .eq('id', persisted.message.id)
-        .eq('conversation_id', conversationId)
-        .select()
-        .single()
 
-      if (updateError || !updatedMessage) {
-        throw updateError ?? new Error('Failed to update outbound media metadata')
+        persistedMessages.push(updatedMessage)
+      } catch (error) {
+        await finalizeQueuedOperatorMessageAsFailed(supabase, {
+          queued,
+          channel: 'whatsapp',
+          errorCode: 'provider_send_failed',
+          metadata: {
+            ...baseMetadata,
+            whatsapp_message_id: null,
+            whatsapp_outbound_status: 'failed',
+          },
+        })
+        throw error
       }
-
-      persistedMessages.push(updatedMessage as Message)
     }
 
     return {
@@ -2202,31 +2352,13 @@ export async function sendConversationInstagramImageBatch(
         }
       }
 
-      const response = await client.sendImage({
-        instagramBusinessAccountId: context.instagramBusinessAccountId,
-        to: context.contactPhone,
-        imageUrl: attachment.publicUrl,
-      })
-
-      const { data, error } = await supabase.rpc('send_operator_message', {
-        p_conversation_id: conversationId,
-        p_content: resolveInstagramImagePlaceholder(),
-      })
-      if (error || !data) {
-        throw error ?? new Error('Failed to persist outbound Instagram image message')
-      }
-
-      const persisted = data as { message: Message; conversation: Conversation }
-      conversationSnapshot = persisted.conversation
-
-      const metadata: Json = {
-        instagram_message_id: response.message_id?.trim() || null,
+      const baseMetadata: Json = {
         instagram_message_type: 'image',
         instagram_media_type: 'image',
         instagram_media_mime_type: attachment.mimeType,
         instagram_media_filename: attachment.name,
         instagram_is_media_placeholder: true,
-        instagram_outbound_status: 'sent',
+        instagram_outbound_status: 'sending',
         instagram_outbound_attachment_id: validatedAttachment.id,
         instagram_media: {
           type: 'image',
@@ -2238,47 +2370,79 @@ export async function sendConversationInstagramImageBatch(
           download_status: 'stored',
         },
       }
+      const queued = await queueOperatorMessage(supabase, {
+        conversationId,
+        content: resolveInstagramImagePlaceholder(),
+        channel: 'instagram',
+        metadata: baseMetadata,
+      })
+      conversationSnapshot = queued.conversation
 
-      const { data: updatedMessage, error: updateError } = await supabase
-        .from('messages')
-        .update({
-          metadata,
+      try {
+        const response = await client.sendImage({
+          instagramBusinessAccountId: context.instagramBusinessAccountId,
+          to: context.contactPhone,
+          imageUrl: attachment.publicUrl,
         })
-        .eq('id', persisted.message.id)
-        .eq('conversation_id', conversationId)
-        .select()
-        .single()
+        const instagramMessageId = response.message_id?.trim() || null
+        const updatedMessage = await finalizeQueuedOperatorMessageAsSent(supabase, {
+          queued,
+          channel: 'instagram',
+          providerMessageId: instagramMessageId,
+          metadata: {
+            ...baseMetadata,
+            instagram_message_id: instagramMessageId,
+            instagram_outbound_status: 'sent',
+          },
+        })
 
-      if (updateError || !updatedMessage) {
-        throw updateError ?? new Error('Failed to update outbound Instagram media metadata')
+        persistedMessages.push(updatedMessage)
+      } catch (error) {
+        await finalizeQueuedOperatorMessageAsFailed(supabase, {
+          queued,
+          channel: 'instagram',
+          errorCode: 'provider_send_failed',
+          metadata: {
+            ...baseMetadata,
+            instagram_message_id: null,
+            instagram_outbound_status: 'failed',
+          },
+        })
+        throw error
       }
-
-      persistedMessages.push(updatedMessage as Message)
     }
 
     if (normalizedText) {
-      const textResponse = await client.sendText({
-        instagramBusinessAccountId: context.instagramBusinessAccountId,
-        to: context.contactPhone,
-        text: normalizedText,
+      const queued = await queueOperatorMessage(supabase, {
+        conversationId,
+        content: normalizedText,
+        channel: 'instagram',
       })
+      conversationSnapshot = queued.conversation
 
-      const { data, error } = await supabase.rpc('send_operator_message', {
-        p_conversation_id: conversationId,
-        p_content: normalizedText,
-      })
-      if (error || !data) {
-        throw error ?? new Error('Failed to persist outbound Instagram text message')
+      try {
+        const textResponse = await client.sendText({
+          instagramBusinessAccountId: context.instagramBusinessAccountId,
+          to: context.contactPhone,
+          text: normalizedText,
+        })
+        const instagramMessageId = textResponse.message_id?.trim() || null
+        const updatedMessage = await finalizeQueuedOperatorMessageAsSent(supabase, {
+          queued,
+          channel: 'instagram',
+          providerMessageId: instagramMessageId,
+          metadata: instagramMessageId ? { instagram_message_id: instagramMessageId } : undefined,
+        })
+
+        persistedMessages.push(updatedMessage)
+      } catch (error) {
+        await finalizeQueuedOperatorMessageAsFailed(supabase, {
+          queued,
+          channel: 'instagram',
+          errorCode: 'provider_send_failed',
+        })
+        throw error
       }
-
-      const persisted = data as { message: Message; conversation: Conversation }
-      conversationSnapshot = persisted.conversation
-      persistedMessages.push({
-        ...persisted.message,
-        metadata: textResponse.message_id
-          ? { instagram_message_id: textResponse.message_id }
-          : persisted.message.metadata,
-      } as Message)
     }
 
     return {
@@ -2510,7 +2674,14 @@ export async function sendConversationWhatsAppTemplateMessage(
     return { ok: false, reason: context.reason }
   }
 
+  let queued: QueuedOperatorMessage | null = null
   try {
+    queued = await queueOperatorMessage(supabase, {
+      conversationId,
+      content: `Template: ${templateName}`,
+      channel: 'whatsapp',
+    })
+
     const { WhatsAppClient } = await import('@/lib/whatsapp/client')
     const client = new WhatsAppClient(context.accessToken)
     const response = await client.sendTemplate({
@@ -2521,24 +2692,27 @@ export async function sendConversationWhatsAppTemplateMessage(
       bodyParameters,
     })
 
-    const { data, error } = await supabase.rpc('send_operator_message', {
-      p_conversation_id: conversationId,
-      p_content: `Template: ${templateName}`,
+    const message = await finalizeQueuedOperatorMessageAsSent(supabase, {
+      queued,
+      channel: 'whatsapp',
+      providerMessageId: response.messages?.[0]?.id ?? null,
     })
-
-    if (error) throw error
-    if (!data) throw new Error('Failed to persist template send message')
-
-    const persisted = data as { message: Message; conversation: Conversation }
 
     return {
       ok: true,
       messageId: response.messages?.[0]?.id ?? null,
-      message: persisted.message,
-      conversation: persisted.conversation,
+      message,
+      conversation: queued.conversation,
     }
   } catch (error) {
     console.error('Failed to send WhatsApp template for conversation:', error)
+    if (queued) {
+      await finalizeQueuedOperatorMessageAsFailed(supabase, {
+        queued,
+        channel: 'whatsapp',
+        errorCode: 'provider_send_failed',
+      })
+    }
     return { ok: false, reason: 'request_failed' }
   }
 }

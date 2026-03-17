@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { after } from 'next/server'
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
@@ -96,6 +97,22 @@ function mergeConversationTags(existingTags: unknown, ensureTag: string | null):
     if (hasTag) return normalized
 
     return [...normalized, ensureTag]
+}
+
+function schedulePostResponseTask(logPrefix: string, label: string, task: () => Promise<void>) {
+    const runTask = async () => {
+        try {
+            await task()
+        } catch (error) {
+            console.error(`${logPrefix}: Deferred ${label} failed`, error)
+        }
+    }
+
+    try {
+        after(runTask)
+    } catch {
+        void runTask()
+    }
 }
 
 export async function processInboundAiPipeline(options: InboundAiPipelineInput) {
@@ -284,33 +301,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         allowDuringOperator
     })
 
-    let leadScoreForEscalation: number | null = null
-    if (shouldRunLeadExtraction) {
-        await runLeadExtraction({
-            organizationId: orgId,
-            conversationId: conversation.id,
-            latestMessage: options.text,
-            supabase: options.supabase,
-            source: options.source
-        })
-
-        const { data: leadForEscalation, error: leadForEscalationError } = await options.supabase
-            .from('leads')
-            .select('total_score')
-            .eq('conversation_id', conversation.id)
-            .maybeSingle()
-
-        if (leadForEscalationError) {
-            console.warn(`${options.logPrefix}: Failed to load lead score for escalation`, leadForEscalationError)
-        } else if (typeof leadForEscalation?.total_score === 'number') {
-            leadScoreForEscalation = leadForEscalation.total_score
-        }
-    }
-
-    if (!await ensureUsageAllowed('before_skill_matching')) return
-
-    if (operatorActive || !allowReplies) return
-
     const persistBotMessage = async (content: string, metadata: Record<string, unknown>) => {
         await options.supabase
             .from('messages')
@@ -332,13 +322,106 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             .eq('id', conversation.id)
     }
 
+    const applyDeferredLeadEscalation = async () => {
+        const { data: leadForEscalation, error: leadForEscalationError } = await options.supabase
+            .from('leads')
+            .select('total_score')
+            .eq('conversation_id', conversation.id)
+            .maybeSingle()
+
+        if (leadForEscalationError) {
+            console.warn(`${options.logPrefix}: Failed to load lead score for escalation`, leadForEscalationError)
+            return
+        }
+
+        const leadScoreForEscalation = typeof leadForEscalation?.total_score === 'number'
+            ? leadForEscalation.total_score
+            : null
+        const handoverMessage = responseLanguage === 'tr'
+            ? aiSettings.hot_lead_handover_message_tr
+            : aiSettings.hot_lead_handover_message_en
+        const escalation = decideHumanEscalation({
+            skillRequiresHumanHandover: false,
+            leadScore: leadScoreForEscalation,
+            hotLeadThreshold: aiSettings.hot_lead_score_threshold,
+            hotLeadAction: aiSettings.hot_lead_action,
+            handoverMessage
+        })
+
+        if (!escalation.shouldEscalate) return
+
+        if (
+            escalation.noticeMode === 'assistant_promise'
+            && escalation.noticeMessage
+            && conversation.active_agent !== 'operator'
+        ) {
+            const formattedEscalationNotice = formatOutboundBotMessage(escalation.noticeMessage)
+            await options.sendOutbound(formattedEscalationNotice)
+            await persistBotMessage(formattedEscalationNotice, {
+                is_handover_notice: true,
+                escalation_reason: escalation.reason,
+                escalation_action: escalation.action
+            })
+        }
+
+        const nowIso = new Date().toISOString()
+        const attentionRequestedAt = conversation.human_attention_requested_at ?? nowIso
+        const escalationConversationUpdate: Record<string, unknown> = {
+            human_attention_required: true,
+            human_attention_reason: escalation.reason,
+            human_attention_requested_at: attentionRequestedAt,
+            human_attention_resolved_at: null,
+            updated_at: nowIso
+        }
+
+        if (escalation.action === 'switch_to_operator' && conversation.active_agent !== 'operator') {
+            escalationConversationUpdate.active_agent = 'operator'
+        }
+
+        const { error: escalationUpdateError } = await options.supabase
+            .from('conversations')
+            .update(escalationConversationUpdate)
+            .eq('id', conversation.id)
+
+        if (escalationUpdateError) {
+            console.error(`${options.logPrefix}: Failed to persist deferred conversation escalation state`, escalationUpdateError)
+            return
+        }
+
+        conversation = {
+            ...conversation,
+            ...escalationConversationUpdate
+        }
+    }
+
+    if (shouldRunLeadExtraction) {
+        schedulePostResponseTask(options.logPrefix, 'lead extraction', async () => {
+            if (!await ensureUsageAllowed('deferred_lead_extraction')) return
+
+            await runLeadExtraction({
+                organizationId: orgId,
+                conversationId: conversation.id,
+                latestMessage: options.text,
+                supabase: options.supabase,
+                source: options.source
+            })
+
+            if (operatorActive || !allowReplies) return
+            await applyDeferredLeadEscalation()
+        })
+    }
+
+    if (!await ensureUsageAllowed('before_skill_matching')) return
+
+    if (operatorActive || !allowReplies) return
+
     const applyEscalationAfterReply = async (args: { skillRequiresHumanHandover: boolean }) => {
         const handoverMessage = responseLanguage === 'tr'
             ? aiSettings.hot_lead_handover_message_tr
             : aiSettings.hot_lead_handover_message_en
         const escalation = decideHumanEscalation({
             skillRequiresHumanHandover: args.skillRequiresHumanHandover,
-            leadScore: leadScoreForEscalation,
+            leadScore: null,
             hotLeadThreshold: aiSettings.hot_lead_score_threshold,
             hotLeadAction: aiSettings.hot_lead_action,
             handoverMessage
@@ -567,6 +650,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         }
     }
 
+    const llmResponseStartedAt = Date.now()
+
     const matchedSkills = await matchSkillsSafely({
         matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
         context: {
@@ -609,8 +694,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
         return
     }
-
-    const llmResponseStartedAt = Date.now()
 
     try {
         const { searchKnowledgeBase } = await import('@/lib/knowledge-base/actions')

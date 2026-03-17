@@ -9,6 +9,7 @@ const {
   instagramSendTextMock,
   instagramGetUserProfileMock,
   sendTemplateMock,
+  whatsAppSendTextMock,
   whatsAppCtorMock,
 } = vi.hoisted(() => ({
   assertTenantWriteAllowedMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   instagramSendTextMock: vi.fn(),
   instagramGetUserProfileMock: vi.fn(),
   sendTemplateMock: vi.fn(),
+  whatsAppSendTextMock: vi.fn(),
   whatsAppCtorMock: vi.fn(),
 }))
 
@@ -44,6 +46,7 @@ vi.mock('@/lib/whatsapp/client', () => ({
 
     getMessageTemplates = getMessageTemplatesMock
     sendTemplate = sendTemplateMock
+    sendText = whatsAppSendTextMock
   },
 }))
 
@@ -66,6 +69,7 @@ import {
   deleteConversationPredefinedTemplate,
   listConversationWhatsAppTemplates,
   listConversationPredefinedTemplates,
+  sendMessage,
   sendConversationInstagramImageBatch,
   sendConversationWhatsAppTemplateMessage,
   setConversationRequiredIntakeOverride,
@@ -172,6 +176,131 @@ function createLead(overrides: Partial<Lead> = {}): Lead {
     created_at: '2026-03-15T09:00:00.000Z',
     updated_at: '2026-03-15T10:00:00.000Z',
     ...overrides,
+  }
+}
+
+function createChainMaybeSingleBuilder<T>(data: T, error: unknown = null) {
+  const builder: Record<string, unknown> = {}
+  const maybeSingleMock = vi.fn(async () => ({ data, error }))
+
+  builder.select = vi.fn(() => builder)
+  builder.eq = vi.fn(() => builder)
+  builder.order = vi.fn(() => builder)
+  builder.limit = vi.fn(() => builder)
+  builder.maybeSingle = maybeSingleMock
+
+  return {
+    builder,
+    maybeSingleMock,
+  }
+}
+
+function createUpdateSelectSingleBuilder<T>(data: T, error: unknown = null) {
+  const singleMock = vi.fn(async () => ({ data, error }))
+  const builder: Record<string, unknown> = {}
+
+  builder.update = vi.fn(() => builder)
+  builder.eq = vi.fn(() => builder)
+  builder.select = vi.fn(() => ({ single: singleMock }))
+
+  return {
+    builder,
+    updateMock: builder.update as ReturnType<typeof vi.fn>,
+    eqMock: builder.eq as ReturnType<typeof vi.fn>,
+    selectMock: builder.select as ReturnType<typeof vi.fn>,
+    singleMock,
+  }
+}
+
+function createSendMessageSupabaseMock(options: {
+  conversation?: Partial<Conversation> & Pick<Conversation, 'platform' | 'organization_id' | 'contact_phone'>
+  latestInboundAt?: string | null
+  queuedMessageId?: string
+}) {
+  const conversationSingleMock = vi.fn(async () => ({
+    data: {
+      ...createConversation(),
+      tags: [],
+      ...options.conversation,
+    },
+    error: null,
+  }))
+  const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+  const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+  const latestInboundBuilder = createChainMaybeSingleBuilder(
+    options.latestInboundAt ? { created_at: options.latestInboundAt } : null
+  )
+  const messageUpdateBuilder = createUpdateSelectSingleBuilder({
+    id: options.queuedMessageId ?? 'queued-msg-1',
+    conversation_id: 'conv-1',
+    sender_type: 'user',
+    content: 'Merhaba',
+    metadata: {},
+    created_at: '2026-03-17T10:10:01.000Z',
+  })
+
+  const channelSingleMock = vi.fn(async () => ({
+    data: {
+      config: {
+        permanent_access_token: 'wa-token-1',
+        phone_number_id: 'phone-1',
+      },
+    },
+    error: null,
+  }))
+  const channelEqStatusMock = vi.fn(() => ({ single: channelSingleMock }))
+  const channelEqTypeMock = vi.fn(() => ({ eq: channelEqStatusMock }))
+  const channelEqOrgMock = vi.fn(() => ({ eq: channelEqTypeMock }))
+  const channelSelectMock = vi.fn(() => ({ eq: channelEqOrgMock }))
+
+  const rpcMock = vi.fn(async () => ({
+    data: {
+      message: {
+        id: options.queuedMessageId ?? 'queued-msg-1',
+        conversation_id: 'conv-1',
+        sender_type: 'user',
+        content: 'Merhaba',
+        metadata: {
+          outbound_delivery_status: 'pending',
+          outbound_channel: 'whatsapp',
+        },
+        created_at: '2026-03-17T10:10:00.000Z',
+      },
+      conversation: {
+        ...createConversation({
+          id: 'conv-1',
+          platform: 'whatsapp',
+          organization_id: 'org-1',
+          contact_phone: '+905555555555',
+          active_agent: 'operator',
+          assignee_id: 'profile-1',
+        }),
+      },
+    },
+    error: null,
+  }))
+
+  const messageBuilders = [latestInboundBuilder.builder, messageUpdateBuilder.builder]
+
+  return {
+    supabase: {
+      from: vi.fn((table: string) => {
+        if (table === 'conversations') return { select: conversationSelectMock }
+        if (table === 'messages') {
+          const next = messageBuilders.shift()
+          if (!next) {
+            throw new Error('Unexpected extra messages query')
+          }
+          return next
+        }
+        if (table === 'channels') return { select: channelSelectMock }
+        throw new Error(`Unexpected query for table: ${table}`)
+      }),
+      rpc: rpcMock,
+    },
+    rpcMock,
+    messageUpdateBuilder,
   }
 }
 
@@ -589,6 +718,17 @@ function createConversationTemplateSupabaseMock(options: {
     error: null,
   }))
 
+  const messageUpdateBuilder = createUpdateSelectSingleBuilder({
+    id: 'msg-1',
+    conversation_id: 'conv-1',
+    sender_type: 'user',
+    content: 'Template: appointment_reminder',
+    metadata: {
+      outbound_delivery_status: 'sent',
+    },
+    created_at: '2026-03-17T10:10:01.000Z',
+  })
+
   const fromMock = vi.fn((table: string) => {
     if (table === 'conversations') {
       return {
@@ -602,6 +742,10 @@ function createConversationTemplateSupabaseMock(options: {
       }
     }
 
+    if (table === 'messages') {
+      return messageUpdateBuilder.builder
+    }
+
     throw new Error(`Unexpected query for table: ${table}`)
   })
 
@@ -611,6 +755,7 @@ function createConversationTemplateSupabaseMock(options: {
       rpc: rpcMock,
     },
     rpcMock,
+    messageUpdateBuilder,
     conversationEqMock,
     channelEqOrgMock,
     channelEqTypeMock,
@@ -618,12 +763,88 @@ function createConversationTemplateSupabaseMock(options: {
   }
 }
 
+describe('sendMessage durability', () => {
+  beforeEach(() => {
+    createClientMock.mockReset()
+    assertTenantWriteAllowedMock.mockResolvedValue(undefined)
+    whatsAppSendTextMock.mockReset()
+    whatsAppSendTextMock.mockResolvedValue({
+      messages: [{ id: 'wamid.text.1' }],
+    })
+  })
+
+  it('queues a pending WhatsApp operator message before provider send and finalizes it as sent', async () => {
+    const { supabase, rpcMock, messageUpdateBuilder } = createSendMessageSupabaseMock({
+      latestInboundAt: '2026-03-17T10:00:00.000Z',
+    })
+    createClientMock.mockResolvedValueOnce(supabase)
+
+    await sendMessage('conv-1', 'Merhaba')
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'queue_operator_message',
+      expect.objectContaining({
+        p_conversation_id: 'conv-1',
+        p_content: 'Merhaba',
+        p_metadata: expect.objectContaining({
+          outbound_channel: 'whatsapp',
+        }),
+      })
+    )
+    expect(rpcMock.mock.invocationCallOrder[0]).toBeLessThan(
+      whatsAppSendTextMock.mock.invocationCallOrder[0]
+    )
+    expect(messageUpdateBuilder.updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          outbound_delivery_status: 'sent',
+          outbound_channel: 'whatsapp',
+          outbound_provider_message_id: 'wamid.text.1',
+        }),
+      })
+    )
+  })
+
+  it('marks the queued WhatsApp operator message as failed when provider send fails', async () => {
+    const { supabase, rpcMock, messageUpdateBuilder } = createSendMessageSupabaseMock({
+      latestInboundAt: '2026-03-17T10:00:00.000Z',
+    })
+    createClientMock.mockResolvedValueOnce(supabase)
+    whatsAppSendTextMock.mockRejectedValueOnce(new Error('provider unavailable'))
+
+    await expect(sendMessage('conv-1', 'Merhaba')).rejects.toThrow(
+      'Failed to send message to WhatsApp API'
+    )
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'queue_operator_message',
+      expect.objectContaining({
+        p_conversation_id: 'conv-1',
+        p_content: 'Merhaba',
+      })
+    )
+    expect(messageUpdateBuilder.updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          outbound_delivery_status: 'failed',
+          outbound_channel: 'whatsapp',
+          outbound_error_code: expect.any(String),
+        }),
+      })
+    )
+  })
+})
+
 describe('inbox WhatsApp template actions', () => {
   beforeEach(() => {
     createClientMock.mockReset()
     assertTenantWriteAllowedMock.mockResolvedValue(undefined)
     instagramSendTextMock.mockReset()
     instagramSendImageMock.mockReset()
+    whatsAppSendTextMock.mockReset()
+    whatsAppSendTextMock.mockResolvedValue({
+      messages: [{ id: 'wamid.text.1' }],
+    })
     getMessageTemplatesMock.mockResolvedValue({
       data: [
         {
@@ -666,7 +887,7 @@ describe('inbox WhatsApp template actions', () => {
   })
 
   it('sends a WhatsApp template message to conversation contact', async () => {
-    const { supabase, rpcMock } = createConversationTemplateSupabaseMock({
+    const { supabase, rpcMock, messageUpdateBuilder } = createConversationTemplateSupabaseMock({
       conversation: {
         platform: 'whatsapp',
         contact_phone: '905551112233',
@@ -699,10 +920,67 @@ describe('inbox WhatsApp template actions', () => {
       languageCode: 'tr',
       bodyParameters: ['Ali'],
     })
-    expect(rpcMock).toHaveBeenCalledWith('send_operator_message', {
-      p_conversation_id: 'conv-1',
-      p_content: 'Template: appointment_reminder',
+    expect(rpcMock).toHaveBeenCalledWith(
+      'queue_operator_message',
+      expect.objectContaining({
+        p_conversation_id: 'conv-1',
+        p_content: 'Template: appointment_reminder',
+        p_metadata: expect.objectContaining({
+          outbound_channel: 'whatsapp',
+        }),
+      })
+    )
+    expect(messageUpdateBuilder.updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          outbound_delivery_status: 'sent',
+          outbound_channel: 'whatsapp',
+          outbound_provider_message_id: 'wamid.template.1',
+        }),
+      })
+    )
+  })
+
+  it('marks the queued template message as failed when the provider request fails', async () => {
+    const { supabase, rpcMock, messageUpdateBuilder } = createConversationTemplateSupabaseMock({
+      conversation: {
+        platform: 'whatsapp',
+        contact_phone: '905551112233',
+        organization_id: 'org-1',
+      },
+      channelConfig: {
+        permanent_access_token: 'token-1',
+        business_account_id: 'waba-1',
+        phone_number_id: 'phone-1',
+      },
     })
+    createClientMock.mockResolvedValueOnce(supabase)
+    sendTemplateMock.mockRejectedValueOnce(new Error('provider unavailable'))
+
+    const result = await sendConversationWhatsAppTemplateMessage({
+      conversationId: 'conv-1',
+      templateName: 'appointment_reminder',
+      languageCode: 'tr',
+      bodyParameters: ['Ali'],
+    })
+
+    expect(result).toEqual({ ok: false, reason: 'request_failed' })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'queue_operator_message',
+      expect.objectContaining({
+        p_conversation_id: 'conv-1',
+        p_content: 'Template: appointment_reminder',
+      })
+    )
+    expect(messageUpdateBuilder.updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          outbound_delivery_status: 'failed',
+          outbound_channel: 'whatsapp',
+          outbound_error_code: expect.any(String),
+        }),
+      })
+    )
   })
 })
 
@@ -827,13 +1105,22 @@ describe('inbox instagram image actions', () => {
       to: '17841400000000000',
       imageUrl: 'https://cdn.example.com/outbound/price-shot.jpg',
     })
-    expect(rpcMock).toHaveBeenCalledWith('send_operator_message', {
-      p_conversation_id: 'conv-1',
-      p_content: '[Instagram image]',
-    })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'queue_operator_message',
+      expect.objectContaining({
+        p_conversation_id: 'conv-1',
+        p_content: '[Instagram image]',
+        p_metadata: expect.objectContaining({
+          outbound_channel: 'instagram',
+        }),
+      })
+    )
     expect(messageUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
+          outbound_delivery_status: 'sent',
+          outbound_channel: 'instagram',
+          outbound_provider_message_id: 'igmid.outbound.image.1',
           instagram_message_id: 'igmid.outbound.image.1',
           instagram_media_type: 'image',
           instagram_outbound_attachment_id: 'ig-attachment-1',
@@ -842,6 +1129,140 @@ describe('inbox instagram image actions', () => {
             type: 'image',
             storage_url: 'https://cdn.example.com/outbound/price-shot.jpg',
           }),
+        }),
+      })
+    )
+  })
+
+  it('marks the queued instagram image message as failed when provider send fails', async () => {
+    instagramSendImageMock.mockRejectedValueOnce(new Error('provider unavailable'))
+
+    const conversationSingleMock = vi.fn(async () => ({
+      data: {
+        platform: 'instagram',
+        contact_phone: '17841400000000000',
+        organization_id: 'org-1',
+      },
+      error: null,
+    }))
+    const conversationEqMock = vi.fn(() => ({ single: conversationSingleMock }))
+    const conversationSelectMock = vi.fn(() => ({ eq: conversationEqMock }))
+
+    const inboundCountEqSenderMock = vi.fn(async () => ({
+      count: 1,
+      error: null,
+    }))
+    const inboundCountEqConversationMock = vi.fn(() => ({ eq: inboundCountEqSenderMock }))
+    const inboundCountSelectMock = vi.fn(() => ({ eq: inboundCountEqConversationMock }))
+
+    const messageSingleMock = vi.fn(async () => ({
+      data: {
+        id: 'msg-1',
+        conversation_id: 'conv-1',
+        sender_type: 'user',
+        content: '[Instagram image]',
+        metadata: {
+          outbound_delivery_status: 'failed',
+        },
+        created_at: '2026-03-11T10:10:01.000Z',
+      },
+      error: null,
+    }))
+    const messageSelectAfterUpdateMock = vi.fn(() => ({ single: messageSingleMock }))
+    const messageEqConversationIdMock = vi.fn(() => ({ select: messageSelectAfterUpdateMock }))
+    const messageEqIdMock = vi.fn(() => ({ eq: messageEqConversationIdMock }))
+    const messageUpdateMock = vi.fn(() => ({ eq: messageEqIdMock }))
+
+    const channelSingleMock = vi.fn(async () => ({
+      data: {
+        config: {
+          page_access_token: 'ig-token-1',
+          instagram_business_account_id: 'ig-business-1',
+        },
+      },
+      error: null,
+    }))
+    const channelEqStatusMock = vi.fn(() => ({ single: channelSingleMock }))
+    const channelEqTypeMock = vi.fn(() => ({ eq: channelEqStatusMock }))
+    const channelEqOrgMock = vi.fn(() => ({ eq: channelEqTypeMock }))
+    const channelSelectMock = vi.fn(() => ({ eq: channelEqOrgMock }))
+
+    const rpcMock = vi.fn(async () => ({
+      data: {
+        message: {
+          id: 'msg-1',
+          metadata: {
+            outbound_delivery_status: 'pending',
+            outbound_channel: 'instagram',
+          },
+        },
+        conversation: {
+          id: 'conv-1',
+          assignee_id: 'profile-1',
+        },
+      },
+      error: null,
+    }))
+
+    const messagesBuilders = [{ select: inboundCountSelectMock }, { update: messageUpdateMock }]
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'conversations') return { select: conversationSelectMock }
+        if (table === 'messages') {
+          const next = messagesBuilders.shift()
+          if (!next) {
+            throw new Error('Unexpected extra messages query')
+          }
+          return next
+        }
+        if (table === 'channels') return { select: channelSelectMock }
+        throw new Error(`Unexpected query for table: ${table}`)
+      }),
+      rpc: rpcMock,
+    }
+    createClientMock.mockResolvedValueOnce(supabase)
+
+    const result = await sendConversationInstagramImageBatch({
+      conversationId: 'conv-1',
+      text: '',
+      attachments: [
+        {
+          id: 'ig-attachment-1',
+          name: 'price-shot.jpg',
+          mimeType: 'image/jpeg',
+          sizeBytes: 2048,
+          mediaType: 'image',
+          storagePath: 'org-1/ig-business-1/outbound/price-shot.jpg',
+          uploadToken: 'ignored-in-send-test',
+          publicUrl: 'https://cdn.example.com/outbound/price-shot.jpg',
+        },
+      ],
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'request_failed',
+      attachmentId: 'ig-attachment-1',
+    })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'queue_operator_message',
+      expect.objectContaining({
+        p_conversation_id: 'conv-1',
+        p_content: '[Instagram image]',
+        p_metadata: expect.objectContaining({
+          outbound_channel: 'instagram',
+        }),
+      })
+    )
+    expect(messageUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          outbound_delivery_status: 'failed',
+          outbound_channel: 'instagram',
+          outbound_error_code: expect.any(String),
+          instagram_outbound_status: 'failed',
+          instagram_outbound_attachment_id: 'ig-attachment-1',
         }),
       })
     )

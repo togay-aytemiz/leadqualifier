@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
     analyzeRequiredIntakeStateMock,
+    afterCallbacks,
+    afterMock,
     buildRagContextMock,
     buildFallbackResponseMock,
     decideHumanEscalationMock,
@@ -19,6 +21,10 @@ const {
     searchKnowledgeBaseMock
 } = vi.hoisted(() => ({
     analyzeRequiredIntakeStateMock: vi.fn(),
+    afterCallbacks: [] as Array<() => void | Promise<void>>,
+    afterMock: vi.fn((callback: () => void | Promise<void>) => {
+        afterCallbacks.push(callback)
+    }),
     buildRagContextMock: vi.fn(),
     buildFallbackResponseMock: vi.fn(),
     decideHumanEscalationMock: vi.fn(),
@@ -34,6 +40,10 @@ const {
     resolveLeadExtractionAllowanceMock: vi.fn(),
     runLeadExtractionMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn()
+}))
+
+vi.mock('next/server', () => ({
+    after: afterMock
 }))
 
 vi.mock('@/lib/ai/settings', () => ({
@@ -102,6 +112,14 @@ vi.mock('@/lib/ai/fallback', () => ({
 }))
 
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
+
+async function flushAfterCallbacks() {
+    while (afterCallbacks.length > 0) {
+        const callback = afterCallbacks.shift()
+        if (!callback) continue
+        await callback()
+    }
+}
 
 type SupabaseBuilder = Record<string, unknown>
 
@@ -282,6 +300,10 @@ function buildInputBase(supabase: unknown, sendOutbound: ReturnType<typeof vi.fn
 describe('processInboundAiPipeline guardrails', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        afterCallbacks.length = 0
+        afterMock.mockImplementation((callback: () => void | Promise<void>) => {
+            afterCallbacks.push(callback)
+        })
 
         getOrgAiSettingsMock.mockResolvedValue({
             match_threshold: 0.7,
@@ -416,6 +438,7 @@ describe('processInboundAiPipeline guardrails', () => {
         isOperatorActiveMock.mockReturnValueOnce(false)
 
         await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+        await flushAfterCallbacks()
 
         expect(resolveLeadExtractionAllowanceMock).toHaveBeenCalledWith({
             botMode: 'shadow',
@@ -431,6 +454,146 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(sendOutbound).not.toHaveBeenCalled()
         expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('defers lead extraction until after the reply path completes', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({ total_score: 4 })
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            skills: [skillDetails.builder]
+        })
+
+        resolveLeadExtractionAllowanceMock.mockReturnValueOnce(true)
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
+
+        await flushAfterCallbacks()
+
+        expect(runLeadExtractionMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            conversationId: 'conv-1',
+            latestMessage: 'Merhaba',
+            source: 'whatsapp'
+        }))
+    })
+
+    it('isolates deferred lead extraction failures from the reply path', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder]
+        })
+
+        resolveLeadExtractionAllowanceMock.mockReturnValueOnce(true)
+        runLeadExtractionMock.mockRejectedValueOnce(new Error('lead extraction failed'))
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await expect(processInboundAiPipeline(buildInput(supabase, sendOutbound))).resolves.toBeUndefined()
+        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+
+        await flushAfterCallbacks()
+
+        expect(consoleErrorSpy).toHaveBeenCalled()
+        consoleErrorSpy.mockRestore()
+    })
+
+    it('applies hot-lead escalation from deferred extraction after the reply completes', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const escalationConversationUpdate = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({ total_score: 9 })
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotReply.builder,
+                escalationConversationUpdate.builder
+            ],
+            leads: [leadSnapshot.builder],
+            skills: [skillDetails.builder]
+        })
+
+        resolveLeadExtractionAllowanceMock.mockReturnValueOnce(true)
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+        decideHumanEscalationMock.mockImplementation(({ leadScore }) => {
+            if (leadScore === 9) {
+                return {
+                    shouldEscalate: true,
+                    reason: 'hot_lead',
+                    action: 'notify_only',
+                    noticeMode: 'none',
+                    noticeMessage: null
+                }
+            }
+
+            return {
+                shouldEscalate: false
+            }
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(escalationConversationUpdate.updateMock).not.toHaveBeenCalled()
+
+        await flushAfterCallbacks()
+
+        expect(escalationConversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            human_attention_required: true,
+            human_attention_reason: 'hot_lead',
+            human_attention_resolved_at: null,
+            human_attention_requested_at: expect.any(String)
+        }))
     })
 
     it('skips lead extraction and replies when conversation AI processing is paused', async () => {
@@ -1235,6 +1398,7 @@ describe('processInboundAiPipeline guardrails', () => {
             }
         ])
         const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
         const conversationUpdateAfterInbound = createUpdateBuilder()
         const conversationUpdateAfterBotReply = createUpdateBuilder()
         const leadSnapshot = createLeadSnapshotBuilder({
@@ -1275,7 +1439,8 @@ describe('processInboundAiPipeline guardrails', () => {
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
             conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
-            leads: [leadSnapshot.builder]
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
         })
 
         matchSkillsSafelyMock.mockResolvedValueOnce([])
@@ -1303,6 +1468,7 @@ describe('processInboundAiPipeline guardrails', () => {
             }
         ])
         const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
         const conversationUpdateAfterInbound = createUpdateBuilder()
         const conversationUpdateAfterBotReply = createUpdateBuilder()
         const leadSnapshot = createLeadSnapshotBuilder({
@@ -1343,7 +1509,8 @@ describe('processInboundAiPipeline guardrails', () => {
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
             conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
-            leads: [leadSnapshot.builder]
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
         })
 
         await processInboundAiPipeline(
@@ -1373,6 +1540,7 @@ describe('processInboundAiPipeline guardrails', () => {
         const inboundInsert = createInsertBuilder()
         const historySelect = createMessageHistoryBuilder([])
         const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
         const conversationUpdateAfterInbound = createUpdateBuilder()
         const conversationUpdateAfterBotReply = createUpdateBuilder()
         const leadSnapshot = createLeadSnapshotBuilder({
@@ -1383,7 +1551,8 @@ describe('processInboundAiPipeline guardrails', () => {
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
             conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
-            leads: [leadSnapshot.builder]
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
         })
 
         await processInboundAiPipeline(
