@@ -85,6 +85,34 @@ function createChannelLookupSupabaseMock(channelData: unknown) {
     }
 }
 
+function createGlobalVerifySupabaseMock(channelData: unknown) {
+    const maybeSingleMock = vi.fn(async () => ({ data: channelData }))
+    const updateEqMock = vi.fn(async () => ({ error: null }))
+    const updateMock = vi.fn(() => ({ eq: updateEqMock }))
+    const eqThird = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+    const eqSecond = vi.fn(() => ({ eq: eqThird }))
+    const eqFirst = vi.fn(() => ({ eq: eqSecond }))
+    const selectMock = vi.fn(() => ({ eq: eqFirst }))
+    const fromMock = vi.fn((table: string) => {
+        if (table !== 'channels') {
+            throw new Error(`Unexpected table ${table}`)
+        }
+        return {
+            select: selectMock,
+            update: updateMock
+        }
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        maybeSingleMock,
+        updateMock,
+        updateEqMock
+    }
+}
+
 describe('WhatsApp webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -98,6 +126,13 @@ describe('WhatsApp webhook route', () => {
 
     it('returns challenge when global verify token matches on GET', async () => {
         process.env.META_WEBHOOK_VERIFY_TOKEN = 'global-token'
+        const { supabase, updateMock, updateEqMock } = createGlobalVerifySupabaseMock({
+            id: 'channel-1',
+            config: {
+                verify_token: 'global-token'
+            }
+        })
+        createClientMock.mockReturnValue(supabase)
 
         const req = new NextRequest(
             'http://localhost/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=global-token&hub.challenge=challenge-ok'
@@ -107,7 +142,14 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.text()).resolves.toBe('challenge-ok')
-        expect(createClientMock).not.toHaveBeenCalled()
+        expect(createClientMock).toHaveBeenCalled()
+        expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            config: expect.objectContaining({
+                webhook_status: 'verified',
+                webhook_verified_at: expect.any(String)
+            })
+        }))
+        expect(updateEqMock).toHaveBeenCalledWith('id', 'channel-1')
     })
 
     it('rejects POST request with invalid signature', async () => {

@@ -42,6 +42,7 @@ import {
     debugWhatsAppChannel,
     disconnectChannel
 } from '@/lib/channels/actions'
+import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
 import { getMetaEmbeddedSignupConfig, type MetaEmbeddedSignupMode } from '@/lib/channels/meta-embedded-signup'
 import type { Channel } from '@/types/database'
 
@@ -121,6 +122,7 @@ export function WhatsAppOnboardingPage({
     const [showTemplateModal, setShowTemplateModal] = useState(false)
     const [error, setError] = useState('')
     const [info, setInfo] = useState('')
+    const connectionState = getChannelConnectionState(channel)
 
     useEffect(() => {
         if (!popupResult) return
@@ -785,11 +787,17 @@ export function WhatsAppOnboardingPage({
                 </div>
             </div>
 
+            {!existingNumberSignupConfig && (
+                <Alert variant="warning">
+                    {t('whatsappConnect.existingEmbeddedSignupUnavailable')}
+                </Alert>
+            )}
+
             <div className="flex flex-wrap gap-3">
                 <Button
                     type="button"
-                    onClick={handleLegacyConnect}
-                    disabled={isConnecting || isReadOnly}
+                    onClick={() => handleEmbeddedSignup('existing')}
+                    disabled={isConnecting || !existingNumberSignupConfig || isReadOnly}
                 >
                     {isConnecting ? t('whatsappConnect.connecting') : t('whatsappConnect.bspMigration.cta')}
                 </Button>
@@ -857,44 +865,62 @@ export function WhatsAppOnboardingPage({
         return renderLandingScreen()
     }
 
-    const renderConnectedState = () => (
-        <div className="space-y-6">
-            <div>
-                <h2 className={sectionTitleClass}>
-                    {t('onboarding.whatsapp.connectedHeading')}
-                </h2>
-                <p className={sectionLeadClass}>
-                    {t('onboarding.whatsapp.connectedDescription')}
-                </p>
-            </div>
+    const renderConnectedState = () => {
+        const connectedDescription = connectionState === 'ready'
+            ? t('onboarding.whatsapp.connectedDescription')
+            : connectionState === 'pending'
+                ? t('onboarding.whatsapp.pendingDescription')
+                : t('onboarding.whatsapp.errorDescription')
+        const connectedBanner = connectionState === 'ready'
+            ? t('onboarding.whatsapp.connectedBanner', { name: channel?.name ?? t('types.whatsapp') })
+            : connectionState === 'pending'
+                ? t('onboarding.whatsapp.pendingBanner', { name: channel?.name ?? t('types.whatsapp') })
+                : t('onboarding.whatsapp.errorBanner', { name: channel?.name ?? t('types.whatsapp') })
+        const bannerVariant = connectionState === 'ready'
+            ? 'success'
+            : connectionState === 'pending'
+                ? 'warning'
+                : 'error'
 
-            <Alert variant="success">
-                {t('onboarding.whatsapp.connectedBanner', { name: channel?.name ?? t('types.whatsapp') })}
-            </Alert>
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h2 className={sectionTitleClass}>
+                        {t('onboarding.whatsapp.connectedHeading')}
+                    </h2>
+                    <p className={sectionLeadClass}>
+                        {connectedDescription}
+                    </p>
+                </div>
 
-            <div className="flex flex-wrap gap-3">
-                <Button
-                    onClick={() => setShowTemplateModal(true)}
-                    disabled={isReadOnly}
-                    variant="secondary"
-                >
-                    <FileText size={16} className="mr-2" />
-                    {t('templateTools.openAction')}
-                </Button>
-                <Button onClick={handleDebug} disabled={isReadOnly} variant="outline">
-                    <Bug size={16} className="mr-2" />
-                    {t('debug.tooltip')}
-                </Button>
-                <Button
-                    onClick={() => setShowConfirm(true)}
-                    disabled={isDisconnecting || isReadOnly}
-                    variant="danger"
-                >
-                    {t('actions.disconnect')}
-                </Button>
+                <Alert variant={bannerVariant}>
+                    {connectedBanner}
+                </Alert>
+
+                <div className="flex flex-wrap gap-3">
+                    <Button
+                        onClick={() => setShowTemplateModal(true)}
+                        disabled={isReadOnly}
+                        variant="secondary"
+                    >
+                        <FileText size={16} className="mr-2" />
+                        {t('templateTools.openAction')}
+                    </Button>
+                    <Button onClick={handleDebug} disabled={isReadOnly} variant="outline">
+                        <Bug size={16} className="mr-2" />
+                        {t('debug.tooltip')}
+                    </Button>
+                    <Button
+                        onClick={() => setShowConfirm(true)}
+                        disabled={isDisconnecting || isReadOnly}
+                        variant="danger"
+                    >
+                        {t('actions.disconnect')}
+                    </Button>
+                </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     return (
         <>

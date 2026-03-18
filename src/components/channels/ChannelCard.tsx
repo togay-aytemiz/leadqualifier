@@ -12,6 +12,7 @@ import type {
 import { WhatsAppTemplateModal } from '@/components/channels/WhatsAppTemplateModal'
 import { MetaProviderBadge } from '@/components/channels/MetaProviderBadge'
 import { debugInstagramChannel, debugTelegramChannel, debugWhatsAppChannel } from '@/lib/channels/actions'
+import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
 import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
@@ -60,8 +61,10 @@ function getChannelSurfaceStyle(tone: ChannelCardTone) {
     }
 }
 
-function getStatusVariant(isConnected: boolean, isComingSoon: boolean) {
-    if (isConnected) return 'success'
+function getStatusVariant(connectionState: 'not_connected' | 'ready' | 'pending' | 'error', isComingSoon: boolean) {
+    if (connectionState === 'ready') return 'success'
+    if (connectionState === 'pending') return 'warning'
+    if (connectionState === 'error') return 'error'
     if (isComingSoon) return 'info'
     return 'neutral'
 }
@@ -81,6 +84,7 @@ export function ChannelCard({
 }: ChannelCardProps) {
     const t = useTranslations('Channels')
     const [showTemplateModal, setShowTemplateModal] = useState(false)
+    const connectionState = getChannelConnectionState(channel)
 
     const handleDebug = async () => {
         if (!channel) return
@@ -105,7 +109,11 @@ export function ChannelCard({
     const showComingSoonBadge = !isConnected && (badge === 'comingSoon' || isComingSoon)
     const showFooterBadge = isConnected || showComingSoonBadge
     const statusLabel = isConnected
-        ? t('status.active')
+        ? connectionState === 'ready'
+            ? t('status.active')
+            : connectionState === 'pending'
+                ? t('status.pending')
+                : t('status.needsAttention')
         : showComingSoonBadge
             ? t('actions.comingSoon')
             : t('status.notConnected')
@@ -153,7 +161,7 @@ export function ChannelCard({
                         <div className="flex items-center justify-between gap-3 pt-3">
                             <div className="min-w-0">
                                 {showFooterBadge && (
-                                    <Badge variant={getStatusVariant(isConnected, showComingSoonBadge)}>
+                                    <Badge variant={getStatusVariant(connectionState, showComingSoonBadge)}>
                                         {statusLabel}
                                     </Badge>
                                 )}

@@ -1,4 +1,5 @@
 import { getChannels } from '@/lib/channels/actions'
+import { shouldCountChannelAsConnected } from '@/lib/channels/connection-readiness'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ChannelsList } from '@/components/channels/ChannelsList'
 import { PageHeader } from '@/design'
@@ -33,7 +34,7 @@ export default async function ChannelsPage() {
 
     const channels = await getChannels(organizationId)
     const totalChannels = 4
-    const connectedChannels = (channels || []).filter(channel => channel.status === 'active').length
+    const connectedChannels = (channels || []).filter(channel => shouldCountChannelAsConnected(channel)).length
 
     return (
         <>

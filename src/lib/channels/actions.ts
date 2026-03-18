@@ -13,6 +13,14 @@ import {
     exchangeMetaForLongLivedToken,
     resolveMetaInstagramConnectionCandidate
 } from '@/lib/channels/meta-oauth'
+import {
+    getChannelConnectionState,
+    getWhatsAppWebhookStatus
+} from '@/lib/channels/connection-readiness'
+import {
+    resolveConfiguredAppUrl,
+    resolveWhatsAppWebhookSubscriptionOverrides
+} from '@/lib/channels/whatsapp-webhook-config'
 import { v4 as uuidv4 } from 'uuid'
 import type { Json } from '@/types/database'
 
@@ -128,22 +136,6 @@ function normalizeTemplateSummary(value: unknown): WhatsAppTemplateSummary | nul
     }
 }
 
-function resolveConfiguredAppUrl() {
-    const candidates = [
-        process.env.NEXT_PUBLIC_APP_URL,
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-        process.env.URL
-    ]
-
-    for (const candidate of candidates) {
-        if (typeof candidate !== 'string') continue
-        const trimmed = candidate.trim().replace(/\/+$/, '')
-        if (trimmed) return trimmed
-    }
-
-    return null
-}
-
 function createWhatsAppTwoStepVerificationPin(params: {
     organizationId: string
     businessAccountId: string
@@ -156,16 +148,6 @@ function createWhatsAppTwoStepVerificationPin(params: {
 
     const numericValue = parseInt(digest.slice(0, 12), 16)
     return String((numericValue % 900000) + 100000)
-}
-
-function resolveWhatsAppWebhookSubscriptionOverrides(globalVerifyToken: string | null) {
-    const appUrl = resolveConfiguredAppUrl()
-    if (!appUrl || !globalVerifyToken) return undefined
-
-    return {
-        overrideCallbackUri: `${appUrl}/api/webhooks/whatsapp`,
-        verifyToken: globalVerifyToken
-    }
 }
 
 export async function connectTelegramChannel(organizationId: string, botToken: string) {
@@ -235,7 +217,10 @@ export async function connectWhatsAppChannel(organizationId: string, input: Conn
 
     try {
         const client = new WhatsAppClient(permanentAccessToken)
+        const webhookOverrides = resolveWhatsAppWebhookSubscriptionOverrides(verifyToken)
+        await client.subscribeAppToBusinessAccount(businessAccountId, webhookOverrides)
         const phoneDetails = await client.getPhoneNumber(phoneNumberId)
+        const webhookSubscriptionRequestedAt = new Date().toISOString()
 
         const displayPhoneNumber = (phoneDetails.display_phone_number ?? '').trim()
         const channelName = displayPhoneNumber
@@ -255,7 +240,12 @@ export async function connectWhatsAppChannel(organizationId: string, input: Conn
                     permanent_access_token: permanentAccessToken,
                     app_secret: appSecret,
                     verify_token: verifyToken,
+                    connected_via: 'manual',
                     display_phone_number: displayPhoneNumber,
+                    webhook_status: 'pending',
+                    webhook_callback_uri: webhookOverrides?.overrideCallbackUri ?? null,
+                    webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
+                    webhook_subscription_error: null,
                     webhook_verified_at: null
                 }
             }, {
@@ -351,7 +341,6 @@ export async function completeWhatsAppEmbeddedSignupChannel(
 
     const appId = process.env.META_WHATSAPP_APP_ID?.trim() || process.env.META_APP_ID?.trim()
     const appSecret = process.env.META_WHATSAPP_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim()
-    const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || null
     const authCode = input.authCode.trim()
     const phoneNumberId = input.phoneNumberId.trim()
     const businessAccountId = input.businessAccountId.trim()
@@ -379,6 +368,8 @@ export async function completeWhatsAppEmbeddedSignupChannel(
         })
 
         const client = new WhatsAppClient(permanentAccessToken)
+        const verifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || uuidv4()
+        const webhookOverrides = resolveWhatsAppWebhookSubscriptionOverrides(verifyToken)
         const twoStepVerificationPin = createWhatsAppTwoStepVerificationPin({
             organizationId,
             businessAccountId,
@@ -389,8 +380,9 @@ export async function completeWhatsAppEmbeddedSignupChannel(
         await client.registerPhoneNumber(phoneNumberId, twoStepVerificationPin)
         await client.subscribeAppToBusinessAccount(
             businessAccountId,
-            resolveWhatsAppWebhookSubscriptionOverrides(globalVerifyToken)
+            webhookOverrides
         )
+        const webhookSubscriptionRequestedAt = new Date().toISOString()
 
         const phoneDetails = await client.getPhoneNumber(phoneNumberId)
 
@@ -410,11 +402,15 @@ export async function completeWhatsAppEmbeddedSignupChannel(
                     phone_number_id: phoneNumberId,
                     business_account_id: businessAccountId,
                     permanent_access_token: permanentAccessToken,
-                    verify_token: globalVerifyToken || uuidv4(),
+                    verify_token: verifyToken,
                     connected_via: 'embedded_signup',
                     oauth_connected_at: new Date().toISOString(),
                     two_step_verification_pin: twoStepVerificationPin,
                     display_phone_number: displayPhoneNumber,
+                    webhook_status: 'pending',
+                    webhook_callback_uri: webhookOverrides?.overrideCallbackUri ?? null,
+                    webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
+                    webhook_subscription_error: null,
                     webhook_verified_at: null
                 }
             }, {
@@ -537,11 +533,19 @@ export async function debugWhatsAppChannel(channelId: string): Promise<WhatsAppD
     try {
         const client = new WhatsAppClient(accessToken)
         const phoneDetails = await client.getPhoneNumber(phoneNumberId)
+        const connectionState = getChannelConnectionState(channel)
+        const webhookStatus = getWhatsAppWebhookStatus(channel.config)
         return {
             success: true,
             info: {
                 phone_number_id: phoneNumberId,
                 verify_token_set: Boolean(verifyToken),
+                connection_state: connectionState,
+                webhook_status: webhookStatus,
+                webhook_callback_uri: readConfigString(channel.config, 'webhook_callback_uri'),
+                webhook_subscription_requested_at: readConfigString(channel.config, 'webhook_subscription_requested_at'),
+                webhook_subscription_error: readConfigString(channel.config, 'webhook_subscription_error'),
+                webhook_verified_at: readConfigString(channel.config, 'webhook_verified_at'),
                 display_phone_number: phoneDetails.display_phone_number ?? null,
                 verified_name: phoneDetails.verified_name ?? null,
                 quality_rating: phoneDetails.quality_rating ?? null

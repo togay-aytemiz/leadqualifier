@@ -16,6 +16,8 @@ import {
     pickWhatsAppConnectionCandidate
 } from '@/lib/channels/meta-oauth'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
+import { WhatsAppClient } from '@/lib/whatsapp/client'
+import { resolveWhatsAppWebhookSubscriptionOverrides } from '@/lib/channels/whatsapp-webhook-config'
 
 function normalizeLocale(value: string | null) {
     return value === 'en' ? 'en' : 'tr'
@@ -241,6 +243,11 @@ export async function GET(req: NextRequest) {
         const channelName = candidate.displayPhoneNumber
             ? `WhatsApp (${candidate.displayPhoneNumber})`
             : `WhatsApp (${candidate.phoneNumberId})`
+        const verifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || randomUUID()
+        const webhookOverrides = resolveWhatsAppWebhookSubscriptionOverrides(verifyToken)
+        const whatsAppClient = new WhatsAppClient(userAccessToken)
+        await whatsAppClient.subscribeAppToBusinessAccount(candidate.businessAccountId, webhookOverrides)
+        const webhookSubscriptionRequestedAt = new Date().toISOString()
 
         const { error } = await supabase
             .from('channels')
@@ -253,9 +260,13 @@ export async function GET(req: NextRequest) {
                     phone_number_id: candidate.phoneNumberId,
                     business_account_id: candidate.businessAccountId,
                     permanent_access_token: userAccessToken,
-                    verify_token: globalVerifyToken || randomUUID(),
+                    verify_token: verifyToken,
                     connected_via: 'oauth',
                     oauth_connected_at: new Date().toISOString(),
+                    webhook_status: 'pending',
+                    webhook_callback_uri: webhookOverrides?.overrideCallbackUri ?? null,
+                    webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
+                    webhook_subscription_error: null,
                     webhook_verified_at: null,
                     display_phone_number: candidate.displayPhoneNumber
                 }

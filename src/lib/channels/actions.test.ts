@@ -191,6 +191,10 @@ describe('channels actions: WhatsApp core flows', () => {
         expect(result).toEqual({ success: true })
         expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
         expect(getPhoneNumberMock).toHaveBeenCalledWith('phone-1')
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledWith('biz-1', {
+            overrideCallbackUri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+            verifyToken: 'verify-1'
+        })
         expect(upsertMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 organization_id: 'org-1',
@@ -203,7 +207,12 @@ describe('channels actions: WhatsApp core flows', () => {
                     permanent_access_token: 'token-1',
                     app_secret: 'secret-1',
                     verify_token: 'verify-1',
+                    connected_via: 'manual',
                     display_phone_number: '+90 555 111 22 33',
+                    webhook_status: 'pending',
+                    webhook_callback_uri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+                    webhook_subscription_error: null,
+                    webhook_subscription_requested_at: expect.any(String),
                     webhook_verified_at: null
                 })
             }),
@@ -301,10 +310,7 @@ describe('channels actions: WhatsApp core flows', () => {
         })
     })
 
-    it('subscribes without callback override when app url or verify token are unavailable', async () => {
-        delete process.env.NEXT_PUBLIC_APP_URL
-        delete process.env.URL
-        delete process.env.VERCEL_URL
+    it('uses a generated channel verify token for webhook override when global token is unavailable', async () => {
         delete process.env.META_WEBHOOK_VERIFY_TOKEN
 
         const { supabase } = createUpsertSupabaseMock()
@@ -316,17 +322,25 @@ describe('channels actions: WhatsApp core flows', () => {
             businessAccountId: 'waba-1'
         })
 
-        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledWith('waba-1', undefined)
+        const subscribeOverrides = subscribeAppToBusinessAccountMock.mock.calls[0]?.[1]
+        expect(subscribeOverrides).toEqual({
+            overrideCallbackUri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+            verifyToken: expect.any(String)
+        })
+        expect((subscribeOverrides as { verifyToken?: string } | undefined)?.verifyToken).not.toBe('global-verify-token')
     })
 
     it('returns normalized debug info for WhatsApp channel', async () => {
         const { supabase, eqMock } = createDebugSupabaseMock({
             id: 'channel-1',
             type: 'whatsapp',
+            status: 'active',
             config: {
                 permanent_access_token: 'token-1',
                 phone_number_id: 'phone-1',
-                verify_token: 'verify-1'
+                verify_token: 'verify-1',
+                webhook_status: 'pending',
+                webhook_verified_at: null
             }
         })
         createClientMock.mockResolvedValueOnce(supabase)
@@ -340,6 +354,12 @@ describe('channels actions: WhatsApp core flows', () => {
             info: {
                 phone_number_id: 'phone-1',
                 verify_token_set: true,
+                connection_state: 'pending',
+                webhook_status: 'pending',
+                webhook_callback_uri: null,
+                webhook_subscription_requested_at: null,
+                webhook_subscription_error: null,
+                webhook_verified_at: null,
                 display_phone_number: '+90 555 111 22 33',
                 verified_name: 'Qualy',
                 quality_rating: 'GREEN'

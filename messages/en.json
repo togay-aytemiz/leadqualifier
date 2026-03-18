@@ -631,6 +631,8 @@
     },
     "status": {
       "active": "Active",
+      "pending": "Pending setup",
+      "needsAttention": "Needs attention",
       "notConnected": "Not connected"
     },
     "trust": {
@@ -693,7 +695,11 @@
         "subheading": "Start with the API path that matches your business today. If you already use the WhatsApp Business app, move into the migration flow instead of opening the wrong Meta setup.",
         "connectedHeading": "Manage your connected WhatsApp channel",
         "connectedDescription": "Your WhatsApp channel is already active. Use the actions below to manage templates, debug webhook health, or disconnect it safely.",
-        "connectedBanner": "{name} is connected and ready to receive conversations."
+        "connectedBanner": "{name} is connected and ready to receive conversations.",
+        "pendingDescription": "Your WhatsApp assets are attached, but webhook verification is still pending. Do not expect inbound conversations until Meta confirms the webhook callback.",
+        "pendingBanner": "{name} is attached, but webhook verification is still pending.",
+        "errorDescription": "Your WhatsApp assets are attached, but webhook setup needs attention before this channel can receive conversations reliably.",
+        "errorBanner": "{name} needs webhook attention before it is ready."
       },
       "telegram": {
         "sidebarTitle": "Telegram",

@@ -1,6 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
 > **Last Updated:** 2026-03-18 (Calendar / scheduling / booking now ships with a full-width `/calendar` workspace, `Tercihler > Takvim` for booking rules, `Entegrasyonlar > Uygulamalar` for Google Calendar management, compact business-hour rows, inline timing help, simplified Google connection cards, a single calendar-settings entry in the workspace header, client-side buffered calendar navigation for faster day/week/month switching, mutation-time cache invalidation, AI scheduling continuity across follow-up availability questions, stricter booking-intent gating, deterministic human handoff on scheduling failures, minimum-notice enforcement across slot generation + exact-slot checks + booking writes, safe Google disconnect cleanup for mirrored future events, per-booking duration override and customer-email capture in the booking modal, shared select-field visual cleanup, full-width `Settings > Channels` gallery usage, Turkish-first copy cleanup, and the existing org-scoped booking / Google boundary foundation.)
+> **Update Note (2026-03-18):** WhatsApp connect hardening now treats `asset attached` and `channel ready` as different states: webhook verification status is persisted in channel config, Channels UI shows pending/attention states until verification completes, and `another BSP migration` opens the guided existing-number Embedded Signup path instead of generic OAuth asset discovery.
 > **Update Note (2026-03-18):** `Settings > Channels` no longer sits inside a centered `max-w` shell. The page now uses the full dashboard content width, and the channel gallery opens a fourth column on ultra-wide screens so the wider surface is actually used.
 > **Update Note (2026-03-17):** The new/edit booking modal now lets operators override duration per booking, captures customer email as first-class booking data, and routes calendar selects through a shared primitive so dropdown chevrons stay consistently inset instead of hugging the right edge.
 > **Update Note (2026-03-17):** `/calendar` view/date switches now stay client-side inside a buffered booking window instead of full route transitions on every click. Week/day/month/agenda changes update the URL with history state and only fetch a new window when the operator moves outside the loaded range.
@@ -101,6 +102,8 @@
   - [x] Keep current server OAuth discovery as an explicit fallback only for pre-existing Meta Cloud API assets
   - [x] Add deterministic blocked/unconfigured guidance when Embedded Signup is unavailable instead of dropping users into a dead-end Meta flow
   - [x] Complete Embedded Signup post-auth provisioning by registering the business phone number for Cloud API use, subscribing app webhooks on the customer WABA, and persisting the managed two-step verification PIN in channel config
+  - [x] Persist WhatsApp webhook provisioning state across manual/OAuth/Embedded connect flows and treat the channel as ready only after webhook verification succeeds
+  - [x] Route `another BSP migration` through existing-number Embedded Signup instead of the generic WhatsApp OAuth asset-discovery fallback
 - [x] **Telegram (Sandbox)**
   - [x] Channel connect + webhook registration
   - [x] Incoming message webhook
