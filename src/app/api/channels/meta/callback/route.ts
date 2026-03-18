@@ -183,6 +183,8 @@ export async function GET(req: NextRequest) {
                         verify_token: globalVerifyToken || randomUUID(),
                         connected_via: 'oauth',
                         oauth_connected_at: new Date().toISOString(),
+                        webhook_status: 'pending',
+                        webhook_subscription_error: null,
                         webhook_verified_at: null,
                         username: candidate.instagramUsername
                     }

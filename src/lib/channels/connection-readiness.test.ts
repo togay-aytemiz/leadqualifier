@@ -47,7 +47,21 @@ describe('channel connection readiness', () => {
         expect(shouldCountChannelAsConnected(channel)).toBe(true)
     })
 
-    it('keeps non-whatsapp active channels ready', () => {
+    it('treats active Instagram channels without webhook verification as pending', () => {
+        const channel = createChannel({
+            type: 'instagram',
+            config: {
+                instagram_business_account_id: 'ig-1',
+                webhook_status: 'pending',
+                webhook_verified_at: null
+            }
+        })
+
+        expect(getChannelConnectionState(channel)).toBe('pending')
+        expect(shouldCountChannelAsConnected(channel)).toBe(false)
+    })
+
+    it('keeps non-meta active channels ready', () => {
         const channel = createChannel({
             type: 'telegram',
             config: {

@@ -371,6 +371,7 @@ describe('channels actions: WhatsApp core flows', () => {
         const { supabase, eqMock } = createDebugSupabaseMock({
             id: 'channel-ig-1',
             type: 'instagram',
+            status: 'active',
             config: {
                 page_access_token: 'token-ig-1',
                 instagram_business_account_id: '17841444965056435',
@@ -387,9 +388,13 @@ describe('channels actions: WhatsApp core flows', () => {
         expect(result).toEqual({
             success: true,
             info: {
+                connection_state: 'pending',
                 instagram_business_account_id: '17841444965056435',
                 page_id: '17841444965056435',
                 verify_token_set: true,
+                webhook_status: 'pending',
+                webhook_verified_at: null,
+                webhook_subscription_error: null,
                 username: 'itsalinayalin',
                 page_name: 'itsalinayalin',
                 resolved_instagram_business_account_id: '17841444965056435',

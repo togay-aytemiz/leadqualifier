@@ -1,7 +1,7 @@
 import type { Channel, Json } from '@/types/database'
 
 export type ChannelConnectionState = 'not_connected' | 'ready' | 'pending' | 'error'
-export type WhatsAppWebhookStatus = 'pending' | 'verified' | 'error'
+export type MetaWebhookStatus = 'pending' | 'verified' | 'error'
 
 function asConfigRecord(value: Json): Record<string, Json | undefined> {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
@@ -15,7 +15,7 @@ function readConfigString(config: Json, key: string): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
-export function getWhatsAppWebhookStatus(config: Json): WhatsAppWebhookStatus {
+export function getMetaWebhookStatus(config: Json): MetaWebhookStatus {
     const verifiedAt = readConfigString(config, 'webhook_verified_at')
     if (verifiedAt) return 'verified'
 
@@ -30,15 +30,17 @@ export function getWhatsAppWebhookStatus(config: Json): WhatsAppWebhookStatus {
     return 'pending'
 }
 
+export const getWhatsAppWebhookStatus = getMetaWebhookStatus
+
 export function getChannelConnectionState(
     channel: Pick<Channel, 'type' | 'status' | 'config'> | null | undefined
 ): ChannelConnectionState {
     if (!channel) return 'not_connected'
     if (channel.status === 'error') return 'error'
     if (channel.status !== 'active') return 'not_connected'
-    if (channel.type !== 'whatsapp') return 'ready'
+    if (channel.type !== 'whatsapp' && channel.type !== 'instagram') return 'ready'
 
-    const webhookStatus = getWhatsAppWebhookStatus(channel.config)
+    const webhookStatus = getMetaWebhookStatus(channel.config)
     if (webhookStatus === 'verified') return 'ready'
     if (webhookStatus === 'error') return 'error'
     return 'pending'

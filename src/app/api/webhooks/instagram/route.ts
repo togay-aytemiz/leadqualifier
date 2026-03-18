@@ -89,6 +89,7 @@ function summarizeInstagramPayloadShape(payload: unknown) {
 
 function channelLookupFilter(instagramAccountId: string) {
     return [
+        `config->>page_id.eq.${instagramAccountId}`,
         `config->>instagram_business_account_id.eq.${instagramAccountId}`,
         `config->>instagram_user_id.eq.${instagramAccountId}`,
         `config->>instagram_app_scoped_id.eq.${instagramAccountId}`
@@ -130,7 +131,8 @@ async function reconcileChannelByInstagramAccountId(
             if (!candidate) continue
 
             const isMatch =
-                candidate.instagramBusinessAccountId === instagramAccountId
+                candidate.pageId === instagramAccountId
+                || candidate.instagramBusinessAccountId === instagramAccountId
                 || candidate.instagramAppScopedId === instagramAccountId
 
             if (!isMatch) continue
@@ -166,13 +168,10 @@ export async function GET(req: NextRequest) {
     const token = req.nextUrl.searchParams.get('hub.verify_token')
     const challenge = req.nextUrl.searchParams.get('hub.challenge')
     const globalVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim()
+    const isGlobalVerifyToken = Boolean(globalVerifyToken && token === globalVerifyToken)
 
     if (mode !== 'subscribe' || !token || !challenge) {
         return NextResponse.json({ error: 'Invalid verification request' }, { status: 400 })
-    }
-
-    if (globalVerifyToken && token === globalVerifyToken) {
-        return new NextResponse(challenge, { status: 200 })
     }
 
     const supabase = createClient(
@@ -188,19 +187,23 @@ export async function GET(req: NextRequest) {
         .eq('config->>verify_token', token)
         .maybeSingle()
 
-    if (!channel) {
+    if (!channel && !isGlobalVerifyToken) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const nextConfig = {
-        ...asConfigRecord(channel.config),
-        webhook_verified_at: new Date().toISOString()
-    }
+    if (channel) {
+        const nextConfig = {
+            ...asConfigRecord(channel.config),
+            webhook_status: 'verified',
+            webhook_subscription_error: null,
+            webhook_verified_at: new Date().toISOString()
+        }
 
-    await supabase
-        .from('channels')
-        .update({ config: nextConfig })
-        .eq('id', channel.id)
+        await supabase
+            .from('channels')
+            .update({ config: nextConfig })
+            .eq('id', channel.id)
+    }
 
     return new NextResponse(challenge, { status: 200 })
 }

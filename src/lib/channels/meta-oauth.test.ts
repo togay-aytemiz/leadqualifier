@@ -310,6 +310,11 @@ describe('meta oauth helpers', () => {
                     username: 'itsalinayalin'
                 })
             })
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 400,
+                json: async () => ({ error: { message: '(#200) Missing Permissions' } })
+            })
 
         vi.stubGlobal('fetch', fetchMock)
 
@@ -323,11 +328,59 @@ describe('meta oauth helpers', () => {
             instagramUsername: 'itsalinayalin'
         })
 
-        expect(fetchMock).toHaveBeenCalledTimes(1)
+        expect(fetchMock).toHaveBeenCalledTimes(2)
         const profileEndpoint = new URL((fetchMock.mock.calls[0]?.[0] as string) ?? 'https://example.com')
         expect(`${profileEndpoint.origin}${profileEndpoint.pathname}`).toBe('https://graph.instagram.com/v25.0/me')
         expect(profileEndpoint.searchParams.get('fields')).toBe('user_id,username')
         expect(profileEndpoint.searchParams.get('access_token')).toBe('token-1')
+        const pagesEndpoint = new URL((fetchMock.mock.calls[1]?.[0] as string) ?? 'https://example.com')
+        expect(`${pagesEndpoint.origin}${pagesEndpoint.pathname}`).toBe('https://graph.facebook.com/v21.0/me/accounts')
+    })
+
+    it('prefers page discovery when available and merges app-scoped instagram profile metadata', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    id: '26160270836990969',
+                    user_id: '17841444965056435',
+                    username: 'itsalinayalin'
+                })
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [
+                        {
+                            id: 'page-1',
+                            name: 'Leadqualifier Page',
+                            access_token: 'page-token-1',
+                            instagram_business_account: {
+                                id: '17841444965056435',
+                                username: 'itsalinayalin'
+                            }
+                        }
+                    ]
+                })
+            })
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const candidate = await resolveMetaInstagramConnectionCandidate('token-merge-1')
+        expect(candidate).toEqual({
+            pageId: 'page-1',
+            pageName: 'Leadqualifier Page',
+            pageAccessToken: 'page-token-1',
+            instagramBusinessAccountId: '17841444965056435',
+            instagramAppScopedId: '26160270836990969',
+            instagramUsername: 'itsalinayalin'
+        })
+
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        const pagesEndpoint = new URL((fetchMock.mock.calls[1]?.[0] as string) ?? 'https://example.com')
+        expect(`${pagesEndpoint.origin}${pagesEndpoint.pathname}`).toBe('https://graph.facebook.com/v21.0/me/accounts')
     })
 
     it('falls back to facebook page discovery when instagram profile endpoints are unavailable', async () => {

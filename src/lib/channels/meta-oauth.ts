@@ -275,6 +275,25 @@ function pickInstagramBusinessProfileCandidate(payload: unknown, userAccessToken
     }
 }
 
+function mergeInstagramConnectionCandidates(
+    profileCandidate: InstagramConnectionCandidate | null,
+    pageCandidate: InstagramConnectionCandidate | null
+): InstagramConnectionCandidate | null {
+    if (!pageCandidate) return profileCandidate
+    if (!profileCandidate) return pageCandidate
+
+    const sameBusinessAccount =
+        profileCandidate.instagramBusinessAccountId === pageCandidate.instagramBusinessAccountId
+
+    return {
+        ...pageCandidate,
+        instagramAppScopedId: sameBusinessAccount
+            ? profileCandidate.instagramAppScopedId ?? pageCandidate.instagramAppScopedId
+            : pageCandidate.instagramAppScopedId,
+        instagramUsername: pageCandidate.instagramUsername ?? profileCandidate.instagramUsername
+    }
+}
+
 export function pickWhatsAppConnectionCandidate(payload: unknown): WhatsAppConnectionCandidate | null {
     if (!isRecord(payload) || !Array.isArray(payload.data)) return null
 
@@ -480,18 +499,20 @@ async function fetchMetaInstagramBusinessProfile(userAccessToken: string) {
 
 export async function resolveMetaInstagramConnectionCandidate(userAccessToken: string) {
     const profilePayload = await fetchMetaInstagramBusinessProfile(userAccessToken)
-    if (profilePayload) {
-        const profileCandidate = pickInstagramBusinessProfileCandidate(profilePayload, userAccessToken)
-        if (profileCandidate) return profileCandidate
-    }
+    const profileCandidate = profilePayload
+        ? pickInstagramBusinessProfileCandidate(profilePayload, userAccessToken)
+        : null
 
     try {
         const pagesPayload = await fetchMetaInstagramPages(userAccessToken)
-        return pickInstagramConnectionCandidate(pagesPayload)
+        const pageCandidate = pickInstagramConnectionCandidate(pagesPayload)
+        const mergedCandidate = mergeInstagramConnectionCandidates(profileCandidate, pageCandidate)
+        if (mergedCandidate) return mergedCandidate
     } catch {
-        // Fall through: Instagram business profile + page graph discovery both unavailable.
-        return null
+        // Fall through: page discovery unavailable for this token/app combo.
     }
+
+    return profileCandidate
 }
 
 export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string) {

@@ -15,6 +15,7 @@ import {
 } from '@/lib/channels/meta-oauth'
 import {
     getChannelConnectionState,
+    getMetaWebhookStatus,
     getWhatsAppWebhookStatus
 } from '@/lib/channels/connection-readiness'
 import {
@@ -316,6 +317,8 @@ export async function connectInstagramChannel(organizationId: string, input: Con
                     app_secret: appSecret,
                     verify_token: verifyToken,
                     username,
+                    webhook_status: 'pending',
+                    webhook_subscription_error: null,
                     webhook_verified_at: null
                 }
             }, {
@@ -676,9 +679,13 @@ export async function debugInstagramChannel(channelId: string): Promise<Instagra
         return {
             success: true,
             info: {
+                connection_state: getChannelConnectionState(channel),
                 instagram_business_account_id: instagramBusinessAccountId,
                 page_id: pageId,
                 verify_token_set: Boolean(verifyToken),
+                webhook_status: getMetaWebhookStatus(channel.config),
+                webhook_verified_at: readConfigString(channel.config, 'webhook_verified_at'),
+                webhook_subscription_error: readConfigString(channel.config, 'webhook_subscription_error'),
                 username: candidate.instagramUsername ?? null,
                 page_name: candidate.pageName,
                 resolved_instagram_business_account_id: candidate.instagramBusinessAccountId,
