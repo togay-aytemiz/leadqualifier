@@ -43,6 +43,7 @@ import {
     disconnectChannel
 } from '@/lib/channels/actions'
 import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
+import { getMetaChannelConnectedCopy } from '@/lib/channels/meta-connection-copy'
 import { getMetaEmbeddedSignupConfig, type MetaEmbeddedSignupMode } from '@/lib/channels/meta-embedded-signup'
 import type { Channel } from '@/types/database'
 
@@ -866,21 +867,12 @@ export function WhatsAppOnboardingPage({
     }
 
     const renderConnectedState = () => {
-        const connectedDescription = connectionState === 'ready'
-            ? t('onboarding.whatsapp.connectedDescription')
-            : connectionState === 'pending'
-                ? t('onboarding.whatsapp.pendingDescription')
-                : t('onboarding.whatsapp.errorDescription')
-        const connectedBanner = connectionState === 'ready'
-            ? t('onboarding.whatsapp.connectedBanner', { name: channel?.name ?? t('types.whatsapp') })
-            : connectionState === 'pending'
-                ? t('onboarding.whatsapp.pendingBanner', { name: channel?.name ?? t('types.whatsapp') })
-                : t('onboarding.whatsapp.errorBanner', { name: channel?.name ?? t('types.whatsapp') })
-        const bannerVariant = connectionState === 'ready'
-            ? 'success'
-            : connectionState === 'pending'
-                ? 'warning'
-                : 'error'
+        const connectedCopy = getMetaChannelConnectedCopy('whatsapp', connectionState)
+        const connectedDescription = t(connectedCopy.descriptionKey)
+        const connectedBanner = t(connectedCopy.bannerKey, {
+            name: channel?.name ?? t('types.whatsapp')
+        })
+        const bannerVariant = connectedCopy.bannerVariant
 
         return (
             <div className="space-y-6">

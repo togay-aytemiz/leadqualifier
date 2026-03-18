@@ -724,7 +724,11 @@
         "body": "After clicking Continue with Instagram, choose the professional Instagram account you want to connect and approve permissions. When authorization completes, this channel becomes active for webhook intake and reactive replies.",
         "connectedHeading": "Manage your connected Instagram channel",
         "connectedDescription": "Your Instagram channel is already active. You can verify webhook health or disconnect it from this workspace.",
-        "connectedBanner": "{name} is connected and ready to receive conversations."
+        "connectedBanner": "{name} is connected and ready to receive conversations.",
+        "pendingDescription": "Your Instagram account is connected, but Qualy has not recorded webhook verification for this channel yet. This is separate from OAuth permissions, so treat the channel as not fully ready until webhook health is confirmed.",
+        "pendingBanner": "{name} is connected, but webhook verification is still pending.",
+        "errorDescription": "Your Instagram account is connected, but webhook health needs attention before this channel can receive conversations reliably.",
+        "errorBanner": "{name} needs webhook attention before it is ready."
       },
       "messenger": {
         "sidebarTitle": "Facebook Messenger",

@@ -724,7 +724,11 @@
         "body": "Instagram ile Devam Et'e bastıktan sonra bağlamak istediğiniz profesyonel Instagram hesabını seçip izinleri onaylayın. Yetkilendirme tamamlanınca kanal webhook alımı ve reaktif yanıtlar için aktif olur.",
         "connectedHeading": "Bağlı Instagram kanalınızı yönetin",
         "connectedDescription": "Instagram kanalınız zaten aktif. Webhook sağlığını kontrol edebilir veya bu workspace'ten bağlantısını kesebilirsiniz.",
-        "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır."
+        "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır.",
+        "pendingDescription": "Instagram hesabınız bağlı, ancak Qualy bu kanal için webhook doğrulamasını henüz kaydetmedi. Bu durum OAuth izinlerinden ayrıdır; webhook sağlığı doğrulanana kadar kanalı tam hazır kabul etmeyin.",
+        "pendingBanner": "{name} bağlı, ancak webhook doğrulaması hâlâ bekleniyor.",
+        "errorDescription": "Instagram hesabınız bağlı, ancak bu kanalın güvenilir şekilde konuşma alabilmesi için webhook sağlığı tarafında dikkat gerekiyor.",
+        "errorBanner": "{name} hazır olmadan önce webhook tarafında dikkat gerektiriyor."
       },
       "messenger": {
         "sidebarTitle": "Facebook Messenger",

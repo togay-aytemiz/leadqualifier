@@ -10,6 +10,8 @@ import { useMetaOAuthPopupTransport } from '@/components/channels/useMetaOAuthPo
 import { Alert, Button } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import { debugInstagramChannel, disconnectChannel } from '@/lib/channels/actions'
+import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
+import { getMetaChannelConnectedCopy } from '@/lib/channels/meta-connection-copy'
 import type { Channel } from '@/types/database'
 
 interface InstagramOnboardingPageProps {
@@ -37,6 +39,7 @@ export function InstagramOnboardingPage({
         organizationId,
         locale
     })
+    const connectionState = getChannelConnectionState(channel)
 
     const [isConnecting, setIsConnecting] = useState(false)
     const [isDisconnecting, setIsDisconnecting] = useState(false)
@@ -147,34 +150,42 @@ export function InstagramOnboardingPage({
                     {info && <Alert variant="info">{info}</Alert>}
 
                     {channel ? (
-                        <div className="space-y-6">
-                            <div>
-                                <h2 className={sectionTitleClass}>
-                                    {t('onboarding.instagram.connectedHeading')}
-                                </h2>
-                                <p className={sectionLeadClass}>
-                                    {t('onboarding.instagram.connectedDescription')}
-                                </p>
-                            </div>
+                        (() => {
+                            const connectedCopy = getMetaChannelConnectedCopy('instagram', connectionState)
+                            const connectedDescription = t(connectedCopy.descriptionKey)
+                            const connectedBanner = t(connectedCopy.bannerKey, { name: channel.name })
 
-                            <Alert variant="success">
-                                {t('onboarding.instagram.connectedBanner', { name: channel.name })}
-                            </Alert>
+                            return (
+                                <div className="space-y-6">
+                                    <div>
+                                        <h2 className={sectionTitleClass}>
+                                            {t('onboarding.instagram.connectedHeading')}
+                                        </h2>
+                                        <p className={sectionLeadClass}>
+                                            {connectedDescription}
+                                        </p>
+                                    </div>
 
-                            <div className="flex flex-wrap gap-3">
-                                <Button onClick={handleDebug} disabled={isReadOnly} variant="outline">
-                                    <Bug size={16} className="mr-2" />
-                                    {t('debug.tooltip')}
-                                </Button>
-                                <Button
-                                    onClick={() => setShowConfirm(true)}
-                                    disabled={isDisconnecting || isReadOnly}
-                                    variant="danger"
-                                >
-                                    {t('actions.disconnect')}
-                                </Button>
-                            </div>
-                        </div>
+                                    <Alert variant={connectedCopy.bannerVariant}>
+                                        {connectedBanner}
+                                    </Alert>
+
+                                    <div className="flex flex-wrap gap-3">
+                                        <Button onClick={handleDebug} disabled={isReadOnly} variant="outline">
+                                            <Bug size={16} className="mr-2" />
+                                            {t('debug.tooltip')}
+                                        </Button>
+                                        <Button
+                                            onClick={() => setShowConfirm(true)}
+                                            disabled={isDisconnecting || isReadOnly}
+                                            variant="danger"
+                                        >
+                                            {t('actions.disconnect')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )
+                        })()
                     ) : (
                         <div className="space-y-6">
                             <div>
