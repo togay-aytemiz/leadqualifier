@@ -203,6 +203,248 @@ function createInstagramOutboundPersistenceSupabaseMock() {
     }
 }
 
+function createInstagramOutboundFallbackConversationSupabaseMock() {
+    const existingConversation = {
+        id: 'conv-existing',
+        organization_id: 'org-1',
+        platform: 'instagram',
+        contact_phone: '17841400000000000',
+        contact_name: 'serayaytemiz',
+        contact_avatar_url: 'https://cdn.example.com/existing.jpg',
+        unread_count: 0,
+        tags: []
+    }
+
+    const channelsQuery = createChannelsQuery({
+        directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+            ? {
+                id: 'channel-ig-1',
+                organization_id: 'org-1',
+                config: {
+                    page_id: 'page-1',
+                    instagram_business_account_id: 'ig-biz-1',
+                    instagram_app_scoped_id: 'ig-app-1',
+                    app_secret: 'app-secret',
+                    page_access_token: 'token-ig-1'
+                }
+            }
+            : null,
+        listData: []
+    })
+
+    const channelsUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const channelsUpdateMock = vi.fn(() => ({ eq: channelsUpdateEqMock }))
+    const channelsSelectMock = vi.fn(() => channelsQuery.queryBuilder)
+
+    const dedupeMaybeSingleMock = vi.fn(async () => ({ data: null }))
+    const dedupeEqMock = vi.fn()
+    const dedupeBuilder = {
+        eq: dedupeEqMock,
+        maybeSingle: dedupeMaybeSingleMock
+    }
+    dedupeEqMock.mockReturnValue(dedupeBuilder)
+    const messagesSelectMock = vi.fn(() => dedupeBuilder)
+    const messagesInsertMock = vi.fn(async () => ({ error: null }))
+
+    const phoneLookupEqMock = vi.fn()
+    const phoneLookupBuilder = {
+        eq: phoneLookupEqMock,
+        limit: vi.fn(() => phoneLookupBuilder),
+        maybeSingle: vi.fn(async () => ({ data: null }))
+    }
+    phoneLookupEqMock.mockReturnValue(phoneLookupBuilder)
+
+    const nameLookupEqMock = vi.fn()
+    const nameLookupBuilder = {
+        eq: nameLookupEqMock,
+        limit: vi.fn(() => nameLookupBuilder),
+        maybeSingle: vi.fn(async () => ({ data: existingConversation }))
+    }
+    nameLookupEqMock.mockReturnValue(nameLookupBuilder)
+
+    const conversationSelectBuilders = [phoneLookupBuilder, nameLookupBuilder]
+    const conversationsSelectMock = vi.fn(() => {
+        const nextBuilder = conversationSelectBuilders.shift()
+        if (!nextBuilder) {
+            throw new Error('Unexpected extra conversations select call')
+        }
+        return nextBuilder
+    })
+    const conversationsUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const conversationsUpdateMock = vi.fn(() => ({ eq: conversationsUpdateEqMock }))
+    const conversationsInsertMock = vi.fn(() => {
+        throw new Error('Conversation insert should not be called when username fallback matches')
+    })
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'channels') {
+            return {
+                select: channelsSelectMock,
+                update: channelsUpdateMock
+            }
+        }
+
+        if (table === 'messages') {
+            return {
+                select: messagesSelectMock,
+                insert: messagesInsertMock
+            }
+        }
+
+        if (table === 'conversations') {
+            return {
+                select: conversationsSelectMock,
+                update: conversationsUpdateMock,
+                insert: conversationsInsertMock
+            }
+        }
+
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        messagesInsertMock,
+        conversationsUpdateMock
+    }
+}
+
+function createInstagramOutboundEmptyDuplicateSupabaseMock() {
+    const emptyDuplicateConversation = {
+        id: 'conv-empty-duplicate',
+        organization_id: 'org-1',
+        platform: 'instagram',
+        contact_phone: 'ig-recipient-new-scope',
+        contact_name: 'serayaytemiz',
+        contact_avatar_url: null,
+        unread_count: 0,
+        tags: []
+    }
+
+    const existingConversation = {
+        id: 'conv-existing-history',
+        organization_id: 'org-1',
+        platform: 'instagram',
+        contact_phone: '17841400000000000',
+        contact_name: 'serayaytemiz',
+        contact_avatar_url: 'https://cdn.example.com/existing.jpg',
+        unread_count: 1,
+        tags: []
+    }
+
+    const channelsQuery = createChannelsQuery({
+        directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+            ? {
+                id: 'channel-ig-1',
+                organization_id: 'org-1',
+                config: {
+                    page_id: 'page-1',
+                    instagram_business_account_id: 'ig-biz-1',
+                    instagram_app_scoped_id: 'ig-app-1',
+                    app_secret: 'app-secret',
+                    page_access_token: 'token-ig-1'
+                }
+            }
+            : null,
+        listData: []
+    })
+
+    const channelsUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const channelsUpdateMock = vi.fn(() => ({ eq: channelsUpdateEqMock }))
+    const channelsSelectMock = vi.fn(() => channelsQuery.queryBuilder)
+
+    const dedupeEqMock = vi.fn()
+    const dedupeBuilder = {
+        eq: dedupeEqMock,
+        maybeSingle: vi.fn(async () => ({ data: null }))
+    }
+    dedupeEqMock.mockReturnValue(dedupeBuilder)
+
+    const emptyConversationMessageCheckEqMock = vi.fn()
+    const emptyConversationMessageCheckBuilder = {
+        eq: emptyConversationMessageCheckEqMock,
+        limit: vi.fn(() => emptyConversationMessageCheckBuilder),
+        maybeSingle: vi.fn(async () => ({ data: null }))
+    }
+    emptyConversationMessageCheckEqMock.mockReturnValue(emptyConversationMessageCheckBuilder)
+
+    const messageSelectBuilders = [dedupeBuilder, emptyConversationMessageCheckBuilder]
+    const messagesSelectMock = vi.fn(() => {
+        const nextBuilder = messageSelectBuilders.shift()
+        if (!nextBuilder) {
+            throw new Error('Unexpected extra messages select call')
+        }
+        return nextBuilder
+    })
+    const messagesInsertMock = vi.fn(async () => ({ error: null }))
+
+    const exactLookupEqMock = vi.fn()
+    const exactLookupBuilder = {
+        eq: exactLookupEqMock,
+        limit: vi.fn(() => exactLookupBuilder),
+        maybeSingle: vi.fn(async () => ({ data: emptyDuplicateConversation }))
+    }
+    exactLookupEqMock.mockReturnValue(exactLookupBuilder)
+
+    const fallbackLookupEqMock = vi.fn()
+    const fallbackLookupBuilder = {
+        eq: fallbackLookupEqMock,
+        limit: vi.fn(() => fallbackLookupBuilder),
+        maybeSingle: vi.fn(async () => ({ data: existingConversation }))
+    }
+    fallbackLookupEqMock.mockReturnValue(fallbackLookupBuilder)
+
+    const conversationSelectBuilders = [exactLookupBuilder, fallbackLookupBuilder]
+    const conversationsSelectMock = vi.fn(() => {
+        const nextBuilder = conversationSelectBuilders.shift()
+        if (!nextBuilder) {
+            throw new Error('Unexpected extra conversations select call')
+        }
+        return nextBuilder
+    })
+    const conversationsUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const conversationsUpdateMock = vi.fn(() => ({ eq: conversationsUpdateEqMock }))
+    const conversationsDeleteEqMock = vi.fn(async () => ({ error: null }))
+    const conversationsDeleteMock = vi.fn(() => ({ eq: conversationsDeleteEqMock }))
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'channels') {
+            return {
+                select: channelsSelectMock,
+                update: channelsUpdateMock
+            }
+        }
+
+        if (table === 'messages') {
+            return {
+                select: messagesSelectMock,
+                insert: messagesInsertMock
+            }
+        }
+
+        if (table === 'conversations') {
+            return {
+                select: conversationsSelectMock,
+                update: conversationsUpdateMock,
+                delete: conversationsDeleteMock
+            }
+        }
+
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        messagesInsertMock,
+        conversationsUpdateMock,
+        conversationsDeleteEqMock
+    }
+}
+
 describe('Instagram webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -375,6 +617,112 @@ describe('Instagram webhook route', () => {
             contact_avatar_url: 'https://cdn.example.com/gamze.jpg',
             unread_count: 2,
             tags: []
+        }))
+    })
+
+    it('reuses an existing instagram conversation when the webhook recipient id changes but username still matches', async () => {
+        const { supabase, messagesInsertMock, conversationsUpdateMock } =
+            createInstagramOutboundFallbackConversationSupabaseMock()
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([{
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-recipient-new-scope',
+            contactName: null,
+            messageId: 'ig-mid-echo-2',
+            text: 'Size bilgi verdim',
+            timestamp: '1738000002',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'outbound',
+            skipAutomation: true
+        }])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getUserProfileMock.mockResolvedValue({
+            id: 'ig-recipient-new-scope',
+            username: 'serayaytemiz',
+            name: 'Sera',
+            profile_picture_url: 'https://cdn.example.com/sera.jpg'
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(messagesInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+            conversation_id: 'conv-existing',
+            sender_type: 'user',
+            content: 'Size bilgi verdim'
+        }))
+        expect(conversationsUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'serayaytemiz',
+            contact_avatar_url: 'https://cdn.example.com/sera.jpg'
+        }))
+    })
+
+    it('prefers the older populated instagram conversation over an empty duplicate thread', async () => {
+        const {
+            supabase,
+            messagesInsertMock,
+            conversationsUpdateMock,
+            conversationsDeleteEqMock
+        } = createInstagramOutboundEmptyDuplicateSupabaseMock()
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([{
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-recipient-new-scope',
+            contactName: null,
+            messageId: 'ig-mid-echo-3',
+            text: 'Detaylari DMden gonderdim',
+            timestamp: '1738000003',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'outbound',
+            skipAutomation: true
+        }])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getUserProfileMock.mockResolvedValue({
+            id: 'ig-recipient-new-scope',
+            username: 'serayaytemiz',
+            name: 'Sera',
+            profile_picture_url: 'https://cdn.example.com/sera.jpg'
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(messagesInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+            conversation_id: 'conv-existing-history',
+            sender_type: 'user',
+            content: 'Detaylari DMden gonderdim'
+        }))
+        expect(conversationsDeleteEqMock).toHaveBeenCalledWith('id', 'conv-empty-duplicate')
+        expect(conversationsUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'serayaytemiz',
+            contact_avatar_url: 'https://cdn.example.com/sera.jpg',
+            unread_count: 1
         }))
     })
 })

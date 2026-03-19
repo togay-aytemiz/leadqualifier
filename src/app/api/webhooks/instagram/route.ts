@@ -230,14 +230,99 @@ async function findInstagramConversationByContactId(
     return data as InstagramWebhookConversation | null
 }
 
+async function findInstagramConversationByContactName(
+    supabase: any,
+    organizationId: string,
+    contactName: string
+) {
+    const normalizedContactName = readTrimmedString(contactName)
+    if (!normalizedContactName) return null
+
+    const { data } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('platform', 'instagram')
+        .eq('contact_name', normalizedContactName)
+        .limit(1)
+        .maybeSingle()
+
+    return data as InstagramWebhookConversation | null
+}
+
+async function instagramConversationHasMessages(
+    supabase: any,
+    conversationId: string
+) {
+    const { data } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .limit(1)
+        .maybeSingle()
+
+    return Boolean((data as { id?: string } | null)?.id)
+}
+
+async function deleteInstagramConversationById(
+    supabase: any,
+    conversationId: string
+) {
+    const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId)
+
+    if (error) {
+        console.warn('Instagram Webhook: Failed to clean up empty duplicate conversation', {
+            conversation_id: conversationId,
+            error
+        })
+        return false
+    }
+
+    return true
+}
+
 async function ensureInstagramConversationForContact(
     supabase: any,
     organizationId: string,
     contactId: string,
     contactIdentity: InstagramContactIdentity
 ) {
+    const fallbackNames = [
+        contactIdentity.username,
+        contactIdentity.contactName
+    ]
+        .map((value) => readTrimmedString(value))
+        .filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index)
+
     let conversation = await findInstagramConversationByContactId(supabase, organizationId, contactId)
+    let fallbackConversation: InstagramWebhookConversation | null = null
+
+    for (const fallbackName of fallbackNames) {
+        fallbackConversation = await findInstagramConversationByContactName(
+            supabase,
+            organizationId,
+            fallbackName
+        )
+        if (fallbackConversation) break
+    }
+
+    if (conversation && fallbackConversation && conversation.id !== fallbackConversation.id) {
+        const exactConversationHasMessages = await instagramConversationHasMessages(
+            supabase,
+            conversation.id
+        )
+
+        if (!exactConversationHasMessages) {
+            await deleteInstagramConversationById(supabase, conversation.id)
+            return fallbackConversation
+        }
+    }
+
     if (conversation) return conversation
+    if (fallbackConversation) return fallbackConversation
 
     const nowIso = new Date().toISOString()
     const { data: createdConversation, error: createConversationError } = await supabase
