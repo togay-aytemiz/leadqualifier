@@ -1,6 +1,7 @@
 import { Conversation } from '@/types/database'
 import { useTranslations } from 'next-intl'
 import { Avatar } from '@/design'
+import { resolveConversationSecondaryIdentifier } from '@/components/inbox/conversationIdentity'
 
 interface DetailsPanelProps {
     conversation: Conversation
@@ -8,6 +9,7 @@ interface DetailsPanelProps {
 
 export function DetailsPanel({ conversation }: DetailsPanelProps) {
     const t = useTranslations('inbox')
+    const secondaryIdentifier = resolveConversationSecondaryIdentifier(conversation, t('noPhoneNumber'))
     return (
         <aside className="w-80 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto hidden lg:block">
             <div className="flex border-b border-gray-200 px-4 py-3 items-center space-x-4">
@@ -21,7 +23,9 @@ export function DetailsPanel({ conversation }: DetailsPanelProps) {
                 <div className="text-center">
                     <Avatar name={conversation.contact_name} src={conversation.contact_avatar_url} size="lg" className="mx-auto mb-3 h-20 w-20 text-2xl" />
                     <h3 className="font-bold text-gray-900">{conversation.contact_name}</h3>
-                    <p className="text-sm text-gray-500">{conversation.contact_phone || t('noPhoneNumber')}</p>
+                    {secondaryIdentifier && (
+                        <p className="text-sm text-gray-500">{secondaryIdentifier}</p>
+                    )}
                 </div>
 
                 <hr className="border-gray-100" />

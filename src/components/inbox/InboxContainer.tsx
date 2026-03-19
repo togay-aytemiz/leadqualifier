@@ -97,6 +97,7 @@ import {
   resolveMessagePreviewContent,
 } from '@/components/inbox/messageMedia'
 import { buildInboxImageGalleryLookup } from '@/components/inbox/message-image-groups'
+import { resolveConversationSecondaryIdentifier } from '@/components/inbox/conversationIdentity'
 import {
   prependOlderMessages,
   resolveRestoredScrollTop,
@@ -2382,6 +2383,9 @@ export function InboxContainer({
   const selectedConversationDisplayName = selectedConversation
     ? resolveInboxContactDisplayName(selectedConversation, visibleMessages)
     : ''
+  const selectedConversationSecondaryIdentifier = selectedConversation
+    ? resolveConversationSecondaryIdentifier(selectedConversation, t('noPhoneNumber'))
+    : null
   const selectedConversationAvatarUrl = selectedConversation?.contact_avatar_url ?? null
   const selectedConversationPrivateNote =
     typeof selectedConversation?.private_note === 'string' ? selectedConversation.private_note : ''
@@ -3075,9 +3079,11 @@ export function InboxContainer({
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-500">
-                                {selectedConversation.contact_phone || t('noPhoneNumber')}
-                              </p>
+                              {selectedConversationSecondaryIdentifier && (
+                                <p className="text-xs text-gray-500">
+                                  {selectedConversationSecondaryIdentifier}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="my-3 h-px bg-gray-100" />
@@ -4216,9 +4222,11 @@ export function InboxContainer({
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {selectedConversation.contact_phone || t('noPhoneNumber')}
-                        </p>
+                        {selectedConversationSecondaryIdentifier && (
+                          <p className="mt-1 text-sm text-gray-500">
+                            {selectedConversationSecondaryIdentifier}
+                          </p>
+                        )}
                       </div>
 
                       <hr className="my-6 border-gray-100" />
