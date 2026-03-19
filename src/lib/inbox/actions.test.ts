@@ -443,6 +443,58 @@ describe('getConversations', () => {
     )
   })
 
+  it('does not append instagram_request tag for normal instagram messaging conversations', async () => {
+    const rawConversation = {
+      ...createConversation({
+        platform: 'instagram',
+        contact_name: 'togayaytemiz',
+        contact_phone: 'togayaytemiz',
+        contact_avatar_url: 'https://cdn.example.com/ig-avatar.jpg',
+        tags: [],
+      }),
+      assignee: {
+        full_name: 'Test User',
+        email: 'test@example.com',
+      },
+      leads: [],
+      messages: [
+        {
+          content: 'Merhaba',
+          created_at: '2026-02-08T10:00:00.000Z',
+          sender_type: 'contact',
+          metadata: {
+            instagram_event_source: 'messaging',
+          },
+        },
+      ],
+    }
+
+    const supabaseMock = createSupabaseMock({
+      conversations: [
+        createQueryBuilder({
+          rangeResult: {
+            data: [rawConversation],
+            error: null,
+          },
+        }),
+      ],
+      messages: [
+        createQueryBuilder({
+          inResult: {
+            data: [],
+            error: null,
+          },
+        }),
+      ],
+    })
+
+    createClientMock.mockResolvedValue(supabaseMock)
+
+    const result = await getConversations('org-1')
+
+    expect(result[0]?.tags).toEqual([])
+  })
+
   it('falls back to flat queries when primary nested query fails', async () => {
     const baseConversation = createConversation()
 

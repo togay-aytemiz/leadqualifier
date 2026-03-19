@@ -373,6 +373,40 @@ function readTrimmedString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
+function parseMessageMetadataRecord(metadata: unknown): Record<string, unknown> | null {
+  if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+    return metadata as Record<string, unknown>
+  }
+
+  if (typeof metadata !== 'string') return null
+  const trimmed = metadata.trim()
+  if (!trimmed) return null
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function resolveInstagramPreviewEventSource(metadata: unknown): 'messaging' | 'standby' | null {
+  const parsed = parseMessageMetadataRecord(metadata)
+  if (!parsed) return null
+
+  const sourceValue = readTrimmedString(parsed.instagram_event_source)
+  if (sourceValue === 'messaging' || sourceValue === 'standby') return sourceValue
+
+  const eventType = readTrimmedString(parsed.instagram_event_type)
+  if (eventType === 'standby') return 'standby'
+
+  return null
+}
+
 function isInstagramScopedId(value: string) {
   return /^\d{10,}$/.test(value)
 }
@@ -602,6 +636,7 @@ async function annotateInstagramRequestFallback(
 
     const latestMessage = Array.isArray(conversation.messages) ? conversation.messages[0] : null
     if (!latestMessage || latestMessage.sender_type !== 'contact') return conversation
+    if (resolveInstagramPreviewEventSource(latestMessage.metadata) !== 'standby') return conversation
 
     const tags = Array.isArray(conversation.tags)
       ? conversation.tags.filter((tag): tag is string => typeof tag === 'string')

@@ -107,7 +107,7 @@ describe('instagramRequestState helpers', () => {
         expect(isInstagramRequestConversation(conversation)).toBe(true)
     })
 
-    it('falls back to request-origin when instagram contact is unresolved numeric id', () => {
+    it('does not infer request-origin from unresolved numeric instagram ids alone', () => {
         const conversation = buildConversation({
             tags: [],
             contact_name: '1400879865404973',
@@ -119,7 +119,7 @@ describe('instagramRequestState helpers', () => {
             }]
         })
 
-        expect(isInstagramRequestConversation(conversation)).toBe(true)
+        expect(isInstagramRequestConversation(conversation)).toBe(false)
     })
 
     it('does not apply unresolved-id fallback when conversation already has outbound replies', () => {

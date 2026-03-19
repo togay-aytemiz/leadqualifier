@@ -120,24 +120,7 @@ export function isInstagramRequestConversation(
     ))
     if (hasStandbySignal && !hasOutboundReply) return true
 
-    const fallbackName = readTrimmedString(conversation.contact_name)
-        || readTrimmedString(conversation.contact_phone)
-        || ''
-    if (!isInstagramScopedId(fallbackName)) return false
-
-    const hasInboundContactMessage = candidates.some((message) => message.sender_type === 'contact')
-    if (!hasInboundContactMessage) return false
-
-    const hasResolvedIdentity = candidates.some((message) => {
-        if (message.sender_type !== 'contact') return false
-        const displayName = readInstagramContactDisplayName(message.metadata)
-        return Boolean(displayName && !isInstagramScopedId(displayName))
-    })
-    if (hasResolvedIdentity) return false
-
-    if (hasOutboundReply) return false
-
-    return true
+    return false
 }
 
 export function resolveInboxContactDisplayName(
