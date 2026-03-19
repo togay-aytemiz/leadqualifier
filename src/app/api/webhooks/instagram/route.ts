@@ -163,6 +163,32 @@ async function reconcileChannelByInstagramAccountId(
     return null
 }
 
+async function markInstagramChannelWebhookVerified(
+    supabase: any,
+    channel: InstagramChannelRecord
+) {
+    if (readConfigString(channel.config, 'webhook_verified_at')) {
+        return channel
+    }
+
+    const nextConfig = {
+        ...asConfigRecord(channel.config),
+        webhook_status: 'verified',
+        webhook_subscription_error: null,
+        webhook_verified_at: new Date().toISOString()
+    }
+
+    await supabase
+        .from('channels')
+        .update({ config: nextConfig })
+        .eq('id', channel.id)
+
+    return {
+        ...channel,
+        config: nextConfig
+    } as InstagramChannelRecord
+}
+
 export async function GET(req: NextRequest) {
     const mode = req.nextUrl.searchParams.get('hub.mode')
     const token = req.nextUrl.searchParams.get('hub.verify_token')
@@ -268,7 +294,7 @@ export async function POST(req: NextRequest) {
                 continue
             }
 
-            channel = resolvedChannel
+            channel = await markInstagramChannelWebhookVerified(supabase, resolvedChannel)
             const appSecret = process.env.META_INSTAGRAM_APP_SECRET
                 || process.env.META_APP_SECRET
                 || readConfigString(channel.config, 'app_secret')

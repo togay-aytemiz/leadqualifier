@@ -4,6 +4,17 @@ const DEFAULT_GRAPH_API_VERSION = 'v21.0'
 const INSTAGRAM_USER_PROFILE_FIELDS_WITH_AVATAR = 'id,username,name,profile_pic'
 const INSTAGRAM_USER_PROFILE_FIELDS_BASIC = 'id,username,name'
 
+export const INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS = [
+    'messages',
+    'messaging_optins',
+    'messaging_postbacks',
+    'messaging_referral',
+    'messaging_seen',
+    'message_reactions',
+    'messaging_handover',
+    'standby'
+] as const
+
 type GraphApiErrorResponse = {
     error?: {
         message?: string
@@ -30,6 +41,10 @@ export interface InstagramUserProfile {
     username?: string
     name?: string
     profile_picture_url?: string
+}
+
+export interface InstagramWebhookSubscriptionResponse {
+    success: boolean
 }
 
 export class InstagramClient {
@@ -132,19 +147,19 @@ export class InstagramClient {
         }
 
         try {
-            return await this.requestInstagramLogin<{ message_id?: string }>(path, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            })
-        } catch (instagramLoginError) {
             try {
-                return await this.request<{ message_id?: string }>(path, {
+                return await this.requestInstagramLogin<{ message_id?: string }>(path, {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 })
             } catch {
-                throw instagramLoginError
+                return await this.request<{ message_id?: string }>(path, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                })
             }
+        } catch (instagramLoginError) {
+            throw instagramLoginError
         }
     }
 
@@ -170,20 +185,36 @@ export class InstagramClient {
         }
 
         try {
-            return await this.requestInstagramLogin<{ message_id?: string }>(path, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            })
-        } catch (instagramLoginError) {
             try {
-                return await this.request<{ message_id?: string }>(path, {
+                return await this.requestInstagramLogin<{ message_id?: string }>(path, {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 })
             } catch {
-                throw instagramLoginError
+                return await this.request<{ message_id?: string }>(path, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                })
             }
+        } catch (instagramLoginError) {
+            throw instagramLoginError
         }
+    }
+
+    async subscribeAppToAccount(params: {
+        instagramAccountId: string
+        subscribedFields: readonly string[]
+    }): Promise<InstagramWebhookSubscriptionResponse> {
+        const searchParams = new URLSearchParams({
+            subscribed_fields: params.subscribedFields.join(',')
+        })
+
+        return this.requestInstagramLogin<InstagramWebhookSubscriptionResponse>(
+            `${params.instagramAccountId}/subscribed_apps?${searchParams.toString()}`,
+            {
+                method: 'POST'
+            }
+        )
     }
 
     async getBusinessAccount(instagramBusinessAccountId: string): Promise<InstagramBusinessAccountDetails> {

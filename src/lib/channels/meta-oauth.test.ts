@@ -155,12 +155,11 @@ describe('meta oauth helpers', () => {
         expect(scopes).not.toContain('business_management')
     })
 
-    it('uses instagram-business scopes for instagram oauth', () => {
+    it('uses instagram-login messaging scopes for instagram oauth', () => {
         const scopes = getMetaOAuthScopes('instagram')
 
         expect(scopes).toEqual([
             'instagram_business_basic',
-            'instagram_business_manage_comments',
             'instagram_business_manage_messages'
         ])
     })

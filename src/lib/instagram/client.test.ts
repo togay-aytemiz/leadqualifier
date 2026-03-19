@@ -127,6 +127,32 @@ describe('InstagramClient', () => {
         )
     })
 
+    it('subscribes instagram accounts to webhook fields via graph.instagram', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ success: true })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new InstagramClient('token-1')
+        const result = await client.subscribeAppToAccount({
+            instagramAccountId: 'ig-business-1',
+            subscribedFields: ['messages', 'standby']
+        })
+
+        expect(result.success).toBe(true)
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.instagram.com/v21.0/ig-business-1/subscribed_apps?subscribed_fields=messages%2Cstandby',
+            expect.objectContaining({
+                method: 'POST',
+                headers: expect.objectContaining({
+                    Authorization: 'Bearer token-1',
+                    'Content-Type': 'application/json'
+                })
+            })
+        )
+    })
+
     it('fetches instagram user profile details for sender identity resolution', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

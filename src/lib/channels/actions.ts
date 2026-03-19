@@ -116,6 +116,17 @@ function readConfigString(config: Json, key: string): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function readConfigStringArray(config: Json, key: string): string[] | null {
+    const value = asConfigRecord(config)[key]
+    if (!Array.isArray(value)) return null
+
+    const normalized = value
+        .map((item) => typeof item === 'string' ? item.trim() : '')
+        .filter((item) => item.length > 0)
+
+    return normalized.length > 0 ? normalized : null
+}
+
 function normalizeTemplateSummary(value: unknown): WhatsAppTemplateSummary | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
 
@@ -684,6 +695,8 @@ export async function debugInstagramChannel(channelId: string): Promise<Instagra
                 page_id: pageId,
                 verify_token_set: Boolean(verifyToken),
                 webhook_status: getMetaWebhookStatus(channel.config),
+                webhook_subscription_requested_at: readConfigString(channel.config, 'webhook_subscription_requested_at'),
+                webhook_subscribed_fields: readConfigStringArray(channel.config, 'webhook_subscribed_fields'),
                 webhook_verified_at: readConfigString(channel.config, 'webhook_verified_at'),
                 webhook_subscription_error: readConfigString(channel.config, 'webhook_subscription_error'),
                 username: candidate.instagramUsername ?? null,

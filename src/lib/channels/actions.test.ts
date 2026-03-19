@@ -393,6 +393,8 @@ describe('channels actions: WhatsApp core flows', () => {
                 page_id: '17841444965056435',
                 verify_token_set: true,
                 webhook_status: 'pending',
+                webhook_subscription_requested_at: null,
+                webhook_subscribed_fields: null,
                 webhook_verified_at: null,
                 webhook_subscription_error: null,
                 username: 'itsalinayalin',

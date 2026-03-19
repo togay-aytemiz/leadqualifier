@@ -163,7 +163,6 @@ export function getMetaOAuthScopes(channel: MetaChannelType) {
 
     return [
         'instagram_business_basic',
-        'instagram_business_manage_comments',
         'instagram_business_manage_messages'
     ]
 }

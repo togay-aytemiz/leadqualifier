@@ -168,7 +168,7 @@ describe('Instagram webhook route', () => {
             skipAutomation: false
         }
 
-        const { supabase, orMaybeSingleMock } = createInstagramSupabaseMock({
+        const { supabase, orMaybeSingleMock, updateMock } = createInstagramSupabaseMock({
             directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
                 ? {
                     id: 'channel-ig-1',
@@ -216,6 +216,12 @@ describe('Instagram webhook route', () => {
             source: 'instagram',
             contactId: 'ig-user-1',
             inboundMessageId: 'ig-mid-1'
+        }))
+        expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            config: expect.objectContaining({
+                webhook_status: 'verified',
+                webhook_verified_at: expect.any(String)
+            })
         }))
     })
 })

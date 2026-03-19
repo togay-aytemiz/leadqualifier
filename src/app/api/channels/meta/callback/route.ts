@@ -16,6 +16,7 @@ import {
     pickWhatsAppConnectionCandidate
 } from '@/lib/channels/meta-oauth'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
+import { InstagramClient, INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS } from '@/lib/instagram/client'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
 import { resolveWhatsAppWebhookSubscriptionOverrides } from '@/lib/channels/whatsapp-webhook-config'
 
@@ -163,6 +164,13 @@ export async function GET(req: NextRequest) {
                 return redirectToChannels(req, locale, 'missing_instagram_assets', state.channel, returnToPath, popup)
             }
 
+            const instagramClient = new InstagramClient(candidate.pageAccessToken)
+            await instagramClient.subscribeAppToAccount({
+                instagramAccountId: candidate.pageId,
+                subscribedFields: INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS
+            })
+            const webhookSubscriptionRequestedAt = new Date().toISOString()
+
             const channelName = candidate.instagramUsername
                 ? `Instagram (@${candidate.instagramUsername})`
                 : `Instagram (${candidate.pageName})`
@@ -184,6 +192,8 @@ export async function GET(req: NextRequest) {
                         connected_via: 'oauth',
                         oauth_connected_at: new Date().toISOString(),
                         webhook_status: 'pending',
+                        webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
+                        webhook_subscribed_fields: [...INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS],
                         webhook_subscription_error: null,
                         webhook_verified_at: null,
                         username: candidate.instagramUsername
