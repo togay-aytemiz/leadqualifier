@@ -429,21 +429,35 @@ async function resolveInstagramBusinessIdentity(params: {
 }) {
     const fallbackUsername = readConfigString(params.channel.config, 'username')
     const fallbackAvatarUrl = readConfigString(params.channel.config, 'profile_picture_url')
+    const candidateIds = Array.from(new Set([
+        readTrimmedString(params.instagramBusinessAccountId),
+        readConfigString(params.channel.config, 'instagram_business_account_id'),
+        readConfigString(params.channel.config, 'instagram_user_id'),
+        readConfigString(params.channel.config, 'instagram_app_scoped_id'),
+        readConfigString(params.channel.config, 'page_id')
+    ].filter((value): value is string => Boolean(value))))
 
-    try {
-        const profile = await params.client.getBusinessAccount(params.instagramBusinessAccountId)
-        return {
-            username: readTrimmedString(profile.username)
-                || readTrimmedString(profile.name)
-                || fallbackUsername,
-            avatarUrl: readTrimmedString(profile.profile_picture_url) || fallbackAvatarUrl
-        } satisfies InstagramBusinessIdentity
-    } catch {
-        return {
-            username: fallbackUsername,
-            avatarUrl: fallbackAvatarUrl
-        } satisfies InstagramBusinessIdentity
+    for (const candidateId of candidateIds) {
+        try {
+            const profile = await params.client.getBusinessAccount(candidateId)
+            const username = readTrimmedString(profile.username) || readTrimmedString(profile.name)
+            const avatarUrl = readTrimmedString(profile.profile_picture_url)
+
+            if (username || avatarUrl) {
+                return {
+                    username: username || fallbackUsername,
+                    avatarUrl: avatarUrl || fallbackAvatarUrl
+                } satisfies InstagramBusinessIdentity
+            }
+        } catch {
+            // Keep trying alternate Instagram-scoped ids; webhook events may be addressed by page_id.
+        }
     }
+
+    return {
+        username: fallbackUsername,
+        avatarUrl: fallbackAvatarUrl
+    } satisfies InstagramBusinessIdentity
 }
 
 export async function GET(req: NextRequest) {

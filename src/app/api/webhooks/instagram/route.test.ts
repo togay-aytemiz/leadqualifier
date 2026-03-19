@@ -581,11 +581,21 @@ describe('Instagram webhook route', () => {
         }])
         isValidMetaSignatureMock.mockReturnValue(true)
         resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
-        getBusinessAccountMock.mockResolvedValue({
-            id: 'ig-biz-1',
-            username: 'sweetdreams.photography_tr',
-            name: 'Sweet Dreams',
-            profile_picture_url: 'https://cdn.example.com/business-avatar.jpg'
+        getBusinessAccountMock.mockImplementation(async (accountId: string) => {
+            if (accountId === 'page-1') {
+                throw new Error('Unsupported node id')
+            }
+
+            if (accountId === 'ig-biz-1') {
+                return {
+                    id: 'ig-biz-1',
+                    username: 'sweetdreams.photography_tr',
+                    name: 'Sweet Dreams',
+                    profile_picture_url: 'https://cdn.example.com/business-avatar.jpg'
+                }
+            }
+
+            throw new Error(`Unexpected account id: ${accountId}`)
         })
         getUserProfileMock.mockResolvedValue({
             id: 'ig-user-1',
@@ -624,6 +634,8 @@ describe('Instagram webhook route', () => {
                 instagram_business_avatar_url: 'https://cdn.example.com/business-avatar.jpg'
             })
         }))
+        expect(getBusinessAccountMock).toHaveBeenNthCalledWith(1, 'page-1')
+        expect(getBusinessAccountMock).toHaveBeenNthCalledWith(2, 'ig-biz-1')
         expect(conversationsUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
             contact_name: 'keskinngamzee',
             contact_avatar_url: 'https://cdn.example.com/gamze.jpg',
