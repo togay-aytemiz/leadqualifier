@@ -1,6 +1,19 @@
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 
 const COMBINING_MARKS = /[\u0300-\u036f]/g
+const DATE_FALLBACK_ALIASES = new Set(['tarih', 'date'])
+const LOCATION_FALLBACK_ALIASES = new Set([
+  'konum',
+  'lokasyon',
+  'location',
+  'adres',
+  'il',
+  'ilce',
+  'sehir',
+  'il ilce',
+])
+const BUDGET_FALLBACK_ALIASES = new Set(['butce', 'ucret', 'fiyat', 'price', 'odeme', 'budget'])
+const SERVICE_FALLBACK_ALIASES = new Set(['hizmet', 'service'])
 
 export interface RequiredIntakeOverrideMetaEntry {
   updated_at: string | null
@@ -23,6 +36,14 @@ export function normalizeRequiredIntakeFieldKey(value: string) {
     .normalize('NFKD')
     .replace(COMBINING_MARKS, '')
     .toLowerCase()
+}
+
+function extractNormalizedFieldTokens(value: string) {
+  return normalizeRequiredIntakeFieldKey(value).match(/[\p{L}\p{N}]+/gu) ?? []
+}
+
+function normalizeFallbackAlias(field: string) {
+  return extractNormalizedFieldTokens(field).join(' ')
 }
 
 export function normalizeRequiredIntakeFieldValue(value: unknown): string | null {
@@ -92,37 +113,18 @@ function inferFallbackValue(options: {
   const serviceType = normalizeRequiredIntakeFieldValue(
     options.serviceType ?? extracted.service_type
   )
+  const fallbackAlias = normalizeFallbackAlias(normalizedField)
 
-  const dateHints = ['tarih', 'date', 'gun', 'gün', 'zaman', 'time']
-  const locationHints = [
-    'konum',
-    'lokasyon',
-    'adres',
-    'yer',
-    'location',
-    'sehir',
-    'şehir',
-    'ilce',
-    'ilçe',
-    'il',
-  ]
-  const budgetHints = ['butce', 'bütçe', 'ucret', 'ücret', 'fiyat', 'price', 'odeme', 'ödeme']
-  const serviceHints = ['hizmet', 'service', 'cekim', 'çekim', 'paket']
-
-  if (dateHints.some((hint) => normalizedField.includes(normalizeRequiredIntakeFieldKey(hint)))) {
+  if (DATE_FALLBACK_ALIASES.has(fallbackAlias)) {
     return desiredDate
   }
-  if (
-    locationHints.some((hint) => normalizedField.includes(normalizeRequiredIntakeFieldKey(hint)))
-  ) {
+  if (LOCATION_FALLBACK_ALIASES.has(fallbackAlias)) {
     return location
   }
-  if (budgetHints.some((hint) => normalizedField.includes(normalizeRequiredIntakeFieldKey(hint)))) {
+  if (BUDGET_FALLBACK_ALIASES.has(fallbackAlias)) {
     return budgetSignals
   }
-  if (
-    serviceHints.some((hint) => normalizedField.includes(normalizeRequiredIntakeFieldKey(hint)))
-  ) {
+  if (SERVICE_FALLBACK_ALIASES.has(fallbackAlias)) {
     return serviceType
   }
 

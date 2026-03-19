@@ -59,6 +59,31 @@ describe('resolveCollectedRequiredIntake', () => {
     ])
   })
 
+  it('does not fall back for custom descriptive required fields', () => {
+    const result = resolveCollectedRequiredIntake({
+      requiredFields: ['Bebek Doğum Tarihi', 'Doğum Yeri', 'Hamilelik Durumu'],
+      extractedFields: {
+        desired_date: '13 Nisan',
+        location: 'Ankara',
+      },
+    })
+
+    expect(result).toEqual([])
+  })
+
+  it('still treats standalone il fields as location fallback fields', () => {
+    const result = resolveCollectedRequiredIntake({
+      requiredFields: ['İl'],
+      extractedFields: {
+        location: 'Ankara',
+      },
+    })
+
+    expect(result).toEqual([
+      { field: 'İl', value: 'Ankara', source: 'ai', updatedAt: null, updatedBy: null },
+    ])
+  })
+
   it('skips required fields that still have no collected value', () => {
     const result = resolveCollectedRequiredIntake({
       requiredFields: ['Ad Soyad', 'Telefon'],

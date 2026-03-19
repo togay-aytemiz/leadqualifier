@@ -89,14 +89,16 @@ export function SubscriptionPlanCatalog({
                                 })}
                             </p>
 
-                            <button
-                                type="button"
-                                onClick={() => setCheckoutPlanId(plan.id)}
-                                className="mt-4 inline-flex h-10 min-w-[132px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                disabled={!canSubmit}
-                            >
-                                {tPlans('packageCatalog.planCta.start')}
-                            </button>
+                            <div className="mt-auto pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setCheckoutPlanId(plan.id)}
+                                    className="inline-flex h-10 min-w-[132px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                    disabled={!canSubmit}
+                                >
+                                    {tPlans('packageCatalog.planCta.start')}
+                                </button>
+                            </div>
                         </article>
                     )
                 })}
