@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { v4 as uuidv4 } from 'uuid'
 import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { InstagramClient } from '@/lib/instagram/client'
@@ -21,6 +22,17 @@ interface InstagramContactIdentity {
     avatarUrl: string | null
 }
 
+interface InstagramWebhookConversation {
+    id: string
+    contact_name: string | null
+    contact_avatar_url: string | null
+    contact_phone: string | null
+    organization_id: string
+    platform: 'instagram'
+    unread_count: number | null
+    tags: unknown
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -41,6 +53,18 @@ function readTrimmedString(value: unknown): string | null {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function readStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+}
+
+function clearInstagramRequestTag(tags: unknown) {
+    return readStringArray(tags).filter((tag) => tag.toLowerCase() !== 'instagram_request')
 }
 
 function isInstagramWebhookDebugEnabled() {
@@ -187,6 +211,125 @@ async function markInstagramChannelWebhookVerified(
         ...channel,
         config: nextConfig
     } as InstagramChannelRecord
+}
+
+async function findInstagramConversationByContactId(
+    supabase: any,
+    organizationId: string,
+    contactId: string
+) {
+    const { data } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('platform', 'instagram')
+        .eq('contact_phone', contactId)
+        .limit(1)
+        .maybeSingle()
+
+    return data as InstagramWebhookConversation | null
+}
+
+async function ensureInstagramConversationForContact(
+    supabase: any,
+    organizationId: string,
+    contactId: string,
+    contactIdentity: InstagramContactIdentity
+) {
+    let conversation = await findInstagramConversationByContactId(supabase, organizationId, contactId)
+    if (conversation) return conversation
+
+    const nowIso = new Date().toISOString()
+    const { data: createdConversation, error: createConversationError } = await supabase
+        .from('conversations')
+        .insert({
+            id: uuidv4(),
+            organization_id: organizationId,
+            platform: 'instagram',
+            contact_name: contactIdentity.contactName || contactId,
+            contact_avatar_url: contactIdentity.avatarUrl,
+            contact_phone: contactId,
+            status: 'open',
+            unread_count: 0,
+            tags: [],
+            last_message_at: nowIso,
+            updated_at: nowIso
+        })
+        .select()
+        .single()
+
+    if (createConversationError) {
+        if (createConversationError.code === '23505') {
+            return findInstagramConversationByContactId(supabase, organizationId, contactId)
+        }
+
+        console.error('Instagram Webhook: Failed to create conversation for outbound echo', createConversationError)
+        return null
+    }
+
+    return createdConversation as InstagramWebhookConversation
+}
+
+async function persistInstagramExternalOutboundMessage(params: {
+    supabase: any
+    organizationId: string
+    contactId: string
+    contactIdentity: InstagramContactIdentity
+    messageId: string
+    text: string
+    metadata: Record<string, unknown>
+}) {
+    const { data: existingMessage } = await params.supabase
+        .from('messages')
+        .select('id')
+        .eq('organization_id', params.organizationId)
+        .eq('metadata->>instagram_message_id', params.messageId)
+        .maybeSingle()
+
+    if ((existingMessage as { id?: string } | null)?.id) return
+
+    const conversation = await ensureInstagramConversationForContact(
+        params.supabase,
+        params.organizationId,
+        params.contactId,
+        params.contactIdentity
+    )
+
+    if (!conversation) return
+
+    const { error: insertError } = await params.supabase
+        .from('messages')
+        .insert({
+            id: uuidv4(),
+            conversation_id: conversation.id,
+            organization_id: params.organizationId,
+            sender_type: 'user',
+            content: params.text,
+            metadata: params.metadata
+        })
+
+    if (insertError) {
+        if (insertError.code === '23505') return
+        console.error('Instagram Webhook: Failed to save external outbound message', insertError)
+        return
+    }
+
+    const nowIso = new Date().toISOString()
+    const { error: updateConversationError } = await params.supabase
+        .from('conversations')
+        .update({
+            contact_name: params.contactIdentity.contactName || conversation.contact_name || params.contactId,
+            contact_avatar_url: params.contactIdentity.avatarUrl || conversation.contact_avatar_url || null,
+            tags: clearInstagramRequestTag(conversation.tags),
+            last_message_at: nowIso,
+            unread_count: conversation.unread_count ?? 0,
+            updated_at: nowIso
+        })
+        .eq('id', conversation.id)
+
+    if (updateConversationError) {
+        console.error('Instagram Webhook: Failed to update conversation after external outbound message', updateConversationError)
+    }
 }
 
 export async function GET(req: NextRequest) {
@@ -351,6 +494,51 @@ export async function POST(req: NextRequest) {
 
         if (!contactIdentity) continue
 
+        const messageMetadata = {
+            instagram_message_id: event.messageId,
+            instagram_timestamp: event.timestamp,
+            instagram_business_account_id: event.instagramBusinessAccountId,
+            instagram_event_source: event.eventSource,
+            instagram_event_type: event.eventType,
+            instagram_message_direction: event.direction,
+            instagram_contact_name: contactIdentity.contactName,
+            instagram_contact_username: contactIdentity.username,
+            instagram_contact_avatar_url: contactIdentity.avatarUrl,
+            ...(event.direction === 'outbound'
+                ? {
+                    instagram_is_echo: true
+                }
+                : {}),
+            ...(event.media
+                ? {
+                    instagram_media_type: event.media.type,
+                    instagram_is_media_placeholder: !readTrimmedString(event.media.caption),
+                    instagram_media: {
+                        type: event.media.type,
+                        mime_type: event.media.mimeType,
+                        caption: event.media.caption,
+                        filename: null,
+                        storage_path: null,
+                        storage_url: event.media.url,
+                        download_status: event.media.url ? 'remote' : 'missing'
+                    }
+                }
+                : {})
+        }
+
+        if (event.direction === 'outbound') {
+            await persistInstagramExternalOutboundMessage({
+                supabase,
+                organizationId: channel.organization_id,
+                contactId: event.contactId,
+                contactIdentity,
+                messageId: event.messageId,
+                text: event.text,
+                metadata: messageMetadata
+            })
+            continue
+        }
+
         await processInboundAiPipeline({
             supabase,
             organizationId: channel.organization_id,
@@ -362,31 +550,7 @@ export async function POST(req: NextRequest) {
             text: event.text,
             inboundMessageId: event.messageId,
             inboundMessageIdMetadataKey: 'instagram_message_id',
-            inboundMessageMetadata: {
-                instagram_message_id: event.messageId,
-                instagram_timestamp: event.timestamp,
-                instagram_business_account_id: event.instagramBusinessAccountId,
-                instagram_event_source: event.eventSource,
-                instagram_event_type: event.eventType,
-                instagram_contact_name: contactIdentity.contactName,
-                instagram_contact_username: contactIdentity.username,
-                instagram_contact_avatar_url: contactIdentity.avatarUrl,
-                ...(event.media
-                    ? {
-                        instagram_media_type: event.media.type,
-                        instagram_is_media_placeholder: !readTrimmedString(event.media.caption),
-                        instagram_media: {
-                            type: event.media.type,
-                            mime_type: event.media.mimeType,
-                            caption: event.media.caption,
-                            filename: null,
-                            storage_path: null,
-                            storage_url: event.media.url,
-                            download_status: event.media.url ? 'remote' : 'missing'
-                        }
-                    }
-                    : {})
-            },
+            inboundMessageMetadata: messageMetadata,
             skipAutomation: event.skipAutomation,
             sendOutbound: async (content) => {
                 const normalized = normalizeOutboundMessage(content)

@@ -112,6 +112,97 @@ function createInstagramSupabaseMock(options: {
     }
 }
 
+function createInstagramOutboundPersistenceSupabaseMock() {
+    const existingConversation = {
+        id: 'conv-1',
+        organization_id: 'org-1',
+        platform: 'instagram',
+        contact_phone: 'ig-user-1',
+        contact_name: 'old-name',
+        contact_avatar_url: null,
+        unread_count: 2,
+        tags: ['instagram_request']
+    }
+
+    const channelsQuery = createChannelsQuery({
+        directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+            ? {
+                id: 'channel-ig-1',
+                organization_id: 'org-1',
+                config: {
+                    page_id: 'page-1',
+                    instagram_business_account_id: 'ig-biz-1',
+                    instagram_app_scoped_id: 'ig-app-1',
+                    app_secret: 'app-secret',
+                    page_access_token: 'token-ig-1'
+                }
+            }
+            : null,
+        listData: []
+    })
+
+    const channelsUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const channelsUpdateMock = vi.fn(() => ({ eq: channelsUpdateEqMock }))
+    const channelsSelectMock = vi.fn(() => channelsQuery.queryBuilder)
+
+    const dedupeMaybeSingleMock = vi.fn(async () => ({ data: null }))
+    const dedupeEqMock = vi.fn()
+    const dedupeBuilder = {
+        eq: dedupeEqMock,
+        maybeSingle: dedupeMaybeSingleMock
+    }
+    dedupeEqMock.mockReturnValue(dedupeBuilder)
+    const messagesSelectMock = vi.fn(() => dedupeBuilder)
+    const messagesInsertMock = vi.fn(async () => ({ error: null }))
+
+    const conversationMaybeSingleMock = vi.fn(async () => ({ data: existingConversation }))
+    const conversationLimitMock = vi.fn(() => conversationLookupBuilder)
+    const conversationEqMock = vi.fn()
+    const conversationLookupBuilder = {
+        eq: conversationEqMock,
+        limit: conversationLimitMock,
+        maybeSingle: conversationMaybeSingleMock
+    }
+    conversationEqMock.mockReturnValue(conversationLookupBuilder)
+    const conversationsSelectMock = vi.fn(() => conversationLookupBuilder)
+    const conversationsUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const conversationsUpdateMock = vi.fn(() => ({ eq: conversationsUpdateEqMock }))
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'channels') {
+            return {
+                select: channelsSelectMock,
+                update: channelsUpdateMock
+            }
+        }
+
+        if (table === 'messages') {
+            return {
+                select: messagesSelectMock,
+                insert: messagesInsertMock
+            }
+        }
+
+        if (table === 'conversations') {
+            return {
+                select: conversationsSelectMock,
+                update: conversationsUpdateMock
+            }
+        }
+
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        messagesInsertMock,
+        conversationsUpdateMock,
+        channelsUpdateMock
+    }
+}
+
 describe('Instagram webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -165,6 +256,7 @@ describe('Instagram webhook route', () => {
             timestamp: '1738000000',
             eventSource: 'messaging',
             eventType: 'message',
+            direction: 'inbound',
             skipAutomation: false
         }
 
@@ -222,6 +314,67 @@ describe('Instagram webhook route', () => {
                 webhook_status: 'verified',
                 webhook_verified_at: expect.any(String)
             })
+        }))
+    })
+
+    it('persists direct-instagram business echo messages as outbound inbox messages', async () => {
+        const { supabase, messagesInsertMock, conversationsUpdateMock } =
+            createInstagramOutboundPersistenceSupabaseMock()
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([{
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-user-1',
+            contactName: null,
+            messageId: 'ig-mid-echo-1',
+            text: 'Tesekkur ederiz, nisan basi gibi',
+            timestamp: '1738000001',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'outbound',
+            skipAutomation: true
+        }])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getUserProfileMock.mockResolvedValue({
+            id: 'ig-user-1',
+            username: 'keskinngamzee',
+            name: 'Gamze',
+            profile_picture_url: 'https://cdn.example.com/gamze.jpg'
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(messagesInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+            conversation_id: 'conv-1',
+            organization_id: 'org-1',
+            sender_type: 'user',
+            content: 'Tesekkur ederiz, nisan basi gibi',
+            metadata: expect.objectContaining({
+                instagram_message_id: 'ig-mid-echo-1',
+                instagram_event_source: 'messaging',
+                instagram_event_type: 'message',
+                instagram_contact_username: 'keskinngamzee',
+                instagram_contact_avatar_url: 'https://cdn.example.com/gamze.jpg'
+            })
+        }))
+        expect(conversationsUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'keskinngamzee',
+            contact_avatar_url: 'https://cdn.example.com/gamze.jpg',
+            unread_count: 2,
+            tags: []
         }))
     })
 })

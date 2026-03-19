@@ -23,7 +23,7 @@ describe('instagram webhook utilities', () => {
         expect(isValidMetaSignature('sha256=deadbeef', rawBody, secret)).toBe(false)
     })
 
-    it('extracts inbound text instagram message events and ignores echoes', () => {
+    it('extracts inbound text instagram message events and keeps business echo messages as outbound conversation events', () => {
         const payload = {
             object: 'instagram',
             entry: [{
@@ -67,7 +67,19 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000000',
             eventSource: 'messaging',
             eventType: 'message',
+            direction: 'inbound',
             skipAutomation: false
+        }, {
+            instagramBusinessAccountId: 'ig-business-1',
+            contactId: 'ig-user-1',
+            contactName: null,
+            messageId: 'igmid-echo',
+            text: 'echo',
+            timestamp: '1738000001',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'outbound',
+            skipAutomation: true
         }])
     })
 
@@ -99,6 +111,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000003',
             eventSource: 'standby',
             eventType: 'message',
+            direction: 'inbound',
             skipAutomation: false
         }])
     })
@@ -178,6 +191,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000010',
             eventSource: 'messaging',
             eventType: 'attachment',
+            direction: 'inbound',
             skipAutomation: true,
             media: {
                 type: 'image',
@@ -194,6 +208,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000011',
             eventSource: 'messaging',
             eventType: 'postback',
+            direction: 'inbound',
             skipAutomation: true
         }, {
             instagramBusinessAccountId: 'ig-business-1',
@@ -204,6 +219,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000012',
             eventSource: 'messaging',
             eventType: 'referral',
+            direction: 'inbound',
             skipAutomation: true
         }, {
             instagramBusinessAccountId: 'ig-business-1',
@@ -214,6 +230,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000013',
             eventSource: 'messaging',
             eventType: 'reaction',
+            direction: 'inbound',
             skipAutomation: true
         }, {
             instagramBusinessAccountId: 'ig-business-1',
@@ -224,6 +241,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000014',
             eventSource: 'messaging',
             eventType: 'seen',
+            direction: 'inbound',
             skipAutomation: true
         }, {
             instagramBusinessAccountId: 'ig-business-1',
@@ -234,6 +252,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000015',
             eventSource: 'messaging',
             eventType: 'optin',
+            direction: 'inbound',
             skipAutomation: true
         }, {
             instagramBusinessAccountId: 'ig-business-1',
@@ -244,6 +263,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000016',
             eventSource: 'messaging',
             eventType: 'handover',
+            direction: 'inbound',
             skipAutomation: true
         }])
     })
@@ -280,6 +300,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1738000020',
             eventSource: 'messaging',
             eventType: 'attachment',
+            direction: 'inbound',
             skipAutomation: false,
             media: {
                 type: 'image',
@@ -321,6 +342,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1739000000',
             eventSource: 'messaging',
             eventType: 'message',
+            direction: 'inbound',
             skipAutomation: false
         }])
     })
@@ -356,6 +378,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1739000001',
             eventSource: 'standby',
             eventType: 'message',
+            direction: 'inbound',
             skipAutomation: false
         }])
     })
@@ -393,6 +416,7 @@ describe('instagram webhook utilities', () => {
             timestamp: '1739000002',
             eventSource: 'messaging',
             eventType: 'message',
+            direction: 'inbound',
             skipAutomation: false
         }])
     })

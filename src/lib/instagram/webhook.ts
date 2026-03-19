@@ -20,6 +20,7 @@ export interface InstagramInboundEvent {
     timestamp: string | null
     eventSource: 'messaging' | 'standby'
     eventType: InstagramInboundEventType
+    direction: 'inbound' | 'outbound'
     skipAutomation: boolean
     media?: {
         type: 'image'
@@ -93,16 +94,7 @@ function extractInboundEventsFromItems(
 
         const sender = isRecord(item.sender) ? item.sender : null
         const recipient = isRecord(item.recipient) ? item.recipient : null
-
-        const contactId = sender ? asString(sender.id) : null
         const recipientId = recipient ? asString(recipient.id) : null
-        const contactName = sender
-            ? asString(sender.username) || asString(sender.name)
-            : null
-
-        if (!contactId) continue
-        if (contactId === entryId) continue
-        if (!recipientId && !isRecord(item.postback) && !isRecord(item.referral) && !isRecord(item.reaction)) continue
 
         const timestampRaw = item.timestamp
         const timestamp = typeof timestampRaw === 'number'
@@ -110,7 +102,18 @@ function extractInboundEventsFromItems(
             : asString(timestampRaw)
 
         const message = isRecord(item.message) ? item.message : null
-        if (message && message.is_echo !== true) {
+        const direction = message?.is_echo === true ? 'outbound' : 'inbound'
+        const contactActor = direction === 'outbound' ? recipient : sender
+        const contactId = contactActor ? asString(contactActor.id) : null
+        const contactName = contactActor
+            ? asString(contactActor.username) || asString(contactActor.name)
+            : null
+
+        if (!contactId) continue
+        if (contactId === entryId) continue
+        if (!recipientId && !isRecord(item.postback) && !isRecord(item.referral) && !isRecord(item.reaction)) continue
+
+        if (message) {
             const messageId = asString(message.mid) || buildSyntheticMessageId({
                 entryId,
                 contactId,
@@ -134,7 +137,8 @@ function extractInboundEventsFromItems(
                     timestamp,
                     eventSource,
                     eventType: 'attachment',
-                    skipAutomation: !caption,
+                    direction,
+                    skipAutomation: direction === 'outbound' || !caption,
                     media: {
                         ...imageAttachment,
                         caption
@@ -153,7 +157,8 @@ function extractInboundEventsFromItems(
                     timestamp,
                     eventSource,
                     eventType: 'message',
-                    skipAutomation: false
+                    direction,
+                    skipAutomation: direction === 'outbound'
                 })
                 continue
             }
@@ -178,6 +183,7 @@ function extractInboundEventsFromItems(
                     timestamp,
                     eventSource,
                     eventType: 'attachment',
+                    direction,
                     skipAutomation: true
                 })
                 continue
@@ -193,6 +199,7 @@ function extractInboundEventsFromItems(
                     timestamp,
                     eventSource,
                     eventType: 'message_deleted',
+                    direction,
                     skipAutomation: true
                 })
                 continue
@@ -226,6 +233,7 @@ function extractInboundEventsFromItems(
                 timestamp,
                 eventSource,
                 eventType: 'postback',
+                direction: 'inbound',
                 skipAutomation: true
             })
             continue
@@ -252,6 +260,7 @@ function extractInboundEventsFromItems(
                 timestamp,
                 eventSource,
                 eventType: 'referral',
+                direction: 'inbound',
                 skipAutomation: true
             })
             continue
@@ -280,6 +289,7 @@ function extractInboundEventsFromItems(
                 timestamp,
                 eventSource,
                 eventType: 'reaction',
+                direction: 'inbound',
                 skipAutomation: true
             })
             continue
@@ -304,6 +314,7 @@ function extractInboundEventsFromItems(
                 timestamp,
                 eventSource,
                 eventType: 'seen',
+                direction: 'inbound',
                 skipAutomation: true
             })
             continue
@@ -328,6 +339,7 @@ function extractInboundEventsFromItems(
                 timestamp,
                 eventSource,
                 eventType: 'optin',
+                direction: 'inbound',
                 skipAutomation: true
             })
             continue
@@ -357,6 +369,7 @@ function extractInboundEventsFromItems(
                 timestamp,
                 eventSource,
                 eventType: 'handover',
+                direction: 'inbound',
                 skipAutomation: true
             })
         }
