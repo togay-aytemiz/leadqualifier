@@ -577,7 +577,9 @@
       "video": "Video alındı",
       "sticker": "Çıkartma alındı",
       "media": "Medya alındı",
-      "open": "Dosyayı aç"
+      "open": "Dosyayı aç",
+      "instagramUnsupported": "Bu içeriği görmek için Instagram'ı açın",
+      "instagramUnsupportedDetail": "Bu Instagram içeriği henüz Qualy içinde önizlenemiyor. Görmek için Instagram'ı açın."
     }
   },
   "simulator": {

@@ -24,6 +24,27 @@ function trimString(value: string | null | undefined) {
     return typeof value === 'string' ? value.trim() : ''
 }
 
+function parseMetadataRecord(metadata: unknown) {
+    if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+        return metadata as Record<string, unknown>
+    }
+
+    if (typeof metadata !== 'string') return null
+    const trimmed = metadata.trim()
+    if (!trimmed) return null
+
+    try {
+        const parsed = JSON.parse(trimmed)
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            return parsed as Record<string, unknown>
+        }
+    } catch {
+        return null
+    }
+
+    return null
+}
+
 function resolveProfileDisplayName(profile: InboxSenderProfile | null | undefined) {
     const fullName = trimString(profile?.full_name)
     if (fullName) return fullName
@@ -70,6 +91,32 @@ export function resolveMessageSenderIdentity(
     const profile = isCurrentUser
         ? options.currentUserProfile
         : (createdBy ? options.senderProfilesById[createdBy] ?? null : null)
+
+    if (!profile) {
+        const metadata = parseMetadataRecord(options.message.metadata)
+        const isExternalInstagramEcho = metadata?.instagram_is_echo === true
+
+        if (isExternalInstagramEcho) {
+            const instagramDisplayName =
+                trimString(typeof metadata?.instagram_business_username === 'string'
+                    ? metadata.instagram_business_username
+                    : null)
+                || 'Instagram'
+            const instagramAvatarUrl = trimString(
+                typeof metadata?.instagram_business_avatar_url === 'string'
+                    ? metadata.instagram_business_avatar_url
+                    : null
+            ) || null
+
+            return {
+                kind: 'user',
+                displayName: instagramDisplayName,
+                footerLabel: instagramDisplayName,
+                avatarUrl: instagramAvatarUrl
+            }
+        }
+    }
+
     const displayName = resolveProfileDisplayName(profile)
 
     return {

@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 const {
     createClientMock,
     extractInstagramInboundEventsMock,
+    getBusinessAccountMock,
     getUserProfileMock,
     instagramCtorMock,
     isValidMetaSignatureMock,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
     extractInstagramInboundEventsMock: vi.fn(),
+    getBusinessAccountMock: vi.fn(),
     getUserProfileMock: vi.fn(),
     instagramCtorMock: vi.fn(),
     isValidMetaSignatureMock: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock('@/lib/instagram/client', () => ({
             instagramCtorMock(token)
         }
 
+        getBusinessAccount = getBusinessAccountMock
         getUserProfile = getUserProfileMock
         sendText = sendTextMock
     }
@@ -578,6 +581,12 @@ describe('Instagram webhook route', () => {
         }])
         isValidMetaSignatureMock.mockReturnValue(true)
         resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getBusinessAccountMock.mockResolvedValue({
+            id: 'ig-biz-1',
+            username: 'sweetdreams.photography_tr',
+            name: 'Sweet Dreams',
+            profile_picture_url: 'https://cdn.example.com/business-avatar.jpg'
+        })
         getUserProfileMock.mockResolvedValue({
             id: 'ig-user-1',
             username: 'keskinngamzee',
@@ -605,11 +614,14 @@ describe('Instagram webhook route', () => {
             sender_type: 'user',
             content: 'Tesekkur ederiz, nisan basi gibi',
             metadata: expect.objectContaining({
+                outbound_channel: 'instagram',
                 instagram_message_id: 'ig-mid-echo-1',
                 instagram_event_source: 'messaging',
                 instagram_event_type: 'message',
                 instagram_contact_username: 'keskinngamzee',
-                instagram_contact_avatar_url: 'https://cdn.example.com/gamze.jpg'
+                instagram_contact_avatar_url: 'https://cdn.example.com/gamze.jpg',
+                instagram_business_username: 'sweetdreams.photography_tr',
+                instagram_business_avatar_url: 'https://cdn.example.com/business-avatar.jpg'
             })
         }))
         expect(conversationsUpdateMock).toHaveBeenCalledWith(expect.objectContaining({

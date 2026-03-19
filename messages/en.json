@@ -577,6 +577,8 @@
       "video": "Video received",
       "sticker": "Sticker received",
       "media": "Media received",
+      "instagramUnsupported": "Open Instagram to view this content",
+      "instagramUnsupportedDetail": "This Instagram content cannot be previewed in Qualy yet. Open Instagram to view it.",
       "open": "Open file"
     }
   },

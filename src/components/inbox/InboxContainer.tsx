@@ -95,6 +95,7 @@ import {
   collectOptimisticPreviewUrls,
   extractMediaFromMessageMetadata,
   resolveMessagePreviewContent,
+  resolveVisibleMessageContent,
 } from '@/components/inbox/messageMedia'
 import { buildInboxImageGalleryLookup } from '@/components/inbox/message-image-groups'
 import { resolveConversationSecondaryIdentifier } from '@/components/inbox/conversationIdentity'
@@ -2260,6 +2261,7 @@ export function InboxContainer({
             content: previewMessage?.content,
             metadata: previewMessage?.metadata,
             fallbackNoMessage: t('noMessagesYet'),
+            unsupportedInstagramAttachment: t('mediaPreview.instagramUnsupported'),
             labels: {
               image: t('mediaPreview.image'),
               document: t('mediaPreview.document'),
@@ -3377,6 +3379,13 @@ export function InboxContainer({
                         ? splitBotMessageDisclaimer(m.content)
                         : { body: m.content, disclaimer: null as string | null }
                       const visibleMessageContent = parsedBotContent.body
+                      const visibleResolvedContent = resolveVisibleMessageContent({
+                        content: visibleMessageContent,
+                        metadata: m.metadata,
+                        fallbackUnsupportedInstagramAttachment: t(
+                          'mediaPreview.instagramUnsupportedDetail'
+                        ),
+                      })
                       const senderIdentity = resolveMessageSenderIdentity({
                         message: m,
                         currentUserId,
@@ -3400,7 +3409,7 @@ export function InboxContainer({
                       const shouldHideMessageText = Boolean(
                         media && media.isPlaceholder && !media.caption
                       )
-                      const renderMessageText = shouldHideMessageText ? '' : visibleMessageContent
+                      const renderMessageText = shouldHideMessageText ? '' : visibleResolvedContent
                       const messageDateSeparator = messageDateSeparatorById.get(m.id)
                       const dateSeparator = messageDateSeparator ? (
                         <div className="flex justify-center">

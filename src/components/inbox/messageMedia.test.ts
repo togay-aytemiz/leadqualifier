@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     collectOptimisticPreviewUrls,
     extractMediaFromMessageMetadata,
+    resolveVisibleMessageContent,
     resolveMessagePreviewContent
 } from './messageMedia'
 
@@ -101,6 +102,7 @@ describe('resolveMessagePreviewContent', () => {
             content: 'Merhaba',
             metadata: {},
             fallbackNoMessage: 'No messages yet',
+            unsupportedInstagramAttachment: 'Open Instagram to view this content',
             labels: {
                 image: 'Image received',
                 document: 'Document received',
@@ -112,6 +114,44 @@ describe('resolveMessagePreviewContent', () => {
         })
 
         expect(preview).toBe('Merhaba')
+    })
+
+    it('uses unsupported instagram fallback text for non-previewable instagram attachments', () => {
+        const preview = resolveMessagePreviewContent({
+            content: '[Instagram attachment: share]',
+            metadata: {
+                instagram_event_type: 'attachment'
+            },
+            fallbackNoMessage: 'No messages yet',
+            unsupportedInstagramAttachment: 'Open Instagram to view this content',
+            labels: {
+                image: 'Image received',
+                document: 'Document received',
+                audio: 'Audio received',
+                video: 'Video received',
+                sticker: 'Sticker received',
+                media: 'Media received'
+            }
+        })
+
+        expect(preview).toBe('Open Instagram to view this content')
+    })
+})
+
+describe('resolveVisibleMessageContent', () => {
+    it('uses friendly fallback text for unsupported instagram attachments', () => {
+        const content = resolveVisibleMessageContent({
+            content: '[Instagram attachment: share]',
+            metadata: {
+                instagram_event_type: 'attachment'
+            },
+            fallbackUnsupportedInstagramAttachment:
+                'This Instagram content cannot be previewed in Qualy yet. Open Instagram to view it.'
+        })
+
+        expect(content).toBe(
+            'This Instagram content cannot be previewed in Qualy yet. Open Instagram to view it.'
+        )
     })
 })
 

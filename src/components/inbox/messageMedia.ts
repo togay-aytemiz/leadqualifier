@@ -19,6 +19,12 @@ export interface InboxMessageMedia {
     downloadStatus: string | null
 }
 
+function isUnsupportedInstagramAttachmentContent(content: string | null | undefined) {
+    if (typeof content !== 'string') return false
+    const normalized = content.trim().toLowerCase()
+    return normalized.startsWith('[instagram attachment')
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -43,6 +49,21 @@ function parseMetadata(metadata: unknown) {
 
     if (!isRecord(metadata)) return null
     return metadata
+}
+
+function resolveInstagramEventType(metadata: unknown) {
+    const parsed = parseMetadata(metadata)
+    if (!parsed) return null
+    return toNullableString(parsed.instagram_event_type)?.toLowerCase() ?? null
+}
+
+function shouldUseUnsupportedInstagramAttachmentFallback(
+    content: string | null | undefined,
+    metadata: unknown
+) {
+    if (extractMediaFromMessageMetadata(metadata)) return false
+    if (!isUnsupportedInstagramAttachmentContent(content)) return false
+    return resolveInstagramEventType(metadata) === 'attachment'
 }
 
 function normalizeMediaType(value: unknown): InboxMessageMediaType {
@@ -90,6 +111,7 @@ export function resolveMessagePreviewContent(args: {
     content: string | null | undefined
     metadata: unknown
     fallbackNoMessage: string
+    unsupportedInstagramAttachment?: string
     labels: MediaPreviewLabelMap
 }) {
     const media = extractMediaFromMessageMetadata(args.metadata)
@@ -97,9 +119,31 @@ export function resolveMessagePreviewContent(args: {
         return resolvePreviewLabel(media.type, args.labels)
     }
 
+    if (
+        args.unsupportedInstagramAttachment &&
+        shouldUseUnsupportedInstagramAttachmentFallback(args.content, args.metadata)
+    ) {
+        return args.unsupportedInstagramAttachment
+    }
+
     const normalized = typeof args.content === 'string' ? args.content.trim() : ''
     if (normalized.length > 0) return args.content as string
     return args.fallbackNoMessage
+}
+
+export function resolveVisibleMessageContent(args: {
+    content: string | null | undefined
+    metadata: unknown
+    fallbackUnsupportedInstagramAttachment?: string
+}) {
+    if (
+        args.fallbackUnsupportedInstagramAttachment &&
+        shouldUseUnsupportedInstagramAttachmentFallback(args.content, args.metadata)
+    ) {
+        return args.fallbackUnsupportedInstagramAttachment
+    }
+
+    return typeof args.content === 'string' ? args.content : ''
 }
 
 export function collectOptimisticPreviewUrls(messages: Array<{ metadata?: unknown }>) {

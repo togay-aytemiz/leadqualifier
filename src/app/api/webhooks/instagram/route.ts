@@ -22,6 +22,11 @@ interface InstagramContactIdentity {
     avatarUrl: string | null
 }
 
+interface InstagramBusinessIdentity {
+    username: string | null
+    avatarUrl: string | null
+}
+
 interface InstagramWebhookConversation {
     id: string
     contact_name: string | null
@@ -417,6 +422,30 @@ async function persistInstagramExternalOutboundMessage(params: {
     }
 }
 
+async function resolveInstagramBusinessIdentity(params: {
+    channel: InstagramChannelRecord
+    client: InstagramClient
+    instagramBusinessAccountId: string
+}) {
+    const fallbackUsername = readConfigString(params.channel.config, 'username')
+    const fallbackAvatarUrl = readConfigString(params.channel.config, 'profile_picture_url')
+
+    try {
+        const profile = await params.client.getBusinessAccount(params.instagramBusinessAccountId)
+        return {
+            username: readTrimmedString(profile.username)
+                || readTrimmedString(profile.name)
+                || fallbackUsername,
+            avatarUrl: readTrimmedString(profile.profile_picture_url) || fallbackAvatarUrl
+        } satisfies InstagramBusinessIdentity
+    } catch {
+        return {
+            username: fallbackUsername,
+            avatarUrl: fallbackAvatarUrl
+        } satisfies InstagramBusinessIdentity
+    }
+}
+
 export async function GET(req: NextRequest) {
     const mode = req.nextUrl.searchParams.get('hub.mode')
     const token = req.nextUrl.searchParams.get('hub.verify_token')
@@ -502,6 +531,7 @@ export async function POST(req: NextRequest) {
     const channelCache = new Map<string, InstagramChannelRecord>()
     const clientCache = new Map<string, InstagramClient>()
     const contactIdentityCache = new Map<string, InstagramContactIdentity>()
+    const businessIdentityCache = new Map<string, InstagramBusinessIdentity>()
 
     for (const event of events) {
         let channel = channelCache.get(event.instagramBusinessAccountId)
@@ -579,7 +609,18 @@ export async function POST(req: NextRequest) {
 
         if (!contactIdentity) continue
 
+        let businessIdentity = businessIdentityCache.get(event.instagramBusinessAccountId) ?? null
+        if (!businessIdentity && event.direction === 'outbound') {
+            businessIdentity = await resolveInstagramBusinessIdentity({
+                channel,
+                client,
+                instagramBusinessAccountId: event.instagramBusinessAccountId
+            })
+            businessIdentityCache.set(event.instagramBusinessAccountId, businessIdentity)
+        }
+
         const messageMetadata = {
+            outbound_channel: 'instagram',
             instagram_message_id: event.messageId,
             instagram_timestamp: event.timestamp,
             instagram_business_account_id: event.instagramBusinessAccountId,
@@ -589,6 +630,8 @@ export async function POST(req: NextRequest) {
             instagram_contact_name: contactIdentity.contactName,
             instagram_contact_username: contactIdentity.username,
             instagram_contact_avatar_url: contactIdentity.avatarUrl,
+            instagram_business_username: businessIdentity?.username ?? null,
+            instagram_business_avatar_url: businessIdentity?.avatarUrl ?? null,
             ...(event.direction === 'outbound'
                 ? {
                     instagram_is_echo: true

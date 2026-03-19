@@ -100,4 +100,34 @@ describe('resolveMessageSenderIdentity', () => {
         expect(identity.displayName).toBe('Kualia')
         expect(identity.footerLabel).toBe('Kualia')
     })
+
+    it('falls back to instagram business identity for external instagram app replies without created_by', () => {
+        const identity = resolveMessageSenderIdentity({
+            message: createMessage({
+                created_by: null,
+                metadata: {
+                    instagram_is_echo: true,
+                    instagram_business_username: 'sweetdreams.photography_tr',
+                    instagram_business_avatar_url: 'https://cdn.example.com/business-avatar.jpg'
+                }
+            }),
+            currentUserId: 'user-1',
+            currentUserProfile: {
+                id: 'user-1',
+                full_name: 'Togay Yilmaz',
+                email: 'togay@example.com',
+                avatar_url: 'https://cdn.example.com/togay.webp'
+            },
+            senderProfilesById: {},
+            contactName: 'Ayse Demir',
+            contactAvatarUrl: null,
+            youLabel: 'You',
+            botName: 'Kualia'
+        })
+
+        expect(identity.kind).toBe('user')
+        expect(identity.displayName).toBe('sweetdreams.photography_tr')
+        expect(identity.footerLabel).toBe('sweetdreams.photography_tr')
+        expect(identity.avatarUrl).toBe('https://cdn.example.com/business-avatar.jpg')
+    })
 })
