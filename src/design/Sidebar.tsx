@@ -71,6 +71,7 @@ interface SidebarItemProps {
     avatar?: string
     disabled?: boolean
     disabledLabel?: string
+    prefetch?: boolean
 }
 
 export function SidebarItem({
@@ -84,7 +85,8 @@ export function SidebarItem({
     href,
     avatar,
     disabled = false,
-    disabledLabel
+    disabledLabel,
+    prefetch = false
 }: SidebarItemProps) {
     const resolvedLabel = disabled && disabledLabel
         ? `${label} (${disabledLabel})`
@@ -128,7 +130,7 @@ export function SidebarItem({
 
     if (href && !disabled) {
         return (
-            <Link href={href} title={resolvedLabel} aria-label={resolvedLabel}>
+            <Link href={href} prefetch={prefetch} title={resolvedLabel} aria-label={resolvedLabel}>
                 {content}
             </Link>
         )

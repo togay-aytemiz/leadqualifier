@@ -235,6 +235,7 @@ export function SettingsResponsiveShell({
                                 icon={item.icon}
                                 label={item.label}
                                 href={item.href}
+                                prefetch
                                 active={item.active}
                                 indicator={item.indicator}
                                 disabled={item.locked}
@@ -252,6 +253,7 @@ export function SettingsResponsiveShell({
                                 icon={item.icon}
                                 label={item.label}
                                 href={item.href}
+                                prefetch
                                 active={item.active}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}
@@ -268,6 +270,7 @@ export function SettingsResponsiveShell({
                                 icon={item.icon}
                                 label={item.label}
                                 href={item.href}
+                                prefetch
                                 active={item.active}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}

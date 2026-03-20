@@ -940,8 +940,7 @@ export function InboxContainer({
     setMessages([])
     setLead(null)
     refreshMessages(selectedId)
-    refreshLead(selectedId)
-  }, [refreshMessages, refreshLead, selectedId])
+  }, [refreshMessages, selectedId])
 
   // Scroll Management
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {

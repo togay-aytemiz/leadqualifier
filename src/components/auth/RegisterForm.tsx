@@ -85,6 +85,7 @@ export function RegisterForm({
             </div>
 
             <form action={formAction} className="space-y-5">
+                <input type="hidden" name="locale" value={locale} />
                 {errorMessage && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         {errorMessage}

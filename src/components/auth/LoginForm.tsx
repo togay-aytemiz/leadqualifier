@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useActionState, useEffect, useState } from 'react'
 import { login } from '@/lib/auth/actions'
 import { Link, useRouter } from '@/i18n/navigation'
@@ -14,6 +14,7 @@ import {
 export function LoginForm() {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
+    const locale = useLocale()
     const router = useRouter()
     const [showPassword, setShowPassword] = useState(false)
     const [state, formAction, pending] = useActionState(
@@ -45,6 +46,7 @@ export function LoginForm() {
             </div>
 
             <form action={formAction} className="space-y-6">
+                <input type="hidden" name="locale" value={locale} />
                 {state?.error && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         {state.error}

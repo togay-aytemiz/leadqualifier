@@ -4,10 +4,12 @@ const {
     createClientMock,
     headersMock,
     redirectMock,
+    resolveActiveOrganizationContextMock,
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
     headersMock: vi.fn(),
     redirectMock: vi.fn(),
+    resolveActiveOrganizationContextMock: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -22,16 +24,71 @@ vi.mock('next/navigation', () => ({
     redirect: redirectMock,
 }))
 
-import { register, requestPasswordReset } from '@/lib/auth/actions'
+vi.mock('@/lib/organizations/active-context', () => ({
+    resolveActiveOrganizationContext: resolveActiveOrganizationContextMock,
+}))
 
-function createRegisterFormData(values?: Partial<Record<'email' | 'password' | 'fullName' | 'companyName', string>>) {
+import { login, register, requestPasswordReset } from '@/lib/auth/actions'
+
+function createRegisterFormData(values?: Partial<Record<'email' | 'password' | 'fullName' | 'companyName' | 'locale', string>>) {
     const formData = new FormData()
     formData.set('email', values?.email ?? 'jane@example.com')
     formData.set('password', values?.password ?? 'password123')
     formData.set('fullName', values?.fullName ?? 'Jane Doe')
     formData.set('companyName', values?.companyName ?? '')
+    formData.set('locale', values?.locale ?? 'tr')
     return formData
 }
+
+function createLoginFormData(values?: Partial<Record<'email' | 'password' | 'locale', string>>) {
+    const formData = new FormData()
+    formData.set('email', values?.email ?? 'jane@example.com')
+    formData.set('password', values?.password ?? 'password123')
+    formData.set('locale', values?.locale ?? 'tr')
+    return formData
+}
+
+describe('auth login action', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        resolveActiveOrganizationContextMock.mockResolvedValue({
+            activeOrganizationId: 'org-1',
+            activeOrganization: { id: 'org-1', name: 'Org 1', slug: 'org-1' },
+            accessibleOrganizations: [{ id: 'org-1', name: 'Org 1', slug: 'org-1' }],
+            isSystemAdmin: false,
+            readOnlyTenantMode: false,
+            source: 'cookie',
+            userAvatarUrl: null,
+            userEmail: 'jane@example.com',
+            userFullName: 'Jane Doe',
+            userId: 'user-1',
+        })
+        redirectMock.mockImplementation(() => {
+            throw new Error('NEXT_REDIRECT')
+        })
+    })
+
+    it('redirects directly to the localized home route after successful login', async () => {
+        const signInWithPasswordMock = vi.fn(async () => ({
+            data: {
+                session: { access_token: 'token-1' },
+            },
+            error: null,
+        }))
+
+        createClientMock.mockResolvedValue({
+            auth: {
+                signInWithPassword: signInWithPasswordMock,
+                getUser: vi.fn(),
+            },
+            from: vi.fn(),
+        })
+
+        await expect(login(createLoginFormData({ locale: 'en' }))).rejects.toThrow('NEXT_REDIRECT')
+
+        expect(redirectMock).toHaveBeenCalledWith('/en/inbox')
+    })
+})
 
 describe('auth register action', () => {
     beforeEach(() => {
@@ -46,6 +103,18 @@ describe('auth register action', () => {
             'x-vercel-ip-country': 'TR',
             'user-agent': 'Mozilla/5.0',
         }))
+        resolveActiveOrganizationContextMock.mockResolvedValue({
+            activeOrganizationId: 'org-1',
+            activeOrganization: { id: 'org-1', name: 'Org 1', slug: 'org-1' },
+            accessibleOrganizations: [{ id: 'org-1', name: 'Org 1', slug: 'org-1' }],
+            isSystemAdmin: false,
+            readOnlyTenantMode: false,
+            source: 'cookie',
+            userAvatarUrl: null,
+            userEmail: 'jane@example.com',
+            userFullName: 'Jane Doe',
+            userId: 'user-1',
+        })
         redirectMock.mockImplementation(() => {
             throw new Error('NEXT_REDIRECT')
         })
@@ -178,6 +247,62 @@ describe('auth register action', () => {
         expect(rpcMock).toHaveBeenCalledWith('record_signup_trial_attempt', expect.objectContaining({
             input_succeeded: true,
         }))
+    })
+
+    it('redirects directly to the localized home route when signup returns a session', async () => {
+        const rpcMock = vi.fn(async (fn: string) => {
+            if (fn === 'check_signup_trial_rate_limit') {
+                return {
+                    data: {
+                        allowed: true,
+                        cooldown_seconds: 0,
+                        reason: null,
+                    },
+                    error: null,
+                }
+            }
+
+            if (fn === 'check_trial_business_identity') {
+                return {
+                    data: {
+                        eligible: true,
+                        conflict_signal_type: null,
+                    },
+                    error: null,
+                }
+            }
+
+            if (fn === 'record_signup_trial_attempt') {
+                return {
+                    data: {
+                        recorded: true,
+                    },
+                    error: null,
+                }
+            }
+
+            throw new Error(`Unexpected rpc ${fn}`)
+        })
+
+        const signUpMock = vi.fn(async () => ({
+            data: {
+                session: { access_token: 'token-1' },
+            },
+            error: null,
+        }))
+
+        createClientMock.mockResolvedValue({
+            rpc: rpcMock,
+            auth: {
+                signUp: signUpMock,
+                getUser: vi.fn(),
+            },
+            from: vi.fn(),
+        })
+
+        await expect(register(createRegisterFormData({ locale: 'en' }))).rejects.toThrow('NEXT_REDIRECT')
+
+        expect(redirectMock).toHaveBeenCalledWith('/en/inbox')
     })
 
     it('records failed attempts after signup errors', async () => {

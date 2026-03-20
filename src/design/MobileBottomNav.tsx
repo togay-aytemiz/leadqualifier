@@ -59,6 +59,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const router = useRouter()
     const tNav = useTranslations('nav')
     const tSidebar = useTranslations('mainSidebar')
+    const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)
     const [isOtherOpen, setIsOtherOpen] = useState(false)
     const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
 
@@ -153,6 +154,23 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     }, [pathname])
 
     useEffect(() => {
+        const mediaQuery = window.matchMedia('(min-width: 1024px)')
+        const syncViewport = () => {
+            setIsDesktopViewport(mediaQuery.matches)
+        }
+
+        syncViewport()
+
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', syncViewport)
+            return () => mediaQuery.removeEventListener('change', syncViewport)
+        }
+
+        mediaQuery.addListener(syncViewport)
+        return () => mediaQuery.removeListener(syncViewport)
+    }, [])
+
+    useEffect(() => {
         if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
         const hotRoutes = ['/inbox', '/calendar', '/leads', '/skills', '/knowledge', '/simulator', '/settings', '/settings/plans', '/settings/billing']
@@ -166,7 +184,12 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     }, [router])
 
     const refreshBillingSnapshot = useCallback(async () => {
-        if (!activeOrganizationId) {
+        if (isDesktopViewport === null) {
+            setBillingSnapshot(null)
+            return
+        }
+
+        if (!activeOrganizationId || isDesktopViewport) {
             setBillingSnapshot(null)
             return
         }
@@ -186,20 +209,21 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         }
 
         setBillingSnapshot(buildOrganizationBillingSnapshot(data as OrganizationBillingAccount))
-    }, [activeOrganizationId, supabase])
+    }, [activeOrganizationId, isDesktopViewport, supabase])
 
     useEffect(() => {
+        if (isDesktopViewport === null) return
         void refreshBillingSnapshot()
-    }, [billingRefreshSignal, refreshBillingSnapshot])
+    }, [billingRefreshSignal, isDesktopViewport, refreshBillingSnapshot])
 
     useEffect(() => {
-        if (!activeOrganizationId) return
+        if (!activeOrganizationId || isDesktopViewport !== false) return
         const handler = () => {
             void refreshBillingSnapshot()
         }
         window.addEventListener(BILLING_UPDATED_EVENT, handler)
         return () => window.removeEventListener(BILLING_UPDATED_EVENT, handler)
-    }, [activeOrganizationId, refreshBillingSnapshot])
+    }, [activeOrganizationId, isDesktopViewport, refreshBillingSnapshot])
 
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
@@ -344,6 +368,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                         {billingSnapshot && (
                             <Link
                                 href="/settings/plans"
+                                prefetch={false}
                                 onClick={() => setIsOtherOpen(false)}
                                 className="mb-1 block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
                             >
@@ -399,6 +424,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                             ) : (
                                 <Link
                                     href={skillsMenuNavState.href ?? '/skills'}
+                                    prefetch={false}
                                     onClick={() => setIsOtherOpen(false)}
                                     className={cn(
                                         'mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
@@ -428,6 +454,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                             ) : (
                                 <Link
                                     href={knowledgeMenuNavState.href ?? '/knowledge'}
+                                    prefetch={false}
                                     onClick={() => setIsOtherOpen(false)}
                                     className={cn(
                                         'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
@@ -458,6 +485,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                             ) : (
                                 <Link
                                     href={simulatorMenuNavState.href ?? '/simulator'}
+                                    prefetch={false}
                                     onClick={() => setIsOtherOpen(false)}
                                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                                 >

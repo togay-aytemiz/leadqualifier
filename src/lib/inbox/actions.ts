@@ -287,6 +287,9 @@ type ConversationAssigneePreviewRow = {
   email?: string | null
 }
 const CONVERSATION_PREVIEW_MESSAGE_LIMIT = 5
+const INSTAGRAM_CONTACT_HYDRATION_LIMIT = 6
+const DEFAULT_INSTAGRAM_PROFILE_HYDRATION_TIMEOUT_MS = 1500
+const MAX_INSTAGRAM_PROFILE_HYDRATION_TIMEOUT_MS = 5000
 const SUMMARY_MAX_OUTPUT_TOKENS = 180
 const LEAD_REASONING_MAX_OUTPUT_TOKENS = 220
 
@@ -371,6 +374,37 @@ function readTrimmedString(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+function resolveInstagramProfileHydrationTimeoutMs() {
+  const rawTimeout = Number.parseInt(
+    process.env.INBOX_INSTAGRAM_PROFILE_HYDRATION_TIMEOUT_MS ?? '',
+    10
+  )
+  if (!Number.isFinite(rawTimeout) || rawTimeout <= 0) {
+    return DEFAULT_INSTAGRAM_PROFILE_HYDRATION_TIMEOUT_MS
+  }
+  return Math.min(rawTimeout, MAX_INSTAGRAM_PROFILE_HYDRATION_TIMEOUT_MS)
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  if (timeoutMs <= 0) return promise
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Instagram profile hydration timed out'))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timeoutId)
+        reject(error)
+      }
+    )
+  })
 }
 
 function parseMessageMetadataRecord(metadata: unknown): Record<string, unknown> | null {
@@ -548,12 +582,13 @@ async function hydrateInstagramConversationContactNames(
     }
   >()
 
-  for (const conversation of unresolved.slice(0, 6)) {
-    const contactId = readTrimmedString(conversation.contact_phone)
-    if (!contactId) continue
+  const profileHydrationTimeoutMs = resolveInstagramProfileHydrationTimeoutMs()
+  const hydrationResults = await Promise.allSettled(
+    unresolved.slice(0, INSTAGRAM_CONTACT_HYDRATION_LIMIT).map(async (conversation) => {
+      const contactId = readTrimmedString(conversation.contact_phone)
+      if (!contactId) return null
 
-    try {
-      const profile = await client.getUserProfile(contactId)
+      const profile = await withTimeout(client.getUserProfile(contactId), profileHydrationTimeoutMs)
       const resolvedName = readTrimmedString(profile.username) || readTrimmedString(profile.name)
       const avatarUrl = readTrimmedString(profile.profile_picture_url)
       const profileUpdate: {
@@ -568,11 +603,20 @@ async function hydrateInstagramConversationContactNames(
         profileUpdate.contactAvatarUrl = avatarUrl
       }
 
-      if (!profileUpdate.contactName && !profileUpdate.contactAvatarUrl) continue
-      updatedConversationProfiles.set(conversation.id, profileUpdate)
-    } catch {
-      continue
-    }
+      if (!profileUpdate.contactName && !profileUpdate.contactAvatarUrl) return null
+      return {
+        conversationId: conversation.id,
+        profileUpdate,
+      }
+    })
+  )
+
+  for (const hydrationResult of hydrationResults) {
+    if (hydrationResult.status !== 'fulfilled' || !hydrationResult.value) continue
+    updatedConversationProfiles.set(
+      hydrationResult.value.conversationId,
+      hydrationResult.value.profileUpdate
+    )
   }
 
   if (updatedConversationProfiles.size === 0) return conversations

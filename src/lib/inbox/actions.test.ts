@@ -155,6 +155,15 @@ function createConversation(overrides: Partial<Conversation> = {}): Conversation
   }
 }
 
+function createDeferredPromise<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver
+  })
+
+  return { promise, resolve }
+}
+
 function createLead(overrides: Partial<Lead> = {}): Lead {
   return {
     id: 'lead-1',
@@ -694,6 +703,90 @@ describe('getConversations', () => {
     )
     expect(result[0]?.contact_name).toBe('itsalinayalin')
     expect(result[0]?.contact_avatar_url).toBe('https://cdn.example.com/ig-avatar.jpg')
+  })
+
+  it('starts instagram profile hydration requests in parallel so a slow profile does not block others', async () => {
+    const firstConversation = createConversation({
+      id: 'conv-ig-1',
+      platform: 'instagram',
+      contact_phone: '1400879865404973',
+      contact_name: '1400879865404973',
+      contact_avatar_url: null,
+      assignee_id: null,
+    })
+    const secondConversation = createConversation({
+      id: 'conv-ig-2',
+      platform: 'instagram',
+      contact_phone: '1400879865404974',
+      contact_name: '1400879865404974',
+      contact_avatar_url: null,
+      assignee_id: null,
+    })
+    const firstConversationUpdate = createConversationUpdateBuilder()
+    const secondConversationUpdate = createConversationUpdateBuilder()
+    const channelLookup = createInstagramChannelLookupBuilder('ig-token-1')
+    const slowProfile = createDeferredPromise<{
+      id: string
+      username: string
+      name: string
+      profile_picture_url: string
+    }>()
+
+    const supabaseMock = createSupabaseMock({
+      conversations: [
+        createQueryBuilder({
+          rangeResult: {
+            data: [firstConversation, secondConversation],
+            error: null,
+          },
+        }),
+        firstConversationUpdate.builder,
+        secondConversationUpdate.builder,
+      ],
+      messages: [
+        createQueryBuilder({
+          inResult: {
+            data: [],
+            error: null,
+          },
+        }),
+      ],
+      channels: [channelLookup.builder],
+    })
+
+    instagramGetUserProfileMock
+      .mockImplementationOnce(() => slowProfile.promise)
+      .mockResolvedValueOnce({
+        id: '1400879865404974',
+        username: 'hizli-profil',
+        name: 'Hizli Profil',
+        profile_picture_url: 'https://cdn.example.com/ig-avatar-2.jpg',
+      })
+
+    createClientMock.mockResolvedValue(supabaseMock)
+
+    const pendingConversations = getConversations('org-1')
+    let waitError: unknown = null
+
+    try {
+      await vi.waitFor(() => {
+        expect(instagramGetUserProfileMock).toHaveBeenCalledTimes(2)
+      }, { timeout: 120 })
+    } catch (error) {
+      waitError = error
+    } finally {
+      slowProfile.resolve({
+        id: '1400879865404973',
+        username: 'yavas-profil',
+        name: 'Yavas Profil',
+        profile_picture_url: 'https://cdn.example.com/ig-avatar-1.jpg',
+      })
+      await pendingConversations
+    }
+
+    if (waitError) {
+      throw waitError
+    }
   })
 })
 

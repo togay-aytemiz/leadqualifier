@@ -3,6 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
+import { resolveDefaultHomeRoute } from '@/lib/navigation/default-home-route'
+import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 import {
     checkTrialBusinessIdentity,
     checkSignupVelocityGuard,
@@ -21,8 +24,17 @@ export type RegisterActionState = {
     cooldownSeconds?: number
 }
 
+async function resolvePostAuthRedirectPath(
+    locale: string | null | undefined,
+    supabase: Awaited<ReturnType<typeof createClient>>
+) {
+    const orgContext = await resolveActiveOrganizationContext(supabase)
+    return buildLocalizedPath(resolveDefaultHomeRoute(orgContext), normalizeAppLocale(locale))
+}
+
 export async function login(formData: FormData) {
     const supabase = await createClient()
+    const locale = String(formData.get('locale') ?? '')
 
     const data = {
         email: formData.get('email') as string,
@@ -35,12 +47,13 @@ export async function login(formData: FormData) {
         return { error: error.message }
     }
 
-    redirect('/')
+    redirect(await resolvePostAuthRedirectPath(locale, supabase))
 }
 
 export async function register(formData: FormData) {
     const supabase = await createClient()
     const requestHeaders = await headers()
+    const locale = String(formData.get('locale') ?? '')
 
     const { email, password, fullName, companyName } = normalizeRegisterFormData(formData)
     const signupRequestMetadata = resolveSignupRequestMetadata(requestHeaders)
@@ -125,10 +138,10 @@ export async function register(formData: FormData) {
     })
 
     if (data.session) {
-        redirect('/')
+        redirect(await resolvePostAuthRedirectPath(locale, supabase))
     }
 
-    redirect(`/register/check-email?email=${encodeURIComponent(email)}`)
+    redirect(`${buildLocalizedPath('/register/check-email', normalizeAppLocale(locale))}?email=${encodeURIComponent(email)}`)
 }
 
 export async function logout() {

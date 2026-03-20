@@ -442,6 +442,7 @@ export function MainSidebar({
 
     useEffect(() => {
         let isMounted = true
+        let deferredLoadTimer: number | null = null
 
         if (!organizationId) {
             setHasUnread(false)
@@ -464,20 +465,25 @@ export function MainSidebar({
         setIsBotModeLoading(initialBotModeState.isLoading)
 
         refreshUnread(organizationId)
-        refreshPendingSuggestions(organizationId)
-        refreshBillingSnapshot(organizationId)
+        deferredLoadTimer = window.setTimeout(() => {
+            void refreshPendingSuggestions(organizationId)
+            void refreshBillingSnapshot(organizationId)
 
-        const loadBotMode = async () => {
-            const nextBotMode = await fetchBotMode(organizationId)
-            if (!isMounted) return
-            setBotMode(nextBotMode)
-            setIsBotModeLoading(false)
-            setBotModeUpdateError(null)
-        }
-        void loadBotMode()
+            const loadBotMode = async () => {
+                const nextBotMode = await fetchBotMode(organizationId)
+                if (!isMounted) return
+                setBotMode(nextBotMode)
+                setIsBotModeLoading(false)
+                setBotModeUpdateError(null)
+            }
+            void loadBotMode()
+        }, 150)
 
         return () => {
             isMounted = false
+            if (deferredLoadTimer !== null) {
+                window.clearTimeout(deferredLoadTimer)
+            }
         }
     }, [fetchBotMode, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread])
 
@@ -1511,7 +1517,7 @@ export function MainSidebar({
                                         asChild
                                         className="mt-2 justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                     >
-                                        <Link href={settingsNavState.href ?? '/settings/ai'}>
+                                        <Link href={settingsNavState.href ?? '/settings/ai'} prefetch={false}>
                                             {tSidebar('botStatusQuickSwitchOpenSettings')}
                                         </Link>
                                     </DropdownMenuItem>
@@ -1701,7 +1707,7 @@ export function MainSidebar({
             {billingSnapshot && !collapsed && canAccessTenantModules && (
                 <div className="px-3 pb-2">
                     <div className="rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
-                        <Link href="/settings/plans" className="block px-3 pt-3">
+                        <Link href="/settings/plans" prefetch={false} className="block px-3 pt-3">
                             <div className="flex items-center justify-between gap-2">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                     {tSidebar('billingStatusLabel')}
@@ -1792,6 +1798,7 @@ export function MainSidebar({
                     <div className="relative group">
                         <Link
                             href="/settings/plans"
+                            prefetch={false}
                             aria-label={tSidebar('billingUsageMenuLabel')}
                             title={`${tSidebar('billingStatusLabel')}: ${formatCredits(billingDisplayCredits)} ${tSidebar('billingCreditsUnit')}`}
                             className={cn(
