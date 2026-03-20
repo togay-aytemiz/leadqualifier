@@ -90,6 +90,12 @@ function shouldMarkInstagramRequest(input: InboundAiPipelineInput) {
     return eventSource === 'standby'
 }
 
+function isInstagramSeenEvent(input: InboundAiPipelineInput) {
+    if (input.platform !== 'instagram') return false
+    const eventType = readTrimmedString(input.inboundMessageMetadata.instagram_event_type)
+    return eventType?.toLowerCase() === 'seen'
+}
+
 function mergeConversationTags(existingTags: unknown, ensureTag: string | null): string[] {
     const normalized = readStringArray(existingTags)
     if (!ensureTag) return normalized
@@ -186,6 +192,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         conversation.tags,
         markInstagramRequest ? INSTAGRAM_REQUEST_TAG : null
     )
+    const isInstagramSeen = isInstagramSeenEvent(options)
 
     const { error: inboundInsertError } = await options.supabase
         .from('messages')
@@ -210,8 +217,12 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             contact_name: options.contactName || conversation.contact_name,
             contact_avatar_url: contactAvatarUrl || conversation.contact_avatar_url || null,
             tags: updatedConversationTags,
-            last_message_at: new Date().toISOString(),
-            unread_count: (conversation.unread_count ?? 0) + 1,
+            ...(!isInstagramSeen
+                ? {
+                    last_message_at: new Date().toISOString(),
+                    unread_count: (conversation.unread_count ?? 0) + 1
+                }
+                : {}),
             updated_at: new Date().toISOString()
         })
         .eq('id', conversation.id)

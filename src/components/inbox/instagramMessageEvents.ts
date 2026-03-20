@@ -14,6 +14,14 @@ type ConversationPreviewCandidate = {
     content?: string | null
 }
 
+type TimelineMessageCandidate = {
+    id: string
+    created_at: string
+    sender_type?: MessageSenderType
+    metadata?: unknown
+    content?: string | null
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -79,4 +87,18 @@ export function resolveLatestNonSeenPreviewMessage(
     }
 
     return null
+}
+
+export function filterTimelineMessagesForDateSeparators<T extends TimelineMessageCandidate>(
+    platform: ConversationListItem['platform'] | null | undefined,
+    messages: T[] | null | undefined
+): T[] {
+    if (!Array.isArray(messages) || messages.length === 0) return []
+
+    return messages.filter((message) => !isInstagramSeenEventMessage({
+        platform: platform ?? 'simulator',
+        senderType: message.sender_type,
+        metadata: message.metadata,
+        content: message.content
+    }))
 }

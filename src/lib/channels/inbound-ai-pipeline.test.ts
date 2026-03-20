@@ -650,6 +650,48 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(resolveOrganizationUsageEntitlementMock).not.toHaveBeenCalled()
     })
 
+    it('does not bump unread count or last message timestamp for instagram seen events', async () => {
+        const sendOutbound = vi.fn()
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'instagram',
+            unread_count: 2,
+            last_message_at: '2026-02-10T12:00:00.000Z'
+        }))
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [lookup.builder, conversationUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: null,
+            inboundMessageId: 'igmid-seen-1',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-seen-1',
+                instagram_event_type: 'seen'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(inboundInsert.insertMock).toHaveBeenCalledTimes(1)
+        expect(conversationUpdate.updateMock).toHaveBeenCalledTimes(1)
+
+        const updatePayload = conversationUpdate.updateMock.mock.calls[0]?.[0] as
+            | Record<string, unknown>
+            | undefined
+        expect(updatePayload).toBeDefined()
+        expect(updatePayload).not.toHaveProperty('unread_count')
+        expect(updatePayload).not.toHaveProperty('last_message_at')
+    })
+
     it('marks instagram standby inbound conversations with instagram_request tag', async () => {
         const sendOutbound = vi.fn()
         const dedupe = createDedupeBuilder(null)

@@ -126,6 +126,7 @@ import {
   resolveInboxContactDisplayName,
 } from '@/components/inbox/instagramRequestState'
 import {
+  filterTimelineMessagesForDateSeparators,
   isInstagramSeenEventMessage,
   resolveLatestNonSeenPreviewMessage,
 } from '@/components/inbox/instagramMessageEvents'
@@ -1106,6 +1107,12 @@ export function InboxContainer({
           (payload) => {
             const newMsg = payload.new as Message
             console.log('Realtime Message received:', newMsg)
+            const isInstagramSeenRealtimeEvent = isInstagramSeenEventMessage({
+              platform: 'instagram',
+              senderType: newMsg.sender_type,
+              metadata: newMsg.metadata,
+              content: newMsg.content,
+            })
             const inboundContactAvatarUrl =
               newMsg.sender_type === 'contact'
                 ? extractSocialContactAvatarUrl(newMsg.metadata)
@@ -1146,7 +1153,8 @@ export function InboxContainer({
 
             if (
               newMsg.sender_type === 'contact' &&
-              newMsg.conversation_id === selectedIdRef.current
+              newMsg.conversation_id === selectedIdRef.current &&
+              !isInstagramSeenRealtimeEvent
             ) {
               scheduleLeadAutoRefresh(newMsg.conversation_id)
             }
@@ -1156,6 +1164,15 @@ export function InboxContainer({
               prev
                 .map((c) => {
                   if (c.id === newMsg.conversation_id) {
+                    const isInstagramSeenEventForConversation =
+                      c.platform === 'instagram' && isInstagramSeenRealtimeEvent
+                    if (isInstagramSeenEventForConversation) {
+                      return {
+                        ...c,
+                        contact_avatar_url: c.contact_avatar_url ?? inboundContactAvatarUrl,
+                      }
+                    }
+
                     const shouldIncrementUnread = newMsg.sender_type === 'contact'
                     const previewMessage: Pick<
                       Message,
@@ -2469,9 +2486,17 @@ export function InboxContainer({
   const isSelectedConversationInstagramRequest = selectedConversation
     ? isInstagramRequestConversation(selectedConversation, visibleMessages)
     : false
+  const dateSeparatorSourceMessages = useMemo(
+    () =>
+      filterTimelineMessagesForDateSeparators(
+        selectedConversation?.platform ?? null,
+        visibleMessages
+      ),
+    [selectedConversation?.platform, visibleMessages]
+  )
   const messageDateSeparatorById = new Map(
     buildMessageDateSeparators({
-      messages: visibleMessages,
+      messages: dateSeparatorSourceMessages,
       now: relativeTimeBaseDate,
       todayLabel: t('today'),
       yesterdayLabel: t('yesterday'),
@@ -3495,11 +3520,7 @@ export function InboxContainer({
                       }
 
                       if (isInstagramSeenEvent) {
-                        return dateSeparator ? (
-                          <div key={m.id} className="space-y-3">
-                            {dateSeparator}
-                          </div>
-                        ) : null
+                        return null
                       }
 
                       if (!isMe && !isBot) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+    filterTimelineMessagesForDateSeparators,
     isInstagramSeenEventMessage,
     resolveInstagramMessageEventType,
     resolveLatestNonSeenPreviewMessage
@@ -72,5 +73,42 @@ describe('instagramMessageEvents helpers', () => {
                 metadata: { instagram_event_type: 'seen' }
             }
         ])).toBeNull()
+    })
+
+    it('filters instagram seen events from timeline date-separator candidates', () => {
+        expect(filterTimelineMessagesForDateSeparators('instagram', [
+            {
+                id: 'm1',
+                sender_type: 'contact',
+                content: '[Instagram seen]',
+                created_at: '2026-03-20T10:00:00.000Z',
+                metadata: { instagram_event_type: 'seen' }
+            },
+            {
+                id: 'm2',
+                sender_type: 'contact',
+                content: 'Merhaba',
+                created_at: '2026-03-20T10:01:00.000Z',
+                metadata: { instagram_event_type: 'message' }
+            }
+        ])).toEqual([
+            {
+                id: 'm2',
+                sender_type: 'contact',
+                content: 'Merhaba',
+                created_at: '2026-03-20T10:01:00.000Z',
+                metadata: { instagram_event_type: 'message' }
+            }
+        ])
+
+        expect(filterTimelineMessagesForDateSeparators('whatsapp', [
+            {
+                id: 'w1',
+                sender_type: 'contact',
+                content: 'Selam',
+                created_at: '2026-03-20T10:00:00.000Z',
+                metadata: { instagram_event_type: 'seen' }
+            }
+        ])).toHaveLength(1)
     })
 })
