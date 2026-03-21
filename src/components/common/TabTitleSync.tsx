@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
+    listenForInboxUnreadState,
     listenForInboxUnreadUpdates,
     shouldRefreshInboxUnreadIndicator
 } from '@/lib/inbox/unread-events'
@@ -24,8 +25,26 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
     const tAuth = useTranslations('auth')
 
     const [hasUnread, setHasUnread] = useState(false)
+    const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)
 
     const supabase = useMemo(() => createClient(), [])
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(min-width: 1024px)')
+        const syncViewport = () => {
+            setIsDesktopViewport(mediaQuery.matches)
+        }
+
+        syncViewport()
+
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', syncViewport)
+            return () => mediaQuery.removeEventListener('change', syncViewport)
+        }
+
+        mediaQuery.addListener(syncViewport)
+        return () => mediaQuery.removeListener(syncViewport)
+    }, [])
 
     const titleMap = useMemo<Record<TabRouteId, string>>(
         () => ({
@@ -54,22 +73,26 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
             return
         }
 
-        const { count, error } = await supabase
+        const { data, error } = await supabase
             .from('conversations')
-            .select('id', { count: 'exact', head: true })
+            .select('id')
             .eq('organization_id', organizationId)
             .gt('unread_count', 0)
+            .limit(1)
 
         if (error) {
             console.error('Failed to load tab unread indicator', error)
             return
         }
 
-        setHasUnread((count ?? 0) > 0)
+        setHasUnread((data ?? []).length > 0)
     }, [organizationId, supabase])
 
     useEffect(() => {
         if (routeId === 'inbox') {
+            if (isDesktopViewport === null || isDesktopViewport === true) {
+                return
+            }
             const timer = window.setTimeout(() => {
                 void refreshUnread()
             }, 0)
@@ -83,9 +106,10 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
         return () => {
             window.clearTimeout(timer)
         }
-    }, [refreshUnread, routeId])
+    }, [isDesktopViewport, refreshUnread, routeId])
 
     useEffect(() => {
+        if (isDesktopViewport !== false) return
         if (routeId !== 'inbox' || !organizationId) return
 
         let unreadChannel: ReturnType<typeof supabase.channel> | null = null
@@ -126,16 +150,28 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
                 supabase.removeChannel(unreadChannel)
             }
         }
-    }, [organizationId, refreshUnread, routeId, supabase])
+    }, [isDesktopViewport, organizationId, refreshUnread, routeId, supabase])
 
     useEffect(() => {
+        if (isDesktopViewport !== false) return
         if (routeId !== 'inbox' || !organizationId) return
 
         return listenForInboxUnreadUpdates((detail) => {
             if (!shouldRefreshInboxUnreadIndicator(organizationId, detail)) return
             void refreshUnread()
         })
-    }, [organizationId, refreshUnread, routeId])
+    }, [isDesktopViewport, organizationId, refreshUnread, routeId])
+
+    useEffect(() => {
+        if (isDesktopViewport !== true) return
+        if (routeId !== 'inbox' || !organizationId) return
+
+        return listenForInboxUnreadState((detail) => {
+            if (!shouldRefreshInboxUnreadIndicator(organizationId, detail)) return
+            if (typeof detail.hasUnread !== 'boolean') return
+            setHasUnread(detail.hasUnread)
+        })
+    }, [isDesktopViewport, organizationId, routeId])
 
     useEffect(() => {
         const pageTitle = routeId ? titleMap[routeId] : null

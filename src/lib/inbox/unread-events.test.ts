@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+    dispatchInboxUnreadState,
     dispatchInboxUnreadUpdated,
+    listenForInboxUnreadState,
     listenForInboxUnreadUpdates,
     shouldRefreshInboxUnreadIndicator
 } from './unread-events'
@@ -29,5 +31,21 @@ describe('inbox unread events', () => {
         expect(shouldRefreshInboxUnreadIndicator('org-1', null)).toBe(true)
         expect(shouldRefreshInboxUnreadIndicator('org-1', { organizationId: 'org-2' })).toBe(false)
         expect(shouldRefreshInboxUnreadIndicator(null, { organizationId: 'org-1' })).toBe(false)
+    })
+
+    it('dispatches unread state snapshots with normalized organization detail', () => {
+        const target = new EventTarget()
+        const listener = vi.fn()
+
+        const unsubscribe = listenForInboxUnreadState(listener, target)
+
+        dispatchInboxUnreadState({ organizationId: ' org-1 ', hasUnread: true }, target)
+
+        expect(listener).toHaveBeenCalledWith({ organizationId: 'org-1', hasUnread: true })
+
+        unsubscribe()
+        dispatchInboxUnreadState({ organizationId: 'org-2', hasUnread: false }, target)
+
+        expect(listener).toHaveBeenCalledTimes(1)
     })
 })

@@ -2,6 +2,21 @@ import { routing } from '@/i18n/routing'
 
 export type LocaleMessages = Record<string, unknown>
 
+export const DASHBOARD_SHELL_MESSAGE_NAMESPACES = [
+    'auth',
+    'common',
+    'nav',
+    'mainSidebar',
+    'aiSettings'
+] as const
+
+export function mergeMessageNamespaceLists(
+    baseNamespaces: readonly string[],
+    extraNamespaces: readonly string[] = []
+) {
+    return Array.from(new Set([...baseNamespaces, ...extraNamespaces]))
+}
+
 export function pickMessageNamespaces(
     messages: LocaleMessages,
     namespaces: readonly string[]

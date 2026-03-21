@@ -13,5 +13,28 @@ describe('SettingsResponsiveShell source', () => {
         expect(source).toContain("id: 'apps'")
         expect(source).toContain("href: getLocalizedHref(locale, '/settings/apps')")
     })
-})
 
+    it('hydrates pending suggestion count on the client', () => {
+        const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+        expect(source).toContain('createClient()')
+        expect(source).toContain("'pending-suggestions-updated'")
+        expect(source).toContain(".from('offering_profile_suggestions')")
+    })
+
+    it('guards pending count against stale organization fetches', () => {
+        const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+        expect(source).toContain('pendingCountRequestIdRef')
+        expect(source).toContain('pendingCountRequestIdRef.current !== requestId')
+        expect(source).toContain('pendingCountRequestIdRef.current += 1')
+    })
+
+    it('keeps prefetch routes stable across pending-count updates', () => {
+        const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+        expect(source).toContain('const prefetchRoutes = useMemo(() => {')
+        expect(source).toContain('}, [billingOnlyMode, locale])')
+        expect(source).toContain('}, [prefetchRoutes, router])')
+    })
+})

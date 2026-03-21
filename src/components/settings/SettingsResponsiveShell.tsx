@@ -24,9 +24,11 @@ import {
     type SettingsNavItemId
 } from '@/components/settings/mobilePaneState'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
+import { createClient } from '@/lib/supabase/client'
 
 interface SettingsResponsiveShellProps {
-    pendingCount: number
+    activeOrganizationId?: string | null
+    initialPendingCount?: number
     billingOnlyMode?: boolean
     children?: ReactNode
 }
@@ -50,7 +52,8 @@ function getLocalizedHref(locale: string, href: string): string {
 }
 
 export function SettingsResponsiveShell({
-    pendingCount,
+    activeOrganizationId = null,
+    initialPendingCount = 0,
     billingOnlyMode = false,
     children
 }: SettingsResponsiveShellProps) {
@@ -59,10 +62,46 @@ export function SettingsResponsiveShell({
     const router = useRouter()
     const activeItem = getSettingsNavItemFromPath(pathname)
     const tSidebar = useTranslations('Sidebar')
+    const supabase = useMemo(() => createClient(), [])
     const hasDetail = Boolean(activeItem && children)
     const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const isClosingRef = useRef(false)
+    const pendingCountRequestIdRef = useRef(0)
     const settingsRootHref = getLocalizedHref(locale, '/settings')
+    const [pendingCount, setPendingCount] = useState(initialPendingCount)
+
+    const refreshPendingCount = useCallback(async () => {
+        const requestId = pendingCountRequestIdRef.current + 1
+        pendingCountRequestIdRef.current = requestId
+
+        if (!activeOrganizationId) {
+            if (pendingCountRequestIdRef.current === requestId) {
+                setPendingCount(0)
+            }
+            return
+        }
+
+        const { count, error } = await supabase
+            .from('offering_profile_suggestions')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', activeOrganizationId)
+            .is('archived_at', null)
+            .or('status.eq.pending,status.is.null')
+
+        if (error) {
+            if (pendingCountRequestIdRef.current !== requestId) {
+                return
+            }
+            console.error('Failed to load settings pending suggestion count', error)
+            return
+        }
+
+        if (pendingCountRequestIdRef.current !== requestId) {
+            return
+        }
+
+        setPendingCount(count ?? 0)
+    }, [activeOrganizationId, supabase])
     const navItems = useMemo<SettingsNavItem[]>(() => {
         const fullNavItems: SettingsNavItem[] = [
             {
@@ -148,6 +187,23 @@ export function SettingsResponsiveShell({
             }
         })
     }, [activeItem, billingOnlyMode, locale, pendingCount, tSidebar])
+    const prefetchRoutes = useMemo(() => {
+        const routeItems: Array<{ id: SettingsNavItemId; href: string }> = [
+            { id: 'profile', href: getLocalizedHref(locale, '/settings/profile') },
+            { id: 'organization', href: getLocalizedHref(locale, '/settings/organization') },
+            { id: 'ai', href: getLocalizedHref(locale, '/settings/ai') },
+            { id: 'calendar', href: getLocalizedHref(locale, '/settings/calendar') },
+            { id: 'channels', href: getLocalizedHref(locale, '/settings/channels') },
+            { id: 'apps', href: getLocalizedHref(locale, '/settings/apps') },
+            { id: 'plans', href: getLocalizedHref(locale, '/settings/plans') },
+            { id: 'billing', href: getLocalizedHref(locale, '/settings/billing') }
+        ]
+
+        return routeItems.flatMap((item) => {
+            const navState = resolveBillingLockedNavItem(item, billingOnlyMode)
+            return navState.isLocked || !navState.href ? [] : [navState.href]
+        })
+    }, [billingOnlyMode, locale])
     const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
 
     useEffect(() => {
@@ -167,11 +223,20 @@ export function SettingsResponsiveShell({
 
     useEffect(() => {
         return () => {
+            pendingCountRequestIdRef.current += 1
             if (closeTimeoutRef.current) {
                 clearTimeout(closeTimeoutRef.current)
             }
         }
     }, [])
+
+    useEffect(() => {
+        setPendingCount(initialPendingCount)
+    }, [activeOrganizationId, initialPendingCount])
+
+    useEffect(() => {
+        void refreshPendingCount()
+    }, [refreshPendingCount])
 
     const navigateBackToSettings = useCallback(() => {
         if (!hasDetail || isClosingRef.current) return
@@ -200,22 +265,26 @@ export function SettingsResponsiveShell({
     }, [navigateBackToSettings])
 
     useEffect(() => {
+        const handler = () => {
+            void refreshPendingCount()
+        }
+
+        window.addEventListener('pending-suggestions-updated', handler)
+        return () => window.removeEventListener('pending-suggestions-updated', handler)
+    }, [refreshPendingCount])
+
+    useEffect(() => {
         if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
-        const routes = navItems
-            .filter((item) => !item.locked)
-            .map((item) => item.href)
-            .filter((href): href is string => Boolean(href))
-
-        const prefetchRoutes = () => {
-            routes.forEach((href) => {
+        const prefetchVisibleRoutes = () => {
+            prefetchRoutes.forEach((href) => {
                 router.prefetch(href)
             })
         }
 
-        const timeoutId = setTimeout(prefetchRoutes, 250)
+        const timeoutId = setTimeout(prefetchVisibleRoutes, 250)
         return () => clearTimeout(timeoutId)
-    }, [navItems, router])
+    }, [prefetchRoutes, router])
 
     const mobileListPaneClasses = getSettingsMobileListPaneClasses(isMobileDetailOpen)
     const mobileDetailPaneClasses = getSettingsMobileDetailPaneClasses(isMobileDetailOpen)
@@ -235,7 +304,6 @@ export function SettingsResponsiveShell({
                                 icon={item.icon}
                                 label={item.label}
                                 href={item.href}
-                                prefetch
                                 active={item.active}
                                 indicator={item.indicator}
                                 disabled={item.locked}
@@ -253,7 +321,6 @@ export function SettingsResponsiveShell({
                                 icon={item.icon}
                                 label={item.label}
                                 href={item.href}
-                                prefetch
                                 active={item.active}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}
@@ -270,7 +337,6 @@ export function SettingsResponsiveShell({
                                 icon={item.icon}
                                 label={item.label}
                                 href={item.href}
-                                prefetch
                                 active={item.active}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}

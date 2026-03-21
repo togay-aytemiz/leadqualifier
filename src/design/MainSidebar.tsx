@@ -65,6 +65,7 @@ import {
     resolveMainSidebarBotModeTone
 } from '@/design/main-sidebar-bot-mode'
 import {
+    dispatchInboxUnreadState,
     listenForInboxUnreadUpdates,
     shouldRefreshInboxUnreadIndicator
 } from '@/lib/inbox/unread-events'
@@ -214,6 +215,7 @@ export function MainSidebar({
     const [orgSearch, setOrgSearch] = useState('')
     const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
     const [isOrgPickerOpen, setIsOrgPickerOpen] = useState(false)
+    const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)
     const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
     const localePrefix = localePrefixMatch && localePrefixMatch[1] !== 'tr'
         ? `/${localePrefixMatch[1]}`
@@ -224,6 +226,23 @@ export function MainSidebar({
         supabaseRef.current = createClient()
     }
     const supabase = supabaseRef.current
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(min-width: 1024px)')
+        const syncViewport = () => {
+            setIsDesktopViewport(mediaQuery.matches)
+        }
+
+        syncViewport()
+
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', syncViewport)
+            return () => mediaQuery.removeEventListener('change', syncViewport)
+        }
+
+        mediaQuery.addListener(syncViewport)
+        return () => mediaQuery.removeListener(syncViewport)
+    }, [])
 
     const currentOrganization = useMemo(
         () => organizationOptions.find((organization) => organization.id === organizationId)
@@ -277,18 +296,24 @@ export function MainSidebar({
     }, [hasLoadedOrganizationOptions, isLoadingOrganizationOptions, isSystemAdmin])
 
     const refreshUnread = useCallback(async (orgId: string) => {
-        const { count, error } = await supabase
+        const { data, error } = await supabase
             .from('conversations')
-            .select('id', { count: 'exact', head: true })
+            .select('id')
             .eq('organization_id', orgId)
             .gt('unread_count', 0)
+            .limit(1)
 
         if (error) {
             console.error('Failed to load unread indicator', error)
             return
         }
 
-        setHasUnread((count ?? 0) > 0)
+        const nextHasUnread = (data ?? []).length > 0
+        setHasUnread(nextHasUnread)
+        dispatchInboxUnreadState({
+            organizationId: orgId,
+            hasUnread: nextHasUnread
+        })
     }, [supabase])
 
     const refreshPendingSuggestions = useCallback(async (orgId: string) => {
@@ -444,7 +469,7 @@ export function MainSidebar({
         let isMounted = true
         let deferredLoadTimer: number | null = null
 
-        if (!organizationId) {
+        if (!organizationId || isDesktopViewport !== true) {
             setHasUnread(false)
             setHasPendingSuggestions(false)
             setBotMode('active')
@@ -485,19 +510,21 @@ export function MainSidebar({
                 window.clearTimeout(deferredLoadTimer)
             }
         }
-    }, [fetchBotMode, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread])
+    }, [fetchBotMode, isDesktopViewport, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         if (!billingRefreshSignal) return
         refreshBillingSnapshot(organizationId)
-    }, [billingRefreshSignal, organizationId, refreshBillingSnapshot])
+    }, [billingRefreshSignal, isDesktopViewport, organizationId, refreshBillingSnapshot])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         if (pathWithoutLocale !== '/inbox') return
         void refreshUnread(organizationId)
-    }, [organizationId, pathWithoutLocale, refreshUnread])
+    }, [isDesktopViewport, organizationId, pathWithoutLocale, refreshUnread])
 
     useEffect(() => {
         if (billingSnapshot?.membershipState !== 'premium_active') {
@@ -506,6 +533,7 @@ export function MainSidebar({
     }, [billingSnapshot?.membershipState])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         let unreadChannel: ReturnType<typeof supabase.channel> | null = null
         let suggestionChannel: ReturnType<typeof supabase.channel> | null = null
@@ -576,9 +604,10 @@ export function MainSidebar({
                 supabase.removeChannel(billingChannel)
             }
         }
-    }, [organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread, supabase])
+    }, [isDesktopViewport, organizationId, refreshBillingSnapshot, refreshPendingSuggestions, refreshUnread, supabase])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         let isMounted = true
         const handler = () => {
@@ -596,29 +625,32 @@ export function MainSidebar({
             isMounted = false
             window.removeEventListener('ai-settings-updated', handler)
         }
-    }, [fetchBotMode, organizationId])
+    }, [fetchBotMode, isDesktopViewport, organizationId])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         const handler = () => refreshPendingSuggestions(organizationId)
         window.addEventListener('pending-suggestions-updated', handler)
         return () => window.removeEventListener('pending-suggestions-updated', handler)
-    }, [organizationId, refreshPendingSuggestions])
+    }, [isDesktopViewport, organizationId, refreshPendingSuggestions])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         const handler = () => refreshBillingSnapshot(organizationId)
         window.addEventListener(BILLING_UPDATED_EVENT, handler)
         return () => window.removeEventListener(BILLING_UPDATED_EVENT, handler)
-    }, [organizationId, refreshBillingSnapshot])
+    }, [isDesktopViewport, organizationId, refreshBillingSnapshot])
 
     useEffect(() => {
+        if (isDesktopViewport !== true) return
         if (!organizationId) return
         return listenForInboxUnreadUpdates((detail) => {
             if (!shouldRefreshInboxUnreadIndicator(organizationId, detail)) return
             void refreshUnread(organizationId)
         })
-    }, [organizationId, refreshUnread])
+    }, [isDesktopViewport, organizationId, refreshUnread])
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch('app-shell')) return

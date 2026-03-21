@@ -5,7 +5,7 @@ import { MobileBottomNav } from '@/design/MobileBottomNav'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { TabTitleSync } from '@/components/common/TabTitleSync'
-import { getScopedMessages } from '@/i18n/messages'
+import { DASHBOARD_SHELL_MESSAGE_NAMESPACES, getScopedMessages } from '@/i18n/messages'
 
 export default async function DashboardLayout({
     children,
@@ -14,7 +14,7 @@ export default async function DashboardLayout({
 }) {
     const locale = await getLocale()
     const orgContext = await resolveActiveOrganizationContext()
-    const messages = await getScopedMessages(locale)
+    const messages = await getScopedMessages(locale, DASHBOARD_SHELL_MESSAGE_NAMESPACES)
     const hasExplicitAdminOrganizationSelection = !(orgContext?.isSystemAdmin ?? false)
         || orgContext?.source === 'cookie'
     const sidebarOrganizationId = hasExplicitAdminOrganizationSelection

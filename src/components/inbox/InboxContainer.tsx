@@ -130,6 +130,11 @@ import {
   isInstagramSeenEventMessage,
   resolveLatestNonSeenPreviewMessage,
 } from '@/components/inbox/instagramMessageEvents'
+import {
+  buildConversationPreviewMessages,
+  CONVERSATION_LIST_PREVIEW_MESSAGE_LIMIT,
+  mergeRealtimeConversationUpdate,
+} from '@/components/inbox/conversationListState'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { resolveMainSidebarBotModeTone } from '@/design/main-sidebar-bot-mode'
 import { extractSocialContactAvatarUrl } from '@/lib/inbox/contact-avatar'
@@ -761,13 +766,22 @@ export function InboxContainer({
           pendingPrependScrollRestoreRef.current = null
           isLoadingMessageHistoryRef.current = false
           await hydrateSenderProfiles(pageResult.messages)
+          const nextPreviewMessages = buildConversationPreviewMessages(pageResult.messages)
           setMessages(pageResult.messages)
           setMessageOffset(pageResult.fetchedCount)
           setHasMoreMessageHistory(pageResult.hasMore)
           setIsLoadingMessageHistory(false)
           setLoadedConversationId(nextId)
           setConversations((prev) =>
-            prev.map((c) => (c.id === nextId ? { ...c, unread_count: 0 } : c))
+            prev.map((c) =>
+              c.id === nextId
+                ? {
+                    ...c,
+                    unread_count: 0,
+                    messages: nextPreviewMessages.length > 0 ? nextPreviewMessages : c.messages,
+                  }
+                : c
+            )
           )
           await markConversationRead(nextId)
           dispatchInboxUnreadUpdated({ organizationId })
@@ -785,6 +799,28 @@ export function InboxContainer({
     },
     [hydrateSenderProfiles, organizationId, refreshLead]
   )
+
+  const refreshConversationPreview = useCallback(async (conversationId: string) => {
+    try {
+      const pageResult = await getMessagesPage(
+        conversationId,
+        0,
+        CONVERSATION_LIST_PREVIEW_MESSAGE_LIMIT
+      )
+      const nextPreviewMessages = buildConversationPreviewMessages(pageResult.messages)
+      if (nextPreviewMessages.length === 0) return
+
+      setConversations((previous) =>
+        previous.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, messages: nextPreviewMessages }
+            : conversation
+        )
+      )
+    } catch (error) {
+      console.error('Failed to refresh conversation preview', error)
+    }
+  }, [])
 
   const loadOlderMessages = useCallback(async () => {
     const conversationId = selectedIdRef.current
@@ -1193,8 +1229,10 @@ export function InboxContainer({
                             ? c.unread_count + 1
                             : c.unread_count
                           : 0,
-                      // If we have messages snippet in list, update it too
-                      messages: [previewMessage],
+                      messages: buildConversationPreviewMessages([
+                        previewMessage,
+                        ...(c.messages ?? []),
+                      ]),
                     }
                   }
                   return c
@@ -1223,6 +1261,7 @@ export function InboxContainer({
           (payload) => {
             const newOrUpdatedConv = payload.new as Conversation
             console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
+            let shouldHydrateConversationPreview = false
 
             setConversations((prev) => {
               // Check if exists
@@ -1238,13 +1277,17 @@ export function InboxContainer({
                           (c.assignee_id === newOrUpdatedConv.assignee_id ? c.assignee : null))
                         : null
 
-                      return {
-                        ...c,
-                        ...newOrUpdatedConv,
-                        leads: c.leads, // preserve relational data
-                        messages: c.messages, // preserve relational data
-                        assignee: nextAssignee,
+                      const mergedConversationResult = mergeRealtimeConversationUpdate({
+                        currentConversation: c,
+                        incomingConversation: newOrUpdatedConv,
+                        nextAssignee,
+                      })
+
+                      if (mergedConversationResult.shouldHydratePreview) {
+                        shouldHydrateConversationPreview = true
                       }
+
+                      return mergedConversationResult.conversation
                     }
                     return c
                   })
@@ -1254,9 +1297,14 @@ export function InboxContainer({
                   )
               } else {
                 // INSERT logic (new conversation)
+                shouldHydrateConversationPreview = true
                 return [newOrUpdatedConv, ...prev]
               }
             })
+
+            if (shouldHydrateConversationPreview) {
+              void refreshConversationPreview(newOrUpdatedConv.id)
+            }
 
             // Resolve assignee if needed
             if (
@@ -1351,6 +1399,7 @@ export function InboxContainer({
     hydrateSenderProfiles,
     organizationId,
     refreshMessages,
+    refreshConversationPreview,
     resolveAssignee,
     scheduleLeadAutoRefresh,
     supabase,
