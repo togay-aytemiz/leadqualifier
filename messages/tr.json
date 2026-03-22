@@ -577,6 +577,12 @@
       "video": "Video alındı",
       "sticker": "Çıkartma alındı",
       "media": "Medya alındı",
+      "imageSent": "Görsel gönderildi",
+      "documentSent": "Belge gönderildi",
+      "audioSent": "Ses gönderildi",
+      "videoSent": "Video gönderildi",
+      "stickerSent": "Çıkartma gönderildi",
+      "mediaSent": "Medya gönderildi",
       "open": "Dosyayı aç",
       "instagramUnsupported": "Bu içeriği görmek için Instagram'ı açın",
       "instagramUnsupportedDetail": "Bu Instagram içeriği henüz Qualy içinde önizlenemiyor. Görmek için Instagram'ı açın."

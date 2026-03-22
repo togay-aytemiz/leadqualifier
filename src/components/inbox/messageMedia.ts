@@ -5,6 +5,12 @@ type MediaPreviewLabelMap = {
     video: string
     sticker: string
     media: string
+    imageSent?: string
+    documentSent?: string
+    audioSent?: string
+    videoSent?: string
+    stickerSent?: string
+    mediaSent?: string
 }
 
 export type InboxMessageMediaType = 'image' | 'document' | 'audio' | 'video' | 'sticker' | 'unknown'
@@ -75,13 +81,44 @@ function normalizeMediaType(value: unknown): InboxMessageMediaType {
     return 'unknown'
 }
 
-function resolvePreviewLabel(mediaType: InboxMessageMediaType, labels: MediaPreviewLabelMap) {
+function isOutboundSenderType(senderType: unknown) {
+    if (typeof senderType !== 'string') return false
+    const normalized = senderType.trim().toLowerCase()
+    return normalized === 'user' || normalized === 'bot'
+}
+
+function resolveReceivedPreviewLabel(
+    mediaType: InboxMessageMediaType,
+    labels: MediaPreviewLabelMap
+) {
     if (mediaType === 'image') return labels.image
     if (mediaType === 'document') return labels.document
     if (mediaType === 'audio') return labels.audio
     if (mediaType === 'video') return labels.video
     if (mediaType === 'sticker') return labels.sticker
     return labels.media
+}
+
+function resolveSentPreviewLabel(mediaType: InboxMessageMediaType, labels: MediaPreviewLabelMap) {
+    if (mediaType === 'image') return labels.imageSent ?? labels.image
+    if (mediaType === 'document') return labels.documentSent ?? labels.document
+    if (mediaType === 'audio') return labels.audioSent ?? labels.audio
+    if (mediaType === 'video') return labels.videoSent ?? labels.video
+    if (mediaType === 'sticker') return labels.stickerSent ?? labels.sticker
+    return labels.mediaSent ?? labels.media
+}
+
+export function resolveMediaPreviewLabel(args: {
+    mediaType: InboxMessageMediaType | string | null | undefined
+    senderType?: string | null
+    labels: MediaPreviewLabelMap
+}) {
+    const mediaType = normalizeMediaType(args.mediaType)
+    if (isOutboundSenderType(args.senderType)) {
+        return resolveSentPreviewLabel(mediaType, args.labels)
+    }
+
+    return resolveReceivedPreviewLabel(mediaType, args.labels)
 }
 
 export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessageMedia | null {
@@ -110,13 +147,18 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
 export function resolveMessagePreviewContent(args: {
     content: string | null | undefined
     metadata: unknown
+    senderType?: string | null
     fallbackNoMessage: string
     unsupportedInstagramAttachment?: string
     labels: MediaPreviewLabelMap
 }) {
     const media = extractMediaFromMessageMetadata(args.metadata)
     if (media) {
-        return resolvePreviewLabel(media.type, args.labels)
+        return resolveMediaPreviewLabel({
+            mediaType: media.type,
+            senderType: args.senderType,
+            labels: args.labels
+        })
     }
 
     if (

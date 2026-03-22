@@ -94,6 +94,7 @@ import {
 import {
   collectOptimisticPreviewUrls,
   extractMediaFromMessageMetadata,
+  resolveMediaPreviewLabel as resolveDirectionalMediaPreviewLabel,
   resolveMessagePreviewContent,
   resolveVisibleMessageContent,
 } from '@/components/inbox/messageMedia'
@@ -2325,6 +2326,7 @@ export function InboxContainer({
           const previewContent = resolveMessagePreviewContent({
             content: previewMessage?.content,
             metadata: previewMessage?.metadata,
+            senderType: previewMessage?.sender_type,
             fallbackNoMessage: t('noMessagesYet'),
             unsupportedInstagramAttachment: t('mediaPreview.instagramUnsupported'),
             labels: {
@@ -2334,6 +2336,12 @@ export function InboxContainer({
               video: t('mediaPreview.video'),
               sticker: t('mediaPreview.sticker'),
               media: t('mediaPreview.media'),
+              imageSent: t('mediaPreview.imageSent'),
+              documentSent: t('mediaPreview.documentSent'),
+              audioSent: t('mediaPreview.audioSent'),
+              videoSent: t('mediaPreview.videoSent'),
+              stickerSent: t('mediaPreview.stickerSent'),
+              mediaSent: t('mediaPreview.mediaSent'),
             },
           })
           const isInstagramRequestPreview = isInstagramRequestConversation(c)
@@ -2617,13 +2625,28 @@ export function InboxContainer({
   const canOpenWhatsAppPhone = Boolean(
     (selectedConversation?.contact_phone ?? '').replace(/\D/g, '')
   )
-  const resolveMediaPreviewLabel = (mediaType: string | null | undefined) => {
-    if (mediaType === 'image') return t('mediaPreview.image')
-    if (mediaType === 'document') return t('mediaPreview.document')
-    if (mediaType === 'audio') return t('mediaPreview.audio')
-    if (mediaType === 'video') return t('mediaPreview.video')
-    if (mediaType === 'sticker') return t('mediaPreview.sticker')
-    return t('mediaPreview.media')
+  const resolveMediaPreviewLabel = (
+    mediaType: string | null | undefined,
+    senderType: string | null | undefined
+  ) => {
+    return resolveDirectionalMediaPreviewLabel({
+      mediaType,
+      senderType,
+      labels: {
+        image: t('mediaPreview.image'),
+        document: t('mediaPreview.document'),
+        audio: t('mediaPreview.audio'),
+        video: t('mediaPreview.video'),
+        sticker: t('mediaPreview.sticker'),
+        media: t('mediaPreview.media'),
+        imageSent: t('mediaPreview.imageSent'),
+        documentSent: t('mediaPreview.documentSent'),
+        audioSent: t('mediaPreview.audioSent'),
+        videoSent: t('mediaPreview.videoSent'),
+        stickerSent: t('mediaPreview.stickerSent'),
+        mediaSent: t('mediaPreview.mediaSent'),
+      },
+    })
   }
 
   const resolvedBotMode = inboxBotMode
@@ -3473,7 +3496,9 @@ export function InboxContainer({
                         ? extractSkillTitleFromMetadata(m.metadata)
                         : null
                       const media = extractMediaFromMessageMetadata(m.metadata)
-                      const mediaPreviewLabel = media ? resolveMediaPreviewLabel(media.type) : null
+                      const mediaPreviewLabel = media
+                        ? resolveMediaPreviewLabel(media.type, m.sender_type)
+                        : null
                       const isInstagramRequestInboundMessage = isInstagramRequestMessage(
                         selectedConversation?.platform ?? 'simulator',
                         m.sender_type,

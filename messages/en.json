@@ -577,6 +577,12 @@
       "video": "Video received",
       "sticker": "Sticker received",
       "media": "Media received",
+      "imageSent": "Image sent",
+      "documentSent": "Document sent",
+      "audioSent": "Audio sent",
+      "videoSent": "Video sent",
+      "stickerSent": "Sticker sent",
+      "mediaSent": "Media sent",
       "instagramUnsupported": "Open Instagram to view this content",
       "instagramUnsupportedDetail": "This Instagram content cannot be previewed in Qualy yet. Open Instagram to view it.",
       "open": "Open file"

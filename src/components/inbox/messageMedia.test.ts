@@ -97,6 +97,37 @@ describe('resolveMessagePreviewContent', () => {
         expect(preview).toBe('Image received')
     })
 
+    it('uses sent media preview labels for outbound media messages', () => {
+        const mediaLabels = {
+            image: 'Image received',
+            document: 'Document received',
+            audio: 'Audio received',
+            video: 'Video received',
+            sticker: 'Sticker received',
+            media: 'Media received',
+            imageSent: 'Image sent',
+            documentSent: 'Document sent',
+            audioSent: 'Audio sent',
+            videoSent: 'Video sent',
+            stickerSent: 'Sticker sent',
+            mediaSent: 'Media sent'
+        }
+        const previewArgs = {
+            content: '[WhatsApp image]',
+            senderType: 'user',
+            metadata: {
+                whatsapp_media: {
+                    type: 'image'
+                },
+                whatsapp_is_media_placeholder: true
+            },
+            fallbackNoMessage: 'No messages yet',
+            labels: mediaLabels
+        }
+
+        expect(resolveMessagePreviewContent(previewArgs)).toBe('Image sent')
+    })
+
     it('falls back to text content when no media metadata exists', () => {
         const preview = resolveMessagePreviewContent({
             content: 'Merhaba',
