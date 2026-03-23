@@ -160,7 +160,7 @@ function SidebarHoverTooltip({
                 className={cn(
                     'pointer-events-none absolute left-full top-1/2 z-[140] ml-2 w-max max-w-64 -translate-y-1/2 translate-x-[-2px] rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 shadow-lg opacity-0 invisible transition-all duration-150 ease-out motion-reduce:transition-none',
                     'group-hover/sidebar-tooltip:visible group-hover/sidebar-tooltip:translate-x-0 group-hover/sidebar-tooltip:opacity-100',
-                    'group-focus-within/sidebar-tooltip:visible group-focus-within/sidebar-tooltip:translate-x-0 group-focus-within/sidebar-tooltip:opacity-100',
+                    'group-has-[:focus-visible]/sidebar-tooltip:visible group-has-[:focus-visible]/sidebar-tooltip:translate-x-0 group-has-[:focus-visible]/sidebar-tooltip:opacity-100',
                     panelClassName
                 )}
                 role="tooltip"
