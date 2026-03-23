@@ -100,7 +100,7 @@ export function resolveLeadExtractionLocale(options?: {
     return turkishScore > 0 ? 'tr' as const : 'en' as const
 }
 
-function buildExtractionSystemPrompt(responseLanguage: 'Turkish' | 'English') {
+export function buildExtractionSystemPrompt(responseLanguage: 'Turkish' | 'English') {
     return `Extract lead signals as JSON.
 Return ONLY valid JSON (no code fences, no extra text).
 Return keys: service_type, services, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
@@ -126,6 +126,10 @@ If catalog is empty, infer service_type and services from offering profile summa
 If inferred service matches a provided catalog name, keep that catalog name exactly as-is.
 If no catalog match exists, write inferred service_type and services in ${responseLanguage}.
 When required intake fields are provided, fill required_intake_collected as an object that maps clearly collected field names to concise values.
+Use the exact required intake field labels as object keys when filling required_intake_collected.
+Match required fields by meaning, not only exact wording.
+Approximate or range-style customer answers are valid values when that is what the customer provided.
+High-confidence implied answers can be included, but never invent low-confidence values.
 Only include fields clearly provided by the customer; otherwise omit them from the object.
 If none are collected, return required_intake_collected as {}.
 Messages indicating cancellation/decline (e.g., "vazgeçtim", "istemiyorum") are still business-context messages, not personal/social chat.

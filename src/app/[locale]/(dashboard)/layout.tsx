@@ -2,6 +2,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
 import { MainSidebar } from '@/design'
 import { MobileBottomNav } from '@/design/MobileBottomNav'
+import { DashboardRouteTransitionViewport } from '@/components/common/DashboardRouteTransitionViewport'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { TabTitleSync } from '@/components/common/TabTitleSync'
@@ -45,7 +46,9 @@ export default async function DashboardLayout({
                 </div>
                 <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
                     <div className="flex min-h-0 flex-1 overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-                        {children}
+                        <DashboardRouteTransitionViewport>
+                            {children}
+                        </DashboardRouteTransitionViewport>
                     </div>
                     <MobileBottomNav activeOrganizationId={orgContext?.activeOrganizationId ?? null} />
                 </div>

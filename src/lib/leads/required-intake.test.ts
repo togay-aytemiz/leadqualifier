@@ -71,6 +71,27 @@ describe('resolveCollectedRequiredIntake', () => {
     expect(result).toEqual([])
   })
 
+  it('matches semantically similar collected field keys for custom required fields', () => {
+    const result = resolveCollectedRequiredIntake({
+      requiredFields: ['Bebek Doğum Tarihi'],
+      extractedFields: {
+        required_intake_collected: {
+          'Doğum Tarihi': 'Mayıs başı - ortası gibi',
+        },
+      },
+    })
+
+    expect(result).toEqual([
+      {
+        field: 'Bebek Doğum Tarihi',
+        value: 'Mayıs başı - ortası gibi',
+        source: 'ai',
+        updatedAt: null,
+        updatedBy: null,
+      },
+    ])
+  })
+
   it('still treats standalone il fields as location fallback fields', () => {
     const result = resolveCollectedRequiredIntake({
       requiredFields: ['İl'],
@@ -150,6 +171,33 @@ describe('resolveCollectedRequiredIntake', () => {
         source: 'manual',
         updatedAt: '2026-03-15T10:00:00.000Z',
         updatedBy: 'profile-1',
+      },
+    ])
+  })
+
+  it('matches semantically similar manual override keys and preserves manual source metadata', () => {
+    const result = resolveCollectedRequiredIntake({
+      requiredFields: ['İletişim Numarası'],
+      extractedFields: {
+        required_intake_overrides: {
+          telefon: '0555 111 11 11',
+        },
+        required_intake_override_meta: {
+          telefon: {
+            updated_at: '2026-03-22T10:00:00.000Z',
+            updated_by: 'profile-2',
+          },
+        },
+      },
+    })
+
+    expect(result).toEqual([
+      {
+        field: 'İletişim Numarası',
+        value: '0555 111 11 11',
+        source: 'manual',
+        updatedAt: '2026-03-22T10:00:00.000Z',
+        updatedBy: 'profile-2',
       },
     ])
   })

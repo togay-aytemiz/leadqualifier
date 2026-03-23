@@ -1,4 +1,5 @@
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
+import { messageMentionsField } from '@/lib/ai/intake-field-match'
 
 const COMBINING_MARKS = /[\u0300-\u036f]/g
 const DATE_FALLBACK_ALIASES = new Set(['tarih', 'date'])
@@ -78,6 +79,49 @@ function normalizeCollectedMap(raw: unknown) {
   return map
 }
 
+function findSemanticFieldValue(field: string, sourceMap: Map<string, string>) {
+  const normalizedField = normalizeRequiredIntakeFieldKey(field)
+  const exactValue = sourceMap.get(normalizedField)
+  if (exactValue) {
+    return {
+      matchedKey: normalizedField,
+      value: exactValue,
+    }
+  }
+
+  let bestMatch:
+    | {
+        matchedKey: string
+        value: string
+        score: number
+      }
+    | null = null
+
+  for (const [candidateKey, candidateValue] of sourceMap.entries()) {
+    const forwardMatch = messageMentionsField(field, candidateKey)
+    const backwardMatch = messageMentionsField(candidateKey, field)
+    if (!forwardMatch && !backwardMatch) continue
+
+    const candidateTokenCount = candidateKey.split(' ').filter(Boolean).length
+    const score = (forwardMatch ? 2 : 0) + (backwardMatch ? 1 : 0) + candidateTokenCount
+
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = {
+        matchedKey: candidateKey,
+        value: candidateValue,
+        score,
+      }
+    }
+  }
+
+  if (!bestMatch) return null
+
+  return {
+    matchedKey: bestMatch.matchedKey,
+    value: bestMatch.value,
+  }
+}
+
 function normalizeOverrideMetaMap(raw: unknown) {
   const map = new Map<string, RequiredIntakeOverrideMetaEntry>()
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return map
@@ -152,8 +196,10 @@ export function resolveCollectedRequiredIntake(options: {
   return requiredFields
     .map((field) => {
       const normalizedField = normalizeRequiredIntakeFieldKey(field)
-      const overriddenValue = overrideMap.get(normalizedField)
-      const explicitValue = collectedMap.get(normalizedField)
+      const overriddenMatch = findSemanticFieldValue(field, overrideMap)
+      const explicitMatch = findSemanticFieldValue(field, collectedMap)
+      const overriddenValue = overriddenMatch?.value
+      const explicitValue = explicitMatch?.value
       const fallbackValue = inferFallbackValue({
         field,
         serviceType: options.serviceType,
@@ -166,7 +212,7 @@ export function resolveCollectedRequiredIntake(options: {
           ? 'manual'
           : 'ai'
         : null
-      const overrideMeta = overrideMetaMap.get(normalizedField)
+      const overrideMeta = overrideMetaMap.get(overriddenMatch?.matchedKey ?? normalizedField)
       return {
         field,
         value: value ?? '',

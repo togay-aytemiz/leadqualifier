@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    buildExtractionSystemPrompt,
     buildLeadExtractionConversationContext,
     mergeExtractionWithExisting,
     normalizeLowSignalLeadStatus,
@@ -77,6 +78,17 @@ describe('safeParseLeadExtraction', () => {
             Telefon: '555',
             'Bütçe': '15.000 TL'
         })
+    })
+})
+
+describe('buildExtractionSystemPrompt', () => {
+    it('instructs required intake collection to use exact field labels and high-confidence semantic matches', () => {
+        const prompt = buildExtractionSystemPrompt('Turkish')
+
+        expect(prompt).toContain('Use the exact required intake field labels as object keys')
+        expect(prompt).toContain('Match required fields by meaning, not only exact wording')
+        expect(prompt).toContain('High-confidence implied answers can be included')
+        expect(prompt).toContain('Approximate or range-style customer answers are valid values')
     })
 })
 

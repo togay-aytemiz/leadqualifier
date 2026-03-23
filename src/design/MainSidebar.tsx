@@ -3,13 +3,18 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import type { AiBotMode, OrganizationBillingAccount } from '@/types/database'
 import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import {
+    dispatchDashboardRouteTransitionStart,
+    primeDashboardRoute,
+    shouldStartDashboardRouteTransition
+} from '@/design/dashboard-route-transition'
 import {
     buildOrganizationBillingSnapshot,
     type OrganizationBillingSnapshot
@@ -688,6 +693,19 @@ export function MainSidebar({
         const timeoutId = setTimeout(prefetchRoutes, 250)
         return () => clearTimeout(timeoutId)
     }, [canAccessQaLabAdmin, isSystemAdmin, localePrefix, router])
+
+    const warmDashboardHotRoute = useCallback((href: string) => {
+        primeDashboardRoute(router, href, localePrefix)
+    }, [localePrefix, router])
+
+    const handleDashboardNavClick = useCallback((
+        event: ReactMouseEvent<HTMLAnchorElement>,
+        href: string
+    ) => {
+        if (!shouldStartDashboardRouteTransition(event)) return
+        warmDashboardHotRoute(href)
+        dispatchDashboardRouteTransitionStart(href)
+    }, [warmDashboardHotRoute])
 
     const sections = useMemo(
         () => [
@@ -1707,6 +1725,10 @@ export function MainSidebar({
                                             title={collapsed ? undefined : item.label}
                                             aria-label={item.label}
                                             className={navItemClassName}
+                                            onMouseEnter={() => warmDashboardHotRoute(itemHref)}
+                                            onFocus={() => warmDashboardHotRoute(itemHref)}
+                                            onTouchStart={() => warmDashboardHotRoute(itemHref)}
+                                            onClick={(event) => handleDashboardNavClick(event, itemHref)}
                                         >
                                             {navItemContent}
                                         </Link>

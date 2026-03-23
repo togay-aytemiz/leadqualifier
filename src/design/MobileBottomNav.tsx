@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type MouseEvent as ReactMouseEvent } from 'react'
 import { useTranslations } from 'next-intl'
 import {
     HiMiniCalendarDays,
@@ -20,6 +20,11 @@ import { AlertCircle, LogOut, Lock, MoreHorizontal, Puzzle, Settings } from 'luc
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
 import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import {
+    dispatchDashboardRouteTransitionStart,
+    primeDashboardRoute,
+    shouldStartDashboardRouteTransition
+} from '@/design/dashboard-route-transition'
 import { createClient } from '@/lib/supabase/client'
 import type { OrganizationBillingAccount } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
@@ -64,6 +69,10 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
 
     const activeItem = resolveMobileNavActiveItem(pathname)
+    const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
+    const localePrefix = localePrefixMatch && localePrefixMatch[1] !== 'tr'
+        ? `/${localePrefixMatch[1]}`
+        : ''
     const supabase = useMemo(() => createClient(), [])
     const billingRefreshSignal = useMemo(
         () => buildBillingRefreshSignal(searchParams, pathname),
@@ -182,6 +191,19 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         const timeoutId = setTimeout(prefetchRoutes, 250)
         return () => clearTimeout(timeoutId)
     }, [router])
+
+    const warmDashboardHotRoute = useCallback((href: string) => {
+        primeDashboardRoute(router, href, localePrefix)
+    }, [localePrefix, router])
+
+    const handleDashboardNavClick = useCallback((
+        event: ReactMouseEvent<HTMLAnchorElement>,
+        href: string
+    ) => {
+        if (!shouldStartDashboardRouteTransition(event)) return
+        warmDashboardHotRoute(href)
+        dispatchDashboardRouteTransitionStart(href)
+    }, [warmDashboardHotRoute])
 
     const refreshBillingSnapshot = useCallback(async () => {
         if (isDesktopViewport === null) {
@@ -553,6 +575,10 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                     'flex flex-col items-center justify-center rounded-xl py-1.5 text-[11px] font-medium transition-colors',
                                     isActive ? 'text-[#242A40]' : 'text-slate-500 hover:text-slate-900'
                                 )}
+                                onMouseEnter={() => warmDashboardHotRoute(item.href)}
+                                onFocus={() => warmDashboardHotRoute(item.href)}
+                                onTouchStart={() => warmDashboardHotRoute(item.href)}
+                                onClick={(event) => handleDashboardNavClick(event, item.href)}
                             >
                                 <span className={cn(
                                     'mb-0.5 flex h-8 w-8 items-center justify-center rounded-lg transition-colors',

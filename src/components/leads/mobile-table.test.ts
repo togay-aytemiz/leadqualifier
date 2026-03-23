@@ -57,6 +57,23 @@ describe('mobile leads table helpers', () => {
         expect(hints[1]).toEqual({ field: 'budget', value: '20.000 TL' })
     })
 
+    it('reads semantically matched required fields from required_intake_collected payload', () => {
+        const hints = getMobileRequiredFieldHints(
+            {
+                extracted_fields: {
+                    required_intake_collected: {
+                        'Doğum Tarihi': 'Mayıs başı - ortası gibi'
+                    }
+                }
+            },
+            ['Bebek Doğum Tarihi']
+        )
+
+        expect(hints).toEqual([
+            { field: 'Bebek Doğum Tarihi', value: 'Mayıs başı - ortası gibi' }
+        ])
+    })
+
     it('filters out missing required field values', () => {
         const hints = getMobileRequiredFieldHints(
             {
