@@ -24,6 +24,7 @@
 
 ### Changed
 
+- Changed Inbox list unread presentation: the last incoming message preview is now bold for unread threads, and the selected conversation wrapper background uses a more visible light blue (`bg-blue-50`) to improve contrast and scannability (`src/components/inbox/InboxContainer.tsx`).
 - Changed route prefetching for app-shell to enable `true` in production and dev environments, improving initial load and transition speeds (`src/design/manual-prefetch.ts`, `src/design/manual-prefetch.test.ts`).
 - Changed database query behavior for `enforceWorkspaceAccessOrRedirect` by conditionally passing and reusing the existing Supabase client in Dashboard pages (`Leads`, `Inbox`, `Skills`, `Calendar`), removing redundant duplicate billing snapshot data fetches.
 - Changed i18n payload size management by wrapping the dynamic locale file import in `messages.ts` with React `cache()`, memoizing the 120KB payload parsing overhead per request.

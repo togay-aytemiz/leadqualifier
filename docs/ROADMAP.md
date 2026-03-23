@@ -286,6 +286,7 @@
   - [x] Inbox list time moved to a dedicated third row under message preview
   - [x] Inbox bot message bubbles now use a darker background with light text for better contrast
   - [x] Unread indicators in sidebar + conversation list
+  - [x] Inbox list unread message text is bold and selected conversation uses a more visible light blue background
   - [x] Inbox mark-read now pushes a shared client-side unread refresh signal so sidebar and tab-title unread indicators stay in sync immediately
   - [x] Real-time updates (via polling/subscriptions)
   - [x] On-demand conversation summary (button + inline panel)

@@ -2350,7 +2350,7 @@ export function InboxContainer({
             <div
               key={c.id}
               onClick={() => handleSelectConversation(c.id)}
-              className={`relative cursor-pointer border-b border-gray-100 bg-white px-4 py-4 transition-colors hover:bg-gray-50 group ${selectedId === c.id ? 'bg-blue-50/30' : ''}`}
+              className={`relative cursor-pointer border-b border-gray-100 px-4 py-4 transition-colors group ${selectedId === c.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
             >
               <div className="flex items-start gap-3">
                 <div className="relative shrink-0">
@@ -2412,7 +2412,7 @@ export function InboxContainer({
                     </div>
                   </div>
                   <p
-                    className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'text-gray-700' : 'text-gray-500'}`}
+                    className={`mt-0.5 flex items-center gap-1.5 truncate text-sm leading-relaxed ${c.unread_count > 0 ? 'font-semibold text-gray-900' : 'text-gray-500'}`}
                   >
                     {previewMessage &&
                       (previewMessage.sender_type === 'contact' ? (
