@@ -15,11 +15,11 @@ describe('shouldEnableManualRoutePrefetch', () => {
     })
 
     it('disables app-shell manual prefetch in production', () => {
-        expect(shouldEnableManualRoutePrefetch('app-shell', 'production')).toBe(false)
+        expect(shouldEnableManualRoutePrefetch('app-shell', 'production')).toBe(true)
     })
 
-    it('disables app-shell manual prefetch in development', () => {
-        expect(shouldEnableManualRoutePrefetch('app-shell', 'development')).toBe(false)
+    it('returns true for app-shell surface in development', () => {
+        expect(shouldEnableManualRoutePrefetch('app-shell', 'development')).toBe(true)
     })
 
     it('disables manual prefetch in test', () => {

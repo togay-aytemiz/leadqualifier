@@ -22,7 +22,7 @@ export function shouldEnableManualRoutePrefetch(
     }
 
     if (surface === 'app-shell') {
-        return false
+        return environment === 'production' || environment === 'development'
     }
 
     return environment === 'production' || environment === 'development'

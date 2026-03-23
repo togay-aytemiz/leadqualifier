@@ -40,6 +40,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         organizationId,
         locale,
         currentPath: '/leads',
+        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

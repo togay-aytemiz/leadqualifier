@@ -38,6 +38,7 @@ export default async function InboxPage() {
         organizationId,
         locale,
         currentPath: '/inbox',
+        supabase,
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 

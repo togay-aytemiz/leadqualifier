@@ -27,6 +27,7 @@ export default async function SkillsPage({ searchParams }: SkillsPageProps) {
             organizationId,
             locale,
             currentPath: '/skills',
+            supabase,
             bypassLock: orgContext?.isSystemAdmin ?? false
         })
     }

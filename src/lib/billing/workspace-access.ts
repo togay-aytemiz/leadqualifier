@@ -65,9 +65,9 @@ export async function enforceWorkspaceAccessOrRedirect(options: {
     if (options.bypassLock) return
     if (isBillingOnlyPath(options.currentPath)) return
 
-    const snapshot = await getOrganizationBillingSnapshot(options.organizationId, {
+    const snapshot = await getOrganizationBillingSnapshot(options.organizationId, options.supabase ? {
         supabase: options.supabase
-    })
+    } : undefined)
     const access = resolveWorkspaceAccessState(snapshot)
     if (!access.isLocked) return
 

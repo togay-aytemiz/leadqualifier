@@ -53,6 +53,7 @@ export default async function CalendarWorkspacePage({ searchParams }: PageProps)
     organizationId,
     locale,
     currentPath: '/calendar',
+    supabase,
     bypassLock: orgContext.isSystemAdmin ?? false,
   })
 

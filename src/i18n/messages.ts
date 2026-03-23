@@ -29,6 +29,12 @@ export function pickMessageNamespaces(
     }, {})
 }
 
+import { cache } from 'react'
+
+const loadMessages = cache(async (locale: string) => {
+    return (await import(`../../messages/${locale}.json`)).default as LocaleMessages
+})
+
 export async function getScopedMessages(
     locale: string,
     namespaces?: readonly string[]
@@ -36,7 +42,8 @@ export async function getScopedMessages(
     const resolvedLocale = routing.locales.includes(locale as 'en' | 'tr')
         ? locale
         : routing.defaultLocale
-    const messages = (await import(`../../messages/${resolvedLocale}.json`)).default as LocaleMessages
+    
+    const messages = await loadMessages(resolvedLocale)
 
     if (!namespaces || namespaces.length === 0) {
         return messages
