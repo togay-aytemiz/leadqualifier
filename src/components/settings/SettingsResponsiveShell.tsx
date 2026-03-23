@@ -1,11 +1,16 @@
 'use client'
 
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Sidebar, SidebarGroup, SidebarItem } from '@/design'
 import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import {
+    dispatchDashboardRouteTransitionStart,
+    primeDashboardRoute,
+    shouldStartDashboardRouteTransition
+} from '@/design/dashboard-route-transition'
 import {
     HiOutlineBanknotes,
     HiOutlineBriefcase,
@@ -63,6 +68,7 @@ export function SettingsResponsiveShell({
     const activeItem = getSettingsNavItemFromPath(pathname)
     const tSidebar = useTranslations('Sidebar')
     const supabase = useMemo(() => createClient(), [])
+    const localePrefix = locale === 'tr' ? '' : `/${locale}`
     const hasDetail = Boolean(activeItem && children)
     const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const isClosingRef = useRef(false)
@@ -286,6 +292,20 @@ export function SettingsResponsiveShell({
         return () => clearTimeout(timeoutId)
     }, [prefetchRoutes, router])
 
+    const warmDashboardRoute = useCallback((href: string | undefined) => {
+        if (!href) return
+        primeDashboardRoute(router, href, localePrefix)
+    }, [localePrefix, router])
+
+    const handleDashboardNavClick = useCallback((
+        event: ReactMouseEvent<HTMLAnchorElement>,
+        href: string | undefined
+    ) => {
+        if (!href || !shouldStartDashboardRouteTransition(event)) return
+        warmDashboardRoute(href)
+        dispatchDashboardRouteTransitionStart(href)
+    }, [warmDashboardRoute])
+
     const mobileListPaneClasses = getSettingsMobileListPaneClasses(isMobileDetailOpen)
     const mobileDetailPaneClasses = getSettingsMobileDetailPaneClasses(isMobileDetailOpen)
 
@@ -308,6 +328,8 @@ export function SettingsResponsiveShell({
                                 indicator={item.indicator}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}
+                                onNavigateIntent={() => warmDashboardRoute(item.href)}
+                                onNavigateClick={(event) => handleDashboardNavClick(event, item.href)}
                             />
                         ))}
                     </SidebarGroup>
@@ -324,6 +346,8 @@ export function SettingsResponsiveShell({
                                 active={item.active}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}
+                                onNavigateIntent={() => warmDashboardRoute(item.href)}
+                                onNavigateClick={(event) => handleDashboardNavClick(event, item.href)}
                             />
                         ))}
                     </SidebarGroup>
@@ -340,6 +364,8 @@ export function SettingsResponsiveShell({
                                 active={item.active}
                                 disabled={item.locked}
                                 disabledLabel={tSidebar('lockedLabel')}
+                                onNavigateIntent={() => warmDashboardRoute(item.href)}
+                                onNavigateClick={(event) => handleDashboardNavClick(event, item.href)}
                             />
                         ))}
                     </SidebarGroup>

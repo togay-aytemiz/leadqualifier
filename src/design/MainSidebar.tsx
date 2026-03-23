@@ -1567,7 +1567,14 @@ export function MainSidebar({
                                         asChild
                                         className="mt-2 justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                     >
-                                        <Link href={settingsNavState.href ?? '/settings/ai'} prefetch={false}>
+                                        <Link
+                                            href={settingsNavState.href ?? '/settings/ai'}
+                                            prefetch={false}
+                                            onMouseEnter={() => warmDashboardHotRoute(settingsNavState.href ?? '/settings/ai')}
+                                            onFocus={() => warmDashboardHotRoute(settingsNavState.href ?? '/settings/ai')}
+                                            onTouchStart={() => warmDashboardHotRoute(settingsNavState.href ?? '/settings/ai')}
+                                            onClick={(event) => handleDashboardNavClick(event, settingsNavState.href ?? '/settings/ai')}
+                                        >
                                             {tSidebar('botStatusQuickSwitchOpenSettings')}
                                         </Link>
                                     </DropdownMenuItem>
@@ -1761,7 +1768,15 @@ export function MainSidebar({
             {billingSnapshot && !collapsed && canAccessTenantModules && (
                 <div className="px-3 pb-2">
                     <div className="rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
-                        <Link href="/settings/plans" prefetch={false} className="block px-3 pt-3">
+                        <Link
+                            href="/settings/plans"
+                            prefetch={false}
+                            className="block px-3 pt-3"
+                            onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
+                            onFocus={() => warmDashboardHotRoute('/settings/plans')}
+                            onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
+                            onClick={(event) => handleDashboardNavClick(event, '/settings/plans')}
+                        >
                             <div className="flex items-center justify-between gap-2">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                     {tSidebar('billingStatusLabel')}
@@ -1855,6 +1870,10 @@ export function MainSidebar({
                             prefetch={false}
                             aria-label={tSidebar('billingUsageMenuLabel')}
                             title={`${tSidebar('billingStatusLabel')}: ${formatCredits(billingDisplayCredits)} ${tSidebar('billingCreditsUnit')}`}
+                            onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
+                            onFocus={() => warmDashboardHotRoute('/settings/plans')}
+                            onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
+                            onClick={(event) => handleDashboardNavClick(event, '/settings/plans')}
                             className={cn(
                                 'mx-auto flex h-11 w-11 items-center justify-center rounded-xl border bg-white shadow-sm transition hover:border-slate-300',
                                 showLowCreditWarning ? 'border-amber-300 bg-amber-50' : 'border-slate-200'

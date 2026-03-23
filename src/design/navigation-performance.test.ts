@@ -16,7 +16,8 @@ describe('navigation performance source guards', () => {
         const settingsShellSource = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
 
         expect(sidebarSource).toContain('prefetch = false')
-        expect(sidebarSource).toContain('<Link href={href} prefetch={prefetch}')
+        expect(sidebarSource).toContain('prefetch={prefetch}')
+        expect(sidebarSource).toContain('onMouseEnter={onNavigateIntent}')
         expect(settingsShellSource).not.toMatch(/href=\{item\.href\}\s+prefetch\s+active=\{item\.active\}/)
         expect(mainSidebarSource).toContain("href={itemHref}\n                                            title={collapsed ? undefined : item.label}")
         expect(mobileBottomNavSource).toContain("href={item.href}\n                                className={cn(")

@@ -37,4 +37,12 @@ describe('SettingsResponsiveShell source', () => {
         expect(source).toContain('}, [billingOnlyMode, locale])')
         expect(source).toContain('}, [prefetchRoutes, router])')
     })
+
+    it('warms dashboard routes on navigation intent before click transitions', () => {
+        const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+        expect(source).toContain('primeDashboardRoute')
+        expect(source).toContain('dispatchDashboardRouteTransitionStart')
+        expect(source).toContain('onNavigateIntent={() => warmDashboardRoute(item.href)}')
+    })
 })

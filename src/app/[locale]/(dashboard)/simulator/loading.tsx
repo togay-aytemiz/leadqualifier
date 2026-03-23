@@ -1,6 +1,5 @@
-
-import { PageSkeleton } from '@/design'
+import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 
 export default function SimulatorLoading() {
-    return <PageSkeleton />
+    return <DashboardRouteSkeleton route="page" />
 }

@@ -1,12 +1,18 @@
 export const DASHBOARD_ROUTE_TRANSITION_START_EVENT = 'leadqualifier:dashboard-route-transition:start'
 
-const DASHBOARD_ROUTE_SKELETONS = {
-    '/inbox': 'inbox',
-    '/leads': 'leads'
-} as const
+const DASHBOARD_ROUTE_FAMILIES = [
+    { prefix: '/inbox', skeleton: 'inbox' },
+    { prefix: '/calendar', skeleton: 'page' },
+    { prefix: '/leads', skeleton: 'leads' },
+    { prefix: '/simulator', skeleton: 'page' },
+    { prefix: '/skills', skeleton: 'page' },
+    { prefix: '/knowledge', skeleton: 'knowledge' },
+    { prefix: '/settings', skeleton: 'page' },
+    { prefix: '/admin', skeleton: 'admin' }
+] as const
 
 export type DashboardRouteSkeletonKey =
-    (typeof DASHBOARD_ROUTE_SKELETONS)[keyof typeof DASHBOARD_ROUTE_SKELETONS]
+    (typeof DASHBOARD_ROUTE_FAMILIES)[number]['skeleton']
 
 interface DashboardRouteTransitionStartDetail {
     href: string
@@ -53,16 +59,22 @@ export function normalizeDashboardRoutePath(value: string) {
     return withoutLocale
 }
 
-export function shouldPrimeDashboardRoute(value: string) {
+function resolveDashboardRouteFamily(value: string) {
     const normalizedPath = normalizeDashboardRoutePath(value)
-    return normalizedPath in DASHBOARD_ROUTE_SKELETONS
+
+    return DASHBOARD_ROUTE_FAMILIES.find(({ prefix }) => (
+        normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+    )) ?? null
+}
+
+export function shouldPrimeDashboardRoute(value: string) {
+    return Boolean(resolveDashboardRouteFamily(value))
 }
 
 export function resolveDashboardRouteSkeleton(value: string | null | undefined) {
     if (!value) return null
 
-    const normalizedPath = normalizeDashboardRoutePath(value)
-    return DASHBOARD_ROUTE_SKELETONS[normalizedPath as keyof typeof DASHBOARD_ROUTE_SKELETONS] ?? null
+    return resolveDashboardRouteFamily(value)?.skeleton ?? null
 }
 
 export function primeDashboardRoute(

@@ -391,7 +391,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                             <Link
                                 href="/settings/plans"
                                 prefetch={false}
-                                onClick={() => setIsOtherOpen(false)}
+                                onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
+                                onFocus={() => warmDashboardHotRoute('/settings/plans')}
+                                onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
+                                onClick={(event) => {
+                                    handleDashboardNavClick(event, '/settings/plans')
+                                    setIsOtherOpen(false)
+                                }}
                                 className="mb-1 block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
                             >
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -447,7 +453,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                 <Link
                                     href={skillsMenuNavState.href ?? '/skills'}
                                     prefetch={false}
-                                    onClick={() => setIsOtherOpen(false)}
+                                    onMouseEnter={() => warmDashboardHotRoute(skillsMenuNavState.href ?? '/skills')}
+                                    onFocus={() => warmDashboardHotRoute(skillsMenuNavState.href ?? '/skills')}
+                                    onTouchStart={() => warmDashboardHotRoute(skillsMenuNavState.href ?? '/skills')}
+                                    onClick={(event) => {
+                                        handleDashboardNavClick(event, skillsMenuNavState.href ?? '/skills')
+                                        setIsOtherOpen(false)
+                                    }}
                                     className={cn(
                                         'mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
                                         pathname?.includes('/skills')
@@ -477,7 +489,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                 <Link
                                     href={knowledgeMenuNavState.href ?? '/knowledge'}
                                     prefetch={false}
-                                    onClick={() => setIsOtherOpen(false)}
+                                    onMouseEnter={() => warmDashboardHotRoute(knowledgeMenuNavState.href ?? '/knowledge')}
+                                    onFocus={() => warmDashboardHotRoute(knowledgeMenuNavState.href ?? '/knowledge')}
+                                    onTouchStart={() => warmDashboardHotRoute(knowledgeMenuNavState.href ?? '/knowledge')}
+                                    onClick={(event) => {
+                                        handleDashboardNavClick(event, knowledgeMenuNavState.href ?? '/knowledge')
+                                        setIsOtherOpen(false)
+                                    }}
                                     className={cn(
                                         'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
                                         pathname?.includes('/knowledge')
@@ -508,7 +526,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                 <Link
                                     href={simulatorMenuNavState.href ?? '/simulator'}
                                     prefetch={false}
-                                    onClick={() => setIsOtherOpen(false)}
+                                    onMouseEnter={() => warmDashboardHotRoute(simulatorMenuNavState.href ?? '/simulator')}
+                                    onFocus={() => warmDashboardHotRoute(simulatorMenuNavState.href ?? '/simulator')}
+                                    onTouchStart={() => warmDashboardHotRoute(simulatorMenuNavState.href ?? '/simulator')}
+                                    onClick={(event) => {
+                                        handleDashboardNavClick(event, simulatorMenuNavState.href ?? '/simulator')
+                                        setIsOtherOpen(false)
+                                    }}
                                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                                 >
                                     <Puzzle size={16} />
@@ -517,7 +541,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                             )}
                             <Link
                                 href={settingsMenuNavState.href ?? '/settings'}
-                                onClick={() => setIsOtherOpen(false)}
+                                onMouseEnter={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
+                                onFocus={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
+                                onTouchStart={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
+                                onClick={(event) => {
+                                    handleDashboardNavClick(event, settingsMenuNavState.href ?? '/settings')
+                                    setIsOtherOpen(false)
+                                }}
                                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                             >
                                 <Settings size={16} />

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { routing } from '@/i18n/routing'
+import { ChunkLoadRecovery } from '@/components/common/ChunkLoadRecovery'
 import '../globals.css'
 
 export const metadata: Metadata = {
@@ -27,7 +28,10 @@ export default async function LocaleLayout({ children, params }: Props) {
 
     return (
         <html lang={locale}>
-            <body className="font-sans antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>{children}</body>
+            <body className="font-sans antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>
+                <ChunkLoadRecovery />
+                {children}
+            </body>
         </html>
     )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { ReactNode } from 'react'
+import { ReactNode, type MouseEvent as ReactMouseEvent } from 'react'
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 
@@ -72,6 +72,8 @@ interface SidebarItemProps {
     disabled?: boolean
     disabledLabel?: string
     prefetch?: boolean
+    onNavigateIntent?: () => void
+    onNavigateClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void
 }
 
 export function SidebarItem({
@@ -86,7 +88,9 @@ export function SidebarItem({
     avatar,
     disabled = false,
     disabledLabel,
-    prefetch = false
+    prefetch = false,
+    onNavigateIntent,
+    onNavigateClick
 }: SidebarItemProps) {
     const resolvedLabel = disabled && disabledLabel
         ? `${label} (${disabledLabel})`
@@ -130,7 +134,16 @@ export function SidebarItem({
 
     if (href && !disabled) {
         return (
-            <Link href={href} prefetch={prefetch} title={resolvedLabel} aria-label={resolvedLabel}>
+            <Link
+                href={href}
+                prefetch={prefetch}
+                title={resolvedLabel}
+                aria-label={resolvedLabel}
+                onMouseEnter={onNavigateIntent}
+                onFocus={onNavigateIntent}
+                onTouchStart={onNavigateIntent}
+                onClick={onNavigateClick}
+            >
                 {content}
             </Link>
         )
