@@ -1037,14 +1037,10 @@ export async function getConversations(
 
 export async function getMessages(conversationId: string) {
   const supabase = await createClient()
-  const { data: conversation } = await supabase
-    .from('conversations')
-    .select('organization_id')
-    .eq('id', conversationId)
-    .maybeSingle()
+  const organizationId = await resolveConversationOrganizationId(supabase, conversationId)
 
-  if (!conversation) return []
-  if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+  if (!organizationId) return []
+  if (await isOrganizationWorkspaceLocked(organizationId, supabase)) {
     return []
   }
 
@@ -1074,23 +1070,24 @@ export interface ConversationMessagesPageResult {
 export async function getMessagesPage(
   conversationId: string,
   offset: number = 0,
-  pageSize: number = DEFAULT_MESSAGES_PAGE_SIZE
+  pageSize: number = DEFAULT_MESSAGES_PAGE_SIZE,
+  organizationIdOverride?: string | null
 ): Promise<ConversationMessagesPageResult> {
   const supabase = await createClient()
-  const { data: conversation } = await supabase
-    .from('conversations')
-    .select('organization_id')
-    .eq('id', conversationId)
-    .maybeSingle()
+  const organizationId = await resolveConversationOrganizationId(
+    supabase,
+    conversationId,
+    organizationIdOverride
+  )
 
-  if (!conversation) {
+  if (!organizationId) {
     return {
       messages: [],
       hasMore: false,
       fetchedCount: 0,
     }
   }
-  if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+  if (await isOrganizationWorkspaceLocked(organizationId, supabase)) {
     return {
       messages: [],
       hasMore: false,
@@ -1133,16 +1130,19 @@ export async function getMessagesPage(
   }
 }
 
-export async function getConversationLead(conversationId: string): Promise<Lead | null> {
+export async function getConversationLead(
+  conversationId: string,
+  organizationIdOverride?: string | null
+): Promise<Lead | null> {
   const supabase = await createClient()
-  const { data: conversation } = await supabase
-    .from('conversations')
-    .select('organization_id')
-    .eq('id', conversationId)
-    .maybeSingle()
+  const organizationId = await resolveConversationOrganizationId(
+    supabase,
+    conversationId,
+    organizationIdOverride
+  )
 
-  if (!conversation) return null
-  if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
+  if (!organizationId) return null
+  if (await isOrganizationWorkspaceLocked(organizationId, supabase)) {
     return null
   }
 
@@ -1158,6 +1158,27 @@ export async function getConversationLead(conversationId: string): Promise<Lead 
   }
 
   return (data as Lead) ?? null
+}
+
+async function resolveConversationOrganizationId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationId: string,
+  organizationIdOverride?: string | null
+) {
+  const normalizedOrganizationId =
+    typeof organizationIdOverride === 'string' ? organizationIdOverride.trim() : ''
+
+  if (normalizedOrganizationId) {
+    return normalizedOrganizationId
+  }
+
+  const { data: conversation } = await supabase
+    .from('conversations')
+    .select('organization_id')
+    .eq('id', conversationId)
+    .maybeSingle()
+
+  return typeof conversation?.organization_id === 'string' ? conversation.organization_id : null
 }
 
 const SUMMARY_USER_LIMIT = 3

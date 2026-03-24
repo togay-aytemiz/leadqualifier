@@ -24,6 +24,7 @@ type QueryBuilderConfig = {
     singleResult?: QueryResult
     maybeSingleResult?: QueryResult
     orderResult?: QueryResult
+    limitResult?: QueryResult
     eqResult?: QueryResult
 }
 
@@ -45,6 +46,7 @@ function createQueryBuilder(config: QueryBuilderConfig = {}) {
         }
         return builder
     })
+    builder.limit = vi.fn(() => Promise.resolve(config.limitResult ?? { data: null, error: null }))
 
     return builder
 }
@@ -80,6 +82,53 @@ describe('resolveActiveOrganizationContext', () => {
     beforeEach(() => {
         createClientMock.mockReset()
         cookiesMock.mockReset()
+    })
+
+    it('defaults non-admin resolution to the active organization only', async () => {
+        const profileBuilder = createQueryBuilder({
+            singleResult: {
+                data: {
+                    is_system_admin: false,
+                    full_name: 'Test User',
+                    email: 'user@example.com',
+                    avatar_url: null
+                },
+                error: null
+            }
+        })
+        const organizationBuilder = createQueryBuilder({
+            maybeSingleResult: {
+                data: {
+                    id: 'org-cookie',
+                    name: 'Cookie Org',
+                    slug: 'cookie-org'
+                },
+                error: null
+            }
+        })
+        const supabaseMock = createSupabaseMock({
+            profiles: [profileBuilder],
+            organizations: [organizationBuilder]
+        })
+
+        cookiesMock.mockResolvedValue({
+            get: vi.fn(() => ({ value: 'org-cookie' }))
+        })
+
+        const context = await resolveActiveOrganizationContext(supabaseMock as never)
+
+        expect(context).not.toBeNull()
+        expect(context?.source).toBe('cookie')
+        expect(context?.activeOrganizationId).toBe('org-cookie')
+        expect(context?.accessibleOrganizations).toEqual([
+            {
+                id: 'org-cookie',
+                name: 'Cookie Org',
+                slug: 'cookie-org'
+            }
+        ])
+        expect((organizationBuilder.eq as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('id', 'org-cookie')
+        expect(supabaseMock.from).not.toHaveBeenCalledWith('organization_members')
     })
 
     it('avoids loading full organization list when slim mode is used for system admin', async () => {
@@ -247,7 +296,7 @@ describe('resolveActiveOrganizationContext', () => {
             }
         })
         const membershipBuilder = createQueryBuilder({
-            eqResult: {
+            limitResult: {
                 data: [{
                     organization_id: 'org-1',
                     organizations: {

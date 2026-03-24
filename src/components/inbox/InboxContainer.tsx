@@ -762,31 +762,43 @@ export function InboxContainer({
         while (refreshRequestRef.current) {
           const nextId = refreshRequestRef.current
           refreshRequestRef.current = null
-          const pageResult = await getMessagesPage(nextId, 0, MESSAGES_PAGE_SIZE)
+          const [pageResult, nextLead] = await Promise.all([
+            getMessagesPage(nextId, 0, MESSAGES_PAGE_SIZE, organizationId),
+            getConversationLead(nextId, organizationId),
+          ])
           if (selectedIdRef.current !== nextId) continue
           pendingPrependScrollRestoreRef.current = null
           isLoadingMessageHistoryRef.current = false
-          await hydrateSenderProfiles(pageResult.messages)
           const nextPreviewMessages = buildConversationPreviewMessages(pageResult.messages)
           setMessages(pageResult.messages)
+          setLead(nextLead)
           setMessageOffset(pageResult.fetchedCount)
           setHasMoreMessageHistory(pageResult.hasMore)
           setIsLoadingMessageHistory(false)
           setLoadedConversationId(nextId)
           setConversations((prev) =>
-            prev.map((c) =>
-              c.id === nextId
-                ? {
-                    ...c,
-                    unread_count: 0,
-                    messages: nextPreviewMessages.length > 0 ? nextPreviewMessages : c.messages,
-                  }
-                : c
+            applyLeadStatusToConversationList(
+              prev.map((c) =>
+                c.id === nextId
+                  ? {
+                      ...c,
+                      unread_count: 0,
+                      messages: nextPreviewMessages.length > 0 ? nextPreviewMessages : c.messages,
+                    }
+                  : c
+              ),
+              nextId,
+              nextLead?.status ?? null
             )
           )
-          await markConversationRead(nextId)
-          dispatchInboxUnreadUpdated({ organizationId })
-          await refreshLead(nextId)
+          void hydrateSenderProfiles(pageResult.messages)
+          void markConversationRead(nextId)
+            .then(() => {
+              dispatchInboxUnreadUpdated({ organizationId })
+            })
+            .catch((error) => {
+              console.error('Failed to mark conversation as read', error)
+            })
         }
       } catch (error) {
         console.error('Failed to refresh messages', error)
@@ -798,7 +810,7 @@ export function InboxContainer({
         refreshInFlightRef.current = false
       }
     },
-    [hydrateSenderProfiles, organizationId, refreshLead]
+    [hydrateSenderProfiles, organizationId]
   )
 
   const refreshConversationPreview = useCallback(async (conversationId: string) => {

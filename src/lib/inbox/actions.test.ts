@@ -64,7 +64,9 @@ vi.mock('@/lib/instagram/client', () => ({
 
 import {
   clearConversationRequiredIntakeOverride,
+  getConversationLead,
   getConversations,
+  getMessagesPage,
   createConversationPredefinedTemplate,
   deleteConversationPredefinedTemplate,
   listConversationWhatsAppTemplates,
@@ -89,6 +91,7 @@ type QueryResult<T = unknown> = {
 }
 
 type QueryBuilderConfig = {
+  maybeSingleResult?: QueryResult
   rangeResult?: QueryResult
   orderResult?: QueryResult
   inResult?: QueryResult
@@ -100,6 +103,9 @@ function createQueryBuilder(config: QueryBuilderConfig = {}) {
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
+  builder.maybeSingle = vi.fn(() =>
+    Promise.resolve(config.maybeSingleResult ?? { data: null, error: null })
+  )
   builder.order = vi.fn(() => {
     if (config.orderResult) {
       return Promise.resolve(config.orderResult)
@@ -790,6 +796,79 @@ describe('getConversations', () => {
   })
 })
 
+describe('conversation detail fetches', () => {
+  beforeEach(() => {
+    createClientMock.mockReset()
+  })
+
+  it('loads the first message page without querying conversations again when organizationId is provided', async () => {
+    const messagesBuilder = createQueryBuilder({
+      rangeResult: {
+        data: [
+          {
+            id: 'msg-2',
+            conversation_id: 'conv-1',
+            sender_type: 'contact',
+            content: 'Ikinci mesaj',
+            metadata: {},
+            created_at: '2026-03-20T10:01:00.000Z',
+          },
+          {
+            id: 'msg-1',
+            conversation_id: 'conv-1',
+            sender_type: 'contact',
+            content: 'Ilk mesaj',
+            metadata: {},
+            created_at: '2026-03-20T10:00:00.000Z',
+          },
+        ],
+        error: null,
+      },
+    })
+    const supabaseMock = createSupabaseMock({
+      messages: [messagesBuilder],
+    })
+
+    createClientMock.mockResolvedValue(supabaseMock)
+
+    const result = await getMessagesPage('conv-1', 0, 50, 'org-1')
+
+    expect(result.fetchedCount).toBe(2)
+    expect(result.hasMore).toBe(false)
+    expect(result.messages.map((message) => message.id)).toEqual(['msg-1', 'msg-2'])
+    expect((messagesBuilder.eq as ReturnType<typeof vi.fn>)).toHaveBeenNthCalledWith(
+      1,
+      'conversation_id',
+      'conv-1'
+    )
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('conversations')
+  })
+
+  it('loads lead details without querying conversations again when organizationId is provided', async () => {
+    const leadBuilder = createQueryBuilder({
+      maybeSingleResult: {
+        data: createLead(),
+        error: null,
+      },
+    })
+    const supabaseMock = createSupabaseMock({
+      leads: [leadBuilder],
+    })
+
+    createClientMock.mockResolvedValue(supabaseMock)
+
+    const result = await getConversationLead('conv-1', 'org-1')
+
+    expect(result?.id).toBe('lead-1')
+    expect((leadBuilder.eq as ReturnType<typeof vi.fn>)).toHaveBeenNthCalledWith(
+      1,
+      'conversation_id',
+      'conv-1'
+    )
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('conversations')
+  })
+})
+
 function createConversationUpdateBuilder() {
   const eqMock = vi.fn(async () => ({ error: null }))
   const updateMock = vi.fn(() => ({ eq: eqMock }))
@@ -919,8 +998,9 @@ describe('sendMessage durability', () => {
   })
 
   it('queues a pending WhatsApp operator message before provider send and finalizes it as sent', async () => {
+    const latestInboundAt = new Date(Date.now() - 60_000).toISOString()
     const { supabase, rpcMock, messageUpdateBuilder } = createSendMessageSupabaseMock({
-      latestInboundAt: '2026-03-17T10:00:00.000Z',
+      latestInboundAt,
     })
     createClientMock.mockResolvedValueOnce(supabase)
 
@@ -951,8 +1031,9 @@ describe('sendMessage durability', () => {
   })
 
   it('marks the queued WhatsApp operator message as failed when provider send fails', async () => {
+    const latestInboundAt = new Date(Date.now() - 60_000).toISOString()
     const { supabase, rpcMock, messageUpdateBuilder } = createSendMessageSupabaseMock({
-      latestInboundAt: '2026-03-17T10:00:00.000Z',
+      latestInboundAt,
     })
     createClientMock.mockResolvedValueOnce(supabase)
     whatsAppSendTextMock.mockRejectedValueOnce(new Error('provider unavailable'))

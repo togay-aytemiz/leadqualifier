@@ -152,6 +152,25 @@ async function getOrganizationsFromMemberships(
     return buildOrganizationsFromMemberships((memberships ?? []) as MembershipWithOrganization[])
 }
 
+async function getFirstOrganizationFromMemberships(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    userId: string
+): Promise<ActiveOrganizationSummary | null> {
+    const { data: memberships, error } = await supabase
+        .from('organization_members')
+        .select('organization_id, organizations(id, name, slug)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+    if (error) {
+        console.warn('Failed to resolve first organization from memberships fallback:', error)
+        return null
+    }
+
+    return buildOrganizationsFromMemberships((memberships ?? []) as MembershipWithOrganization[])[0] ?? null
+}
+
 async function getOrganizationById(
     supabase: Awaited<ReturnType<typeof createClient>>,
     organizationId: string
@@ -260,17 +279,22 @@ async function resolveActiveOrganizationContextWithSupabase(
     if (!userContext) return null
     const cookieStore = await cookies()
     const cookieOrganizationId = cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null
-    const includeAccessibleOrganizations = options?.includeAccessibleOrganizations ?? !userContext.isSystemAdmin
+    const includeAccessibleOrganizations = options?.includeAccessibleOrganizations ?? false
 
-    if (userContext.isSystemAdmin && !includeAccessibleOrganizations) {
+    if (!includeAccessibleOrganizations) {
         const cookieOrganization = cookieOrganizationId
             ? await getOrganizationById(supabase, cookieOrganizationId)
             : null
 
         let fallbackOrganization: ActiveOrganizationSummary | null = null
         if (!cookieOrganization) {
-            fallbackOrganization = await getFirstOrganization(supabase)
-            if (!fallbackOrganization) {
+            if (userContext.isSystemAdmin) {
+                fallbackOrganization = await getFirstOrganization(supabase)
+            } else {
+                fallbackOrganization = await getFirstOrganizationFromMemberships(supabase, userContext.userId)
+            }
+
+            if (!fallbackOrganization && userContext.isSystemAdmin) {
                 const fallbackOrganizations = filterExcludedSystemAdminOrganizations(
                     await getOrganizationsFromMemberships(supabase, userContext.userId)
                 )
