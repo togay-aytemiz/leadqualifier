@@ -3,7 +3,8 @@ import {
     collectOptimisticPreviewUrls,
     extractMediaFromMessageMetadata,
     resolveVisibleMessageContent,
-    resolveMessagePreviewContent
+    resolveMessagePreviewContent,
+    shouldAttemptInlineImagePreview
 } from './messageMedia'
 
 describe('extractMediaFromMessageMetadata', () => {
@@ -67,9 +68,65 @@ describe('extractMediaFromMessageMetadata', () => {
         })
     })
 
+    it('keeps instagram shared preview metadata when webhook persisted a preview url', () => {
+        const media = extractMediaFromMessageMetadata({
+            instagram_media: {
+                type: 'unknown',
+                original_type: 'share',
+                preview_kind: 'image',
+                storage_url: 'https://cdn.example.com/shared-post.jpg',
+                mime_type: null,
+                caption: 'Bu ilan için bilgi alabilir miyim?',
+                download_status: 'remote'
+            }
+        })
+
+        expect(media).toEqual({
+            type: 'unknown',
+            url: 'https://cdn.example.com/shared-post.jpg',
+            fileName: null,
+            mimeType: null,
+            caption: 'Bu ilan için bilgi alabilir miyim?',
+            isPlaceholder: false,
+            downloadStatus: 'remote',
+            originalType: 'share',
+            previewKind: 'image'
+        })
+    })
+
     it('returns null when no whatsapp media metadata exists', () => {
         expect(extractMediaFromMessageMetadata({})).toBeNull()
         expect(extractMediaFromMessageMetadata(null)).toBeNull()
+    })
+})
+
+describe('shouldAttemptInlineImagePreview', () => {
+    it('allows inline preview for instagram shared media flagged as image preview', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'unknown',
+            url: 'https://cdn.example.com/shared-post.jpg',
+            fileName: null,
+            mimeType: null,
+            caption: null,
+            isPlaceholder: false,
+            downloadStatus: 'remote',
+            previewKind: 'image',
+            originalType: 'share'
+        })).toBe(true)
+    })
+
+    it('does not allow inline preview for link-only external instagram media', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'unknown',
+            url: 'https://www.instagram.com/p/example/',
+            fileName: null,
+            mimeType: null,
+            caption: null,
+            isPlaceholder: false,
+            downloadStatus: 'remote',
+            previewKind: 'link',
+            originalType: 'share'
+        })).toBe(false)
     })
 })
 

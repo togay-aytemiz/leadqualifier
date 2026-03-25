@@ -23,7 +23,9 @@ export interface InstagramInboundEvent {
     direction: 'inbound' | 'outbound'
     skipAutomation: boolean
     media?: {
-        type: 'image'
+        type: 'image' | 'unknown'
+        originalType?: string | null
+        previewKind?: 'image' | 'link'
         url: string | null
         mimeType: string | null
         caption: string | null
@@ -52,23 +54,97 @@ function asString(value: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
-function extractInstagramImageAttachment(attachments: unknown[]) {
+function isHttpUrl(value: unknown) {
+    const normalized = asString(value)
+    if (!normalized) return null
+    if (!/^https?:\/\//i.test(normalized)) return null
+    return normalized
+}
+
+function looksLikeImageUrl(url: string) {
+    const normalized = url.toLowerCase()
+    return /\.(avif|gif|jpe?g|png|webp)(?:[?#].*)?$/.test(normalized)
+        || normalized.includes('cdninstagram.com/')
+        || normalized.includes('scontent-')
+}
+
+function resolveInstagramPreviewKind(params: {
+    originalType: string | null
+    url: string | null
+    mimeType: string | null
+}) {
+    if (params.mimeType?.startsWith('image/')) return 'image' as const
+
+    const normalizedType = params.originalType?.trim().toLowerCase() ?? null
+    if (normalizedType === 'image') return 'image' as const
+    if (normalizedType === 'reply_to_story') return 'image' as const
+    if (normalizedType === 'ig_story') return 'image' as const
+    if (normalizedType === 'story_mention') return 'image' as const
+    if (params.url && looksLikeImageUrl(params.url)) return 'image' as const
+
+    return 'link' as const
+}
+
+function buildInstagramAttachmentMedia(params: {
+    originalType: string | null
+    url: string | null
+    mimeType: string | null
+}) {
+    if (!params.url) return null
+    const previewKind = resolveInstagramPreviewKind(params)
+    const includeExtendedPreviewMetadata = params.originalType !== 'image'
+
+    return {
+        type: params.originalType === 'image' ? 'image' as const : 'unknown' as const,
+        url: params.url,
+        mimeType: params.mimeType,
+        ...(includeExtendedPreviewMetadata
+            ? {
+                originalType: params.originalType,
+                previewKind
+            }
+            : {})
+    }
+}
+
+function extractInstagramAttachmentMedia(attachments: unknown[]) {
     for (const attachment of attachments) {
         if (!isRecord(attachment)) continue
-        if (asString(attachment.type) !== 'image') continue
 
+        const originalType = asString(attachment.type)
         const payload = isRecord(attachment.payload) ? attachment.payload : null
-        const url = payload ? asString(payload.url) : null
+        const url = payload
+            ? isHttpUrl(payload.url) || isHttpUrl(payload.file_url)
+            : null
         const mimeType = payload ? asString(payload.mime_type) : null
-
-        return {
-            type: 'image' as const,
+        const media = buildInstagramAttachmentMedia({
+            originalType,
             url,
             mimeType
-        }
+        })
+
+        if (media) return media
     }
 
     return null
+}
+
+function extractInstagramReplyToStoryMedia(message: Record<string, unknown>) {
+    const replyTo = isRecord(message.reply_to) ? message.reply_to : null
+    const story = replyTo && isRecord(replyTo.story) ? replyTo.story : null
+    const url = story ? isHttpUrl(story.url) : null
+
+    return buildInstagramAttachmentMedia({
+        originalType: 'reply_to_story',
+        url,
+        mimeType: null
+    })
+}
+
+function buildInstagramAttachmentLabel(attachmentTypes: string[]) {
+    const normalizedTypes = attachmentTypes.filter(Boolean)
+    if (normalizedTypes.length === 0) return '[Instagram attachment]'
+    return `[Instagram attachment: ${normalizedTypes.join(', ')}]`
 }
 
 function buildSyntheticMessageId(params: {
@@ -124,23 +200,29 @@ function extractInboundEventsFromItems(
             })
             const text = asString(message.text)
             const attachments = Array.isArray(message.attachments) ? message.attachments : []
-            const imageAttachment = extractInstagramImageAttachment(attachments)
+            const attachmentMedia = extractInstagramAttachmentMedia(attachments)
+                || extractInstagramReplyToStoryMedia(message)
 
-            if (imageAttachment) {
+            if (attachmentMedia) {
                 const caption = text
+                const fallbackText = attachmentMedia.type === 'image'
+                    ? '[Instagram image]'
+                    : buildInstagramAttachmentLabel([
+                        attachmentMedia.originalType ?? attachmentMedia.type
+                    ])
                 events.push({
                     instagramBusinessAccountId: entryId,
                     contactId,
                     contactName,
                     messageId,
-                    text: caption || '[Instagram image]',
+                    text: caption || fallbackText,
                     timestamp,
                     eventSource,
                     eventType: 'attachment',
                     direction,
                     skipAutomation: direction === 'outbound' || !caption,
                     media: {
-                        ...imageAttachment,
+                        ...attachmentMedia,
                         caption
                     }
                 })
@@ -170,9 +252,7 @@ function extractInboundEventsFromItems(
                         return asString(attachment.type)
                     })
                     .filter((value): value is string => Boolean(value))
-                const attachmentLabel = attachmentTypes.length > 0
-                    ? `[Instagram attachment: ${attachmentTypes.join(', ')}]`
-                    : '[Instagram attachment]'
+                const attachmentLabel = buildInstagramAttachmentLabel(attachmentTypes)
 
                 events.push({
                     instagramBusinessAccountId: entryId,

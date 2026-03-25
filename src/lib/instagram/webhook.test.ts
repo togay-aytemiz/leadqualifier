@@ -311,6 +311,103 @@ describe('instagram webhook utilities', () => {
         }])
     })
 
+    it('extracts previewable share attachments when webhook includes a shared url', () => {
+        const payload = {
+            object: 'instagram',
+            entry: [{
+                id: 'ig-business-1',
+                messaging: [{
+                    sender: { id: 'ig-user-share' },
+                    recipient: { id: 'ig-business-1' },
+                    timestamp: 1738000021,
+                    message: {
+                        mid: 'igmid-share-1',
+                        text: 'Bunun fiyatı nedir?',
+                        attachments: [{
+                            type: 'share',
+                            payload: {
+                                url: 'https://cdn.example.com/shared-post.jpg'
+                            }
+                        }, {
+                            type: 'ig_post'
+                        }]
+                    }
+                }]
+            }]
+        }
+
+        const events = extractInstagramInboundEvents(payload)
+
+        expect(events).toEqual([{
+            instagramBusinessAccountId: 'ig-business-1',
+            contactId: 'ig-user-share',
+            contactName: null,
+            messageId: 'igmid-share-1',
+            text: 'Bunun fiyatı nedir?',
+            timestamp: '1738000021',
+            eventSource: 'messaging',
+            eventType: 'attachment',
+            direction: 'inbound',
+            skipAutomation: false,
+            media: {
+                type: 'unknown',
+                originalType: 'share',
+                previewKind: 'image',
+                url: 'https://cdn.example.com/shared-post.jpg',
+                mimeType: null,
+                caption: 'Bunun fiyatı nedir?'
+            }
+        }])
+    })
+
+    it('extracts reply-to story preview urls from instagram story replies', () => {
+        const payload = {
+            object: 'instagram',
+            entry: [{
+                id: 'ig-business-1',
+                messaging: [{
+                    sender: { id: 'ig-user-story' },
+                    recipient: { id: 'ig-business-1' },
+                    timestamp: 1738000022,
+                    message: {
+                        mid: 'igmid-story-reply-1',
+                        text: 'Bununla ilgili detay alabilir miyim?',
+                        reply_to: {
+                            story: {
+                                id: 'story-1',
+                                url: 'https://cdn.example.com/story-preview.jpg'
+                            }
+                        },
+                        is_unsupported: true
+                    }
+                }]
+            }]
+        }
+
+        const events = extractInstagramInboundEvents(payload)
+
+        expect(events).toEqual([{
+            instagramBusinessAccountId: 'ig-business-1',
+            contactId: 'ig-user-story',
+            contactName: null,
+            messageId: 'igmid-story-reply-1',
+            text: 'Bununla ilgili detay alabilir miyim?',
+            timestamp: '1738000022',
+            eventSource: 'messaging',
+            eventType: 'attachment',
+            direction: 'inbound',
+            skipAutomation: false,
+            media: {
+                type: 'unknown',
+                originalType: 'reply_to_story',
+                previewKind: 'image',
+                url: 'https://cdn.example.com/story-preview.jpg',
+                mimeType: null,
+                caption: 'Bununla ilgili detay alabilir miyim?'
+            }
+        }])
+    })
+
     it('extracts inbound text events from entry.changes messages field', () => {
         const payload = {
             object: 'instagram',

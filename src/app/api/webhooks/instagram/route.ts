@@ -654,9 +654,13 @@ export async function POST(req: NextRequest) {
             ...(event.media
                 ? {
                     instagram_media_type: event.media.type,
+                    instagram_media_original_type: event.media.originalType,
+                    instagram_media_preview_kind: event.media.previewKind ?? null,
                     instagram_is_media_placeholder: !readTrimmedString(event.media.caption),
                     instagram_media: {
                         type: event.media.type,
+                        original_type: event.media.originalType,
+                        preview_kind: event.media.previewKind ?? null,
                         mime_type: event.media.mimeType,
                         caption: event.media.caption,
                         filename: null,

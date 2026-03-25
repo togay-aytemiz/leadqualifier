@@ -97,6 +97,7 @@ import {
   resolveMediaPreviewLabel as resolveDirectionalMediaPreviewLabel,
   resolveMessagePreviewContent,
   resolveVisibleMessageContent,
+  shouldAttemptInlineImagePreview,
 } from '@/components/inbox/messageMedia'
 import { buildInboxImageGalleryLookup } from '@/components/inbox/message-image-groups'
 import { resolveConversationSecondaryIdentifier } from '@/components/inbox/conversationIdentity'
@@ -153,6 +154,13 @@ import { LeadServiceEditor } from '@/components/inbox/LeadServiceEditor'
 import { InboxDetailsSection } from '@/components/inbox/InboxDetailsSection'
 import { InboxComposerActionBar } from '@/components/inbox/InboxComposerActionBar'
 import { LeadRequiredInfoBlock } from '@/components/inbox/LeadRequiredInfoBlock'
+import { InboxListFilterMenu } from '@/components/inbox/InboxListFilterMenu'
+import {
+  applyInboxListFilters,
+  hasActiveInboxListFilters,
+  type InboxLeadTemperatureFilter,
+  type InboxUnreadFilter,
+} from '@/components/inbox/conversationListFilters'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -347,6 +355,9 @@ export function InboxContainer({
   const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
   const [aiPauseError, setAiPauseError] = useState(false)
   const [activeQueueTab, setActiveQueueTab] = useState<InboxQueueTab>('all')
+  const [unreadFilter, setUnreadFilter] = useState<InboxUnreadFilter>('all')
+  const [leadTemperatureFilter, setLeadTemperatureFilter] =
+    useState<InboxLeadTemperatureFilter>('all')
   const [inboxBotMode, setInboxBotMode] = useState<AiBotMode>(botMode ?? 'active')
   const [isMobileBotModeSheetOpen, setIsMobileBotModeSheetOpen] = useState(false)
   const [isMobileBotModeSheetMounted, setIsMobileBotModeSheetMounted] = useState(false)
@@ -722,6 +733,25 @@ export function InboxContainer({
     []
   )
 
+  const commitConversationRead = useCallback(
+    (conversationId: string | null) => {
+      if (!conversationId) return
+
+      const currentConversation = conversations.find((conversation) => conversation.id === conversationId)
+      if (!currentConversation || currentConversation.unread_count <= 0) return
+
+      updateConversationDetailsLocally(conversationId, { unread_count: 0 })
+      void markConversationRead(conversationId)
+        .then(() => {
+          dispatchInboxUnreadUpdated({ organizationId })
+        })
+        .catch((error) => {
+          console.error('Failed to mark conversation as read', error)
+        })
+    },
+    [conversations, organizationId, updateConversationDetailsLocally]
+  )
+
   const scheduleLeadAutoRefresh = useCallback(
     (conversationId: string) => {
       if (!conversationId) return
@@ -782,7 +812,6 @@ export function InboxContainer({
                 c.id === nextId
                   ? {
                       ...c,
-                      unread_count: 0,
                       messages: nextPreviewMessages.length > 0 ? nextPreviewMessages : c.messages,
                     }
                   : c
@@ -792,13 +821,6 @@ export function InboxContainer({
             )
           )
           void hydrateSenderProfiles(pageResult.messages)
-          void markConversationRead(nextId)
-            .then(() => {
-              dispatchInboxUnreadUpdated({ organizationId })
-            })
-            .catch((error) => {
-              console.error('Failed to mark conversation as read', error)
-            })
         }
       } catch (error) {
         console.error('Failed to refresh messages', error)
@@ -2267,6 +2289,10 @@ export function InboxContainer({
       setIsMobileConversationOpen(true)
       return
     }
+    const previousSelectedId = selectedIdRef.current
+    if (previousSelectedId) {
+      void commitConversationRead(previousSelectedId)
+    }
     setSelectedId(conversationId)
     setIsMobileConversationOpen(true)
   }
@@ -2283,10 +2309,19 @@ export function InboxContainer({
     conversations,
     currentUserId,
   })
-  const filteredConversations = filterConversationsByQueue({
+  const queueFilteredConversations = filterConversationsByQueue({
     conversations,
     queue: effectiveQueueTab,
     currentUserId,
+  })
+  const filteredConversations = applyInboxListFilters({
+    conversations: queueFilteredConversations,
+    unreadFilter,
+    leadTemperatureFilter,
+  })
+  const hasActiveConversationFilters = hasActiveInboxListFilters({
+    unreadFilter,
+    leadTemperatureFilter,
   })
   useEffect(() => {
     if (filteredConversations.length === 0) {
@@ -2312,8 +2347,14 @@ export function InboxContainer({
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
             <Inbox className="text-gray-400" size={24} />
           </div>
-          <h3 className="text-sm font-medium text-gray-900">{t('noMessages')}</h3>
-          <p className="mt-1 text-xs text-gray-500">{t('noMessagesDesc')}</p>
+          <h3 className="text-sm font-medium text-gray-900">
+            {hasActiveConversationFilters ? t('conversationFiltersNoMatchesTitle') : t('noMessages')}
+          </h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {hasActiveConversationFilters
+              ? t('conversationFiltersNoMatchesDescription')
+              : t('noMessagesDesc')}
+          </p>
         </div>
       ) : (
         filteredConversations.map((c) => {
@@ -2960,30 +3001,42 @@ export function InboxContainer({
               <div className="flex items-center">
                 <span className="text-lg font-bold text-gray-900">{t('title')}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMobileBotModeSheetOpen(true)}
-                aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors lg:hidden',
-                  currentBotModeToneClasses.surface
-                )}
-              >
-                <span
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileBotModeSheetOpen(true)}
+                  aria-label={`${tSidebar('botStatusLabel')}: ${botModeLabel}`}
                   className={cn(
-                    'h-2.5 w-2.5 rounded-full',
-                    currentBotModeToneClasses.dot,
-                    resolvedBotMode === 'active' && 'animate-pulse'
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors lg:hidden',
+                    currentBotModeToneClasses.surface
                   )}
+                >
+                  <span
+                    className={cn(
+                      'h-2.5 w-2.5 rounded-full',
+                      currentBotModeToneClasses.dot,
+                      resolvedBotMode === 'active' && 'animate-pulse'
+                    )}
+                  />
+                  <span>{botModeLabel}</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 opacity-70 transition-transform duration-200 ease-out',
+                      isMobileBotModeSheetOpen && 'rotate-180'
+                    )}
+                  />
+                </button>
+                <InboxListFilterMenu
+                  unreadFilter={unreadFilter}
+                  leadTemperatureFilter={leadTemperatureFilter}
+                  onUnreadFilterChange={setUnreadFilter}
+                  onLeadTemperatureFilterChange={setLeadTemperatureFilter}
+                  onReset={() => {
+                    setUnreadFilter('all')
+                    setLeadTemperatureFilter('all')
+                  }}
                 />
-                <span>{botModeLabel}</span>
-                <ChevronDown
-                  className={cn(
-                    'h-3.5 w-3.5 opacity-70 transition-transform duration-200 ease-out',
-                    isMobileBotModeSheetOpen && 'rotate-180'
-                  )}
-                />
-              </button>
+              </div>
             </div>
             <div className="border-t border-gray-100 px-3 py-2">
               <div className="flex items-center gap-1 overflow-x-auto pb-1">
@@ -3653,16 +3706,16 @@ export function InboxContainer({
                                 <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed">
                                   {media && (
                                     <div className="space-y-2">
-                                      {media.type === 'image' && media.url ? (
+                                      {shouldAttemptInlineImagePreview(media) ? (
                                         <a
-                                          href={media.url}
+                                          href={media.url!}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="block"
                                         >
                                           {/* eslint-disable-next-line @next/next/no-img-element */}
                                           <img
-                                            src={media.url}
+                                            src={media.url!}
                                             alt={
                                               media.caption ??
                                               mediaPreviewLabel ??
@@ -3798,16 +3851,16 @@ export function InboxContainer({
                               >
                                 {media && (
                                   <div className="space-y-2 text-left">
-                                    {media.type === 'image' && media.url ? (
+                                    {shouldAttemptInlineImagePreview(media) ? (
                                       <a
-                                        href={media.url}
+                                        href={media.url!}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="block"
                                       >
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
-                                          src={media.url}
+                                          src={media.url!}
                                           alt={
                                             media.caption ??
                                             mediaPreviewLabel ??

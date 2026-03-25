@@ -23,6 +23,8 @@ export interface InboxMessageMedia {
     caption: string | null
     isPlaceholder: boolean
     downloadStatus: string | null
+    originalType?: string | null
+    previewKind?: 'image' | 'link'
 }
 
 function isUnsupportedInstagramAttachmentContent(content: string | null | undefined) {
@@ -39,6 +41,11 @@ function toNullableString(value: unknown) {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+function toPreviewKind(value: unknown): 'image' | 'link' | undefined {
+    if (value === 'image' || value === 'link') return value
+    return undefined
 }
 
 function parseMetadata(metadata: unknown) {
@@ -133,6 +140,9 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
     const isPlaceholder = parsedMetadata.whatsapp_is_media_placeholder === true
         || parsedMetadata.instagram_is_media_placeholder === true
 
+    const originalType = toNullableString(mediaNode.original_type)
+    const previewKind = toPreviewKind(mediaNode.preview_kind)
+
     return {
         type: normalizeMediaType(mediaNode.type),
         url: toNullableString(mediaNode.storage_url),
@@ -140,8 +150,16 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
         mimeType: toNullableString(mediaNode.mime_type),
         caption: toNullableString(mediaNode.caption),
         isPlaceholder,
-        downloadStatus: toNullableString(mediaNode.download_status)
+        downloadStatus: toNullableString(mediaNode.download_status),
+        ...(originalType ? { originalType } : {}),
+        ...(previewKind ? { previewKind } : {})
     }
+}
+
+export function shouldAttemptInlineImagePreview(media: InboxMessageMedia | null | undefined) {
+    if (!media?.url) return false
+    if (media.type === 'image') return true
+    return media.previewKind === 'image'
 }
 
 export function resolveMessagePreviewContent(args: {
