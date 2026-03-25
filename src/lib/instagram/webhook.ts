@@ -22,6 +22,7 @@ export interface InstagramInboundEvent {
     eventType: InstagramInboundEventType
     direction: 'inbound' | 'outbound'
     skipAutomation: boolean
+    debugMessage?: Record<string, unknown> | null
     media?: {
         type: 'image' | 'unknown'
         originalType?: string | null
@@ -147,6 +148,56 @@ function buildInstagramAttachmentLabel(attachmentTypes: string[]) {
     return `[Instagram attachment: ${normalizedTypes.join(', ')}]`
 }
 
+function cloneDebugValue(value: unknown): unknown {
+    if (value === null) return null
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return value
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => cloneDebugValue(item))
+    }
+
+    if (isRecord(value)) {
+        const cloned: Record<string, unknown> = {}
+        for (const [key, nestedValue] of Object.entries(value)) {
+            const nextValue = cloneDebugValue(nestedValue)
+            if (typeof nextValue === 'undefined') continue
+            cloned[key] = nextValue
+        }
+        return cloned
+    }
+
+    return undefined
+}
+
+function buildInstagramMessageDebugSnapshot(message: Record<string, unknown>) {
+    const snapshot: Record<string, unknown> = {}
+    let hasDebugSignal = false
+
+    if (typeof message.is_unsupported === 'boolean') {
+        snapshot.is_unsupported = message.is_unsupported
+        hasDebugSignal = hasDebugSignal || message.is_unsupported
+    }
+
+    if (Array.isArray(message.attachments)) {
+        snapshot.attachments = cloneDebugValue(message.attachments)
+        hasDebugSignal = true
+    }
+
+    if (isRecord(message.reply_to)) {
+        snapshot.reply_to = cloneDebugValue(message.reply_to)
+        hasDebugSignal = true
+    }
+
+    if (!hasDebugSignal) return null
+
+    const mid = asString(message.mid)
+    if (mid) snapshot.mid = mid
+
+    return snapshot
+}
+
 function buildSyntheticMessageId(params: {
     entryId: string
     contactId: string
@@ -200,6 +251,7 @@ function extractInboundEventsFromItems(
             })
             const text = asString(message.text)
             const attachments = Array.isArray(message.attachments) ? message.attachments : []
+            const debugMessage = buildInstagramMessageDebugSnapshot(message)
             const attachmentMedia = extractInstagramAttachmentMedia(attachments)
                 || extractInstagramReplyToStoryMedia(message)
 
@@ -264,7 +316,8 @@ function extractInboundEventsFromItems(
                     eventSource,
                     eventType: 'attachment',
                     direction,
-                    skipAutomation: true
+                    skipAutomation: true,
+                    debugMessage
                 })
                 continue
             }

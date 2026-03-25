@@ -45,4 +45,11 @@ describe('SettingsResponsiveShell source', () => {
         expect(source).toContain('dispatchDashboardRouteTransitionStart')
         expect(source).toContain('onNavigateIntent={() => warmDashboardRoute(item.href)}')
     })
+
+    it('resolves active settings state from the optimistic dashboard route helper', () => {
+        const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+        expect(source).toContain('useDashboardRouteState(pathname)')
+        expect(source).toContain('getSettingsNavItemFromPath(activePath)')
+    })
 })

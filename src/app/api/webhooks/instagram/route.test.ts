@@ -502,7 +502,14 @@ describe('Instagram webhook route', () => {
             eventSource: 'messaging',
             eventType: 'message',
             direction: 'inbound',
-            skipAutomation: false
+            skipAutomation: false,
+            debugMessage: {
+                mid: 'ig-mid-1',
+                is_unsupported: true,
+                attachments: [{
+                    type: 'ig_story'
+                }]
+            }
         }
 
         const { supabase, orMaybeSingleMock, updateMock } = createInstagramSupabaseMock({
@@ -552,7 +559,17 @@ describe('Instagram webhook route', () => {
             platform: 'instagram',
             source: 'instagram',
             contactId: 'ig-user-1',
-            inboundMessageId: 'ig-mid-1'
+            inboundMessageId: 'ig-mid-1',
+            inboundMessageMetadata: expect.objectContaining({
+                instagram_message_id: 'ig-mid-1',
+                instagram_message_debug: {
+                    mid: 'ig-mid-1',
+                    is_unsupported: true,
+                    attachments: [{
+                        type: 'ig_story'
+                    }]
+                }
+            })
         }))
         expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
             config: expect.objectContaining({

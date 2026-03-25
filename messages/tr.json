@@ -2468,7 +2468,10 @@
     },
     "bookingForm": {
       "validationDateTime": "Randevuyu kaydetmeden önce hem tarih hem saat seçin.",
+      "validationPastDate": "Geçmiş bir tarih veya saat için manuel randevu oluşturamazsınız. Lütfen ileri bir zaman seçin.",
       "validationDuration": "Randevu süresi sıfırdan büyük bir dakika değeri olmalıdır.",
+      "validationSlotUnavailable": "Seçtiğiniz saat artık uygun görünmüyor. Lütfen başka bir saat seçin.",
+      "validationConflict": "Seçtiğiniz saat başka bir randevu ile çakışıyor. Lütfen farklı bir saat seçin.",
       "service": "Hizmet",
       "serviceOptional": "Bağlı hizmet yok",
       "date": "Tarih",
@@ -2492,6 +2495,7 @@
       "availabilitySaved": "Müsaitlik kuralları kaydedildi.",
       "serviceDurationsSaved": "Hizmet süreleri kaydedildi.",
       "googleDisconnected": "Google Calendar bağlantısı kesildi.",
+      "bookingDisabled": "Randevu oluşturma şu anda kapalı. Devam etmek için önce takvim ayarlarından rezervasyonu açın.",
       "invalidTimezone": "Europe/Istanbul gibi geçerli bir IANA saat dilimi girin.",
       "invalidNumericSettings": "Süre alanları geçerli ve negatif olmayan değerler olmalıdır.",
       "invalidAvailabilityWindow": "Her aktif çalışma saati penceresi başlangıcından sonra bitmelidir.",

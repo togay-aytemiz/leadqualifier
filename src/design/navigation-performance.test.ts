@@ -7,6 +7,7 @@ const MOBILE_BOTTOM_NAV_PATH = path.join(process.cwd(), 'src/design/MobileBottom
 const SIDEBAR_PATH = path.join(process.cwd(), 'src/design/Sidebar.tsx')
 const SETTINGS_SHELL_PATH = path.join(process.cwd(), 'src/components/settings/SettingsResponsiveShell.tsx')
 const TAB_TITLE_SYNC_PATH = path.join(process.cwd(), 'src/components/common/TabTitleSync.tsx')
+const DASHBOARD_LAYOUT_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/layout.tsx')
 
 describe('navigation performance source guards', () => {
     it('keeps primary nav routes warm while preserving configurable shell prefetch control', () => {
@@ -55,5 +56,24 @@ describe('navigation performance source guards', () => {
         expect(mainSidebarSource).toContain('const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)')
         expect(mainSidebarSource).toContain("window.matchMedia('(min-width: 1024px)')")
         expect(mainSidebarSource).toContain('if (isDesktopViewport !== true) return')
+    })
+
+    it('uses an optimistic dashboard path so nav active state updates before route commit', () => {
+        const mainSidebarSource = fs.readFileSync(MAIN_SIDEBAR_PATH, 'utf8')
+        const mobileBottomNavSource = fs.readFileSync(MOBILE_BOTTOM_NAV_PATH, 'utf8')
+        const settingsShellSource = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+        expect(mainSidebarSource).toContain('useDashboardRouteState(pathname)')
+        expect(mainSidebarSource).toContain('activePath')
+        expect(mobileBottomNavSource).toContain('useDashboardRouteState(pathname)')
+        expect(mobileBottomNavSource).toContain('activePath')
+        expect(settingsShellSource).toContain('useDashboardRouteState(pathname)')
+        expect(settingsShellSource).toContain('activePath')
+    })
+
+    it('keeps dashboard layout on the slim org-context path during initial render', () => {
+        const layoutSource = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
+
+        expect(layoutSource).not.toContain("resolveActiveOrganizationContext(undefined, { includeAccessibleOrganizations: true })")
     })
 })

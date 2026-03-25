@@ -2468,7 +2468,10 @@
     },
     "bookingForm": {
       "validationDateTime": "Choose both a date and a time before saving the booking.",
+      "validationPastDate": "You can't create a manual booking in the past. Choose a future date and time.",
       "validationDuration": "Booking duration must be greater than zero minutes.",
+      "validationSlotUnavailable": "That time is no longer available. Choose another slot.",
+      "validationConflict": "That time overlaps with another booking. Choose a different slot.",
       "service": "Service",
       "serviceOptional": "No linked service",
       "date": "Date",
@@ -2492,6 +2495,7 @@
       "availabilitySaved": "Availability rules saved.",
       "serviceDurationsSaved": "Service durations saved.",
       "googleDisconnected": "Google Calendar disconnected.",
+      "bookingDisabled": "Booking creation is currently turned off. Enable it in calendar settings to continue.",
       "invalidTimezone": "Enter a valid IANA time zone such as Europe/Istanbul.",
       "invalidNumericSettings": "Duration values must be valid and non-negative.",
       "invalidAvailabilityWindow": "Every active business-hour window must end after it starts.",

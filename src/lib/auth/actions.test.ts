@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
     createClientMock,
+    cookiesMock,
     headersMock,
     redirectMock,
     resolveActiveOrganizationContextMock,
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
+    cookiesMock: vi.fn(),
     headersMock: vi.fn(),
     redirectMock: vi.fn(),
     resolveActiveOrganizationContextMock: vi.fn(),
@@ -17,6 +19,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('next/headers', () => ({
+    cookies: cookiesMock,
     headers: headersMock,
 }))
 
@@ -25,6 +28,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/lib/organizations/active-context', () => ({
+    ACTIVE_ORG_COOKIE: 'active_org_id',
     resolveActiveOrganizationContext: resolveActiveOrganizationContextMock,
 }))
 
@@ -51,6 +55,9 @@ function createLoginFormData(values?: Partial<Record<'email' | 'password' | 'loc
 describe('auth login action', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        cookiesMock.mockResolvedValue({
+            get: vi.fn(() => undefined),
+        })
         resolveActiveOrganizationContextMock.mockResolvedValue({
             activeOrganizationId: 'org-1',
             activeOrganization: { id: 'org-1', name: 'Org 1', slug: 'org-1' },
@@ -71,9 +78,27 @@ describe('auth login action', () => {
     it('redirects directly to the localized home route after successful login', async () => {
         const signInWithPasswordMock = vi.fn(async () => ({
             data: {
+                user: { id: 'user-1' },
                 session: { access_token: 'token-1' },
             },
             error: null,
+        }))
+
+        const fromMock = vi.fn((table: string) => ({
+            select: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                    maybeSingle: vi.fn(async () => {
+                        if (table === 'profiles') {
+                            return {
+                                data: { is_system_admin: false },
+                                error: null,
+                            }
+                        }
+
+                        throw new Error(`Unexpected table ${table}`)
+                    })
+                }))
+            }))
         }))
 
         createClientMock.mockResolvedValue({
@@ -81,12 +106,13 @@ describe('auth login action', () => {
                 signInWithPassword: signInWithPasswordMock,
                 getUser: vi.fn(),
             },
-            from: vi.fn(),
+            from: fromMock,
         })
 
-        await expect(login(createLoginFormData({ locale: 'en' }))).rejects.toThrow('NEXT_REDIRECT')
-
-        expect(redirectMock).toHaveBeenCalledWith('/en/inbox')
+        await expect(login(createLoginFormData({ locale: 'en' }))).resolves.toEqual({
+            redirectPath: '/en/inbox'
+        })
+        expect(resolveActiveOrganizationContextMock).not.toHaveBeenCalled()
     })
 })
 
@@ -103,6 +129,9 @@ describe('auth register action', () => {
             'x-vercel-ip-country': 'TR',
             'user-agent': 'Mozilla/5.0',
         }))
+        cookiesMock.mockResolvedValue({
+            get: vi.fn(() => undefined),
+        })
         resolveActiveOrganizationContextMock.mockResolvedValue({
             activeOrganizationId: 'org-1',
             activeOrganization: { id: 'org-1', name: 'Org 1', slug: 'org-1' },
@@ -286,9 +315,27 @@ describe('auth register action', () => {
 
         const signUpMock = vi.fn(async () => ({
             data: {
+                user: { id: 'user-1' },
                 session: { access_token: 'token-1' },
             },
             error: null,
+        }))
+
+        const fromMock = vi.fn((table: string) => ({
+            select: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                    maybeSingle: vi.fn(async () => {
+                        if (table === 'profiles') {
+                            return {
+                                data: { is_system_admin: false },
+                                error: null,
+                            }
+                        }
+
+                        throw new Error(`Unexpected table ${table}`)
+                    })
+                }))
+            }))
         }))
 
         createClientMock.mockResolvedValue({
@@ -297,12 +344,13 @@ describe('auth register action', () => {
                 signUp: signUpMock,
                 getUser: vi.fn(),
             },
-            from: vi.fn(),
+            from: fromMock,
         })
 
-        await expect(register(createRegisterFormData({ locale: 'en' }))).rejects.toThrow('NEXT_REDIRECT')
-
-        expect(redirectMock).toHaveBeenCalledWith('/en/inbox')
+        await expect(register(createRegisterFormData({ locale: 'en' }))).resolves.toEqual({
+            redirectPath: '/en/inbox'
+        })
+        expect(resolveActiveOrganizationContextMock).not.toHaveBeenCalled()
     })
 
     it('records failed attempts after signup errors', async () => {

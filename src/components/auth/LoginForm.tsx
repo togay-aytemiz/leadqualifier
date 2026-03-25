@@ -2,7 +2,8 @@
 
 import { useLocale, useTranslations } from 'next-intl'
 import { useActionState, useEffect, useState } from 'react'
-import { login } from '@/lib/auth/actions'
+import { AuthSuccessTransition } from '@/components/auth/AuthSuccessTransition'
+import { login, type LoginActionState } from '@/lib/auth/actions'
 import { Link, useRouter } from '@/i18n/navigation'
 import { Button } from '@/design'
 import { Eye, EyeOff } from 'lucide-react'
@@ -18,11 +19,12 @@ export function LoginForm() {
     const router = useRouter()
     const [showPassword, setShowPassword] = useState(false)
     const [state, formAction, pending] = useActionState(
-        async (_prevState: { error?: string } | null, formData: FormData) => {
+        async (_prevState: LoginActionState | null, formData: FormData) => {
             return await login(formData)
         },
         null
     )
+    const isRedirecting = Boolean(state?.redirectPath)
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch('auth')) return
@@ -39,7 +41,8 @@ export function LoginForm() {
     }, [router])
 
     return (
-        <div>
+        <div className="relative">
+            <AuthSuccessTransition redirectPath={state?.redirectPath} />
             <div className="mb-7">
                 <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{t('loginTitle')}</h1>
                 <p className="mt-2 text-sm text-gray-500">{t('loginSubtitle')}</p>
@@ -101,10 +104,10 @@ export function LoginForm() {
 
                 <Button
                     type="submit"
-                    disabled={pending}
+                    disabled={pending || isRedirecting}
                     className="h-10 w-full border-transparent bg-[#242A40] text-white hover:bg-[#1B2033]"
                 >
-                    {pending ? tc('loading') : t('login')}
+                    {pending || isRedirecting ? tc('loading') : t('login')}
                 </Button>
             </form>
 

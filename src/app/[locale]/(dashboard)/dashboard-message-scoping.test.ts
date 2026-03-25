@@ -3,6 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const DASHBOARD_LAYOUT_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/layout.tsx')
+const DASHBOARD_LOADING_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/loading.tsx')
 const PROVIDER_PATH = path.resolve(process.cwd(), 'src/components/i18n/DashboardRouteIntlProvider.tsx')
 const SETTINGS_LAYOUT_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/settings/layout.tsx')
 const KNOWLEDGE_LAYOUT_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/knowledge/layout.tsx')
@@ -19,6 +20,22 @@ describe('dashboard message scoping', () => {
 
         expect(source).toContain('DASHBOARD_SHELL_MESSAGE_NAMESPACES')
         expect(source).toContain('getScopedMessages(locale, DASHBOARD_SHELL_MESSAGE_NAMESPACES)')
+    })
+
+    it('avoids a second admin-only active-organization refetch in the root dashboard layout', () => {
+        const source = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
+
+        expect(source).not.toContain('includeAccessibleOrganizations: true')
+        expect(source.match(/resolveActiveOrganizationContext\(/g) ?? []).toHaveLength(1)
+    })
+
+    it('provides a root dashboard loading boundary for auth-to-app entry', () => {
+        expect(fs.existsSync(DASHBOARD_LOADING_PATH)).toBe(true)
+
+        const source = fs.readFileSync(DASHBOARD_LOADING_PATH, 'utf8')
+
+        expect(source).toContain('DashboardRouteSkeleton')
+        expect(source).toContain('route="inbox"')
     })
 
     it('uses a reusable dashboard route intl provider', () => {

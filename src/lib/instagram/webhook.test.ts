@@ -408,6 +408,65 @@ describe('instagram webhook utilities', () => {
         }])
     })
 
+    it('keeps unsupported attachment payload details for debugging when no preview media is available', () => {
+        const payload = {
+            object: 'instagram',
+            entry: [{
+                id: 'ig-business-1',
+                messaging: [{
+                    sender: { id: 'ig-user-debug' },
+                    recipient: { id: 'ig-business-1' },
+                    timestamp: 1738000023,
+                    message: {
+                        mid: 'igmid-debug-1',
+                        is_unsupported: true,
+                        attachments: [{
+                            type: 'ig_story',
+                            payload: {
+                                story_id: 'story-123'
+                            }
+                        }],
+                        reply_to: {
+                            story: {
+                                id: 'story-123'
+                            }
+                        }
+                    }
+                }]
+            }]
+        }
+
+        const events = extractInstagramInboundEvents(payload)
+
+        expect(events).toEqual([{
+            instagramBusinessAccountId: 'ig-business-1',
+            contactId: 'ig-user-debug',
+            contactName: null,
+            messageId: 'igmid-debug-1',
+            text: '[Instagram attachment: ig_story]',
+            timestamp: '1738000023',
+            eventSource: 'messaging',
+            eventType: 'attachment',
+            direction: 'inbound',
+            skipAutomation: true,
+            debugMessage: {
+                mid: 'igmid-debug-1',
+                is_unsupported: true,
+                attachments: [{
+                    type: 'ig_story',
+                    payload: {
+                        story_id: 'story-123'
+                    }
+                }],
+                reply_to: {
+                    story: {
+                        id: 'story-123'
+                    }
+                }
+            }
+        }])
+    })
+
     it('extracts inbound text events from entry.changes messages field', () => {
         const payload = {
             object: 'instagram',

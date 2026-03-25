@@ -44,6 +44,7 @@ import {
   type CalendarFilters,
   type CalendarView,
 } from '@/lib/calendar/presentation'
+import { resolveCalendarBookingMutationErrorKey } from '@/lib/calendar/booking-errors'
 import {
   cancelCalendarBookingAction,
   createCalendarBookingAction,
@@ -159,6 +160,7 @@ export function CalendarClient({
   const [bookingDraft, setBookingDraft] = useState<BookingFormDraft>(() =>
     createEmptyBookingDraft(data, initialAnchorDate)
   )
+  const [bookingFormError, setBookingFormError] = useState<string | null>(null)
   const [filters, setFilters] = useState<CalendarFilters>({
     status: 'all',
     serviceCatalogId: 'all',
@@ -392,23 +394,27 @@ export function CalendarClient({
   }
 
   const openCreateBooking = () => {
+    setBookingFormError(null)
     setBookingDraft(createEmptyBookingDraft(calendarData, anchorDate))
     setIsBookingModalOpen(true)
   }
 
   const openEditBooking = (booking: CalendarBooking) => {
+    setBookingFormError(null)
     setBookingDraft(createBookingDraftFromRecord(booking, currentTimeZone))
     setIsBookingModalOpen(true)
   }
 
   const submitBooking = () => {
+    setBookingFormError(null)
+
     if (readOnlyTenantMode) {
-      setFeedback({ type: 'error', message: t('readOnlyBanner') })
+      setBookingFormError(t('readOnlyBanner'))
       return
     }
 
     if (!bookingDraft.date || !bookingDraft.time) {
-      setFeedback({ type: 'error', message: t('bookingForm.validationDateTime') })
+      setBookingFormError(t('bookingForm.validationDateTime'))
       return
     }
 
@@ -418,9 +424,20 @@ export function CalendarClient({
       timeZone: currentTimeZone,
     })
     const parsedDuration = Number.parseInt(bookingDraft.durationMinutes, 10)
+    const startsAtMs = new Date(startsAt).getTime()
+
+    if (!Number.isFinite(startsAtMs)) {
+      setBookingFormError(t('bookingForm.validationDateTime'))
+      return
+    }
+
+    if (startsAtMs < Date.now()) {
+      setBookingFormError(t('bookingForm.validationPastDate'))
+      return
+    }
 
     if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
-      setFeedback({ type: 'error', message: t('bookingForm.validationDuration') })
+      setBookingFormError(t('bookingForm.validationDuration'))
       return
     }
 
@@ -456,14 +473,12 @@ export function CalendarClient({
               ? t('messages.bookingUpdated')
               : t('messages.bookingCreated'),
           })
+          setBookingFormError(null)
           setIsBookingModalOpen(false)
           invalidateCalendarWindowCache()
           router.refresh()
         } catch (error) {
-          setFeedback({
-            type: 'error',
-            message: error instanceof Error ? error.message : t('messages.saveFailed'),
-          })
+          setBookingFormError(t(resolveCalendarBookingMutationErrorKey({ error, startsAt })))
         }
       })()
     })
@@ -881,22 +896,22 @@ export function CalendarClient({
       <PageHeader
         title={t('title')}
         actions={
-          <>
+          <div className="flex gap-2">
             <Link
               href="/settings/calendar"
-              className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
             >
               <SlidersHorizontal size={16} className="mr-2" />
               {t('actions.openSettings')}
             </Link>
             <Button
-              size="sm"
               onClick={openCreateBooking}
               disabled={isPending || readOnlyTenantMode}
+              className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
             >
               {t('actions.newBooking')}
             </Button>
-          </>
+          </div>
         }
       />
       <div className="flex-1 overflow-auto p-3 md:p-6">
@@ -1105,10 +1120,14 @@ export function CalendarClient({
 
       <Modal
         isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
+        onClose={() => {
+          setBookingFormError(null)
+          setIsBookingModalOpen(false)
+        }}
         title={bookingDraft.bookingId ? t('actions.editBooking') : t('actions.newBooking')}
       >
         <div className="space-y-4">
+          {bookingFormError && <Alert variant="error">{bookingFormError}</Alert>}
           <label className="block text-sm text-slate-700">
             <span>{t('bookingForm.service')}</span>
             <Select
@@ -1276,10 +1295,20 @@ export function CalendarClient({
             />
           </label>
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setIsBookingModalOpen(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setBookingFormError(null)
+                setIsBookingModalOpen(false)
+              }}
+            >
               {t('actions.close')}
             </Button>
-            <Button size="sm" onClick={submitBooking} disabled={isPending || readOnlyTenantMode}>
+            <Button
+              onClick={submitBooking}
+              disabled={isPending || readOnlyTenantMode}
+              className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
+            >
               {isPending ? t('actions.saving') : t('actions.saveBooking')}
             </Button>
           </div>

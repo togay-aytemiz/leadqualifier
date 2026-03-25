@@ -77,6 +77,26 @@ export function resolveDashboardRouteSkeleton(value: string | null | undefined) 
     return resolveDashboardRouteFamily(value)?.skeleton ?? null
 }
 
+export function resolveOptimisticDashboardPath(
+    currentPath: string,
+    pendingPath: string | null | undefined
+) {
+    const normalizedCurrentPath = normalizeDashboardRoutePath(currentPath)
+    const normalizedPendingPath = pendingPath
+        ? normalizeDashboardRoutePath(pendingPath)
+        : null
+
+    if (!normalizedPendingPath || normalizedPendingPath === normalizedCurrentPath) {
+        return normalizedCurrentPath
+    }
+
+    if (!resolveDashboardRouteSkeleton(normalizedPendingPath)) {
+        return normalizedCurrentPath
+    }
+
+    return normalizedPendingPath
+}
+
 export function primeDashboardRoute(
     router: DashboardRoutePrefetcher,
     href: string,

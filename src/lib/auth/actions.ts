@@ -3,8 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
-import { resolveDefaultHomeRoute } from '@/lib/navigation/default-home-route'
-import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { ACTIVE_ORG_COOKIE } from '@/lib/organizations/active-context'
+import { resolvePostAuthRedirectPath } from '@/lib/auth/post-auth-redirect'
 import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 import {
     checkTrialBusinessIdentity,
@@ -15,21 +15,37 @@ import {
     verifyTurnstileCaptcha,
 } from '@/lib/auth/signup-guard'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
+
+export type LoginActionState = {
+    error?: string
+    redirectPath?: string
+}
 
 export type RegisterActionState = {
     error?: string
     errorCode?: 'signup_rate_limited' | 'captcha_required' | 'captcha_failed' | 'trial_already_used_business'
     cooldownSeconds?: number
+    redirectPath?: string
 }
 
-async function resolvePostAuthRedirectPath(
+async function buildPostAuthRedirectPath(
     locale: string | null | undefined,
-    supabase: Awaited<ReturnType<typeof createClient>>
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    userId: string | null | undefined
 ) {
-    const orgContext = await resolveActiveOrganizationContext(supabase)
-    return buildLocalizedPath(resolveDefaultHomeRoute(orgContext), normalizeAppLocale(locale))
+    if (!userId) {
+        return buildLocalizedPath('/inbox', normalizeAppLocale(locale))
+    }
+
+    const cookieStore = await cookies()
+    return resolvePostAuthRedirectPath({
+        cookieOrganizationId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null,
+        locale,
+        supabase,
+        userId
+    })
 }
 
 export async function login(formData: FormData) {
@@ -41,13 +57,19 @@ export async function login(formData: FormData) {
         password: formData.get('password') as string,
     }
 
-    const { error } = await supabase.auth.signInWithPassword(data)
+    const { data: authResult, error } = await supabase.auth.signInWithPassword(data)
 
     if (error) {
         return { error: error.message }
     }
 
-    redirect(await resolvePostAuthRedirectPath(locale, supabase))
+    return {
+        redirectPath: await buildPostAuthRedirectPath(
+            locale,
+            supabase,
+            authResult.user?.id ?? authResult.session?.user?.id
+        )
+    } satisfies LoginActionState
 }
 
 export async function register(formData: FormData) {
@@ -138,7 +160,13 @@ export async function register(formData: FormData) {
     })
 
     if (data.session) {
-        redirect(await resolvePostAuthRedirectPath(locale, supabase))
+        return {
+            redirectPath: await buildPostAuthRedirectPath(
+                locale,
+                supabase,
+                data.user?.id ?? data.session?.user?.id
+            )
+        } satisfies RegisterActionState
     }
 
     redirect(`${buildLocalizedPath('/register/check-email', normalizeAppLocale(locale))}?email=${encodeURIComponent(email)}`)

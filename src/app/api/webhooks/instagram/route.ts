@@ -646,6 +646,11 @@ export async function POST(req: NextRequest) {
             instagram_contact_avatar_url: contactIdentity.avatarUrl,
             instagram_business_username: businessIdentity?.username ?? null,
             instagram_business_avatar_url: businessIdentity?.avatarUrl ?? null,
+            ...(event.debugMessage
+                ? {
+                    instagram_message_debug: event.debugMessage
+                }
+                : {}),
             ...(event.direction === 'outbound'
                 ? {
                     instagram_is_echo: true

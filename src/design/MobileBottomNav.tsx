@@ -25,6 +25,7 @@ import {
     primeDashboardRoute,
     shouldStartDashboardRouteTransition
 } from '@/design/dashboard-route-transition'
+import { useDashboardRouteState } from '@/design/dashboard-route-state'
 import { createClient } from '@/lib/supabase/client'
 import type { OrganizationBillingAccount } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
@@ -68,7 +69,8 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const [isOtherOpen, setIsOtherOpen] = useState(false)
     const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
 
-    const activeItem = resolveMobileNavActiveItem(pathname)
+    const { activePath } = useDashboardRouteState(pathname)
+    const activeItem = resolveMobileNavActiveItem(activePath)
     const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
     const localePrefix = localePrefixMatch && localePrefixMatch[1] !== 'tr'
         ? `/${localePrefixMatch[1]}`

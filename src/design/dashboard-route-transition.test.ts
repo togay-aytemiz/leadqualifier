@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
     normalizeDashboardRoutePath,
+    resolveOptimisticDashboardPath,
     resolveDashboardRouteSkeleton,
     shouldPrimeDashboardRoute
 } from '@/design/dashboard-route-transition'
@@ -43,5 +44,18 @@ describe('resolveDashboardRouteSkeleton', () => {
     it('returns null for routes without a dedicated fast-transition skeleton', () => {
         expect(resolveDashboardRouteSkeleton('/login')).toBeNull()
         expect(resolveDashboardRouteSkeleton(null)).toBeNull()
+    })
+})
+
+describe('resolveOptimisticDashboardPath', () => {
+    it('prefers a pending dashboard destination for immediate nav feedback', () => {
+        expect(resolveOptimisticDashboardPath('/tr/inbox', '/settings/ai')).toBe('/settings/ai')
+        expect(resolveOptimisticDashboardPath('/en/leads', '/calendar?view=week')).toBe('/calendar')
+    })
+
+    it('falls back to the committed path when there is no distinct pending dashboard route', () => {
+        expect(resolveOptimisticDashboardPath('/settings/ai', '/settings/ai')).toBe('/settings/ai')
+        expect(resolveOptimisticDashboardPath('/skills', null)).toBe('/skills')
+        expect(resolveOptimisticDashboardPath('/inbox', '/login')).toBe('/inbox')
     })
 })

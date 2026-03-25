@@ -67,4 +67,35 @@ describe('calendar page source', () => {
     expect(source).toContain('<Select')
     expect(source).not.toContain("t('bookingForm.durationPreview')")
   })
+
+  it('keeps header actions aligned with the knowledge workspace sizing and dark primary CTA styling', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+
+    expect(source).toContain(
+      'className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"'
+    )
+    expect(source).not.toContain(
+      'className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"'
+    )
+    expect(source).toContain('className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"')
+    expect(source).not.toContain('<Button\n              size="sm"\n              onClick={openCreateBooking}')
+  })
+
+  it('keeps manual booking validation and save errors inside the booking modal', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+
+    expect(source).toContain("const [bookingFormError, setBookingFormError] = useState<string | null>(null)")
+    expect(source).toContain("setBookingFormError(t('bookingForm.validationPastDate'))")
+    expect(source).toContain('setBookingFormError(t(resolveCalendarBookingMutationErrorKey({ error, startsAt })))')
+    expect(source).toContain('{bookingFormError && <Alert variant="error">{bookingFormError}</Alert>}')
+  })
+
+  it('keeps modal footer actions at the standard page button size and dark primary styling', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+
+    expect(source).toContain("variant=\"secondary\"")
+    expect(source).toContain("{isPending ? t('actions.saving') : t('actions.saveBooking')}")
+    expect(source).toContain('className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"')
+    expect(source).not.toContain('<Button size="sm" onClick={submitBooking}')
+  })
 })

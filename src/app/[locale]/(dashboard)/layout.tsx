@@ -13,14 +13,11 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode
 }) {
-    const [locale, initialOrgContext] = await Promise.all([
+    const [locale, orgContext] = await Promise.all([
         getLocale(),
         resolveActiveOrganizationContext()
     ])
     const messagesPromise = getScopedMessages(locale, DASHBOARD_SHELL_MESSAGE_NAMESPACES)
-    const orgContext = initialOrgContext?.isSystemAdmin
-        ? await resolveActiveOrganizationContext(undefined, { includeAccessibleOrganizations: true })
-        : initialOrgContext
     const messages = await messagesPromise
     const hasExplicitAdminOrganizationSelection = !(orgContext?.isSystemAdmin ?? false)
         || orgContext?.source === 'cookie'

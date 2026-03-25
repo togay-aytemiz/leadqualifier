@@ -11,6 +11,7 @@ import {
     primeDashboardRoute,
     shouldStartDashboardRouteTransition
 } from '@/design/dashboard-route-transition'
+import { useDashboardRouteState } from '@/design/dashboard-route-state'
 import {
     HiOutlineBanknotes,
     HiOutlineBriefcase,
@@ -65,7 +66,8 @@ export function SettingsResponsiveShell({
     const locale = useLocale()
     const pathname = usePathname()
     const router = useRouter()
-    const activeItem = getSettingsNavItemFromPath(pathname)
+    const { activePath } = useDashboardRouteState(pathname)
+    const activeItem = getSettingsNavItemFromPath(activePath)
     const tSidebar = useTranslations('Sidebar')
     const supabase = useMemo(() => createClient(), [])
     const localePrefix = locale === 'tr' ? '' : `/${locale}`

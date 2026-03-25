@@ -15,6 +15,7 @@ import {
     primeDashboardRoute,
     shouldStartDashboardRouteTransition
 } from '@/design/dashboard-route-transition'
+import { useDashboardRouteState } from '@/design/dashboard-route-state'
 import {
     buildOrganizationBillingSnapshot,
     type OrganizationBillingSnapshot
@@ -193,7 +194,8 @@ export function MainSidebar({
     const pathname = usePathname()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+    const committedPathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+    const { activePath } = useDashboardRouteState(pathname)
     const tNav = useTranslations('nav')
     const tCommon = useTranslations('common')
     const tSidebar = useTranslations('mainSidebar')
@@ -527,9 +529,9 @@ export function MainSidebar({
     useEffect(() => {
         if (isDesktopViewport !== true) return
         if (!organizationId) return
-        if (pathWithoutLocale !== '/inbox') return
+        if (committedPathWithoutLocale !== '/inbox') return
         void refreshUnread(organizationId)
-    }, [isDesktopViewport, organizationId, pathWithoutLocale, refreshUnread])
+    }, [committedPathWithoutLocale, isDesktopViewport, organizationId, refreshUnread])
 
     useEffect(() => {
         if (billingSnapshot?.membershipState !== 'premium_active') {
@@ -1611,10 +1613,10 @@ export function MainSidebar({
                                     const isSettingsItem = item.id === 'settings'
                                     const isAdminRoot = item.id === 'admin-dashboard'
                                     const isActive = isSettingsItem
-                                        ? pathWithoutLocale.startsWith('/settings')
+                                        ? activePath.startsWith('/settings')
                                         : isAdminRoot
-                                            ? pathWithoutLocale === '/admin'
-                                            : pathWithoutLocale.startsWith(itemHref)
+                                            ? activePath === '/admin'
+                                            : activePath.startsWith(itemHref)
                                     const Icon = isActive ? item.activeIcon : item.icon
                                     const showUnread = item.id === 'inbox' && hasUnread
                                     const showPending = item.id === 'settings' && hasPendingSuggestions

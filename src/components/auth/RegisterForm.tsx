@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl'
 import { useActionState, useEffect, useState } from 'react'
+import { AuthSuccessTransition } from '@/components/auth/AuthSuccessTransition'
 import { register, type RegisterActionState } from '@/lib/auth/actions'
 import { Link, useRouter } from '@/i18n/navigation'
 import { Button } from '@/design'
@@ -62,6 +63,7 @@ export function RegisterForm({
         null
     )
     const errorMessage = resolveRegisterErrorMessage(state, t)
+    const isRedirecting = Boolean(state?.redirectPath)
 
     useEffect(() => {
         if (!shouldEnableManualRoutePrefetch('auth')) return
@@ -78,7 +80,8 @@ export function RegisterForm({
     }, [router])
 
     return (
-        <div>
+        <div className="relative">
+            <AuthSuccessTransition redirectPath={state?.redirectPath} />
             <div className="mb-7">
                 <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{t('registerTitle')}</h1>
                 <p className="mt-2 text-sm text-gray-500">{t('registerSubtitle')}</p>
@@ -204,10 +207,10 @@ export function RegisterForm({
 
                 <Button
                     type="submit"
-                    disabled={pending}
+                    disabled={pending || isRedirecting}
                     className="h-10 w-full border-transparent bg-[#242A40] text-white hover:bg-[#1B2033]"
                 >
-                    {pending ? tc('loading') : t('register')}
+                    {pending || isRedirecting ? tc('loading') : t('register')}
                 </Button>
             </form>
 
