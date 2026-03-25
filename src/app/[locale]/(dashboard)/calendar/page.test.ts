@@ -98,4 +98,69 @@ describe('calendar page source', () => {
     expect(source).toContain('className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"')
     expect(source).not.toContain('<Button size="sm" onClick={submitBooking}')
   })
+
+  it('drops the week-view status chip and uses a modal instead of the desktop detail sidebar', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+
+    expect(source).not.toContain('<Badge variant={resolveStatusVariant(booking.status)}>')
+    expect(source).not.toContain('xl:grid-cols-[minmax(0,1fr)_20rem]')
+    expect(source).not.toContain('{!isMobile && <div className="space-y-4">{renderDetailPanel(selectedBooking)}</div>}')
+    expect(source).toContain('const openDetailBooking = (bookingId: string) => {')
+    expect(source).toContain('isOpen={isDetailModalOpen}')
+  })
+
+  it('keeps detail modal footer actions at the standard size', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+
+    expect(source).not.toContain('<Button\n            variant="secondary"\n            size="sm"\n            onClick={() => openEditBooking(booking)}')
+    expect(source).not.toContain('<Button\n            variant="danger"\n            size="sm"\n            onClick={() => cancelSelectedBooking(booking.id)}')
+  })
+
+  it('opens booking details in the shared modal across day, week, month, and agenda views', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+    const agendaViewSource =
+      source.split('const renderAgendaView = () => {')[1]?.split('const renderDayView = () => {')[0] ??
+      ''
+    const dayViewSource =
+      source.split('const renderDayView = () => {')[1]?.split('const renderWeekView = () => {')[0] ??
+      ''
+    const weekViewSource =
+      source.split('const renderWeekView = () => {')[1]?.split('const renderMonthView = () => {')[0] ??
+      ''
+    const monthViewSource =
+      source.split('const renderMonthView = () => {')[1]?.split('const renderDetailPanel =')[0] ?? ''
+
+    expect(agendaViewSource).toContain('.map((booking) => renderBookingCard(booking))')
+    expect(dayViewSource).toContain('dayBookings.map((booking) => renderBookingCard(booking))')
+    expect(weekViewSource).toContain('renderBookingCard(booking')
+    expect(monthViewSource).toContain('onClick={() => openDetailBooking(booking.id)}')
+    expect(monthViewSource).not.toContain('if (isMobile) {')
+  })
+
+  it('shows customer name and end time in month-view booking cards', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+    const monthViewSource =
+      source.split('const renderMonthView = () => {')[1]?.split('const renderDetailPanel =')[0] ?? ''
+
+    expect(monthViewSource).toMatch(
+      /booking\.customer_name[\s\S]*booking\.customer_phone[\s\S]*emptyStates\.customerPending/
+    )
+    expect(monthViewSource).toMatch(
+      /bookingEndTime[\s\S]*isoToLocalDateTimeParts\([\s\S]*booking\.ends_at[\s\S]*currentTimeZone[\s\S]*\.time/
+    )
+  })
+
+  it('uses background-only booking cards in day, week, and agenda views to match month styling', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+    const bookingCardSource =
+      source.split('const renderBookingCard =')[1]?.split('const renderAgendaView = () => {')[0] ?? ''
+    const weekViewSource =
+      source.split('const renderWeekView = () => {')[1]?.split('const renderMonthView = () => {')[0] ??
+      ''
+
+    expect(bookingCardSource).not.toContain('border border-slate-200')
+    expect(bookingCardSource).toContain('bg-slate-50 text-slate-700 hover:bg-slate-100')
+    expect(bookingCardSource).toContain('bg-white/10 text-white hover:bg-white/15')
+    expect(weekViewSource).toContain("renderBookingCard(booking, { tone: isToday ? 'inverse' : 'default' })")
+  })
 })

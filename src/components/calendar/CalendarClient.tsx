@@ -11,7 +11,7 @@ import {
   Link2,
   SlidersHorizontal,
 } from 'lucide-react'
-import { Alert, Badge, Button, Modal, PageHeader, Select } from '@/design'
+import { Alert, Button, Modal, PageHeader, Select } from '@/design'
 import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 import type {
@@ -122,13 +122,6 @@ function createBookingDraftFromRecord(
     channel: booking.channel,
     status: booking.status,
   }
-}
-
-function resolveStatusVariant(status: CalendarBooking['status']) {
-  if (status === 'confirmed' || status === 'completed') return 'success'
-  if (status === 'pending') return 'warning'
-  if (status === 'no_show' || status === 'canceled') return 'error'
-  return 'neutral'
 }
 
 function buildRangeCacheKey(rangeStartIso: string, rangeEndIso: string) {
@@ -400,9 +393,15 @@ export function CalendarClient({
   }
 
   const openEditBooking = (booking: CalendarBooking) => {
+    setIsDetailModalOpen(false)
     setBookingFormError(null)
     setBookingDraft(createBookingDraftFromRecord(booking, currentTimeZone))
     setIsBookingModalOpen(true)
+  }
+
+  const openDetailBooking = (bookingId: string) => {
+    setSelectedBookingId(bookingId)
+    setIsDetailModalOpen(true)
   }
 
   const submitBooking = () => {
@@ -475,6 +474,7 @@ export function CalendarClient({
           })
           setBookingFormError(null)
           setIsBookingModalOpen(false)
+          setIsDetailModalOpen(false)
           invalidateCalendarWindowCache()
           router.refresh()
         } catch (error) {
@@ -508,48 +508,36 @@ export function CalendarClient({
     })
   }
 
-  const renderBookingCard = (booking: CalendarBooking) => {
+  const renderBookingCard = (
+    booking: CalendarBooking,
+    options: { tone?: 'default' | 'inverse' } = {}
+  ) => {
+    const tone = options.tone ?? 'default'
+    const isInverse = tone === 'inverse'
+
     return (
       <button
         key={booking.id}
         type="button"
-        onClick={() => {
-          setSelectedBookingId(booking.id)
-          if (isMobile) {
-            setIsDetailModalOpen(true)
-          }
-        }}
+        onClick={() => openDetailBooking(booking.id)}
         className={cn(
-          'w-full rounded-2xl border p-3 text-left transition-colors',
-          selectedBookingId === booking.id
-            ? 'border-slate-900 bg-slate-900 text-white'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+          'w-full rounded-2xl p-3 text-left transition-colors',
+          isInverse
+            ? 'bg-white/10 text-white hover:bg-white/15'
+            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
         )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
+            <p className={cn('truncate text-sm font-semibold', isInverse ? 'text-white' : 'text-slate-900')}>
               {booking.service_name_snapshot ?? t('emptyStates.untitledBooking')}
             </p>
-            <p
-              className={cn(
-                'mt-1 text-xs',
-                selectedBookingId === booking.id ? 'text-slate-300' : 'text-slate-500'
-              )}
-            >
+            <p className={cn('mt-1 text-xs', isInverse ? 'text-slate-300' : 'text-slate-500')}>
               {booking.customer_name ?? booking.customer_phone ?? t('emptyStates.customerPending')}
             </p>
           </div>
-          <Badge variant={resolveStatusVariant(booking.status)}>
-            {t(`statuses.${booking.status}`)}
-          </Badge>
         </div>
-        <p
-          className={cn(
-            'mt-3 text-sm',
-            selectedBookingId === booking.id ? 'text-slate-100' : 'text-slate-700'
-          )}
-        >
+        <p className={cn('mt-3 text-sm', isInverse ? 'text-slate-100' : 'text-slate-700')}>
           {formatDateTimeLabel({
             startIso: booking.starts_at,
             endIso: booking.ends_at,
@@ -557,12 +545,7 @@ export function CalendarClient({
             locale,
           })}
         </p>
-        <div
-          className={cn(
-            'mt-3 flex flex-wrap gap-2 text-[11px]',
-            selectedBookingId === booking.id ? 'text-slate-300' : 'text-slate-500'
-          )}
-        >
+        <div className={cn('mt-3 flex flex-wrap gap-2 text-[11px]', isInverse ? 'text-slate-300' : 'text-slate-500')}>
           <span>{t(`sources.${booking.source}`)}</span>
           <span>•</span>
           <span>{t(`channels.${booking.channel ?? 'manual'}`)}</span>
@@ -607,7 +590,7 @@ export function CalendarClient({
               </span>
             </div>
             <div className="space-y-3">
-              {(groupedBookings.get(dateKey) ?? []).map(renderBookingCard)}
+              {(groupedBookings.get(dateKey) ?? []).map((booking) => renderBookingCard(booking))}
             </div>
           </section>
         ))}
@@ -638,7 +621,7 @@ export function CalendarClient({
             {t('emptyStates.noBookingsOnDay')}
           </p>
         ) : (
-          <div className="space-y-3">{dayBookings.map(renderBookingCard)}</div>
+          <div className="space-y-3">{dayBookings.map((booking) => renderBookingCard(booking))}</div>
         )}
       </section>
     )
@@ -687,7 +670,9 @@ export function CalendarClient({
                     {t('emptyStates.noBookingsShort')}
                   </p>
                 ) : (
-                  dayBookings.map(renderBookingCard)
+                  dayBookings.map((booking) =>
+                    renderBookingCard(booking, { tone: isToday ? 'inverse' : 'default' })
+                  )
                 )}
               </div>
             </section>
@@ -737,33 +722,52 @@ export function CalendarClient({
                 </span>
               </div>
               <div className="mt-3 space-y-2">
-                {dayBookings.slice(0, 3).map((booking) => (
-                  <button
-                    key={booking.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedBookingId(booking.id)
-                      if (isMobile) {
-                        setIsDetailModalOpen(true)
-                      }
-                    }}
-                    className={cn(
-                      'block w-full rounded-2xl px-2 py-2 text-left text-xs',
-                      isToday
-                        ? 'bg-white/10 text-white hover:bg-white/15'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                    )}
-                  >
-                    <p className="truncate font-medium">
-                      {booking.service_name_snapshot ?? t('emptyStates.untitledBooking')}
-                    </p>
-                    <p
-                      className={cn('mt-1 truncate', isToday ? 'text-slate-300' : 'text-slate-500')}
+                {dayBookings.slice(0, 3).map((booking) => {
+                  const bookingStartTime = isoToLocalDateTimeParts(
+                    booking.starts_at,
+                    currentTimeZone
+                  ).time
+                  const bookingEndTime = isoToLocalDateTimeParts(
+                    booking.ends_at,
+                    currentTimeZone
+                  ).time
+
+                  return (
+                    <button
+                      key={booking.id}
+                      type="button"
+                      onClick={() => openDetailBooking(booking.id)}
+                      className={cn(
+                        'block w-full rounded-2xl px-2 py-2 text-left text-xs transition-colors',
+                        isToday
+                          ? 'bg-white/10 text-white hover:bg-white/15'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      )}
                     >
-                      {isoToLocalDateTimeParts(booking.starts_at, currentTimeZone).time}
-                    </p>
-                  </button>
-                ))}
+                      <p className="truncate font-medium">
+                        {booking.service_name_snapshot ?? t('emptyStates.untitledBooking')}
+                      </p>
+                      <p
+                        className={cn(
+                          'mt-1 truncate text-[11px]',
+                          isToday ? 'text-slate-300' : 'text-slate-500'
+                        )}
+                      >
+                        {booking.customer_name ??
+                          booking.customer_phone ??
+                          t('emptyStates.customerPending')}
+                      </p>
+                      <p
+                        className={cn(
+                          'mt-1 truncate text-[11px] font-medium',
+                          isToday ? 'text-white' : 'text-slate-600'
+                        )}
+                      >
+                        {bookingStartTime} - {bookingEndTime}
+                      </p>
+                    </button>
+                  )
+                })}
                 {dayBookings.length > 3 && (
                   <p className={cn('text-xs', isToday ? 'text-slate-300' : 'text-slate-500')}>
                     +{dayBookings.length - 3} {t('labels.moreBookings')}
@@ -778,33 +782,17 @@ export function CalendarClient({
   }
 
   const renderDetailPanel = (booking: CalendarBooking | null) => {
-    if (!booking) {
-      if (isMobile) {
-        return null
-      }
-
-      return (
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900">{t('detail.title')}</h3>
-          <p className="mt-3 text-sm text-slate-500">{t('detail.empty')}</p>
-        </div>
-      )
-    }
+    if (!booking) return null
 
     const detailContent = (
       <>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold text-slate-900">
-              {booking.service_name_snapshot ?? t('emptyStates.untitledBooking')}
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {booking.customer_name ?? booking.customer_phone ?? t('emptyStates.customerPending')}
-            </p>
-          </div>
-          <Badge variant={resolveStatusVariant(booking.status)}>
-            {t(`statuses.${booking.status}`)}
-          </Badge>
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-slate-900">
+            {booking.service_name_snapshot ?? t('emptyStates.untitledBooking')}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {booking.customer_name ?? booking.customer_phone ?? t('emptyStates.customerPending')}
+          </p>
         </div>
         <div className="mt-5 space-y-3 text-sm">
           <div className="flex items-start gap-3 text-slate-600">
@@ -850,44 +838,25 @@ export function CalendarClient({
             </div>
           )}
         </div>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => openEditBooking(booking)}
-            disabled={isPending || readOnlyTenantMode}
-          >
+        <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
+          <Button variant="secondary" onClick={() => openEditBooking(booking)} disabled={isPending || readOnlyTenantMode}>
             {t('actions.editBooking')}
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => cancelSelectedBooking(booking.id)}
-            disabled={isPending || readOnlyTenantMode}
-          >
+          <Button variant="danger" onClick={() => cancelSelectedBooking(booking.id)} disabled={isPending || readOnlyTenantMode}>
             {t('actions.cancelBooking')}
           </Button>
         </div>
       </>
     )
 
-    if (isMobile) {
-      return (
-        <Modal
-          isOpen={isDetailModalOpen}
-          onClose={() => setIsDetailModalOpen(false)}
-          title={t('detail.title')}
-        >
-          {detailContent}
-        </Modal>
-      )
-    }
-
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-900">{t('detail.title')}</h3>
-        <div className="mt-4">{detailContent}</div>
-      </div>
+      <Modal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        title={t('detail.title')}
+      >
+        {detailContent}
+      </Modal>
     )
   }
 
@@ -1106,14 +1075,11 @@ export function CalendarClient({
             </div>
           </section>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-            <div className="space-y-4">
-              {activeView === 'agenda' && renderAgendaView()}
-              {activeView === 'day' && renderDayView()}
-              {activeView === 'week' && renderWeekView()}
-              {activeView === 'month' && renderMonthView()}
-            </div>
-            {!isMobile && <div className="space-y-4">{renderDetailPanel(selectedBooking)}</div>}
+          <div className="space-y-4">
+            {activeView === 'agenda' && renderAgendaView()}
+            {activeView === 'day' && renderDayView()}
+            {activeView === 'week' && renderWeekView()}
+            {activeView === 'month' && renderMonthView()}
           </div>
         </div>
       </div>
@@ -1315,7 +1281,7 @@ export function CalendarClient({
         </div>
       </Modal>
 
-      {isMobile && renderDetailPanel(selectedBooking)}
+      {renderDetailPanel(selectedBooking)}
     </div>
   )
 }
