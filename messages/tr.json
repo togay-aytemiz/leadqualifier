@@ -1038,6 +1038,8 @@
       "trialTimeTitle": "Ücretsiz deneme süresi",
       "packageCreditsTitle": "Aylık paket",
       "topupCreditsTitle": "Ek kredi bakiyesi",
+      "totalCreditsTitle": "Toplam kullanılabilir kredi",
+      "creditPriorityTopupFirst": "Kullanım sırası: önce ek kredi, sonra aylık paket",
       "nonActiveMembershipNote": "Plan aktif değil. Aşağıdan bir paket işlemiyle devam edebilirsin.",
       "usedVsLimit": "{used} / {limit}",
       "daysUnit": "gün",

@@ -4,6 +4,7 @@ import { recordAiUsage } from '@/lib/ai/usage'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { messageMentionsField } from '@/lib/ai/intake-field-match'
+import { analyzeRuntimeRequiredIntake } from '@/lib/ai/required-intake-runtime'
 import { normalizeIntakeFields } from '@/lib/leads/offering-profile-utils'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
 
@@ -169,7 +170,7 @@ function resolvePrioritizedRequiredFields(requiredFields: string[], latestMessag
         .map((item) => item.field)
 }
 
-function resolveCollectedFieldsFromLeadSnapshot(
+function resolveCollectedFieldMapFromLeadSnapshot(
     requiredFields: string[],
     leadSnapshot?: FollowupLeadSnapshot | null
 ) {
@@ -177,46 +178,11 @@ function resolveCollectedFieldsFromLeadSnapshot(
         requiredFields,
         serviceType: leadSnapshot?.service_type ?? null,
         extractedFields: leadSnapshot?.extracted_fields ?? null
-    }).map((item) => item.field)
+    })
 
-    return normalizeIntakeFields(collected)
-}
-
-function resolveBlockedReaskFields(input: {
-    requiredFields: string[]
-    recentCustomerMessages: string[]
-    recentAssistantMessages: string[]
-    collectedFieldKeys: Set<string>
-    noProgressStreak: boolean
-}) {
-    const blocked = new Set<string>()
-    const refusalMessages = input.recentCustomerMessages.filter((message) => hasRefusalSignal(message))
-    const assistantQuestionMessages = input.recentAssistantMessages
-        .filter((message) => message.includes('?'))
-        .slice(-3)
-
-    for (const field of input.requiredFields) {
-        const fieldKey = normalizeFieldKey(field)
-        if (!fieldKey) continue
-        if (input.collectedFieldKeys.has(fieldKey)) {
-            blocked.add(fieldKey)
-            continue
-        }
-
-        if (refusalMessages.some((message) => messageMentionsField(field, message))) {
-            blocked.add(fieldKey)
-            continue
-        }
-
-        if (
-            input.noProgressStreak
-            && assistantQuestionMessages.some((message) => messageMentionsField(field, message))
-        ) {
-            blocked.add(fieldKey)
-        }
-    }
-
-    return blocked
+    return Object.fromEntries(
+        collected.map((item) => [item.field, item.value] as const)
+    ) as Record<string, string>
 }
 
 export function analyzeRequiredIntakeState(
@@ -254,15 +220,22 @@ export function analyzeRequiredIntakeState(
     const noProgressStreak = lastTwoCustomerMessages.length >= 2
         && lastTwoCustomerMessages.every((message) => hasRefusalSignal(message) || hasNoProgressSignal(message))
 
-    const collectedFields = resolveCollectedFieldsFromLeadSnapshot(requiredFields, options.leadSnapshot)
-    const collectedFieldKeys = new Set(collectedFields.map((field) => normalizeFieldKey(field)))
-    const blockedFieldKeys = resolveBlockedReaskFields({
+    const persistedCollectedFieldMap = resolveCollectedFieldMapFromLeadSnapshot(requiredFields, options.leadSnapshot)
+    const runtimeFieldStates = analyzeRuntimeRequiredIntake({
         requiredFields,
         recentCustomerMessages: customerMessages,
         recentAssistantMessages: assistantMessages,
-        collectedFieldKeys,
-        noProgressStreak
+        persistedCollectedFields: persistedCollectedFieldMap
     })
+    const collectedFields = runtimeFieldStates
+        .filter((state) => state.fulfilled)
+        .map((state) => state.field)
+    const collectedFieldKeys = new Set(collectedFields.map((field) => normalizeFieldKey(field)))
+    const blockedFieldKeys = new Set(
+        runtimeFieldStates
+            .filter((state) => state.blocked || state.fulfilled)
+            .map((state) => normalizeFieldKey(state.field))
+    )
     const prioritizedFields = resolvePrioritizedRequiredFields(requiredFields, latestCustomerMessage)
     const dynamicMinimumCount = resolveDynamicMinimumRequiredFieldCount(
         prioritizedFields.length,

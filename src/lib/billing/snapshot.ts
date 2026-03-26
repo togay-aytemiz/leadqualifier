@@ -98,8 +98,8 @@ function resolveCreditPool(options: {
         return null
     }
 
-    if (options.remainingPackageCredits > 0) return 'package_pool'
     if (options.topupBalance > 0) return 'topup_pool'
+    if (options.remainingPackageCredits > 0) return 'package_pool'
     return null
 }
 

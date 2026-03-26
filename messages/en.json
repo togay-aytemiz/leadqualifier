@@ -1038,6 +1038,8 @@
       "trialTimeTitle": "Trial time",
       "packageCreditsTitle": "Monthly package",
       "topupCreditsTitle": "Extra credit balance",
+      "totalCreditsTitle": "Total available credits",
+      "creditPriorityTopupFirst": "Usage priority: extra credits first, then monthly package",
       "nonActiveMembershipNote": "Plan is not active. Continue with a package action below.",
       "usedVsLimit": "{used} / {limit}",
       "daysUnit": "days",

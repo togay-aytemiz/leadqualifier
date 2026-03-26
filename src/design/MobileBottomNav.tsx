@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type MouseEvent as ReactMouseEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import {
     HiMiniCalendarDays,
     HiMiniChatBubbleBottomCenterText,
@@ -35,6 +35,10 @@ import {
     calculateSidebarBillingProgressSegments,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import {
+    formatSidebarBillingCredits,
+    formatSidebarBillingDate
+} from '@/lib/billing/sidebar-format'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 
@@ -47,14 +51,6 @@ interface NavItem {
     locked?: boolean
 }
 
-function formatCredits(value: number) {
-    const safe = Math.max(0, Number.isFinite(value) ? value : 0)
-    return new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1
-    }).format(safe)
-}
-
 interface MobileBottomNavProps {
     activeOrganizationId?: string | null
 }
@@ -63,6 +59,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const router = useRouter()
+    const locale = useLocale()
     const tNav = useTranslations('nav')
     const tSidebar = useTranslations('mainSidebar')
     const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)
@@ -326,7 +323,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
 
         if (billingSnapshot.membershipState === 'premium_active') {
             return tSidebar('billingPackageCreditsSubline', {
-                credits: formatCredits(billingSnapshot.package.credits.remaining)
+                credits: formatSidebarBillingCredits(locale, billingSnapshot.package.credits.remaining)
             })
         }
 
@@ -343,13 +340,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
         }
 
         return tSidebar('billingUnavailableDescription')
-    }, [billingSnapshot, tSidebar])
+    }, [billingSnapshot, locale, tSidebar])
     const billingDetailSecondary = useMemo(() => {
         if (!billingSnapshot) return null
 
         if (billingSnapshot.membershipState === 'trial_active') {
             return tSidebar('billingTrialCreditsSubline', {
-                credits: formatCredits(billingSnapshot.trial.credits.remaining)
+                credits: formatSidebarBillingCredits(locale, billingSnapshot.trial.credits.remaining)
             })
         }
 
@@ -359,7 +356,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
 
         if (billingSnapshot.topupBalance > 0) {
             return tSidebar('billingTopupSubline', {
-                credits: formatCredits(billingSnapshot.topupBalance)
+                credits: formatSidebarBillingCredits(locale, billingSnapshot.topupBalance)
             })
         }
 
@@ -367,16 +364,13 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
             return tSidebar('billingPackageSubline')
         }
 
-        try {
-            const resetDate = new Intl.DateTimeFormat(undefined, {
-                month: 'short',
-                day: 'numeric'
-            }).format(new Date(billingSnapshot.package.periodEnd))
+        const resetDate = formatSidebarBillingDate(locale, billingSnapshot.package.periodEnd)
+        if (resetDate) {
             return tSidebar('billingPackageSublineWithDate', { date: resetDate })
-        } catch {
-            return tSidebar('billingPackageSubline')
         }
-    }, [billingSnapshot, tSidebar])
+
+        return tSidebar('billingPackageSubline')
+    }, [billingSnapshot, locale, tSidebar])
 
     return (
         <>
@@ -406,7 +400,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
                                     {tSidebar('billingStatusLabel')}
                                 </p>
                                 <p className="mt-1 text-sm font-semibold text-slate-900">
-                                    {formatCredits(billingDisplayCredits)}
+                                    {formatSidebarBillingCredits(locale, billingDisplayCredits)}
                                     <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
                                 </p>
                                 <div className="mt-2 h-1.5 flex overflow-hidden rounded-full bg-slate-200">

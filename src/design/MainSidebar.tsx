@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
@@ -62,6 +62,11 @@ import {
     calculateSidebarBillingProgressSegments,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import {
+    formatSidebarBillingCompactCredits,
+    formatSidebarBillingCredits,
+    formatSidebarBillingDate
+} from '@/lib/billing/sidebar-format'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 import {
@@ -117,22 +122,6 @@ function mergeOrganizations(
         lookup.set(organization.id, organization)
     }
     return sortOrganizations(Array.from(lookup.values()))
-}
-
-function formatCredits(value: number) {
-    const safe = Math.max(0, Number.isFinite(value) ? value : 0)
-    return new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1
-    }).format(safe)
-}
-
-function formatCompactCredits(value: number) {
-    const safe = Math.max(0, Number.isFinite(value) ? value : 0)
-    return new Intl.NumberFormat(undefined, {
-        notation: 'compact',
-        maximumFractionDigits: safe >= 10000 ? 0 : 1
-    }).format(safe)
 }
 
 interface SidebarHoverTooltipProps {
@@ -196,6 +185,7 @@ export function MainSidebar({
     const searchParams = useSearchParams()
     const committedPathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
     const { activePath } = useDashboardRouteState(pathname)
+    const locale = useLocale()
     const tNav = useTranslations('nav')
     const tCommon = useTranslations('common')
     const tSidebar = useTranslations('mainSidebar')
@@ -1001,7 +991,7 @@ export function MainSidebar({
         default:
             return billingSnapshot.membershipState
         }
-    }, [billingSnapshot, tSidebar])
+    }, [billingSnapshot, locale, tSidebar])
     const billingDisplayCredits = useMemo(() => {
         if (!billingSnapshot) return 0
 
@@ -1078,7 +1068,7 @@ export function MainSidebar({
 
         if (billingSnapshot.membershipState === 'premium_active') {
             return tSidebar('billingPackageCreditsSubline', {
-                credits: formatCredits(billingSnapshot.package.credits.remaining)
+                credits: formatSidebarBillingCredits(locale, billingSnapshot.package.credits.remaining)
             })
         }
 
@@ -1095,13 +1085,13 @@ export function MainSidebar({
         }
 
         return tSidebar('billingUnavailableDescription')
-    }, [billingSnapshot, tSidebar])
+    }, [billingSnapshot, locale, tSidebar])
     const billingDetailSecondary = useMemo(() => {
         if (!billingSnapshot) return null
 
         if (billingSnapshot.membershipState === 'trial_active') {
             return tSidebar('billingTrialCreditsSubline', {
-                credits: formatCredits(billingSnapshot.trial.credits.remaining)
+                credits: formatSidebarBillingCredits(locale, billingSnapshot.trial.credits.remaining)
             })
         }
 
@@ -1111,7 +1101,7 @@ export function MainSidebar({
 
         if (billingSnapshot.topupBalance > 0) {
             return tSidebar('billingTopupSubline', {
-                credits: formatCredits(billingSnapshot.topupBalance)
+                credits: formatSidebarBillingCredits(locale, billingSnapshot.topupBalance)
             })
         }
 
@@ -1119,16 +1109,13 @@ export function MainSidebar({
             return tSidebar('billingPackageSubline')
         }
 
-        try {
-            const resetDate = new Intl.DateTimeFormat(undefined, {
-                month: 'short',
-                day: 'numeric'
-            }).format(new Date(billingSnapshot.package.periodEnd))
+        const resetDate = formatSidebarBillingDate(locale, billingSnapshot.package.periodEnd)
+        if (resetDate) {
             return tSidebar('billingPackageSublineWithDate', { date: resetDate })
-        } catch {
-            return tSidebar('billingPackageSubline')
         }
-    }, [billingSnapshot, tSidebar])
+
+        return tSidebar('billingPackageSubline')
+    }, [billingSnapshot, locale, tSidebar])
     const billingPackageRenewalDetail = useMemo(() => {
         if (!billingSnapshot || billingSnapshot.membershipState !== 'premium_active') return null
 
@@ -1136,16 +1123,13 @@ export function MainSidebar({
             return tSidebar('billingPackageRenewalUnknown')
         }
 
-        try {
-            const renewalDate = new Intl.DateTimeFormat(undefined, {
-                month: 'short',
-                day: 'numeric'
-            }).format(new Date(billingSnapshot.package.periodEnd))
+        const renewalDate = formatSidebarBillingDate(locale, billingSnapshot.package.periodEnd)
+        if (renewalDate) {
             return tSidebar('billingPackageRenewalDate', { date: renewalDate })
-        } catch {
-            return tSidebar('billingPackageRenewalUnknown')
         }
-    }, [billingSnapshot, tSidebar])
+
+        return tSidebar('billingPackageRenewalUnknown')
+    }, [billingSnapshot, locale, tSidebar])
     const canExpandBillingDetails = billingSnapshot?.membershipState === 'premium_active'
 
     return (
@@ -1786,7 +1770,7 @@ export function MainSidebar({
                                 <p className="text-xs font-semibold text-slate-700">{billingMembershipLabel}</p>
                             </div>
                             <p className="mt-1 text-base font-semibold text-slate-900">
-                                {formatCredits(billingDisplayCredits)}
+                                {formatSidebarBillingCredits(locale, billingDisplayCredits)}
                                 <span className="ml-1 text-xs font-medium text-slate-500">{tSidebar('billingCreditsUnit')}</span>
                             </p>
                         </Link>
@@ -1843,11 +1827,11 @@ export function MainSidebar({
                                     <div className="space-y-1 text-[11px] text-slate-600">
                                         <p className="flex items-center gap-1.5">
                                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#242A40]" aria-hidden />
-                                            {tSidebar('billingBreakdownPackage')}: {formatCredits(billingSnapshot.package.credits.remaining)}
+                                            {tSidebar('billingBreakdownPackage')}: {formatSidebarBillingCredits(locale, billingSnapshot.package.credits.remaining)}
                                         </p>
                                         <p className="flex items-center gap-1.5">
                                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-600" aria-hidden />
-                                            {tSidebar('billingBreakdownTopup')}: {formatCredits(billingSnapshot.topupBalance)}
+                                            {tSidebar('billingBreakdownTopup')}: {formatSidebarBillingCredits(locale, billingSnapshot.topupBalance)}
                                         </p>
                                         {billingPackageRenewalDetail && <p>{billingPackageRenewalDetail}</p>}
                                     </div>
@@ -1871,7 +1855,7 @@ export function MainSidebar({
                             href="/settings/plans"
                             prefetch={false}
                             aria-label={tSidebar('billingUsageMenuLabel')}
-                            title={`${tSidebar('billingStatusLabel')}: ${formatCredits(billingDisplayCredits)} ${tSidebar('billingCreditsUnit')}`}
+                            title={`${tSidebar('billingStatusLabel')}: ${formatSidebarBillingCredits(locale, billingDisplayCredits)} ${tSidebar('billingCreditsUnit')}`}
                             onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
                             onFocus={() => warmDashboardHotRoute('/settings/plans')}
                             onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
@@ -1886,7 +1870,7 @@ export function MainSidebar({
                                 style={{ background: collapsedBillingRingBackground }}
                             >
                                 <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-[9px] font-semibold text-slate-700">
-                                    {formatCompactCredits(billingDisplayCredits)}
+                                    {formatSidebarBillingCompactCredits(locale, billingDisplayCredits)}
                                 </div>
                             </div>
                         </Link>
@@ -1895,7 +1879,7 @@ export function MainSidebar({
                             <p className="font-semibold text-slate-900">{tSidebar('billingStatusLabel')}</p>
                             <p className="mt-1 text-slate-600">{billingMembershipLabel}</p>
                             <p className="mt-1 text-slate-600">
-                                {formatCredits(billingDisplayCredits)} {tSidebar('billingCreditsUnit')}
+                                {formatSidebarBillingCredits(locale, billingDisplayCredits)} {tSidebar('billingCreditsUnit')}
                             </p>
                             <p className="mt-1 text-slate-500">{billingDetailPrimary}</p>
                             {billingDetailSecondary && (
@@ -1903,8 +1887,8 @@ export function MainSidebar({
                             )}
                             {billingSnapshot.membershipState === 'premium_active' && (
                                 <div className="mt-2 space-y-1 text-slate-600">
-                                    <p>{tSidebar('billingBreakdownPackage')}: {formatCredits(billingSnapshot.package.credits.remaining)}</p>
-                                    <p>{tSidebar('billingBreakdownTopup')}: {formatCredits(billingSnapshot.topupBalance)}</p>
+                                    <p>{tSidebar('billingBreakdownPackage')}: {formatSidebarBillingCredits(locale, billingSnapshot.package.credits.remaining)}</p>
+                                    <p>{tSidebar('billingBreakdownTopup')}: {formatSidebarBillingCredits(locale, billingSnapshot.topupBalance)}</p>
                                 </div>
                             )}
                             {showLowCreditWarning && (

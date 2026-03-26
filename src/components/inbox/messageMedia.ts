@@ -48,6 +48,21 @@ function toPreviewKind(value: unknown): 'image' | 'link' | undefined {
     return undefined
 }
 
+function isRenderableImageMimeType(value: string | null | undefined) {
+    if (typeof value !== 'string') return false
+    return value.trim().toLowerCase().startsWith('image/')
+}
+
+function looksLikeImageAssetPath(value: string | null | undefined) {
+    if (typeof value !== 'string') return false
+    const normalized = value.trim().toLowerCase()
+    if (!normalized) return false
+
+    return /\.(avif|gif|jpe?g|png|webp)(?:[?#].*)?$/.test(normalized)
+        || normalized.includes('cdninstagram.com/')
+        || normalized.includes('scontent-')
+}
+
 function parseMetadata(metadata: unknown) {
     if (typeof metadata === 'string') {
         const trimmed = metadata.trim()
@@ -159,6 +174,9 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
 export function shouldAttemptInlineImagePreview(media: InboxMessageMedia | null | undefined) {
     if (!media?.url) return false
     if (media.type === 'image') return true
+    if (isRenderableImageMimeType(media.mimeType)) return true
+    if (looksLikeImageAssetPath(media.url)) return true
+    if (looksLikeImageAssetPath(media.fileName)) return true
     return media.previewKind === 'image'
 }
 

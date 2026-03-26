@@ -161,6 +161,7 @@ import {
   type InboxLeadTemperatureFilter,
   type InboxUnreadFilter,
 } from '@/components/inbox/conversationListFilters'
+import { resolveFilteredConversationBackfillState } from '@/components/inbox/filteredConversationBackfill'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -683,27 +684,36 @@ export function InboxContainer({
     }
   }, [])
 
+  const loadMoreConversations = useCallback(async () => {
+    if (!hasMore || loadingMore) return
+
+    setLoadingMore(true)
+    try {
+      const nextConversations = await getConversations(organizationId, page)
+      if (nextConversations.length > 0) {
+        setConversations((prev) => {
+          const existingIds = new Set(prev.map((conversation) => conversation.id))
+          const uniqueNew = nextConversations.filter(
+            (conversation) => !existingIds.has(conversation.id)
+          )
+          return [...prev, ...uniqueNew]
+        })
+        setPage((prev) => prev + 1)
+        return
+      }
+
+      setHasMore(false)
+    } catch (error) {
+      console.error('Failed to load more conversations', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [hasMore, loadingMore, organizationId, page])
+
   const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    if (scrollHeight - scrollTop <= clientHeight + 50 && hasMore && !loadingMore) {
-      setLoadingMore(true)
-      try {
-        const nextConversations = await getConversations(organizationId, page)
-        if (nextConversations.length > 0) {
-          setConversations((prev) => {
-            const existingIds = new Set(prev.map((c) => c.id))
-            const uniqueNew = nextConversations.filter((c) => !existingIds.has(c.id))
-            return [...prev, ...uniqueNew]
-          })
-          setPage((prev) => prev + 1)
-        } else {
-          setHasMore(false)
-        }
-      } catch (error) {
-        console.error('Failed to load more conversations', error)
-      } finally {
-        setLoadingMore(false)
-      }
+    if (scrollHeight - scrollTop <= clientHeight + 50) {
+      await loadMoreConversations()
     }
   }
 
@@ -2323,6 +2333,18 @@ export function InboxContainer({
     unreadFilter,
     leadTemperatureFilter,
   })
+  const filterBackfillState = resolveFilteredConversationBackfillState({
+    hasActiveFilters: hasActiveConversationFilters,
+    filteredConversationCount: filteredConversations.length,
+    hasMoreConversations: hasMore,
+    isLoadingMoreConversations: loadingMore,
+  })
+
+  useEffect(() => {
+    if (!filterBackfillState.shouldLoadMore) return
+    void loadMoreConversations()
+  }, [filterBackfillState.shouldLoadMore, loadMoreConversations])
+
   useEffect(() => {
     if (filteredConversations.length === 0) {
       if (selectedId !== null) {
@@ -2342,7 +2364,7 @@ export function InboxContainer({
 
   const renderConversationListContent = () => (
     <>
-      {filteredConversations.length === 0 ? (
+      {filterBackfillState.shouldShowEmptyState ? (
         <div className="flex h-full flex-col items-center justify-start p-6 pt-20 text-center">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
             <Inbox className="text-gray-400" size={24} />
@@ -2355,6 +2377,10 @@ export function InboxContainer({
               ? t('conversationFiltersNoMatchesDescription')
               : t('noMessagesDesc')}
           </p>
+        </div>
+      ) : filteredConversations.length === 0 ? (
+        <div className="flex h-full items-center justify-center p-6">
+          <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-blue-500" />
         </div>
       ) : (
         filteredConversations.map((c) => {
@@ -2494,7 +2520,7 @@ export function InboxContainer({
           )
         })
       )}
-      {loadingMore && (
+      {loadingMore && filteredConversations.length > 0 && (
         <div className="flex justify-center p-4">
           <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-blue-500"></div>
         </div>

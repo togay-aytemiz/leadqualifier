@@ -1,5 +1,9 @@
 import { isLikelyTurkishMessage, type MvpResponseLanguage } from '@/lib/ai/language'
 import { messageMentionsField } from '@/lib/ai/intake-field-match'
+import {
+    doesAssistantMessageTargetRequiredField,
+    hasRequiredIntakeQuestionIntent
+} from '@/lib/ai/required-intake-runtime'
 
 const ENGLISH_SIGNAL_PATTERN = /\b(i|we|you|your|can|could|would|should|please|continue|clarify|available|options|share|details|information|service|appointment|cancel|contact|support|team|next|step|understood|meanwhile)\b/i
 
@@ -120,8 +124,7 @@ function splitIntoSentenceLikeChunks(message: string) {
 }
 
 function hasQuestionIntent(value: string) {
-    if (value.includes('?')) return true
-    return /\b(ne|nas[iı]l|neden|hangi|kim|nereye|ne zaman|how|why|what|which|when|can|could|would|should)\b/i.test(value)
+    return hasRequiredIntakeQuestionIntent(value)
 }
 
 function hasRefusalSignal(value: string) {
@@ -337,7 +340,10 @@ function stripBlockedFieldReaskQuestions(input: {
     const chunks = splitIntoSentenceLikeChunks(response)
     const filtered = chunks.filter((chunk) => {
         if (!hasQuestionIntent(chunk)) return true
-        return !blockedFields.some((field) => messageMentionsField(field, chunk))
+        return !blockedFields.some((field) => (
+            messageMentionsField(field, chunk)
+            || doesAssistantMessageTargetRequiredField(field, chunk)
+        ))
     })
     if (filtered.length === chunks.length) return response
     if (filtered.length === 0) {
@@ -346,7 +352,7 @@ function stripBlockedFieldReaskQuestions(input: {
             : 'Understood. We can continue with the available options without those details.'
     }
     const merged = filtered.join(' ').replace(/\s+/g, ' ').trim()
-    const weakAcknowledgementOnly = /^(peki|tamam|olur|ok|okay)\.?$/i.test(merged)
+    const weakAcknowledgementOnly = /^(peki|tamam|olur|ok|okay|tabii|tabi|elbette)\.?$/i.test(merged)
     if (weakAcknowledgementOnly) {
         return input.responseLanguage === 'tr'
             ? 'Anladım. Bu bilgiler olmadan mevcut seçeneklerle devam edebiliriz.'

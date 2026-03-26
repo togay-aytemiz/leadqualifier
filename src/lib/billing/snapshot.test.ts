@@ -107,6 +107,26 @@ describe('buildOrganizationBillingSnapshot', () => {
         expect(snapshot.package.credits.remaining).toBe(65)
     })
 
+    it('prioritizes extra credits before monthly package credits when both remain', () => {
+        const snapshot = buildOrganizationBillingSnapshot(
+            createBillingAccount({
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 100,
+                monthly_package_credit_used: 35,
+                topup_credit_balance: 12.5,
+                current_period_start: '2026-02-01T00:00:00.000Z',
+                current_period_end: '2026-03-01T00:00:00.000Z'
+            }),
+            { nowIso: '2026-02-14T00:00:00.000Z' }
+        )
+
+        expect(snapshot.isUsageAllowed).toBe(true)
+        expect(snapshot.activeCreditPool).toBe('topup_pool')
+        expect(snapshot.package.credits.remaining).toBe(65)
+        expect(snapshot.topupBalance).toBe(12.5)
+    })
+
     it('locks premium users when both package and top-up credits are exhausted', () => {
         const snapshot = buildOrganizationBillingSnapshot(
             createBillingAccount({
@@ -163,6 +183,6 @@ describe('buildOrganizationBillingSnapshot', () => {
         expect(snapshot.isUsageAllowed).toBe(true)
         expect(snapshot.isTopupAllowed).toBe(true)
         expect(snapshot.lockReason).toBe('none')
-        expect(snapshot.activeCreditPool).toBe('package_pool')
+        expect(snapshot.activeCreditPool).toBe('topup_pool')
     })
 })

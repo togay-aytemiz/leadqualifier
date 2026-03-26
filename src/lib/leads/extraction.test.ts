@@ -4,6 +4,8 @@ import {
     buildLeadExtractionConversationContext,
     mergeExtractionWithExisting,
     normalizeLowSignalLeadStatus,
+    parseRequiredIntakeRepairPayload,
+    repairLeadExtractionRequiredIntake,
     resolvePersistedServiceType,
     resolvePersistedServiceTypes,
     resolveLeadExtractionLocale,
@@ -89,6 +91,36 @@ describe('buildExtractionSystemPrompt', () => {
         expect(prompt).toContain('Match required fields by meaning, not only exact wording')
         expect(prompt).toContain('High-confidence implied answers can be included')
         expect(prompt).toContain('Approximate or range-style customer answers are valid values')
+    })
+})
+
+describe('repairLeadExtractionRequiredIntake', () => {
+    it('backfills missing required intake fields from contextual conversation evidence', () => {
+        const repaired = repairLeadExtractionRequiredIntake({
+            extracted: safeParseLeadExtraction('{"required_intake_collected":{"Hamilelik Durumu":"Evet"},"summary":"Fiyat bilgisi istiyor."}'),
+            requiredFields: ['Bebek Doğum Tarihi', 'Hamilelik Durumu'],
+            recentAssistantMessages: ['Tahminen bebişin gelişi ne zaman'],
+            recentCustomerMessages: ['Temmuz sonu ağustos başı gibi']
+        })
+
+        expect(repaired.required_intake_collected).toEqual({
+            'Hamilelik Durumu': 'Evet',
+            'Bebek Doğum Tarihi': 'Temmuz sonu ağustos başı gibi'
+        })
+    })
+})
+
+describe('parseRequiredIntakeRepairPayload', () => {
+    it('keeps only allowed required field labels from repair payloads', () => {
+        const parsed = parseRequiredIntakeRepairPayload(
+            '{"required_intake_collected":{"Hamilelik Durumu":"Evet","Bebek Doğum Tarihi":"Temmuz sonu ağustos başı","Not":"ignore"}}',
+            ['Hamilelik Durumu', 'Bebek Doğum Tarihi']
+        )
+
+        expect(parsed).toEqual({
+            'Hamilelik Durumu': 'Evet',
+            'Bebek Doğum Tarihi': 'Temmuz sonu ağustos başı'
+        })
     })
 })
 
@@ -498,7 +530,7 @@ describe('buildLeadExtractionConversationContext', () => {
         ])
     })
 
-    it('excludes whatsapp media messages and keeps text-only turns', () => {
+    it('excludes whatsapp media-only placeholder messages and keeps text-only turns', () => {
         const result = buildLeadExtractionConversationContext({
             messages: [
                 {
@@ -531,6 +563,66 @@ describe('buildLeadExtractionConversationContext', () => {
             'customer: Fiyat alabilir miyim?'
         ])
         expect(result.customerMessages).toEqual(['Fiyat alabilir miyim?'])
+    })
+
+    it('keeps caption text from whatsapp media messages in extraction context', () => {
+        const result = buildLeadExtractionConversationContext({
+            messages: [
+                {
+                    sender_type: 'contact',
+                    content: 'Bunun fiyatını öğrenebilir miyim?',
+                    metadata: {
+                        whatsapp_message_type: 'image',
+                        whatsapp_media: {
+                            type: 'image',
+                            storage_url: 'https://cdn.example.com/media-2.jpg',
+                            caption: 'Bunun fiyatını öğrenebilir miyim?'
+                        }
+                    }
+                },
+                {
+                    sender_type: 'bot',
+                    content: 'Tabii, hangi paket için bilgi istersiniz?'
+                }
+            ]
+        })
+
+        expect(result.conversationTurns).toEqual([
+            'assistant: Tabii, hangi paket için bilgi istersiniz?',
+            'customer: Bunun fiyatını öğrenebilir miyim?'
+        ])
+        expect(result.customerMessages).toEqual(['Bunun fiyatını öğrenebilir miyim?'])
+    })
+
+    it('uses instagram media caption when content falls back to a placeholder label', () => {
+        const result = buildLeadExtractionConversationContext({
+            messages: [
+                {
+                    sender_type: 'contact',
+                    content: '[Instagram image]',
+                    metadata: {
+                        instagram_event_type: 'attachment',
+                        instagram_media: {
+                            type: 'image',
+                            storage_url: 'https://cdn.example.com/instagram-media-1.jpg',
+                            caption: 'Merhaba, bunun hakkında daha fazla bilgi alabilir miyim?'
+                        }
+                    }
+                },
+                {
+                    sender_type: 'bot',
+                    content: 'Tabii, size yardımcı olayım.'
+                }
+            ]
+        })
+
+        expect(result.conversationTurns).toEqual([
+            'assistant: Tabii, size yardımcı olayım.',
+            'customer: Merhaba, bunun hakkında daha fazla bilgi alabilir miyim?'
+        ])
+        expect(result.customerMessages).toEqual([
+            'Merhaba, bunun hakkında daha fazla bilgi alabilir miyim?'
+        ])
     })
 })
 

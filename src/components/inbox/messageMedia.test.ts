@@ -101,6 +101,54 @@ describe('extractMediaFromMessageMetadata', () => {
 })
 
 describe('shouldAttemptInlineImagePreview', () => {
+    it('allows inline preview for document media when mime type is still an image', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'document',
+            url: 'https://cdn.example.com/whatsapp-forwarded-image.jpg',
+            fileName: 'whatsapp-forwarded-image.jpg',
+            mimeType: 'image/jpeg',
+            caption: null,
+            isPlaceholder: true,
+            downloadStatus: 'stored'
+        })).toBe(true)
+    })
+
+    it('allows inline preview for document media when the stored asset url ends with an image extension', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'document',
+            url: 'https://cdn.example.com/whatsapp-forwarded-image.jpg?download=1',
+            fileName: null,
+            mimeType: null,
+            caption: null,
+            isPlaceholder: true,
+            downloadStatus: 'stored'
+        })).toBe(true)
+    })
+
+    it('allows inline preview for document media when only the stored filename looks like an image', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'document',
+            url: 'https://storage.example.com/object/sign/whatsapp-media/signed-object',
+            fileName: 'newborn-package.png',
+            mimeType: null,
+            caption: null,
+            isPlaceholder: true,
+            downloadStatus: 'stored'
+        })).toBe(true)
+    })
+
+    it('allows inline preview for unknown media when mime type is still an image', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'unknown',
+            url: 'https://cdn.example.com/whatsapp-image-without-type.jpg',
+            fileName: null,
+            mimeType: 'image/jpeg',
+            caption: null,
+            isPlaceholder: true,
+            downloadStatus: 'stored'
+        })).toBe(true)
+    })
+
     it('allows inline preview for instagram shared media flagged as image preview', () => {
         expect(shouldAttemptInlineImagePreview({
             type: 'unknown',

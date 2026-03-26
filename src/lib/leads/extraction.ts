@@ -1,10 +1,12 @@
 import OpenAI from 'openai'
+import { messageMentionsField } from '@/lib/ai/intake-field-match'
 import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
+import { repairRequiredIntakeFromConversation } from '@/lib/leads/required-intake-repair'
 import {
     normalizeRequiredIntakeFieldKey,
     normalizeRequiredIntakeFieldValue,
@@ -19,6 +21,7 @@ const ENGLISH_WORD_PATTERN = /\b(hello|hi|price|appointment|thank(s| you)|please
 const GENERIC_GREETING_PATTERN = /^(?:hi|hello|hey|selam|merhaba|slm|tesekkurler|teşekkürler|thanks|thank you|ok|tamam|👍|👌|👋|🙏)[.!?\s]*$/i
 const COMBINING_MARKS_PATTERN = /[\u0300-\u036f]/g
 const LEAD_EXTRACTION_MAX_OUTPUT_TOKENS = 320
+const REQUIRED_INTAKE_REPAIR_MAX_OUTPUT_TOKENS = 180
 const LEAD_EXTRACTION_MAX_CONTEXT_TURNS = 10
 const LEAD_EXTRACTION_MAX_MESSAGES_TO_LOAD = 20
 const LEAD_EXTRACTION_MAX_CUSTOMER_MESSAGES = 5
@@ -135,6 +138,16 @@ If none are collected, return required_intake_collected as {}.
 Messages indicating cancellation/decline (e.g., "vazgeçtim", "istemiyorum") are still business-context messages, not personal/social chat.
 Use nulls if unknown. Use non_business=true only for personal/social conversations.
 Write summary, desired_date, location, and required_intake_collected values in ${responseLanguage}.`
+}
+
+function buildRequiredIntakeRepairSystemPrompt(responseLanguage: 'Turkish' | 'English') {
+    return `Repair missing required intake fields as JSON.
+Return ONLY valid JSON with this shape: { "required_intake_collected": { "<Exact Field Label>": "<value>" } }.
+Use only the listed missing required intake fields.
+Always use the exact configured required field labels as object keys.
+Infer values only when the conversation provides high-confidence evidence.
+Do not invent low-confidence values.
+Keep values concise and in ${responseLanguage}.`
 }
 
 function normalizeForMatch(value: string) {
@@ -373,15 +386,41 @@ function parseMessageMetadataRecord(metadata: unknown) {
     }
 }
 
-function isMediaLikeMessage(message: LeadExtractionMessageRecord) {
-    const metadata = parseMessageMetadataRecord(message.metadata)
-    if (!metadata) return false
+function readMediaMetadataNode(metadata: Record<string, unknown>) {
+    if (isRecord(metadata.whatsapp_media)) return metadata.whatsapp_media
+    if (isRecord(metadata.instagram_media)) return metadata.instagram_media
+    return null
+}
 
-    if (isRecord(metadata.whatsapp_media)) return true
+function hasMediaMetadata(metadata: Record<string, unknown>) {
+    if (readMediaMetadataNode(metadata)) return true
+
     const whatsappMessageType = typeof metadata.whatsapp_message_type === 'string'
         ? metadata.whatsapp_message_type.trim().toLowerCase()
         : ''
-    return ['image', 'document', 'audio', 'video', 'sticker'].includes(whatsappMessageType)
+    if (['image', 'document', 'audio', 'video', 'sticker'].includes(whatsappMessageType)) return true
+
+    const instagramEventType = typeof metadata.instagram_event_type === 'string'
+        ? metadata.instagram_event_type.trim().toLowerCase()
+        : ''
+    return instagramEventType === 'attachment'
+}
+
+function isKnownMediaPlaceholderContent(value: string) {
+    return /^\[(?:whatsapp|instagram)\s(?:image|document|audio|video|sticker|media|attachment)(?::[^\]]+)?\]$/i.test(value)
+}
+
+function resolveLeadExtractionMessageContent(message: LeadExtractionMessageRecord) {
+    const content = normalizeLeadMessageContent(message.content)
+    const metadata = parseMessageMetadataRecord(message.metadata)
+    if (!metadata || !hasMediaMetadata(metadata)) return content
+
+    const mediaNode = readMediaMetadataNode(metadata)
+    const caption = mediaNode ? normalizeLeadMessageContent(mediaNode.caption) : ''
+
+    if (content && !isKnownMediaPlaceholderContent(content)) return content
+    if (caption) return caption
+    return ''
 }
 
 export function buildLeadExtractionConversationContext(options: {
@@ -391,11 +430,10 @@ export function buildLeadExtractionConversationContext(options: {
 }) {
     const maxTurns = Math.max(1, Math.min(options.maxTurns ?? LEAD_EXTRACTION_MAX_CONTEXT_TURNS, 20))
     const turns = [...(options.messages ?? [])]
-        .filter((message) => !isMediaLikeMessage(message))
         .reverse()
         .map((message) => {
             const role = toLeadConversationRole(message.sender_type)
-            const content = normalizeLeadMessageContent(message.content)
+            const content = resolveLeadExtractionMessageContent(message)
             if (!role || !content) return null
             return { role, content }
         })
@@ -418,12 +456,17 @@ export function buildLeadExtractionConversationContext(options: {
         .filter((turn) => turn.role === 'customer')
         .map((turn) => turn.content)
         .slice(-LEAD_EXTRACTION_MAX_CUSTOMER_MESSAGES)
+    const assistantMessages = turns
+        .filter((turn) => turn.role !== 'customer')
+        .map((turn) => turn.content)
+        .slice(-3)
 
     return {
         conversationTurns: turns
             .slice(-maxTurns)
             .map((turn) => `${turn.role}: ${turn.content}`),
-        customerMessages
+        customerMessages,
+        assistantMessages
     }
 }
 
@@ -650,6 +693,62 @@ export function safeParseLeadExtraction(input: string) {
     }
 }
 
+export function parseRequiredIntakeRepairPayload(raw: string, allowedFields: string[]) {
+    const normalizedAllowedFields = normalizeIntakeFields(allowedFields)
+    if (normalizedAllowedFields.length === 0) return {} as Record<string, string>
+
+    const trimmed = raw.trim()
+    if (!trimmed) return {} as Record<string, string>
+
+    const candidates = [
+        trimmed,
+        stripJsonFence(trimmed),
+        extractFirstJsonObject(stripJsonFence(trimmed))
+    ].filter((item): item is string => Boolean(item))
+    const seen = new Set<string>()
+
+    for (const candidate of candidates) {
+        if (seen.has(candidate)) continue
+        seen.add(candidate)
+
+        try {
+            const parsed = JSON.parse(candidate)
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
+
+            const parsedObject = parsed as Record<string, unknown>
+            const rawCollected = parsedObject.required_intake_collected ?? parsedObject.requiredIntakeCollected
+            if (!rawCollected || typeof rawCollected !== 'object' || Array.isArray(rawCollected)) continue
+
+            const collectedEntries = Object.entries(rawCollected as Record<string, unknown>)
+            const repaired: Record<string, string> = {}
+
+            for (const allowedField of normalizedAllowedFields) {
+                const normalizedAllowedKey = normalizeRequiredIntakeFieldKey(allowedField)
+                const matchingEntry = collectedEntries.find(([candidateKey]) => {
+                    const normalizedCandidateKey = normalizeRequiredIntakeFieldKey(candidateKey)
+                    if (!normalizedCandidateKey) return false
+                    if (normalizedCandidateKey === normalizedAllowedKey) return true
+                    return (
+                        messageMentionsField(allowedField, candidateKey)
+                        || messageMentionsField(candidateKey, allowedField)
+                    )
+                })
+                if (!matchingEntry) continue
+
+                const normalizedValue = normalizeRequiredIntakeFieldValue(matchingEntry[1])
+                if (!normalizedValue) continue
+                repaired[allowedField] = normalizedValue
+            }
+
+            return repaired
+        } catch {
+            continue
+        }
+    }
+
+    return {} as Record<string, string>
+}
+
 function normalizeOptionalString(value: unknown) {
     if (typeof value !== 'string') return null
     const normalized = value.trim()
@@ -847,6 +946,35 @@ export function normalizeLowSignalLeadStatus(options: {
     } satisfies NormalizedLeadExtraction
 }
 
+export function repairLeadExtractionRequiredIntake(options: {
+    extracted: NormalizedLeadExtraction
+    requiredFields: string[]
+    recentAssistantMessages?: string[]
+    recentCustomerMessages?: string[]
+}) {
+    return {
+        ...options.extracted,
+        required_intake_collected: repairRequiredIntakeFromConversation({
+            requiredFields: options.requiredFields,
+            existingCollected: options.extracted.required_intake_collected,
+            recentAssistantMessages: options.recentAssistantMessages ?? [],
+            recentCustomerMessages: options.recentCustomerMessages ?? []
+        })
+    } satisfies NormalizedLeadExtraction
+}
+
+function resolveMissingRequiredIntakeFields(requiredFields: string[], collected: Record<string, string>) {
+    const collectedKeys = new Set(
+        Object.keys(collected)
+            .map((field) => normalizeRequiredIntakeFieldKey(field))
+            .filter(Boolean)
+    )
+
+    return normalizeIntakeFields(requiredFields).filter((field) => (
+        !collectedKeys.has(normalizeRequiredIntakeFieldKey(field))
+    ))
+}
+
 export async function runLeadExtraction(options: {
     organizationId: string
     conversationId: string
@@ -916,7 +1044,7 @@ export async function runLeadExtraction(options: {
             .join('\n')
         : 'none'
     const latestMessage = (options.latestMessage ?? '').trim()
-    const { conversationTurns, customerMessages } = buildLeadExtractionConversationContext({
+    const { conversationTurns, customerMessages, assistantMessages } = buildLeadExtractionConversationContext({
         messages: (messages ?? []) as LeadExtractionMessageRecord[],
         latestCustomerMessage: latestMessage,
         maxTurns: LEAD_EXTRACTION_MAX_CONTEXT_TURNS
@@ -955,7 +1083,8 @@ export async function runLeadExtraction(options: {
         `Recent conversation turns (latest ${conversationTurns.length}, oldest to newest):\n${conversationTurns.length > 0 ? conversationTurns.join('\n') : 'none'}`,
         'Customer messages (latest 5, oldest to newest):',
         customerContextMessages.length > 0 ? customerContextMessages.join('\n') : 'none'
-    ].join('\n\n')
+    ]
+        .join('\n\n')
 
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -1032,6 +1161,51 @@ export async function runLeadExtraction(options: {
         services: persistedServiceTypes
     }
     extracted = normalizeLowSignalLeadStatus({ extracted, customerMessages })
+    extracted = repairLeadExtractionRequiredIntake({
+        extracted,
+        requiredFields: requiredIntakeFields,
+        recentAssistantMessages: assistantMessages,
+        recentCustomerMessages: customerMessages
+    })
+    const missingRequiredIntakeFields = resolveMissingRequiredIntakeFields(
+        requiredIntakeFields,
+        extracted.required_intake_collected
+    )
+    if (missingRequiredIntakeFields.length > 0 && conversationTurns.length > 0) {
+        const repairSystemPrompt = buildRequiredIntakeRepairSystemPrompt(responseLanguage)
+        const repairUserPrompt = [
+            `Missing required intake fields:\n${missingRequiredIntakeFields.map((field) => `- ${field}`).join('\n')}`,
+            `Already collected required intake:\n${Object.keys(extracted.required_intake_collected).length > 0
+                ? Object.entries(extracted.required_intake_collected).map(([field, value]) => `- ${field}: ${value}`).join('\n')
+                : 'none'}`,
+            `Recent conversation turns (oldest to newest):\n${conversationTurns.join('\n')}`
+        ].join('\n\n')
+        const repairCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.1,
+            max_tokens: REQUIRED_INTAKE_REPAIR_MAX_OUTPUT_TOKENS,
+            response_format: { type: 'json_object' },
+            messages: [
+                { role: 'system', content: repairSystemPrompt },
+                { role: 'user', content: repairUserPrompt }
+            ]
+        })
+        const repairResponse = repairCompletion.choices[0]?.message?.content?.trim() ?? '{}'
+        addUsage(repairCompletion, repairUserPrompt, repairResponse)
+        const repairedCollected = parseRequiredIntakeRepairPayload(
+            repairResponse,
+            missingRequiredIntakeFields
+        )
+        if (Object.keys(repairedCollected).length > 0) {
+            extracted = {
+                ...extracted,
+                required_intake_collected: {
+                    ...extracted.required_intake_collected,
+                    ...repairedCollected
+                }
+            }
+        }
+    }
     const normalizedExtracted = mergeExtractionWithExisting(extracted, existingLead)
 
     await supabase.from('leads').upsert({

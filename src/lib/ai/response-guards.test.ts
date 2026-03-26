@@ -110,6 +110,19 @@ describe('response guards', () => {
         expect(response).not.toContain('ulaşabileceğimiz bir numara paylaşabilir misiniz')
     })
 
+    it('strips blocked timeline re-asks when response uses semantic wording drift', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Tabii. Tahminen bebişin gelişi ne zaman?',
+            userMessage: 'Temmuz sonu ağustos başı gibi.',
+            responseLanguage: 'tr',
+            blockedReaskFields: ['Bebek Doğum Tarihi'],
+            recentAssistantMessages: []
+        })
+
+        expect(response).toContain('Anladım.')
+        expect(response).not.toContain('Tahminen bebişin gelişi ne zaman')
+    })
+
     it('strips intake questions when intake suppression is active', () => {
         const response = applyLiveAssistantResponseGuards({
             response: 'İptal politikasını paylaşayım. Bütçe aralığınızı da paylaşabilir misiniz?',

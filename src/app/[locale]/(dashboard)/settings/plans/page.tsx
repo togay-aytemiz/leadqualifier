@@ -831,57 +831,68 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                 )}
 
                                 {isPremiumMembership && (
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="space-y-4">
                                         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.packageCreditsTitle')}</p>
+                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.totalCreditsTitle')}</p>
                                             <p className="mt-2 text-lg font-semibold text-gray-900">
-                                                {formatNumber.format(snapshot.package.credits.remaining)}
+                                                {formatNumber.format(snapshot.totalRemainingCredits)}
                                                 <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
                                             </p>
-                                            <p className="mt-1 text-xs text-gray-500">
-                                                {tPlans('status.usedVsLimit', {
-                                                    used: formatNumber.format(snapshot.package.credits.remaining),
-                                                    limit: formatNumber.format(snapshot.package.credits.limit)
-                                                })}
-                                            </p>
-                                            <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                                <div
-                                                    className="h-2 rounded-full bg-[#242A40]"
-                                                    style={{ width: `${Math.min(100, packageCreditsProgress)}%` }}
-                                                />
-                                            </div>
-                                            {showPremiumLowCreditWarning && (
-                                                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
-                                                    <AlertCircle size={12} />
-                                                    {tPlans('status.lowCreditWarning')}
-                                                </p>
-                                            )}
-                                            {snapshot.package.periodEnd && (
-                                                <p className="mt-2 text-xs text-gray-500">
-                                                    {tPlans('status.packageResetAt', {
-                                                        date: formatDateTime.format(new Date(snapshot.package.periodEnd))
-                                                    })}
-                                                </p>
-                                            )}
+                                            <p className="mt-1 text-xs text-gray-500">{tPlans('status.creditPriorityTopupFirst')}</p>
                                         </div>
 
-                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.topupCreditsTitle')}</p>
-                                            <p className="mt-2 text-lg font-semibold text-gray-900">
-                                                {formatNumber.format(snapshot.topupBalance)}
-                                                <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                            </p>
-                                            <p className="mt-1 text-xs text-gray-500">
-                                                {tPlans('status.usedVsLimit', {
-                                                    used: formatNumber.format(snapshot.topupBalance),
-                                                    limit: formatNumber.format(topupTotalCredits)
-                                                })}
-                                            </p>
-                                            <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                                <div
-                                                    className="h-2 rounded-full bg-purple-600"
-                                                    style={{ width: `${Math.min(100, topupCreditsProgress)}%` }}
-                                                />
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.packageCreditsTitle')}</p>
+                                                <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                    {formatNumber.format(snapshot.package.credits.remaining)}
+                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {tPlans('status.usedVsLimit', {
+                                                        used: formatNumber.format(snapshot.package.credits.remaining),
+                                                        limit: formatNumber.format(snapshot.package.credits.limit)
+                                                    })}
+                                                </p>
+                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                    <div
+                                                        className="h-2 rounded-full bg-[#242A40]"
+                                                        style={{ width: `${Math.min(100, packageCreditsProgress)}%` }}
+                                                    />
+                                                </div>
+                                                {showPremiumLowCreditWarning && (
+                                                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800">
+                                                        <AlertCircle size={12} />
+                                                        {tPlans('status.lowCreditWarning')}
+                                                    </p>
+                                                )}
+                                                {snapshot.package.periodEnd && (
+                                                    <p className="mt-2 text-xs text-gray-500">
+                                                        {tPlans('status.packageResetAt', {
+                                                            date: formatDateTime.format(new Date(snapshot.package.periodEnd))
+                                                        })}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.topupCreditsTitle')}</p>
+                                                <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                    {formatNumber.format(snapshot.topupBalance)}
+                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {tPlans('status.usedVsLimit', {
+                                                        used: formatNumber.format(snapshot.topupBalance),
+                                                        limit: formatNumber.format(topupTotalCredits)
+                                                    })}
+                                                </p>
+                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                    <div
+                                                        className="h-2 rounded-full bg-purple-600"
+                                                        style={{ width: `${Math.min(100, topupCreditsProgress)}%` }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
