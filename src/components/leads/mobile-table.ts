@@ -1,8 +1,14 @@
+import { formatDistance, type Locale } from 'date-fns'
 import { resolveCollectedRequiredIntake } from '@/lib/leads/required-intake'
 import { resolveLeadService } from '@/lib/leads/service'
 
 export const MOBILE_SUMMARY_MAX_CHARS = 88
 export const MOBILE_REQUIRED_FIELDS_MAX = 2
+
+interface CompactRelativeTimeOptions {
+    baseDate?: Date
+    locale?: Locale
+}
 
 interface LeadFieldsLike {
     extracted_fields: unknown
@@ -37,6 +43,20 @@ export function truncateForMobileSummary(summary: string | null | undefined, max
     if (!normalized) return '-'
     if (normalized.length <= maxChars) return normalized
     return `${normalized.slice(0, maxChars - 1).trimEnd()}…`
+}
+
+export function formatCompactRelativeTime(
+    targetDate: Date,
+    options: CompactRelativeTimeOptions = {}
+): string {
+    const relativeTime = formatDistance(targetDate, options.baseDate ?? new Date(), {
+        addSuffix: true,
+        locale: options.locale
+    }).trim()
+
+    return relativeTime
+        .replace(/^about\s+/i, '~')
+        .replace(/^yaklaşık\s+/i, '~')
 }
 
 export function getLeadRequiredFieldHints(

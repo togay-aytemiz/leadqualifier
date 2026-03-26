@@ -6,7 +6,6 @@ import { Avatar, DataTable, TableBody, TableRow, TableCell, Badge, Button } from
 import { LeadWithConversation } from '@/lib/leads/list-actions'
 import type { ConversationPlatform } from '@/types/database'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { useLocale } from 'next-intl'
 import * as Popover from '@radix-ui/react-popover'
@@ -14,6 +13,7 @@ import { useState } from 'react'
 import { getConversationPlatformIconSrc } from '@/lib/channels/platform-icons'
 import { resolveLeadServiceNames } from '@/lib/leads/service'
 import {
+    formatCompactRelativeTime,
     getLeadRequiredFieldValue,
     getMobileRequiredFieldHints,
     truncateForMobileSummary
@@ -108,7 +108,7 @@ export function LeadsTable({
         { key: 'status', label: t('columns.status'), sortable: true, width: 'w-24' },
         { key: 'total_score', label: t('columns.score'), sortable: true, width: 'w-20' },
         { key: 'service_type', label: t('columns.service'), sortable: true },
-        { key: 'updated_at', label: t('columns.lastActivity'), sortable: true, width: 'w-32' },
+        { key: 'updated_at', label: t('columns.lastActivity'), sortable: true, width: 'w-36' },
     ]
 
     // Add dynamic required fields columns
@@ -175,8 +175,8 @@ export function LeadsTable({
     const to = Math.min(page * pageSize, total)
 
     return (
-        <div className="space-y-3 md:space-y-4">
-            <div className="space-y-2 md:hidden">
+        <div className="space-y-2.5 md:space-y-3">
+            <div className="space-y-1.5 md:hidden">
                 {leads.map(lead => {
                     const mobileHints = getMobileRequiredFieldHints(lead, requiredFields)
                     const serviceNames = getLeadServiceNames(lead)
@@ -186,11 +186,11 @@ export function LeadsTable({
                             key={lead.id}
                             type="button"
                             onClick={() => handleRowClick(lead.conversation_id)}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-left shadow-sm transition-colors hover:border-gray-300 active:scale-[0.99]"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:border-gray-300 active:scale-[0.99]"
                         >
-                            <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start justify-between gap-1.5">
                                 <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5">
                                         <Avatar
                                             name={lead.conversation.contact_name}
                                             src={lead.conversation.contact_avatar_url}
@@ -204,40 +204,39 @@ export function LeadsTable({
                                             {lead.conversation.contact_name}
                                         </span>
                                     </div>
-                                    <p className="mt-1 text-[11px] text-gray-500">
-                                        {formatDistanceToNow(new Date(lead.updated_at), {
-                                            addSuffix: true,
+                                    <p className="mt-0.5 whitespace-nowrap text-[11px] leading-4 text-gray-500">
+                                        {formatCompactRelativeTime(new Date(lead.updated_at), {
                                             locale: dateLocale
                                         })}
                                     </p>
                                 </div>
-                                <div className="shrink-0 rounded-lg bg-gray-100 px-2 py-1 text-right">
-                                    <p className="text-[10px] uppercase tracking-wide text-gray-500">
+                                <div className="shrink-0 rounded-lg bg-gray-100 px-2 py-0.5 text-right">
+                                    <p className="text-[9px] uppercase tracking-wide leading-4 text-gray-500">
                                         {t('columns.score')}
                                     </p>
-                                    <p className="text-sm font-semibold text-gray-900">{lead.total_score}</p>
+                                    <p className="text-sm font-semibold leading-4 text-gray-900">{lead.total_score}</p>
                                 </div>
                             </div>
 
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                                 <span className="inline-block whitespace-nowrap">
                                     <Badge variant={statusVariants[lead.status] || 'neutral'}>
                                         {statusLabels[lead.status] || lead.status}
                                     </Badge>
                                 </span>
                                 {serviceNames.length > 0 ? (
-                                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                                    <span className="rounded-full bg-gray-100 px-2 py-px text-[11px] font-medium leading-4 text-gray-600">
                                         {serviceNames.join(', ')}
                                     </span>
                                 ) : null}
                             </div>
 
                             {mobileHints.length > 0 ? (
-                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                <div className="mt-1.5 flex flex-wrap gap-1">
                                     {mobileHints.map((hint) => (
                                         <span
                                             key={hint.field}
-                                            className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600"
+                                            className="rounded-md border border-gray-200 bg-gray-50 px-2 py-px text-[11px] leading-4 text-gray-600"
                                         >
                                             {hint.field}: {hint.value}
                                         </span>
@@ -245,7 +244,7 @@ export function LeadsTable({
                                 </div>
                             ) : null}
 
-                            <p className="mt-2 truncate text-xs text-gray-500">
+                            <p className="mt-1.5 truncate text-[11px] leading-4 text-gray-500">
                                 {truncateForMobileSummary(lead.summary)}
                             </p>
                         </button>
@@ -260,7 +259,7 @@ export function LeadsTable({
                         {allColumns.map(col => (
                             <th
                                 key={col.key}
-                                className={`px-6 py-3 ${col.width || ''} ${col.sortable !== false ? 'cursor-pointer hover:bg-gray-100 select-none' : ''}`}
+                                className={`px-6 py-2.5 ${col.width || ''} ${col.sortable !== false ? 'cursor-pointer select-none hover:bg-gray-100' : ''}`}
                                 onClick={() => col.sortable !== false && handleSort(col.key)}
                             >
                                 <div className="flex items-center gap-1.5">
@@ -281,8 +280,8 @@ export function LeadsTable({
                                 onClick={() => handleRowClick(lead.conversation_id)}
                             >
                                 {/* Name & Platform merged */}
-                                <TableCell>
-                                    <div className="flex min-w-0 items-center gap-3">
+                                <TableCell className="py-3">
+                                    <div className="flex min-w-0 items-center gap-2.5">
                                         <Avatar
                                             name={lead.conversation.contact_name}
                                             src={lead.conversation.contact_avatar_url}
@@ -299,7 +298,7 @@ export function LeadsTable({
                                 </TableCell>
 
                                 {/* Status */}
-                                <TableCell className="w-28">
+                                <TableCell className="w-28 py-3">
                                     <span className="inline-block whitespace-nowrap">
                                         <Badge variant={statusVariants[lead.status] || 'neutral'}>
                                             {statusLabels[lead.status] || lead.status}
@@ -308,24 +307,23 @@ export function LeadsTable({
                                 </TableCell>
 
                                 {/* Score */}
-                                <TableCell className="w-20">
+                                <TableCell className="w-20 py-3">
                                     <span className="font-semibold text-gray-900">
                                         {lead.total_score}
                                     </span>
                                 </TableCell>
 
                                 {/* Service */}
-                                <TableCell>
-                                    <span className="text-gray-600">
+                                <TableCell className="py-3">
+                                    <span className="text-sm leading-5 text-gray-600">
                                         {serviceNames.length > 0 ? serviceNames.join(', ') : '-'}
                                     </span>
                                 </TableCell>
 
                                 {/* Last Activity */}
-                                <TableCell className="w-32">
-                                    <span className="text-gray-500 text-sm">
-                                        {formatDistanceToNow(new Date(lead.updated_at), {
-                                            addSuffix: true,
+                                <TableCell className="w-36 py-3">
+                                    <span className="whitespace-nowrap text-xs leading-4 text-gray-500">
+                                        {formatCompactRelativeTime(new Date(lead.updated_at), {
                                             locale: dateLocale
                                         })}
                                     </span>
@@ -333,16 +331,16 @@ export function LeadsTable({
 
                                 {/* Dynamic Required Fields */}
                                 {requiredFields.map(field => (
-                                    <TableCell key={field}>
-                                        <span className="text-gray-600 text-sm">
+                                    <TableCell key={field} className="py-3">
+                                        <span className="text-sm leading-5 text-gray-600">
                                             {getExtractedFieldValue(lead, field)}
                                         </span>
                                     </TableCell>
                                 ))}
 
                                 {/* Summary with Tooltip */}
-                                <TableCell>
-                                    <div className="text-gray-500 text-sm">
+                                <TableCell className="py-3">
+                                    <div className="text-sm leading-5 text-gray-500">
                                         <SummaryCell text={lead.summary || ''} />
                                     </div>
                                 </TableCell>

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { enUS, tr } from 'date-fns/locale'
 
 import {
+    formatCompactRelativeTime,
     getMobileRequiredFieldHints,
     MOBILE_REQUIRED_FIELDS_MAX,
     MOBILE_SUMMARY_MAX_CHARS,
@@ -19,6 +21,24 @@ describe('mobile leads table helpers', () => {
 
     it('shows a dash when summary is empty', () => {
         expect(truncateForMobileSummary('   ')).toBe('-')
+    })
+
+    it('replaces approximate english relative-time prefixes with a tilde', () => {
+        const relativeTime = formatCompactRelativeTime(new Date('2026-03-26T10:00:00Z'), {
+            baseDate: new Date('2026-03-26T12:00:00Z'),
+            locale: enUS
+        })
+
+        expect(relativeTime).toBe('~2 hours ago')
+    })
+
+    it('replaces approximate turkish relative-time prefixes with a tilde', () => {
+        const relativeTime = formatCompactRelativeTime(new Date('2026-03-26T10:00:00Z'), {
+            baseDate: new Date('2026-03-26T12:00:00Z'),
+            locale: tr
+        })
+
+        expect(relativeTime).toBe('~2 saat önce')
     })
 
     it('keeps required field hints compact and ordered', () => {

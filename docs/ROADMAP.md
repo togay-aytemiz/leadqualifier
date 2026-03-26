@@ -4,6 +4,7 @@
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
 > **Update Note (2026-03-26):** When unused trial credits are carried into premium as persistent extra credits, premium AI usage must consume that extra-credit balance before the monthly package, and `Settings > Plans` should show the same total remaining credits visible in the sidebar.
 > **Update Note (2026-03-26):** Desktop sidebar and mobile usage cards must format billing renewal dates and credit counts with the active app locale instead of browser defaults, so Turkish workspaces render fully localized values such as `20 Nis` and `2.081,1`.
+> **Update Note (2026-03-26):** `/leads` should keep `Last Activity / Son Aktivite` labels compact: replace localized approximate prefixes such as `about` / `yaklaşık` with `~`, keep the relative-time label on a single line, and tighten row spacing on both mobile cards and the desktop table.
 > **Update Note (2026-03-26):** Lead extraction must preserve meaningful text sent with media-backed inbound turns. Pure media placeholder rows stay excluded, but caption/content from WhatsApp and Instagram media messages now remains available for scoring and required-field extraction.
 > **Update Note (2026-03-26):** Inbox filter empty states must now respect pagination. When `Unread` or customer-score filters find no matches in the currently loaded page but more conversations still exist, the list backfills additional pages before showing `No conversations match these filters`, keeping the Inbox result set aligned with global unread indicators such as the browser-tab dot.
 > **Update Note (2026-03-26):** Inbox `Unread` and customer-score list filters must be applied in backend pagination queries, not only against the currently loaded client slice, so lazy-loaded pages cannot hide matching conversations until the operator scrolls far enough.
@@ -705,6 +706,7 @@
 - [x] **Lead List UX**
   - [x] Mobile leads list now uses compact card rows with reduced spacing while preserving the existing desktop table layout
   - [x] Desktop leads table keeps status chips on a single line and truncates long contact names to a single line
+  - [x] Leads `Last Activity / Son Aktivite` labels now replace localized approximation prefixes with `~`, stay on one line, and use denser mobile/desktop row spacing
   - [x] Required-intake values shown in Inbox "Important info" are now rendered consistently in Leads table/mobile rows via shared resolver logic
   - [x] Leads service column/cards now render AI-extracted `services[]` values from `extracted_fields.services` (fallback to `service_type` for legacy rows)
 - [x] **Operator Takeover Control**
