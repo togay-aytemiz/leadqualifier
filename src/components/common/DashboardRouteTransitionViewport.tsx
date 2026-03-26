@@ -19,11 +19,14 @@ export function DashboardRouteTransitionViewport({
         () => resolveDashboardRouteSkeleton(pendingPath),
         [pendingPath]
     )
+    const shouldRenderPendingOverlay = pendingSkeleton
+        && pendingSkeleton !== 'inbox'
+        && pendingSkeleton !== 'leads'
 
     return (
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
             {children}
-            {pendingSkeleton && (
+            {shouldRenderPendingOverlay && (
                 <div className="absolute inset-0 z-20 bg-white">
                     <DashboardRouteSkeleton route={pendingSkeleton} />
                 </div>

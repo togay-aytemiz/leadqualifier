@@ -2,10 +2,9 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PageHeader } from '@/design'
-import { getLeads, getRequiredFields } from '@/lib/leads/list-actions'
-import { LeadsTable } from '@/components/leads/LeadsTable'
-import { LeadSearch } from '@/components/leads/LeadSearch'
 import { LeadsEmptyState } from '@/components/leads/LeadsEmptyState'
+import { LeadsClient } from '@/components/leads/LeadsClient'
+import { getLeadsPageData } from '@/lib/leads/page-data'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
@@ -51,39 +50,18 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     const sortOrder = (params.sortOrder || 'desc') as 'asc' | 'desc'
     const search = params.search
 
-    // Fetch data
-    const [leadsResult, requiredFields] = await Promise.all([
-        getLeads({ page, pageSize: 20, sortBy, sortOrder, search }, organizationId),
-        getRequiredFields(organizationId)
-    ])
+    const initialData = await getLeadsPageData({ page, pageSize: 20, sortBy, sortOrder, search }, organizationId)
 
     return (
-        <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-            <PageHeader
-                title={t('title')}
-                actions={<LeadSearch />}
-            />
-            <div className="flex-1 overflow-auto p-3 md:p-6">
-                {leadsResult.total === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                        <LeadsEmptyState
-                            title={t('noLeads')}
-                            description={t('noLeadsDesc')}
-                        />
-                    </div>
-                ) : (
-                    <LeadsTable
-                        leads={leadsResult.leads}
-                        total={leadsResult.total}
-                        page={leadsResult.page}
-                        pageSize={leadsResult.pageSize}
-                        totalPages={leadsResult.totalPages}
-                        sortBy={sortBy}
-                        sortOrder={sortOrder}
-                        requiredFields={requiredFields}
-                    />
-                )}
-            </div>
-        </div>
+        <LeadsClient
+            initialData={initialData}
+            initialQueryState={{
+                page,
+                sortBy,
+                sortOrder,
+                search: search ?? ''
+            }}
+            organizationId={organizationId}
+        />
     )
 }

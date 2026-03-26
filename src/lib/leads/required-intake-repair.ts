@@ -60,6 +60,9 @@ const GOAL_VALUE_HINTS = [
 const SERVICE_VALUE_HINTS = [
     /\b(hizmet|service|paket|package|talep|ihtiyac|ihtiyaç|konu|subject)\b/i,
 ]
+const FIELD_CONCEPT_GROUPS = [
+    ['hamilelik', 'hamile', 'gebelik', 'pregnan', 'dogum', 'doğum', 'bebek', 'delivery', 'due']
+]
 
 function normalizeText(value: string) {
     return value
@@ -102,7 +105,7 @@ function inferFieldCategory(field: string): FieldCategory {
     if (hasAny(/\b(tarih|date|zaman|time|ne zaman|doğum|dogum|delivery|due)\b/i) || hasToken('tarih', 'date', 'time', 'zaman', 'dogum')) {
         return 'date'
     }
-    if (hasAny(/\b(durum|status|hamilelik|pregnan|evet|hayir|hayır|yes|no)\b/i)) {
+    if (hasAny(/\b(durum|status|hamilelik|pregnan|evet|hayir|hayır|yes|no)\b/i) || hasToken('durum', 'status', 'hamilelik', 'pregnan')) {
         return 'boolean'
     }
     if (hasAny(/\b(butce|bütçe|budget|price|fiyat|ucret|ücret|cost|fee)\b/i)) {
@@ -202,14 +205,68 @@ function normalizeCollectedMap(raw?: Record<string, string> | null) {
     return map
 }
 
+function isCompatibleExistingValue(field: string, category: FieldCategory, value: string) {
+    if (!value) return false
+    if (category === 'generic') return true
+    if (category === 'boolean') {
+        return isStrongAffirmation(value)
+            || isStrongNegation(value)
+            || messageMentionsField(field, value)
+            || /\b(aktif|mevcut|pasif)\b/i.test(value)
+    }
+
+    return valueMatchesCategory(category, value)
+}
+
+function resolveFieldConceptGroupIds(field: string) {
+    const normalizedField = normalizeText(field)
+    if (!normalizedField) return [] as number[]
+
+    return FIELD_CONCEPT_GROUPS.flatMap((group, index) => (
+        group.some((alias) => normalizedField.includes(normalizeText(alias))) ? [index] : []
+    ))
+}
+
+function fieldsShareConcept(field: string, candidateField: string) {
+    const fieldGroups = resolveFieldConceptGroupIds(field)
+    if (fieldGroups.length === 0) return false
+
+    const candidateGroups = new Set(resolveFieldConceptGroupIds(candidateField))
+    return fieldGroups.some((groupId) => candidateGroups.has(groupId))
+}
+
 export function repairRequiredIntakeFromConversation(input: RequiredIntakeRepairInput) {
     const requiredFields = (input.requiredFields ?? []).map((field) => field.trim()).filter(Boolean)
     const existingCollected = input.existingCollected ?? {}
     const assistantMessages = (input.recentAssistantMessages ?? []).map((message) => message.trim()).filter(Boolean)
     const customerMessages = (input.recentCustomerMessages ?? []).map((message) => message.trim()).filter(Boolean)
     const latestCustomerMessage = [...customerMessages].reverse().find(Boolean) ?? ''
-    const collectedMap = normalizeCollectedMap(existingCollected)
-    const repaired: Record<string, string> = { ...existingCollected }
+    const requiredFieldByNormalizedKey = new Map(
+        requiredFields.map((field) => [normalizeRequiredIntakeFieldKey(field), field] as const)
+    )
+    const repaired: Record<string, string> = {}
+
+    for (const [key, value] of Object.entries(existingCollected)) {
+        const normalizedValue = normalizeRequiredIntakeFieldValue(value)
+        if (!normalizedValue) continue
+
+        const normalizedKey = normalizeRequiredIntakeFieldKey(key)
+        const requiredField = requiredFieldByNormalizedKey.get(normalizedKey)
+
+        if (!requiredField) {
+            repaired[key] = normalizedValue
+            continue
+        }
+
+        const category = inferFieldCategory(requiredField)
+        if (!isCompatibleExistingValue(requiredField, category, normalizedValue)) {
+            continue
+        }
+
+        repaired[requiredField] = normalizedValue
+    }
+
+    const repairedCollectedMap = normalizeCollectedMap(repaired)
 
     if (!latestCustomerMessage || assistantMessages.length === 0) {
         return repaired
@@ -217,7 +274,7 @@ export function repairRequiredIntakeFromConversation(input: RequiredIntakeRepair
 
     for (const field of requiredFields) {
         const normalizedField = normalizeRequiredIntakeFieldKey(field)
-        if (!normalizedField || collectedMap.has(normalizedField) || repaired[normalizedField]) continue
+        if (!normalizedField || repairedCollectedMap.has(normalizedField)) continue
 
         const category = inferFieldCategory(field)
         const assistantMessage = selectCandidateAssistantMessage(assistantMessages, field, category)
@@ -234,6 +291,30 @@ export function repairRequiredIntakeFromConversation(input: RequiredIntakeRepair
         if (!responseEligible) continue
 
         repaired[field] = answer
+        repairedCollectedMap.set(normalizedField, answer)
+    }
+
+    for (const field of requiredFields) {
+        const normalizedField = normalizeRequiredIntakeFieldKey(field)
+        if (!normalizedField || repairedCollectedMap.has(normalizedField)) continue
+
+        const category = inferFieldCategory(field)
+        if (category !== 'boolean') continue
+
+        const hasSupportingSiblingEvidence = requiredFields.some((candidateField) => {
+            if (candidateField === field) return false
+            if (!fieldsShareConcept(field, candidateField)) return false
+
+            const candidateValue = repaired[candidateField]
+            if (!candidateValue) return false
+
+            return inferFieldCategory(candidateField) !== 'boolean'
+        })
+
+        if (!hasSupportingSiblingEvidence) continue
+
+        repaired[field] = 'Evet'
+        repairedCollectedMap.set(normalizedField, 'Evet')
     }
 
     return repaired

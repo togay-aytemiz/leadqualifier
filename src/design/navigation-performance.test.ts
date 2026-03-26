@@ -71,6 +71,16 @@ describe('navigation performance source guards', () => {
         expect(settingsShellSource).toContain('activePath')
     })
 
+    it('avoids stacking the global pending overlay on top of inbox and leads segment loaders', () => {
+        const transitionViewportSource = fs.readFileSync(
+            path.join(process.cwd(), 'src/components/common/DashboardRouteTransitionViewport.tsx'),
+            'utf8'
+        )
+
+        expect(transitionViewportSource).toContain("pendingSkeleton !== 'inbox'")
+        expect(transitionViewportSource).toContain("pendingSkeleton !== 'leads'")
+    })
+
     it('keeps dashboard layout on the slim org-context path during initial render', () => {
         const layoutSource = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
 

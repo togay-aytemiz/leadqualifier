@@ -4,6 +4,7 @@ import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getRequiredIntakeFields } from '@/lib/ai/followup'
 import { getServiceCatalogItems } from '@/lib/leads/settings'
 import { InboxContainer } from '@/components/inbox/InboxContainer'
+import { getConversationThreadPayload } from '@/lib/inbox/thread-actions'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { redirect } from 'next/navigation'
 import { Building2 } from 'lucide-react'
@@ -48,10 +49,17 @@ export default async function InboxPage() {
         getRequiredIntakeFields({ organizationId, supabase }),
         getServiceCatalogItems(organizationId)
     ])
+    const initialThreadPayload = conversations[0]
+        ? await getConversationThreadPayload(conversations[0].id, {
+            organizationId,
+            pageSize: 50
+        })
+        : null
 
     return (
         <InboxContainer
             initialConversations={conversations}
+            initialThreadPayload={initialThreadPayload}
             renderedAtIso={renderedAtIso}
             organizationId={organizationId}
             botName={aiSettings.bot_name}

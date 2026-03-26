@@ -28,6 +28,8 @@ interface LeadsTableProps {
     sortBy: string
     sortOrder: 'asc' | 'desc'
     requiredFields: string[]
+    onPageChange?: (page: number) => void
+    onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void
 }
 
 const statusVariants: Record<string, 'error' | 'warning' | 'neutral'> = {
@@ -80,7 +82,9 @@ export function LeadsTable({
     totalPages,
     sortBy,
     sortOrder,
-    requiredFields
+    requiredFields,
+    onPageChange,
+    onSortChange
 }: LeadsTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -126,6 +130,15 @@ export function LeadsTable({
     ]
 
     const handleSort = (columnKey: string) => {
+        const nextSortOrder = sortBy === columnKey
+            ? (sortOrder === 'asc' ? 'desc' : 'asc')
+            : 'desc'
+
+        if (onSortChange) {
+            onSortChange(columnKey, nextSortOrder)
+            return
+        }
+
         const params = new URLSearchParams(searchParams.toString())
         if (sortBy === columnKey) {
             params.set('sortOrder', sortOrder === 'asc' ? 'desc' : 'asc')
@@ -138,6 +151,11 @@ export function LeadsTable({
     }
 
     const handlePageChange = (newPage: number) => {
+        if (onPageChange) {
+            onPageChange(newPage)
+            return
+        }
+
         const params = new URLSearchParams(searchParams.toString())
         params.set('page', newPage.toString())
         router.push(`?${params.toString()}`)

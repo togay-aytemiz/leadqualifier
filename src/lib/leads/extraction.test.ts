@@ -108,6 +108,20 @@ describe('repairLeadExtractionRequiredIntake', () => {
             'Bebek Doğum Tarihi': 'Temmuz sonu ağustos başı gibi'
         })
     })
+
+    it('replaces incompatible sibling values before inferring the correct related status', () => {
+        const repaired = repairLeadExtractionRequiredIntake({
+            extracted: safeParseLeadExtraction('{"required_intake_collected":{"Hamilelik Durumu":"Ağustos ayı gibi inşaAllah"},"summary":"Detay istiyor."}'),
+            requiredFields: ['Bebek Doğum Tarihi', 'Hamilelik Durumu'],
+            recentAssistantMessages: ['Tahminen bebişin gelişi ne zaman'],
+            recentCustomerMessages: ['Ağustos ayı gibi inşaAllah']
+        })
+
+        expect(repaired.required_intake_collected).toEqual({
+            'Bebek Doğum Tarihi': 'Ağustos ayı gibi inşaAllah',
+            'Hamilelik Durumu': 'Evet'
+        })
+    })
 })
 
 describe('parseRequiredIntakeRepairPayload', () => {

@@ -5,7 +5,6 @@ import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddi
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
 import { buildDefaultSystemSkills } from '@/lib/skills/default-system-skills'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
-import { shouldRunSkillsMaintenanceForOrganization } from '@/lib/skills/maintenance-cache'
 import { sanitizeSkillActions } from '@/lib/skills/skill-actions'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
 import {
@@ -16,19 +15,11 @@ import {
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
-/**
- * Get all skills for an organization
- */
-export async function getSkills(organizationId: string, search?: string, locale?: string): Promise<Skill[]> {
-    const supabase = await createClient()
-
-    if (!search?.trim()) {
-        await ensureDefaultSystemSkills(supabase, organizationId, locale)
-        if (shouldRunSkillsMaintenanceForOrganization(organizationId)) {
-            await ensureSkillEmbeddingsForOrg(supabase, organizationId)
-        }
-    }
-
+function buildSkillsListQuery(
+    supabase: SupabaseClientLike,
+    organizationId: string,
+    search?: string
+) {
     let query = supabase
         .from('skills')
         .select('*')
@@ -38,18 +29,40 @@ export async function getSkills(organizationId: string, search?: string, locale?
     if (search && search.trim()) {
         const term = search.trim()
         const searchTerm = `%${term}%`
-        // Search title, response_text, AND trigger_examples (by casting array to text)
-        // Note: casting array to text yields format like ["a","b"], so ilike works for partial matches
         query = query.or(`title.ilike.${searchTerm},response_text.ilike.${searchTerm},trigger_examples.cs.{${term}}`)
     }
 
-    const { data, error } = await query
+    return query
+}
+
+/**
+ * Get all skills for an organization
+ */
+export async function getSkills(organizationId: string, search?: string, locale?: string): Promise<Skill[]> {
+    const supabase = await createClient()
+
+    const { data, error } = await buildSkillsListQuery(supabase, organizationId, search)
 
     if (error) {
         console.error('getSkills error:', error)
         throw new Error(error.message)
     }
-    return data ?? []
+
+    const skills = data ?? []
+    if (search?.trim() || skills.length > 0) {
+        return skills
+    }
+
+    await ensureDefaultSystemSkills(supabase, organizationId, locale)
+
+    const { data: seededData, error: seededError } = await buildSkillsListQuery(supabase, organizationId)
+
+    if (seededError) {
+        console.error('getSkills seeded reload error:', seededError)
+        throw new Error(seededError.message)
+    }
+
+    return seededData ?? []
 }
 
 /**
@@ -281,61 +294,6 @@ async function ensureDefaultSystemSkills(
             )
         )
     )
-}
-
-async function ensureSkillEmbeddingsForOrg(
-    supabase: SkillsClient,
-    organizationId: string
-): Promise<void> {
-    const { data: skills, error: skillsError } = await supabase
-        .from('skills')
-        .select('id, organization_id, title, trigger_examples')
-        .eq('organization_id', organizationId)
-
-    if (skillsError) {
-        console.error('Failed to load skills for embedding backfill:', skillsError)
-        return
-    }
-
-    const rows = skills ?? []
-    if (rows.length === 0) return
-
-    const skillIds = rows.map((skill) => skill.id)
-
-    const { data: embeddings, error: embeddingsError } = await supabase
-        .from('skill_embeddings')
-        .select('skill_id')
-        .in('skill_id', skillIds)
-
-    if (embeddingsError) {
-        console.error('Failed to load skill embeddings for backfill:', embeddingsError)
-        return
-    }
-
-    const counts = new Map<string, number>()
-    for (const row of embeddings ?? []) {
-        counts.set(row.skill_id, (counts.get(row.skill_id) ?? 0) + 1)
-    }
-
-    const missing = rows.filter((skill) => {
-        const expectedCount = buildSkillEmbeddingTexts(skill.title, skill.trigger_examples ?? []).length
-        const embeddingCount = counts.get(skill.id) ?? 0
-        return expectedCount > 0 && embeddingCount !== expectedCount
-    })
-
-    for (const skill of missing) {
-        const { error } = await supabase.from('skill_embeddings').delete().eq('skill_id', skill.id)
-        if (error) {
-            console.error('Failed to clear stale skill embeddings before backfill:', error)
-            continue
-        }
-        await generateAndStoreEmbeddings(
-            skill.id,
-            skill.organization_id,
-            skill.title,
-            skill.trigger_examples ?? []
-        )
-    }
 }
 
 /**

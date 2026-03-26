@@ -39,6 +39,7 @@ export interface KnowledgeBaseEntry {
 export type KnowledgeBaseInsert = Pick<KnowledgeBaseEntry, 'content' | 'title' | 'type' | 'collection_id'>
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 type KnowledgeCountRow = { collection_id: string | null }
+type KnowledgeCollectionCountRow = { collection_id: string | null; document_count: number | string | null }
 type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { collection_id: string | null }
 const MAX_PROFILE_CONTEXT_CHARS = 6000
 
@@ -132,26 +133,40 @@ export async function getCollections(organizationId?: string | null) {
 
     if (error) throw new Error(error.message)
 
-    // Get counts for each collection
-    // This could be optimized with a join/count query but for now this is simple and robust with RLS
-    let countsQuery = supabase
-        .from('knowledge_documents')
-        .select('collection_id')
-    if (scopedOrganizationId) {
-        countsQuery = countsQuery.eq('organization_id', scopedOrganizationId)
-    }
-
-    const { data: counts, error: countError } = await countsQuery
-
-    if (countError) throw new Error(countError.message)
-
-    // Map counts
     const countMap = new Map<string, number>()
-    ;(counts ?? []).forEach((item: KnowledgeCountRow) => {
-        if (item.collection_id) {
-            countMap.set(item.collection_id, (countMap.get(item.collection_id) || 0) + 1)
+    const { data: aggregatedCounts, error: aggregatedCountError } = await supabase.rpc(
+        'count_knowledge_documents_by_collection',
+        {
+            target_organization_id: scopedOrganizationId ?? null
         }
-    })
+    )
+
+    if (aggregatedCountError) {
+        console.warn('Falling back to document row scan for knowledge collection counts:', aggregatedCountError)
+
+        let countsQuery = supabase
+            .from('knowledge_documents')
+            .select('collection_id')
+        if (scopedOrganizationId) {
+            countsQuery = countsQuery.eq('organization_id', scopedOrganizationId)
+        }
+
+        const { data: counts, error: countError } = await countsQuery
+
+        if (countError) throw new Error(countError.message)
+
+        ;(counts ?? []).forEach((item: KnowledgeCountRow) => {
+            if (item.collection_id) {
+                countMap.set(item.collection_id, (countMap.get(item.collection_id) || 0) + 1)
+            }
+        })
+    } else {
+        ;((aggregatedCounts ?? []) as KnowledgeCollectionCountRow[]).forEach((item) => {
+            if (!item.collection_id) return
+            const nextCount = Number(item.document_count ?? 0)
+            countMap.set(item.collection_id, Number.isFinite(nextCount) ? nextCount : 0)
+        })
+    }
 
     return (collections ?? []).map(col => ({
         ...col,

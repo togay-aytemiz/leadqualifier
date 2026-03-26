@@ -52,6 +52,10 @@ import {
   type ConversationInstagramOutboundImageUploadTarget,
   type ConversationWhatsAppOutboundAttachmentUploadTarget,
 } from '@/lib/inbox/actions'
+import {
+  getConversationThreadPayload,
+  type ConversationThreadPayload,
+} from '@/lib/inbox/thread-actions'
 import { createClient } from '@/lib/supabase/client'
 import { setupRealtimeAuth } from '@/lib/supabase/realtime-auth'
 import { format } from 'date-fns'
@@ -149,6 +153,10 @@ import {
 } from '@/components/inbox/message-sender'
 import { ImportantInfoEditor } from '@/components/inbox/ImportantInfoEditor'
 import { ConversationTagsEditor } from '@/components/inbox/ConversationTagsEditor'
+import {
+  shouldDiscardSelectedThreadCache,
+  shouldHydrateSelectedThreadFromCache,
+} from '@/components/inbox/thread-payload-selection'
 import { ConversationPrivateNoteEditor } from '@/components/inbox/ConversationPrivateNoteEditor'
 import { LeadServiceEditor } from '@/components/inbox/LeadServiceEditor'
 import { InboxDetailsSection } from '@/components/inbox/InboxDetailsSection'
@@ -168,6 +176,7 @@ import type { AiBotMode } from '@/types/database'
 
 interface InboxContainerProps {
   initialConversations: ConversationListItem[]
+  initialThreadPayload?: ConversationThreadPayload | null
   renderedAtIso: string
   organizationId: string
   botName?: string
@@ -217,17 +226,85 @@ type PendingAttachment = {
   previewUrl: string | null
 }
 
-type DetailsSectionKey =
-  | 'conversationInfo'
-  | 'lead'
-  | 'tags'
-  | 'privateNote'
+type DetailsSectionKey = 'conversationInfo' | 'lead' | 'tags' | 'privateNote'
 
 const DEFAULT_DETAILS_SECTION_STATE: Record<DetailsSectionKey, boolean> = {
   conversationInfo: true,
   lead: true,
   tags: true,
   privateNote: true,
+}
+
+function buildConversationListFilterKey(input: {
+  organizationId: string
+  unreadFilter: InboxUnreadFilter
+  leadTemperatureFilter: InboxLeadTemperatureFilter
+}) {
+  return JSON.stringify(input)
+}
+
+interface InboxMessageImageProps {
+  src: string
+  alt: string
+  frameClassName?: string
+  imageClassName?: string
+  overlayClassName?: string
+  spinnerClassName?: string
+  onLoad?: () => void
+  children?: React.ReactNode
+}
+
+function InboxMessageImage({
+  src,
+  alt,
+  frameClassName,
+  imageClassName,
+  overlayClassName,
+  spinnerClassName,
+  onLoad,
+  children,
+}: InboxMessageImageProps) {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    setIsLoaded(false)
+    setHasError(false)
+  }, [src])
+
+  return (
+    <div className={cn('relative overflow-hidden', frameClassName)}>
+      {!isLoaded && !hasError && (
+        <div className={cn('absolute inset-0 flex items-center justify-center', overlayClassName)}>
+          <span
+            className={cn(
+              'h-6 w-6 animate-spin rounded-full border-2 border-gray-300/80 border-t-gray-600',
+              spinnerClassName
+            )}
+          />
+        </div>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className={cn(
+          'h-full w-full transition-opacity duration-200',
+          !isLoaded && !hasError ? 'opacity-0' : 'opacity-100',
+          imageClassName
+        )}
+        loading="lazy"
+        onLoad={() => {
+          setIsLoaded(true)
+          onLoad?.()
+        }}
+        onError={() => {
+          setHasError(true)
+        }}
+      />
+      {children}
+    </div>
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -282,6 +359,7 @@ function extractImageFilesFromClipboard(event: React.ClipboardEvent<HTMLTextArea
 
 export function InboxContainer({
   initialConversations,
+  initialThreadPayload = null,
   renderedAtIso,
   organizationId,
   botName,
@@ -296,18 +374,24 @@ export function InboxContainer({
   const tAiSettings = useTranslations('aiSettings')
   const locale = useLocale()
   const dateLocale = locale === 'tr' ? tr : undefined
+  const initialSelectedConversationId =
+    initialThreadPayload?.conversationId ?? initialConversations[0]?.id ?? null
   const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
   const [relativeTimeBaseDate, setRelativeTimeBaseDate] = useState<Date>(() => {
     const parsed = new Date(renderedAtIso)
     return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed
   })
-  const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [messageOffset, setMessageOffset] = useState(0)
-  const [hasMoreMessageHistory, setHasMoreMessageHistory] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedConversationId)
+  const [messages, setMessages] = useState<Message[]>(() => initialThreadPayload?.messages ?? [])
+  const [messageOffset, setMessageOffset] = useState(() => initialThreadPayload?.fetchedCount ?? 0)
+  const [hasMoreMessageHistory, setHasMoreMessageHistory] = useState(
+    () => initialThreadPayload?.hasMore ?? false
+  )
   const [isLoadingMessageHistory, setIsLoadingMessageHistory] = useState(false)
-  const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null)
-  const [lead, setLead] = useState<Lead | null>(null)
+  const [loadedConversationId, setLoadedConversationId] = useState<string | null>(
+    () => initialThreadPayload?.conversationId ?? null
+  )
+  const [lead, setLead] = useState<Lead | null>(() => initialThreadPayload?.lead ?? null)
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null)
@@ -343,9 +427,7 @@ export function InboxContainer({
   const [loadingMore, setLoadingMore] = useState(false)
   const [isDetailsMenuOpen, setIsDetailsMenuOpen] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
-  const [detailsSectionState, setDetailsSectionState] = useState(
-    DEFAULT_DETAILS_SECTION_STATE
-  )
+  const [detailsSectionState, setDetailsSectionState] = useState(DEFAULT_DETAILS_SECTION_STATE)
   const [currentUserProfile, setCurrentUserProfile] = useState<ProfileLite | null>(null)
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, isLoading: false })
   const [isMobileConversationOpen, setIsMobileConversationOpen] = useState(false)
@@ -386,10 +468,18 @@ export function InboxContainer({
   const leadRef = useRef<Lead | null>(null)
   const refreshInFlightRef = useRef(false)
   const refreshRequestRef = useRef<string | null>(null)
+  const threadPayloadCacheRef = useRef<Map<string, ConversationThreadPayload>>(
+    initialThreadPayload
+      ? new Map([[initialThreadPayload.conversationId, initialThreadPayload]])
+      : new Map()
+  )
+  const threadPayloadPromiseCacheRef = useRef<Map<string, Promise<ConversationThreadPayload>>>(
+    new Map()
+  )
+  const warmedConversationIdsRef = useRef<Set<string>>(new Set())
   const assigneeCacheRef = useRef<Record<string, Assignee>>({})
   const senderProfilesRef = useRef<Record<string, SenderProfile>>({})
   const conversationListRequestIdRef = useRef(0)
-  const didMountConversationFiltersRef = useRef(false)
   const isResettingConversationListRef = useRef(false)
   const selectedIdRef = useRef(selectedId)
   const leadRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -508,6 +598,75 @@ export function InboxContainer({
       mergeSenderProfiles((data ?? []) as SenderProfile[])
     },
     [mergeSenderProfiles, supabase]
+  )
+
+  const applyThreadPayload = useCallback(
+    (conversationId: string, payload: ConversationThreadPayload) => {
+      threadPayloadCacheRef.current.set(conversationId, payload)
+      pendingPrependScrollRestoreRef.current = null
+      isLoadingMessageHistoryRef.current = false
+
+      const nextPreviewMessages = buildConversationPreviewMessages(payload.messages)
+      setMessages(payload.messages)
+      setLead(payload.lead)
+      setMessageOffset(payload.fetchedCount)
+      setHasMoreMessageHistory(payload.hasMore)
+      setIsLoadingMessageHistory(false)
+      setLoadedConversationId(conversationId)
+      setConversations((prev) =>
+        applyLeadStatusToConversationList(
+          prev.map((conversation) =>
+            conversation.id === conversationId
+              ? {
+                  ...conversation,
+                  messages:
+                    nextPreviewMessages.length > 0 ? nextPreviewMessages : conversation.messages,
+                }
+              : conversation
+          ),
+          conversationId,
+          payload.lead?.status ?? null
+        )
+      )
+      void hydrateSenderProfiles(payload.messages)
+    },
+    [hydrateSenderProfiles]
+  )
+
+  const loadThreadPayload = useCallback(
+    async (
+      conversationId: string,
+      options?: {
+        force?: boolean
+      }
+    ) => {
+      const cachedThreadPayload =
+        options?.force !== true ? threadPayloadCacheRef.current.get(conversationId) : undefined
+      if (cachedThreadPayload) {
+        return cachedThreadPayload
+      }
+
+      const existingPromise = threadPayloadPromiseCacheRef.current.get(conversationId)
+      if (existingPromise) {
+        return existingPromise
+      }
+
+      const promise = getConversationThreadPayload(conversationId, {
+        organizationId,
+        pageSize: MESSAGES_PAGE_SIZE,
+      })
+        .then((payload) => {
+          threadPayloadCacheRef.current.set(conversationId, payload)
+          return payload
+        })
+        .finally(() => {
+          threadPayloadPromiseCacheRef.current.delete(conversationId)
+        })
+
+      threadPayloadPromiseCacheRef.current.set(conversationId, promise)
+      return promise
+    },
+    [organizationId]
   )
 
   const markOptimisticMessagesAsFailed = useCallback((tempMessageIds: string[]) => {
@@ -695,46 +854,59 @@ export function InboxContainer({
     }),
     [leadTemperatureFilter, unreadFilter]
   )
-
-  const loadConversationsPage = useCallback(async (pageIndex: number, replace: boolean) => {
-    const requestId = ++conversationListRequestIdRef.current
-
-    try {
-      const nextConversations = await getConversations(
+  const conversationListFilterKey = useMemo(
+    () =>
+      buildConversationListFilterKey({
         organizationId,
-        pageIndex,
-        CONVERSATIONS_PAGE_SIZE,
-        activeConversationListFilters
-      )
+        unreadFilter,
+        leadTemperatureFilter,
+      }),
+    [leadTemperatureFilter, organizationId, unreadFilter]
+  )
+  const previousConversationListFilterKeyRef = useRef(conversationListFilterKey)
 
-      if (conversationListRequestIdRef.current !== requestId) return
+  const loadConversationsPage = useCallback(
+    async (pageIndex: number, replace: boolean) => {
+      const requestId = ++conversationListRequestIdRef.current
 
-      setHasMore(nextConversations.length >= CONVERSATIONS_PAGE_SIZE)
-      setPage(pageIndex + 1)
+      try {
+        const nextConversations = await getConversations(
+          organizationId,
+          pageIndex,
+          CONVERSATIONS_PAGE_SIZE,
+          activeConversationListFilters
+        )
 
-      if (replace) {
-        setConversations(nextConversations)
-        return
+        if (conversationListRequestIdRef.current !== requestId) return
+
+        setHasMore(nextConversations.length >= CONVERSATIONS_PAGE_SIZE)
+        setPage(pageIndex + 1)
+
+        if (replace) {
+          setConversations(nextConversations)
+          return
+        }
+
+        if (nextConversations.length > 0) {
+          setConversations((prev) => {
+            const existingIds = new Set(prev.map((conversation) => conversation.id))
+            const uniqueNew = nextConversations.filter(
+              (conversation) => !existingIds.has(conversation.id)
+            )
+            return [...prev, ...uniqueNew]
+          })
+        }
+      } catch (error) {
+        if (conversationListRequestIdRef.current !== requestId) return
+        console.error('Failed to load more conversations', error)
+        setHasMore(false)
+      } finally {
+        if (conversationListRequestIdRef.current !== requestId) return
+        setLoadingMore(false)
       }
-
-      if (nextConversations.length > 0) {
-        setConversations((prev) => {
-          const existingIds = new Set(prev.map((conversation) => conversation.id))
-          const uniqueNew = nextConversations.filter(
-            (conversation) => !existingIds.has(conversation.id)
-          )
-          return [...prev, ...uniqueNew]
-        })
-      }
-    } catch (error) {
-      if (conversationListRequestIdRef.current !== requestId) return
-      console.error('Failed to load more conversations', error)
-      setHasMore(false)
-    } finally {
-      if (conversationListRequestIdRef.current !== requestId) return
-      setLoadingMore(false)
-    }
-  }, [activeConversationListFilters, organizationId])
+    },
+    [activeConversationListFilters, organizationId]
+  )
 
   const loadMoreConversations = useCallback(async () => {
     if (!hasMore || loadingMore) return
@@ -744,10 +916,10 @@ export function InboxContainer({
   }, [hasMore, loadConversationsPage, loadingMore, page])
 
   useEffect(() => {
-    if (!didMountConversationFiltersRef.current) {
-      didMountConversationFiltersRef.current = true
+    if (previousConversationListFilterKeyRef.current === conversationListFilterKey) {
       return
     }
+    previousConversationListFilterKeyRef.current = conversationListFilterKey
 
     isResettingConversationListRef.current = true
 
@@ -762,7 +934,7 @@ export function InboxContainer({
         isResettingConversationListRef.current = false
       }
     })()
-  }, [loadConversationsPage])
+  }, [conversationListFilterKey, loadConversationsPage])
 
   const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
@@ -801,7 +973,9 @@ export function InboxContainer({
     (conversationId: string | null) => {
       if (!conversationId) return
 
-      const currentConversation = conversations.find((conversation) => conversation.id === conversationId)
+      const currentConversation = conversations.find(
+        (conversation) => conversation.id === conversationId
+      )
       if (!currentConversation || currentConversation.unread_count <= 0) return
 
       updateConversationDetailsLocally(conversationId, { unread_count: 0 })
@@ -856,35 +1030,9 @@ export function InboxContainer({
         while (refreshRequestRef.current) {
           const nextId = refreshRequestRef.current
           refreshRequestRef.current = null
-          const [pageResult, nextLead] = await Promise.all([
-            getMessagesPage(nextId, 0, MESSAGES_PAGE_SIZE, organizationId),
-            getConversationLead(nextId, organizationId),
-          ])
+          const payload = await loadThreadPayload(nextId, { force: true })
           if (selectedIdRef.current !== nextId) continue
-          pendingPrependScrollRestoreRef.current = null
-          isLoadingMessageHistoryRef.current = false
-          const nextPreviewMessages = buildConversationPreviewMessages(pageResult.messages)
-          setMessages(pageResult.messages)
-          setLead(nextLead)
-          setMessageOffset(pageResult.fetchedCount)
-          setHasMoreMessageHistory(pageResult.hasMore)
-          setIsLoadingMessageHistory(false)
-          setLoadedConversationId(nextId)
-          setConversations((prev) =>
-            applyLeadStatusToConversationList(
-              prev.map((c) =>
-                c.id === nextId
-                  ? {
-                      ...c,
-                      messages: nextPreviewMessages.length > 0 ? nextPreviewMessages : c.messages,
-                    }
-                  : c
-              ),
-              nextId,
-              nextLead?.status ?? null
-            )
-          )
-          void hydrateSenderProfiles(pageResult.messages)
+          applyThreadPayload(nextId, payload)
         }
       } catch (error) {
         console.error('Failed to refresh messages', error)
@@ -896,7 +1044,7 @@ export function InboxContainer({
         refreshInFlightRef.current = false
       }
     },
-    [hydrateSenderProfiles, organizationId]
+    [applyThreadPayload, loadThreadPayload]
   )
 
   const refreshConversationPreview = useCallback(async (conversationId: string) => {
@@ -945,6 +1093,7 @@ export function InboxContainer({
       }
 
       await hydrateSenderProfiles(pageResult.messages)
+      let mergedMessagesForCache = messagesRef.current
       setMessages((previousMessages) => {
         const merged = prependOlderMessages({
           currentMessages: previousMessages,
@@ -953,11 +1102,20 @@ export function InboxContainer({
         if (merged.addedCount === 0) {
           pendingPrependScrollRestoreRef.current = null
         }
+        mergedMessagesForCache = merged.mergedMessages
         return merged.mergedMessages
       })
 
-      setMessageOffset((previousOffset) => previousOffset + pageResult.fetchedCount)
+      const nextFetchedCount = messageOffset + pageResult.fetchedCount
+      setMessageOffset(nextFetchedCount)
       setHasMoreMessageHistory(pageResult.hasMore)
+      threadPayloadCacheRef.current.set(conversationId, {
+        conversationId,
+        fetchedCount: nextFetchedCount,
+        hasMore: pageResult.hasMore,
+        lead: leadRef.current,
+        messages: mergedMessagesForCache,
+      })
     } catch (error) {
       console.error('Failed to load older messages', error)
     } finally {
@@ -1072,10 +1230,110 @@ export function InboxContainer({
       setLead(null)
       return
     }
+
+    const loadedConversationMatchesSelection = loadedConversationId === selectedId
+    if (loadedConversationMatchesSelection) {
+      return
+    }
+
+    const selectedConversation = conversations.find(
+      (conversation) => conversation.id === selectedId
+    )
+    const selectedConversationPreviewMessage = resolveLatestNonSeenPreviewMessage(
+      selectedConversation?.platform ?? 'simulator',
+      selectedConversation?.messages
+    )
+    const cachedThreadPayload = threadPayloadCacheRef.current.get(selectedId)
+    const cachedThreadPreviewMessage = cachedThreadPayload
+      ? resolveLatestNonSeenPreviewMessage(
+          selectedConversation?.platform ?? 'simulator',
+          cachedThreadPayload.messages
+        )
+      : null
+
+    if (cachedThreadPayload) {
+      if (
+        shouldHydrateSelectedThreadFromCache({
+          hasCachedThreadPayload: true,
+          hasCachedPreviewMessage: Boolean(cachedThreadPreviewMessage),
+          hasListPreviewMessage: Boolean(selectedConversationPreviewMessage),
+          loadedConversationMatchesSelection,
+        })
+      ) {
+        applyThreadPayload(selectedId, cachedThreadPayload)
+        return
+      }
+
+      if (
+        shouldDiscardSelectedThreadCache({
+          hasCachedThreadPayload: true,
+          hasCachedPreviewMessage: Boolean(cachedThreadPreviewMessage),
+          hasListPreviewMessage: Boolean(selectedConversationPreviewMessage),
+          loadedConversationMatchesSelection,
+        })
+      ) {
+        threadPayloadCacheRef.current.delete(selectedId)
+      }
+    }
+
     setMessages([])
     setLead(null)
     refreshMessages(selectedId)
-  }, [refreshMessages, selectedId])
+  }, [applyThreadPayload, conversations, loadedConversationId, refreshMessages, selectedId])
+
+  useEffect(() => {
+    if (!initialThreadPayload) {
+      return
+    }
+
+    threadPayloadCacheRef.current.set(initialThreadPayload.conversationId, initialThreadPayload)
+    void hydrateSenderProfiles(initialThreadPayload.messages)
+  }, [hydrateSenderProfiles, initialThreadPayload])
+
+  useEffect(() => {
+    if (!loadedConversationId) {
+      return
+    }
+    if (loadedConversationId !== selectedId) {
+      return
+    }
+
+    threadPayloadCacheRef.current.set(loadedConversationId, {
+      conversationId: loadedConversationId,
+      fetchedCount: messageOffset,
+      hasMore: hasMoreMessageHistory,
+      lead,
+      messages,
+    })
+  }, [hasMoreMessageHistory, lead, loadedConversationId, messageOffset, messages, selectedId])
+
+  useEffect(() => {
+    const conversationIdsToWarm = conversations
+      .slice(0, 3)
+      .map((conversation) => conversation.id)
+      .filter(
+        (conversationId) =>
+          conversationId !== selectedId &&
+          !threadPayloadCacheRef.current.has(conversationId) &&
+          !warmedConversationIdsRef.current.has(conversationId)
+      )
+
+    if (conversationIdsToWarm.length === 0) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      conversationIdsToWarm.forEach((conversationId) => {
+        warmedConversationIdsRef.current.add(conversationId)
+        void loadThreadPayload(conversationId).catch((error) => {
+          warmedConversationIdsRef.current.delete(conversationId)
+          console.error('Failed to warm conversation thread payload', error)
+        })
+      })
+    }, 150)
+
+    return () => clearTimeout(timeoutId)
+  }, [conversations, loadThreadPayload, selectedId])
 
   // Scroll Management
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -2425,7 +2683,9 @@ export function InboxContainer({
             <Inbox className="text-gray-400" size={24} />
           </div>
           <h3 className="text-sm font-medium text-gray-900">
-            {hasActiveConversationFilters ? t('conversationFiltersNoMatchesTitle') : t('noMessages')}
+            {hasActiveConversationFilters
+              ? t('conversationFiltersNoMatchesTitle')
+              : t('noMessages')}
           </h3>
           <p className="mt-1 text-xs text-gray-500">
             {hasActiveConversationFilters
@@ -3361,9 +3621,7 @@ export function InboxContainer({
                                       </p>
                                       <p className="text-xs text-amber-800">{pauseReasonText}</p>
                                       {leadRefreshStatus === 'error' && (
-                                        <p className="text-xs text-red-600">
-                                          {leadRefreshMessage}
-                                        </p>
+                                        <p className="text-xs text-red-600">{leadRefreshMessage}</p>
                                       )}
                                       {leadRefreshStatus === 'success' && (
                                         <p className="text-xs text-green-700">
@@ -3379,8 +3637,7 @@ export function InboxContainer({
                                       }
                                       className={cn(
                                         'shrink-0 rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100',
-                                        (leadRefreshStatus === 'loading' ||
-                                          conversationAiPaused) &&
+                                        (leadRefreshStatus === 'loading' || conversationAiPaused) &&
                                           'cursor-not-allowed opacity-60'
                                       )}
                                     >
@@ -3457,7 +3714,9 @@ export function InboxContainer({
                                           {t('leadRequiredInfo')}
                                         </span>
                                         <LeadRequiredInfoBlock
-                                          editLabel={!isReadOnly ? t('leadRequiredInfoEdit') : undefined}
+                                          editLabel={
+                                            !isReadOnly ? t('leadRequiredInfoEdit') : undefined
+                                          }
                                           onEdit={
                                             !isReadOnly
                                               ? () => setIsImportantInfoModalOpen(true)
@@ -3699,21 +3958,33 @@ export function InboxContainer({
                                     href={item.media.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`relative overflow-hidden rounded-lg ${tileClassName} ${isDark ? 'border border-white/20' : 'border border-gray-200 bg-white'}`}
+                                    className="block"
                                   >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                    <InboxMessageImage
                                       src={item.media.url}
                                       alt={item.media.caption ?? t('mediaPreview.image')}
-                                      className="h-full w-full object-cover"
-                                      loading="lazy"
+                                      frameClassName={cn(
+                                        'rounded-lg',
+                                        tileClassName,
+                                        isDark
+                                          ? 'border border-white/20'
+                                          : 'border border-gray-200 bg-white'
+                                      )}
+                                      imageClassName="object-cover"
+                                      overlayClassName={isDark ? 'bg-white/10' : 'bg-gray-100/90'}
+                                      spinnerClassName={
+                                        isDark
+                                          ? 'border-white/20 border-t-white/90'
+                                          : 'border-gray-300/80 border-t-gray-500'
+                                      }
                                       onLoad={handleMessageMediaLoad}
-                                    />
-                                    {shouldShowHiddenCount && (
-                                      <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-semibold text-white">
-                                        +{hiddenGalleryItemCount}
-                                      </span>
-                                    )}
+                                    >
+                                      {shouldShowHiddenCount && (
+                                        <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-semibold text-white">
+                                          +{hiddenGalleryItemCount}
+                                        </span>
+                                      )}
+                                    </InboxMessageImage>
                                   </a>
                                 )
                               })}
@@ -3794,16 +4065,17 @@ export function InboxContainer({
                                           rel="noopener noreferrer"
                                           className="block"
                                         >
-                                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                                          <img
+                                          <InboxMessageImage
                                             src={media.url!}
                                             alt={
                                               media.caption ??
                                               mediaPreviewLabel ??
                                               t('mediaPreview.media')
                                             }
-                                            className="max-h-64 w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain"
-                                            loading="lazy"
+                                            frameClassName="w-[240px] max-w-full rounded-lg border border-gray-200 bg-white aspect-[4/3]"
+                                            imageClassName="object-contain bg-white"
+                                            overlayClassName="bg-gray-100/90"
+                                            spinnerClassName="border-gray-300/80 border-t-gray-500"
                                             onLoad={handleMessageMediaLoad}
                                           />
                                         </a>
@@ -3939,16 +4211,17 @@ export function InboxContainer({
                                         rel="noopener noreferrer"
                                         className="block"
                                       >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
+                                        <InboxMessageImage
                                           src={media.url!}
                                           alt={
                                             media.caption ??
                                             mediaPreviewLabel ??
                                             t('mediaPreview.media')
                                           }
-                                          className="max-h-64 w-auto max-w-full rounded-lg border border-white/20 object-contain"
-                                          loading="lazy"
+                                          frameClassName="w-[240px] max-w-full rounded-lg border border-white/20 bg-white/5 aspect-[4/3]"
+                                          imageClassName="object-contain bg-black/10"
+                                          overlayClassName="bg-white/10"
+                                          spinnerClassName="border-white/20 border-t-white/90"
                                           onLoad={handleMessageMediaLoad}
                                         />
                                       </a>
@@ -4378,9 +4651,7 @@ export function InboxContainer({
                       isSending={isSending}
                       onTemplateClick={() => setIsTemplatePickerModalOpen(true)}
                       onSendClick={handleSendMessage}
-                      sendAriaLabel={
-                        isSending ? t('composerAttachments.sending') : t('sendButton')
-                      }
+                      sendAriaLabel={isSending ? t('composerAttachments.sending') : t('sendButton')}
                       sendTitle={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
                     />
                   </div>
@@ -4550,7 +4821,9 @@ export function InboxContainer({
                                 <div className="grid grid-cols-[100px_1fr] items-center gap-4">
                                   <span className="text-sm text-gray-500">{t('leadScore')}</span>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-900">{lead.total_score}</span>
+                                    <span className="text-sm text-gray-900">
+                                      {lead.total_score}
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={handleOpenScoreReason}
@@ -4595,7 +4868,9 @@ export function InboxContainer({
                                 )}
                                 {lead.summary && (
                                   <div className="grid grid-cols-[100px_1fr] items-start gap-4">
-                                    <span className="text-sm text-gray-500">{t('leadSummary')}</span>
+                                    <span className="text-sm text-gray-500">
+                                      {t('leadSummary')}
+                                    </span>
                                     <span className="whitespace-pre-wrap text-sm text-gray-900">
                                       {lead.summary}
                                     </span>
@@ -4603,7 +4878,9 @@ export function InboxContainer({
                                 )}
                                 {lead.updated_at && (
                                   <div className="grid grid-cols-[100px_1fr] items-center gap-4">
-                                    <span className="text-sm text-gray-500">{t('leadUpdated')}</span>
+                                    <span className="text-sm text-gray-500">
+                                      {t('leadUpdated')}
+                                    </span>
                                     <span className="text-sm text-gray-900">
                                       {format(new Date(lead.updated_at), 'PP p', {
                                         locale: dateLocale,

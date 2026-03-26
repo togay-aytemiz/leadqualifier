@@ -23,6 +23,14 @@ describe('InboxContainer filter menu source guards', () => {
     expect(source).toContain('if (isResettingConversationListRef.current) return')
   })
 
+  it('does not clear the server-bootstrapped list on mount when filters have not changed yet', () => {
+    const source = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
+
+    expect(source).toContain('buildConversationListFilterKey')
+    expect(source).toContain('previousConversationListFilterKeyRef')
+    expect(source).not.toContain('didMountConversationFiltersRef')
+  })
+
   it('marks a conversation read when manually switching away, not when opening it', () => {
     const source = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
 
