@@ -360,6 +360,53 @@ describe('instagram webhook utilities', () => {
         }])
     })
 
+    it('treats lookaside instagram messaging cdn urls as previewable images', () => {
+        const payload = {
+            object: 'instagram',
+            entry: [{
+                id: 'ig-business-1',
+                messaging: [{
+                    sender: { id: 'ig-user-lookaside' },
+                    recipient: { id: 'ig-business-1' },
+                    timestamp: 17380000215,
+                    message: {
+                        mid: 'igmid-lookaside-1',
+                        text: 'Bunun detayını alabilir miyim?',
+                        attachments: [{
+                            type: 'share',
+                            payload: {
+                                url: 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18106583254871156&signature=abc123'
+                            }
+                        }]
+                    }
+                }]
+            }]
+        }
+
+        const events = extractInstagramInboundEvents(payload)
+
+        expect(events).toEqual([{
+            instagramBusinessAccountId: 'ig-business-1',
+            contactId: 'ig-user-lookaside',
+            contactName: null,
+            messageId: 'igmid-lookaside-1',
+            text: 'Bunun detayını alabilir miyim?',
+            timestamp: '17380000215',
+            eventSource: 'messaging',
+            eventType: 'attachment',
+            direction: 'inbound',
+            skipAutomation: false,
+            media: {
+                type: 'unknown',
+                originalType: 'share',
+                previewKind: 'image',
+                url: 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18106583254871156&signature=abc123',
+                mimeType: null,
+                caption: 'Bunun detayını alabilir miyim?'
+            }
+        }])
+    })
+
     it('extracts reply-to story preview urls from instagram story replies', () => {
         const payload = {
             object: 'instagram',

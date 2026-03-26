@@ -61,6 +61,10 @@ function looksLikeImageAssetPath(value: string | null | undefined) {
     return /\.(avif|gif|jpe?g|png|webp)(?:[?#].*)?$/.test(normalized)
         || normalized.includes('cdninstagram.com/')
         || normalized.includes('scontent-')
+        || (
+            normalized.includes('fbsbx.com/')
+            && normalized.includes('/ig_messaging_cdn/')
+        )
 }
 
 function parseMetadata(metadata: unknown) {

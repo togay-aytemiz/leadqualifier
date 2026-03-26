@@ -163,6 +163,18 @@ describe('shouldAttemptInlineImagePreview', () => {
         })).toBe(true)
     })
 
+    it('allows inline preview for instagram lookaside messaging cdn urls', () => {
+        expect(shouldAttemptInlineImagePreview({
+            type: 'unknown',
+            url: 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18106583254871156&signature=abc123',
+            fileName: null,
+            mimeType: null,
+            caption: null,
+            isPlaceholder: false,
+            downloadStatus: 'remote'
+        })).toBe(true)
+    })
+
     it('does not allow inline preview for link-only external instagram media', () => {
         expect(shouldAttemptInlineImagePreview({
             type: 'unknown',
