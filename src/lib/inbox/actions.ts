@@ -299,6 +299,14 @@ export interface ConversationListItem extends Conversation {
   messages?: ConversationPreviewMessage[]
 }
 
+export type ConversationUnreadFilter = 'all' | 'unread'
+export type ConversationLeadTemperatureFilter = 'all' | 'hot' | 'warm' | 'cold'
+
+export interface ConversationListFilters {
+  unreadFilter?: ConversationUnreadFilter
+  leadTemperatureFilter?: ConversationLeadTemperatureFilter
+}
+
 type MaybeArray<T> = T | T[] | null | undefined
 
 function toArray<T>(value: MaybeArray<T>): T[] {
@@ -309,6 +317,78 @@ function toArray<T>(value: MaybeArray<T>): T[] {
 function toSingle<T>(value: MaybeArray<T>): T | null {
   if (!value) return null
   return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+function normalizeConversationListFilters(
+  filters?: ConversationListFilters | null
+): Required<ConversationListFilters> {
+  const unreadFilter = filters?.unreadFilter === 'unread' ? 'unread' : 'all'
+  const leadTemperatureFilter =
+    filters?.leadTemperatureFilter === 'hot'
+      || filters?.leadTemperatureFilter === 'warm'
+      || filters?.leadTemperatureFilter === 'cold'
+      ? filters.leadTemperatureFilter
+      : 'all'
+
+  return {
+    unreadFilter,
+    leadTemperatureFilter,
+  }
+}
+
+function buildConversationListSelect(filters: Required<ConversationListFilters>) {
+  const leadRelation =
+    filters.leadTemperatureFilter === 'all'
+      ? `leads (
+                status
+            )`
+      : `leads!inner (
+                status
+            )`
+
+  return `
+            *,
+            active_agent,
+            assignee:assignee_id(
+                full_name,
+                email
+            ),
+            ${leadRelation},
+            messages (
+                content,
+                created_at,
+                sender_type,
+                metadata
+            )
+        `
+}
+
+async function resolveFilteredConversationIdsForFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  filters: Required<ConversationListFilters>
+) {
+  if (filters.leadTemperatureFilter === 'all') return null
+
+  const { data, error } = await supabase
+    .from('leads')
+    .select('conversation_id')
+    .eq('organization_id', organizationId)
+    .eq('status', filters.leadTemperatureFilter)
+    .order('conversation_id', { ascending: true })
+
+  if (error) {
+    console.warn('Failed to resolve filtered conversation ids for fallback:', error)
+    return []
+  }
+
+  return Array.from(
+    new Set(
+      (data ?? [])
+        .map((row) => readTrimmedString((row as ConversationLeadPreviewRow).conversation_id))
+        .filter((value): value is string => Boolean(value))
+    )
+  )
 }
 
 function asConfigRecord(value: Json): Record<string, Json | undefined> {
@@ -914,7 +994,8 @@ function buildConversationListItemsFromFallback(
 export async function getConversations(
   organizationId: string,
   page: number = 0,
-  pageSize: number = 20
+  pageSize: number = 20,
+  filters?: ConversationListFilters
 ): Promise<ConversationListItem[]> {
   const supabase = await createClient()
   if (await isOrganizationWorkspaceLocked(organizationId, supabase)) {
@@ -924,28 +1005,19 @@ export async function getConversations(
   const from = page * pageSize
   const to = from + pageSize - 1
 
-  const { data, error } = await supabase
+  const normalizedFilters = normalizeConversationListFilters(filters)
+  let conversationQuery = supabase
     .from('conversations')
-    .select(
-      `
-            *,
-            active_agent,
-            assignee:assignee_id(
-                full_name,
-                email
-            ),
-            leads (
-                status
-            ),
-            messages (
-                content,
-                created_at,
-                sender_type,
-                metadata
-            )
-        `
-    )
+    .select(buildConversationListSelect(normalizedFilters))
     .eq('organization_id', organizationId)
+  if (normalizedFilters.unreadFilter === 'unread') {
+    conversationQuery = conversationQuery.gt('unread_count', 0)
+  }
+  if (normalizedFilters.leadTemperatureFilter !== 'all') {
+    conversationQuery = conversationQuery.eq('leads.status', normalizedFilters.leadTemperatureFilter)
+  }
+
+  const { data, error } = await conversationQuery
     .order('last_message_at', { ascending: false })
     .order('created_at', { foreignTable: 'messages', ascending: false })
     .limit(CONVERSATION_PREVIEW_MESSAGE_LIMIT, { foreignTable: 'messages' })
@@ -964,10 +1036,27 @@ export async function getConversations(
 
   console.warn('Error fetching conversations with nested query, using fallback:', error)
 
-  const { data: conversationRows, error: conversationError } = await supabase
+  const filteredConversationIds = await resolveFilteredConversationIdsForFallback(
+    supabase,
+    organizationId,
+    normalizedFilters
+  )
+  if (filteredConversationIds && filteredConversationIds.length === 0) {
+    return []
+  }
+
+  let fallbackConversationQuery = supabase
     .from('conversations')
     .select('*')
     .eq('organization_id', organizationId)
+  if (normalizedFilters.unreadFilter === 'unread') {
+    fallbackConversationQuery = fallbackConversationQuery.gt('unread_count', 0)
+  }
+  if (filteredConversationIds) {
+    fallbackConversationQuery = fallbackConversationQuery.in('id', filteredConversationIds)
+  }
+
+  const { data: conversationRows, error: conversationError } = await fallbackConversationQuery
     .order('last_message_at', { ascending: false })
     .range(from, to)
 

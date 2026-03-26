@@ -1,7 +1,11 @@
-import type { ConversationListItem } from '@/lib/inbox/actions'
+import type {
+  ConversationLeadTemperatureFilter,
+  ConversationListItem,
+  ConversationUnreadFilter,
+} from '@/lib/inbox/actions'
 
-export type InboxUnreadFilter = 'all' | 'unread'
-export type InboxLeadTemperatureFilter = 'all' | 'hot' | 'warm' | 'cold'
+export type InboxUnreadFilter = ConversationUnreadFilter
+export type InboxLeadTemperatureFilter = ConversationLeadTemperatureFilter
 
 interface ApplyInboxListFiltersInput {
   conversations: ConversationListItem[]

@@ -102,6 +102,7 @@ function createQueryBuilder(config: QueryBuilderConfig = {}) {
 
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
+  builder.gt = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
   builder.maybeSingle = vi.fn(() =>
     Promise.resolve(config.maybeSingleResult ?? { data: null, error: null })
@@ -374,6 +375,34 @@ describe('getConversations', () => {
     const result = await getConversations('org-1')
 
     expect(result).toEqual([nestedConversation])
+  })
+
+  it('applies unread and lead-status filters in the primary conversation query', async () => {
+    const queryBuilder = createQueryBuilder({
+      rangeResult: {
+        data: [],
+        error: null,
+      },
+    })
+    const supabaseMock = createSupabaseMock({
+      conversations: [queryBuilder],
+    })
+
+    createClientMock.mockResolvedValue(supabaseMock)
+
+    await (getConversations as unknown as (
+      organizationId: string,
+      page?: number,
+      pageSize?: number,
+      filters?: { unreadFilter: 'all' | 'unread'; leadTemperatureFilter: 'all' | 'hot' | 'warm' | 'cold' }
+    ) => Promise<ConversationListItem[]>)('org-1', 0, 20, {
+      unreadFilter: 'unread',
+      leadTemperatureFilter: 'hot',
+    })
+
+    expect(queryBuilder.select).toHaveBeenCalledWith(expect.stringContaining('leads!inner'))
+    expect(queryBuilder.gt).toHaveBeenCalledWith('unread_count', 0)
+    expect(queryBuilder.eq).toHaveBeenCalledWith('leads.status', 'hot')
   })
 
   it('normalizes one-to-one lead payloads from nested query into an array', async () => {

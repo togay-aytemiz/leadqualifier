@@ -183,6 +183,7 @@ type Assignee = Pick<Profile, 'full_name' | 'email'>
 type SenderProfile = InboxSenderProfile
 const SUMMARY_PANEL_ID = 'conversation-summary-panel'
 const INBOX_MEDIA_BUCKET = 'whatsapp-media'
+const CONVERSATIONS_PAGE_SIZE = 20
 const MESSAGES_PAGE_SIZE = 50
 const MESSAGE_HISTORY_TOP_THRESHOLD = 96
 const MOBILE_DETAILS_SECTION_SPACING_CLASSNAME = 'mt-4 border-t border-gray-100 pt-4'
@@ -338,7 +339,7 @@ export function InboxContainer({
   >(null)
   const [leadAutoRefreshStatus, setLeadAutoRefreshStatus] = useState<'idle' | 'loading'>('idle')
   const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(initialConversations.length >= 20)
+  const [hasMore, setHasMore] = useState(initialConversations.length >= CONVERSATIONS_PAGE_SIZE)
   const [loadingMore, setLoadingMore] = useState(false)
   const [isDetailsMenuOpen, setIsDetailsMenuOpen] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
@@ -387,6 +388,9 @@ export function InboxContainer({
   const refreshRequestRef = useRef<string | null>(null)
   const assigneeCacheRef = useRef<Record<string, Assignee>>({})
   const senderProfilesRef = useRef<Record<string, SenderProfile>>({})
+  const conversationListRequestIdRef = useRef(0)
+  const didMountConversationFiltersRef = useRef(false)
+  const isResettingConversationListRef = useRef(false)
   const selectedIdRef = useRef(selectedId)
   const leadRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leadAutoRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -684,12 +688,35 @@ export function InboxContainer({
     }
   }, [])
 
-  const loadMoreConversations = useCallback(async () => {
-    if (!hasMore || loadingMore) return
+  const activeConversationListFilters = useMemo(
+    () => ({
+      unreadFilter,
+      leadTemperatureFilter,
+    }),
+    [leadTemperatureFilter, unreadFilter]
+  )
 
-    setLoadingMore(true)
+  const loadConversationsPage = useCallback(async (pageIndex: number, replace: boolean) => {
+    const requestId = ++conversationListRequestIdRef.current
+
     try {
-      const nextConversations = await getConversations(organizationId, page)
+      const nextConversations = await getConversations(
+        organizationId,
+        pageIndex,
+        CONVERSATIONS_PAGE_SIZE,
+        activeConversationListFilters
+      )
+
+      if (conversationListRequestIdRef.current !== requestId) return
+
+      setHasMore(nextConversations.length >= CONVERSATIONS_PAGE_SIZE)
+      setPage(pageIndex + 1)
+
+      if (replace) {
+        setConversations(nextConversations)
+        return
+      }
+
       if (nextConversations.length > 0) {
         setConversations((prev) => {
           const existingIds = new Set(prev.map((conversation) => conversation.id))
@@ -698,17 +725,44 @@ export function InboxContainer({
           )
           return [...prev, ...uniqueNew]
         })
-        setPage((prev) => prev + 1)
-        return
       }
-
-      setHasMore(false)
     } catch (error) {
+      if (conversationListRequestIdRef.current !== requestId) return
       console.error('Failed to load more conversations', error)
+      setHasMore(false)
     } finally {
+      if (conversationListRequestIdRef.current !== requestId) return
       setLoadingMore(false)
     }
-  }, [hasMore, loadingMore, organizationId, page])
+  }, [activeConversationListFilters, organizationId])
+
+  const loadMoreConversations = useCallback(async () => {
+    if (!hasMore || loadingMore) return
+
+    setLoadingMore(true)
+    await loadConversationsPage(page, false)
+  }, [hasMore, loadConversationsPage, loadingMore, page])
+
+  useEffect(() => {
+    if (!didMountConversationFiltersRef.current) {
+      didMountConversationFiltersRef.current = true
+      return
+    }
+
+    isResettingConversationListRef.current = true
+
+    void (async () => {
+      try {
+        setLoadingMore(true)
+        setHasMore(true)
+        setPage(0)
+        setConversations([])
+        await loadConversationsPage(0, true)
+      } finally {
+        isResettingConversationListRef.current = false
+      }
+    })()
+  }, [loadConversationsPage])
 
   const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
@@ -2341,6 +2395,7 @@ export function InboxContainer({
   })
 
   useEffect(() => {
+    if (isResettingConversationListRef.current) return
     if (!filterBackfillState.shouldLoadMore) return
     void loadMoreConversations()
   }, [filterBackfillState.shouldLoadMore, loadMoreConversations])

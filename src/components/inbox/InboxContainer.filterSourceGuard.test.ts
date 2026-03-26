@@ -10,6 +10,17 @@ describe('InboxContainer filter menu source guards', () => {
 
     expect(source).toContain('InboxListFilterMenu')
     expect(source).toContain('applyInboxListFilters({')
+    expect(source).toContain('activeConversationListFilters')
+    expect(source).toContain('const loadConversationsPage = useCallback')
+    expect(source).toContain('const nextConversations = await getConversations(')
+    expect(source).toContain('CONVERSATIONS_PAGE_SIZE')
+  })
+
+  it('guards filtered backfill while a filter-change reload is resetting page 0', () => {
+    const source = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
+
+    expect(source).toContain('isResettingConversationListRef')
+    expect(source).toContain('if (isResettingConversationListRef.current) return')
   })
 
   it('marks a conversation read when manually switching away, not when opening it', () => {
