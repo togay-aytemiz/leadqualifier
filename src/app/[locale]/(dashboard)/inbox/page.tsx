@@ -1,15 +1,22 @@
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { getConversations } from '@/lib/inbox/actions'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getRequiredIntakeFields } from '@/lib/ai/followup'
 import { getServiceCatalogItems } from '@/lib/leads/settings'
-import { InboxContainer } from '@/components/inbox/InboxContainer'
-import { getConversationThreadPayload } from '@/lib/inbox/thread-actions'
+import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { redirect } from 'next/navigation'
 import { Building2 } from 'lucide-react'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+
+const InboxContainer = dynamic(
+    () => import('@/components/inbox/InboxContainer').then((mod) => mod.InboxContainer),
+    {
+        loading: () => <DashboardRouteSkeleton route="inbox" />
+    }
+)
 
 export default async function InboxPage() {
     const locale = await getLocale()
@@ -49,17 +56,10 @@ export default async function InboxPage() {
         getRequiredIntakeFields({ organizationId, supabase }),
         getServiceCatalogItems(organizationId)
     ])
-    const initialThreadPayload = conversations[0]
-        ? await getConversationThreadPayload(conversations[0].id, {
-            organizationId,
-            pageSize: 50
-        })
-        : null
 
     return (
         <InboxContainer
             initialConversations={conversations}
-            initialThreadPayload={initialThreadPayload}
             renderedAtIso={renderedAtIso}
             organizationId={organizationId}
             botName={aiSettings.bot_name}

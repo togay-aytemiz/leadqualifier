@@ -1,12 +1,20 @@
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import {
     getKnowledgeBaseEntries,
     getCollections,
     KnowledgeCollection
 } from '@/lib/knowledge-base/actions'
-import { KnowledgeContainer } from './components/KnowledgeContainer'
+import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+
+const KnowledgeContainer = dynamic(
+    () => import('./components/KnowledgeContainer').then((mod) => mod.KnowledgeContainer),
+    {
+        loading: () => <DashboardRouteSkeleton route="knowledge" />
+    }
+)
 
 interface KnowledgePageProps {
     searchParams: Promise<{ collectionId?: string }>

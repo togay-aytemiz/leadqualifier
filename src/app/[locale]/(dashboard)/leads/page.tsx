@@ -1,12 +1,20 @@
+import dynamic from 'next/dynamic'
 import { getTranslations, getLocale } from 'next-intl/server'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { PageHeader } from '@/design'
 import { LeadsEmptyState } from '@/components/leads/LeadsEmptyState'
-import { LeadsClient } from '@/components/leads/LeadsClient'
+import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 import { getLeadsPageData } from '@/lib/leads/page-data'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+
+const LeadsClient = dynamic(
+    () => import('@/components/leads/LeadsClient').then((mod) => mod.LeadsClient),
+    {
+        loading: () => <DashboardRouteSkeleton route="leads" />
+    }
+)
 
 interface PageProps {
     searchParams: Promise<{ page?: string; sortBy?: string; sortOrder?: string; search?: string }>

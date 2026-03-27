@@ -16,6 +16,11 @@ const SETTINGS_PLAN_CATALOG_PATH = path.join(process.cwd(), 'src/app/[locale]/(d
 const SETTINGS_TOPUP_CARD_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/TopupCheckoutCard.tsx')
 const TAB_TITLE_SYNC_PATH = path.join(process.cwd(), 'src/components/common/TabTitleSync.tsx')
 const DASHBOARD_LAYOUT_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/layout.tsx')
+const INBOX_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/inbox/page.tsx')
+const CALENDAR_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/calendar/page.tsx')
+const LEADS_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/leads/page.tsx')
+const SKILLS_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/skills/page.tsx')
+const KNOWLEDGE_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/knowledge/page.tsx')
 
 describe('navigation performance source guards', () => {
     it('keeps primary nav routes warm while preserving configurable shell prefetch control', () => {
@@ -146,5 +151,29 @@ describe('navigation performance source guards', () => {
         const layoutSource = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
 
         expect(layoutSource).not.toContain("resolveActiveOrganizationContext(undefined, { includeAccessibleOrganizations: true })")
+    })
+
+    it('lazy-loads heavy workspace route containers and removes inbox thread bootstrap from the server critical path', () => {
+        const inboxPageSource = fs.readFileSync(INBOX_PAGE_PATH, 'utf8')
+        const calendarPageSource = fs.readFileSync(CALENDAR_PAGE_PATH, 'utf8')
+        const leadsPageSource = fs.readFileSync(LEADS_PAGE_PATH, 'utf8')
+        const skillsPageSource = fs.readFileSync(SKILLS_PAGE_PATH, 'utf8')
+        const knowledgePageSource = fs.readFileSync(KNOWLEDGE_PAGE_PATH, 'utf8')
+
+        expect(inboxPageSource).toContain("from 'next/dynamic'")
+        expect(inboxPageSource).toContain("import('@/components/inbox/InboxContainer')")
+        expect(inboxPageSource).not.toContain('getConversationThreadPayload(')
+
+        expect(calendarPageSource).toContain("from 'next/dynamic'")
+        expect(calendarPageSource).toContain("import('@/components/calendar/CalendarClient')")
+
+        expect(leadsPageSource).toContain("from 'next/dynamic'")
+        expect(leadsPageSource).toContain("import('@/components/leads/LeadsClient')")
+
+        expect(skillsPageSource).toContain("from 'next/dynamic'")
+        expect(skillsPageSource).toContain("import('@/components/skills/SkillsContainer')")
+
+        expect(knowledgePageSource).toContain("from 'next/dynamic'")
+        expect(knowledgePageSource).toContain("import('./components/KnowledgeContainer')")
     })
 })

@@ -1,6 +1,8 @@
+import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader } from '@/design'
+import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 import { createClient } from '@/lib/supabase/server'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
@@ -13,7 +15,13 @@ import {
   getTodayDateKey,
   normalizeCalendarView,
 } from '@/lib/calendar/presentation'
-import { CalendarClient } from '@/components/calendar/CalendarClient'
+
+const CalendarClient = dynamic(
+  () => import('@/components/calendar/CalendarClient').then((mod) => mod.CalendarClient),
+  {
+    loading: () => <DashboardRouteSkeleton route="page" />,
+  }
+)
 
 interface PageProps {
   searchParams: Promise<{ view?: string; date?: string }>

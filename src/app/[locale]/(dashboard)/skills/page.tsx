@@ -1,11 +1,19 @@
+import dynamic from 'next/dynamic'
 import { getSkills } from '@/lib/skills/actions'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_HANDOVER_MESSAGE_EN, DEFAULT_HANDOVER_MESSAGE_TR } from '@/lib/ai/escalation'
 import { createClient } from '@/lib/supabase/server'
-import { SkillsContainer } from '@/components/skills/SkillsContainer'
+import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+
+const SkillsContainer = dynamic(
+    () => import('@/components/skills/SkillsContainer').then((mod) => mod.SkillsContainer),
+    {
+        loading: () => <DashboardRouteSkeleton route="page" />
+    }
+)
 
 interface SkillsPageProps {
     searchParams: Promise<{ q?: string }>
