@@ -1,6 +1,7 @@
 import type { ConversationPlatform } from '@/types/database'
 
 export type TemplatePickerTab = 'predefined' | 'whatsapp'
+export type TemplatePickerPaneState = 'loading' | 'empty' | 'ready'
 
 export function resolveTemplatePickerTabs(platform: ConversationPlatform | null | undefined): TemplatePickerTab[] {
     if (platform === 'whatsapp') {
@@ -52,4 +53,22 @@ export function resolveTemplatePickerRefreshLoading(params: {
     }
 
     return isLoadingWhatsAppTemplates
+}
+
+export function resolveTemplatePickerPaneState(params: {
+    isLoading: boolean
+    hasLoadedOnce: boolean
+    itemCount: number
+}): TemplatePickerPaneState {
+    const { isLoading, hasLoadedOnce, itemCount } = params
+
+    if (itemCount > 0) {
+        return 'ready'
+    }
+
+    if (isLoading || !hasLoadedOnce) {
+        return 'loading'
+    }
+
+    return 'empty'
 }

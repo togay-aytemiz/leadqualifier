@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
     resolveTemplatePickerActiveTab,
     resolveTemplatePickerInsertDisabled,
+    resolveTemplatePickerPaneState,
     resolveTemplatePickerRefreshLoading,
     resolveTemplatePickerTabs
 } from '@/components/inbox/template-picker-state'
@@ -62,5 +63,25 @@ describe('template-picker-state', () => {
             isLoadingPredefinedTemplates: true,
             isLoadingWhatsAppTemplates: false
         })).toBe(false)
+    })
+
+    it('keeps empty panes in loading state until the initial fetch completes', () => {
+        expect(resolveTemplatePickerPaneState({
+            isLoading: false,
+            hasLoadedOnce: false,
+            itemCount: 0
+        })).toBe('loading')
+
+        expect(resolveTemplatePickerPaneState({
+            isLoading: false,
+            hasLoadedOnce: true,
+            itemCount: 0
+        })).toBe('empty')
+
+        expect(resolveTemplatePickerPaneState({
+            isLoading: false,
+            hasLoadedOnce: true,
+            itemCount: 2
+        })).toBe('ready')
     })
 })

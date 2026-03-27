@@ -38,4 +38,14 @@ describe('InboxContainer filter menu source guards', () => {
     expect(source).toContain('void commitConversationRead(previousSelectedId)')
     expect(source).not.toContain('void markConversationRead(nextId)')
   })
+
+  it('uses a plain icon treatment for the selected-thread read toggle', () => {
+    const source = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
+
+    expect(source).toContain('onClick={handleToggleSelectedConversationUnread}')
+    expect(source).toContain(
+      'className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"'
+    )
+    expect(source).not.toContain('rounded-lg border border-gray-200 bg-gray-50 text-gray-600')
+  })
 })

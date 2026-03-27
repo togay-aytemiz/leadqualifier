@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Avatar, DataTable, TableBody, TableRow, TableCell, Badge, Button } from '@/design'
@@ -180,7 +181,16 @@ export function LeadsTable({
     const getPlatformIcon = (platform: ConversationPlatform) => {
         const src = getConversationPlatformIconSrc(platform)
         if (src) {
-            return <img alt="" aria-hidden className="h-[18px] w-[18px]" src={src} />
+            return (
+                <Image
+                    alt=""
+                    aria-hidden
+                    className="h-[18px] w-[18px]"
+                    src={src}
+                    width={18}
+                    height={18}
+                />
+            )
         }
         return <span className="text-xs text-gray-400">{t('platformSimulatorShort')}</span>
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import {
@@ -273,24 +273,31 @@ export function CalendarClient({
   const selectedService =
     availableServices.find((service) => service.id === bookingDraft.serviceCatalogId) ?? null
 
-  const syncCalendarUrl = useEffectEvent((nextDate: string, nextView: CalendarView) => {
-    if (typeof window === 'undefined') return
+  const syncCalendarUrl = useCallback(
+    (nextDate: string, nextView: CalendarView) => {
+      if (typeof window === 'undefined') return
 
-    const params = new URLSearchParams(window.location.search)
-    params.set('date', nextDate)
-    params.set('view', nextView)
-    const query = params.toString()
+      const params = new URLSearchParams(window.location.search)
+      params.set('date', nextDate)
+      params.set('view', nextView)
+      const query = params.toString()
 
-    window.history.replaceState(window.history.state, '', query ? `${pathname}?${query}` : pathname)
-  })
+      window.history.replaceState(
+        window.history.state,
+        '',
+        query ? `${pathname}?${query}` : pathname
+      )
+    },
+    [pathname]
+  )
 
-  const invalidateCalendarWindowCache = useEffectEvent(() => {
+  const invalidateCalendarWindowCache = useCallback(() => {
     isCalendarCacheDirtyRef.current = true
     latestCalendarLoadIdRef.current += 1
     rangeCacheRef.current.clear()
-  })
+  }, [])
 
-  const ensureCalendarWindow = useEffectEvent(
+  const ensureCalendarWindow = useCallback(
     async (nextAnchorDate: string, nextView: CalendarView, timeZone: string) => {
       const nextVisibleRange = buildCalendarRange({
         anchorDate: nextAnchorDate,
@@ -369,7 +376,8 @@ export function CalendarClient({
           setIsCalendarLoading(false)
         }
       }
-    }
+    },
+    [calendarData.rangeEndIso, calendarData.rangeStartIso, t]
   )
 
   useEffect(() => {
@@ -529,7 +537,12 @@ export function CalendarClient({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className={cn('truncate text-sm font-semibold', isInverse ? 'text-white' : 'text-slate-900')}>
+            <p
+              className={cn(
+                'truncate text-sm font-semibold',
+                isInverse ? 'text-white' : 'text-slate-900'
+              )}
+            >
               {booking.service_name_snapshot ?? t('emptyStates.untitledBooking')}
             </p>
             <p className={cn('mt-1 text-xs', isInverse ? 'text-slate-300' : 'text-slate-500')}>
@@ -545,7 +558,12 @@ export function CalendarClient({
             locale,
           })}
         </p>
-        <div className={cn('mt-3 flex flex-wrap gap-2 text-[11px]', isInverse ? 'text-slate-300' : 'text-slate-500')}>
+        <div
+          className={cn(
+            'mt-3 flex flex-wrap gap-2 text-[11px]',
+            isInverse ? 'text-slate-300' : 'text-slate-500'
+          )}
+        >
           <span>{t(`sources.${booking.source}`)}</span>
           <span>•</span>
           <span>{t(`channels.${booking.channel ?? 'manual'}`)}</span>
@@ -621,7 +639,9 @@ export function CalendarClient({
             {t('emptyStates.noBookingsOnDay')}
           </p>
         ) : (
-          <div className="space-y-3">{dayBookings.map((booking) => renderBookingCard(booking))}</div>
+          <div className="space-y-3">
+            {dayBookings.map((booking) => renderBookingCard(booking))}
+          </div>
         )}
       </section>
     )
@@ -839,10 +859,18 @@ export function CalendarClient({
           )}
         </div>
         <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
-          <Button variant="secondary" onClick={() => openEditBooking(booking)} disabled={isPending || readOnlyTenantMode}>
+          <Button
+            variant="secondary"
+            onClick={() => openEditBooking(booking)}
+            disabled={isPending || readOnlyTenantMode}
+          >
             {t('actions.editBooking')}
           </Button>
-          <Button variant="danger" onClick={() => cancelSelectedBooking(booking.id)} disabled={isPending || readOnlyTenantMode}>
+          <Button
+            variant="danger"
+            onClick={() => cancelSelectedBooking(booking.id)}
+            disabled={isPending || readOnlyTenantMode}
+          >
             {t('actions.cancelBooking')}
           </Button>
         </div>

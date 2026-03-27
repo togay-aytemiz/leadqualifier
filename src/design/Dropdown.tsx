@@ -118,19 +118,23 @@ export function DropdownMenuContent({
   const [visualState, setVisualState] = useState<'opening' | 'open' | 'closing'>('closing')
 
   useEffect(() => {
-    if (context.isOpen) {
-      setIsRendered(true)
-      setVisualState('opening')
+    let raf1 = 0
+    let raf2 = 0
+    let timeoutId = 0
 
-      let raf1 = 0
-      let raf2 = 0
-      raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => {
-          setVisualState('open')
+    if (context.isOpen) {
+      timeoutId = window.setTimeout(() => {
+        setIsRendered(true)
+        setVisualState('opening')
+        raf1 = window.requestAnimationFrame(() => {
+          raf2 = window.requestAnimationFrame(() => {
+            setVisualState('open')
+          })
         })
-      })
+      }, 0)
 
       return () => {
+        window.clearTimeout(timeoutId)
         window.cancelAnimationFrame(raf1)
         window.cancelAnimationFrame(raf2)
       }
@@ -138,12 +142,17 @@ export function DropdownMenuContent({
 
     if (!isRendered) return
 
-    setVisualState('closing')
-    const timeoutId = window.setTimeout(() => {
+    raf1 = window.requestAnimationFrame(() => {
+      setVisualState('closing')
+    })
+    timeoutId = window.setTimeout(() => {
       setIsRendered(false)
     }, 220)
 
-    return () => window.clearTimeout(timeoutId)
+    return () => {
+      window.cancelAnimationFrame(raf1)
+      window.clearTimeout(timeoutId)
+    }
   }, [context.isOpen, isRendered])
 
   if (!isRendered) return null

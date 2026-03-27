@@ -37,6 +37,7 @@ import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
+import { getOrganizationTopupConsumedCreditsTotal } from '@/lib/billing/topup-status'
 import { readCheckoutLegalConsent } from '@/lib/billing/checkout-legal'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
@@ -46,6 +47,7 @@ import { PlansStatusBanner } from './PlansStatusBanner'
 import { TopupCheckoutCard, type TopupPackOption } from './TopupCheckoutCard'
 import { SubscriptionPlanManager, type SubscriptionPlanOption } from './SubscriptionPlanManager'
 import { SubscriptionPlanCatalog } from './SubscriptionPlanCatalog'
+import { resolvePremiumStatusVisibility } from './status-visibility'
 
 interface PlansSettingsPageProps {
     searchParams: Promise<{
@@ -58,30 +60,6 @@ interface PlansSettingsPageProps {
         renewal_status?: string
         renewal_error?: string
     }>
-}
-
-type SupabaseClient = Awaited<ReturnType<typeof createClient>>
-
-async function getPaidTopupCreditsTotal(
-    organizationId: string,
-    supabase: SupabaseClient
-) {
-    const { data, error } = await supabase
-        .from('credit_purchase_orders')
-        .select('credits')
-        .eq('organization_id', organizationId)
-        .eq('status', 'paid')
-
-    if (error) {
-        console.error('Failed to load paid top-up credits total for plans page:', error)
-        return 0
-    }
-
-    return (data ?? []).reduce((sum, row) => {
-        const credits = Number(row.credits ?? 0)
-        if (!Number.isFinite(credits) || credits <= 0) return sum
-        return sum + credits
-    }, 0)
 }
 
 function resolveMembershipLabel(
@@ -228,7 +206,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         { data: organizationRecord, error: organizationError },
         snapshot,
         pricingCatalog,
-        paidTopupCreditsTotal,
+        consumedTopupCreditsTotal,
         subscriptionRenewalState
     ] = await Promise.all([
         supabase
@@ -240,7 +218,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         getBillingPricingCatalog({
             supabase
         }),
-        getPaidTopupCreditsTotal(organizationId, supabase),
+        getOrganizationTopupConsumedCreditsTotal(organizationId, supabase),
         getSubscriptionRenewalState({
             organizationId,
             supabase
@@ -484,12 +462,10 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
             topupBalance: snapshot.topupBalance
         })
         : false
-    const topupTotalCredits = snapshot
-        ? Math.max(snapshot.topupBalance, paidTopupCreditsTotal)
-        : 0
-    const topupCreditsProgress = topupTotalCredits > 0 && snapshot
-        ? Math.min(100, Math.max(0, (snapshot.topupBalance / topupTotalCredits) * 100))
-        : 0
+    const premiumStatusVisibility = resolvePremiumStatusVisibility({
+        snapshot,
+        consumedTopupCreditsTotal
+    })
 
     const getCheckoutTitle = () => {
         if (!checkoutStatus) return ''
@@ -832,16 +808,18 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
 
                                 {isPremiumMembership && (
                                     <div className="space-y-4">
-                                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                            <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.totalCreditsTitle')}</p>
-                                            <p className="mt-2 text-lg font-semibold text-gray-900">
-                                                {formatNumber.format(snapshot.totalRemainingCredits)}
-                                                <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                            </p>
-                                            <p className="mt-1 text-xs text-gray-500">{tPlans('status.creditPriorityTopupFirst')}</p>
-                                        </div>
+                                        {premiumStatusVisibility.showTotalCreditsCard && (
+                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.totalCreditsTitle')}</p>
+                                                <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                    {formatNumber.format(snapshot.totalRemainingCredits)}
+                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">{tPlans('status.creditPriorityTopupFirst')}</p>
+                                            </div>
+                                        )}
 
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className={`grid grid-cols-1 gap-4${premiumStatusVisibility.showTopupCreditsCard ? ' md:grid-cols-2' : ''}`}>
                                             <div className="rounded-2xl border border-gray-200 bg-white p-4">
                                                 <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.packageCreditsTitle')}</p>
                                                 <p className="mt-2 text-lg font-semibold text-gray-900">
@@ -875,25 +853,27 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                                                 )}
                                             </div>
 
-                                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                                <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.topupCreditsTitle')}</p>
-                                                <p className="mt-2 text-lg font-semibold text-gray-900">
-                                                    {formatNumber.format(snapshot.topupBalance)}
-                                                    <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
-                                                </p>
-                                                <p className="mt-1 text-xs text-gray-500">
-                                                    {tPlans('status.usedVsLimit', {
-                                                        used: formatNumber.format(snapshot.topupBalance),
-                                                        limit: formatNumber.format(topupTotalCredits)
-                                                    })}
-                                                </p>
-                                                <div className="mt-3 h-2 rounded-full bg-gray-100">
-                                                    <div
-                                                        className="h-2 rounded-full bg-purple-600"
-                                                        style={{ width: `${Math.min(100, topupCreditsProgress)}%` }}
-                                                    />
+                                            {premiumStatusVisibility.showTopupCreditsCard && (
+                                                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.topupCreditsTitle')}</p>
+                                                    <p className="mt-2 text-lg font-semibold text-gray-900">
+                                                        {formatNumber.format(snapshot.topupBalance)}
+                                                        <span className="ml-1 text-sm font-medium text-gray-500">{tPlans('creditsUnit')}</span>
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-gray-500">
+                                                        {tPlans('status.usedVsLimit', {
+                                                            used: formatNumber.format(snapshot.topupBalance),
+                                                            limit: formatNumber.format(premiumStatusVisibility.topupTotalCredits)
+                                                        })}
+                                                    </p>
+                                                    <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                                        <div
+                                                            className="h-2 rounded-full bg-purple-600"
+                                                            style={{ width: `${Math.min(100, premiumStatusVisibility.topupCreditsProgress)}%` }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

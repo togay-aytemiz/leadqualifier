@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { createPortal } from 'react-dom'
 import { CheckoutLegalConsentModal } from './CheckoutLegalConsentModal'
@@ -35,13 +35,9 @@ export function SubscriptionPlanCatalog({
         }),
         [currency, locale]
     )
-    const [isClient, setIsClient] = useState(false)
     const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
     const checkoutPlan = plans.find((plan) => plan.id === checkoutPlanId) ?? null
-
-    useEffect(() => {
-        setIsClient(true)
-    }, [])
+    const isClient = typeof document !== 'undefined'
 
     return (
         <>

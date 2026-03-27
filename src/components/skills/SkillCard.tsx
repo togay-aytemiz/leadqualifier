@@ -82,10 +82,11 @@ export function SkillCard({ skill }: SkillCardProps) {
                     >
                         {skill.enabled ? tc('disable') : tc('enable')}
                     </Button>
-                    <Link href={`/skills/${skill.id}/edit`}>
-                        <Button variant="secondary" size="sm">
-                            {tc('edit')}
-                        </Button>
+                    <Link
+                        href={`/skills/${skill.id}/edit`}
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {tc('edit')}
                     </Link>
                     <Button
                         onClick={handleDeleteClick}

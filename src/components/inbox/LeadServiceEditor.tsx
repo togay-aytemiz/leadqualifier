@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 type LeadServiceEditorResult =
   | { ok: true }
@@ -32,12 +32,23 @@ interface LeadServiceEditorProps {
     service: string
     knownLeadUpdatedAt: string | null
   }) => Promise<LeadServiceEditorResult>
-  onReturnToAi: (input: {
-    knownLeadUpdatedAt: string | null
-  }) => Promise<LeadServiceEditorResult>
+  onReturnToAi: (input: { knownLeadUpdatedAt: string | null }) => Promise<LeadServiceEditorResult>
 }
 
-function resolveErrorMessage(reason: LeadServiceEditorFailureReason, labels: LeadServiceEditorLabels) {
+interface LeadServiceEditorFormProps {
+  catalogServices: string[]
+  initialService: string | null
+  initialKnownLeadUpdatedAt: string | null
+  labels: LeadServiceEditorLabels
+  onCancel: () => void
+  onSave: LeadServiceEditorProps['onSave']
+  onSaved: () => void
+}
+
+function resolveErrorMessage(
+  reason: LeadServiceEditorFailureReason,
+  labels: LeadServiceEditorLabels
+) {
   switch (reason) {
     case 'stale_conflict':
       return labels.staleConflict
@@ -59,48 +70,17 @@ export function LeadServiceEditor({
   onReturnToAi,
 }: LeadServiceEditorProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [draftService, setDraftService] = useState(currentService ?? '')
-  const [editingLeadUpdatedAt, setEditingLeadUpdatedAt] = useState<string | null>(knownLeadUpdatedAt)
-  const [isSaving, setIsSaving] = useState(false)
   const [isReturningToAi, setIsReturningToAi] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (isEditing || isSaving) return
-    setDraftService(currentService ?? '')
-    setEditingLeadUpdatedAt(knownLeadUpdatedAt)
-    setErrorMessage(null)
-  }, [currentService, isEditing, isSaving, knownLeadUpdatedAt])
+  const editSessionKey = `${currentService ?? ''}:${knownLeadUpdatedAt ?? ''}`
 
   const beginEditing = () => {
-    setDraftService(currentService ?? '')
-    setEditingLeadUpdatedAt(knownLeadUpdatedAt)
     setErrorMessage(null)
     setIsEditing(true)
   }
 
   const cancelEditing = () => {
-    setDraftService(currentService ?? '')
-    setEditingLeadUpdatedAt(knownLeadUpdatedAt)
     setErrorMessage(null)
-    setIsEditing(false)
-  }
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    setErrorMessage(null)
-
-    const result = await onSave({
-      service: draftService,
-      knownLeadUpdatedAt: editingLeadUpdatedAt,
-    })
-
-    setIsSaving(false)
-    if (!result.ok) {
-      setErrorMessage(resolveErrorMessage(result.reason, labels))
-      return
-    }
-
     setIsEditing(false)
   }
 
@@ -120,42 +100,19 @@ export function LeadServiceEditor({
 
   if (isEditing) {
     return (
-      <div className="w-full space-y-2">
-        <select
-          value={draftService}
-          onChange={(event) => setDraftService(event.target.value)}
-          disabled={isSaving}
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50"
-        >
-          <option value="">{labels.selectPlaceholder}</option>
-          {catalogServices.map((service) => (
-            <option key={service} value={service}>
-              {service}
-            </option>
-          ))}
-        </select>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={isSaving}
-            className="rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {labels.save}
-          </button>
-          <button
-            type="button"
-            onClick={cancelEditing}
-            disabled={isSaving}
-            className="text-xs font-semibold text-gray-500 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {labels.cancel}
-          </button>
-        </div>
-
-        {errorMessage && <p className="text-xs text-red-600">{errorMessage}</p>}
-      </div>
+      <LeadServiceEditorForm
+        key={editSessionKey}
+        catalogServices={catalogServices}
+        initialService={currentService}
+        initialKnownLeadUpdatedAt={knownLeadUpdatedAt}
+        labels={labels}
+        onCancel={cancelEditing}
+        onSave={onSave}
+        onSaved={() => {
+          setErrorMessage(null)
+          setIsEditing(false)
+        }}
+      />
     )
   }
 
@@ -191,6 +148,77 @@ export function LeadServiceEditor({
       {!isReadOnly && catalogServices.length === 0 && (
         <p className="text-xs text-gray-400">{labels.noCatalog}</p>
       )}
+
+      {errorMessage && <p className="text-xs text-red-600">{errorMessage}</p>}
+    </div>
+  )
+}
+
+function LeadServiceEditorForm({
+  catalogServices,
+  initialService,
+  initialKnownLeadUpdatedAt,
+  labels,
+  onCancel,
+  onSave,
+  onSaved,
+}: LeadServiceEditorFormProps) {
+  const [draftService, setDraftService] = useState(initialService ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setErrorMessage(null)
+
+    const result = await onSave({
+      service: draftService,
+      knownLeadUpdatedAt: initialKnownLeadUpdatedAt,
+    })
+
+    setIsSaving(false)
+    if (!result.ok) {
+      setErrorMessage(resolveErrorMessage(result.reason, labels))
+      return
+    }
+
+    onSaved()
+  }
+
+  return (
+    <div className="w-full space-y-2">
+      <select
+        value={draftService}
+        onChange={(event) => setDraftService(event.target.value)}
+        disabled={isSaving}
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50"
+      >
+        <option value="">{labels.selectPlaceholder}</option>
+        {catalogServices.map((service) => (
+          <option key={service} value={service}>
+            {service}
+          </option>
+        ))}
+      </select>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={isSaving}
+          className="rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {labels.save}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSaving}
+          className="text-xs font-semibold text-gray-500 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {labels.cancel}
+        </button>
+      </div>
 
       {errorMessage && <p className="text-xs text-red-600">{errorMessage}</p>}
     </div>

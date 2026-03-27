@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Input, Modal, TextArea } from '@/design'
 import {
     listWhatsAppMessageTemplates,
@@ -49,7 +49,7 @@ export function WhatsAppTemplateModal({
         [selectedTemplateValue, templates]
     )
 
-    const loadTemplates = async () => {
+    const loadTemplates = useCallback(async () => {
         setIsLoadingTemplates(true)
         setLoadError('')
         setSendError('')
@@ -75,25 +75,39 @@ export function WhatsAppTemplateModal({
             return firstTemplate ? toTemplateOptionValue(firstTemplate) : ''
         })
         setIsLoadingTemplates(false)
-    }
+    }, [channelId, t])
+
+    const handleClose = useCallback(() => {
+        setIsGuideModalOpen(false)
+        onClose()
+    }, [onClose])
 
     useEffect(() => {
         if (!isOpen) return
-        void loadTemplates()
-    }, [isOpen])
+        const timeoutId = window.setTimeout(() => {
+            void loadTemplates()
+        }, 0)
+        return () => window.clearTimeout(timeoutId)
+    }, [isOpen, loadTemplates])
 
     useEffect(() => {
         if (!isOpen) return
-        setRecipientPhone('')
-        setBodyParametersText('')
-        setSendError('')
-        setSendSuccess('')
-        setSendSuccessMessageId('')
+        const timeoutId = window.setTimeout(() => {
+            setRecipientPhone('')
+            setBodyParametersText('')
+            setSendError('')
+            setSendSuccess('')
+            setSendSuccessMessageId('')
+        }, 0)
+        return () => window.clearTimeout(timeoutId)
     }, [isOpen])
 
     useEffect(() => {
         if (isOpen) return
-        setIsGuideModalOpen(false)
+        const timeoutId = window.setTimeout(() => {
+            setIsGuideModalOpen(false)
+        }, 0)
+        return () => window.clearTimeout(timeoutId)
     }, [isOpen])
 
     const handleSendTemplate = async () => {
@@ -137,12 +151,12 @@ export function WhatsAppTemplateModal({
         setSendSuccess(t('templateTools.sendSuccess'))
         setSendSuccessMessageId(result.messageId ?? '')
         setIsSendingTemplate(false)
-        onClose()
+        handleClose()
     }
 
     return (
         <>
-            <Modal isOpen={isOpen} onClose={onClose} title={t('templateTools.title')}>
+            <Modal isOpen={isOpen} onClose={handleClose} title={t('templateTools.title')}>
                 <div className="space-y-4">
                     <Alert variant="info">
                         {t('templateTools.description')}
@@ -236,7 +250,7 @@ export function WhatsAppTemplateModal({
                     )}
 
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="secondary" onClick={onClose}>
+                        <Button type="button" variant="secondary" onClick={handleClose}>
                             {t('actions.cancel')}
                         </Button>
                         <Button

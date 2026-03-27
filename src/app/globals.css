@@ -38,6 +38,34 @@ body {
   font-family: var(--font-sans);
 }
 
+@media (min-width: 1024px) {
+  .dashboard-content-type-scale {
+    --text-xs: var(--dashboard-content-text-xs);
+    --text-xs--line-height: var(--dashboard-content-text-xs--line-height);
+    --text-sm: var(--dashboard-content-text-sm);
+    --text-sm--line-height: var(--dashboard-content-text-sm--line-height);
+    --text-base: var(--dashboard-content-text-base);
+    --text-base--line-height: var(--dashboard-content-text-base--line-height);
+    --text-lg: var(--dashboard-content-text-lg);
+    --text-lg--line-height: var(--dashboard-content-text-lg--line-height);
+    --text-xl: var(--dashboard-content-text-xl);
+    --text-xl--line-height: var(--dashboard-content-text-xl--line-height);
+    --text-2xl: var(--dashboard-content-text-2xl);
+    --text-2xl--line-height: var(--dashboard-content-text-2xl--line-height);
+  }
+
+  .dashboard-sidebar-type-scale {
+    --text-xs: var(--dashboard-sidebar-text-xs);
+    --text-xs--line-height: var(--dashboard-sidebar-text-xs--line-height);
+    --text-sm: var(--dashboard-sidebar-text-sm);
+    --text-sm--line-height: var(--dashboard-sidebar-text-sm--line-height);
+    --text-base: var(--dashboard-sidebar-text-base);
+    --text-base--line-height: var(--dashboard-sidebar-text-base--line-height);
+    --text-lg: var(--dashboard-sidebar-text-lg);
+    --text-lg--line-height: var(--dashboard-sidebar-text-lg--line-height);
+  }
+}
+
 @keyframes admin-loading-zoom {
   0%, 100% {
     transform: scale(0.92);

@@ -2,82 +2,94 @@ import { resolvePostAuthRoute } from '@/lib/auth/post-auth-route'
 import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 
 interface PostAuthSupabaseQueryResult<T> {
-    data: T | null
-    error: unknown
+  data: T | null
+  error: unknown
 }
 
-interface PostAuthSupabase {
-    from: (table: string) => any
+interface PostAuthSupabaseMaybeSingleQuery<T> {
+  maybeSingle: () => Promise<PostAuthSupabaseQueryResult<T>>
+}
+
+interface PostAuthSupabaseFilterQuery<T> {
+  eq: (column: string, value: string) => PostAuthSupabaseMaybeSingleQuery<T>
+}
+
+interface PostAuthSupabaseSelectQuery<T> {
+  select: (columns: string) => PostAuthSupabaseFilterQuery<T>
+}
+
+export interface PostAuthSupabase {
+  from: (table: string) => PostAuthSupabaseSelectQuery<Record<string, unknown>>
 }
 
 interface ResolvePostAuthRedirectPathInput {
-    cookieOrganizationId: string | null
-    locale: string | null | undefined
-    supabase: PostAuthSupabase
-    userId: string
+  cookieOrganizationId: string | null
+  locale: string | null | undefined
+  supabase: PostAuthSupabase
+  userId: string
 }
 
 export function resolvePostAuthHomeRoute({
-    isSystemAdmin,
-    hasExplicitOrganizationSelection
+  isSystemAdmin,
+  hasExplicitOrganizationSelection,
 }: {
-    isSystemAdmin: boolean
-    hasExplicitOrganizationSelection: boolean
+  isSystemAdmin: boolean
+  hasExplicitOrganizationSelection: boolean
 }) {
-    return resolvePostAuthRoute({
-        isSystemAdmin,
-        hasExplicitOrganizationSelection
-    })
+  return resolvePostAuthRoute({
+    isSystemAdmin,
+    hasExplicitOrganizationSelection,
+  })
 }
 
 async function isExplicitOrganizationSelectionValid(
-    supabase: PostAuthSupabase,
-    cookieOrganizationId: string | null
+  supabase: PostAuthSupabase,
+  cookieOrganizationId: string | null
 ) {
-    if (!cookieOrganizationId) {
-        return false
-    }
+  if (!cookieOrganizationId) {
+    return false
+  }
 
-    const { data, error } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('id', cookieOrganizationId)
-        .maybeSingle() as PostAuthSupabaseQueryResult<Record<string, unknown>>
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('id', cookieOrganizationId)
+    .maybeSingle()
 
-    if (error) {
-        console.warn('Failed to validate post-auth organization selection:', error)
-        return false
-    }
+  if (error) {
+    console.warn('Failed to validate post-auth organization selection:', error)
+    return false
+  }
 
-    return typeof data?.id === 'string'
+  return typeof data?.id === 'string'
 }
 
 export async function resolvePostAuthRedirectPath({
-    cookieOrganizationId,
-    locale,
-    supabase,
-    userId
+  cookieOrganizationId,
+  locale,
+  supabase,
+  userId,
 }: ResolvePostAuthRedirectPathInput) {
-    const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_system_admin')
-        .eq('id', userId)
-        .maybeSingle() as PostAuthSupabaseQueryResult<Record<string, unknown>>
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('is_system_admin')
+    .eq('id', userId)
+    .maybeSingle()
 
-    if (error) {
-        console.warn('Failed to resolve post-auth profile:', error)
-    }
+  if (error) {
+    console.warn('Failed to resolve post-auth profile:', error)
+  }
 
-    const isSystemAdmin = Boolean(profile?.is_system_admin)
-    const hasExplicitOrganizationSelection = isSystemAdmin
-        ? await isExplicitOrganizationSelectionValid(supabase, cookieOrganizationId)
-        : true
+  const isSystemAdmin = Boolean(profile?.is_system_admin)
+  const hasExplicitOrganizationSelection = isSystemAdmin
+    ? await isExplicitOrganizationSelectionValid(supabase, cookieOrganizationId)
+    : true
 
-    return buildLocalizedPath(
-        resolvePostAuthHomeRoute({
-            isSystemAdmin,
-            hasExplicitOrganizationSelection
-        }),
-        normalizeAppLocale(locale)
-    )
+  return buildLocalizedPath(
+    resolvePostAuthHomeRoute({
+      isSystemAdmin,
+      hasExplicitOrganizationSelection,
+    }),
+    normalizeAppLocale(locale)
+  )
 }

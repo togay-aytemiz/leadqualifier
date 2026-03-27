@@ -447,7 +447,7 @@ function createStorageUsageSupabaseMock(options: {
             error: null
         }
     })
-    const storageFromMock = vi.fn((_bucketName: string) => ({
+    const storageFromMock = vi.fn(() => ({
         list: storageListMock
     }))
     const fromMock = vi.fn((table: string) => {

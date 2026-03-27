@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { NextIntlClientProvider } from 'next-intl'
 import { renderToStaticMarkup } from 'react-dom/server'
+import messages from '../../../../../../messages/tr.json'
 import { ProfileAvatarCard } from './ProfileAvatarCard'
 
 const TEST_TITLE = 'Profil fotoğrafı'
@@ -15,21 +17,23 @@ const TEST_PREVIEW_TITLE = 'Profil fotoğrafı önizleme'
 describe('ProfileAvatarCard', () => {
     it('renders profile photo copy and a preview trigger when an uploaded image exists', () => {
         const markup = renderToStaticMarkup(
-            <ProfileAvatarCard
-                name="Togay Yilmaz"
-                email="togay@example.com"
-                avatarUrl="https://cdn.example.com/togay.webp"
-                title={TEST_TITLE}
-                description={TEST_DESCRIPTION}
-                formatHint={TEST_HINT}
-                uploadLabel={TEST_UPLOAD_LABEL}
-                replaceLabel={TEST_REPLACE_LABEL}
-                savingLabel={TEST_SAVING_LABEL}
-                inputLabel={TEST_INPUT_LABEL}
-                previewLabel={TEST_PREVIEW_LABEL}
-                previewTitle={TEST_PREVIEW_TITLE}
-                onSelectFile={() => {}}
-            />
+            <NextIntlClientProvider locale="tr" messages={messages} timeZone="Europe/Istanbul">
+                <ProfileAvatarCard
+                    name="Togay Yilmaz"
+                    email="togay@example.com"
+                    avatarUrl="https://cdn.example.com/togay.webp"
+                    title={TEST_TITLE}
+                    description={TEST_DESCRIPTION}
+                    formatHint={TEST_HINT}
+                    uploadLabel={TEST_UPLOAD_LABEL}
+                    replaceLabel={TEST_REPLACE_LABEL}
+                    savingLabel={TEST_SAVING_LABEL}
+                    inputLabel={TEST_INPUT_LABEL}
+                    previewLabel={TEST_PREVIEW_LABEL}
+                    previewTitle={TEST_PREVIEW_TITLE}
+                    onSelectFile={() => {}}
+                />
+            </NextIntlClientProvider>
         )
 
         expect(markup).toContain(TEST_TITLE)
@@ -42,21 +46,23 @@ describe('ProfileAvatarCard', () => {
 
     it('falls back to initials and hides the preview trigger when no uploaded image exists', () => {
         const markup = renderToStaticMarkup(
-            <ProfileAvatarCard
-                name="Togay Yilmaz"
-                email="togay@example.com"
-                avatarUrl={null}
-                title={TEST_TITLE}
-                description={TEST_DESCRIPTION}
-                formatHint={TEST_HINT}
-                uploadLabel={TEST_UPLOAD_LABEL}
-                replaceLabel={TEST_REPLACE_LABEL}
-                savingLabel={TEST_SAVING_LABEL}
-                inputLabel={TEST_INPUT_LABEL}
-                previewLabel={TEST_PREVIEW_LABEL}
-                previewTitle={TEST_PREVIEW_TITLE}
-                onSelectFile={() => {}}
-            />
+            <NextIntlClientProvider locale="tr" messages={messages} timeZone="Europe/Istanbul">
+                <ProfileAvatarCard
+                    name="Togay Yilmaz"
+                    email="togay@example.com"
+                    avatarUrl={null}
+                    title={TEST_TITLE}
+                    description={TEST_DESCRIPTION}
+                    formatHint={TEST_HINT}
+                    uploadLabel={TEST_UPLOAD_LABEL}
+                    replaceLabel={TEST_REPLACE_LABEL}
+                    savingLabel={TEST_SAVING_LABEL}
+                    inputLabel={TEST_INPUT_LABEL}
+                    previewLabel={TEST_PREVIEW_LABEL}
+                    previewTitle={TEST_PREVIEW_TITLE}
+                    onSelectFile={() => {}}
+                />
+            </NextIntlClientProvider>
         )
 
         expect(markup).toContain('TY')

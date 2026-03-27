@@ -71,6 +71,8 @@ import {
   deleteConversationPredefinedTemplate,
   listConversationWhatsAppTemplates,
   listConversationPredefinedTemplates,
+  markConversationRead,
+  markConversationUnread,
   sendMessage,
   sendConversationInstagramImageBatch,
   sendConversationWhatsAppTemplateMessage,
@@ -155,6 +157,7 @@ function createConversation(overrides: Partial<Conversation> = {}): Conversation
     ai_processing_paused: false,
     last_message_at: '2026-02-08T10:00:00.000Z',
     unread_count: 0,
+    manual_unread: false,
     tags: [],
     created_at: '2026-02-08T09:00:00.000Z',
     updated_at: '2026-02-08T10:00:00.000Z',
@@ -2240,5 +2243,57 @@ describe('setConversationAgent', () => {
         human_attention_resolved_at: expect.any(String),
       })
     )
+  })
+})
+
+describe('conversation read state actions', () => {
+  beforeEach(() => {
+    createClientMock.mockReset()
+  })
+
+  it('marks a conversation read and clears manual unread state', async () => {
+    const eqMock = vi.fn(async () => ({ error: null }))
+    const updateMock = vi.fn(() => ({ eq: eqMock }))
+    const fromMock = vi.fn((table: string) => {
+      if (table !== 'conversations') {
+        throw new Error(`Unexpected query for table: ${table}`)
+      }
+      return { update: updateMock }
+    })
+    createClientMock.mockResolvedValueOnce({ from: fromMock })
+
+    await markConversationRead('conv-1')
+
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unread_count: 0,
+        manual_unread: false,
+        updated_at: expect.any(String),
+      })
+    )
+    expect(eqMock).toHaveBeenCalledWith('id', 'conv-1')
+  })
+
+  it('marks a conversation unread and persists manual unread state', async () => {
+    const eqMock = vi.fn(async () => ({ error: null }))
+    const updateMock = vi.fn(() => ({ eq: eqMock }))
+    const fromMock = vi.fn((table: string) => {
+      if (table !== 'conversations') {
+        throw new Error(`Unexpected query for table: ${table}`)
+      }
+      return { update: updateMock }
+    })
+    createClientMock.mockResolvedValueOnce({ from: fromMock })
+
+    await markConversationUnread('conv-1')
+
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unread_count: 1,
+        manual_unread: true,
+        updated_at: expect.any(String),
+      })
+    )
+    expect(eqMock).toHaveBeenCalledWith('id', 'conv-1')
   })
 })

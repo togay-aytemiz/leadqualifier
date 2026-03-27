@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { useRouter } from 'next/navigation'
 import { tr } from 'date-fns/locale'
 import { FileText, File, Scissors, Lock, Folder, ChevronRight } from 'lucide-react'
 import {
@@ -8,6 +7,7 @@ import {
 import { KnowledgeBaseEntry } from '@/lib/knowledge-base/actions'
 import { useTranslations, useLocale } from 'next-intl'
 import { formatMobileEntryPreview } from './mobileEntryPreview'
+import { Link } from '@/i18n/navigation'
 
 interface KnowledgeTableProps {
     entries: KnowledgeBaseEntry[]
@@ -54,16 +54,13 @@ export function KnowledgeTable({ entries }: KnowledgeTableProps) {
         }
     }
 
-    const router = useRouter()
-
     return (
         <>
             <div className="space-y-3 lg:hidden">
                 {entries.map(entry => (
-                    <button
+                    <Link
                         key={entry.id}
-                        type="button"
-                        onClick={() => router.push(`/knowledge/${entry.id}`)}
+                        href={`/knowledge/${entry.id}`}
                         className="group w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50"
                     >
                         <div className="flex items-start justify-between gap-3">
@@ -95,7 +92,7 @@ export function KnowledgeTable({ entries }: KnowledgeTableProps) {
                         <p className="mt-2 text-xs text-gray-500">
                             {format(new Date(entry.created_at), 'd MMM yyyy', { locale: locale === 'tr' ? tr : undefined })}
                         </p>
-                    </button>
+                    </Link>
                 ))}
             </div>
 
@@ -106,18 +103,20 @@ export function KnowledgeTable({ entries }: KnowledgeTableProps) {
                         {entries.map(entry => (
                             <TableRow
                                 key={entry.id}
-                                className="group cursor-pointer hover:bg-gray-50 transition-colors"
-                                onClick={() => router.push(`/knowledge/${entry.id}`)}
+                                className="group hover:bg-gray-50 transition-colors"
                             >
                                 {/* Title */}
                                 <TableCell>
-                                    <div className="flex items-center gap-3">
+                                    <Link
+                                        href={`/knowledge/${entry.id}`}
+                                        className="flex items-center gap-3 text-left"
+                                    >
                                         {getTypeIcon(entry.type)}
                                         <div>
                                             <p className="font-medium text-gray-900">{entry.title}</p>
                                             <p className="text-xs text-gray-500 truncate max-w-[200px]">{entry.content.substring(0, 50)}...</p>
                                         </div>
-                                    </div>
+                                    </Link>
                                 </TableCell>
 
                                 {/* Type */}
@@ -151,9 +150,9 @@ export function KnowledgeTable({ entries }: KnowledgeTableProps) {
 
                                 {/* Action Arrow */}
                                 <TableCell align="right">
-                                    <div className="text-gray-400 group-hover:text-blue-600 transition-colors flex justify-end">
+                                    <span className="text-gray-400 group-hover:text-blue-600 transition-colors flex justify-end">
                                         <ChevronRight size={20} />
-                                    </div>
+                                    </span>
                                 </TableCell>
                             </TableRow>
                         ))}

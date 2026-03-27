@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NextIntlClientProvider } from 'next-intl'
@@ -62,5 +64,15 @@ describe('SubscriptionPlanCatalog', () => {
     const html = renderCatalog()
 
     expect(html.match(/mt-auto pt-4/g)).toHaveLength(plans.length)
+  })
+
+  it('does not gate the checkout portal with client-only state sync', () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/SubscriptionPlanCatalog.tsx'),
+      'utf8'
+    )
+
+    expect(source).not.toContain('setIsClient(true)')
+    expect(source).not.toContain('useEffect(() => {')
   })
 })

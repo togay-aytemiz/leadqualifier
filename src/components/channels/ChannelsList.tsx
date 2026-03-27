@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 
@@ -25,14 +25,18 @@ export function ChannelsList({ channels, showDescription = true, isReadOnly = fa
     const locale = useLocale()
     const router = useRouter()
 
-    const channelCards = getChannelCardConfigs(channels)
+    const channelCards = useMemo(() => getChannelCardConfigs(channels), [channels])
+    const channelPrefetchHrefs = useMemo(
+        () => channelCards.map((card) => getLocalizedHref(locale, card.href)),
+        [channelCards, locale]
+    )
     const channelsListLayoutClasses = getChannelsListLayoutClasses()
 
     useEffect(() => {
-        channelCards.forEach((card) => {
-            router.prefetch(getLocalizedHref(locale, card.href))
+        channelPrefetchHrefs.forEach((href) => {
+            router.prefetch(href)
         })
-    }, [channelCards, locale, router])
+    }, [channelPrefetchHrefs, router])
 
     return (
         <div>

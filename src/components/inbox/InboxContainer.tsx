@@ -1,5 +1,6 @@
 'use client'
 
+import NextImage from 'next/image'
 import Link from 'next/link'
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react'
 import { Avatar, EmptyState, IconButton, ConfirmDialog, Modal, Skeleton } from '@/design'
@@ -13,6 +14,8 @@ import {
   Trash2,
   MoreHorizontal,
   LogOut,
+  Mail,
+  MailOpen,
   RotateCw,
   ArrowLeft,
   ArrowDown,
@@ -39,6 +42,7 @@ import {
   sendSystemMessage,
   setConversationAgent,
   markConversationRead,
+  markConversationUnread,
   getConversationSummary,
   getConversationLead,
   getLeadScoreReasoning,
@@ -69,6 +73,11 @@ import {
   getMobileDetailsPanelClasses,
   getMobileListPaneClasses,
 } from '@/components/inbox/mobilePaneState'
+import {
+  resolveSelectedConversationUnreadCountOnIncoming,
+  shouldAutoMarkConversationRead,
+  shouldClearManualUnreadOnSelect,
+} from '@/components/inbox/manualUnreadState'
 import { resolveSummaryToggle } from '@/components/inbox/summaryPanelState'
 import { shouldShowConversationSkeleton } from '@/components/inbox/conversationSwitchState'
 import { cn } from '@/lib/utils'
@@ -170,6 +179,7 @@ import {
   type InboxUnreadFilter,
 } from '@/components/inbox/conversationListFilters'
 import { resolveFilteredConversationBackfillState } from '@/components/inbox/filteredConversationBackfill'
+import { resolveInboxBotDisplayName } from '@/lib/ai/bot-name'
 
 import { useTranslations, useLocale } from 'next-intl'
 import type { AiBotMode } from '@/types/database'
@@ -215,6 +225,7 @@ const INSTAGRAM_UPLOAD_ACCEPT = [
   'image/webp',
   'image/gif',
 ].join(',')
+const EMPTY_VISIBLE_MESSAGES: Message[] = []
 
 type PendingAttachment = {
   id: string
@@ -264,13 +275,10 @@ function InboxMessageImage({
   onLoad,
   children,
 }: InboxMessageImageProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [hasError, setHasError] = useState(false)
-
-  useEffect(() => {
-    setIsLoaded(false)
-    setHasError(false)
-  }, [src])
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const isLoaded = loadedSrc === src
+  const hasError = failedSrc === src
 
   return (
     <div className={cn('relative overflow-hidden', frameClassName)}>
@@ -295,11 +303,11 @@ function InboxMessageImage({
         )}
         loading="lazy"
         onLoad={() => {
-          setIsLoaded(true)
+          setLoadedSrc(src)
           onLoad?.()
         }}
         onError={() => {
-          setHasError(true)
+          setFailedSrc(src)
         }}
       />
       {children}
@@ -373,6 +381,7 @@ export function InboxContainer({
   const tSidebar = useTranslations('mainSidebar')
   const tAiSettings = useTranslations('aiSettings')
   const locale = useLocale()
+  const displayedBotName = resolveInboxBotDisplayName(botName, t('copilot'))
   const dateLocale = locale === 'tr' ? tr : undefined
   const initialSelectedConversationId =
     initialThreadPayload?.conversationId ?? initialConversations[0]?.id ?? null
@@ -438,6 +447,7 @@ export function InboxContainer({
   const [isImportantInfoModalOpen, setIsImportantInfoModalOpen] = useState(false)
   const [isAiPauseUpdating, setIsAiPauseUpdating] = useState(false)
   const [aiPauseError, setAiPauseError] = useState(false)
+  const [isUnreadTogglePending, setIsUnreadTogglePending] = useState(false)
   const [activeQueueTab, setActiveQueueTab] = useState<InboxQueueTab>('all')
   const [unreadFilter, setUnreadFilter] = useState<InboxUnreadFilter>('all')
   const [leadTemperatureFilter, setLeadTemperatureFilter] =
@@ -976,9 +986,12 @@ export function InboxContainer({
       const currentConversation = conversations.find(
         (conversation) => conversation.id === conversationId
       )
-      if (!currentConversation || currentConversation.unread_count <= 0) return
+      if (!shouldAutoMarkConversationRead(currentConversation)) return
 
-      updateConversationDetailsLocally(conversationId, { unread_count: 0 })
+      updateConversationDetailsLocally(conversationId, {
+        unread_count: 0,
+        manual_unread: false,
+      })
       void markConversationRead(conversationId)
         .then(() => {
           dispatchInboxUnreadUpdated({ organizationId })
@@ -1579,13 +1592,12 @@ export function InboxContainer({
                       ...c,
                       last_message_at: newMsg.created_at,
                       contact_avatar_url: c.contact_avatar_url ?? inboundContactAvatarUrl,
-                      // Only increment unread if it's NOT the currently open chat
-                      unread_count:
-                        newMsg.conversation_id !== selectedIdRef.current
-                          ? shouldIncrementUnread
-                            ? c.unread_count + 1
-                            : c.unread_count
-                          : 0,
+                      unread_count: resolveSelectedConversationUnreadCountOnIncoming({
+                        isSelectedConversation: newMsg.conversation_id === selectedIdRef.current,
+                        shouldIncrementUnread,
+                        unreadCount: c.unread_count,
+                        manualUnread: Boolean(c.manual_unread),
+                      }),
                       messages: buildConversationPreviewMessages([
                         previewMessage,
                         ...(c.messages ?? []),
@@ -2612,12 +2624,73 @@ export function InboxContainer({
       return
     }
     const previousSelectedId = selectedIdRef.current
+    const nextConversation =
+      conversations.find((conversation) => conversation.id === conversationId) ?? null
     if (previousSelectedId) {
       void commitConversationRead(previousSelectedId)
+    }
+    if (
+      shouldClearManualUnreadOnSelect({
+        previousSelectedId,
+        nextSelectedId: conversationId,
+        nextConversation,
+      })
+    ) {
+      updateConversationDetailsLocally(conversationId, {
+        unread_count: 0,
+        manual_unread: false,
+      })
+      void markConversationRead(conversationId)
+        .then(() => {
+          dispatchInboxUnreadUpdated({ organizationId })
+        })
+        .catch((error) => {
+          console.error('Failed to clear manual unread on revisit', error)
+        })
     }
     setSelectedId(conversationId)
     setIsMobileConversationOpen(true)
   }
+
+  const handleToggleSelectedConversationUnread = useCallback(async () => {
+    const conversationId = selectedIdRef.current
+    if (!conversationId || isReadOnly || isUnreadTogglePending) return
+
+    const currentConversation =
+      conversations.find((conversation) => conversation.id === conversationId) ?? null
+    if (!currentConversation) return
+
+    const nextIsUnread = currentConversation.unread_count <= 0
+    const optimisticUpdates = nextIsUnread
+      ? { unread_count: 1, manual_unread: true }
+      : { unread_count: 0, manual_unread: false }
+
+    updateConversationDetailsLocally(conversationId, optimisticUpdates)
+    setIsUnreadTogglePending(true)
+
+    try {
+      if (nextIsUnread) {
+        await markConversationUnread(conversationId)
+      } else {
+        await markConversationRead(conversationId)
+      }
+      dispatchInboxUnreadUpdated({ organizationId })
+    } catch (error) {
+      console.error('Failed to toggle conversation unread state', error)
+      updateConversationDetailsLocally(conversationId, {
+        unread_count: currentConversation.unread_count,
+        manual_unread: Boolean(currentConversation.manual_unread),
+      })
+    } finally {
+      setIsUnreadTogglePending(false)
+    }
+  }, [
+    conversations,
+    isReadOnly,
+    isUnreadTogglePending,
+    organizationId,
+    updateConversationDetailsLocally,
+  ])
 
   const handleBackToConversationList = () => {
     setIsMobileConversationOpen(false)
@@ -2752,11 +2825,13 @@ export function InboxContainer({
                   <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
                       {c.platform !== 'simulator' ? (
-                        <img
+                        <NextImage
                           alt=""
                           aria-hidden
                           className="h-[18px] w-[18px]"
                           src={getChannelPlatformIconSrc(c.platform)}
+                          width={18}
+                          height={18}
                         />
                       ) : (
                         <span className="text-[9px] font-semibold uppercase text-gray-400">
@@ -2848,7 +2923,10 @@ export function InboxContainer({
     selectedConversation?.id ?? null,
     loadedConversationId
   )
-  const visibleMessages = showConversationSkeleton ? [] : messages
+  const visibleMessages = useMemo(
+    () => (showConversationSkeleton ? EMPTY_VISIBLE_MESSAGES : messages),
+    [messages, showConversationSkeleton]
+  )
   const selectedConversationDisplayName = selectedConversation
     ? resolveInboxContactDisplayName(selectedConversation, visibleMessages)
     : ''
@@ -2856,6 +2934,10 @@ export function InboxContainer({
     ? resolveConversationSecondaryIdentifier(selectedConversation, t('noPhoneNumber'))
     : null
   const selectedConversationAvatarUrl = selectedConversation?.contact_avatar_url ?? null
+  const isSelectedConversationUnread = (selectedConversation?.unread_count ?? 0) > 0
+  const selectedConversationUnreadActionLabel = isSelectedConversationUnread
+    ? t('markConversationRead')
+    : t('markConversationUnread')
   const selectedConversationPrivateNote =
     typeof selectedConversation?.private_note === 'string' ? selectedConversation.private_note : ''
   const selectedConversationPrivateNoteUpdatedAt =
@@ -3225,7 +3307,7 @@ export function InboxContainer({
             {activeAgent === 'ai' ? (
               <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
                 <Bot size={12} />
-                {t('copilot')}
+                {displayedBotName}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
@@ -3259,11 +3341,13 @@ export function InboxContainer({
           <div className="flex items-center gap-2">
             <span className="inline-flex h-4 w-4 items-center justify-center">
               {selectedConversation.platform !== 'simulator' ? (
-                <img
+                <NextImage
                   alt=""
                   aria-hidden
                   className="h-4 w-4"
                   src={getChannelPlatformIconSrc(selectedConversation.platform)}
+                  width={16}
+                  height={16}
                 />
               ) : (
                 <span className="text-[10px] font-semibold uppercase text-gray-400">
@@ -3463,12 +3547,14 @@ export function InboxContainer({
                     <ArrowLeft size={18} />
                   </button>
                   {selectedConversation.platform !== 'simulator' ? (
-                    <img
+                    <NextImage
                       alt=""
                       aria-hidden
                       title={`${t('platform')}: ${selectedConversation.platform}`}
                       className="h-5 w-5 shrink-0 lg:hidden"
                       src={getChannelPlatformIconSrc(selectedConversation.platform)}
+                      width={20}
+                      height={20}
                     />
                   ) : (
                     <span
@@ -3495,13 +3581,23 @@ export function InboxContainer({
                         ? 'border-purple-100 bg-purple-50 text-purple-700'
                         : 'border-blue-100 bg-blue-50 text-blue-700'
                     )}
-                    aria-label={`${t('activeAgent')}: ${activeAgent === 'ai' ? t('copilot') : t('operator')}`}
+                    aria-label={`${t('activeAgent')}: ${activeAgent === 'ai' ? displayedBotName : t('operator')}`}
                   >
                     {activeAgent === 'ai' ? <Bot size={12} /> : <Zap size={12} />}
                     <span className="max-w-[70px] truncate">
-                      {activeAgent === 'ai' ? (botName ?? t('botName')) : t('operator')}
+                      {activeAgent === 'ai' ? displayedBotName : t('operator')}
                     </span>
                   </span>
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectedConversationUnread}
+                    disabled={isReadOnly || isUnreadTogglePending}
+                    aria-label={selectedConversationUnreadActionLabel}
+                    title={selectedConversationUnreadActionLabel}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSelectedConversationUnread ? <MailOpen size={16} /> : <Mail size={16} />}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setIsMobileDetailsOpen((prev) => !prev)}
@@ -3523,7 +3619,7 @@ export function InboxContainer({
                   >
                     {activeAgent === 'ai' ? <Bot size={14} /> : <Zap size={14} />}
                     <span className="font-medium">
-                      {activeAgent === 'ai' ? t('copilot') : t('operator')}
+                      {activeAgent === 'ai' ? displayedBotName : t('operator')}
                     </span>
                   </span>
                 </div>
@@ -3895,7 +3991,7 @@ export function InboxContainer({
                         contactName: selectedConversationDisplayName,
                         contactAvatarUrl: selectedConversationAvatarUrl,
                         youLabel: t('you'),
-                        botName: botName ?? t('botName'),
+                        botName: displayedBotName,
                       })
                       const matchedSkillTitle = isBot
                         ? extractSkillTitleFromMetadata(m.metadata)
@@ -3961,6 +4057,7 @@ export function InboxContainer({
                                     className="block"
                                   >
                                     <InboxMessageImage
+                                      key={item.media.url}
                                       src={item.media.url}
                                       alt={item.media.caption ?? t('mediaPreview.image')}
                                       frameClassName={cn(
@@ -4066,6 +4163,7 @@ export function InboxContainer({
                                           className="block"
                                         >
                                           <InboxMessageImage
+                                            key={media.url!}
                                             src={media.url!}
                                             alt={
                                               media.caption ??
@@ -4212,6 +4310,7 @@ export function InboxContainer({
                                         className="block"
                                       >
                                         <InboxMessageImage
+                                          key={media.url!}
                                           src={media.url!}
                                           alt={
                                             media.caption ??
@@ -4544,52 +4643,46 @@ export function InboxContainer({
                         <div className="mb-2 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-sm">
                           <div className="flex gap-2 overflow-x-auto pb-1">
                             {pendingAttachments.map((attachment) => (
-                              <button
+                              <div
                                 key={attachment.id}
-                                type="button"
-                                onClick={() => setPreviewAttachmentId(attachment.id)}
-                                className="group relative flex min-w-[120px] max-w-[160px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-left"
+                                className="group relative flex min-w-[120px] max-w-[160px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5"
                               >
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-100">
-                                  {attachment.mediaType === 'image' && attachment.previewUrl ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={attachment.previewUrl}
-                                      alt={attachment.name}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <FileText size={16} className="text-gray-500" />
-                                  )}
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block truncate text-xs font-medium text-gray-800">
-                                    {attachment.name}
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewAttachmentId(attachment.id)}
+                                  aria-label={t('composerAttachments.previewTitle')}
+                                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                >
+                                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-100">
+                                    {attachment.mediaType === 'image' && attachment.previewUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={attachment.previewUrl}
+                                        alt={attachment.name}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <FileText size={16} className="text-gray-500" />
+                                    )}
                                   </span>
-                                  <span className="block text-[11px] text-gray-500">
-                                    {formatAttachmentSize(attachment.sizeBytes)}
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-xs font-medium text-gray-800">
+                                      {attachment.name}
+                                    </span>
+                                    <span className="block text-[11px] text-gray-500">
+                                      {formatAttachmentSize(attachment.sizeBytes)}
+                                    </span>
                                   </span>
-                                </span>
-                                <span
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(event) => {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                    handleRemovePendingAttachment(attachment.id)
-                                  }}
-                                  onKeyDown={(event) => {
-                                    if (event.key !== 'Enter' && event.key !== ' ') return
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                    handleRemovePendingAttachment(attachment.id)
-                                  }}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePendingAttachment(attachment.id)}
                                   className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-gray-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
                                   aria-label={t('composerAttachments.remove')}
                                 >
                                   <X size={12} />
-                                </span>
-                              </button>
+                                </button>
+                              </div>
                             ))}
                           </div>
                           <p className="mt-1 text-[11px] text-gray-500">

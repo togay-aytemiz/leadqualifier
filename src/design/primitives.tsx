@@ -1,10 +1,12 @@
 'use client'
 
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft, ChevronDown } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { isSettingsDetailPath, SETTINGS_MOBILE_BACK_EVENT } from '@/components/settings/mobilePaneState'
 
 // --- Button ---
@@ -87,25 +89,25 @@ export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
     ]
     const colorClass = colors[name.length % colors.length]
     const normalizedSrc = typeof src === 'string' && /^https?:\/\//i.test(src.trim()) ? src.trim() : null
-    const [imageFailed, setImageFailed] = useState(false)
-
-    useEffect(() => {
-        setImageFailed(false)
-    }, [normalizedSrc])
+    const [failedSrc, setFailedSrc] = useState<string | null>(null)
+    const showImage = Boolean(normalizedSrc && failedSrc !== normalizedSrc)
 
     return (
         <div className={cn(
-            "flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold border border-white shadow-sm ring-1 ring-gray-100",
-            normalizedSrc && !imageFailed ? "bg-gray-100 text-transparent" : colorClass,
+            "relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold border border-white shadow-sm ring-1 ring-gray-100",
+            showImage ? "bg-gray-100 text-transparent" : colorClass,
             sizeClass,
             className
         )}>
-            {normalizedSrc && !imageFailed ? (
-                <img
+            {normalizedSrc && showImage ? (
+                <Image
                     alt={name}
-                    className="h-full w-full object-cover"
+                    className="object-cover"
+                    fill
+                    sizes={size === 'lg' ? '64px' : '32px'}
                     src={normalizedSrc}
-                    onError={() => setImageFailed(true)}
+                    onError={() => setFailedSrc(normalizedSrc)}
+                    unoptimized
                 />
             ) : initials}
         </div>
@@ -435,45 +437,22 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, headerActions, children, panelClassName, bodyClassName }: ModalProps) {
-    const [shouldRender, setShouldRender] = useState(isOpen)
-    const [isVisible, setIsVisible] = useState(isOpen)
+    const tCommon = useTranslations('common')
 
-    useEffect(() => {
-        let closeTimer: ReturnType<typeof setTimeout> | null = null
-        let openFrame: number | null = null
-
-        if (isOpen) {
-            setShouldRender(true)
-            openFrame = window.requestAnimationFrame(() => {
-                setIsVisible(true)
-            })
-        } else {
-            setIsVisible(false)
-            closeTimer = setTimeout(() => {
-                setShouldRender(false)
-            }, 220)
-        }
-
-        return () => {
-            if (closeTimer) clearTimeout(closeTimer)
-            if (openFrame !== null) window.cancelAnimationFrame(openFrame)
-        }
-    }, [isOpen])
-
-    if (!shouldRender) return null
+    if (!isOpen) return null
 
     const content = (
         <div
             className={cn(
                 "fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm transition-opacity duration-200",
-                isVisible ? "opacity-100" : "opacity-0"
+                "opacity-100"
             )}
             onClick={(e) => e.stopPropagation()}
         >
             <div
                 className={cn(
                     "bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden pointer-events-auto transition-all duration-200",
-                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.98]",
+                    "opacity-100 translate-y-0 scale-100",
                     panelClassName
                 )}
                 onClick={(e) => e.stopPropagation()}
@@ -482,7 +461,12 @@ export function Modal({ isOpen, onClose, title, headerActions, children, panelCl
                     <h3 className="font-bold text-gray-900">{title}</h3>
                     <div className="flex items-center gap-1">
                         {headerActions}
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label={tCommon('close')}
+                            className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors"
+                        >
                             <X size={20} />
                         </button>
                     </div>

@@ -31,4 +31,9 @@ describe('locale layout metadata branding', () => {
     expect(trMessages.common.appName).not.toMatch(legacyBrandingPattern)
     expect(trMessages.common.welcome).not.toMatch(legacyBrandingPattern)
   })
+
+  it('provides a close label in common messages for both locales', () => {
+    expect(enMessages.common.close).toBe('Close')
+    expect(trMessages.common.close).toBe('Kapat')
+  })
 })

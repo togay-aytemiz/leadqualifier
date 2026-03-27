@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -87,8 +87,15 @@ import {
     DropdownMenuTrigger
 } from '@/design/Dropdown'
 import { Avatar } from '@/design/primitives'
+import {
+    hydrateMainSidebarSectionState,
+    MAIN_SIDEBAR_SECTIONS_STORAGE_KEY,
+    syncMainSidebarSectionState,
+    toggleMainSidebarSection
+} from '@/design/main-sidebar-sections'
+import { resolveDashboardTypographyVariables } from '@/design/dashboard-typography'
 
-const STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
 interface ActiveOrganizationSummary {
     id: string
@@ -213,12 +220,14 @@ export function MainSidebar({
     const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
     const [isOrgPickerOpen, setIsOrgPickerOpen] = useState(false)
     const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
     const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
     const localePrefix = localePrefixMatch && localePrefixMatch[1] !== 'tr'
         ? `/${localePrefixMatch[1]}`
         : ''
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+    const hasHydratedSectionStateRef = useRef(false)
     if (!supabaseRef.current) {
         supabaseRef.current = createClient()
     }
@@ -421,7 +430,7 @@ export function MainSidebar({
 
     useEffect(() => {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY)
+            const stored = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)
             setCollapsed(stored === 'true')
         } catch {
             setCollapsed(false)
@@ -430,7 +439,7 @@ export function MainSidebar({
 
     useEffect(() => {
         try {
-            localStorage.setItem(STORAGE_KEY, collapsed ? 'true' : 'false')
+            localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? 'true' : 'false')
         } catch {
             // ignore persistence errors
         }
@@ -969,9 +978,55 @@ export function MainSidebar({
         },
         shouldRestrictToBilling
     )
-    const navigationSections = canAccessTenantModules
-        ? [...sections, ...adminSections]
-        : adminSections
+    const navigationSections = useMemo(
+        () => (canAccessTenantModules ? [...sections, ...adminSections] : adminSections),
+        [adminSections, canAccessTenantModules, sections]
+    )
+    const navigationSectionIds = useMemo(
+        () => navigationSections.map((section) => section.id),
+        [navigationSections]
+    )
+
+    useEffect(() => {
+        setExpandedSections((current) => {
+            if (!hasHydratedSectionStateRef.current) {
+                hasHydratedSectionStateRef.current = true
+                let storedValue: string | null = null
+
+                try {
+                    storedValue = localStorage.getItem(MAIN_SIDEBAR_SECTIONS_STORAGE_KEY)
+                } catch {
+                    storedValue = null
+                }
+
+                return hydrateMainSidebarSectionState({
+                    sectionIds: navigationSectionIds,
+                    storedValue
+                })
+            }
+
+            return syncMainSidebarSectionState({
+                sectionIds: navigationSectionIds,
+                currentState: current
+            })
+        })
+    }, [navigationSectionIds])
+
+    useEffect(() => {
+        if (!hasHydratedSectionStateRef.current || Object.keys(expandedSections).length === 0) {
+            return
+        }
+
+        try {
+            localStorage.setItem(MAIN_SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(expandedSections))
+        } catch {
+            // ignore persistence errors
+        }
+    }, [expandedSections])
+
+    const handleSectionToggle = useCallback((sectionId: string) => {
+        setExpandedSections((current) => toggleMainSidebarSection(current, sectionId))
+    }, [])
     const billingMembershipLabel = useMemo(() => {
         if (!billingSnapshot) return tSidebar('billingUnavailable')
 
@@ -991,7 +1046,7 @@ export function MainSidebar({
         default:
             return billingSnapshot.membershipState
         }
-    }, [billingSnapshot, locale, tSidebar])
+    }, [billingSnapshot, tSidebar])
     const billingDisplayCredits = useMemo(() => {
         if (!billingSnapshot) return 0
 
@@ -1131,13 +1186,18 @@ export function MainSidebar({
         return tSidebar('billingPackageRenewalUnknown')
     }, [billingSnapshot, locale, tSidebar])
     const canExpandBillingDetails = billingSnapshot?.membershipState === 'premium_active'
+    const sidebarTypographyStyle = useMemo(
+        () => resolveDashboardTypographyVariables('sidebar') as CSSProperties,
+        []
+    )
 
     return (
         <aside
             className={cn(
-                'relative flex h-screen shrink-0 flex-col border-r border-slate-200/80 bg-slate-50/70 text-slate-900 transition-[width] duration-200 motion-reduce:transition-none',
+                'dashboard-sidebar-type-scale relative flex h-screen shrink-0 flex-col border-r border-slate-200/80 bg-slate-50/70 text-slate-900 transition-[width] duration-200 motion-reduce:transition-none',
                 collapsed ? 'w-[76px]' : 'w-[264px]'
             )}
+            style={sidebarTypographyStyle}
             data-collapsed={collapsed ? 'true' : 'false'}
         >
             <div className="px-4 pt-4 pb-3">
@@ -1219,7 +1279,7 @@ export function MainSidebar({
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {tSidebar('organizationSwitcherTitle')}
                             </p>
-                            <p className="mt-2 truncate text-sm font-semibold text-slate-900">
+                            <p className="mt-2 truncate text-[14px] font-semibold text-slate-900">
                                 {currentOrganization?.name ?? tSidebar('organizationSwitcherNoSelection')}
                             </p>
                             <p className="mt-1 truncate text-xs text-slate-500">
@@ -1270,7 +1330,7 @@ export function MainSidebar({
                         <div className="border-b border-slate-200 px-4 py-3">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-semibold text-slate-900">
+                                    <p className="text-[14px] font-semibold text-slate-900">
                                         {tSidebar('organizationSwitcherModalTitle')}
                                     </p>
                                     <p className="text-xs text-slate-500">
@@ -1313,9 +1373,9 @@ export function MainSidebar({
                                             )}
                                         >
                                             <div className="flex items-center justify-between gap-2">
-                                                <p className="truncate text-sm font-medium">{organization.name}</p>
+                                                <p className="truncate text-[14px] font-medium">{organization.name}</p>
                                                 {isActive && (
-                                                    <span className="rounded-full bg-[#242A40]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#242A40]">
+                                                    <span className="rounded-full bg-[#242A40]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#242A40]">
                                                         {tSidebar('organizationSwitcherCurrent')}
                                                     </span>
                                                 )}
@@ -1367,10 +1427,10 @@ export function MainSidebar({
                         panelClassName="w-60"
                         content={
                             <div className="space-y-1">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                                     {tSidebar('botStatusLabel')}
                                 </p>
-                                <p className="text-sm font-semibold text-slate-900">{currentBotModeOption.label}</p>
+                                <p className="text-[14px] font-semibold text-slate-900">{currentBotModeOption.label}</p>
                                 <p className="text-xs leading-5 text-slate-600">{currentBotModeOption.description}</p>
                             </div>
                         }
@@ -1424,10 +1484,10 @@ export function MainSidebar({
                                                 />
                                             </span>
                                             <div className="min-w-0">
-                                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">
                                                     {tSidebar('botStatusLabel')}
                                                 </p>
-                                                <p className="truncate text-sm font-semibold">
+                                                <p className="truncate text-[14px] font-semibold">
                                                     {botModeLabel}
                                                 </p>
                                             </div>
@@ -1451,7 +1511,7 @@ export function MainSidebar({
                             >
                                 <div className="border-b border-slate-100 px-3.5 py-3">
                                     <div className="flex items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold text-slate-900">
+                                        <p className="text-[14px] font-semibold text-slate-900">
                                             {tSidebar('botStatusQuickSwitchTitle')}
                                         </p>
                                         <span
@@ -1513,11 +1573,11 @@ export function MainSidebar({
                                                     </span>
                                                     <span className="min-w-0 flex-1">
                                                         <span className="flex items-center gap-2">
-                                                            <span className="truncate text-sm font-semibold text-slate-900">
+                                                            <span className="truncate text-[14px] font-semibold text-slate-900">
                                                                 {option.label}
                                                             </span>
                                                             {isSelected && (
-                                                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                                                                     {tSidebar('botStatusCurrentLabel')}
                                                                 </span>
                                                             )}
@@ -1572,182 +1632,213 @@ export function MainSidebar({
             )}
 
             <nav className="flex-1 px-3 pt-3">
-                <div className="space-y-4">
-                    {navigationSections.map(section => (
-                        <div key={section.id} className="space-y-2">
-                            <p
-                                className={cn(
-                                    'px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400',
-                                    collapsed && 'sr-only'
+                <div className={cn('space-y-5', !collapsed && 'space-y-6')}>
+                    {navigationSections.map((section) => {
+                        const sectionPanelId = `main-sidebar-section-${section.id}`
+                        const isSectionExpanded = collapsed ? true : expandedSections[section.id] !== false
+
+                        return (
+                            <section key={section.id} className="space-y-2.5">
+                                {collapsed ? (
+                                    <p className="sr-only">{section.label}</p>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSectionToggle(section.id)}
+                                        aria-expanded={isSectionExpanded}
+                                        aria-controls={sectionPanelId}
+                                        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1 text-left transition-colors duration-150 hover:bg-white/70"
+                                    >
+                                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                            {section.label}
+                                        </span>
+                                        <ChevronDown
+                                            size={14}
+                                            className={cn(
+                                                'shrink-0 text-slate-400 transition-transform duration-200 motion-reduce:transition-none',
+                                                isSectionExpanded ? 'rotate-0' : '-rotate-90'
+                                            )}
+                                        />
+                                    </button>
                                 )}
-                            >
-                                {section.label}
-                            </p>
-                            <div className="space-y-1">
-                                {section.items.map(item => {
-                                    const navState = resolveBillingLockedNavItem(
-                                        {
-                                            id: item.id,
-                                            href: item.href
-                                        },
-                                        shouldRestrictToBilling
-                                    )
-                                    const itemHref = navState.href ?? item.href
-                                    const isLockedItem = navState.isLocked
-                                    const isSettingsItem = item.id === 'settings'
-                                    const isAdminRoot = item.id === 'admin-dashboard'
-                                    const isActive = isSettingsItem
-                                        ? activePath.startsWith('/settings')
-                                        : isAdminRoot
-                                            ? activePath === '/admin'
-                                            : activePath.startsWith(itemHref)
-                                    const Icon = isActive ? item.activeIcon : item.icon
-                                    const showUnread = item.id === 'inbox' && hasUnread
-                                    const showPending = item.id === 'settings' && hasPendingSuggestions
-                                    const showIndicator = showUnread || showPending
-                                    const itemLabel = isLockedItem
-                                        ? `${item.label} (${tSidebar('lockedLabel')})`
-                                        : item.label
-                                    const navItemClassName = cn(
-                                        'group flex items-center rounded-xl text-sm font-medium transition-colors duration-150 motion-reduce:transition-none',
-                                        collapsed
-                                            ? 'mx-auto h-11 w-11 justify-center gap-0'
-                                            : 'w-full gap-3 px-3 py-2',
-                                        isActive
-                                            ? 'bg-[#242A40] text-white shadow-sm'
-                                            : isLockedItem
-                                                ? 'cursor-not-allowed bg-slate-100/80 text-slate-400'
-                                                : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                                    )
-                                    const iconClassName = cn(
-                                        'shrink-0',
-                                        isActive
-                                            ? 'text-white'
-                                            : isLockedItem
-                                                ? 'text-slate-400'
-                                                : 'text-slate-500 group-hover:text-slate-900'
-                                    )
-                                    const lockIconClassName = isActive ? 'text-white/90' : 'text-slate-400'
 
-                                    const navItemContent = (
-                                        <>
-                                            <span className="relative flex items-center">
-                                                <Icon
-                                                    size={18}
-                                                    className={iconClassName}
-                                                />
-                                                {showIndicator && collapsed && (
-                                                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
-                                                )}
-                                                {isLockedItem && collapsed && (
-                                                    <span className="absolute -bottom-1 -right-1 rounded-full border border-slate-200 bg-white p-[1px]">
-                                                        <Lock size={8} className={lockIconClassName} />
-                                                    </span>
-                                                )}
-                                            </span>
-                                            <span
-                                                className={cn(
-                                                    'whitespace-nowrap transition-all duration-200 motion-reduce:transition-none',
+                                <div
+                                    id={sectionPanelId}
+                                    aria-hidden={!isSectionExpanded}
+                                    className={cn(
+                                        'grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none',
+                                        isSectionExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                                    )}
+                                >
+                                    <div className="min-h-0">
+                                        <div className={cn('space-y-1', collapsed ? 'space-y-2' : 'space-y-1.5')}>
+                                            {section.items.map((item) => {
+                                                const navState = resolveBillingLockedNavItem(
+                                                    {
+                                                        id: item.id,
+                                                        href: item.href
+                                                    },
+                                                    shouldRestrictToBilling
+                                                )
+                                                const itemHref = navState.href ?? item.href
+                                                const isLockedItem = navState.isLocked
+                                                const isSettingsItem = item.id === 'settings'
+                                                const isAdminRoot = item.id === 'admin-dashboard'
+                                                const isActive = isSettingsItem
+                                                    ? activePath.startsWith('/settings')
+                                                    : isAdminRoot
+                                                        ? activePath === '/admin'
+                                                        : activePath.startsWith(itemHref)
+                                                const Icon = isActive ? item.activeIcon : item.icon
+                                                const showUnread = item.id === 'inbox' && hasUnread
+                                                const showPending = item.id === 'settings' && hasPendingSuggestions
+                                                const showIndicator = showUnread || showPending
+                                                const itemLabel = isLockedItem
+                                                    ? `${item.label} (${tSidebar('lockedLabel')})`
+                                                    : item.label
+                                                const navItemClassName = cn(
+                                                    'group flex items-center rounded-xl text-[14px] font-medium text-slate-600 transition-colors duration-150 motion-reduce:transition-none',
                                                     collapsed
-                                                        ? 'w-0 translate-x-2 overflow-hidden opacity-0'
-                                                        : 'opacity-100'
-                                                )}
-                                            >
-                                                {item.label}
-                                            </span>
-                                            {isLockedItem && !collapsed && (
-                                                <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-white/80 p-1">
-                                                    <Lock size={11} className={lockIconClassName} />
-                                                </span>
-                                            )}
-                                            {showIndicator && !collapsed && !isLockedItem && (
-                                                <span
-                                                    className={cn(
-                                                        'ml-auto h-2 w-2 rounded-full ring-2',
-                                                        isActive ? 'bg-white ring-[#242A40]/25' : 'bg-[#242A40] ring-white'
-                                                    )}
-                                                />
-                                            )}
-                                        </>
-                                    )
-                                    const collapsedNavTooltipContent = (
-                                        <div className="space-y-0.5">
-                                            <p className="font-semibold text-slate-900">{item.label}</p>
-                                            {isLockedItem && (
-                                                <p className="text-slate-600">{tSidebar('lockedLabel')}</p>
-                                            )}
+                                                        ? 'mx-auto h-10 w-10 justify-center gap-0'
+                                                        : 'w-full gap-2.5 px-3 py-2',
+                                                    isActive
+                                                        ? 'bg-slate-200/80 text-slate-900'
+                                                        : isLockedItem
+                                                            ? 'cursor-not-allowed bg-slate-100/80 text-slate-400'
+                                                            : 'hover:bg-white hover:text-slate-900'
+                                                )
+                                                const iconClassName = cn(
+                                                    'shrink-0',
+                                                    isActive
+                                                        ? 'text-slate-800'
+                                                        : isLockedItem
+                                                            ? 'text-slate-400'
+                                                            : 'text-slate-500 group-hover:text-slate-900'
+                                                )
+                                                const lockIconClassName = isActive ? 'text-slate-700' : 'text-slate-400'
+
+                                                const navItemContent = (
+                                                    <>
+                                                        <span className="relative flex items-center">
+                                                            <Icon
+                                                                size={17}
+                                                                className={iconClassName}
+                                                            />
+                                                            {showIndicator && collapsed && (
+                                                                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
+                                                            )}
+                                                            {isLockedItem && collapsed && (
+                                                                <span className="absolute -bottom-1 -right-1 rounded-full border border-slate-200 bg-white p-[1px]">
+                                                                    <Lock size={8} className={lockIconClassName} />
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        <span
+                                                            className={cn(
+                                                                'whitespace-nowrap leading-none transition-all duration-200 motion-reduce:transition-none',
+                                                                collapsed
+                                                                    ? 'w-0 translate-x-2 overflow-hidden opacity-0'
+                                                                    : 'opacity-100'
+                                                            )}
+                                                        >
+                                                            {item.label}
+                                                        </span>
+                                                        {isLockedItem && !collapsed && (
+                                                            <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-white/80 p-1">
+                                                                <Lock size={11} className={lockIconClassName} />
+                                                            </span>
+                                                        )}
+                                                        {showIndicator && !collapsed && !isLockedItem && (
+                                                            <span
+                                                                className={cn(
+                                                                    'ml-auto h-2 w-2 rounded-full ring-2',
+                                                                    isActive ? 'bg-slate-700 ring-slate-200' : 'bg-[#242A40] ring-white'
+                                                                )}
+                                                            />
+                                                        )}
+                                                    </>
+                                                )
+                                                const collapsedNavTooltipContent = (
+                                                    <div className="space-y-0.5">
+                                                        <p className="font-semibold text-slate-900">{item.label}</p>
+                                                        {isLockedItem && (
+                                                            <p className="text-slate-600">{tSidebar('lockedLabel')}</p>
+                                                        )}
+                                                    </div>
+                                                )
+
+                                                if (isLockedItem) {
+                                                    const lockedButton = (
+                                                        <button
+                                                            type="button"
+                                                            disabled
+                                                            title={collapsed ? undefined : itemLabel}
+                                                            aria-label={itemLabel}
+                                                            aria-disabled
+                                                            className={navItemClassName}
+                                                        >
+                                                            {navItemContent}
+                                                        </button>
+                                                    )
+
+                                                    if (collapsed) {
+                                                        return (
+                                                            <SidebarHoverTooltip
+                                                                key={item.id}
+                                                                className="flex justify-center"
+                                                                content={collapsedNavTooltipContent}
+                                                            >
+                                                                {lockedButton}
+                                                            </SidebarHoverTooltip>
+                                                        )
+                                                    }
+
+                                                    return (
+                                                        <div key={item.id}>
+                                                            {lockedButton}
+                                                        </div>
+                                                    )
+                                                }
+
+                                                const navLink = (
+                                                    <Link
+                                                        href={itemHref}
+                                                        title={collapsed ? undefined : item.label}
+                                                        aria-label={item.label}
+                                                        className={navItemClassName}
+                                                        onMouseEnter={() => warmDashboardHotRoute(itemHref)}
+                                                        onFocus={() => warmDashboardHotRoute(itemHref)}
+                                                        onTouchStart={() => warmDashboardHotRoute(itemHref)}
+                                                        onClick={(event) => handleDashboardNavClick(event, itemHref)}
+                                                    >
+                                                        {navItemContent}
+                                                    </Link>
+                                                )
+
+                                                if (collapsed) {
+                                                    return (
+                                                        <SidebarHoverTooltip
+                                                            key={item.id}
+                                                            className="flex justify-center"
+                                                            content={collapsedNavTooltipContent}
+                                                        >
+                                                            {navLink}
+                                                        </SidebarHoverTooltip>
+                                                    )
+                                                }
+
+                                                return (
+                                                    <div key={item.id}>
+                                                        {navLink}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
-                                    )
-
-                                    if (isLockedItem) {
-                                        const lockedButton = (
-                                            <button
-                                                type="button"
-                                                disabled
-                                                title={collapsed ? undefined : itemLabel}
-                                                aria-label={itemLabel}
-                                                aria-disabled
-                                                className={navItemClassName}
-                                            >
-                                                {navItemContent}
-                                            </button>
-                                        )
-
-                                        if (collapsed) {
-                                            return (
-                                                <SidebarHoverTooltip
-                                                    key={item.id}
-                                                    className="flex justify-center"
-                                                    content={collapsedNavTooltipContent}
-                                                >
-                                                    {lockedButton}
-                                                </SidebarHoverTooltip>
-                                            )
-                                        }
-
-                                        return (
-                                            <div key={item.id}>
-                                                {lockedButton}
-                                            </div>
-                                        )
-                                    }
-
-                                    const navLink = (
-                                        <Link
-                                            href={itemHref}
-                                            title={collapsed ? undefined : item.label}
-                                            aria-label={item.label}
-                                            className={navItemClassName}
-                                            onMouseEnter={() => warmDashboardHotRoute(itemHref)}
-                                            onFocus={() => warmDashboardHotRoute(itemHref)}
-                                            onTouchStart={() => warmDashboardHotRoute(itemHref)}
-                                            onClick={(event) => handleDashboardNavClick(event, itemHref)}
-                                        >
-                                            {navItemContent}
-                                        </Link>
-                                    )
-
-                                    if (collapsed) {
-                                        return (
-                                            <SidebarHoverTooltip
-                                                key={item.id}
-                                                className="flex justify-center"
-                                                content={collapsedNavTooltipContent}
-                                            >
-                                                {navLink}
-                                            </SidebarHoverTooltip>
-                                        )
-                                    }
-
-                                    return (
-                                        <div key={item.id}>
-                                            {navLink}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    ))}
+                                    </div>
+                                </div>
+                            </section>
+                        )
+                    })}
                 </div>
             </nav>
 
@@ -1892,7 +1983,7 @@ export function MainSidebar({
                                 </div>
                             )}
                             {showLowCreditWarning && (
-                                <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                                <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
                                     <AlertCircle size={10} />
                                     {tSidebar('billingLowCreditWarning')}
                                 </p>
@@ -1924,7 +2015,7 @@ export function MainSidebar({
                                 collapsed ? 'w-0 translate-x-2 overflow-hidden opacity-0' : 'opacity-100'
                             )}
                         >
-                            <p className="truncate text-sm font-semibold text-slate-900">
+                            <p className="truncate text-[14px] font-semibold text-slate-900">
                                 {userName || tCommon('defaultUserName')}
                             </p>
                         </div>
@@ -1933,7 +2024,7 @@ export function MainSidebar({
                     <div className="absolute left-full bottom-0 ml-2 w-52 rounded-lg border border-gray-100 bg-white py-1 shadow-lg invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-all duration-200 motion-reduce:transition-none z-50">
                         <div className="px-3 py-2 border-b border-gray-50">
                             <p className="text-xs text-gray-500 truncate">{tCommon('loggedInAs')}</p>
-                            <p className="text-sm font-medium text-gray-900 truncate" title={userName}>
+                            <p className="text-[14px] font-medium text-gray-900 truncate" title={userName}>
                                 {userName || tCommon('defaultUserName')}
                             </p>
                         </div>

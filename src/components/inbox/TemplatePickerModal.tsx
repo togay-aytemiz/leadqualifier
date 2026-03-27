@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Input, Modal, TextArea } from '@/design'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Input, Modal, Skeleton, TextArea } from '@/design'
 import {
     createConversationPredefinedTemplate,
     deleteConversationPredefinedTemplate,
@@ -15,6 +15,7 @@ import type { ConversationPlatform } from '@/types/database'
 import {
     resolveTemplatePickerActiveTab,
     resolveTemplatePickerInsertDisabled,
+    resolveTemplatePickerPaneState,
     resolveTemplatePickerRefreshLoading,
     resolveTemplatePickerTabs,
     type TemplatePickerTab
@@ -42,6 +43,30 @@ function parseBodyParameters(text: string) {
         .filter(Boolean)
 }
 
+const POLITE_ARIA_LIVE = 'polite'
+
+function TemplatePickerLoadingState({ description }: { description: string }) {
+    return (
+        <div
+            role="status"
+            aria-live={POLITE_ARIA_LIVE}
+            className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-3"
+        >
+            <p className="text-sm text-gray-600">{description}</p>
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-11 w-full rounded-xl" />
+            </div>
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+            </div>
+        </div>
+    )
+}
+
 export function TemplatePickerModal({
     conversationId,
     platform,
@@ -57,6 +82,8 @@ export function TemplatePickerModal({
 
     const [isLoadingPredefinedTemplates, setIsLoadingPredefinedTemplates] = useState(false)
     const [isLoadingWhatsAppTemplates, setIsLoadingWhatsAppTemplates] = useState(false)
+    const [hasLoadedPredefinedTemplates, setHasLoadedPredefinedTemplates] = useState(false)
+    const [hasLoadedWhatsAppTemplates, setHasLoadedWhatsAppTemplates] = useState(false)
     const [isSavingPredefinedTemplate, setIsSavingPredefinedTemplate] = useState(false)
     const [isDeletingPredefinedTemplate, setIsDeletingPredefinedTemplate] = useState(false)
 
@@ -86,7 +113,7 @@ export function TemplatePickerModal({
         [selectedWhatsAppTemplateValue, whatsAppTemplates]
     )
 
-    const loadPredefinedTemplates = async () => {
+    const loadPredefinedTemplates = useCallback(async () => {
         setIsLoadingPredefinedTemplates(true)
         setErrorMessage('')
 
@@ -99,6 +126,7 @@ export function TemplatePickerModal({
             }
             setPredefinedTemplates([])
             setSelectedPredefinedTemplateId('')
+            setHasLoadedPredefinedTemplates(true)
             setIsLoadingPredefinedTemplates(false)
             return
         }
@@ -110,10 +138,11 @@ export function TemplatePickerModal({
             }
             return result.templates[0]?.id ?? ''
         })
+        setHasLoadedPredefinedTemplates(true)
         setIsLoadingPredefinedTemplates(false)
-    }
+    }, [conversationId, t])
 
-    const loadWhatsAppTemplates = async () => {
+    const loadWhatsAppTemplates = useCallback(async () => {
         if (platform !== 'whatsapp') return
 
         setIsLoadingWhatsAppTemplates(true)
@@ -130,6 +159,7 @@ export function TemplatePickerModal({
             }
             setWhatsAppTemplates([])
             setSelectedWhatsAppTemplateValue('')
+            setHasLoadedWhatsAppTemplates(true)
             setIsLoadingWhatsAppTemplates(false)
             return
         }
@@ -142,19 +172,23 @@ export function TemplatePickerModal({
             const firstTemplate = result.templates[0]
             return firstTemplate ? toTemplateOptionValue(firstTemplate) : ''
         })
+        setHasLoadedWhatsAppTemplates(true)
         setIsLoadingWhatsAppTemplates(false)
-    }
+    }, [conversationId, platform, t])
 
-    const resetEditor = () => {
+    const resetEditor = useCallback(() => {
         setEditingTemplateId(null)
         setTemplateTitleDraft('')
         setTemplateContentDraft('')
         setIsEditorOpen(false)
-    }
+    }, [])
 
-    useEffect(() => {
-        if (!isOpen) return
+    const handleClose = useCallback(() => {
+        setIsEditorOpen(false)
+        onClose()
+    }, [onClose])
 
+    const resetAndLoadOnOpen = useCallback(() => {
         setActiveTab(resolveTemplatePickerActiveTab(platform, null))
         setWhatsAppBodyParametersText('')
         setErrorMessage('')
@@ -164,7 +198,16 @@ export function TemplatePickerModal({
         if (platform === 'whatsapp') {
             void loadWhatsAppTemplates()
         }
-    }, [isOpen, platform, conversationId])
+    }, [loadPredefinedTemplates, loadWhatsAppTemplates, platform, resetEditor])
+
+    useEffect(() => {
+        if (!isOpen) return
+        const timeoutId = window.setTimeout(() => {
+            resetAndLoadOnOpen()
+        }, 0)
+
+        return () => window.clearTimeout(timeoutId)
+    }, [isOpen, resetAndLoadOnOpen])
 
     useLayoutEffect(() => {
         if (!isOpen) return
@@ -202,8 +245,16 @@ export function TemplatePickerModal({
 
     useEffect(() => {
         if (!isOpen) {
-            setTabContentHeight(null)
+            const timeoutId = window.setTimeout(() => {
+                setTabContentHeight(null)
+                setHasLoadedPredefinedTemplates(false)
+                setHasLoadedWhatsAppTemplates(false)
+            }, 0)
+
+            return () => window.clearTimeout(timeoutId)
         }
+
+        return undefined
     }, [isOpen])
 
     const openCreateEditor = () => {
@@ -332,7 +383,7 @@ export function TemplatePickerModal({
             }
 
             onInsert(selectedPredefinedTemplate.content)
-            onClose()
+            handleClose()
             return
         }
 
@@ -351,7 +402,7 @@ export function TemplatePickerModal({
             : t('whatsAppInsertPrefix', { template: templateLabel })
 
         onInsert(templateInsertText)
-        onClose()
+        handleClose()
     }
 
     const isInsertDisabled = resolveTemplatePickerInsertDisabled({
@@ -365,6 +416,18 @@ export function TemplatePickerModal({
         activeTab,
         isLoadingPredefinedTemplates,
         isLoadingWhatsAppTemplates
+    })
+
+    const predefinedPaneState = resolveTemplatePickerPaneState({
+        isLoading: isLoadingPredefinedTemplates,
+        hasLoadedOnce: hasLoadedPredefinedTemplates,
+        itemCount: predefinedTemplates.length
+    })
+
+    const whatsAppPaneState = resolveTemplatePickerPaneState({
+        isLoading: isLoadingWhatsAppTemplates,
+        hasLoadedOnce: hasLoadedWhatsAppTemplates,
+        itemCount: whatsAppTemplates.length
     })
 
     const headerActions = platform === 'whatsapp' && activeTab === 'whatsapp' ? (
@@ -383,7 +446,7 @@ export function TemplatePickerModal({
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title={t('title')}
             headerActions={headerActions}
         >
@@ -415,46 +478,54 @@ export function TemplatePickerModal({
                     <div ref={tabContentRef} className="space-y-3 pb-1">
                         {activeTab === 'predefined' && (
                             <div className="space-y-3">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase">
-                                        {t('predefined.templateLabel')}
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full h-11 pl-3 pr-10 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm bg-white text-gray-900 appearance-none"
-                                            value={selectedPredefinedTemplateId}
-                                            onChange={(event) => setSelectedPredefinedTemplateId(event.target.value)}
-                                            disabled={isLoadingPredefinedTemplates || predefinedTemplates.length === 0}
-                                        >
-                                            {predefinedTemplates.map(template => (
-                                                <option key={template.id} value={template.id}>
-                                                    {template.title}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown
-                                            size={18}
-                                            className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${isLoadingPredefinedTemplates || predefinedTemplates.length === 0 ? 'text-gray-300' : 'text-gray-500'}`}
-                                        />
-                                    </div>
-                                </div>
-
-                                {predefinedTemplates.length === 0 && !isLoadingPredefinedTemplates && (
-                                    <Alert variant="warning">{t('predefined.emptyState')}</Alert>
+                                {predefinedPaneState === 'loading' && (
+                                    <TemplatePickerLoadingState description={t('predefined.loadingState')} />
                                 )}
 
-                                {selectedPredefinedTemplate && (
-                                    <TextArea
-                                        label={t('predefined.previewLabel')}
-                                        value={selectedPredefinedTemplate.content}
-                                        onChange={(value) => {
-                                            setPredefinedTemplates((prev) => prev.map((item) => (
-                                                item.id === selectedPredefinedTemplate.id ? { ...item, content: value } : item
-                                            )))
-                                        }}
-                                        rows={4}
-                                        readOnly
-                                    />
+                                {predefinedPaneState === 'ready' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase">
+                                                {t('predefined.templateLabel')}
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    className="w-full h-11 pl-3 pr-10 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm bg-white text-gray-900 appearance-none"
+                                                    value={selectedPredefinedTemplateId}
+                                                    onChange={(event) => setSelectedPredefinedTemplateId(event.target.value)}
+                                                    disabled={isLoadingPredefinedTemplates}
+                                                >
+                                                    {predefinedTemplates.map(template => (
+                                                        <option key={template.id} value={template.id}>
+                                                            {template.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown
+                                                    size={18}
+                                                    className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${isLoadingPredefinedTemplates ? 'text-gray-300' : 'text-gray-500'}`}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {selectedPredefinedTemplate && (
+                                            <TextArea
+                                                label={t('predefined.previewLabel')}
+                                                value={selectedPredefinedTemplate.content}
+                                                onChange={(value) => {
+                                                    setPredefinedTemplates((prev) => prev.map((item) => (
+                                                        item.id === selectedPredefinedTemplate.id ? { ...item, content: value } : item
+                                                    )))
+                                                }}
+                                                rows={4}
+                                                readOnly
+                                            />
+                                        )}
+                                    </>
+                                )}
+
+                                {predefinedPaneState === 'empty' && (
+                                    <Alert variant="warning">{t('predefined.emptyState')}</Alert>
                                 )}
 
                                 <div className="flex flex-wrap items-center gap-2">
@@ -519,58 +590,66 @@ export function TemplatePickerModal({
 
                         {activeTab === 'whatsapp' && (
                             <div className="space-y-3">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase">
-                                        {t('whatsapp.templateLabel')}
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full h-11 pl-3 pr-10 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm bg-white text-gray-900 appearance-none"
-                                            value={selectedWhatsAppTemplateValue}
-                                            onChange={(event) => setSelectedWhatsAppTemplateValue(event.target.value)}
-                                            disabled={isLoadingWhatsAppTemplates || whatsAppTemplates.length === 0}
-                                        >
-                                            {whatsAppTemplates.map(template => (
-                                                <option key={toTemplateOptionValue(template)} value={toTemplateOptionValue(template)}>
-                                                    {template.name} ({template.language ?? 'n/a'})
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown
-                                            size={18}
-                                            className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${isLoadingWhatsAppTemplates || whatsAppTemplates.length === 0 ? 'text-gray-300' : 'text-gray-500'}`}
-                                        />
-                                    </div>
-                                </div>
-
-                                {selectedWhatsAppTemplate && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-600">
-                                        <div>
-                                            <span className="font-semibold text-gray-700">{t('whatsapp.languageLabel')}: </span>
-                                            <span>{selectedWhatsAppTemplate.language ?? 'n/a'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">{t('whatsapp.statusLabel')}: </span>
-                                            <span>{selectedWhatsAppTemplate.status ?? 'n/a'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">{t('whatsapp.categoryLabel')}: </span>
-                                            <span>{selectedWhatsAppTemplate.category ?? 'n/a'}</span>
-                                        </div>
-                                    </div>
+                                {whatsAppPaneState === 'loading' && (
+                                    <TemplatePickerLoadingState description={t('whatsapp.loadingState')} />
                                 )}
 
-                                {whatsAppTemplates.length === 0 && !isLoadingWhatsAppTemplates && (
+                                {whatsAppPaneState === 'ready' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase">
+                                                {t('whatsapp.templateLabel')}
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    className="w-full h-11 pl-3 pr-10 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm bg-white text-gray-900 appearance-none"
+                                                    value={selectedWhatsAppTemplateValue}
+                                                    onChange={(event) => setSelectedWhatsAppTemplateValue(event.target.value)}
+                                                    disabled={isLoadingWhatsAppTemplates}
+                                                >
+                                                    {whatsAppTemplates.map(template => (
+                                                        <option key={toTemplateOptionValue(template)} value={toTemplateOptionValue(template)}>
+                                                            {template.name} ({template.language ?? 'n/a'})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown
+                                                    size={18}
+                                                    className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${isLoadingWhatsAppTemplates ? 'text-gray-300' : 'text-gray-500'}`}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {selectedWhatsAppTemplate && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-600">
+                                                <div>
+                                                    <span className="font-semibold text-gray-700">{t('whatsapp.languageLabel')}: </span>
+                                                    <span>{selectedWhatsAppTemplate.language ?? 'n/a'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold text-gray-700">{t('whatsapp.statusLabel')}: </span>
+                                                    <span>{selectedWhatsAppTemplate.status ?? 'n/a'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold text-gray-700">{t('whatsapp.categoryLabel')}: </span>
+                                                    <span>{selectedWhatsAppTemplate.category ?? 'n/a'}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <TextArea
+                                            label={t('whatsapp.paramsLabel')}
+                                            value={whatsAppBodyParametersText}
+                                            onChange={setWhatsAppBodyParametersText}
+                                            rows={4}
+                                            placeholder={t('whatsapp.paramsPlaceholder')}
+                                        />
+                                    </>
+                                )}
+
+                                {whatsAppPaneState === 'empty' && (
                                     <Alert variant="warning">{t('whatsapp.emptyState')}</Alert>
                                 )}
-
-                                <TextArea
-                                    label={t('whatsapp.paramsLabel')}
-                                    value={whatsAppBodyParametersText}
-                                    onChange={setWhatsAppBodyParametersText}
-                                    rows={4}
-                                    placeholder={t('whatsapp.paramsPlaceholder')}
-                                />
                             </div>
                         )}
 

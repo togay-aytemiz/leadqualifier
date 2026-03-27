@@ -8,6 +8,7 @@
     "delete": "Sil",
     "edit": "Düzenle",
     "back": "Geri",
+    "close": "Kapat",
     "create": "Oluştur",
     "enable": "Aktif Et",
     "disable": "Pasif Et",
@@ -338,6 +339,8 @@
     "yesterday": "Dün",
     "you": "Siz",
     "botName": "AI",
+    "markConversationUnread": "Okunmamış yap",
+    "markConversationRead": "Okunmuş yap",
     "replyPlaceholder": "Bir yanıt yazın...",
     "takeOverPlaceholder": "Sohbeti devralın...",
     "botActiveTitle": "Yapay zeka asistanı devrede.",
@@ -415,6 +418,7 @@
       "predefined": {
         "templateLabel": "Hazır mesaj",
         "previewLabel": "Mesaj önizleme",
+        "loadingState": "Hazır mesajlarınız yükleniyor...",
         "emptyState": "Henüz hazır mesaj yok. İlk şablonunuzu oluşturun.",
         "new": "Yeni",
         "edit": "Düzenle",
@@ -429,6 +433,7 @@
         "languageLabel": "Dil",
         "statusLabel": "Durum",
         "categoryLabel": "Kategori",
+        "loadingState": "WhatsApp şablonları yükleniyor...",
         "emptyState": "Bu hesap için kullanılabilir WhatsApp şablonu bulunamadı.",
         "paramsLabel": "Şablon değişkenleri (opsiyonel)",
         "paramsPlaceholder": "Şablondaki değişken sırasına göre her satıra bir değer yazın."

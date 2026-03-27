@@ -50,7 +50,6 @@ export function SubscriptionPlanManager({
     planAction,
     cancelAction
 }: SubscriptionPlanManagerProps) {
-    const [isClient, setIsClient] = useState(false)
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
     const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
@@ -83,10 +82,7 @@ export function SubscriptionPlanManager({
     )
     const hasHigherPlan = plans.some((plan) => plan.credits > activePlanCredits)
     const checkoutPlan = plans.find((plan) => plan.id === checkoutPlanId) ?? null
-
-    useEffect(() => {
-        setIsClient(true)
-    }, [])
+    const canRenderPortal = typeof document !== 'undefined'
 
     useEffect(() => {
         if (!isPlanModalOpen && !isCancelModalOpen) return
@@ -339,9 +335,9 @@ export function SubscriptionPlanManager({
                 </div>
             </article>
 
-            {isClient && isPlanModalOpen && createPortal(planModal, document.body)}
-            {isClient && isCancelModalOpen && createPortal(cancelModal, document.body)}
-            {isClient && checkoutPlan && createPortal(
+            {canRenderPortal && isPlanModalOpen && createPortal(planModal, document.body)}
+            {canRenderPortal && isCancelModalOpen && createPortal(cancelModal, document.body)}
+            {canRenderPortal && checkoutPlan && createPortal(
                 <CheckoutLegalConsentModal
                     flowType="subscription"
                     summary={tPlans('checkoutLegal.subscriptionSummary', {

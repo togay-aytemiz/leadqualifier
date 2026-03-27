@@ -324,9 +324,9 @@ function normalizeConversationListFilters(
 ): Required<ConversationListFilters> {
   const unreadFilter = filters?.unreadFilter === 'unread' ? 'unread' : 'all'
   const leadTemperatureFilter =
-    filters?.leadTemperatureFilter === 'hot'
-      || filters?.leadTemperatureFilter === 'warm'
-      || filters?.leadTemperatureFilter === 'cold'
+    filters?.leadTemperatureFilter === 'hot' ||
+    filters?.leadTemperatureFilter === 'warm' ||
+    filters?.leadTemperatureFilter === 'cold'
       ? filters.leadTemperatureFilter
       : 'all'
 
@@ -760,7 +760,8 @@ async function annotateInstagramRequestFallback(
 
     const latestMessage = Array.isArray(conversation.messages) ? conversation.messages[0] : null
     if (!latestMessage || latestMessage.sender_type !== 'contact') return conversation
-    if (resolveInstagramPreviewEventSource(latestMessage.metadata) !== 'standby') return conversation
+    if (resolveInstagramPreviewEventSource(latestMessage.metadata) !== 'standby')
+      return conversation
 
     const tags = Array.isArray(conversation.tags)
       ? conversation.tags.filter((tag): tag is string => typeof tag === 'string')
@@ -1014,7 +1015,10 @@ export async function getConversations(
     conversationQuery = conversationQuery.gt('unread_count', 0)
   }
   if (normalizedFilters.leadTemperatureFilter !== 'all') {
-    conversationQuery = conversationQuery.eq('leads.status', normalizedFilters.leadTemperatureFilter)
+    conversationQuery = conversationQuery.eq(
+      'leads.status',
+      normalizedFilters.leadTemperatureFilter
+    )
   }
 
   const { data, error } = await conversationQuery
@@ -1741,13 +1745,30 @@ export async function markConversationRead(conversationId: string) {
     .from('conversations')
     .update({
       unread_count: 0,
+      manual_unread: false,
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId)
-    .gt('unread_count', 0)
 
   if (error) {
     console.error('Error marking conversation as read:', error)
+  }
+}
+
+export async function markConversationUnread(conversationId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('conversations')
+    .update({
+      unread_count: 1,
+      manual_unread: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+
+  if (error) {
+    console.error('Error marking conversation as unread:', error)
   }
 }
 
@@ -1966,9 +1987,9 @@ export async function sendMessage(
 
     if (Array.isArray(conversation.tags)) {
       const normalizedTags = conversation.tags
-      .filter((tag): tag is string => typeof tag === 'string')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
       const hasRequestTag = normalizedTags.some((tag) => tag.toLowerCase() === 'instagram_request')
 
       if (hasRequestTag) {
@@ -3141,7 +3162,9 @@ export async function setConversationLeadServiceOverride(input: {
   const matchedService =
     (catalogItems ?? []).find((item) => {
       const catalogName = readTrimmedString(item.name)
-      return catalogName && normalizeServiceName(catalogName) === normalizeServiceName(requestedService)
+      return (
+        catalogName && normalizeServiceName(catalogName) === normalizeServiceName(requestedService)
+      )
     }) ?? null
 
   const resolvedService = readTrimmedString(matchedService?.name)
@@ -3215,8 +3238,11 @@ export async function clearConversationLeadServiceOverride(input: {
     : []
   const nextServiceType = extractedServices[0] ?? null
   const now = new Date().toISOString()
-  const { service_override: _removedServiceOverride, service_override_meta: _removedServiceMeta, ...nextExtractedFields } =
-    extractedFields
+  const nextExtractedFields = {
+    ...extractedFields,
+  }
+  delete nextExtractedFields.service_override
+  delete nextExtractedFields.service_override_meta
 
   const { data: updatedLead, error: updateError } = await supabase
     .from('leads')

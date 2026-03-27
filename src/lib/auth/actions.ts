@@ -5,6 +5,7 @@ import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
 import { ACTIVE_ORG_COOKIE } from '@/lib/organizations/active-context'
 import { resolvePostAuthRedirectPath } from '@/lib/auth/post-auth-redirect'
+import type { PostAuthSupabase } from '@/lib/auth/post-auth-redirect'
 import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 import {
     checkTrialBusinessIdentity,
@@ -32,7 +33,7 @@ export type RegisterActionState = {
 
 async function buildPostAuthRedirectPath(
     locale: string | null | undefined,
-    supabase: Awaited<ReturnType<typeof createClient>>,
+    supabase: PostAuthSupabase,
     userId: string | null | undefined
 ) {
     if (!userId) {
@@ -66,7 +67,7 @@ export async function login(formData: FormData) {
     return {
         redirectPath: await buildPostAuthRedirectPath(
             locale,
-            supabase,
+            supabase as unknown as PostAuthSupabase,
             authResult.user?.id ?? authResult.session?.user?.id
         )
     } satisfies LoginActionState
@@ -163,7 +164,7 @@ export async function register(formData: FormData) {
         return {
             redirectPath: await buildPostAuthRedirectPath(
                 locale,
-                supabase,
+                supabase as unknown as PostAuthSupabase,
                 data.user?.id ?? data.session?.user?.id
             )
         } satisfies RegisterActionState

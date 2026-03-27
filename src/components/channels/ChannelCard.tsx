@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { Bug, FileText } from 'lucide-react'
 
@@ -127,11 +128,13 @@ export function ChannelCard({
                 )}
                 style={getChannelSurfaceStyle(tone)}
             >
-                <img
+                <Image
                     alt=""
                     aria-hidden
                     className="pointer-events-none absolute right-4 top-4 h-11 w-11 shrink-0 object-contain"
                     src={getChannelPlatformIconSrc(type)}
+                    width={44}
+                    height={44}
                 />
 
                 <div className="flex min-h-0 flex-1 flex-col pt-2">

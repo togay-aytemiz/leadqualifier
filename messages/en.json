@@ -8,6 +8,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "back": "Back",
+    "close": "Close",
     "create": "Create",
     "enable": "Enable",
     "disable": "Disable",
@@ -338,6 +339,8 @@
     "yesterday": "Yesterday",
     "you": "You",
     "botName": "AI",
+    "markConversationUnread": "Mark as unread",
+    "markConversationRead": "Mark as read",
     "replyPlaceholder": "Write a reply...",
     "takeOverPlaceholder": "Take over the conversation...",
     "botActiveTitle": "AI assistant is active.",
@@ -415,6 +418,7 @@
       "predefined": {
         "templateLabel": "Predefined template",
         "previewLabel": "Message preview",
+        "loadingState": "Loading predefined templates...",
         "emptyState": "No predefined templates yet. Create your first template.",
         "new": "New",
         "edit": "Edit",
@@ -429,6 +433,7 @@
         "languageLabel": "Language",
         "statusLabel": "Status",
         "categoryLabel": "Category",
+        "loadingState": "Loading WhatsApp templates...",
         "emptyState": "No available WhatsApp templates were found for this account.",
         "paramsLabel": "Template variables (optional)",
         "paramsPlaceholder": "Enter one value per line in template variable order."

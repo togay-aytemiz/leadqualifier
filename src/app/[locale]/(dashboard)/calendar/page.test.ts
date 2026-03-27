@@ -52,7 +52,7 @@ describe('calendar page source', () => {
   it('invalidates cached calendar windows after create, update, and cancel mutations', () => {
     const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
 
-    expect(source).toContain('const invalidateCalendarWindowCache = useEffectEvent(() => {')
+    expect(source).toContain('const invalidateCalendarWindowCache = useCallback(() => {')
     expect(source).toContain('isCalendarCacheDirtyRef')
     expect(source).toContain('latestCalendarLoadIdRef.current += 1')
     expect(source.match(/invalidateCalendarWindowCache\(\)/g)).toHaveLength(2)

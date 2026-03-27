@@ -17,7 +17,7 @@ interface InboxComposerActionBarProps {
 }
 
 const COMPOSER_ACTION_CLASSNAME =
-  'inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-xl px-0 text-sm font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-3'
 
 export function InboxComposerActionBar({
   templateLabel,
@@ -31,7 +31,7 @@ export function InboxComposerActionBar({
   sendAriaLabel,
 }: InboxComposerActionBarProps) {
   return (
-    <div className="flex shrink-0 items-stretch gap-2">
+    <div className="flex shrink-0 items-stretch gap-1.5 sm:gap-2">
       <button
         type="button"
         onClick={onTemplateClick}
@@ -44,7 +44,7 @@ export function InboxComposerActionBar({
         )}
       >
         <HiOutlineDocumentText size={16} />
-        <span>{templateLabel}</span>
+        <span className="hidden sm:inline">{templateLabel}</span>
       </button>
 
       <button
@@ -61,7 +61,7 @@ export function InboxComposerActionBar({
         )}
       >
         {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-        <span>{sendLabel}</span>
+        <span className="hidden sm:inline">{sendLabel}</span>
       </button>
     </div>
   )

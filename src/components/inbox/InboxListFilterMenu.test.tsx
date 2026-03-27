@@ -25,6 +25,25 @@ describe('InboxListFilterMenu', () => {
     expect(markup).toContain('type="button"')
   })
 
+  it('renders the filter trigger as a plain icon control instead of a bordered pill', () => {
+    const markup = renderToStaticMarkup(
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="Europe/Istanbul">
+        <InboxListFilterMenu
+          unreadFilter="all"
+          leadTemperatureFilter="all"
+          onUnreadFilterChange={() => {}}
+          onLeadTemperatureFilterChange={() => {}}
+          onReset={() => {}}
+        />
+      </NextIntlClientProvider>
+    )
+
+    expect(markup).toContain('h-8 w-8')
+    expect(markup).toContain('rounded-md')
+    expect(markup).not.toContain('rounded-full border bg-white')
+    expect(markup).not.toContain('shadow-sm')
+  })
+
   it('renders localized unread and customer-score options inside the menu content', () => {
     const markup = renderToStaticMarkup(
       <NextIntlClientProvider locale="en" messages={messages} timeZone="Europe/Istanbul">

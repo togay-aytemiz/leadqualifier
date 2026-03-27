@@ -20,8 +20,10 @@ describe('navigation performance source guards', () => {
         expect(sidebarSource).toContain('prefetch={prefetch}')
         expect(sidebarSource).toContain('onMouseEnter={onNavigateIntent}')
         expect(settingsShellSource).not.toMatch(/href=\{item\.href\}\s+prefetch\s+active=\{item\.active\}/)
-        expect(mainSidebarSource).toContain("href={itemHref}\n                                            title={collapsed ? undefined : item.label}")
-        expect(mobileBottomNavSource).toContain("href={item.href}\n                                className={cn(")
+        expect(mainSidebarSource).toContain('href={itemHref}')
+        expect(mainSidebarSource).toContain('title={collapsed ? undefined : item.label}')
+        expect(mobileBottomNavSource).toContain('href={item.href}')
+        expect(mobileBottomNavSource).toContain('className={cn(')
     })
 
     it('defers non-critical main sidebar hydration work', () => {
@@ -36,7 +38,7 @@ describe('navigation performance source guards', () => {
         const mobileBottomNavSource = fs.readFileSync(MOBILE_BOTTOM_NAV_PATH, 'utf8')
 
         expect(mobileBottomNavSource).toContain("window.matchMedia('(min-width: 1024px)')")
-        expect(mobileBottomNavSource).toContain('if (!activeOrganizationId || isDesktopViewport) {')
+        expect(mobileBottomNavSource).toContain('if (!activeOrganizationId || isDesktopViewport !== false) {')
     })
 
     it('keeps unread checks lightweight and desktop tab title sync tied to shared shell state', () => {

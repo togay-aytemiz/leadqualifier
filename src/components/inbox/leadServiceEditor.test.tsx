@@ -1,6 +1,13 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { LeadServiceEditor } from '@/components/inbox/LeadServiceEditor'
+
+const LEAD_SERVICE_EDITOR_PATH = path.resolve(
+  process.cwd(),
+  'src/components/inbox/LeadServiceEditor.tsx'
+)
 
 describe('LeadServiceEditor', () => {
   it('keeps the service selector collapsed until edit mode is opened', () => {
@@ -32,5 +39,13 @@ describe('LeadServiceEditor', () => {
     expect(markup).toContain('Edit')
     expect(markup).not.toContain('<select')
     expect(markup).not.toContain('Select service')
+  })
+
+  it('keys the edit form to the current lead snapshot instead of resyncing draft state in an effect', () => {
+    const source = fs.readFileSync(LEAD_SERVICE_EDITOR_PATH, 'utf8')
+
+    expect(source).toContain('const editSessionKey = `${currentService ??')
+    expect(source).toContain('<LeadServiceEditorForm')
+    expect(source).not.toContain('useEffect(() => {')
   })
 })

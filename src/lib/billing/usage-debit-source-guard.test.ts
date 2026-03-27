@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const PREMIUM_PRIORITY_MIGRATION_PATH = path.join(
     process.cwd(),
-    'supabase/migrations/00099_premium_usage_debits_topup_first.sql'
+    'supabase/migrations/00102_reassert_premium_usage_debits_topup_first.sql'
 )
 
 describe('premium usage debit source guard', () => {

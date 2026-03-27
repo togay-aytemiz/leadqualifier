@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Modal, TextArea } from '@/design'
 import { RotateCw } from 'lucide-react'
 import {
@@ -49,7 +49,7 @@ export function WhatsAppTemplateSendModal({
         [selectedTemplateValue, templates]
     )
 
-    const loadTemplates = async () => {
+    const loadTemplates = useCallback(async () => {
         setIsLoadingTemplates(true)
         setErrorMessage('')
         setSuccessMessage('')
@@ -79,19 +79,25 @@ export function WhatsAppTemplateSendModal({
             return firstTemplate ? toTemplateOptionValue(firstTemplate) : ''
         })
         setIsLoadingTemplates(false)
-    }
+    }, [conversationId, t])
 
     useEffect(() => {
         if (!isOpen) return
-        void loadTemplates()
-    }, [isOpen])
+        const timeoutId = window.setTimeout(() => {
+            void loadTemplates()
+        }, 0)
+        return () => window.clearTimeout(timeoutId)
+    }, [isOpen, loadTemplates])
 
     useEffect(() => {
         if (!isOpen) return
-        setBodyParametersText('')
-        setErrorMessage('')
-        setSuccessMessage('')
-        setSuccessMessageId('')
+        const timeoutId = window.setTimeout(() => {
+            setBodyParametersText('')
+            setErrorMessage('')
+            setSuccessMessage('')
+            setSuccessMessageId('')
+        }, 0)
+        return () => window.clearTimeout(timeoutId)
     }, [isOpen])
 
     const handleSend = async () => {

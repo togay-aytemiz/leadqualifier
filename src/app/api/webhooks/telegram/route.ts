@@ -116,7 +116,9 @@ export async function POST(req: NextRequest) {
     if (secretToken) {
         const { data } = await supabase
             .from('channels')
-            .select('*')
+            .select('id, organization_id, config')
+            .eq('type', 'telegram')
+            .eq('status', 'active')
             .eq('config->>webhook_secret', secretToken)
             .single()
 

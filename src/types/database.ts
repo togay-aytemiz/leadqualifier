@@ -332,6 +332,7 @@ export interface Conversation {
     ai_processing_paused: boolean
     last_message_at: string
     unread_count: number
+    manual_unread?: boolean
     ai_usage_input_tokens_total?: number
     ai_usage_output_tokens_total?: number
     ai_usage_total_tokens_total?: number

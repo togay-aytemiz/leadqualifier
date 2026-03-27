@@ -160,15 +160,13 @@ export function InboxListFilterMenu(props: InboxListFilterMenuProps) {
           aria-label={t('conversationFiltersOpen')}
           title={t('conversationFiltersOpen')}
           className={cn(
-            'relative inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700',
-            hasActiveFilters
-              ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
-              : 'border-slate-200'
+            'relative inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300',
+            hasActiveFilters && 'text-slate-900'
           )}
         >
-          <Filter size={16} />
+          <Filter size={17} />
           {hasActiveFilters && (
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-blue-500" />
+            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-500" />
           )}
         </button>
       </DropdownMenuTrigger>

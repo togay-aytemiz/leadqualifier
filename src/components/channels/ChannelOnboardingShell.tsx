@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -70,11 +71,13 @@ export function ChannelOnboardingShell({
                         </Link>
                     )}
 
-                    <img
+                    <Image
                         alt=""
                         aria-hidden
                         className="pointer-events-none mt-3 h-11 w-11 shrink-0 object-contain"
                         src={getChannelPlatformIconSrc(channelType)}
+                        width={44}
+                        height={44}
                     />
                     {isMetaProductChannel(channelType) && (
                         <MetaProviderBadge

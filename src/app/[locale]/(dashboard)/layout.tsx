@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
 import { MainSidebar } from '@/design'
@@ -7,6 +8,7 @@ import { resolveActiveOrganizationContext } from '@/lib/organizations/active-con
 import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { TabTitleSync } from '@/components/common/TabTitleSync'
 import { DASHBOARD_SHELL_MESSAGE_NAMESPACES, getScopedMessages } from '@/i18n/messages'
+import { resolveDashboardTypographyVariables } from '@/design/dashboard-typography'
 
 export default async function DashboardLayout({
     children,
@@ -31,6 +33,7 @@ export default async function DashboardLayout({
 
     const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
     const userAvatarUrl = orgContext?.userAvatarUrl ?? null
+    const dashboardContentTypographyStyle = resolveDashboardTypographyVariables('content') as CSSProperties
 
     return (
         <NextIntlClientProvider locale={locale} messages={messages}>
@@ -47,7 +50,10 @@ export default async function DashboardLayout({
                         canAccessQaLabAdmin={canAccessQaLabAdmin}
                     />
                 </div>
-                <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+                <div
+                    className="dashboard-content-type-scale relative flex min-w-0 flex-1 flex-col overflow-hidden"
+                    style={dashboardContentTypographyStyle}
+                >
                     <div className="flex min-h-0 flex-1 overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
                         <DashboardRouteTransitionViewport>
                             {children}

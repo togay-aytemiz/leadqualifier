@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import {
@@ -172,7 +171,11 @@ function resolveRequestedBookingDuration(input: {
   })
 }
 
-function satisfiesMinimumNotice(settings: BookingSettings, bookingStartIso: string, now = new Date()) {
+function satisfiesMinimumNotice(
+  settings: BookingSettings,
+  bookingStartIso: string,
+  now = new Date()
+) {
   const minimumNoticeMinutes = normalizePositiveMinuteValue(settings.minimum_notice_minutes)
   if (minimumNoticeMinutes === 0) return true
 
@@ -670,8 +673,8 @@ function buildBookingInsertRecord(input: {
   const endsAt = input.booking.durationMinutes
     ? addMinutesToIso(startsAt, resolvedDuration.durationMinutes)
     : input.booking.endsAt
-    ? new Date(input.booking.endsAt).toISOString()
-    : addMinutesToIso(startsAt, resolvedDuration.durationMinutes)
+      ? new Date(input.booking.endsAt).toISOString()
+      : addMinutesToIso(startsAt, resolvedDuration.durationMinutes)
 
   return {
     record: {
@@ -917,8 +920,8 @@ export async function updateCalendarBookingRecord(
   const endsAt = input.durationMinutes
     ? addMinutesToIso(startsAt, duration.durationMinutes)
     : input.endsAt
-    ? new Date(input.endsAt).toISOString()
-    : addMinutesToIso(startsAt, duration.durationMinutes)
+      ? new Date(input.endsAt).toISOString()
+      : addMinutesToIso(startsAt, duration.durationMinutes)
 
   await assertRequestedBookingSlotAvailable(supabase, organizationId, {
     startsAt,
@@ -953,8 +956,8 @@ export async function updateCalendarBookingRecord(
       sync_status:
         shouldMirrorToGoogle(connection, settings) ||
         canSyncExistingGoogleMirror(connection, existingBooking as CalendarBooking)
-        ? 'pending'
-        : existingBooking.sync_status,
+          ? 'pending'
+          : existingBooking.sync_status,
       metadata: input.metadata ?? existingBooking.metadata,
     })
     .eq('organization_id', organizationId)
@@ -995,8 +998,8 @@ export async function cancelCalendarBookingRecord(
       sync_status:
         shouldMirrorToGoogle(connection, settings) ||
         canSyncExistingGoogleMirror(connection, existingBooking as CalendarBooking)
-        ? 'pending'
-        : existingBooking.sync_status,
+          ? 'pending'
+          : existingBooking.sync_status,
     })
     .eq('organization_id', organizationId)
     .eq('id', bookingId)

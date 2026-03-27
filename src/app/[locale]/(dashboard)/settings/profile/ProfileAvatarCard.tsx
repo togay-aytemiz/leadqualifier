@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { Avatar, Modal } from '@/design'
 
@@ -115,10 +116,13 @@ export function ProfileAvatarCard({
                 {hasAvatar && (
                     <div className="space-y-4">
                         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-slate-50">
-                            <img
+                            <Image
                                 src={normalizedAvatarUrl}
                                 alt={fallbackName}
+                                width={1200}
+                                height={1200}
                                 className="h-auto w-full object-cover"
+                                unoptimized
                             />
                         </div>
                         <p className="text-sm text-gray-500">{description}</p>
