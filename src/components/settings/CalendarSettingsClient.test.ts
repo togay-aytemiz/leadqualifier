@@ -24,4 +24,11 @@ describe('CalendarSettingsClient source', () => {
         expect(source).toContain('lg:grid-cols-[minmax(0,1.4fr)_minmax(0,11rem)_minmax(0,11rem)_auto]')
         expect(source).not.toContain('md:grid-cols-[auto,1fr,1fr]')
     })
+
+    it('disables the save action until the active tab has unsaved changes', () => {
+        const source = fs.readFileSync(CALENDAR_SETTINGS_CLIENT_PATH, 'utf8')
+
+        expect(source).toContain('const isActiveTabDirty = activeTab === \'availability\'')
+        expect(source).toContain('disabled={isPending || isReadOnly || !isActiveTabDirty}')
+    })
 })

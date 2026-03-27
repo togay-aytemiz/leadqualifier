@@ -1,25 +1,21 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useLocale, useTranslations } from 'next-intl'
-import { Alert, Button, PageHeader } from '@/design'
+import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Alert, Badge, Button, PageHeader } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
-import {
-    disconnectGoogleCalendarAction,
-    updateBookingSettingsAction
-} from '@/lib/calendar/actions'
+import { updateBookingSettingsAction } from '@/lib/calendar/actions'
 import {
     buildCalendarSettingsDraft,
-    resolveGoogleConnectionSummary,
+    isCalendarAppsSettingsDirty,
     type CalendarSettingsDraft
 } from '@/lib/calendar/settings-surface'
 import { cn } from '@/lib/utils'
-import type { BookingSettings, CalendarConnection } from '@/types/database'
+import type { BookingSettings } from '@/types/database'
 
 interface ApplicationsSettingsClientProps {
     initialSettings: BookingSettings | null
-    initialConnection: CalendarConnection | null
     isReadOnly?: boolean
 }
 
@@ -81,38 +77,29 @@ function StatusDot({ connected }: { connected: boolean }) {
 
 export function ApplicationsSettingsClient({
     initialSettings,
-    initialConnection,
     isReadOnly = false
 }: ApplicationsSettingsClientProps) {
-    const locale = useLocale()
     const t = useTranslations('calendar')
     const tSidebar = useTranslations('Sidebar')
-    const searchParams = useSearchParams()
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
-    const [settingsDraft, setSettingsDraft] = useState<CalendarSettingsDraft>(() => buildCalendarSettingsDraft(initialSettings))
+    const baselineSettingsDraft = useMemo(() => buildCalendarSettingsDraft(initialSettings), [initialSettings])
+    const [settingsDraft, setSettingsDraft] = useState<CalendarSettingsDraft>(() => baselineSettingsDraft)
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+    const googleApplicationsSurfaceAvailable = false
 
     useEffect(() => {
-        setSettingsDraft(buildCalendarSettingsDraft(initialSettings))
-    }, [initialSettings])
+        setSettingsDraft(baselineSettingsDraft)
+    }, [baselineSettingsDraft])
 
-    useEffect(() => {
-        const googleStatus = searchParams.get('google_calendar')
-        if (!googleStatus) return
-
-        const googleErrorCode = searchParams.get('google_calendar_error')
-        setFeedback({
-            type: googleStatus === 'success' ? 'success' : 'error',
-            message: `${t(`googleStatus.${googleStatus}`)}${googleErrorCode ? ` (${googleErrorCode})` : ''}`
-        })
-    }, [searchParams, t])
-
-    const googleSummary = useMemo(() => resolveGoogleConnectionSummary(initialConnection, settingsDraft), [initialConnection, settingsDraft])
-    const returnToPath = locale === 'en' ? '/en/settings/apps' : '/settings/apps'
-    const googleConnectHref = `/api/calendar/google/start?locale=${locale}&returnTo=${encodeURIComponent(returnToPath)}`
+    const isDirty = useMemo(
+        () => isCalendarAppsSettingsDirty(baselineSettingsDraft, settingsDraft),
+        [baselineSettingsDraft, settingsDraft]
+    )
 
     const saveGoogleSettings = () => {
+        if (!isDirty) return
+
         if (isReadOnly) {
             setFeedback({ type: 'error', message: t('readOnlyBanner') })
             return
@@ -138,34 +125,12 @@ export function ApplicationsSettingsClient({
         })
     }
 
-    const disconnectGoogleCalendar = () => {
-        if (isReadOnly) {
-            setFeedback({ type: 'error', message: t('readOnlyBanner') })
-            return
-        }
-
-        startTransition(() => {
-            void (async () => {
-                try {
-                    await disconnectGoogleCalendarAction()
-                    setFeedback({ type: 'success', message: t('messages.googleDisconnected') })
-                    router.refresh()
-                } catch (error) {
-                    setFeedback({
-                        type: 'error',
-                        message: error instanceof Error ? error.message : t('messages.saveFailed')
-                    })
-                }
-            })()
-        })
-    }
-
     return (
         <>
             <PageHeader
                 title={tSidebar('apps')}
                 actions={(
-                    <Button onClick={saveGoogleSettings} disabled={isPending || isReadOnly}>
+                    <Button onClick={saveGoogleSettings} disabled={isPending || isReadOnly || !isDirty}>
                         {isPending ? t('actions.saving') : t('actions.saveSettings')}
                     </Button>
                 )}
@@ -196,42 +161,18 @@ export function ApplicationsSettingsClient({
                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <StatusDot connected={googleSummary.connected} />
+                                            <StatusDot connected={false} />
                                             <p className="text-sm font-semibold text-gray-900">
-                                                {googleSummary.connected ? t('summary.connected') : t('summary.notConnected')}
+                                                {t('apps.googleStatusTitle')}
                                             </p>
                                         </div>
                                         <p className="mt-2 text-sm leading-6 text-gray-500">
-                                            {googleSummary.connected
-                                                ? t(`google.${googleSummary.mode === 'writeThrough' ? 'modeWriteThrough' : 'modeBusyOverlay'}`)
-                                                : t('apps.googleDisconnected')}
+                                            {t('apps.googleComingSoonDescription')}
                                         </p>
-                                        {googleSummary.email && (
-                                            <p className="mt-2 text-xs font-medium text-gray-500">{googleSummary.email}</p>
-                                        )}
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
-                                        {googleSummary.connected ? (
-                                            <Button
-                                                size="sm"
-                                                variant="danger"
-                                                className="shrink-0 whitespace-nowrap"
-                                                onClick={disconnectGoogleCalendar}
-                                                disabled={isPending || isReadOnly}
-                                            >
-                                                {t('actions.disconnect')}
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                size="sm"
-                                                className="shrink-0 whitespace-nowrap"
-                                                onClick={() => window.location.assign(googleConnectHref)}
-                                                disabled={isPending || isReadOnly}
-                                            >
-                                                {t('actions.connect')}
-                                            </Button>
-                                        )}
+                                        <Badge variant="warning">{t('apps.googleComingSoon')}</Badge>
                                     </div>
                                 </div>
                             </div>
@@ -240,7 +181,7 @@ export function ApplicationsSettingsClient({
                                 title={t('settings.googleBusyOverlay')}
                                 description={t('settings.googleBusyOverlayHelp')}
                                 checked={settingsDraft.googleBusyOverlayEnabled}
-                                disabled={isPending || isReadOnly || !googleSummary.connected}
+                                disabled={isPending || isReadOnly || !googleApplicationsSurfaceAvailable}
                                 onChange={(nextValue) => setSettingsDraft((current) => ({ ...current, googleBusyOverlayEnabled: nextValue }))}
                             />
 
@@ -248,7 +189,7 @@ export function ApplicationsSettingsClient({
                                 title={t('settings.googleWriteThrough')}
                                 description={t('settings.googleWriteThroughHelp')}
                                 checked={settingsDraft.googleWriteThroughEnabled}
-                                disabled={isPending || isReadOnly || !googleSummary.connected}
+                                disabled={isPending || isReadOnly || !googleApplicationsSurfaceAvailable}
                                 onChange={(nextValue) => setSettingsDraft((current) => ({ ...current, googleWriteThroughEnabled: nextValue }))}
                             />
                         </div>

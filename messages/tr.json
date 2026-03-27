@@ -2446,8 +2446,11 @@
       "connectionDisconnected": "Henüz bağlı bir Google Calendar hesabı yok."
     },
     "apps": {
-      "googleTitle": "Google Calendar",
-      "googleDescription": "Harici takvim uygulamalarını buradan yönetin. Bugün Google Calendar, ileride başka uygulamalar da aynı yüzeyde yer alacak.",
+      "googleTitle": "Google Takvim",
+      "googleDescription": "Harici takvim uygulamalarını buradan yönetin. Bugün Google Takvim, ileride başka uygulamalar da aynı yüzeyde yer alacak.",
+      "googleStatusTitle": "Google Takvim",
+      "googleComingSoon": "Yakında",
+      "googleComingSoonDescription": "Google Takvim yakında. Kullanıma açıldığında meşguliyet katmanını ve iki yönlü yazma davranışını burada yöneteceksiniz.",
       "googleDisconnected": "Google Calendar şu anda bağlı değil. Bağladıktan sonra meşguliyet katmanını ve iki yönlü yazma davranışını burada yönetebilirsiniz."
     },
     "availability": {

@@ -1,10 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ApplicationsSettingsClient } from '@/components/settings/ApplicationsSettingsClient'
-import {
-    getBookingSettingsByOrganizationId,
-    getCalendarConnectionByOrganizationId
-} from '@/lib/calendar/bookings'
+import { getBookingSettingsByOrganizationId } from '@/lib/calendar/bookings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
@@ -35,15 +32,11 @@ export default async function SettingsApplicationsPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const [bookingSettings, calendarConnection] = await Promise.all([
-        getBookingSettingsByOrganizationId(supabase, organizationId),
-        getCalendarConnectionByOrganizationId(supabase, organizationId)
-    ])
+    const bookingSettings = await getBookingSettingsByOrganizationId(supabase, organizationId)
 
     return (
         <ApplicationsSettingsClient
             initialSettings={bookingSettings}
-            initialConnection={calendarConnection}
             isReadOnly={orgContext?.readOnlyTenantMode ?? false}
         />
     )

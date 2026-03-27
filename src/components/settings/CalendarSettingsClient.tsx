@@ -14,6 +14,8 @@ import {
 } from '@/lib/calendar/actions'
 import { timeStringToMinutes } from '@/lib/calendar/presentation'
 import {
+    areCalendarAvailabilityDraftsEqual,
+    areCalendarServiceDurationDraftsEqual,
     buildCalendarAvailabilityDraft,
     buildCalendarServiceDurationDraft,
     buildCalendarSettingsDraft,
@@ -21,6 +23,7 @@ import {
     countEnabledAvailabilityDays,
     DAY_KEY_BY_INDEX,
     getCalendarSettingsSectionIds,
+    isCalendarGeneralSettingsDirty,
     resolveGoogleConnectionSummary,
     type CalendarAvailabilityDraftRow,
     type CalendarSettingsDraft
@@ -265,26 +268,41 @@ export function CalendarSettingsClient({
     const router = useRouter()
     const [activeTab, setActiveTab] = useState<CalendarSettingsTabId>('general')
     const [isPending, startTransition] = useTransition()
-    const [settingsDraft, setSettingsDraft] = useState<CalendarSettingsDraft>(() => buildCalendarSettingsDraft(initialSettings))
-    const [availabilityDraft, setAvailabilityDraft] = useState<CalendarAvailabilityDraftRow[]>(() => buildCalendarAvailabilityDraft(initialAvailabilityRules))
-    const [serviceDurationDraft, setServiceDurationDraft] = useState<Record<string, string>>(() => buildCalendarServiceDurationDraft(initialServices))
+    const baselineSettingsDraft = useMemo(() => buildCalendarSettingsDraft(initialSettings), [initialSettings])
+    const baselineAvailabilityDraft = useMemo(() => buildCalendarAvailabilityDraft(initialAvailabilityRules), [initialAvailabilityRules])
+    const baselineServiceDurationDraft = useMemo(() => buildCalendarServiceDurationDraft(initialServices), [initialServices])
+    const [settingsDraft, setSettingsDraft] = useState<CalendarSettingsDraft>(() => baselineSettingsDraft)
+    const [availabilityDraft, setAvailabilityDraft] = useState<CalendarAvailabilityDraftRow[]>(() => baselineAvailabilityDraft)
+    const [serviceDurationDraft, setServiceDurationDraft] = useState<Record<string, string>>(() => baselineServiceDurationDraft)
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
     useEffect(() => {
-        setSettingsDraft(buildCalendarSettingsDraft(initialSettings))
-    }, [initialSettings])
+        setSettingsDraft(baselineSettingsDraft)
+    }, [baselineSettingsDraft])
 
     useEffect(() => {
-        setAvailabilityDraft(buildCalendarAvailabilityDraft(initialAvailabilityRules))
-    }, [initialAvailabilityRules])
+        setAvailabilityDraft(baselineAvailabilityDraft)
+    }, [baselineAvailabilityDraft])
 
     useEffect(() => {
-        setServiceDurationDraft(buildCalendarServiceDurationDraft(initialServices))
-    }, [initialServices])
+        setServiceDurationDraft(baselineServiceDurationDraft)
+    }, [baselineServiceDurationDraft])
 
     const enabledDayCount = useMemo(() => countEnabledAvailabilityDays(availabilityDraft), [availabilityDraft])
     const customDurationCount = useMemo(() => countCustomDurationServices(initialServices, serviceDurationDraft), [initialServices, serviceDurationDraft])
     const googleSummary = useMemo(() => resolveGoogleConnectionSummary(initialConnection, settingsDraft), [initialConnection, settingsDraft])
+    const isGeneralDirty = useMemo(
+        () => isCalendarGeneralSettingsDirty(baselineSettingsDraft, settingsDraft),
+        [baselineSettingsDraft, settingsDraft]
+    )
+    const isAvailabilityDirty = useMemo(
+        () => !areCalendarAvailabilityDraftsEqual(baselineAvailabilityDraft, availabilityDraft),
+        [baselineAvailabilityDraft, availabilityDraft]
+    )
+    const isServiceDurationsDirty = useMemo(
+        () => !areCalendarServiceDurationDraftsEqual(baselineServiceDurationDraft, serviceDurationDraft),
+        [baselineServiceDurationDraft, serviceDurationDraft]
+    )
 
     const tabs = useMemo(() => {
         return getCalendarSettingsSectionIds('settings').map((id) => ({
@@ -322,6 +340,8 @@ export function CalendarSettingsClient({
     )
 
     const saveGeneralSettings = () => {
+        if (!isGeneralDirty) return
+
         if (isReadOnly) {
             setFeedback({ type: 'error', message: t('readOnlyBanner') })
             return
@@ -377,6 +397,8 @@ export function CalendarSettingsClient({
     }
 
     const saveAvailability = () => {
+        if (!isAvailabilityDirty) return
+
         if (isReadOnly) {
             setFeedback({ type: 'error', message: t('readOnlyBanner') })
             return
@@ -414,6 +436,8 @@ export function CalendarSettingsClient({
     }
 
     const saveServiceDurations = () => {
+        if (!isServiceDurationsDirty) return
+
         if (isReadOnly) {
             setFeedback({ type: 'error', message: t('readOnlyBanner') })
             return
@@ -473,13 +497,18 @@ export function CalendarSettingsClient({
         : activeTab === 'serviceDurations'
             ? t('actions.saveServiceDurations')
             : t('actions.saveSettings')
+    const isActiveTabDirty = activeTab === 'availability'
+        ? isAvailabilityDirty
+        : activeTab === 'serviceDurations'
+            ? isServiceDurationsDirty
+            : isGeneralDirty
 
     return (
         <>
             <PageHeader
                 title={tSidebar('calendar')}
                 actions={(
-                    <Button onClick={handleSave} disabled={isPending || isReadOnly}>
+                    <Button onClick={handleSave} disabled={isPending || isReadOnly || !isActiveTabDirty}>
                         {isPending ? t('actions.saving') : saveLabel}
                     </Button>
                 )}

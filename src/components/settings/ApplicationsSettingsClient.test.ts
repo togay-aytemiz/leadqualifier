@@ -8,11 +8,12 @@ const APPLICATIONS_SETTINGS_CLIENT_PATH = path.resolve(
 )
 
 describe('ApplicationsSettingsClient source', () => {
-    it('uses a short connect CTA and drops the extra Google badge beside status', () => {
+    it('shows Google Calendar as a passive coming-soon integration and disables save until dirty', () => {
         const source = fs.readFileSync(APPLICATIONS_SETTINGS_CLIENT_PATH, 'utf8')
 
-        expect(source).toContain("t('actions.connect')")
-        expect(source).not.toContain('Badge variant=')
-        expect(source).not.toContain("t('google.title')")
+        expect(source).toContain("t('apps.googleStatusTitle')")
+        expect(source).toContain("t('apps.googleComingSoon')")
+        expect(source).not.toContain('window.location.assign(googleConnectHref)')
+        expect(source).toContain('disabled={isPending || isReadOnly || !isDirty}')
     })
 })

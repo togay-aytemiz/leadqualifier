@@ -2448,6 +2448,9 @@
     "apps": {
       "googleTitle": "Google Calendar",
       "googleDescription": "Manage external calendar apps from here. Google Calendar is first, and other applications can join this surface later.",
+      "googleStatusTitle": "Google Calendar",
+      "googleComingSoon": "Coming soon",
+      "googleComingSoonDescription": "Google Calendar is coming soon. Once it is available, you will manage busy-time checks and write-through behavior here.",
       "googleDisconnected": "Google Calendar is not connected yet. Once connected, you can manage busy-time checks and write-through behavior here."
     },
     "availability": {

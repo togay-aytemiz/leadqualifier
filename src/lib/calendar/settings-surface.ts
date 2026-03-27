@@ -98,6 +98,61 @@ export function buildCalendarServiceDurationDraft(services: ServiceCatalogItem[]
     }, {})
 }
 
+export function isCalendarGeneralSettingsDirty(
+    baseline: CalendarSettingsDraft,
+    draft: CalendarSettingsDraft
+) {
+    return (
+        draft.bookingEnabled !== baseline.bookingEnabled ||
+        draft.timezone !== baseline.timezone ||
+        draft.defaultDuration !== baseline.defaultDuration ||
+        draft.slotInterval !== baseline.slotInterval ||
+        draft.minimumNotice !== baseline.minimumNotice ||
+        draft.bufferBefore !== baseline.bufferBefore ||
+        draft.bufferAfter !== baseline.bufferAfter
+    )
+}
+
+export function isCalendarAppsSettingsDirty(
+    baseline: CalendarSettingsDraft,
+    draft: CalendarSettingsDraft
+) {
+    return (
+        draft.googleBusyOverlayEnabled !== baseline.googleBusyOverlayEnabled ||
+        draft.googleWriteThroughEnabled !== baseline.googleWriteThroughEnabled
+    )
+}
+
+export function areCalendarAvailabilityDraftsEqual(
+    left: CalendarAvailabilityDraftRow[],
+    right: CalendarAvailabilityDraftRow[]
+) {
+    if (left.length !== right.length) return false
+
+    return left.every((entry, index) => {
+        const candidate = right[index]
+        if (!candidate) return false
+
+        return (
+            candidate.dayOfWeek === entry.dayOfWeek &&
+            candidate.enabled === entry.enabled &&
+            candidate.startTime === entry.startTime &&
+            candidate.endTime === entry.endTime
+        )
+    })
+}
+
+export function areCalendarServiceDurationDraftsEqual(
+    left: Record<string, string>,
+    right: Record<string, string>
+) {
+    const leftKeys = Object.keys(left)
+    const rightKeys = Object.keys(right)
+    if (leftKeys.length !== rightKeys.length) return false
+
+    return leftKeys.every((key) => right[key] === left[key])
+}
+
 export function countCustomDurationServices(services: ServiceCatalogItem[], serviceDurationDraft: Record<string, string>) {
     return services.filter((service) => Boolean(serviceDurationDraft[service.id]?.trim())).length
 }
