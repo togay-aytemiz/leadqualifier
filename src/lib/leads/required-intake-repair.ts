@@ -30,8 +30,9 @@ const QUESTION_HINTS = [
 ]
 const DATE_VALUE_HINTS = [
     /\b\d{1,2}[./-]\d{1,2}([./-]\d{2,4})?\b/,
-    /\b(ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)\b/i,
+    /\b(ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)(?:['’]?[a-zçğıöşü]+)?\b/i,
     /\b(hemen|bugün|bugun|yarın|yarin|bugün|bu hafta|gelecek hafta|hafta sonu|ayın sonu|ay sonu|başı|basi|sonu)\b/i,
+    /\b(?:\d+|bir|iki|üç|uc|dört|dort|beş|bes|altı|alti|yedi|sekiz|dokuz|on)\s*(gün|gun|hafta|ay|yıl|yil)\s*(içinde|icinde|sonra|kaldı|kaldi)?\b/i,
 ]
 const BOOLEAN_VALUE_HINTS = [
     /^(evet|hayır|hayir|no|yes|var|yok|tabii|tabii ki|olabilir|olmaz)$/i,
@@ -56,9 +57,6 @@ const LEVEL_VALUE_HINTS = [
 ]
 const GOAL_VALUE_HINTS = [
     /\b(hedef|amac|amaç|goal|sonuc|sonuç)\b/i,
-]
-const SERVICE_VALUE_HINTS = [
-    /\b(hizmet|service|paket|package|talep|ihtiyac|ihtiyaç|konu|subject)\b/i,
 ]
 const FIELD_CONCEPT_GROUPS = [
     ['hamilelik', 'hamile', 'gebelik', 'pregnan', 'dogum', 'doğum', 'bebek', 'delivery', 'due']
@@ -94,6 +92,13 @@ function isStrongAffirmation(value: string) {
 function isStrongNegation(value: string) {
     const normalized = normalizeText(value)
     return /^(hayır|hayir|no|yok|olmaz|istemiyorum)$/i.test(normalized)
+}
+
+function isLikelyNonAnswer(value: string) {
+    const normalized = normalizeText(value)
+    if (!normalized) return true
+
+    return /^(bilmiyorum|emin degilim|emin değilim|kararsizim|kararsızım|fark etmez|farketmez|not sure|dont know|don't know|maybe|belki|gorecegiz|göreceğiz)$/i.test(normalized)
 }
 
 function inferFieldCategory(field: string): FieldCategory {
@@ -183,7 +188,7 @@ function valueMatchesCategory(category: FieldCategory, value: string) {
         case 'goal':
             return GOAL_VALUE_HINTS.some((pattern) => pattern.test(value))
         case 'service':
-            return SERVICE_VALUE_HINTS.some((pattern) => pattern.test(value))
+            return !isLikelyNonAnswer(value) && !hasQuestionIntent(value)
         default:
             return Boolean(normalizeRequiredIntakeFieldValue(value))
     }
@@ -240,7 +245,6 @@ export function repairRequiredIntakeFromConversation(input: RequiredIntakeRepair
     const existingCollected = input.existingCollected ?? {}
     const assistantMessages = (input.recentAssistantMessages ?? []).map((message) => message.trim()).filter(Boolean)
     const customerMessages = (input.recentCustomerMessages ?? []).map((message) => message.trim()).filter(Boolean)
-    const latestCustomerMessage = [...customerMessages].reverse().find(Boolean) ?? ''
     const requiredFieldByNormalizedKey = new Map(
         requiredFields.map((field) => [normalizeRequiredIntakeFieldKey(field), field] as const)
     )
@@ -268,7 +272,7 @@ export function repairRequiredIntakeFromConversation(input: RequiredIntakeRepair
 
     const repairedCollectedMap = normalizeCollectedMap(repaired)
 
-    if (!latestCustomerMessage || assistantMessages.length === 0) {
+    if (customerMessages.length === 0 || assistantMessages.length === 0) {
         return repaired
     }
 
@@ -280,15 +284,23 @@ export function repairRequiredIntakeFromConversation(input: RequiredIntakeRepair
         const assistantMessage = selectCandidateAssistantMessage(assistantMessages, field, category)
         if (!assistantMessage) continue
 
-        const answer = normalizeRequiredIntakeFieldValue(latestCustomerMessage)
+        const answer = [...customerMessages]
+            .reverse()
+            .map((message) => normalizeRequiredIntakeFieldValue(message))
+            .find((candidate): candidate is string => {
+                if (!candidate) return false
+
+                if (category === 'boolean') {
+                    return isStrongAffirmation(candidate) || isStrongNegation(candidate)
+                }
+
+                if (valueMatchesCategory(category, candidate)) {
+                    return true
+                }
+
+                return category === 'generic' && hasQuestionIntent(assistantMessage)
+            })
         if (!answer) continue
-
-        const responseEligible = isStrongAffirmation(answer)
-            || isStrongNegation(answer)
-            || valueMatchesCategory(category, answer)
-            || hasQuestionIntent(assistantMessage)
-
-        if (!responseEligible) continue
 
         repaired[field] = answer
         repairedCollectedMap.set(normalizedField, answer)

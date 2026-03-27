@@ -56,4 +56,24 @@ describe('repairRequiredIntakeFromConversation', () => {
             'Hamilelik Durumu': 'Evet'
         })
     })
+
+    it('finds a relative timeline answer from earlier customer turns instead of only the latest message', () => {
+        const repaired = repairRequiredIntakeFromConversation({
+            requiredFields: ['Bebek Doğum Tarihi', 'Hamilelik Durumu'],
+            existingCollected: {},
+            recentAssistantMessages: [
+                'Tahmini doğum ne zaman görünüyor?',
+                'Elbette, hizmetler hakkında bilgi verebilirim.'
+            ],
+            recentCustomerMessages: [
+                '1 ay içinde doğum bekliyorum.',
+                'Yenidoğan bebek fotoğrafçılığı hakkında bilgi almak istiyorum.'
+            ]
+        })
+
+        expect(repaired).toEqual({
+            'Bebek Doğum Tarihi': '1 ay içinde doğum bekliyorum.',
+            'Hamilelik Durumu': 'Evet'
+        })
+    })
 })

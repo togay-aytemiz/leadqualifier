@@ -7,6 +7,7 @@ import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 import { repairRequiredIntakeFromConversation } from '@/lib/leads/required-intake-repair'
+import { scoreLead } from '@/lib/leads/scoring'
 import {
     normalizeRequiredIntakeFieldKey,
     normalizeRequiredIntakeFieldValue,
@@ -26,6 +27,7 @@ const LEAD_EXTRACTION_MAX_CONTEXT_TURNS = 10
 const LEAD_EXTRACTION_MAX_MESSAGES_TO_LOAD = 20
 const LEAD_EXTRACTION_MAX_CUSTOMER_MESSAGES = 5
 const PROFILE_SERVICE_SIGNAL_TOKEN_MIN_LENGTH = 8
+const SERVICE_SIGNAL_TOKEN_MIN_LENGTH = 4
 const PROFILE_SERVICE_SIGNAL_STOPWORDS = new Set([
     'hizmetleri',
     'hizmetimiz',
@@ -50,6 +52,59 @@ const PROFILE_SERVICE_SIGNAL_STOPWORDS = new Set([
     'appointment',
     'packages'
 ])
+const SERVICE_SIGNAL_STOPWORDS = new Set([
+    'hizmet',
+    'service',
+    'paket',
+    'package',
+    'urun',
+    'ürün',
+    'tedavi',
+    'treatment',
+    'therapy',
+    'session',
+    'seans',
+    'oturum',
+    'book',
+    'booking',
+    'appointment',
+    'randevu',
+    'fiyat',
+    'price',
+    'bilgi',
+    'detay',
+    'shoot',
+    'photoshoot',
+    'photo',
+    'photography',
+    'fotograf',
+    'fotoğraf',
+    'cekim',
+    'çekim',
+    'cekimi',
+    'çekimi'
+])
+const SERVICE_CONTEXT_HINT_PATTERN = /\b(hizmet|service|paket|package|fiyat|price|bilgi|detay|randevu|appointment|book|booking|çekim|cekim|fotoğraf|fotograf|photoshoot|photography|shoot|tedavi|treatment|seans|session|kurs|program)\b/i
+const DATE_LIKE_FIELD_TOKENS = ['tarih', 'date', 'dogum', 'doğum', 'due', 'termin', 'delivery', 'arrival']
+const COMMERCIAL_INQUIRY_TOKENS = [
+    'fiyat',
+    'price',
+    'ucret',
+    'ücret',
+    'detay',
+    'detail',
+    'bilgi',
+    'info',
+    'daha fazla bilgi',
+    'learn more',
+    'quote',
+    'paket',
+    'package'
+]
+const URGENT_SIGNAL_TOKENS = ['urgent', 'asap', 'acil', 'today', 'bugun', 'bugün', 'tomorrow', 'yarin', 'yarın']
+const INDECISIVE_SIGNAL_TOKENS = ['indecisive', 'unsure', 'kararsiz', 'kararsız', 'bilmiyorum']
+const FAR_FUTURE_SIGNAL_TOKENS = ['far future', 'far_future', 'months later', 'next season', 'ileride', 'aylar sonra']
+const OPT_OUT_TOKENS = ['vazgecti', 'vazgeçti', 'vazgectim', 'vazgeçtim', 'istemiyor', 'istemiyorum', 'iptal', 'cancel']
 
 function isLikelyTurkishText(value: string) {
     const text = (value ?? '').trim()
@@ -173,6 +228,104 @@ function extractProfileServiceSignalTokens(value: string) {
         )
 }
 
+function extractServiceSignalTokens(value: string) {
+    const normalized = normalizeForMatch(value)
+    if (!normalized) return []
+
+    return normalized
+        .split(' ')
+        .map((token) => token.trim())
+        .filter((token) =>
+            token.length >= SERVICE_SIGNAL_TOKEN_MIN_LENGTH
+            && !SERVICE_SIGNAL_STOPWORDS.has(token)
+        )
+}
+
+function textMatchesServiceEvidence(text: string, phrase: string) {
+    const normalizedText = normalizeForMatch(text)
+    const normalizedPhrase = normalizeForMatch(phrase)
+    if (!normalizedText || !normalizedPhrase) return false
+    if (normalizedText.includes(normalizedPhrase)) return true
+
+    const phraseTokens = extractServiceSignalTokens(phrase)
+    if (phraseTokens.length === 0) return false
+
+    const textTokens = new Set(extractServiceSignalTokens(text))
+    const overlapCount = phraseTokens.filter((token) => textTokens.has(token)).length
+    if (overlapCount === 0) return false
+    if (overlapCount >= Math.min(2, phraseTokens.length)) return true
+
+    return SERVICE_CONTEXT_HINT_PATTERN.test(text)
+}
+
+function resolveRelatedCatalogServicePhrases(options: {
+    serviceType: string | null | undefined
+    catalogItems?: ServiceCatalogCandidate[]
+}) {
+    const serviceType = (options.serviceType ?? '').trim()
+    if (!serviceType) return []
+
+    const normalizedServiceType = normalizeForMatch(serviceType)
+    const phrases = new Set<string>([serviceType])
+
+    for (const catalogItem of options.catalogItems ?? []) {
+        const catalogName = (catalogItem.name ?? '').trim()
+        if (!catalogName) continue
+
+        const aliases = (catalogItem.aliases ?? [])
+            .map((alias) => (alias ?? '').trim())
+            .filter(Boolean)
+        const catalogTerms = [catalogName, ...aliases]
+        const hasMatch = catalogTerms.some((term) => {
+            const normalizedTerm = normalizeForMatch(term)
+            return normalizedTerm.length >= 3 && (
+                normalizedServiceType === normalizedTerm
+                || normalizedServiceType.includes(normalizedTerm)
+                || normalizedTerm.includes(normalizedServiceType)
+            )
+        })
+        if (!hasMatch) continue
+
+        phrases.add(catalogName)
+        aliases.forEach((alias) => phrases.add(alias))
+    }
+
+    return Array.from(phrases)
+}
+
+function recoverCatalogServicesFromEvidence(options: {
+    customerMessages: string[]
+    summary?: string | null
+    catalogItems?: ServiceCatalogCandidate[]
+}) {
+    const evidenceTexts = [
+        ...(options.customerMessages ?? []),
+        (options.summary ?? '').trim()
+    ].filter(Boolean)
+    if (evidenceTexts.length === 0) return []
+
+    const recovered: string[] = []
+    const seen = new Set<string>()
+
+    for (const catalogItem of options.catalogItems ?? []) {
+        const catalogName = (catalogItem.name ?? '').trim()
+        if (!catalogName) continue
+
+        const phrases = [catalogName, ...((catalogItem.aliases ?? []).map((alias) => (alias ?? '').trim()).filter(Boolean))]
+        const matched = evidenceTexts.some((text) => (
+            phrases.some((phrase) => textMatchesServiceEvidence(text, phrase))
+        ))
+        if (!matched) continue
+
+        const key = normalizeForMatch(catalogName)
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        recovered.push(catalogName)
+    }
+
+    return recovered
+}
+
 function hasProfileServiceSignal(options: {
     normalizedCustomerMessages: string[]
     profileSummary?: string | null
@@ -242,6 +395,7 @@ export function shouldAcceptInferredServiceType(options: {
     customerMessages: string[]
     catalogItems?: ServiceCatalogCandidate[]
     profileSummary?: string | null
+    summary?: string | null
 }) {
     const serviceType = (options.serviceType ?? '').trim()
     if (!serviceType) return false
@@ -254,40 +408,22 @@ export function shouldAcceptInferredServiceType(options: {
     if (customerMessages.every(isGenericGreetingOnly)) return false
 
     const normalizedMessages = customerMessages.map(normalizeForMatch)
-    const serviceTerms = new Set<string>()
-    const normalizedServiceType = normalizeForMatch(serviceType)
-    if (normalizedServiceType.length >= 3) {
-        serviceTerms.add(normalizedServiceType)
+    const evidenceTexts = [...customerMessages]
+    const summary = (options.summary ?? '').trim()
+    if (summary) {
+        evidenceTexts.push(summary)
     }
 
-    for (const catalogItem of options.catalogItems ?? []) {
-        const catalogName = normalizeForMatch((catalogItem.name ?? '').trim())
-        const aliases = (catalogItem.aliases ?? [])
-            .map((alias) => normalizeForMatch((alias ?? '').trim()))
-            .filter((alias) => alias.length >= 3)
+    const servicePhrases = resolveRelatedCatalogServicePhrases({
+        serviceType,
+        catalogItems: options.catalogItems
+    })
 
-        const isLikelyMatchedCatalogItem = catalogName
-            ? normalizedServiceType === catalogName
-                || normalizedServiceType.includes(catalogName)
-                || catalogName.includes(normalizedServiceType)
-                || aliases.some((alias) => normalizedServiceType.includes(alias) || alias.includes(normalizedServiceType))
-            : aliases.some((alias) => normalizedServiceType.includes(alias) || alias.includes(normalizedServiceType))
-
-        if (!isLikelyMatchedCatalogItem) continue
-
-        if (catalogName.length >= 3) {
-            serviceTerms.add(catalogName)
-        }
-        aliases.forEach((alias) => serviceTerms.add(alias))
-    }
-
-    if (serviceTerms.size > 0) {
-        const hasDirectServiceMention = normalizedMessages.some((message) => {
-            return Array.from(serviceTerms).some((term) => message.includes(term))
-        })
-        if (hasDirectServiceMention) {
-            return true
-        }
+    if (servicePhrases.length > 0) {
+        const hasServiceEvidence = evidenceTexts.some((text) => (
+            servicePhrases.some((phrase) => textMatchesServiceEvidence(text, phrase))
+        ))
+        if (hasServiceEvidence) return true
     }
 
     return hasProfileServiceSignal({
@@ -301,6 +437,7 @@ export function resolvePersistedServiceType(options: {
     customerMessages: string[]
     catalogItems?: ServiceCatalogCandidate[]
     profileSummary?: string | null
+    summary?: string | null
 }) {
     if (!shouldAcceptInferredServiceType(options)) return null
     return resolveCatalogCanonicalServiceType({
@@ -315,13 +452,20 @@ export function resolvePersistedServiceTypes(options: {
     customerMessages: string[]
     catalogItems?: ServiceCatalogCandidate[]
     profileSummary?: string | null
+    summary?: string | null
 }) {
     const rawCandidates = normalizeServiceCatalogNames([
         ...(options.services ?? []),
         ...(options.serviceType ? [options.serviceType] : [])
     ])
 
-    if (rawCandidates.length === 0) return []
+    if (rawCandidates.length === 0) {
+        return recoverCatalogServicesFromEvidence({
+            customerMessages: options.customerMessages,
+            summary: options.summary,
+            catalogItems: options.catalogItems
+        })
+    }
 
     const persisted: string[] = []
     const seen = new Set<string>()
@@ -331,7 +475,8 @@ export function resolvePersistedServiceTypes(options: {
             serviceType: candidate,
             customerMessages: options.customerMessages,
             catalogItems: options.catalogItems,
-            profileSummary: options.profileSummary
+            profileSummary: options.profileSummary,
+            summary: options.summary
         })
 
         if (!next) continue
@@ -859,7 +1004,7 @@ export function mergeExtractionWithExisting(
             })
         : null
 
-    return {
+    const merged = {
         service_type: mergedServiceOverride ?? incomingServices[0] ?? null,
         services: incomingServices,
         service_override: mergedServiceOverride,
@@ -886,6 +1031,14 @@ export function mergeExtractionWithExisting(
         score: incoming.score,
         status: incoming.status
     }
+
+    const calibratedScore = calibrateLeadScoreFromExtraction(merged)
+
+    return {
+        ...merged,
+        score: calibratedScore.totalScore,
+        status: calibratedScore.status
+    }
 }
 
 function hasStrongIntentSignal(intentSignals: string[]) {
@@ -899,6 +1052,75 @@ function hasStrongIntentSignal(intentSignals: string[]) {
             || normalizedSignal.includes('booking')
             || normalizedSignal.includes('randevu')
         ))
+}
+
+function resolveLeadStatusFromScore(totalScore: number) {
+    if (totalScore >= 8) return 'hot' as const
+    if (totalScore >= 5) return 'warm' as const
+    return 'cold' as const
+}
+
+function hasSignalToken(signals: string[], tokens: string[]) {
+    const normalizedSignals = signals
+        .map((signal) => normalizeForMatch(signal))
+        .filter(Boolean)
+
+    return normalizedSignals.some((signal) => tokens.some((token) => signal.includes(token)))
+}
+
+function hasDateLikeRequiredIntake(collected: Record<string, string>) {
+    return Object.entries(collected).some(([field, value]) => {
+        if (!normalizeRequiredIntakeFieldValue(value)) return false
+        const normalizedField = normalizeForMatch(field)
+        return DATE_LIKE_FIELD_TOKENS.some((token) => normalizedField.includes(token))
+    })
+}
+
+function hasCommercialInquirySummary(summary: string | null | undefined) {
+    const normalizedSummary = normalizeForMatch(summary ?? '')
+    if (!normalizedSummary) return false
+    return COMMERCIAL_INQUIRY_TOKENS.some((token) => normalizedSummary.includes(token))
+}
+
+function hasOptOutSummary(summary: string | null | undefined) {
+    const normalizedSummary = normalizeForMatch(summary ?? '')
+    if (!normalizedSummary) return false
+    return OPT_OUT_TOKENS.some((token) => normalizedSummary.includes(token))
+}
+
+export function calibrateLeadScoreFromExtraction(extracted: NormalizedLeadExtraction) {
+    if (extracted.non_business || hasOptOutSummary(extracted.summary)) {
+        return {
+            serviceFit: 0,
+            intentScore: 0,
+            totalScore: 0,
+            status: 'cold' as const
+        }
+    }
+
+    const hasCatalogMatch = Boolean(extracted.service_type) || extracted.services.length > 0
+    const hasServiceSpecificIntake = Object.keys(extracted.required_intake_collected).length > 0
+    const base = scoreLead({
+        hasCatalogMatch,
+        hasProfileMatch: !hasCatalogMatch && hasServiceSpecificIntake,
+        hasDate: Boolean(extracted.desired_date) || hasDateLikeRequiredIntake(extracted.required_intake_collected),
+        hasBudget: extracted.budget_signals.length > 0,
+        isDecisive: hasStrongIntentSignal(extracted.intent_signals) || hasCommercialInquirySummary(extracted.summary),
+        isUrgent: hasSignalToken(extracted.intent_signals, URGENT_SIGNAL_TOKENS),
+        isIndecisive: hasSignalToken(extracted.intent_signals, INDECISIVE_SIGNAL_TOKENS)
+            || hasSignalToken(extracted.risk_signals, INDECISIVE_SIGNAL_TOKENS),
+        isFarFuture: hasSignalToken(extracted.intent_signals, FAR_FUTURE_SIGNAL_TOKENS)
+    })
+
+    const serviceContextBoost = !hasCatalogMatch && hasServiceSpecificIntake ? 1 : 0
+    const totalScore = Math.max(0, Math.min(10, base.totalScore + serviceContextBoost))
+
+    return {
+        serviceFit: Math.max(0, Math.min(4, base.serviceFit + serviceContextBoost)),
+        intentScore: base.intentScore,
+        totalScore,
+        status: resolveLeadStatusFromScore(totalScore)
+    }
 }
 
 export function normalizeLowSignalLeadStatus(options: {
@@ -1152,7 +1374,8 @@ export async function runLeadExtraction(options: {
         services: extracted.services,
         customerMessages,
         catalogItems: (catalog ?? []) as ServiceCatalogCandidate[],
-        profileSummary: profileText
+        profileSummary: profileText,
+        summary: extracted.summary
     })
     const persistedPrimaryService = persistedServiceTypes[0] ?? null
     extracted = {
@@ -1207,15 +1430,16 @@ export async function runLeadExtraction(options: {
         }
     }
     const normalizedExtracted = mergeExtractionWithExisting(extracted, existingLead)
+    const calibratedScore = calibrateLeadScoreFromExtraction(normalizedExtracted)
 
     await supabase.from('leads').upsert({
         organization_id: options.organizationId,
         conversation_id: options.conversationId,
         service_type: normalizedExtracted.service_type,
-        service_fit: 0,
-        intent_score: 0,
-        total_score: normalizedExtracted.score,
-        status: normalizedExtracted.status,
+        service_fit: calibratedScore.serviceFit,
+        intent_score: calibratedScore.intentScore,
+        total_score: calibratedScore.totalScore,
+        status: calibratedScore.status,
         non_business: normalizedExtracted.non_business,
         summary: normalizedExtracted.summary,
         extracted_fields: {

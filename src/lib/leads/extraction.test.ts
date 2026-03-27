@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     buildExtractionSystemPrompt,
     buildLeadExtractionConversationContext,
+    calibrateLeadScoreFromExtraction,
     mergeExtractionWithExisting,
     normalizeLowSignalLeadStatus,
     parseRequiredIntakeRepairPayload,
@@ -324,6 +325,75 @@ describe('mergeExtractionWithExisting', () => {
             source: 'manual'
         })
     })
+
+    it('keeps score/status aligned with previously captured buying signals after a later acknowledgement turn', () => {
+        const merged = mergeExtractionWithExisting(
+            {
+                service_type: null,
+                services: [],
+                desired_date: null,
+                location: null,
+                budget_signals: [],
+                intent_signals: [],
+                risk_signals: [],
+                required_intake_collected: {},
+                required_intake_overrides: {},
+                required_intake_override_meta: {},
+                non_business: false,
+                summary: 'Müşteri teşekkür etti.',
+                score: 0,
+                status: 'cold'
+            },
+            {
+                service_type: null,
+                summary: 'Müşteri fiyat bilgisi almak istiyor.',
+                extracted_fields: {
+                    budget_signals: [],
+                    intent_signals: ['decisive'],
+                    required_intake_collected: {
+                        'Hamilelik Durumu': 'Evet',
+                        'Bebek Doğum Tarihi': 'Temmuz sonu ağustos başı gibi'
+                    }
+                }
+            }
+        )
+
+        expect(merged.required_intake_collected).toEqual({
+            'Hamilelik Durumu': 'Evet',
+            'Bebek Doğum Tarihi': 'Temmuz sonu ağustos başı gibi'
+        })
+        expect(merged.score).toBe(8)
+        expect(merged.status).toBe('hot')
+    })
+})
+
+describe('calibrateLeadScoreFromExtraction', () => {
+    it('treats price/detail inquiry plus service-specific intake evidence as a hot lead floor', () => {
+        const calibrated = calibrateLeadScoreFromExtraction({
+            service_type: null,
+            services: [],
+            desired_date: null,
+            location: null,
+            budget_signals: [],
+            intent_signals: [],
+            risk_signals: [],
+            required_intake_collected: {
+                'Hamilelik Durumu': 'Evet',
+                'Bebek Doğum Tarihi': 'Mayıs ayı'
+            },
+            required_intake_overrides: {},
+            required_intake_override_meta: {},
+            non_business: false,
+            summary: 'Müşteri bunun hakkında daha fazla bilgi almak istiyor.',
+            score: 5,
+            status: 'warm'
+        })
+
+        expect(calibrated.serviceFit).toBe(3)
+        expect(calibrated.intentScore).toBe(5)
+        expect(calibrated.totalScore).toBe(8)
+        expect(calibrated.status).toBe('hot')
+    })
 })
 
 describe('resolveLeadExtractionLocale', () => {
@@ -466,6 +536,23 @@ describe('resolvePersistedServiceTypes', () => {
             'Yenidoğan çekimi',
             'Hamile çekimi'
         ])
+    })
+
+    it('recovers a catalog service from summary evidence when raw service fields are empty', () => {
+        const services = resolvePersistedServiceTypes({
+            serviceType: null,
+            services: [],
+            customerMessages: ['Bebek fotoğrafçılığı hakkında bilgi almak istiyorum.'],
+            catalogItems: [
+                {
+                    name: 'Yenidoğan çekimi',
+                    aliases: ['newborn photography']
+                }
+            ],
+            summary: 'Müşteri, yenidoğan bebek fotoğrafçılığı hakkında bilgi almak istiyor ve 1 ay içinde doğum bekliyor.'
+        })
+
+        expect(services).toEqual(['Yenidoğan çekimi'])
     })
 
     it('returns empty array when no customer service clue exists', () => {

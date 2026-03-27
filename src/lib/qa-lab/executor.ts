@@ -373,7 +373,7 @@ const QA_LAB_PROACTIVE_QUESTIONING_CLAIM_PATTERNS = [
 ] as const
 
 const QA_LAB_LOW_INFORMATION_RESPONSE_PATTERNS = [
-    /^(bu|bunun|this|that|it)\b.{0,120}\b(onemli|önemli|yardimci|yardımcı|gerekli|helpful|important)\b/i,
+    /^(bu|bunun|this|that|it)\b.{0,120}\b(onemli|önemli|yardimci|yardımcı|gerekli|helpful|important)(?:dir)?\b/i,
     /^(anladim|anlıyorum|noted|tamam)\.?$/i
 ] as const
 const QA_LAB_ENGAGEMENT_QUESTION_PATTERNS = [
@@ -1054,7 +1054,7 @@ function hasTypeLikeEntitySemanticAnswerSignal(input: {
 function detectIntakeFieldCategory(field: string): QaLabIntakeFieldCategory {
     const normalized = normalizeForFieldMatching(field)
     if (/(yas|yaş|age|sinif|sınıf)/i.test(normalized)) return 'age'
-    if (/(butce|bütçe|fiyat|ucret|ücret|price|cost)/i.test(normalized)) return 'budget'
+    if (/(butce|bütçe|budget|fiyat|ucret|ücret|price|cost)/i.test(normalized)) return 'budget'
     if (/(acil|aciliyet|urgent|urgency|oncelik|priority|hizli|hızlı)/i.test(normalized)) return 'urgency'
     if (/(zaman|tarih|saat|uygunluk|timeline|timing|availability|program)/i.test(normalized)) return 'timeline'
     if (/(ders turu|ders türü|ders|konu|hizmet|service|kapsam|paket|cozum|çözüm|proje|uygulama|gelistirme|geliştirme|entegrasyon|danismanlik|danışmanlık)/i.test(normalized)) return 'service'
@@ -1358,8 +1358,8 @@ function detectAssistantQuestionCategory(message: string): QaLabIntakeFieldCateg
 
     if (/(geri donus|geri dönüş|callback|hangi saatte donelim|hangi saatte dönelim|hangi saat arayal|ne zaman arayal)/i.test(normalized)) return 'callback_time'
     if (/(acil|aciliyet|urgent|urgency|oncelik|priority|ne kadar acil|ne kadar hızlı|ne kadar hizli)/i.test(normalized)) return 'urgency'
-    if (/(butce|bütçe|fiyat|ucret|ücret|price|cost)/i.test(normalized)) return 'budget'
-    if (/(tarih|saat|uygunluk|randevu|timeline|timing|availability|hangi gun|hangi gün|ne zaman)/i.test(normalized)) return 'timeline'
+    if (/(butce|bütçe|budget|fiyat|ucret|ücret|price|cost)/i.test(normalized)) return 'budget'
+    if (/(tarih|saat|uygunluk|randevu|timeline|timing|availability|hangi gun|hangi gün|ne zaman|zamanlama|zaman araligi|zaman aralığı|uygun zaman)/i.test(normalized)) return 'timeline'
     if (/(hizmet|service|ders|konu|kapsam|paket|cozum|çözüm|proje|uygulama|gelistirme|geliştirme|entegrasyon|danismanlik|danışmanlık|hangi hizmet|hangi ders|hangi konu)/i.test(normalized)) return 'service'
     if (/(isletme|işletme|calisan|çalışan|ekip|personel|team size|business size|company size|kac kisi|kaç kişi)/i.test(normalized)) return 'business_size'
     if (/(yas|yaş|sinif|sınıf|ogrenci|öğrenci|kac yas|kaç yaş)/i.test(normalized)) return 'age'
@@ -1394,6 +1394,24 @@ function isLowInformationAssistantResponse(input: {
     const tokenCount = tokenizeForFieldMatching(assistant).length
     const overlap = tokenOverlapCount(input.customerMessage, assistant)
     const customerAskedQuestion = hasQuestionIntent(input.customerMessage)
+    const hasGroundedDetailSignal = (
+        hasScopeCoverageSignal(assistant)
+        || hasPricingBasisSignal(assistant)
+        || hasStartPlanningSignal(assistant)
+    )
+    const isGeneralInfoOffer = (
+        hasScopeCoverageSignal(assistant)
+        && /\b(paylasabilirim|paylaşabilirim|aktarabilirim|sunabilirim)\b/i.test(normalizedAssistant)
+    )
+
+    if (hasGroundedDetailSignal && tokenCount >= 5) {
+        return false
+    }
+    if (isGeneralInfoOffer && tokenCount >= 4) return false
+
+    if (/^(temel|genel)\s+bilgi\s+verebilirim\b/i.test(normalizedAssistant)) {
+        return true
+    }
 
     if (
         QA_LAB_LOW_INFORMATION_RESPONSE_PATTERNS.some((pattern) => pattern.test(normalizedAssistant))
@@ -3286,6 +3304,19 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
     const missingFields = input.coverage.missingFields ?? []
     const missingFieldSet = missingFieldSetForConsistency(missingFields)
     const summaryCategory = detectIntakeFieldCategory(normalizedSummary)
+    const summaryAlreadyUsesConsistencyResolution = (
+        /\bdid not ask claim was cleared by transcript consistency check\b/i.test(normalizedSummary)
+        || /\bmissing field warning was cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+        || /\bmissing field claim was cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+        || /\bmissing field warning was softened assistant asked remaining field s on the final turn\b/i.test(normalizedSummary)
+        || /\brepetitive question warning was cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+        || /\bpricing detail warning was cleared by kb pricing consistency check\b/i.test(normalizedSummary)
+        || /\bproactive questioning warning was cleared by cold resistant context normalization\b/i.test(normalizedSummary)
+    )
+
+    if (summaryAlreadyUsesConsistencyResolution) {
+        return { summary: input.summary, status: input.status }
+    }
 
     if (
         shouldClearProactiveQuestioningClaimByContext({
@@ -3309,10 +3340,16 @@ function normalizeJudgeScenarioSummaryAgainstCoverage(input: {
     if (
         input.caseItem
         && isDidNotAskClaimText(normalizedSummary)
-        && hasAssistantAskedClaimedFieldByText({
-            text: input.summary,
-            caseItem: input.caseItem
-        })
+        && (
+            hasAssistantAskedClaimedFieldByText({
+                text: input.summary,
+                caseItem: input.caseItem
+            })
+            || (
+                summaryCategory !== 'generic'
+                && !missingFields.some((field) => detectIntakeFieldCategory(field) === summaryCategory)
+            )
+        )
     ) {
         const clearStatus = (
             input.coverage.handoffReadiness === 'pass'
@@ -3417,12 +3454,12 @@ function normalizeJudgeScenarioIssuesAgainstSummaryConsistency(input: {
     const normalizedSummary = normalizeForFieldMatching(input.summary)
     if (!normalizedSummary) return input.issues
 
-    const clearsDidNotAskClaim = /did-not-ask claim was cleared by transcript consistency check/i.test(normalizedSummary)
-    const clearsMissingFieldClaim = /missing-field\b.{0,80}\bwas cleared by intake-coverage consistency check/i.test(normalizedSummary)
-    const softensFinalTurnPendingMissing = /missing-field warning was softened: assistant asked remaining field\(s\) on the final turn/i.test(normalizedSummary)
-    const clearsRepetitiveQuestionClaim = /repetitive-question warning was cleared by intake-coverage consistency check/i.test(normalizedSummary)
-    const clearsPricingClaim = /pricing-detail warning was cleared by kb pricing consistency check/i.test(normalizedSummary)
-    const clearsProactiveQuestioningClaim = /proactive-questioning warning was cleared by cold-resistant context normalization/i.test(normalizedSummary)
+    const clearsDidNotAskClaim = /\bdid not ask claim was cleared by transcript consistency check\b/i.test(normalizedSummary)
+    const clearsMissingFieldClaim = /\bmissing field\b.{0,80}\bwas cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+    const softensFinalTurnPendingMissing = /\bmissing field warning was softened assistant asked remaining field s on the final turn\b/i.test(normalizedSummary)
+    const clearsRepetitiveQuestionClaim = /\brepetitive question warning was cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+    const clearsPricingClaim = /\bpricing detail warning was cleared by kb pricing consistency check\b/i.test(normalizedSummary)
+    const clearsProactiveQuestioningClaim = /\bproactive questioning warning was cleared by cold resistant context normalization\b/i.test(normalizedSummary)
 
     if (!clearsDidNotAskClaim && !clearsMissingFieldClaim && !softensFinalTurnPendingMissing && !clearsRepetitiveQuestionClaim && !clearsPricingClaim && !clearsProactiveQuestioningClaim) {
         return input.issues
@@ -3727,11 +3764,11 @@ function doesScenarioSummaryClearFindingClaim(input: {
     const normalizedFindingText = normalizeForFieldMatching(input.findingText)
     if (!normalizedFindingText) return false
 
-    const clearsDidNotAskClaim = /did-not-ask claim was cleared by transcript consistency check/i.test(normalizedSummary)
-    const clearsMissingFieldClaim = /missing-field\b.{0,80}\bwas cleared by intake-coverage consistency check/i.test(normalizedSummary)
-    const clearsRepetitiveQuestionClaim = /repetitive-question warning was cleared by intake-coverage consistency check/i.test(normalizedSummary)
-    const clearsPricingClaim = /pricing-detail warning was cleared by kb pricing consistency check/i.test(normalizedSummary)
-    const clearsProactiveQuestioningClaim = /proactive-questioning warning was cleared by cold-resistant context normalization/i.test(normalizedSummary)
+    const clearsDidNotAskClaim = /\bdid not ask claim was cleared by transcript consistency check\b/i.test(normalizedSummary)
+    const clearsMissingFieldClaim = /\bmissing field\b.{0,80}\bwas cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+    const clearsRepetitiveQuestionClaim = /\brepetitive question warning was cleared by intake coverage consistency check\b/i.test(normalizedSummary)
+    const clearsPricingClaim = /\bpricing detail warning was cleared by kb pricing consistency check\b/i.test(normalizedSummary)
+    const clearsProactiveQuestioningClaim = /\bproactive questioning warning was cleared by cold resistant context normalization\b/i.test(normalizedSummary)
 
     if (clearsDidNotAskClaim && isDidNotAskClaimText(normalizedFindingText)) return true
     if (clearsMissingFieldClaim && isMissingFieldClaimText(normalizedFindingText)) return true
@@ -3919,6 +3956,11 @@ export function filterJudgeFindingsByCitationConsistency(input: {
                     finding,
                     caseItem: item.caseItem,
                     citation: item.citation
+                })
+                || hasAssistantAskedClaimedFieldByText({
+                    text: contextTextWithEvidence,
+                    caseItem: item.caseItem,
+                    turnLimit: item.citation.turnIndex
                 })
             ))
             if (allCitationsShowAssistantActuallyAsked) {
@@ -5052,7 +5094,8 @@ export function refineQaLabGenericUnknownResponse(input: {
         userMessage: input.userMessage,
         kbContextLines: input.kbContextLines ?? [],
         fallbackTopics: input.fallbackTopics,
-        responseLanguage: input.responseLanguage
+        responseLanguage: input.responseLanguage,
+        allowTopicHintFallback: false
     })
 
     const shouldAskMissingField = (
@@ -5196,6 +5239,7 @@ function pickBestKbDetailForResponse(input: {
     kbContextLines: string[]
     fallbackTopics: string[]
     responseLanguage: 'tr' | 'en'
+    allowTopicHintFallback?: boolean
 }) {
     const lines = input.kbContextLines
         .map((line) => line.trim())
@@ -5209,6 +5253,10 @@ function pickBestKbDetailForResponse(input: {
             .sort((left, right) => right.score - left.score)
         const candidate = scored.find((item) => item.score > 0)?.line ?? scored[0]?.line ?? ''
         if (candidate) return normalizeDetailSnippet(candidate)
+    }
+
+    if (input.allowTopicHintFallback === false) {
+        return ''
     }
 
     const topicHint = buildFallbackTopicsHint(input.fallbackTopics, input.responseLanguage)
@@ -5340,8 +5388,7 @@ export function enforceGeneralInformationBaselineResponse(input: {
     }
 
     if (additions.length === 0) return response
-    const selectedAdditions = additions.slice(0, 2)
-    return `${response} ${selectedAdditions.join(' ')}`.replace(/\s+/g, ' ').trim()
+    return `${response} ${additions.join(' ')}`.replace(/\s+/g, ' ').trim()
 }
 
 function isHotCooperativeScenarioContext(input?: {

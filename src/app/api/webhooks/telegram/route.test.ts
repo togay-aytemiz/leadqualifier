@@ -129,7 +129,10 @@ function createChannelLookupBuilder() {
             }
         }
     }))
-    const eqMock = vi.fn(() => ({ single: singleMock }))
+    const eqMock = vi.fn(() => ({
+        eq: eqMock,
+        single: singleMock
+    }))
     const selectMock = vi.fn(() => ({ eq: eqMock }))
 
     return {
