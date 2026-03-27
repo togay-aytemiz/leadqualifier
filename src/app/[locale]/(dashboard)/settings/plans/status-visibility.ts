@@ -4,6 +4,7 @@ import { resolveTopupCreditsTotal } from '@/lib/billing/topup-status'
 interface ResolvePremiumStatusVisibilityInput {
     snapshot: OrganizationBillingSnapshot | null
     consumedTopupCreditsTotal: number
+    hasTrialCreditCarryover: boolean
 }
 
 export interface PremiumStatusVisibility {
@@ -20,7 +21,8 @@ function clampNonNegative(value: number) {
 
 export function resolvePremiumStatusVisibility({
     snapshot,
-    consumedTopupCreditsTotal
+    consumedTopupCreditsTotal,
+    hasTrialCreditCarryover
 }: ResolvePremiumStatusVisibilityInput): PremiumStatusVisibility {
     if (!snapshot || snapshot.membershipState !== 'premium_active') {
         return {
@@ -43,7 +45,9 @@ export function resolvePremiumStatusVisibility({
 
     const topupTotalCredits = resolveTopupCreditsTotal({
         currentBalance: currentTopupBalance,
-        consumedCredits: consumedTopupCreditsTotal
+        consumedCredits: consumedTopupCreditsTotal,
+        trialCreditLimit: snapshot.trial.credits.limit,
+        hasTrialCreditCarryover
     })
     const topupCreditsProgress = topupTotalCredits > 0
         ? Math.min(100, Math.max(0, (currentTopupBalance / topupTotalCredits) * 100))

@@ -43,7 +43,8 @@ describe('resolvePremiumStatusVisibility', () => {
     it('keeps total and extra-credit status cards visible while extra credits remain', () => {
         const visibility = resolvePremiumStatusVisibility({
             snapshot: createPremiumSnapshot(),
-            consumedTopupCreditsTotal: 0
+            consumedTopupCreditsTotal: 0,
+            hasTrialCreditCarryover: false
         })
 
         expect(visibility.showTotalCreditsCard).toBe(true)
@@ -54,8 +55,31 @@ describe('resolvePremiumStatusVisibility', () => {
 
     it('includes consumed carryover credits in the displayed extra-credit total', () => {
         const visibility = resolvePremiumStatusVisibility({
+            snapshot: createPremiumSnapshot({
+                trial: {
+                    ...createPremiumSnapshot().trial,
+                    credits: {
+                        ...createPremiumSnapshot().trial.credits,
+                        limit: 200,
+                        used: 200
+                    }
+                }
+            }),
+            consumedTopupCreditsTotal: 0,
+            hasTrialCreditCarryover: true
+        })
+
+        expect(visibility.showTotalCreditsCard).toBe(true)
+        expect(visibility.showTopupCreditsCard).toBe(true)
+        expect(visibility.topupTotalCredits).toBe(200)
+        expect(visibility.topupCreditsProgress).toBeCloseTo(76.75, 5)
+    })
+
+    it('falls back to consumed topup usage totals when no trial carryover exists', () => {
+        const visibility = resolvePremiumStatusVisibility({
             snapshot: createPremiumSnapshot(),
-            consumedTopupCreditsTotal: 46.5
+            consumedTopupCreditsTotal: 46.5,
+            hasTrialCreditCarryover: false
         })
 
         expect(visibility.showTotalCreditsCard).toBe(true)
@@ -71,7 +95,8 @@ describe('resolvePremiumStatusVisibility', () => {
                 topupBalance: 0,
                 totalRemainingCredits: 1920
             }),
-            consumedTopupCreditsTotal: 46.5
+            consumedTopupCreditsTotal: 46.5,
+            hasTrialCreditCarryover: true
         })
 
         expect(visibility.showTotalCreditsCard).toBe(false)

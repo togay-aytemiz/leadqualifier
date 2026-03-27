@@ -37,7 +37,7 @@ import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
-import { getOrganizationTopupConsumedCreditsTotal } from '@/lib/billing/topup-status'
+import { getOrganizationTopupStatusSummary } from '@/lib/billing/topup-status'
 import { readCheckoutLegalConsent } from '@/lib/billing/checkout-legal'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
@@ -206,7 +206,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         { data: organizationRecord, error: organizationError },
         snapshot,
         pricingCatalog,
-        consumedTopupCreditsTotal,
+        topupStatusSummary,
         subscriptionRenewalState
     ] = await Promise.all([
         supabase
@@ -218,7 +218,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         getBillingPricingCatalog({
             supabase
         }),
-        getOrganizationTopupConsumedCreditsTotal(organizationId, supabase),
+        getOrganizationTopupStatusSummary(organizationId, supabase),
         getSubscriptionRenewalState({
             organizationId,
             supabase
@@ -464,7 +464,8 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
         : false
     const premiumStatusVisibility = resolvePremiumStatusVisibility({
         snapshot,
-        consumedTopupCreditsTotal
+        consumedTopupCreditsTotal: topupStatusSummary.consumedTopupCreditsTotal,
+        hasTrialCreditCarryover: topupStatusSummary.hasTrialCreditCarryover
     })
 
     const getCheckoutTitle = () => {
