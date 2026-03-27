@@ -4,6 +4,7 @@ import {
     normalizeDashboardRoutePath,
     resolveOptimisticDashboardPath,
     resolveDashboardRouteSkeleton,
+    shouldRenderGlobalDashboardPendingOverlay,
     shouldPrimeDashboardRoute
 } from '@/design/dashboard-route-transition'
 
@@ -57,5 +58,16 @@ describe('resolveOptimisticDashboardPath', () => {
         expect(resolveOptimisticDashboardPath('/settings/ai', '/settings/ai')).toBe('/settings/ai')
         expect(resolveOptimisticDashboardPath('/skills', null)).toBe('/skills')
         expect(resolveOptimisticDashboardPath('/inbox', '/login')).toBe('/inbox')
+    })
+})
+
+describe('shouldRenderGlobalDashboardPendingOverlay', () => {
+    it('keeps persistent settings shells visible while retaining overlays for slower route families', () => {
+        expect(shouldRenderGlobalDashboardPendingOverlay('/settings/ai')).toBe(false)
+        expect(shouldRenderGlobalDashboardPendingOverlay('/tr/settings/channels/whatsapp')).toBe(false)
+        expect(shouldRenderGlobalDashboardPendingOverlay('/inbox')).toBe(false)
+        expect(shouldRenderGlobalDashboardPendingOverlay('/leads')).toBe(false)
+        expect(shouldRenderGlobalDashboardPendingOverlay('/calendar')).toBe(true)
+        expect(shouldRenderGlobalDashboardPendingOverlay('/knowledge')).toBe(true)
     })
 })

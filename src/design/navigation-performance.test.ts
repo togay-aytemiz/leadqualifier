@@ -6,6 +6,14 @@ const MAIN_SIDEBAR_PATH = path.join(process.cwd(), 'src/design/MainSidebar.tsx')
 const MOBILE_BOTTOM_NAV_PATH = path.join(process.cwd(), 'src/design/MobileBottomNav.tsx')
 const SIDEBAR_PATH = path.join(process.cwd(), 'src/design/Sidebar.tsx')
 const SETTINGS_SHELL_PATH = path.join(process.cwd(), 'src/components/settings/SettingsResponsiveShell.tsx')
+const SETTINGS_LOADING_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/loading.tsx')
+const SETTINGS_ORGANIZATION_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/organization/page.tsx')
+const SETTINGS_ORGANIZATION_CLIENT_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/organization/OrganizationSettingsClient.tsx')
+const SETTINGS_BILLING_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/billing/page.tsx')
+const SETTINGS_PLANS_PAGE_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/page.tsx')
+const SETTINGS_PLAN_MANAGER_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/SubscriptionPlanManager.tsx')
+const SETTINGS_PLAN_CATALOG_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/SubscriptionPlanCatalog.tsx')
+const SETTINGS_TOPUP_CARD_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/TopupCheckoutCard.tsx')
 const TAB_TITLE_SYNC_PATH = path.join(process.cwd(), 'src/components/common/TabTitleSync.tsx')
 const DASHBOARD_LAYOUT_PATH = path.join(process.cwd(), 'src/app/[locale]/(dashboard)/layout.tsx')
 
@@ -81,6 +89,57 @@ describe('navigation performance source guards', () => {
 
         expect(transitionViewportSource).toContain("pendingSkeleton !== 'inbox'")
         expect(transitionViewportSource).toContain("pendingSkeleton !== 'leads'")
+    })
+
+    it('keeps settings transitions scoped to the detail pane instead of painting a fullscreen shell overlay', () => {
+        const transitionViewportSource = fs.readFileSync(
+            path.join(process.cwd(), 'src/components/common/DashboardRouteTransitionViewport.tsx'),
+            'utf8'
+        )
+        const settingsLoadingSource = fs.readFileSync(SETTINGS_LOADING_PATH, 'utf8')
+
+        expect(transitionViewportSource).toContain('shouldRenderGlobalDashboardPendingOverlay')
+        expect(settingsLoadingSource).toContain('SettingsDetailLoadingSkeleton')
+        expect(settingsLoadingSource).not.toContain('DashboardRouteSkeleton route="page"')
+    })
+
+    it('streams heavy settings pages behind detail-scoped suspense boundaries', () => {
+        const organizationPageSource = fs.readFileSync(SETTINGS_ORGANIZATION_PAGE_PATH, 'utf8')
+        const billingPageSource = fs.readFileSync(SETTINGS_BILLING_PAGE_PATH, 'utf8')
+        const plansPageSource = fs.readFileSync(SETTINGS_PLANS_PAGE_PATH, 'utf8')
+
+        expect(organizationPageSource).toContain('Suspense')
+        expect(organizationPageSource).toContain('OrganizationSettingsPageContent')
+        expect(organizationPageSource).toContain('OrganizationSettingsPageSkeleton')
+
+        expect(billingPageSource).toContain('Suspense')
+        expect(billingPageSource).toContain('BillingSettingsPageContent')
+        expect(billingPageSource).toContain('BillingSettingsPageSkeleton')
+
+        expect(plansPageSource).toContain('Suspense')
+        expect(plansPageSource).toContain('PlansSettingsPageContent')
+        expect(plansPageSource).toContain('PlansSettingsPageSkeleton')
+    })
+
+    it('lazy-loads low-frequency settings detail trees and checkout dialogs', () => {
+        const organizationClientSource = fs.readFileSync(SETTINGS_ORGANIZATION_CLIENT_PATH, 'utf8')
+        const planManagerSource = fs.readFileSync(SETTINGS_PLAN_MANAGER_PATH, 'utf8')
+        const planCatalogSource = fs.readFileSync(SETTINGS_PLAN_CATALOG_PATH, 'utf8')
+        const topupCardSource = fs.readFileSync(SETTINGS_TOPUP_CARD_PATH, 'utf8')
+
+        expect(organizationClientSource).toContain("from 'next/dynamic'")
+        expect(organizationClientSource).toContain("dynamic(() => import('@/components/settings/OfferingProfileSection')")
+        expect(organizationClientSource).toContain("dynamic(() => import('@/components/settings/ServiceCatalogSection')")
+        expect(organizationClientSource).toContain("dynamic(() => import('@/components/settings/RequiredIntakeFieldsSection')")
+
+        expect(planManagerSource).toContain("from 'next/dynamic'")
+        expect(planManagerSource).toContain("dynamic(() => import('./CheckoutLegalConsentModal')")
+
+        expect(planCatalogSource).toContain("from 'next/dynamic'")
+        expect(planCatalogSource).toContain("dynamic(() => import('./CheckoutLegalConsentModal')")
+
+        expect(topupCardSource).toContain("from 'next/dynamic'")
+        expect(topupCardSource).toContain("dynamic(() => import('./CheckoutLegalConsentModal')")
     })
 
     it('keeps dashboard layout on the slim org-context path during initial render', () => {

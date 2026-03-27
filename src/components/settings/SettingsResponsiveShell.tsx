@@ -20,6 +20,8 @@ import {
   shouldStartDashboardRouteTransition,
 } from '@/design/dashboard-route-transition'
 import { useDashboardRouteState } from '@/design/dashboard-route-state'
+import { buildOrganizationBillingSnapshot } from '@/lib/billing/snapshot'
+import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import {
   HiOutlineBanknotes,
   HiOutlineBriefcase,
@@ -39,11 +41,13 @@ import {
 } from '@/components/settings/mobilePaneState'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 import { createClient } from '@/lib/supabase/client'
+import type { OrganizationBillingAccount } from '@/types/database'
 
 interface SettingsResponsiveShellProps {
   activeOrganizationId?: string | null
   initialPendingCount?: number
-  billingOnlyMode?: boolean
+  initialBillingOnlyMode?: boolean
+  bypassBillingOnlyMode?: boolean
   children?: ReactNode
 }
 
@@ -68,7 +72,8 @@ function getLocalizedHref(locale: string, href: string): string {
 export function SettingsResponsiveShell({
   activeOrganizationId = null,
   initialPendingCount = 0,
-  billingOnlyMode = false,
+  initialBillingOnlyMode = false,
+  bypassBillingOnlyMode = false,
   children,
 }: SettingsResponsiveShellProps) {
   const locale = useLocale()
@@ -83,16 +88,28 @@ export function SettingsResponsiveShell({
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isClosingRef = useRef(false)
   const pendingCountRequestIdRef = useRef(0)
+  const billingModeRequestIdRef = useRef(0)
   const settingsRootHref = getLocalizedHref(locale, '/settings')
   const [loadedPendingCount, setLoadedPendingCount] = useState<{
     organizationId: string
     count: number
+  } | null>(null)
+  const [loadedBillingOnlyMode, setLoadedBillingOnlyMode] = useState<{
+    organizationId: string
+    value: boolean
   } | null>(null)
   const pendingCount = !activeOrganizationId
     ? 0
     : loadedPendingCount?.organizationId === activeOrganizationId
       ? loadedPendingCount.count
       : initialPendingCount
+  const billingOnlyMode = !activeOrganizationId
+    ? false
+    : bypassBillingOnlyMode
+      ? false
+    : loadedBillingOnlyMode?.organizationId === activeOrganizationId
+      ? loadedBillingOnlyMode.value
+      : initialBillingOnlyMode
 
   const refreshPendingCount = useCallback(async () => {
     const requestId = pendingCountRequestIdRef.current + 1
@@ -126,6 +143,43 @@ export function SettingsResponsiveShell({
       count: count ?? 0,
     })
   }, [activeOrganizationId, supabase])
+
+  const refreshBillingOnlyMode = useCallback(async () => {
+    const requestId = billingModeRequestIdRef.current + 1
+    billingModeRequestIdRef.current = requestId
+
+    if (!activeOrganizationId || bypassBillingOnlyMode) {
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('organization_billing_accounts')
+      .select('*')
+      .eq('organization_id', activeOrganizationId)
+      .maybeSingle()
+
+    if (error) {
+      if (billingModeRequestIdRef.current !== requestId) {
+        return
+      }
+      console.error('Failed to load settings workspace access state', error)
+      return
+    }
+
+    if (billingModeRequestIdRef.current !== requestId) {
+      return
+    }
+
+    const snapshot = data
+      ? buildOrganizationBillingSnapshot(data as OrganizationBillingAccount)
+      : null
+
+    setLoadedBillingOnlyMode({
+      organizationId: activeOrganizationId,
+      value: resolveWorkspaceAccessState(snapshot).isLocked,
+    })
+  }, [activeOrganizationId, bypassBillingOnlyMode, supabase])
+
   const navItems = useMemo<SettingsNavItem[]>(() => {
     const fullNavItems: SettingsNavItem[] = [
       {
@@ -248,6 +302,7 @@ export function SettingsResponsiveShell({
   useEffect(() => {
     return () => {
       pendingCountRequestIdRef.current += 1
+      billingModeRequestIdRef.current += 1
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current)
       }
@@ -256,6 +311,7 @@ export function SettingsResponsiveShell({
 
   useEffect(() => {
     pendingCountRequestIdRef.current += 1
+    billingModeRequestIdRef.current += 1
   }, [activeOrganizationId])
 
   useEffect(() => {
@@ -266,6 +322,15 @@ export function SettingsResponsiveShell({
 
     return () => window.cancelAnimationFrame(frame)
   }, [activeOrganizationId, refreshPendingCount])
+
+  useEffect(() => {
+    if (!activeOrganizationId || bypassBillingOnlyMode) return
+    const frame = window.requestAnimationFrame(() => {
+      void refreshBillingOnlyMode()
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeOrganizationId, bypassBillingOnlyMode, refreshBillingOnlyMode])
 
   const navigateBackToSettings = useCallback(() => {
     if (!hasDetail || isClosingRef.current) return

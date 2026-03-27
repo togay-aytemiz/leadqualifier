@@ -77,6 +77,18 @@ export function resolveDashboardRouteSkeleton(value: string | null | undefined) 
     return resolveDashboardRouteFamily(value)?.skeleton ?? null
 }
 
+export function shouldRenderGlobalDashboardPendingOverlay(value: string | null | undefined) {
+    const pendingSkeleton = resolveDashboardRouteSkeleton(value)
+    if (!pendingSkeleton) return false
+
+    const normalizedPath = normalizeDashboardRoutePath(value ?? '')
+    if (normalizedPath === '/settings' || normalizedPath.startsWith('/settings/')) {
+        return false
+    }
+
+    return pendingSkeleton !== 'inbox' && pendingSkeleton !== 'leads'
+}
+
 export function resolveOptimisticDashboardPath(
     currentPath: string,
     pendingPath: string | null | undefined

@@ -1,10 +1,14 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { CheckoutLegalConsentModal } from './CheckoutLegalConsentModal'
+
+const CheckoutLegalConsentModal = dynamic(() => import('./CheckoutLegalConsentModal').then((module) => module.CheckoutLegalConsentModal), {
+    loading: () => null
+})
 
 interface TopupConversationRange {
     min: number

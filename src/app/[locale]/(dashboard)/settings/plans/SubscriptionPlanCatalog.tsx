@@ -1,10 +1,14 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { createPortal } from 'react-dom'
-import { CheckoutLegalConsentModal } from './CheckoutLegalConsentModal'
 import type { SubscriptionPlanOption } from './SubscriptionPlanManager'
+
+const CheckoutLegalConsentModal = dynamic(() => import('./CheckoutLegalConsentModal').then((module) => module.CheckoutLegalConsentModal), {
+    loading: () => null
+})
 
 interface SubscriptionPlanCatalogProps {
     organizationId: string

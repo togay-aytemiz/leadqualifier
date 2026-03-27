@@ -1,18 +1,16 @@
 "use client"
 
+import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePathname, useRouter as useLocaleRouter } from '@/i18n/navigation'
-import { Button, Modal, PageHeader } from '@/design'
+import { Button, Modal, PageHeader, Skeleton } from '@/design'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import { SettingsTabs } from '@/components/settings/SettingsTabs'
 import { transformPendingHrefForLocale } from '@/components/settings/localeHref'
 import { deleteOrganizationDataSelfServe, type DeleteOrganizationDataResult, updateOrganizationName } from '@/lib/organizations/actions'
 import type { OfferingProfile, OfferingProfileSuggestion, ServiceCandidate, ServiceCatalogItem } from '@/types/database'
-import { OfferingProfileSection } from '@/components/settings/OfferingProfileSection'
-import { RequiredIntakeFieldsSection } from '@/components/settings/RequiredIntakeFieldsSection'
-import { ServiceCatalogSection } from '@/components/settings/ServiceCatalogSection'
 import {
     archiveOfferingProfileSuggestion,
     generateOfferingProfileSuggestions,
@@ -27,6 +25,33 @@ import { mergeOfferingProfileItems, serializeOfferingProfileItems } from '@/lib/
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
+
+function OrganizationDetailsSectionSkeleton() {
+    return (
+        <div className="py-6 border-b border-gray-200 last:border-b-0">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                <div className="w-full space-y-2 lg:col-span-4 lg:max-w-[300px]">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-48" />
+                </div>
+                <div className="w-full space-y-3 lg:col-span-8 lg:max-w-[720px]">
+                    <Skeleton className="h-24 w-full rounded-2xl" />
+                    <Skeleton className="h-12 w-full rounded-2xl" />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+const OfferingProfileSection = dynamic(() => import('@/components/settings/OfferingProfileSection').then((module) => module.OfferingProfileSection), {
+    loading: () => <OrganizationDetailsSectionSkeleton />
+})
+const ServiceCatalogSection = dynamic(() => import('@/components/settings/ServiceCatalogSection').then((module) => module.ServiceCatalogSection), {
+    loading: () => <OrganizationDetailsSectionSkeleton />
+})
+const RequiredIntakeFieldsSection = dynamic(() => import('@/components/settings/RequiredIntakeFieldsSection').then((module) => module.RequiredIntakeFieldsSection), {
+    loading: () => <OrganizationDetailsSectionSkeleton />
+})
 
 interface OrganizationSettingsClientProps {
     initialName: string

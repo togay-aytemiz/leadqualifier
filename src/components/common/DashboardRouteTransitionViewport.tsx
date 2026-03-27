@@ -3,7 +3,10 @@
 import { usePathname } from 'next/navigation'
 import { useMemo, type ReactNode } from 'react'
 import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
-import { resolveDashboardRouteSkeleton } from '@/design/dashboard-route-transition'
+import {
+    resolveDashboardRouteSkeleton,
+    shouldRenderGlobalDashboardPendingOverlay
+} from '@/design/dashboard-route-transition'
 import { useDashboardRouteState } from '@/design/dashboard-route-state'
 
 interface DashboardRouteTransitionViewportProps {
@@ -22,6 +25,7 @@ export function DashboardRouteTransitionViewport({
     const shouldRenderPendingOverlay = pendingSkeleton
         && pendingSkeleton !== 'inbox'
         && pendingSkeleton !== 'leads'
+        && shouldRenderGlobalDashboardPendingOverlay(pendingPath)
 
     return (
         <div className="relative flex min-h-0 flex-1 overflow-hidden">

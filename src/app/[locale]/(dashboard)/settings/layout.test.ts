@@ -11,4 +11,12 @@ describe('settings layout source', () => {
         expect(source).not.toContain('getPendingOfferingProfileSuggestionCount')
         expect(source).toContain('activeOrganizationId={orgContext?.activeOrganizationId ?? null}')
     })
+
+    it('keeps billing-lock hydration off the server critical path for settings navigation', () => {
+        const source = fs.readFileSync(SETTINGS_LAYOUT_PATH, 'utf8')
+
+        expect(source).not.toContain('getOrganizationBillingSnapshot')
+        expect(source).not.toContain('resolveWorkspaceAccessState')
+        expect(source).not.toContain('billingOnlyMode={')
+    })
 })

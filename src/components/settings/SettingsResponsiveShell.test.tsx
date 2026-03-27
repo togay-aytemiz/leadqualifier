@@ -25,6 +25,14 @@ describe('SettingsResponsiveShell source', () => {
     expect(source).toContain(".from('offering_profile_suggestions')")
   })
 
+  it('hydrates billing-only navigation locks on the client', () => {
+    const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+    expect(source).toContain(".from('organization_billing_accounts')")
+    expect(source).toContain('buildOrganizationBillingSnapshot')
+    expect(source).toContain('resolveWorkspaceAccessState')
+  })
+
   it('guards pending count against stale organization fetches', () => {
     const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
 
