@@ -71,4 +71,15 @@ describe('SettingsResponsiveShell source', () => {
     expect(source).toContain('useDashboardRouteState(pathname)')
     expect(source).toContain('getSettingsNavItemFromPath(activePath)')
   })
+
+  it('reuses warmed detail content for pending settings revisits', () => {
+    const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+    expect(source).toContain('buildSettingsRouteCacheKey')
+    expect(source).toContain('getSettingsRouteCacheEntry')
+    expect(source).toContain('setSettingsRouteCacheEntry')
+    expect(source).toContain('pendingPath')
+    expect(source).toContain('pendingRouteCacheEntry')
+    expect(source).toContain('renderedDetailChildren')
+  })
 })

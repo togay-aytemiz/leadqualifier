@@ -40,6 +40,11 @@ import {
   type SettingsNavItemId,
 } from '@/components/settings/mobilePaneState'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
+import {
+  buildSettingsRouteCacheKey,
+  getSettingsRouteCacheEntry,
+  setSettingsRouteCacheEntry,
+} from '@/lib/settings/route-cache'
 import { createClient } from '@/lib/supabase/client'
 import type { OrganizationBillingAccount } from '@/types/database'
 
@@ -79,7 +84,7 @@ export function SettingsResponsiveShell({
   const locale = useLocale()
   const pathname = usePathname()
   const router = useRouter()
-  const { activePath } = useDashboardRouteState(pathname)
+  const { activePath, currentPath, pendingPath } = useDashboardRouteState(pathname)
   const activeItem = getSettingsNavItemFromPath(activePath)
   const tSidebar = useTranslations('Sidebar')
   const supabase = useMemo(() => createClient(), [])
@@ -283,6 +288,37 @@ export function SettingsResponsiveShell({
     })
   }, [billingOnlyMode, locale])
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
+  const currentRouteCacheKey = useMemo(() => {
+    if (!activeOrganizationId || !activeItem || !children) return null
+    return buildSettingsRouteCacheKey({
+      organizationId: activeOrganizationId,
+      locale,
+      routePath: currentPath,
+    })
+  }, [activeItem, activeOrganizationId, children, currentPath, locale])
+  const pendingRouteCacheKey = useMemo(() => {
+    if (!activeOrganizationId || !pendingPath || !getSettingsNavItemFromPath(pendingPath)) return null
+    return buildSettingsRouteCacheKey({
+      organizationId: activeOrganizationId,
+      locale,
+      routePath: pendingPath,
+    })
+  }, [activeOrganizationId, locale, pendingPath])
+  const pendingRouteCacheEntry = useMemo(
+    () => (pendingRouteCacheKey ? getSettingsRouteCacheEntry(pendingRouteCacheKey) : null),
+    [pendingRouteCacheKey]
+  )
+  const isShowingPendingRouteCache = Boolean(
+    pendingPath && pendingRouteCacheEntry && pendingPath !== currentPath
+  )
+  const renderedDetailChildren = isShowingPendingRouteCache
+    ? pendingRouteCacheEntry?.content
+    : children
+
+  useEffect(() => {
+    if (!currentRouteCacheKey || !children) return
+    setSettingsRouteCacheEntry(currentRouteCacheKey, children)
+  }, [children, currentRouteCacheKey])
 
   useEffect(() => {
     if (!hasDetail) {
@@ -489,8 +525,14 @@ export function SettingsResponsiveShell({
           mobileDetailPaneClasses
         )}
       >
-        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white">
-          {children}
+        <div
+          aria-busy={isShowingPendingRouteCache || undefined}
+          className={cn(
+            'flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white',
+            isShowingPendingRouteCache ? 'pointer-events-none' : ''
+          )}
+        >
+          {renderedDetailChildren}
         </div>
       </div>
     </div>
