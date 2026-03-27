@@ -1128,6 +1128,129 @@ export async function getConversations(
   return hydrateInstagramConversationContactNames(supabase, organizationId, withRequestFallback)
 }
 
+export async function getConversationListItem(
+  organizationId: string,
+  conversationId: string
+): Promise<ConversationListItem | null> {
+  const normalizedConversationId = conversationId.trim()
+  if (!normalizedConversationId) {
+    return null
+  }
+
+  const supabase = await createClient()
+  if (await isOrganizationWorkspaceLocked(organizationId, supabase)) {
+    return null
+  }
+
+  const normalizedFilters = normalizeConversationListFilters()
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(buildConversationListSelect(normalizedFilters))
+    .eq('organization_id', organizationId)
+    .eq('id', normalizedConversationId)
+    .order('created_at', { foreignTable: 'messages', ascending: false })
+    .limit(CONVERSATION_PREVIEW_MESSAGE_LIMIT, { foreignTable: 'messages' })
+    .limit(1, { foreignTable: 'leads' })
+    .maybeSingle()
+
+  if (!error && data) {
+    const normalized = normalizeConversationListItems([data as unknown])[0] ?? null
+    if (!normalized) {
+      return null
+    }
+
+    const withRequestFallback = await annotateInstagramRequestFallback(supabase, organizationId, [
+      normalized,
+    ])
+    return (
+      (await hydrateInstagramConversationContactNames(
+        supabase,
+        organizationId,
+        withRequestFallback
+      ))[0] ?? null
+    )
+  }
+
+  if (error) {
+    console.warn('Error fetching conversation list item with nested query, using fallback:', error)
+  }
+
+  const { data: conversationRow, error: conversationError } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .eq('id', normalizedConversationId)
+    .maybeSingle()
+
+  if (conversationError || !conversationRow) {
+    if (conversationError) {
+      console.error('Error fetching conversation list item fallback:', conversationError)
+    }
+    return null
+  }
+
+  const conversation = conversationRow as Conversation
+  const assigneeIds =
+    typeof conversation.assignee_id === 'string' && conversation.assignee_id.length > 0
+      ? [conversation.assignee_id]
+      : []
+
+  const [messagesResult, leadsResult, assigneesResult] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('conversation_id, content, created_at, sender_type, metadata')
+      .eq('organization_id', organizationId)
+      .eq('conversation_id', normalizedConversationId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('leads')
+      .select('conversation_id, status')
+      .eq('organization_id', organizationId)
+      .eq('conversation_id', normalizedConversationId),
+    assigneeIds.length > 0
+      ? supabase.from('profiles').select('id, full_name, email').in('id', assigneeIds)
+      : Promise.resolve({
+          data: [] as ConversationAssigneePreviewRow[],
+          error: null,
+        }),
+  ])
+
+  if (messagesResult.error) {
+    console.warn(
+      'Failed to load conversation preview messages in single-item fallback:',
+      messagesResult.error
+    )
+  }
+  if (leadsResult.error) {
+    console.warn('Failed to load conversation leads in single-item fallback:', leadsResult.error)
+  }
+  if (assigneesResult.error) {
+    console.warn(
+      'Failed to load conversation assignee in single-item fallback:',
+      assigneesResult.error
+    )
+  }
+
+  const normalizedFallback = normalizeConversationListItems(
+    buildConversationListItemsFromFallback(
+      [conversation],
+      (messagesResult.data ?? []) as ConversationPreviewMessageRow[],
+      (leadsResult.data ?? []) as ConversationLeadPreviewRow[],
+      (assigneesResult.data ?? []) as ConversationAssigneePreviewRow[]
+    )
+  )
+  const withRequestFallback = await annotateInstagramRequestFallback(
+    supabase,
+    organizationId,
+    normalizedFallback
+  )
+
+  return (
+    (await hydrateInstagramConversationContactNames(supabase, organizationId, withRequestFallback))[0]
+      ?? null
+  )
+}
+
 export async function getMessages(conversationId: string) {
   const supabase = await createClient()
   const organizationId = await resolveConversationOrganizationId(supabase, conversationId)

@@ -187,6 +187,7 @@ import type { AiBotMode } from '@/types/database'
 interface InboxContainerProps {
   initialConversations: ConversationListItem[]
   initialThreadPayload?: ConversationThreadPayload | null
+  initialSelectedConversationId?: string | null
   renderedAtIso: string
   organizationId: string
   botName?: string
@@ -368,6 +369,7 @@ function extractImageFilesFromClipboard(event: React.ClipboardEvent<HTMLTextArea
 export function InboxContainer({
   initialConversations,
   initialThreadPayload = null,
+  initialSelectedConversationId = null,
   renderedAtIso,
   organizationId,
   botName,
@@ -383,14 +385,15 @@ export function InboxContainer({
   const locale = useLocale()
   const displayedBotName = resolveInboxBotDisplayName(botName, t('copilot'))
   const dateLocale = locale === 'tr' ? tr : undefined
-  const initialSelectedConversationId =
+  const initialSelectedConversationIdValue =
+    initialSelectedConversationId ??
     initialThreadPayload?.conversationId ?? initialConversations[0]?.id ?? null
   const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
   const [relativeTimeBaseDate, setRelativeTimeBaseDate] = useState<Date>(() => {
     const parsed = new Date(renderedAtIso)
     return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed
   })
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedConversationId)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedConversationIdValue)
   const [messages, setMessages] = useState<Message[]>(() => initialThreadPayload?.messages ?? [])
   const [messageOffset, setMessageOffset] = useState(() => initialThreadPayload?.fetchedCount ?? 0)
   const [hasMoreMessageHistory, setHasMoreMessageHistory] = useState(

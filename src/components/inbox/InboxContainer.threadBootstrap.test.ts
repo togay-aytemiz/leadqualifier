@@ -14,8 +14,7 @@ describe('InboxContainer thread bootstrap source guards', () => {
     expect(containerSource).toContain('threadPayloadCacheRef')
     expect(containerSource).toContain('getConversationThreadPayload(')
     expect(containerSource).toContain('const cachedThreadPayload = threadPayloadCacheRef.current.get(selectedId)')
-    expect(pageSource).toContain('getConversationThreadPayload(')
-    expect(pageSource).toContain('initialThreadPayload={initialThreadPayload}')
+    expect(pageSource).not.toContain('getConversationThreadPayload(')
   })
 
   it('does not overwrite a previously loaded thread cache with the transient empty state from another selection', () => {
@@ -32,5 +31,16 @@ describe('InboxContainer thread bootstrap source guards', () => {
       'const selectedConversationPreviewMessage = resolveLatestNonSeenPreviewMessage('
     )
     expect(containerSource).toContain('threadPayloadCacheRef.current.delete(selectedId)')
+  })
+
+  it('supports leads deeplinks by seeding the requested conversation into inbox bootstrap state', () => {
+    const containerSource = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
+    const pageSource = fs.readFileSync(INBOX_PAGE_PATH, 'utf8')
+
+    expect(pageSource).toContain('searchParams')
+    expect(pageSource).toContain('getConversationListItem(')
+    expect(pageSource).toContain('initialSelectedConversationId={requestedConversationId}')
+    expect(containerSource).toContain('initialSelectedConversationId?: string | null')
+    expect(containerSource).toContain('initialSelectedConversationId ??')
   })
 })

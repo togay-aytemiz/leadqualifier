@@ -1,6 +1,6 @@
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
-import { getConversations } from '@/lib/inbox/actions'
+import { getConversationListItem, getConversations } from '@/lib/inbox/actions'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { getRequiredIntakeFields } from '@/lib/ai/followup'
 import { getServiceCatalogItems } from '@/lib/leads/settings'
@@ -18,11 +18,20 @@ const InboxContainer = dynamic(
     }
 )
 
-export default async function InboxPage() {
+interface InboxPageProps {
+    searchParams: Promise<{ conversation?: string }>
+}
+
+export default async function InboxPage({ searchParams }: InboxPageProps) {
     const locale = await getLocale()
     const t = await getTranslations('inbox')
     const supabase = await createClient()
     const renderedAtIso = new Date().toISOString()
+    const params = await searchParams
+    const requestedConversationId = typeof params.conversation === 'string'
+        && params.conversation.trim().length > 0
+        ? params.conversation.trim()
+        : null
 
     const orgContext = await resolveActiveOrganizationContext()
     if (!orgContext) {
@@ -50,16 +59,24 @@ export default async function InboxPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const [conversations, aiSettings, requiredIntakeFields, serviceCatalogItems] = await Promise.all([
+    const [conversations, requestedConversation, aiSettings, requiredIntakeFields, serviceCatalogItems] = await Promise.all([
         getConversations(organizationId),
+        requestedConversationId
+            ? getConversationListItem(organizationId, requestedConversationId)
+            : Promise.resolve(null),
         getOrgAiSettings(organizationId, { supabase }),
         getRequiredIntakeFields({ organizationId, supabase }),
         getServiceCatalogItems(organizationId)
     ])
+    const initialConversations = requestedConversation
+        && !conversations.some((conversation) => conversation.id === requestedConversation.id)
+        ? [requestedConversation, ...conversations]
+        : conversations
 
     return (
         <InboxContainer
-            initialConversations={conversations}
+            initialConversations={initialConversations}
+            initialSelectedConversationId={requestedConversationId}
             renderedAtIso={renderedAtIso}
             organizationId={organizationId}
             botName={aiSettings.bot_name}

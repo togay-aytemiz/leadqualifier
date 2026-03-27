@@ -14,6 +14,7 @@
 > **Update Note (2026-03-27):** Settings revisits within the same session now use a warmed detail-pane memory cache in the shell. Returning to a previously opened settings subpage can paint cached detail content immediately during the pending route phase while fresh server content is still streaming in.
 > **Update Note (2026-03-27):** Settings navigation latency now has a Playwright regression guard. The E2E flow delays settings destination responses and verifies that cold settings navigation keeps the shell visible while warmed revisits render cached detail content immediately under an `aria-busy` detail pane.
 > **Update Note (2026-03-27):** Top-level workspace routes now trim their own critical path too: `Inbox`, `Calendar`, `Leads`, `Skills`, and `Knowledge` lazy-load their heavy client containers with route-scoped `next/dynamic` boundaries, and `Inbox` no longer waits for the first selected thread payload before the page shell can paint.
+> **Update Note (2026-03-27):** `/leads` now deep-links into the exact Inbox conversation for that contact. When the target thread is outside the default first page, `/inbox?conversation=...` seeds the requested conversation into the initial list so operators still land on the correct thread immediately.
 > **Update Note (2026-03-27):** Desktop dashboard typography is now tuned globally for denser operator scanning: content surfaces (`Inbox`, details, calendar, leads, settings, knowledge, admin) inherit a slightly smaller text scale, while the desktop sidebar is compensated one step upward so navigation does not feel undersized beside the tighter content area.
 > **Update Note (2026-03-27):** `Settings > Plans` premium status now hides redundant total/extra-credit cards when extra credits are exhausted. If `topupBalance` is `0`, the screen keeps only the monthly package card; while extra credits remain, debit priority stays `extra credits first, then monthly package`.
 > **Update Note (2026-03-27):** Inbox list header filter action and selected-thread read/unread toggle now use plain icon chrome instead of bordered pill buttons, keeping the header visually lighter while preserving the same actions and active-state cues.
@@ -335,6 +336,7 @@
   - [x] Platform row shows channel icon and channel cards use consistent icon sizing
   - [x] Platform icons in Channels cards + Inbox badges/details + Leads list now use shared public SVG assets (`/Telegram.svg`, `/whatsapp.svg`, `/instagram.svg`, `/messenger.svg`)
   - [x] Leads list rows/cards now show compact contact avatars immediately before the existing platform icon when conversation social avatar data exists
+  - [x] Clicking a lead row/card now opens the matching Inbox conversation, and `/inbox?conversation=...` bootstraps that requested thread even when it is outside the default first conversation page
   - [x] Inbox list avatars include platform badges for quick channel recognition
   - [x] Inbox list platform badges enlarged with brand-colored icons
   - [x] Inbox list platform badges centered under avatars
