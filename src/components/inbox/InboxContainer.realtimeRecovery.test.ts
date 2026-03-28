@@ -10,6 +10,11 @@ describe('InboxContainer realtime recovery source guards', () => {
 
     expect(source).toContain('attachInboxRealtimeRecoveryListeners({')
     expect(source).toContain('const resyncInboxState = useCallback(')
+    expect(source).toContain('const recoverInboxRealtime = useCallback(')
     expect(source).toContain('if (shouldRecoverInboxRealtime(status)) {')
+    expect(source).toContain('setRealtimeSubscriptionGeneration((current) => current + 1)')
+    expect(source).toContain(
+      'recoverInboxRealtime(`browser:${reason}`, { restartSubscriptions: true })'
+    )
   })
 })

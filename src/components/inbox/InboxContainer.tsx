@@ -473,6 +473,7 @@ export function InboxContainer({
   const [isMobileBotModeSheetVisible, setIsMobileBotModeSheetVisible] = useState(false)
   const [isMobileBotModeUpdating, setIsMobileBotModeUpdating] = useState(false)
   const [mobileBotModeUpdateError, setMobileBotModeUpdateError] = useState<string | null>(null)
+  const [realtimeSubscriptionGeneration, setRealtimeSubscriptionGeneration] = useState(0)
   const [senderProfilesById, setSenderProfilesById] = useState<Record<string, SenderProfile>>({})
 
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
@@ -515,6 +516,7 @@ export function InboxContainer({
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const resyncInFlightRef = useRef(false)
   const pendingResyncRef = useRef(false)
+  const resyncInboxStateRef = useRef<(() => Promise<void>) | null>(null)
   const toggleDetailsSection = useCallback((section: DetailsSectionKey) => {
     setDetailsSectionState((prev) => ({
       ...prev,
@@ -1196,6 +1198,27 @@ export function InboxContainer({
     }
   }, [activeConversationListFilters, applyThreadPayload, loadThreadPayload, organizationId])
 
+  useEffect(() => {
+    resyncInboxStateRef.current = resyncInboxState
+  }, [resyncInboxState])
+
+  const recoverInboxRealtime = useCallback(
+    (reason: string, options?: { restartSubscriptions?: boolean }) => {
+      const restartSubscriptions = options?.restartSubscriptions === true
+      console.log('Recovering inbox realtime state:', {
+        reason,
+        restartSubscriptions,
+      })
+
+      if (restartSubscriptions) {
+        setRealtimeSubscriptionGeneration((current) => current + 1)
+      }
+
+      void resyncInboxStateRef.current?.()
+    },
+    []
+  )
+
   const loadOlderMessages = useCallback(async () => {
     const conversationId = selectedIdRef.current
     if (!conversationId || !hasMoreMessageHistory || isLoadingMessageHistoryRef.current) return
@@ -1591,11 +1614,10 @@ export function InboxContainer({
   useEffect(() => {
     return attachInboxRealtimeRecoveryListeners({
       onRecover: (reason) => {
-        console.log('Recovering inbox realtime state after browser resume event:', reason)
-        void resyncInboxState()
+        recoverInboxRealtime(`browser:${reason}`, { restartSubscriptions: true })
       },
     })
-  }, [resyncInboxState])
+  }, [recoverInboxRealtime])
 
   useEffect(() => {
     let messagesChannel: ReturnType<typeof supabase.channel> | null = null
@@ -1619,19 +1641,22 @@ export function InboxContainer({
         return
       }
 
-      console.log('Setting up Realtime subscription...')
+      console.log('Setting up Realtime subscription...', {
+        generation: realtimeSubscriptionGeneration,
+      })
+      const channelKey = `${organizationId}:${realtimeSubscriptionGeneration}`
 
       const logChannelStatus = (channelName: string, status: string, err?: Error) => {
         console.log(`${channelName} Channel Status:`, status, err ? { error: err } : '')
         if (!isMounted) return
         if (shouldRecoverInboxRealtime(status)) {
-          void resyncInboxState()
+          recoverInboxRealtime(`channel:${channelName}:${status}`, { restartSubscriptions: true })
         }
       }
 
       // Separate channels for messages and conversations
       messagesChannel = supabase
-        .channel('inbox_messages')
+        .channel(`inbox_messages:${channelKey}`)
         .on(
           'postgres_changes',
           {
@@ -1749,7 +1774,7 @@ export function InboxContainer({
         })
 
       conversationsChannel = supabase
-        .channel('inbox_conversations')
+        .channel(`inbox_conversations:${channelKey}`)
         .on(
           'postgres_changes',
           {
@@ -1837,7 +1862,7 @@ export function InboxContainer({
 
       // Separate channel for leads
       leadsChannel = supabase
-        .channel('inbox_leads')
+        .channel(`inbox_leads:${channelKey}`)
         .on(
           'postgres_changes',
           {
@@ -1898,9 +1923,10 @@ export function InboxContainer({
   }, [
     hydrateSenderProfiles,
     organizationId,
+    realtimeSubscriptionGeneration,
     refreshMessages,
     refreshConversationPreview,
-    resyncInboxState,
+    recoverInboxRealtime,
     resolveAssignee,
     scheduleLeadAutoRefresh,
     supabase,
