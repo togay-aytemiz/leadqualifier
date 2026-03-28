@@ -130,6 +130,7 @@ import {
   validateWhatsAppOutboundAttachments,
   type WhatsAppOutboundMediaType,
 } from '@/lib/inbox/outbound-media'
+import { resolveTranslationValue } from '@/components/inbox/translationFallback'
 import {
   filterConversationsByQueue,
   summarizeConversationQueueCounts,
@@ -142,7 +143,11 @@ import {
 } from '@/components/inbox/instagramRequestState'
 import {
   filterTimelineMessagesForDateSeparators,
+  isInstagramReactionEventMessage,
   isInstagramSeenEventMessage,
+  resolveInstagramProviderMessageId,
+  resolveInstagramReactionEvent,
+  resolveInstagramReactionSummary,
   resolveLatestNonSeenPreviewMessage,
 } from '@/components/inbox/instagramMessageEvents'
 import {
@@ -512,6 +517,55 @@ export function InboxContainer({
     warm: t('leadStatusWarm'),
     cold: t('leadStatusCold'),
   }
+  const instagramReactionLabels = useMemo(
+    () => {
+      const localeFallbacks =
+        locale === 'tr'
+          ? {
+              reacted: '{emoji} ile tepki verdi',
+              reactedToYourMessage: 'Mesajınıza {emoji} bıraktı',
+              removed: 'Reaksiyonunu kaldırdı',
+              removedFromYourMessage: 'Mesajınızdaki reaksiyonu kaldırdı',
+              fallback: 'Mesaj reaksiyonu',
+            }
+          : {
+              reacted: 'Reacted with {emoji}',
+              reactedToYourMessage: 'Reacted {emoji} to your message',
+              removed: 'Removed a reaction',
+              removedFromYourMessage: 'Removed the reaction from your message',
+              fallback: 'Message reaction',
+            }
+
+      return {
+        reacted: resolveTranslationValue(
+          t('instagramReaction.reacted'),
+          localeFallbacks.reacted,
+          'inbox.'
+        ),
+        reactedToYourMessage: resolveTranslationValue(
+          t('instagramReaction.reactedToYourMessage'),
+          localeFallbacks.reactedToYourMessage,
+          'inbox.'
+        ),
+        removed: resolveTranslationValue(
+          t('instagramReaction.removed'),
+          localeFallbacks.removed,
+          'inbox.'
+        ),
+        removedFromYourMessage: resolveTranslationValue(
+          t('instagramReaction.removedFromYourMessage'),
+          localeFallbacks.removedFromYourMessage,
+          'inbox.'
+        ),
+        fallback: resolveTranslationValue(
+          t('instagramReaction.fallback'),
+          localeFallbacks.fallback,
+          'inbox.'
+        ),
+      }
+    },
+    [locale, t]
+  )
   const leadExtractedFields =
     lead?.extracted_fields &&
     typeof lead.extracted_fields === 'object' &&
@@ -2793,27 +2847,36 @@ export function InboxContainer({
               : c.human_attention_reason === 'hot_lead'
                 ? t('queueAttentionReasonHotLead')
                 : null
-          const previewContent = resolveMessagePreviewContent({
-            content: previewMessage?.content,
-            metadata: previewMessage?.metadata,
-            senderType: previewMessage?.sender_type,
-            fallbackNoMessage: t('noMessagesYet'),
-            unsupportedInstagramAttachment: t('mediaPreview.instagramUnsupported'),
-            labels: {
-              image: t('mediaPreview.image'),
-              document: t('mediaPreview.document'),
-              audio: t('mediaPreview.audio'),
-              video: t('mediaPreview.video'),
-              sticker: t('mediaPreview.sticker'),
-              media: t('mediaPreview.media'),
-              imageSent: t('mediaPreview.imageSent'),
-              documentSent: t('mediaPreview.documentSent'),
-              audioSent: t('mediaPreview.audioSent'),
-              videoSent: t('mediaPreview.videoSent'),
-              stickerSent: t('mediaPreview.stickerSent'),
-              mediaSent: t('mediaPreview.mediaSent'),
-            },
-          })
+          const reactionPreviewContent = previewMessage
+            ? resolveInstagramReactionSummary({
+                metadata: previewMessage.metadata,
+                content: previewMessage.content,
+                labels: instagramReactionLabels,
+              })
+            : null
+          const previewContent =
+            reactionPreviewContent ??
+            resolveMessagePreviewContent({
+              content: previewMessage?.content,
+              metadata: previewMessage?.metadata,
+              senderType: previewMessage?.sender_type,
+              fallbackNoMessage: t('noMessagesYet'),
+              unsupportedInstagramAttachment: t('mediaPreview.instagramUnsupported'),
+              labels: {
+                image: t('mediaPreview.image'),
+                document: t('mediaPreview.document'),
+                audio: t('mediaPreview.audio'),
+                video: t('mediaPreview.video'),
+                sticker: t('mediaPreview.sticker'),
+                media: t('mediaPreview.media'),
+                imageSent: t('mediaPreview.imageSent'),
+                documentSent: t('mediaPreview.documentSent'),
+                audioSent: t('mediaPreview.audioSent'),
+                videoSent: t('mediaPreview.videoSent'),
+                stickerSent: t('mediaPreview.stickerSent'),
+                mediaSent: t('mediaPreview.mediaSent'),
+              },
+            })
           const isInstagramRequestPreview = isInstagramRequestConversation(c)
 
           return (
@@ -3042,6 +3105,18 @@ export function InboxContainer({
     () => buildInboxImageGalleryLookup(visibleMessages),
     [visibleMessages]
   )
+  const instagramMessagesByProviderId = useMemo(() => {
+    const map = new Map<string, Message>()
+    if (selectedConversation?.platform !== 'instagram') return map
+
+    for (const message of visibleMessages) {
+      const providerMessageId = resolveInstagramProviderMessageId(message.metadata)
+      if (!providerMessageId) continue
+      map.set(providerMessageId, message)
+    }
+
+    return map
+  }, [selectedConversation?.platform, visibleMessages])
   const instagramSeenIndicatorByMessageId = useMemo(() => {
     const map = new Map<string, { seenAt: string }>()
     if (selectedConversation?.platform !== 'instagram') return map
@@ -3969,6 +4044,27 @@ export function InboxContainer({
                         metadata: m.metadata,
                         content: m.content,
                       })
+                      const isInstagramReactionEvent = isInstagramReactionEventMessage({
+                        platform: selectedConversation?.platform ?? 'simulator',
+                        senderType: m.sender_type,
+                        metadata: m.metadata,
+                        content: m.content,
+                      })
+                      const instagramReactionTargetMessageId = resolveInstagramReactionEvent(
+                        m.metadata,
+                        m.content
+                      )?.targetMessageId
+                      const instagramReactionTargetMessage = instagramReactionTargetMessageId
+                        ? (instagramMessagesByProviderId.get(instagramReactionTargetMessageId) ?? null)
+                        : null
+                      const instagramReactionSummary = isInstagramReactionEvent
+                        ? resolveInstagramReactionSummary({
+                            metadata: m.metadata,
+                            content: m.content,
+                            targetSenderType: instagramReactionTargetMessage?.sender_type,
+                            labels: instagramReactionLabels,
+                          })
+                        : null
                       const instagramSeenIndicator =
                         isMe && !isBot
                           ? (instagramSeenIndicatorByMessageId.get(m.id) ?? null)
@@ -4111,6 +4207,25 @@ export function InboxContainer({
 
                       if (isInstagramSeenEvent) {
                         return null
+                      }
+
+                      if (isInstagramReactionEvent) {
+                        return (
+                          <div
+                            key={m.id}
+                            className={messageDateSeparator ? 'space-y-3' : undefined}
+                          >
+                            {dateSeparator}
+                            <div className="flex flex-col items-center gap-1.5 py-1">
+                              <span className="inline-flex max-w-[85%] items-center justify-center rounded-full border border-rose-100 bg-rose-50/80 px-3 py-1.5 text-center text-xs font-medium text-rose-700">
+                                {instagramReactionSummary ?? t('instagramReaction.fallback')}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                              </span>
+                            </div>
+                          </div>
+                        )
                       }
 
                       if (!isMe && !isBot) {

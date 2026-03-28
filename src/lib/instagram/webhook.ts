@@ -23,6 +23,11 @@ export interface InstagramInboundEvent {
     direction: 'inbound' | 'outbound'
     skipAutomation: boolean
     debugMessage?: Record<string, unknown> | null
+    reaction?: {
+        action: string | null
+        emoji: string | null
+        targetMessageId: string | null
+    }
     media?: {
         type: 'image' | 'unknown'
         originalType?: string | null
@@ -415,6 +420,7 @@ function extractInboundEventsFromItems(
             })
             const emoji = asString(reaction.emoji)
             const action = asString(reaction.action)
+            const targetMessageId = asString(reaction.mid)
             const reactionLabel = [action, emoji].filter(Boolean).join(' ')
 
             events.push({
@@ -427,7 +433,12 @@ function extractInboundEventsFromItems(
                 eventSource,
                 eventType: 'reaction',
                 direction: 'inbound',
-                skipAutomation: true
+                skipAutomation: true,
+                reaction: {
+                    action,
+                    emoji,
+                    targetMessageId
+                }
             })
             continue
         }

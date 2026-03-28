@@ -579,6 +579,76 @@ describe('Instagram webhook route', () => {
         }))
     })
 
+    it('persists structured instagram reaction metadata into inbound message metadata', async () => {
+        const event = {
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-user-1',
+            contactName: 'Ayse',
+            messageId: 'ig-reaction-1',
+            text: '[Instagram reaction] react ❤️',
+            timestamp: '1738000001',
+            eventSource: 'messaging',
+            eventType: 'reaction',
+            direction: 'inbound',
+            skipAutomation: true,
+            reaction: {
+                action: 'react',
+                emoji: '❤️',
+                targetMessageId: 'ig-mid-outbound-1'
+            }
+        }
+
+        const { supabase } = createInstagramSupabaseMock({
+            directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+                ? {
+                    id: 'channel-ig-1',
+                    organization_id: 'org-1',
+                    config: {
+                        page_id: 'page-1',
+                        instagram_business_account_id: 'ig-biz-1',
+                        instagram_app_scoped_id: 'ig-app-1',
+                        app_secret: 'app-secret',
+                        page_access_token: 'token-ig-1'
+                    }
+                }
+                : null,
+            listData: []
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([event])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getUserProfileMock.mockResolvedValue({
+            id: 'ig-user-1',
+            username: 'ayse',
+            name: 'Ayse',
+            profile_picture_url: null
+        })
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            inboundMessageMetadata: expect.objectContaining({
+                instagram_message_id: 'ig-reaction-1',
+                instagram_event_type: 'reaction',
+                instagram_reaction_action: 'react',
+                instagram_reaction_emoji: '❤️',
+                instagram_reaction_target_message_id: 'ig-mid-outbound-1'
+            })
+        }))
+    })
+
     it('persists direct-instagram business echo messages as outbound inbox messages', async () => {
         const { supabase, messagesInsertMock, conversationsUpdateMock } =
             createInstagramOutboundPersistenceSupabaseMock()

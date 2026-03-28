@@ -83,6 +83,7 @@ This is a **WhatsApp AI Qualy** SaaS for Turkish SMBs. The system:
 - **No hallucination** — AI responds ONLY from Skills/KB
 - **Graceful fallback** — Unknown → human handoff
 - **Confidence thresholds** — Don't respond if uncertain
+- **Sector and language independent first** — Prefer semantic, LLM-first intent/extraction logic that generalizes across industries and languages; do not make static keyword rules the primary behavior unless a narrowly scoped guardrail is truly required.
 
 ---
 

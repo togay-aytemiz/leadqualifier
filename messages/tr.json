@@ -328,6 +328,13 @@
     "queueNoOperators": "Operatör bulunamadı",
     "instagramRequestBadge": "İstek",
     "instagramSeenIconAria": "Görüldü durumu",
+    "instagramReaction": {
+      "reacted": "{emoji} ile tepki verdi",
+      "reactedToYourMessage": "Mesajınıza {emoji} bıraktı",
+      "removed": "Reaksiyonunu kaldırdı",
+      "removedFromYourMessage": "Mesajınızdaki reaksiyonu kaldırdı",
+      "fallback": "Mesaj reaksiyonu"
+    },
     "noMessages": "Mesaj yok",
     "noMessagesDesc": "Yeni konuşmalar mesaj aldığınızda burada görünecektir.",
     "noMessagesYet": "Henüz mesaj yok",

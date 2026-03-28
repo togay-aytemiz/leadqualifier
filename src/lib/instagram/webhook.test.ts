@@ -153,7 +153,8 @@ describe('instagram webhook utilities', () => {
                     timestamp: 1738000013,
                     reaction: {
                         action: 'react',
-                        emoji: '🔥'
+                        emoji: '🔥',
+                        mid: 'igmid-outbound-1'
                     }
                 }, {
                     sender: { id: 'ig-user-3' },
@@ -231,7 +232,12 @@ describe('instagram webhook utilities', () => {
             eventSource: 'messaging',
             eventType: 'reaction',
             direction: 'inbound',
-            skipAutomation: true
+            skipAutomation: true,
+            reaction: {
+                action: 'react',
+                emoji: '🔥',
+                targetMessageId: 'igmid-outbound-1'
+            }
         }, {
             instagramBusinessAccountId: 'ig-business-1',
             contactId: 'ig-user-3',

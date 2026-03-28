@@ -348,6 +348,7 @@ describe('mergeExtractionWithExisting', () => {
                 service_type: null,
                 summary: 'Müşteri fiyat bilgisi almak istiyor.',
                 extracted_fields: {
+                    intent_stage: 'qualification',
                     budget_signals: [],
                     intent_signals: ['decisive'],
                     required_intake_collected: {
@@ -362,37 +363,62 @@ describe('mergeExtractionWithExisting', () => {
             'Hamilelik Durumu': 'Evet',
             'Bebek Doğum Tarihi': 'Temmuz sonu ağustos başı gibi'
         })
+        expect(merged.intent_stage).toBe('qualification')
         expect(merged.score).toBe(8)
         expect(merged.status).toBe('hot')
     })
 })
 
 describe('calibrateLeadScoreFromExtraction', () => {
-    it('treats price/detail inquiry plus service-specific intake evidence as a hot lead floor', () => {
-        const calibrated = calibrateLeadScoreFromExtraction({
-            service_type: null,
-            services: [],
-            desired_date: null,
-            location: null,
-            budget_signals: [],
-            intent_signals: [],
-            risk_signals: [],
-            required_intake_collected: {
-                'Hamilelik Durumu': 'Evet',
-                'Bebek Doğum Tarihi': 'Mayıs ayı'
-            },
-            required_intake_overrides: {},
-            required_intake_override_meta: {},
-            non_business: false,
-            summary: 'Müşteri bunun hakkında daha fazla bilgi almak istiyor.',
-            score: 5,
-            status: 'warm'
-        })
+    it('treats qualification-stage inquiry plus service-specific intake evidence as a hot lead floor', () => {
+        const calibrated = calibrateLeadScoreFromExtraction(
+            safeParseLeadExtraction(`{
+                "service_type": null,
+                "services": [],
+                "desired_date": null,
+                "location": null,
+                "budget_signals": [],
+                "intent_signals": [],
+                "risk_signals": [],
+                "required_intake_collected": {
+                    "Hamilelik Durumu": "Evet",
+                    "Bebek Doğum Tarihi": "Mayıs ayı"
+                },
+                "intent_stage": "qualification",
+                "non_business": false,
+                "summary": "Müşteri bunun hakkında daha fazla bilgi almak istiyor.",
+                "score": 5,
+                "status": "warm"
+            }`)
+        )
 
         expect(calibrated.serviceFit).toBe(3)
         expect(calibrated.intentScore).toBe(5)
         expect(calibrated.totalScore).toBe(8)
         expect(calibrated.status).toBe('hot')
+    })
+
+    it('treats a first-message commercial inquiry as warm even before service is confirmed', () => {
+        const calibrated = calibrateLeadScoreFromExtraction(
+            safeParseLeadExtraction(`{
+                "service_type": null,
+                "services": [],
+                "desired_date": null,
+                "location": null,
+                "budget_signals": [],
+                "intent_signals": [],
+                "risk_signals": [],
+                "required_intake_collected": {},
+                "intent_stage": "informational_commercial",
+                "non_business": false,
+                "summary": "Müşteri bunun hakkında daha fazla bilgi almak istiyor.",
+                "score": 3,
+                "status": "cold"
+            }`)
+        )
+
+        expect(calibrated.totalScore).toBe(5)
+        expect(calibrated.status).toBe('warm')
     })
 })
 

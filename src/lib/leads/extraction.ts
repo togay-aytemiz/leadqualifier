@@ -86,21 +86,6 @@ const SERVICE_SIGNAL_STOPWORDS = new Set([
 ])
 const SERVICE_CONTEXT_HINT_PATTERN = /\b(hizmet|service|paket|package|fiyat|price|bilgi|detay|randevu|appointment|book|booking|çekim|cekim|fotoğraf|fotograf|photoshoot|photography|shoot|tedavi|treatment|seans|session|kurs|program)\b/i
 const DATE_LIKE_FIELD_TOKENS = ['tarih', 'date', 'dogum', 'doğum', 'due', 'termin', 'delivery', 'arrival']
-const COMMERCIAL_INQUIRY_TOKENS = [
-    'fiyat',
-    'price',
-    'ucret',
-    'ücret',
-    'detay',
-    'detail',
-    'bilgi',
-    'info',
-    'daha fazla bilgi',
-    'learn more',
-    'quote',
-    'paket',
-    'package'
-]
 const URGENT_SIGNAL_TOKENS = ['urgent', 'asap', 'acil', 'today', 'bugun', 'bugün', 'tomorrow', 'yarin', 'yarın']
 const INDECISIVE_SIGNAL_TOKENS = ['indecisive', 'unsure', 'kararsiz', 'kararsız', 'bilmiyorum']
 const FAR_FUTURE_SIGNAL_TOKENS = ['far future', 'far_future', 'months later', 'next season', 'ileride', 'aylar sonra']
@@ -161,8 +146,14 @@ export function resolveLeadExtractionLocale(options?: {
 export function buildExtractionSystemPrompt(responseLanguage: 'Turkish' | 'English') {
     return `Extract lead signals as JSON.
 Return ONLY valid JSON (no code fences, no extra text).
-Return keys: service_type, services, desired_date, location, budget_signals, intent_signals, risk_signals, non_business, summary, score, status, required_intake_collected.
+Return keys: service_type, services, desired_date, location, budget_signals, intent_signals, intent_stage, risk_signals, non_business, summary, score, status, required_intake_collected.
 intent_signals can include: decisive (explicit booking/appointment intent), urgent (ASAP/today/tomorrow), indecisive (unsure), far_future (months later/next season).
+intent_stage must be one of: none, informational_commercial, qualification, booking_ready.
+Use intent_stage semantically and sector-agnostically:
+- none: greeting, social chat, unclear chatter, or non-commercial talk.
+- informational_commercial: customer is gathering commercial info about an offering (pricing, package, availability, process, suitability, details) but is not yet clearly booking-ready.
+- qualification: customer is actively evaluating fit/purchase and the conversation includes purchase-relevant context, answers, or clarifications.
+- booking_ready: customer is explicitly ready to book, reserve, start, or take the next operational step now.
 Recent conversation turns are labeled as one of: customer, owner, assistant.
 Customer messages are labeled "customer:" and represent the latest 5 customer messages.
 Prioritize customer intent and the most recent customer messages.
@@ -710,6 +701,38 @@ function normalizeStatus(value: unknown) {
     return 'cold'
 }
 
+export type CommercialIntentStage =
+    | 'none'
+    | 'informational_commercial'
+    | 'qualification'
+    | 'booking_ready'
+
+function normalizeIntentStage(value: unknown): CommercialIntentStage | null {
+    if (typeof value !== 'string') return null
+
+    const normalized = normalizeForMatch(value).replace(/\s+/g, '_')
+    const aliases: Record<string, CommercialIntentStage> = {
+        none: 'none',
+        no_intent: 'none',
+        unclear: 'none',
+        unknown: 'none',
+        informational_commercial: 'informational_commercial',
+        informationalcommercial: 'informational_commercial',
+        commercial_information: 'informational_commercial',
+        info_request: 'informational_commercial',
+        qualification: 'qualification',
+        qualifying: 'qualification',
+        evaluation: 'qualification',
+        evaluating: 'qualification',
+        booking_ready: 'booking_ready',
+        bookingready: 'booking_ready',
+        ready_to_book: 'booking_ready',
+        appointment_ready: 'booking_ready'
+    }
+
+    return aliases[normalized] ?? null
+}
+
 function stripJsonFence(value: string) {
     const fenceMatch = value.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
     if (fenceMatch?.[1]) return fenceMatch[1].trim()
@@ -754,6 +777,7 @@ export interface NormalizedLeadExtraction {
     location: string | null
     budget_signals: string[]
     intent_signals: string[]
+    intent_stage?: CommercialIntentStage | null
     risk_signals: string[]
     required_intake_collected: Record<string, string>
     required_intake_overrides: Record<string, string>
@@ -775,6 +799,7 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
             location: null,
             budget_signals: [],
             intent_signals: [],
+            intent_stage: null,
             risk_signals: [],
             required_intake_collected: {},
             required_intake_overrides: {},
@@ -814,6 +839,7 @@ function normalizeExtractionPayload(payload: unknown): NormalizedLeadExtraction 
         location: typeof payloadRecord.location === 'string' ? payloadRecord.location.trim() || null : null,
         budget_signals: normalizeStringArray(payloadRecord.budget_signals),
         intent_signals: normalizeStringArray(payloadRecord.intent_signals),
+        intent_stage: normalizeIntentStage(payloadRecord.intent_stage ?? payloadRecord.intentStage),
         risk_signals: normalizeStringArray(payloadRecord.risk_signals),
         required_intake_collected: normalizeCollectedFieldValues(
             payloadRecord.required_intake_collected ?? payloadRecord.requiredIntakeCollected
@@ -959,6 +985,30 @@ function normalizeServiceOverrideMeta(value: unknown) {
     } satisfies RequiredIntakeOverrideMetaEntry
 }
 
+function rankCommercialIntentStage(stage: CommercialIntentStage | null | undefined) {
+    switch (stage) {
+        case 'informational_commercial':
+            return 1
+        case 'qualification':
+            return 2
+        case 'booking_ready':
+            return 3
+        default:
+            return 0
+    }
+}
+
+function mergeCommercialIntentStage(
+    incoming: CommercialIntentStage | null | undefined,
+    existing: unknown
+) {
+    const normalizedIncoming = normalizeIntentStage(incoming)
+    const normalizedExisting = normalizeIntentStage(existing)
+    return rankCommercialIntentStage(normalizedIncoming) >= rankCommercialIntentStage(normalizedExisting)
+        ? normalizedIncoming
+        : normalizedExisting
+}
+
 export function mergeExtractionWithExisting(
     incoming: NormalizedLeadExtraction,
     existingLead?: {
@@ -1017,6 +1067,7 @@ export function mergeExtractionWithExisting(
         intent_signals: incoming.intent_signals.length > 0
             ? incoming.intent_signals
             : normalizeStringArray(existingExtracted.intent_signals),
+        intent_stage: mergeCommercialIntentStage(incoming.intent_stage, existingExtracted.intent_stage),
         risk_signals: incoming.risk_signals.length > 0
             ? incoming.risk_signals
             : normalizeStringArray(existingExtracted.risk_signals),
@@ -1076,16 +1127,30 @@ function hasDateLikeRequiredIntake(collected: Record<string, string>) {
     })
 }
 
-function hasCommercialInquirySummary(summary: string | null | undefined) {
-    const normalizedSummary = normalizeForMatch(summary ?? '')
-    if (!normalizedSummary) return false
-    return COMMERCIAL_INQUIRY_TOKENS.some((token) => normalizedSummary.includes(token))
-}
-
 function hasOptOutSummary(summary: string | null | undefined) {
     const normalizedSummary = normalizeForMatch(summary ?? '')
     if (!normalizedSummary) return false
     return OPT_OUT_TOKENS.some((token) => normalizedSummary.includes(token))
+}
+
+function resolveCommercialIntentStageFloor(options: {
+    intentStage: CommercialIntentStage | null | undefined
+    hasCatalogMatch: boolean
+    hasServiceSpecificIntake: boolean
+    hasDate: boolean
+}) {
+    const hasQualificationContext = options.hasCatalogMatch || options.hasServiceSpecificIntake || options.hasDate
+
+    switch (options.intentStage) {
+        case 'informational_commercial':
+            return 5
+        case 'qualification':
+            return hasQualificationContext ? 8 : 6
+        case 'booking_ready':
+            return hasQualificationContext ? 9 : 6
+        default:
+            return 0
+    }
 }
 
 export function calibrateLeadScoreFromExtraction(extracted: NormalizedLeadExtraction) {
@@ -1100,12 +1165,14 @@ export function calibrateLeadScoreFromExtraction(extracted: NormalizedLeadExtrac
 
     const hasCatalogMatch = Boolean(extracted.service_type) || extracted.services.length > 0
     const hasServiceSpecificIntake = Object.keys(extracted.required_intake_collected).length > 0
+    const hasDate = Boolean(extracted.desired_date) || hasDateLikeRequiredIntake(extracted.required_intake_collected)
+    const intentStage = normalizeIntentStage(extracted.intent_stage)
     const base = scoreLead({
         hasCatalogMatch,
         hasProfileMatch: !hasCatalogMatch && hasServiceSpecificIntake,
-        hasDate: Boolean(extracted.desired_date) || hasDateLikeRequiredIntake(extracted.required_intake_collected),
+        hasDate,
         hasBudget: extracted.budget_signals.length > 0,
-        isDecisive: hasStrongIntentSignal(extracted.intent_signals) || hasCommercialInquirySummary(extracted.summary),
+        isDecisive: hasStrongIntentSignal(extracted.intent_signals),
         isUrgent: hasSignalToken(extracted.intent_signals, URGENT_SIGNAL_TOKENS),
         isIndecisive: hasSignalToken(extracted.intent_signals, INDECISIVE_SIGNAL_TOKENS)
             || hasSignalToken(extracted.risk_signals, INDECISIVE_SIGNAL_TOKENS),
@@ -1113,11 +1180,22 @@ export function calibrateLeadScoreFromExtraction(extracted: NormalizedLeadExtrac
     })
 
     const serviceContextBoost = !hasCatalogMatch && hasServiceSpecificIntake ? 1 : 0
-    const totalScore = Math.max(0, Math.min(10, base.totalScore + serviceContextBoost))
+    const serviceFit = Math.max(0, Math.min(4, base.serviceFit + serviceContextBoost))
+    const stageFloor = resolveCommercialIntentStageFloor({
+        intentStage,
+        hasCatalogMatch,
+        hasServiceSpecificIntake,
+        hasDate
+    })
+    const totalScore = Math.max(
+        0,
+        Math.min(10, Math.max(base.totalScore + serviceContextBoost, stageFloor))
+    )
+    const intentScore = Math.max(0, Math.min(6, Math.max(base.intentScore, totalScore - serviceFit)))
 
     return {
-        serviceFit: Math.max(0, Math.min(4, base.serviceFit + serviceContextBoost)),
-        intentScore: base.intentScore,
+        serviceFit,
+        intentScore,
         totalScore,
         status: resolveLeadStatusFromScore(totalScore)
     }
@@ -1137,6 +1215,7 @@ export function normalizeLowSignalLeadStatus(options: {
     if (isGreetingOnlyConversation) {
         return {
             ...extracted,
+            intent_stage: 'none',
             non_business: false,
             score: Math.min(extracted.score, 2),
             status: 'cold'
@@ -1163,6 +1242,7 @@ export function normalizeLowSignalLeadStatus(options: {
 
     return {
         ...extracted,
+        intent_stage: 'none',
         score: Math.min(extracted.score, 2),
         status: 'cold'
     } satisfies NormalizedLeadExtraction
@@ -1450,6 +1530,7 @@ export async function runLeadExtraction(options: {
             location: normalizedExtracted.location,
             budget_signals: normalizedExtracted.budget_signals,
             intent_signals: normalizedExtracted.intent_signals,
+            intent_stage: normalizedExtracted.intent_stage ?? null,
             risk_signals: normalizedExtracted.risk_signals,
             required_intake_collected: normalizedExtracted.required_intake_collected,
             required_intake_overrides: normalizedExtracted.required_intake_overrides,

@@ -668,6 +668,13 @@ export async function POST(req: NextRequest) {
             instagram_is_echo: true,
           }
         : {}),
+      ...(event.reaction
+        ? {
+            instagram_reaction_action: event.reaction.action,
+            instagram_reaction_emoji: event.reaction.emoji,
+            instagram_reaction_target_message_id: event.reaction.targetMessageId,
+          }
+        : {}),
       ...(event.media
         ? {
             instagram_media_type: event.media.type,

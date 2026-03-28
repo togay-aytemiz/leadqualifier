@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
     filterTimelineMessagesForDateSeparators,
+    isInstagramReactionEventMessage,
     isInstagramSeenEventMessage,
+    resolveInstagramProviderMessageId,
+    resolveInstagramReactionEvent,
+    resolveInstagramReactionSummary,
     resolveInstagramMessageEventType,
     resolveLatestNonSeenPreviewMessage
 } from './instagramMessageEvents'
@@ -20,6 +24,80 @@ describe('instagramMessageEvents helpers', () => {
             senderType: 'contact',
             metadata: { instagram_event_type: 'seen' }
         })).toBe(true)
+    })
+
+    it('detects instagram reaction events using metadata and legacy content', () => {
+        expect(isInstagramReactionEventMessage({
+            platform: 'instagram',
+            senderType: 'contact',
+            metadata: {
+                instagram_event_type: 'reaction',
+                instagram_reaction_emoji: '❤️'
+            }
+        })).toBe(true)
+
+        expect(isInstagramReactionEventMessage({
+            platform: 'instagram',
+            senderType: 'contact',
+            metadata: {},
+            content: '[Instagram reaction] react ❤️'
+        })).toBe(true)
+    })
+
+    it('resolves instagram reaction metadata and provider ids', () => {
+        expect(resolveInstagramProviderMessageId({
+            instagram_message_id: 'igmid-1'
+        })).toBe('igmid-1')
+
+        expect(resolveInstagramReactionEvent({
+            instagram_event_type: 'reaction',
+            instagram_reaction_action: 'react',
+            instagram_reaction_emoji: '❤️',
+            instagram_reaction_target_message_id: 'igmid-outbound-1'
+        })).toEqual({
+            action: 'react',
+            emoji: '❤️',
+            targetMessageId: 'igmid-outbound-1'
+        })
+
+        expect(resolveInstagramReactionEvent({}, '[Instagram reaction] react 🔥')).toEqual({
+            action: 'react',
+            emoji: '🔥',
+            targetMessageId: null
+        })
+    })
+
+    it('formats human-readable instagram reaction summaries', () => {
+        expect(resolveInstagramReactionSummary({
+            metadata: {
+                instagram_event_type: 'reaction',
+                instagram_reaction_action: 'react',
+                instagram_reaction_emoji: '❤️',
+                instagram_reaction_target_message_id: 'igmid-outbound-1'
+            },
+            targetSenderType: 'user',
+            labels: {
+                reacted: '{emoji} ile tepki verdi',
+                reactedToYourMessage: 'Mesajınıza {emoji} bıraktı',
+                removed: 'Reaksiyonunu kaldırdı',
+                removedFromYourMessage: 'Mesajınızdaki reaksiyonu kaldırdı',
+                fallback: 'Mesaj reaksiyonu'
+            }
+        })).toBe('Mesajınıza ❤️ bıraktı')
+
+        expect(resolveInstagramReactionSummary({
+            metadata: {
+                instagram_event_type: 'reaction',
+                instagram_reaction_action: 'unreact'
+            },
+            labels: {
+                reacted: '{emoji} ile tepki verdi',
+                reactedToYourMessage: 'Mesajınıza {emoji} bıraktı',
+                removed: 'Reaksiyonunu kaldırdı',
+                removedFromYourMessage: 'Mesajınızdaki reaksiyonu kaldırdı',
+                fallback: 'Mesaj reaksiyonu'
+            }
+        })).toBe('Reaksiyonunu kaldırdı')
     })
 
     it('detects legacy instagram seen payloads by content fallback', () => {

@@ -328,6 +328,13 @@
     "queueNoOperators": "No operators found",
     "instagramRequestBadge": "Request",
     "instagramSeenIconAria": "Seen status",
+    "instagramReaction": {
+      "reacted": "Reacted with {emoji}",
+      "reactedToYourMessage": "Reacted {emoji} to your message",
+      "removed": "Removed a reaction",
+      "removedFromYourMessage": "Removed the reaction from your message",
+      "fallback": "Message reaction"
+    },
     "noMessages": "No messages",
     "noMessagesDesc": "New conversations will appear here when you receive messages.",
     "noMessagesYet": "No messages yet",
