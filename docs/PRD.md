@@ -1,6 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
 > **Update Note (2026-03-28):** Instagram Inbox reaction events should no longer render as raw `[Instagram reaction] react ❤️` text bubbles. Reaction rows must persist structured reaction metadata, parse legacy raw rows backward-compatibly, and clarify when the customer reacted to the business message instead of sending a standalone heart message.
+> **Update Note (2026-03-28):** Localized Instagram reaction labels may keep an `{emoji}` placeholder in EN/TR copy. Inbox must treat those as raw templates and inject the emoji at render time instead of requesting formatted i18n output without interpolation values.
 > **Update Note (2026-03-28):** Lead extraction should classify first-message business interest with a sector-agnostic semantic `intent_stage` (`none`, `informational_commercial`, `qualification`, `booking_ready`) instead of relying on static language-specific pricing keywords. First-message commercial inquiries should therefore rise to `warm` even before service confirmation, while `hot` still requires stronger qualification evidence.
 > **Update Note (2026-03-27):** AI QA Lab consistency cleanup must recognize normalized clear-summary phrasing and English `budget` wording. Stale did-not-ask/follow-up/missing-field penalties should clear when transcript or intake coverage already disproves the claim, while abstract placeholder replies still count as low-information unless the assistant is giving a grounded general-information offer.
 > **Update Note (2026-03-27):** Lead extraction should recover the approved canonical service from current conversation plus summary evidence when raw `service_type/services` are empty, and required-intake repair should scan recent customer turns for category-compatible answers including relative timeline phrasing such as `1 ay içinde` instead of only trusting the latest message.
@@ -1040,9 +1041,10 @@ Common competitor capabilities that are visible in the market but intentionally 
 
 ## Appendix: Tech Decisions ✅
 
-> Finalized: 2026-01-31 (updated with implementation decisions through 2026-03-27)
+> Finalized: 2026-01-31 (updated with implementation decisions through 2026-03-28)
 
 - **RAG Architecture:** Store raw knowledge documents and embedded chunks separately (`knowledge_documents` + `knowledge_chunks`) to support large content and future file ingestion.
+- **ICU Reaction Label Rendering (Implementation v1.54):** Inbox reaction labels that intentionally keep an `{emoji}` placeholder must read localized templates via `next-intl` `raw/has` access and inject the emoji only when the event row is rendered; calling formatted translation helpers without interpolation values is treated as a runtime regression.
 - **Scheduling Source of Truth (Implementation v1.35):** Keep Qualy as the canonical booking system of record; Google Calendar is an optional provider overlay and mirroring target, not the primary source of truth.
 - **Calendar Provider Boundary (Implementation v1.35):** Model calendar connections by provider and isolate provider secrets so Google can ship first without locking the product into a Google-only runtime shape.
 - **Service-Duration Scheduling Model (Implementation v1.35):** Extend the existing `service_catalog` with per-service duration metadata instead of creating a second appointment-service registry; booking duration falls back to organization defaults when a service-specific duration is missing.

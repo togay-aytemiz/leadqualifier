@@ -130,7 +130,7 @@ import {
   validateWhatsAppOutboundAttachments,
   type WhatsAppOutboundMediaType,
 } from '@/lib/inbox/outbound-media'
-import { resolveTranslationValue } from '@/components/inbox/translationFallback'
+import { resolveTranslationTemplate } from '@/components/inbox/translationFallback'
 import {
   filterConversationsByQueue,
   summarizeConversationQueueCounts,
@@ -392,7 +392,9 @@ export function InboxContainer({
   const dateLocale = locale === 'tr' ? tr : undefined
   const initialSelectedConversationIdValue =
     initialSelectedConversationId ??
-    initialThreadPayload?.conversationId ?? initialConversations[0]?.id ?? null
+    initialThreadPayload?.conversationId ??
+    initialConversations[0]?.id ??
+    null
   const [conversations, setConversations] = useState<ConversationListItem[]>(initialConversations)
   const [relativeTimeBaseDate, setRelativeTimeBaseDate] = useState<Date>(() => {
     const parsed = new Date(renderedAtIso)
@@ -517,55 +519,48 @@ export function InboxContainer({
     warm: t('leadStatusWarm'),
     cold: t('leadStatusCold'),
   }
-  const instagramReactionLabels = useMemo(
-    () => {
-      const localeFallbacks =
-        locale === 'tr'
-          ? {
-              reacted: '{emoji} ile tepki verdi',
-              reactedToYourMessage: 'Mesajınıza {emoji} bıraktı',
-              removed: 'Reaksiyonunu kaldırdı',
-              removedFromYourMessage: 'Mesajınızdaki reaksiyonu kaldırdı',
-              fallback: 'Mesaj reaksiyonu',
-            }
-          : {
-              reacted: 'Reacted with {emoji}',
-              reactedToYourMessage: 'Reacted {emoji} to your message',
-              removed: 'Removed a reaction',
-              removedFromYourMessage: 'Removed the reaction from your message',
-              fallback: 'Message reaction',
-            }
+  const instagramReactionLabels = useMemo(() => {
+    const localeFallbacks =
+      locale === 'tr'
+        ? {
+            reacted: '{emoji} ile tepki verdi',
+            reactedToYourMessage: 'Mesajınıza {emoji} bıraktı',
+            removed: 'Reaksiyonunu kaldırdı',
+            removedFromYourMessage: 'Mesajınızdaki reaksiyonu kaldırdı',
+            fallback: 'Mesaj reaksiyonu',
+          }
+        : {
+            reacted: 'Reacted with {emoji}',
+            reactedToYourMessage: 'Reacted {emoji} to your message',
+            removed: 'Removed a reaction',
+            removedFromYourMessage: 'Removed the reaction from your message',
+            fallback: 'Message reaction',
+          }
 
-      return {
-        reacted: resolveTranslationValue(
-          t('instagramReaction.reacted'),
-          localeFallbacks.reacted,
-          'inbox.'
-        ),
-        reactedToYourMessage: resolveTranslationValue(
-          t('instagramReaction.reactedToYourMessage'),
-          localeFallbacks.reactedToYourMessage,
-          'inbox.'
-        ),
-        removed: resolveTranslationValue(
-          t('instagramReaction.removed'),
-          localeFallbacks.removed,
-          'inbox.'
-        ),
-        removedFromYourMessage: resolveTranslationValue(
-          t('instagramReaction.removedFromYourMessage'),
-          localeFallbacks.removedFromYourMessage,
-          'inbox.'
-        ),
-        fallback: resolveTranslationValue(
-          t('instagramReaction.fallback'),
-          localeFallbacks.fallback,
-          'inbox.'
-        ),
-      }
-    },
-    [locale, t]
-  )
+    const resolveReactionLabel = (
+      key:
+        | 'instagramReaction.reacted'
+        | 'instagramReaction.reactedToYourMessage'
+        | 'instagramReaction.removed'
+        | 'instagramReaction.removedFromYourMessage'
+        | 'instagramReaction.fallback',
+      fallback: string
+    ) => resolveTranslationTemplate(t, key, fallback, 'inbox.')
+
+    return {
+      reacted: resolveReactionLabel('instagramReaction.reacted', localeFallbacks.reacted),
+      reactedToYourMessage: resolveReactionLabel(
+        'instagramReaction.reactedToYourMessage',
+        localeFallbacks.reactedToYourMessage
+      ),
+      removed: resolveReactionLabel('instagramReaction.removed', localeFallbacks.removed),
+      removedFromYourMessage: resolveReactionLabel(
+        'instagramReaction.removedFromYourMessage',
+        localeFallbacks.removedFromYourMessage
+      ),
+      fallback: resolveReactionLabel('instagramReaction.fallback', localeFallbacks.fallback),
+    }
+  }, [locale, t])
   const leadExtractedFields =
     lead?.extracted_fields &&
     typeof lead.extracted_fields === 'object' &&
@@ -4055,7 +4050,8 @@ export function InboxContainer({
                         m.content
                       )?.targetMessageId
                       const instagramReactionTargetMessage = instagramReactionTargetMessageId
-                        ? (instagramMessagesByProviderId.get(instagramReactionTargetMessageId) ?? null)
+                        ? (instagramMessagesByProviderId.get(instagramReactionTargetMessageId) ??
+                          null)
                         : null
                       const instagramReactionSummary = isInstagramReactionEvent
                         ? resolveInstagramReactionSummary({
