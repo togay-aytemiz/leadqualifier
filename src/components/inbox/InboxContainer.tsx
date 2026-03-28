@@ -31,6 +31,7 @@ import { Conversation, Lead, Message, Profile } from '@/types/database'
 import {
   clearConversationRequiredIntakeOverride,
   clearConversationLeadServiceOverride,
+  getConversationListItem,
   getMessagesPage,
   prepareConversationInstagramImageUploads,
   sendMessage,
@@ -184,6 +185,10 @@ import {
   type InboxUnreadFilter,
 } from '@/components/inbox/conversationListFilters'
 import { resolveFilteredConversationBackfillState } from '@/components/inbox/filteredConversationBackfill'
+import {
+  attachInboxRealtimeRecoveryListeners,
+  shouldRecoverInboxRealtime,
+} from '@/components/inbox/inboxRealtimeRecovery'
 import { resolveInboxBotDisplayName } from '@/lib/ai/bot-name'
 
 import { useTranslations, useLocale } from 'next-intl'
@@ -508,6 +513,8 @@ export function InboxContainer({
   const optimisticPreviewUrlsRef = useRef<Set<string>>(new Set())
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const resyncInFlightRef = useRef(false)
+  const pendingResyncRef = useRef(false)
   const toggleDetailsSection = useCallback((section: DetailsSectionKey) => {
     setDetailsSectionState((prev) => ({
       ...prev,
@@ -1134,6 +1141,61 @@ export function InboxContainer({
     }
   }, [])
 
+  const resyncInboxState = useCallback(async () => {
+    pendingResyncRef.current = true
+    if (resyncInFlightRef.current) return
+
+    resyncInFlightRef.current = true
+
+    try {
+      while (pendingResyncRef.current) {
+        pendingResyncRef.current = false
+
+        const currentSelectedId = selectedIdRef.current
+        const [freshConversations, refreshedSelectedConversation, refreshedSelectedThread] =
+          await Promise.all([
+            getConversations(
+              organizationId,
+              0,
+              CONVERSATIONS_PAGE_SIZE,
+              activeConversationListFilters
+            ),
+            currentSelectedId
+              ? getConversationListItem(organizationId, currentSelectedId)
+              : Promise.resolve(null),
+            currentSelectedId
+              ? loadThreadPayload(currentSelectedId, { force: true })
+              : Promise.resolve(null),
+          ])
+
+        const nextConversations =
+          refreshedSelectedConversation &&
+          !freshConversations.some(
+            (conversation) => conversation.id === refreshedSelectedConversation.id
+          )
+            ? [refreshedSelectedConversation, ...freshConversations]
+            : freshConversations
+
+        setConversations(nextConversations)
+        setHasMore(freshConversations.length >= CONVERSATIONS_PAGE_SIZE)
+        setPage(1)
+        setLoadingMore(false)
+
+        if (
+          currentSelectedId &&
+          refreshedSelectedThread &&
+          selectedIdRef.current === currentSelectedId
+        ) {
+          applyThreadPayload(currentSelectedId, refreshedSelectedThread)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to resync inbox state after realtime recovery', error)
+    } finally {
+      resyncInFlightRef.current = false
+    }
+  }, [activeConversationListFilters, applyThreadPayload, loadThreadPayload, organizationId])
+
   const loadOlderMessages = useCallback(async () => {
     const conversationId = selectedIdRef.current
     if (!conversationId || !hasMoreMessageHistory || isLoadingMessageHistoryRef.current) return
@@ -1527,6 +1589,15 @@ export function InboxContainer({
   // ... re-insert realtime subscriptions ...
 
   useEffect(() => {
+    return attachInboxRealtimeRecoveryListeners({
+      onRecover: (reason) => {
+        console.log('Recovering inbox realtime state after browser resume event:', reason)
+        void resyncInboxState()
+      },
+    })
+  }, [resyncInboxState])
+
+  useEffect(() => {
     let messagesChannel: ReturnType<typeof supabase.channel> | null = null
     let conversationsChannel: ReturnType<typeof supabase.channel> | null = null
     let leadsChannel: ReturnType<typeof supabase.channel> | null = null
@@ -1549,6 +1620,14 @@ export function InboxContainer({
       }
 
       console.log('Setting up Realtime subscription...')
+
+      const logChannelStatus = (channelName: string, status: string, err?: Error) => {
+        console.log(`${channelName} Channel Status:`, status, err ? { error: err } : '')
+        if (!isMounted) return
+        if (shouldRecoverInboxRealtime(status)) {
+          void resyncInboxState()
+        }
+      }
 
       // Separate channels for messages and conversations
       messagesChannel = supabase
@@ -1666,7 +1745,7 @@ export function InboxContainer({
           }
         )
         .subscribe((status, err) => {
-          console.log('Messages Channel Status:', status, err ? { error: err } : '')
+          logChannelStatus('Messages', status, err)
         })
 
       conversationsChannel = supabase
@@ -1753,7 +1832,7 @@ export function InboxContainer({
           }
         )
         .subscribe((status, err) => {
-          console.log('Conversations Channel Status:', status, err ? { error: err } : '')
+          logChannelStatus('Conversations', status, err)
         })
 
       // Separate channel for leads
@@ -1792,7 +1871,7 @@ export function InboxContainer({
           }
         )
         .subscribe((status, err) => {
-          console.log('Leads Channel Status:', status, err ? { error: err } : '')
+          logChannelStatus('Leads', status, err)
         })
     }
 
@@ -1821,6 +1900,7 @@ export function InboxContainer({
     organizationId,
     refreshMessages,
     refreshConversationPreview,
+    resyncInboxState,
     resolveAssignee,
     scheduleLeadAutoRefresh,
     supabase,
