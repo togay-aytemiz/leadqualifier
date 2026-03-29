@@ -327,6 +327,9 @@
     "queueUnassignedSummary": "Atanmamış: {count}",
     "queueNoOperators": "Operatör bulunamadı",
     "instagramRequestBadge": "İstek",
+    "instagramUnknownContact": "Instagram kullanıcısı",
+    "instagramIdLabel": "Instagram ID",
+    "instagramDeletedMessage": "Mesaj silindi",
     "instagramSeenIconAria": "Görüldü durumu",
     "instagramReaction": {
       "reacted": "{emoji} ile tepki verdi",
@@ -1099,6 +1102,7 @@
         "cancelCta": "Aboneliği iptal et",
         "cancelScheduledWithDate": "Abonelik iptali planlandı. Planın {date} tarihine kadar aktif kalacak.",
         "cancelScheduledNoDate": "Abonelik iptali planlandı. Planın mevcut dönem sonuna kadar aktif kalacak.",
+        "resumeUnavailable": "Iyzico tarafında kapatılan yenilemeyi uygulama içinden tekrar açamazsın. Gerekirse dönem sonunda yeniden abone olursun.",
         "pendingPlanWithDate": "Yeni plan: {plan}. Geçiş tarihi: {date}.",
         "pendingPlanNoDate": "Yeni plan: {plan}. Geçiş bir sonraki dönem başında uygulanacak."
       },
@@ -1139,7 +1143,7 @@
       },
       "renewalCard": {
         "title": "Abonelik yönetimi",
-        "description": "İstediğin zaman otomatik yenilemeyi buradan kapatıp tekrar açabilirsin.",
+        "description": "Otomatik yenilemeyi buradan kapatabilirsin. Planın dönem sonuna kadar aktif kalır.",
         "statusLabel": "Otomatik yenileme",
         "statusOn": "Açık",
         "statusOff": "Kapalı",
@@ -1147,7 +1151,7 @@
         "offHintWithDate": "Paketin {date} tarihine kadar aktif kalır. Sonrasında otomatik yenileme yapılmaz.",
         "offHintNoDate": "Paketin mevcut dönem sonuna kadar aktif kalır. Sonrasında otomatik yenileme yapılmaz.",
         "turnOff": "Yenilemeyi kapat",
-        "turnOn": "Yenilemeyi aç"
+        "turnOn": "Dönem sonunda yeniden abone ol"
       },
       "manageHint": "Plan geçişlerini bu ekrandan yapabilirsin. Özel faturalandırma ihtiyaçları için",
       "manageHintContact": "bize yaz.",
@@ -1174,16 +1178,32 @@
     "checkoutLegal": {
       "title": "Ödeme öncesi onay",
       "description": "Iyzico ödeme ekranına geçmeden önce aşağıdaki dökümanları inceleyin ve zorunlu onayları tamamlayın.",
+      "descriptionDirectAction": "İşlemi onaylamadan önce aşağıdaki dökümanları inceleyin ve zorunlu onayları tamamlayın.",
       "summaryLabel": "Seçilen ürün",
       "providerNotice": "Ödeme bu adımdan sonra Iyzico ekranında tamamlanır.",
+      "providerNoticeDirectAction": "Onaydan sonra plan değişikliği Iyzico abonelik altyapısında işlenir. Bu akışta ayrı bir ödeme ekranı açılmaz.",
       "infoDocsTitle": "Bilgilendirme dökümanları",
       "acceptRequiredDocs": "<preInformation>Ön Bilgilendirme Formu</preInformation>, <distanceSalesAgreement>Mesafeli Hizmet Sözleşmesi</distanceSalesAgreement> ve <terms>Hizmet Şartları</terms>'nı okudum ve kabul ediyorum.",
       "acceptImmediateStart": "Ödeme tamamlandıktan sonra dijital hizmetin hemen kullanıma açılmasını istiyorum.",
+      "acceptPlanChange": "Plan değişikliğinin yukarıdaki bilgilere göre uygulanmasını istiyorum.",
       "continue": "Ödeme ekranına devam et",
+      "continueDirectAction": "Onayla ve devam et",
       "back": "Geri",
       "close": "Kapat",
       "subscriptionSummary": "{plan} • {price} / ay • {credits} kredi",
       "topupSummary": "{credits} kredi • {amount}",
+      "details": {
+        "currentPlan": "Mevcut plan",
+        "newPlan": "Yeni plan",
+        "planValue": "{plan} • {price} / ay",
+        "effectiveLabel": "Geçiş zamanı",
+        "effectiveImmediate": "Hemen uygulanır.",
+        "effectiveNextPeriod": "Bir sonraki dönem başında uygulanır.",
+        "todayChargeLabel": "Bugünkü tahsilat",
+        "chargeProviderCalculated": "Kesin tutar bu adımda gösterilmez. İşlem Iyzico abonelik kurallarına göre mevcut ödeme yöntemiyle işlenir.",
+        "chargeNoCharge": "Bugün yeni tahsilat yapılmaz. Yeni fiyat bir sonraki dönemde devreye girer.",
+        "chargeFullPrice": "Bugün {price} tutarında ilk abonelik ödemesi alınır."
+      },
       "docs": {
         "preInformation": "Ön Bilgilendirme Formu",
         "distanceSalesAgreement": "Mesafeli Hizmet Sözleşmesi",

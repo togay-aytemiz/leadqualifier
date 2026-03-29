@@ -327,6 +327,9 @@
     "queueUnassignedSummary": "Unassigned: {count}",
     "queueNoOperators": "No operators found",
     "instagramRequestBadge": "Request",
+    "instagramUnknownContact": "Instagram user",
+    "instagramIdLabel": "Instagram ID",
+    "instagramDeletedMessage": "Message deleted",
     "instagramSeenIconAria": "Seen status",
     "instagramReaction": {
       "reacted": "Reacted with {emoji}",
@@ -1099,6 +1102,7 @@
         "cancelCta": "Cancel subscription",
         "cancelScheduledWithDate": "Cancellation scheduled. Your plan stays active until {date}.",
         "cancelScheduledNoDate": "Cancellation scheduled. Your plan stays active until the current period ends.",
+        "resumeUnavailable": "After Iyzico turns auto-renew off, you can't turn it back on from inside the app. Subscribe again when the period ends if needed.",
         "pendingPlanWithDate": "Upcoming plan: {plan}. Effective on {date}.",
         "pendingPlanNoDate": "Upcoming plan: {plan}. Effective at next billing period."
       },
@@ -1139,7 +1143,7 @@
       },
       "renewalCard": {
         "title": "Subscription management",
-        "description": "You can turn auto-renew off and on here anytime.",
+        "description": "You can turn auto-renew off here. The plan stays active until the current period ends.",
         "statusLabel": "Auto-renew",
         "statusOn": "On",
         "statusOff": "Off",
@@ -1147,7 +1151,7 @@
         "offHintWithDate": "Your package stays active until {date}. After that, it will not auto-renew.",
         "offHintNoDate": "Your package stays active until the end of the current period. After that, it will not auto-renew.",
         "turnOff": "Turn off auto-renew",
-        "turnOn": "Turn on auto-renew"
+        "turnOn": "Subscribe again at period end"
       },
       "manageHint": "You can change plans directly from this page. For custom billing needs,",
       "manageHintContact": "contact us.",
@@ -1174,16 +1178,32 @@
     "checkoutLegal": {
       "title": "Pre-payment confirmation",
       "description": "Review the documents below and complete the required confirmations before you continue to the Iyzico payment screen.",
+      "descriptionDirectAction": "Review the documents below and complete the required confirmations before you confirm this change.",
       "summaryLabel": "Selected product",
       "providerNotice": "Payment is completed on the Iyzico screen in the next step.",
+      "providerNoticeDirectAction": "After confirmation, the plan change is processed in Iyzico subscription billing. No separate payment screen opens in this flow.",
       "infoDocsTitle": "Informational documents",
       "acceptRequiredDocs": "I have read and accept the <preInformation>Pre-Information Form</preInformation>, <distanceSalesAgreement>Distance Sales Agreement</distanceSalesAgreement>, and <terms>Terms of Service</terms>.",
       "acceptImmediateStart": "I want the digital service to become available right after payment is completed.",
+      "acceptPlanChange": "I want the plan change to be applied according to the details above.",
       "continue": "Continue to payment screen",
+      "continueDirectAction": "Confirm and continue",
       "back": "Back",
       "close": "Close",
       "subscriptionSummary": "{plan} • {price} / month • {credits} credits",
       "topupSummary": "{credits} credits • {amount}",
+      "details": {
+        "currentPlan": "Current plan",
+        "newPlan": "New plan",
+        "planValue": "{plan} • {price} / month",
+        "effectiveLabel": "Takes effect",
+        "effectiveImmediate": "Applies immediately.",
+        "effectiveNextPeriod": "Applies at the start of the next billing period.",
+        "todayChargeLabel": "Today's charge",
+        "chargeProviderCalculated": "The exact amount is not shown at this step. Any charge is processed with the saved payment method under Iyzico subscription rules.",
+        "chargeNoCharge": "No new charge is taken today. The new price starts next period.",
+        "chargeFullPrice": "The first subscription payment of {price} is charged today."
+      },
       "docs": {
         "preInformation": "Pre-Information Form",
         "distanceSalesAgreement": "Distance Sales Agreement",

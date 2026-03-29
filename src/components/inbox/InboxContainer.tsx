@@ -96,7 +96,7 @@ import {
 } from '@/lib/whatsapp/reply-window'
 import { sortMessagesChronologically } from '@/lib/inbox/message-order'
 import { parseOutboundDeliveryStatus } from '@/lib/inbox/outbound-delivery'
-import { dispatchInboxUnreadUpdated } from '@/lib/inbox/unread-events'
+import { dispatchInboxUnreadState, dispatchInboxUnreadUpdated } from '@/lib/inbox/unread-events'
 import { WhatsAppTemplateSendModal } from '@/components/inbox/WhatsAppTemplateSendModal'
 import { TemplatePickerModal } from '@/components/inbox/TemplatePickerModal'
 import { formatRelativeTimeFromBase } from '@/components/inbox/relativeTime'
@@ -141,8 +141,10 @@ import {
   isInstagramRequestConversation,
   isInstagramRequestMessage,
   resolveInboxContactDisplayName,
+  resolveUnresolvedInstagramContactId,
 } from '@/components/inbox/instagramRequestState'
 import {
+  isInstagramDeletedEventMessage,
   filterTimelineMessagesForDateSeparators,
   isInstagramReactionEventMessage,
   isInstagramSeenEventMessage,
@@ -366,6 +368,14 @@ function makePendingAttachmentId() {
     return crypto.randomUUID()
   }
   return `pending-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function formatCompactIdentifier(value: string | null | undefined) {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  if (!normalized) return null
+  if (normalized.length <= 10) return normalized
+  return `${normalized.slice(0, 4)}…${normalized.slice(-4)}`
 }
 
 function extractImageFilesFromClipboard(event: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -1668,6 +1678,7 @@ export function InboxContainer({
           (payload) => {
             const newMsg = payload.new as Message
             console.log('Realtime Message received:', newMsg)
+            let shouldPublishUnreadState = false
             const isInstagramSeenRealtimeEvent = isInstagramSeenEventMessage({
               platform: 'instagram',
               senderType: newMsg.sender_type,
@@ -1744,16 +1755,20 @@ export function InboxContainer({
                       sender_type: newMsg.sender_type,
                       metadata: newMsg.metadata,
                     }
+                    const nextUnreadCount = resolveSelectedConversationUnreadCountOnIncoming({
+                      isSelectedConversation: newMsg.conversation_id === selectedIdRef.current,
+                      shouldIncrementUnread,
+                      unreadCount: c.unread_count,
+                      manualUnread: Boolean(c.manual_unread),
+                    })
+                    if (nextUnreadCount > 0) {
+                      shouldPublishUnreadState = true
+                    }
                     return {
                       ...c,
                       last_message_at: newMsg.created_at,
                       contact_avatar_url: c.contact_avatar_url ?? inboundContactAvatarUrl,
-                      unread_count: resolveSelectedConversationUnreadCountOnIncoming({
-                        isSelectedConversation: newMsg.conversation_id === selectedIdRef.current,
-                        shouldIncrementUnread,
-                        unreadCount: c.unread_count,
-                        manualUnread: Boolean(c.manual_unread),
-                      }),
+                      unread_count: nextUnreadCount,
                       messages: buildConversationPreviewMessages([
                         previewMessage,
                         ...(c.messages ?? []),
@@ -1767,6 +1782,16 @@ export function InboxContainer({
                     new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
                 )
             )
+
+            if (
+              newMsg.sender_type === 'contact' &&
+              (shouldPublishUnreadState || newMsg.conversation_id !== selectedIdRef.current)
+            ) {
+              dispatchInboxUnreadState({
+                organizationId,
+                hasUnread: true,
+              })
+            }
           }
         )
         .subscribe((status, err) => {
@@ -1787,6 +1812,7 @@ export function InboxContainer({
             const newOrUpdatedConv = payload.new as Conversation
             console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
             let shouldHydrateConversationPreview = false
+            let shouldRefreshSelectedThread = false
 
             setConversations((prev) => {
               // Check if exists
@@ -1810,6 +1836,9 @@ export function InboxContainer({
 
                       if (mergedConversationResult.shouldHydratePreview) {
                         shouldHydrateConversationPreview = true
+                        if (c.id === selectedIdRef.current) {
+                          shouldRefreshSelectedThread = true
+                        }
                       }
 
                       return mergedConversationResult.conversation
@@ -1847,11 +1876,12 @@ export function InboxContainer({
             if (newOrUpdatedConv.id === selectedIdRef.current) {
               const lastMessageAt = messagesRef.current[messagesRef.current.length - 1]?.created_at
               if (
+                shouldRefreshSelectedThread ||
                 !lastMessageAt ||
                 new Date(newOrUpdatedConv.last_message_at).getTime() >
                   new Date(lastMessageAt).getTime()
               ) {
-                refreshMessages(newOrUpdatedConv.id)
+                void refreshMessages(newOrUpdatedConv.id)
               }
             }
           }
@@ -2930,7 +2960,15 @@ export function InboxContainer({
         </div>
       ) : (
         filteredConversations.map((c) => {
-          const contactDisplayName = resolveInboxContactDisplayName(c)
+          const unresolvedInstagramContactId = resolveUnresolvedInstagramContactId(c)
+          const contactDisplayName = resolveInboxContactDisplayName(
+            c,
+            undefined,
+            t('instagramUnknownContact')
+          )
+          const compactUnresolvedInstagramContactId = formatCompactIdentifier(
+            unresolvedInstagramContactId
+          )
           const previewMessage = resolveLatestNonSeenPreviewMessage(c.platform, c.messages)
           const leadStatus = c.leads?.[0]?.status
           const leadStatusLabel = leadStatus ? (leadStatusLabels[leadStatus] ?? leadStatus) : null
@@ -2963,6 +3001,7 @@ export function InboxContainer({
               senderType: previewMessage?.sender_type,
               fallbackNoMessage: t('noMessagesYet'),
               unsupportedInstagramAttachment: t('mediaPreview.instagramUnsupported'),
+              instagramDeletedMessage: t('instagramDeletedMessage'),
               labels: {
                 image: t('mediaPreview.image'),
                 document: t('mediaPreview.document'),
@@ -3015,6 +3054,11 @@ export function InboxContainer({
                     >
                       {contactDisplayName}
                     </span>
+                    {compactUnresolvedInstagramContactId && (
+                      <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-gray-500">
+                        {compactUnresolvedInstagramContactId}
+                      </span>
+                    )}
                     <div className="ml-auto flex items-center gap-1.5">
                       {isInstagramRequestPreview && (
                         <span className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
@@ -3094,11 +3138,20 @@ export function InboxContainer({
     () => (showConversationSkeleton ? EMPTY_VISIBLE_MESSAGES : messages),
     [messages, showConversationSkeleton]
   )
+  const selectedConversationUnresolvedInstagramContactId = selectedConversation
+    ? resolveUnresolvedInstagramContactId(selectedConversation, visibleMessages)
+    : null
   const selectedConversationDisplayName = selectedConversation
-    ? resolveInboxContactDisplayName(selectedConversation, visibleMessages)
+    ? resolveInboxContactDisplayName(
+        selectedConversation,
+        visibleMessages,
+        t('instagramUnknownContact')
+      )
     : ''
   const selectedConversationSecondaryIdentifier = selectedConversation
-    ? resolveConversationSecondaryIdentifier(selectedConversation, t('noPhoneNumber'))
+    ? selectedConversationUnresolvedInstagramContactId
+      ? `${t('instagramIdLabel')}: ${selectedConversationUnresolvedInstagramContactId}`
+      : resolveConversationSecondaryIdentifier(selectedConversation, t('noPhoneNumber'))
     : null
   const selectedConversationAvatarUrl = selectedConversation?.contact_avatar_url ?? null
   const isSelectedConversationUnread = (selectedConversation?.unread_count ?? 0) > 0
@@ -3743,14 +3796,23 @@ export function InboxContainer({
                       {t('platformSimulatorShort')}
                     </span>
                   )}
-                  <h2 className="min-w-0 truncate font-bold text-gray-900 text-lg">
-                    {selectedConversationDisplayName}
-                  </h2>
-                  {isSelectedConversationInstagramRequest && (
-                    <span className="hidden shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 sm:inline-flex">
-                      {t('instagramRequestBadge')}
-                    </span>
-                  )}
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h2 className="min-w-0 truncate font-bold text-gray-900 text-lg">
+                        {selectedConversationDisplayName}
+                      </h2>
+                      {isSelectedConversationInstagramRequest && (
+                        <span className="hidden shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 sm:inline-flex">
+                          {t('instagramRequestBadge')}
+                        </span>
+                      )}
+                    </div>
+                    {selectedConversationSecondaryIdentifier && (
+                      <p className="truncate text-xs text-gray-500">
+                        {selectedConversationSecondaryIdentifier}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
@@ -4151,6 +4213,12 @@ export function InboxContainer({
                         metadata: m.metadata,
                         content: m.content,
                       })
+                      const isInstagramDeletedEvent = isInstagramDeletedEventMessage({
+                        platform: selectedConversation?.platform ?? 'simulator',
+                        senderType: m.sender_type,
+                        metadata: m.metadata,
+                        content: m.content,
+                      })
                       const instagramReactionTargetMessageId = resolveInstagramReactionEvent(
                         m.metadata,
                         m.content
@@ -4321,6 +4389,26 @@ export function InboxContainer({
                             <div className="flex flex-col items-center gap-1.5 py-1">
                               <span className="inline-flex max-w-[85%] items-center justify-center rounded-full border border-rose-100 bg-rose-50/80 px-3 py-1.5 text-center text-xs font-medium text-rose-700">
                                 {instagramReactionSummary ?? t('instagramReaction.fallback')}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      if (isInstagramDeletedEvent) {
+                        return (
+                          <div
+                            key={m.id}
+                            className={messageDateSeparator ? 'space-y-3' : undefined}
+                          >
+                            {dateSeparator}
+                            <div className="flex flex-col items-center gap-1.5 py-1">
+                              <span className="inline-flex max-w-[85%] items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-slate-100/90 px-3 py-1.5 text-center text-xs font-medium text-slate-600">
+                                <Trash2 size={12} />
+                                {t('instagramDeletedMessage')}
                               </span>
                               <span className="text-xs text-gray-400">
                                 {format(new Date(m.created_at), 'HH:mm', { locale: dateLocale })}

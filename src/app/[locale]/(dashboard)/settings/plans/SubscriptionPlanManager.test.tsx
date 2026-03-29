@@ -45,6 +45,7 @@ function renderManager() {
                 pendingPlanId={null}
                 pendingPlanName={null}
                 pendingPlanEffectiveAt={null}
+                supportsAutoRenewResume={false}
                 planAction={() => {}}
                 cancelAction={() => {}}
             />
@@ -58,6 +59,6 @@ describe('SubscriptionPlanManager', () => {
 
         expect(html).toContain('Abonelik iptali planlandı.')
         expect(html).not.toContain('İptali geri al')
-        expect(html).not.toContain('Otomatik yenileme provider tarafında kapatıldı.')
+        expect(html).toContain('Iyzico tarafında kapatılan yenilemeyi uygulama içinden tekrar açamazsın.')
     })
 })

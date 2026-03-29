@@ -63,6 +63,10 @@ export interface InboundAiPipelineInput {
     logPrefix: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function readStringArray(value: unknown): string[] {
     if (!Array.isArray(value)) return []
     return value
@@ -96,6 +100,17 @@ function isInstagramSeenEvent(input: InboundAiPipelineInput) {
     return eventType?.toLowerCase() === 'seen'
 }
 
+function isInstagramDeletedEvent(input: InboundAiPipelineInput) {
+    if (input.platform !== 'instagram') return false
+    const eventType = readTrimmedString(input.inboundMessageMetadata.instagram_event_type)
+    return eventType?.toLowerCase() === 'message_deleted'
+}
+
+function readMessageMetadataString(metadata: unknown, key: string) {
+    if (!isRecord(metadata)) return null
+    return readTrimmedString(metadata[key])
+}
+
 function mergeConversationTags(existingTags: unknown, ensureTag: string | null): string[] {
     const normalized = readStringArray(existingTags)
     if (!ensureTag) return normalized
@@ -122,21 +137,140 @@ function schedulePostResponseTask(logPrefix: string, label: string, task: () => 
     }
 }
 
+async function handleInstagramDeletedEvent(params: {
+    conversation: Record<string, any>
+    contactAvatarUrl: string | null
+    markInstagramRequest: boolean
+    options: InboundAiPipelineInput
+}) {
+    const { conversation, contactAvatarUrl, markInstagramRequest, options } = params
+    const { data: conversationMessages, error: conversationMessagesError } = await options.supabase
+        .from('messages')
+        .select('id, sender_type, content, metadata')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: true })
+
+    if (conversationMessagesError) {
+        console.error(`${options.logPrefix}: Failed to inspect instagram deleted-message history`, conversationMessagesError)
+        return
+    }
+
+    const normalizedConversationMessages = Array.isArray(conversationMessages)
+        ? conversationMessages as Array<Record<string, unknown>>
+        : []
+    const matchingMessage = normalizedConversationMessages.find((message) => (
+        readMessageMetadataString(message.metadata, options.inboundMessageIdMetadataKey) === options.inboundMessageId
+        && readMessageMetadataString(message.metadata, 'instagram_event_type')?.toLowerCase() !== 'message_deleted'
+    ))
+    const existingDeletedMessage = normalizedConversationMessages.find((message) => (
+        readMessageMetadataString(message.metadata, options.inboundMessageIdMetadataKey) === options.inboundMessageId
+        && readMessageMetadataString(message.metadata, 'instagram_event_type')?.toLowerCase() === 'message_deleted'
+    ))
+
+    if (existingDeletedMessage) return
+
+    const hasOtherMeaningfulHistory = normalizedConversationMessages.some((message) => {
+        if (message.id === matchingMessage?.id) return false
+        const eventType = readMessageMetadataString(message.metadata, 'instagram_event_type')?.toLowerCase()
+        if (eventType === 'seen' || eventType === 'message_deleted') return false
+        return true
+    })
+
+    if (matchingMessage && !hasOtherMeaningfulHistory) {
+        const { error: deleteMessagesError } = await options.supabase
+            .from('messages')
+            .delete()
+            .eq('conversation_id', conversation.id)
+
+        if (deleteMessagesError) {
+            console.error(`${options.logPrefix}: Failed to remove deleted-only instagram conversation messages`, deleteMessagesError)
+            return
+        }
+
+        const { error: deleteConversationError } = await options.supabase
+            .from('conversations')
+            .delete()
+            .eq('id', conversation.id)
+
+        if (deleteConversationError) {
+            console.error(`${options.logPrefix}: Failed to remove deleted-only instagram conversation`, deleteConversationError)
+        }
+        return
+    }
+
+    if (matchingMessage?.id) {
+        const currentMetadata = isRecord(matchingMessage.metadata) ? matchingMessage.metadata : {}
+        const { error: updateMessageError } = await options.supabase
+            .from('messages')
+            .update({
+                content: options.text,
+                metadata: {
+                    ...currentMetadata,
+                    ...options.inboundMessageMetadata,
+                    instagram_event_type: 'message_deleted'
+                }
+            })
+            .eq('id', matchingMessage.id)
+
+        if (updateMessageError) {
+            console.error(`${options.logPrefix}: Failed to update instagram deleted message state`, updateMessageError)
+            return
+        }
+    } else if (hasOtherMeaningfulHistory) {
+        const { error: insertDeletedMessageError } = await options.supabase
+            .from('messages')
+            .insert({
+                id: uuidv4(),
+                conversation_id: conversation.id,
+                organization_id: options.organizationId,
+                sender_type: 'contact',
+                content: options.text,
+                metadata: options.inboundMessageMetadata
+            })
+
+        if (insertDeletedMessageError) {
+            if (insertDeletedMessageError.code === '23505') return
+            console.error(`${options.logPrefix}: Failed to persist instagram deleted message placeholder`, insertDeletedMessageError)
+            return
+        }
+    } else {
+        return
+    }
+
+    const updatedConversationTags = mergeConversationTags(
+        conversation.tags,
+        markInstagramRequest ? INSTAGRAM_REQUEST_TAG : null
+    )
+
+    await options.supabase
+        .from('conversations')
+        .update({
+            contact_name: options.contactName || conversation.contact_name,
+            contact_avatar_url: contactAvatarUrl || conversation.contact_avatar_url || null,
+            tags: updatedConversationTags,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', conversation.id)
+}
+
 export async function processInboundAiPipeline(options: InboundAiPipelineInput) {
     const orgId = options.organizationId
     const markInstagramRequest = shouldMarkInstagramRequest(options)
     const contactAvatarUrl = normalizeContactAvatarUrl(options.contactAvatarUrl)
+    const isInstagramDeleted = isInstagramDeletedEvent(options)
 
-    const dedupeFilter = `metadata->>${options.inboundMessageIdMetadataKey}`
-    const { data: existingInboundData } = await options.supabase
-        .from('messages')
-        .select('id')
-        .eq('organization_id', orgId)
-        .eq(dedupeFilter, options.inboundMessageId)
-        .maybeSingle()
-    const existingInbound = existingInboundData as { id?: string } | null
+    if (!isInstagramDeleted) {
+        const dedupeFilter = `metadata->>${options.inboundMessageIdMetadataKey}`
+        const { data: existingInboundData } = await options.supabase
+            .from('messages')
+            .select('id')
+            .eq('organization_id', orgId)
+            .eq(dedupeFilter, options.inboundMessageId)
+            .maybeSingle()
+        const existingInbound = existingInboundData as { id?: string } | null
 
-    if (existingInbound?.id) return
+        if (existingInbound?.id) return
+    }
 
     let { data: conversation } = await options.supabase
         .from('conversations')
@@ -146,6 +280,17 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         .eq('contact_phone', options.contactId)
         .limit(1)
         .maybeSingle()
+
+    if (isInstagramDeleted) {
+        if (!conversation) return
+        await handleInstagramDeletedEvent({
+            conversation,
+            contactAvatarUrl,
+            markInstagramRequest,
+            options
+        })
+        return
+    }
 
     if (!conversation) {
         const conversationTags = mergeConversationTags([], markInstagramRequest ? INSTAGRAM_REQUEST_TAG : null)

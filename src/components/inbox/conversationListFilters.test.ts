@@ -130,4 +130,84 @@ describe('applyInboxListFilters', () => {
 
     expect(updatedResult.map((conversation) => conversation.id)).toEqual(['conv-2'])
   })
+
+  it('hides instagram conversations whose only preview message is a deleted event', () => {
+    const conversations = [
+      createConversation('deleted-only-instagram', {
+        platform: 'instagram',
+        unread_count: 1,
+        messages: [
+          {
+            content: '[Instagram message deleted]',
+            created_at: '2026-03-29T15:00:00.000Z',
+            sender_type: 'contact',
+            metadata: {
+              instagram_event_type: 'message_deleted',
+              instagram_message_id: 'igmid-1',
+            },
+          },
+        ],
+      }),
+      createConversation('normal-instagram', {
+        platform: 'instagram',
+        unread_count: 1,
+        messages: [
+          {
+            content: 'Merhaba',
+            created_at: '2026-03-29T15:01:00.000Z',
+            sender_type: 'contact',
+            metadata: {
+              instagram_event_type: 'message',
+              instagram_message_id: 'igmid-2',
+            },
+          },
+        ],
+      }),
+    ]
+
+    const result = applyInboxListFilters({
+      conversations,
+      unreadFilter: 'all',
+      leadTemperatureFilter: 'all',
+    })
+
+    expect(result.map((conversation) => conversation.id)).toEqual(['normal-instagram'])
+  })
+
+  it('keeps established instagram conversations even when one preview message is deleted', () => {
+    const conversations = [
+      createConversation('existing-instagram', {
+        platform: 'instagram',
+        unread_count: 1,
+        messages: [
+          {
+            content: '[Instagram message deleted]',
+            created_at: '2026-03-29T15:02:00.000Z',
+            sender_type: 'contact',
+            metadata: {
+              instagram_event_type: 'message_deleted',
+              instagram_message_id: 'igmid-3',
+            },
+          },
+          {
+            content: 'Onceki mesaj',
+            created_at: '2026-03-29T14:55:00.000Z',
+            sender_type: 'contact',
+            metadata: {
+              instagram_event_type: 'message',
+              instagram_message_id: 'igmid-4',
+            },
+          },
+        ],
+      }),
+    ]
+
+    const result = applyInboxListFilters({
+      conversations,
+      unreadFilter: 'all',
+      leadTemperatureFilter: 'all',
+    })
+
+    expect(result.map((conversation) => conversation.id)).toEqual(['existing-instagram'])
+  })
 })

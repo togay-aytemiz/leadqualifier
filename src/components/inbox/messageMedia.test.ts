@@ -284,6 +284,28 @@ describe('resolveMessagePreviewContent', () => {
 
         expect(preview).toBe('Open Instagram to view this content')
     })
+
+    it('uses localized deleted-message preview text for instagram deleted events', () => {
+        const preview = resolveMessagePreviewContent({
+            content: '[Instagram message deleted]',
+            metadata: {
+                instagram_event_type: 'message_deleted'
+            },
+            fallbackNoMessage: 'No messages yet',
+            unsupportedInstagramAttachment: 'Open Instagram to view this content',
+            instagramDeletedMessage: 'Message deleted',
+            labels: {
+                image: 'Image received',
+                document: 'Document received',
+                audio: 'Audio received',
+                video: 'Video received',
+                sticker: 'Sticker received',
+                media: 'Media received'
+            }
+        })
+
+        expect(preview).toBe('Message deleted')
+    })
 })
 
 describe('resolveVisibleMessageContent', () => {

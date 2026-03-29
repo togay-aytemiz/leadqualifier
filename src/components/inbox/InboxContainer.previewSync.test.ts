@@ -8,8 +8,15 @@ describe('InboxContainer preview sync source guards', () => {
   it('syncs sidebar previews from fetched thread history and stale conversation updates', () => {
     const source = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
 
-    expect(source).toContain('const nextPreviewMessages = buildConversationPreviewMessages(pageResult.messages)')
+    expect(source).toContain(
+      'const nextPreviewMessages = buildConversationPreviewMessages(pageResult.messages)'
+    )
     expect(source).toContain('void refreshConversationPreview(newOrUpdatedConv.id)')
     expect(source).toContain('const mergedConversationResult = mergeRealtimeConversationUpdate({')
+    expect(source).toContain('let shouldRefreshSelectedThread = false')
+    expect(source).toContain('if (mergedConversationResult.shouldHydratePreview) {')
+    expect(source).toContain('if (c.id === selectedIdRef.current) {')
+    expect(source).toContain('shouldRefreshSelectedThread ||')
+    expect(source).toContain('!lastMessageAt ||')
   })
 })

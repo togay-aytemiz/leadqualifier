@@ -126,6 +126,19 @@ function createQueryBuilder(config: QueryBuilderConfig = {}) {
   return builder
 }
 
+function createDeleteBuilder() {
+  const eqMock = vi.fn(async () => ({ error: null }))
+  const deleteMock = vi.fn(() => ({ eq: eqMock }))
+
+  return {
+    builder: {
+      delete: deleteMock,
+    },
+    deleteMock,
+    eqMock,
+  }
+}
+
 function createSupabaseMock(plan: Record<string, ReturnType<typeof createQueryBuilder>[]>) {
   return {
     from: vi.fn((table: string) => {
@@ -378,6 +391,85 @@ describe('getConversations', () => {
     const result = await getConversations('org-1')
 
     expect(result).toEqual([nestedConversation])
+  })
+
+  it('filters and cleans up deleted-only instagram conversations from primary query results', async () => {
+    const hiddenConversation: ConversationListItem = {
+      ...createConversation({
+        id: 'conv-hidden',
+        platform: 'instagram',
+        contact_name: 'instagram-user',
+        contact_phone: '1907776776594113',
+        contact_avatar_url: 'https://cdn.example.com/ig-avatar.jpg',
+        assignee_id: null,
+        unread_count: 1,
+      }),
+      assignee: null,
+      leads: [],
+      messages: [
+        {
+          content: '[Instagram message deleted]',
+          created_at: '2026-03-29T15:00:00.000Z',
+          sender_type: 'contact',
+          metadata: {
+            instagram_event_type: 'message_deleted',
+            instagram_message_id: 'igmid-hidden',
+          },
+        },
+      ],
+    }
+
+    const visibleConversation: ConversationListItem = {
+      ...createConversation({
+        id: 'conv-visible',
+        platform: 'whatsapp',
+      }),
+      assignee: null,
+      leads: [],
+      messages: [
+        {
+          content: 'Merhaba',
+          created_at: '2026-03-29T15:01:00.000Z',
+          sender_type: 'contact',
+          metadata: {},
+        },
+      ],
+    }
+
+    const messagesQuery = createQueryBuilder({
+      inResult: {
+        data: [],
+        error: null,
+      },
+    })
+    const messagesDelete = createDeleteBuilder()
+    const conversationsDelete = createDeleteBuilder()
+
+    const supabaseMock = createSupabaseMock({
+      conversations: [
+        createQueryBuilder({
+          rangeResult: {
+            data: [hiddenConversation, visibleConversation],
+            error: null,
+          },
+        }),
+        conversationsDelete.builder as unknown as ReturnType<typeof createQueryBuilder>,
+      ],
+      messages: [
+        messagesQuery,
+        messagesDelete.builder as unknown as ReturnType<typeof createQueryBuilder>,
+      ],
+    })
+
+    createClientMock.mockResolvedValue(supabaseMock)
+
+    const result = await getConversations('org-1')
+
+    expect(result.map((conversation) => conversation.id)).toEqual(['conv-visible'])
+    expect(messagesDelete.deleteMock).toHaveBeenCalledTimes(1)
+    expect(messagesDelete.eqMock).toHaveBeenCalledWith('conversation_id', 'conv-hidden')
+    expect(conversationsDelete.deleteMock).toHaveBeenCalledTimes(1)
+    expect(conversationsDelete.eqMock).toHaveBeenCalledWith('id', 'conv-hidden')
   })
 
   it('applies unread and lead-status filters in the primary conversation query', async () => {

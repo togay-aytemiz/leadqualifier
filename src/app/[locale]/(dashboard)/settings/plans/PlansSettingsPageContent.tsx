@@ -13,6 +13,7 @@ import {
     resolveBillingCurrencyByRegion,
     resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
+import { getBillingProviderConfig } from '@/lib/billing/providers/config'
 import {
     normalizeBillingRegion,
     resolveBillingRegionForOrganization,
@@ -398,6 +399,7 @@ export default async function PlansSettingsPageContent({
     const topupState = resolveTopupActionState(snapshot)
     const isTrialMembership = snapshot?.membershipState === 'trial_active' || snapshot?.membershipState === 'trial_exhausted'
     const isPremiumMembership = snapshot?.membershipState === 'premium_active'
+    const supportsAutoRenewResume = getBillingProviderConfig().provider !== 'iyzico'
     const autoRenewEnabled = subscriptionRenewalState.autoRenew
     const renewalPeriodEnd = subscriptionRenewalState.periodEnd ?? snapshot?.package.periodEnd ?? null
     const pendingPlanChange = subscriptionRenewalState.pendingPlanChange
@@ -947,6 +949,7 @@ export default async function PlansSettingsPageContent({
                                 pendingPlanId={hasPendingDowngrade ? pendingPlanId : null}
                                 pendingPlanName={hasPendingDowngrade ? pendingPlanName : null}
                                 pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
+                                supportsAutoRenewResume={supportsAutoRenewResume}
                                 planAction={handleMockSubscribe}
                                 cancelAction={handleCancelRenewal}
                             />

@@ -1,4 +1,5 @@
 import type { ConversationListItem } from '@/lib/inbox/actions'
+import { isDeletedOnlyInstagramConversationPreview } from '@/lib/inbox/instagram-deleted-thread'
 
 export type InboxQueueTab = 'me' | 'unassigned' | 'all'
 
@@ -26,26 +27,33 @@ function isUnassignedOperatorConversation(conversation: ConversationListItem) {
 }
 
 export function filterConversationsByQueue({ conversations, queue, currentUserId }: QueueFilterInput) {
-    if (queue === 'all') return conversations
+    const visibleConversations = conversations.filter(
+        (conversation) => !isDeletedOnlyInstagramConversationPreview(conversation)
+    )
+
+    if (queue === 'all') return visibleConversations
 
     if (queue === 'me') {
         if (!currentUserId) return []
-        return conversations.filter((conversation) => conversation.assignee_id === currentUserId)
+        return visibleConversations.filter((conversation) => conversation.assignee_id === currentUserId)
     }
 
-    return conversations.filter(isUnassignedOperatorConversation)
+    return visibleConversations.filter(isUnassignedOperatorConversation)
 }
 
 export function summarizeConversationQueueCounts({ conversations, currentUserId }: QueueCountInput): InboxQueueCounts {
+    const visibleConversations = conversations.filter(
+        (conversation) => !isDeletedOnlyInstagramConversationPreview(conversation)
+    )
     const meConversations = currentUserId
-        ? conversations.filter((conversation) => conversation.assignee_id === currentUserId)
+        ? visibleConversations.filter((conversation) => conversation.assignee_id === currentUserId)
         : []
-    const unassignedConversations = conversations.filter(isUnassignedOperatorConversation)
+    const unassignedConversations = visibleConversations.filter(isUnassignedOperatorConversation)
 
     return {
         me: meConversations.length,
         unassigned: unassignedConversations.length,
-        all: conversations.length,
+        all: visibleConversations.length,
         meAttention: meConversations.filter((conversation) => Boolean(conversation.human_attention_required)).length,
         unassignedAttention: unassignedConversations.filter((conversation) => Boolean(conversation.human_attention_required)).length
     }

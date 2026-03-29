@@ -28,6 +28,7 @@ import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholde
 import { InstagramClient } from '@/lib/instagram/client'
 import { resolveConversationContactAvatarUrl } from '@/lib/inbox/contact-avatar'
 import { normalizeConversationTags } from '@/lib/inbox/conversation-tags'
+import { isDeletedOnlyInstagramConversationPreview } from '@/lib/inbox/instagram-deleted-thread'
 import { buildOutboundDeliveryMetadata } from '@/lib/inbox/outbound-delivery'
 import {
   normalizeRequiredIntakeFieldKey,
@@ -992,6 +993,40 @@ function buildConversationListItemsFromFallback(
   })
 }
 
+async function cleanupDeletedOnlyInstagramConversations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversations: ConversationListItem[]
+) {
+  const suppressedConversations = conversations.filter(isDeletedOnlyInstagramConversationPreview)
+  if (suppressedConversations.length === 0) return conversations
+
+  await Promise.all(
+    suppressedConversations.map(async (conversation) => {
+      const { error: messagesDeleteError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversation.id)
+
+      if (messagesDeleteError) {
+        console.warn('Failed to delete stale deleted-only instagram messages:', messagesDeleteError)
+        return
+      }
+
+      const { error: conversationDeleteError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversation.id)
+
+      if (conversationDeleteError) {
+        console.warn('Failed to delete stale deleted-only instagram conversation:', conversationDeleteError)
+      }
+    })
+  )
+
+  const suppressedIds = new Set(suppressedConversations.map((conversation) => conversation.id))
+  return conversations.filter((conversation) => !suppressedIds.has(conversation.id))
+}
+
 export async function getConversations(
   organizationId: string,
   page: number = 0,
@@ -1035,7 +1070,11 @@ export async function getConversations(
       organizationId,
       normalized
     )
-    return hydrateInstagramConversationContactNames(supabase, organizationId, withRequestFallback)
+    const cleanedConversations = await cleanupDeletedOnlyInstagramConversations(
+      supabase,
+      withRequestFallback
+    )
+    return hydrateInstagramConversationContactNames(supabase, organizationId, cleanedConversations)
   }
 
   console.warn('Error fetching conversations with nested query, using fallback:', error)
@@ -1125,7 +1164,11 @@ export async function getConversations(
     organizationId,
     normalizedFallback
   )
-  return hydrateInstagramConversationContactNames(supabase, organizationId, withRequestFallback)
+  const cleanedConversations = await cleanupDeletedOnlyInstagramConversations(
+    supabase,
+    withRequestFallback
+  )
+  return hydrateInstagramConversationContactNames(supabase, organizationId, cleanedConversations)
 }
 
 export async function getConversationListItem(

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
     filterTimelineMessagesForDateSeparators,
+    isInstagramDeletedEventMessage,
     isInstagramReactionEventMessage,
     isInstagramSeenEventMessage,
     resolveInstagramProviderMessageId,
@@ -41,6 +42,23 @@ describe('instagramMessageEvents helpers', () => {
             senderType: 'contact',
             metadata: {},
             content: '[Instagram reaction] react ❤️'
+        })).toBe(true)
+    })
+
+    it('detects instagram deleted-message events from metadata and legacy content', () => {
+        expect(isInstagramDeletedEventMessage({
+            platform: 'instagram',
+            senderType: 'contact',
+            metadata: {
+                instagram_event_type: 'message_deleted'
+            }
+        })).toBe(true)
+
+        expect(isInstagramDeletedEventMessage({
+            platform: 'instagram',
+            senderType: 'contact',
+            metadata: {},
+            content: '[Instagram message deleted]'
         })).toBe(true)
     })
 

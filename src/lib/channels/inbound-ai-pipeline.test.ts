@@ -162,7 +162,7 @@ function createDedupeBuilder(existingMessageId: string | null) {
     }
 }
 
-function createConversationLookupBuilder(conversation: Record<string, unknown>) {
+function createConversationLookupBuilder(conversation: Record<string, unknown> | null) {
     const builder: Record<string, unknown> = {}
 
     builder.select = vi.fn(() => builder)
@@ -200,6 +200,19 @@ function createUpdateBuilder() {
     }
 }
 
+function createDeleteBuilder() {
+    const eqMock = vi.fn(async () => ({ error: null }))
+    const deleteMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            delete: deleteMock
+        },
+        deleteMock,
+        eqMock
+    }
+}
+
 function createSkillDetailsBuilder(skill: Record<string, unknown> | null) {
     const maybeSingleMock = vi.fn(async () => ({ data: skill, error: null }))
     const builder: Record<string, unknown> = {}
@@ -232,6 +245,21 @@ function createMessageHistoryBuilder(messages: Array<Record<string, unknown>>) {
         eqMock,
         orderMock,
         limitMock
+    }
+}
+
+function createConversationMessagesBuilder(messages: Array<Record<string, unknown>>) {
+    const orderMock = vi.fn(async () => ({ data: messages, error: null }))
+    const eqMock = vi.fn(() => ({ order: orderMock }))
+    const selectMock = vi.fn(() => ({ eq: eqMock }))
+
+    return {
+        builder: {
+            select: selectMock
+        },
+        selectMock,
+        eqMock,
+        orderMock
     }
 }
 
@@ -690,6 +718,158 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(updatePayload).toBeDefined()
         expect(updatePayload).not.toHaveProperty('unread_count')
         expect(updatePayload).not.toHaveProperty('last_message_at')
+    })
+
+    it('ignores instagram deleted events when the conversation does not exist yet', async () => {
+        const sendOutbound = vi.fn()
+        const lookup = createConversationLookupBuilder(null)
+
+        const supabase = createSupabaseMock({
+            conversations: [lookup.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: null,
+            text: '[Instagram message deleted]',
+            inboundMessageId: 'igmid-deleted-only-1',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-deleted-only-1',
+                instagram_event_type: 'message_deleted'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(lookup.maybeSingleMock).toHaveBeenCalledTimes(1)
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
+        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
+    })
+
+    it('removes instagram conversations when the only stored message is later deleted', async () => {
+        const sendOutbound = vi.fn()
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'instagram',
+            contact_phone: 'ig-user-1'
+        }))
+        const conversationMessages = createConversationMessagesBuilder([{
+            id: 'msg-1',
+            sender_type: 'contact',
+            content: 'Merhaba',
+            metadata: {
+                instagram_message_id: 'igmid-deleted-only-2',
+                instagram_event_type: 'message'
+            }
+        }])
+        const messagesDelete = createDeleteBuilder()
+        const conversationsDelete = createDeleteBuilder()
+
+        const supabase = createSupabaseMock({
+            conversations: [lookup.builder, conversationsDelete.builder],
+            messages: [conversationMessages.builder, messagesDelete.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: null,
+            text: '[Instagram message deleted]',
+            inboundMessageId: 'igmid-deleted-only-2',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-deleted-only-2',
+                instagram_event_type: 'message_deleted'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(messagesDelete.deleteMock).toHaveBeenCalledTimes(1)
+        expect(messagesDelete.eqMock).toHaveBeenCalledWith('conversation_id', 'conv-1')
+        expect(conversationsDelete.deleteMock).toHaveBeenCalledTimes(1)
+        expect(conversationsDelete.eqMock).toHaveBeenCalledWith('id', 'conv-1')
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
+    })
+
+    it('updates the matching instagram message to deleted state when the thread already has history', async () => {
+        const sendOutbound = vi.fn()
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'instagram',
+            contact_phone: 'ig-user-1',
+            unread_count: 3,
+            tags: ['vip']
+        }))
+        const conversationMessages = createConversationMessagesBuilder([
+            {
+                id: 'msg-older',
+                sender_type: 'user',
+                content: 'Merhaba, size yardim edebilirim.',
+                metadata: {
+                    instagram_message_id: 'igmid-older',
+                    instagram_event_type: 'message'
+                }
+            },
+            {
+                id: 'msg-target',
+                sender_type: 'contact',
+                content: 'Fiyat nedir?',
+                metadata: {
+                    instagram_message_id: 'igmid-deleted-history-1',
+                    instagram_event_type: 'message'
+                }
+            }
+        ])
+        const messageUpdate = createUpdateBuilder()
+        const conversationUpdate = createUpdateBuilder()
+
+        const supabase = createSupabaseMock({
+            conversations: [lookup.builder, conversationUpdate.builder],
+            messages: [conversationMessages.builder, messageUpdate.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            contactName: 'keskinngamzee',
+            text: '[Instagram message deleted]',
+            inboundMessageId: 'igmid-deleted-history-1',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'igmid-deleted-history-1',
+                instagram_event_type: 'message_deleted'
+            },
+            skipAutomation: true,
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(messageUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            content: '[Instagram message deleted]',
+            metadata: expect.objectContaining({
+                instagram_message_id: 'igmid-deleted-history-1',
+                instagram_event_type: 'message_deleted'
+            })
+        }))
+        expect(messageUpdate.eqMock).toHaveBeenCalledWith('id', 'msg-target')
+        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            contact_name: 'keskinngamzee',
+            tags: ['vip']
+        }))
+
+        const updatePayload = conversationUpdate.updateMock.mock.calls[0]?.[0] as
+            | Record<string, unknown>
+            | undefined
+        expect(updatePayload).toBeDefined()
+        expect(updatePayload).not.toHaveProperty('unread_count')
+        expect(updatePayload).not.toHaveProperty('last_message_at')
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(runLeadExtractionMock).not.toHaveBeenCalled()
     })
 
     it('marks instagram standby inbound conversations with instagram_request tag', async () => {

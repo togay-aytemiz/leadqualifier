@@ -188,6 +188,12 @@ function toNonNegativeNumber(value: unknown) {
     return Math.max(0, parsed)
 }
 
+function withoutPendingPlanChange(metadata: Record<string, unknown>) {
+    const nextMetadata = { ...metadata }
+    delete nextMetadata.pending_plan_change
+    return nextMetadata
+}
+
 function formatIyzicoDate(date: Date) {
     const pad = (value: number) => value.toString().padStart(2, '0')
     const year = date.getUTCFullYear()
@@ -665,26 +671,6 @@ export async function simulateMockSubscriptionCheckout(input: {
     const currentCredits = Math.round(toNonNegativeNumber(billing.monthly_package_credit_limit))
     const requestedCredits = Math.round(toNonNegativeNumber(input.monthlyCredits))
     if (billing.membership_state === 'premium_active') {
-        if (requestedCredits === currentCredits) {
-            return {
-                ok: true,
-                status: 'success',
-                error: null,
-                changeType: 'no_change',
-                effectiveAt: null
-            }
-        }
-
-        if (requestedCredits < currentCredits) {
-            return {
-                ok: true,
-                status: 'scheduled',
-                error: null,
-                changeType: 'downgrade',
-                effectiveAt: null
-            }
-        }
-
         const planId = resolvePlanIdFromCredits({
             planId: input.planId,
             monthlyCredits: input.monthlyCredits
@@ -711,10 +697,79 @@ export async function simulateMockSubscriptionCheckout(input: {
             return errorResult('request_failed')
         }
 
+        if (requestedCredits === currentCredits) {
+            return {
+                ok: true,
+                status: 'success',
+                error: null,
+                changeType: 'no_change',
+                effectiveAt: null
+            }
+        }
+
+        if (requestedCredits < currentCredits) {
+            try {
+                const scheduleResult = await upgradeIyzicoSubscription({
+                    subscriptionReferenceCode: activeSubscription.provider_subscription_id,
+                    newPricingPlanReferenceCode: pricingPlanReferenceCode,
+                    upgradePeriod: 'NEXT_PERIOD'
+                })
+                const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(scheduleResult)
+                    ?? activeSubscription.provider_subscription_id
+                const { startAt } = extractIyzicoSubscriptionStartEnd(scheduleResult)
+                const effectiveAt = startAt ?? activeSubscription.period_end ?? null
+                const nowIso = new Date().toISOString()
+                const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
+
+                await serviceSupabase
+                    .from('organization_subscription_records')
+                    .update({
+                        provider_subscription_id: subscriptionReferenceCode,
+                        metadata: {
+                            ...metadata,
+                            source: 'iyzico_subscription_downgrade',
+                            change_type: 'downgrade',
+                            requested_plan_id: planId,
+                            requested_monthly_credits: requestedCredits,
+                            requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                            downgrade_scheduled_at: nowIso,
+                            downgrade_schedule_response: scheduleResult,
+                            pending_plan_change: {
+                                change_type: 'downgrade',
+                                requested_monthly_credits: requestedCredits,
+                                requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                                effective_at: effectiveAt,
+                                requested_at: nowIso
+                            }
+                        }
+                    })
+                    .eq('id', activeSubscription.id)
+
+                await serviceSupabase
+                    .from('organization_billing_accounts')
+                    .update({
+                        last_manual_action_at: nowIso,
+                        updated_at: nowIso
+                    })
+                    .eq('organization_id', input.organizationId)
+
+                return {
+                    ok: true,
+                    status: 'scheduled',
+                    error: null,
+                    changeType: 'downgrade',
+                    effectiveAt
+                }
+            } catch (error) {
+                return errorResult(mapIyzicoErrorToCheckoutError(error))
+            }
+        }
+
         try {
             const upgradeResult = await upgradeIyzicoSubscription({
                 subscriptionReferenceCode: activeSubscription.provider_subscription_id,
-                newPricingPlanReferenceCode: pricingPlanReferenceCode
+                newPricingPlanReferenceCode: pricingPlanReferenceCode,
+                upgradePeriod: 'NOW'
             })
             const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(upgradeResult)
                 ?? activeSubscription.provider_subscription_id
@@ -724,7 +779,7 @@ export async function simulateMockSubscriptionCheckout(input: {
             const nextPackageBalance = Math.max(0, requestedCredits - currentUsed)
             const creditDelta = Math.max(0, requestedCredits - currentCredits)
             const nowIso = new Date().toISOString()
-            const metadata = asRecord(activeSubscription.metadata)
+            const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
             const periodStart = startAt ?? activeSubscription.period_start
             const periodEnd = endAt ?? activeSubscription.period_end
 

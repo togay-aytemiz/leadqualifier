@@ -73,6 +73,13 @@ function isLegacyReactionContent(content: string | null | undefined) {
         || normalized.startsWith('[instagram reaction] ')
 }
 
+function isLegacyDeletedContent(content: string | null | undefined) {
+    if (typeof content !== 'string') return false
+    const normalized = content.trim().toLowerCase()
+    return normalized === '[instagram message deleted]'
+        || normalized === 'instagram message deleted'
+}
+
 function normalizeReactionAction(value: string | null) {
     const normalized = value?.trim().toLowerCase() ?? null
     if (!normalized) return null
@@ -205,6 +212,17 @@ export function isInstagramReactionEventMessage(candidate: InstagramEventCandida
     if (eventType && eventType !== 'reaction') return false
 
     return isLegacyReactionContent(candidate.content)
+}
+
+export function isInstagramDeletedEventMessage(candidate: InstagramEventCandidate): boolean {
+    if (candidate.platform !== 'instagram') return false
+    if (candidate.senderType && candidate.senderType !== 'contact') return false
+
+    const eventType = resolveInstagramMessageEventType(candidate.metadata)
+    if (eventType === 'message_deleted') return true
+    if (eventType && eventType !== 'message_deleted') return false
+
+    return isLegacyDeletedContent(candidate.content)
 }
 
 export function resolveLatestNonSeenPreviewMessage(

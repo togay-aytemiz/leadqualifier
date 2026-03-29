@@ -61,6 +61,30 @@ function resolveLatestMessageCandidate(
     return candidates[0] ?? null
 }
 
+function resolveInstagramFallbackName(
+    conversation: Pick<ConversationListItem, 'contact_name' | 'contact_phone'>
+) {
+    return readTrimmedString(conversation.contact_name)
+        || readTrimmedString(conversation.contact_phone)
+        || ''
+}
+
+function resolveInstagramMetadataDisplayName(
+    conversation: Pick<ConversationListItem, 'messages'>,
+    messageHistory: Array<Pick<Message, 'sender_type' | 'metadata'>> | null | undefined
+) {
+    const candidates = resolveMessageCandidates(conversation, messageHistory)
+    for (const message of candidates) {
+        if (message.sender_type !== 'contact') continue
+        const resolvedName = readInstagramContactDisplayName(message.metadata)
+        if (!resolvedName) continue
+        if (isInstagramScopedId(resolvedName)) continue
+        return resolvedName
+    }
+
+    return null
+}
+
 function hasInstagramRequestTag(tags: unknown): boolean {
     if (!Array.isArray(tags)) return false
     return tags.some((tag) => typeof tag === 'string' && tag.trim().toLowerCase() === 'instagram_request')
@@ -125,23 +149,35 @@ export function isInstagramRequestConversation(
 
 export function resolveInboxContactDisplayName(
     conversation: Pick<ConversationListItem, 'platform' | 'contact_name' | 'contact_phone' | 'messages'>,
-    messageHistory?: Array<Pick<Message, 'sender_type' | 'metadata'>>
+    messageHistory?: Array<Pick<Message, 'sender_type' | 'metadata'>>,
+    unresolvedInstagramLabel?: string
 ): string {
-    const fallbackName = readTrimmedString(conversation.contact_name)
-        || readTrimmedString(conversation.contact_phone)
-        || ''
+    const fallbackName = resolveInstagramFallbackName(conversation)
 
     if (conversation.platform !== 'instagram') return fallbackName
     if (!isInstagramScopedId(fallbackName)) return fallbackName
 
-    const candidates = resolveMessageCandidates(conversation, messageHistory)
-    for (const message of candidates) {
-        if (message.sender_type !== 'contact') continue
-        const resolvedName = readInstagramContactDisplayName(message.metadata)
-        if (!resolvedName) continue
-        if (isInstagramScopedId(resolvedName)) continue
-        return resolvedName
-    }
+    const resolvedName = resolveInstagramMetadataDisplayName(conversation, messageHistory)
+    if (resolvedName) return resolvedName
+
+    const normalizedUnresolvedLabel = readTrimmedString(unresolvedInstagramLabel)
+    if (normalizedUnresolvedLabel) return normalizedUnresolvedLabel
 
     return fallbackName
+}
+
+export function resolveUnresolvedInstagramContactId(
+    conversation: Pick<ConversationListItem, 'platform' | 'contact_name' | 'contact_phone' | 'messages'>,
+    messageHistory?: Array<Pick<Message, 'sender_type' | 'metadata'>>
+) {
+    const fallbackName = resolveInstagramFallbackName(conversation)
+    if (conversation.platform !== 'instagram') return null
+    if (!isInstagramScopedId(fallbackName)) return null
+
+    const resolvedName = resolveInstagramMetadataDisplayName(conversation, messageHistory)
+    if (resolvedName) return null
+
+    return readTrimmedString(conversation.contact_phone)
+        || readTrimmedString(conversation.contact_name)
+        || null
 }

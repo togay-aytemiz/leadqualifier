@@ -66,7 +66,7 @@ describe('filterConversationsByQueue', () => {
 })
 
 describe('summarizeConversationQueueCounts', () => {
-    it('returns queue totals and attention counters', () => {
+  it('returns queue totals and attention counters', () => {
         const conversations: ConversationListItem[] = [
             createConversation({ id: 'me-1', assignee_id: 'me', human_attention_required: true }),
             createConversation({ id: 'me-2', assignee_id: 'me' }),
@@ -84,12 +84,53 @@ describe('summarizeConversationQueueCounts', () => {
             currentUserId: 'me'
         })
 
-        expect(result).toEqual({
-            me: 2,
-            unassigned: 1,
-            all: 4,
-            meAttention: 1,
-            unassignedAttention: 1
-        })
+    expect(result).toEqual({
+      me: 2,
+      unassigned: 1,
+      all: 4,
+      meAttention: 1,
+      unassignedAttention: 1
     })
+  })
+
+  it('ignores deleted-only instagram conversations that are hidden from inbox', () => {
+    const conversations: ConversationListItem[] = [
+      createConversation({
+        id: 'deleted-only-instagram',
+        platform: 'instagram',
+        unread_count: 1,
+        messages: [
+          {
+            content: '[Instagram message deleted]',
+            created_at: '2026-03-29T15:00:00.000Z',
+            sender_type: 'contact',
+            metadata: {
+              instagram_event_type: 'message_deleted',
+              instagram_message_id: 'igmid-hidden',
+            },
+          },
+        ],
+      }),
+      createConversation({ id: 'visible-1', assignee_id: 'me' }),
+      createConversation({
+        id: 'visible-2',
+        active_agent: 'operator',
+        assignee_id: null,
+        human_attention_required: true,
+      }),
+    ]
+
+    const result = summarizeConversationQueueCounts({
+      conversations,
+      currentUserId: 'me',
+    })
+
+    expect(result).toEqual({
+      me: 1,
+      unassigned: 1,
+      all: 2,
+      meAttention: 0,
+      unassignedAttention: 1,
+    })
+  })
 })

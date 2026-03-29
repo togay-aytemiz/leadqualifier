@@ -3,6 +3,7 @@ import type {
   ConversationListItem,
   ConversationUnreadFilter,
 } from '@/lib/inbox/actions'
+import { isDeletedOnlyInstagramConversationPreview } from '@/lib/inbox/instagram-deleted-thread'
 
 export type InboxUnreadFilter = ConversationUnreadFilter
 export type InboxLeadTemperatureFilter = ConversationLeadTemperatureFilter
@@ -19,12 +20,20 @@ function normalizeLeadStatus(status: string | null | undefined) {
   return normalized.length > 0 ? normalized : null
 }
 
+function shouldSuppressDeletedOnlyInstagramConversation(conversation: ConversationListItem) {
+  return isDeletedOnlyInstagramConversationPreview(conversation)
+}
+
 export function applyInboxListFilters({
   conversations,
   unreadFilter,
   leadTemperatureFilter,
 }: ApplyInboxListFiltersInput) {
   return conversations.filter((conversation) => {
+    if (shouldSuppressDeletedOnlyInstagramConversation(conversation)) {
+      return false
+    }
+
     if (unreadFilter === 'unread' && conversation.unread_count <= 0) {
       return false
     }

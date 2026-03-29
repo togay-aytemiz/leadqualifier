@@ -15,6 +15,14 @@ import { createExternalLegalLink } from '@/lib/legal/external-links'
 interface CheckoutLegalConsentModalProps {
     flowType: CheckoutLegalFlowType
     summary: string
+    summaryDetails?: Array<{
+        label: string
+        value: string
+    }>
+    description?: string
+    providerNotice?: string
+    continueLabel?: string
+    immediateStartLabel?: string
     action: (formData: FormData) => void | Promise<void>
     hiddenFields: Array<{
         name: string
@@ -26,6 +34,11 @@ interface CheckoutLegalConsentModalProps {
 export function CheckoutLegalConsentModal({
     flowType,
     summary,
+    summaryDetails = [],
+    description,
+    providerNotice,
+    continueLabel,
+    immediateStartLabel,
     action,
     hiddenFields,
     onClose
@@ -56,7 +69,7 @@ export function CheckoutLegalConsentModal({
                             {tPlans('checkoutLegal.title')}
                         </h3>
                         <p className="mt-1 text-sm text-gray-600">
-                            {tPlans('checkoutLegal.description')}
+                            {description ?? tPlans('checkoutLegal.description')}
                         </p>
                     </div>
                     <button
@@ -75,7 +88,26 @@ export function CheckoutLegalConsentModal({
                             {tPlans('checkoutLegal.summaryLabel')}
                         </p>
                         <p className="mt-2 text-sm font-medium text-gray-900">{summary}</p>
-                        <p className="mt-2 text-xs text-gray-600">{tPlans('checkoutLegal.providerNotice')}</p>
+                        {summaryDetails.length > 0 && (
+                            <dl className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                                {summaryDetails.map((detail) => (
+                                    <div
+                                        key={`${detail.label}:${detail.value}`}
+                                        className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                                    >
+                                        <dt className="text-xs font-medium uppercase tracking-[0.14em] text-gray-500">
+                                            {detail.label}
+                                        </dt>
+                                        <dd className="text-sm text-gray-700 sm:max-w-[65%] sm:text-right">
+                                            {detail.value}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        )}
+                        <p className="mt-3 text-xs text-gray-600">
+                            {providerNotice ?? tPlans('checkoutLegal.providerNotice')}
+                        </p>
                     </div>
 
                     <div className="mt-5 space-y-3">
@@ -135,7 +167,7 @@ export function CheckoutLegalConsentModal({
                                 required
                                 className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#242A40] focus:ring-[#242A40]"
                             />
-                            <span>{tPlans('checkoutLegal.acceptImmediateStart')}</span>
+                            <span>{immediateStartLabel ?? tPlans('checkoutLegal.acceptImmediateStart')}</span>
                         </label>
 
                         {infoDocuments.length > 0 && (
@@ -181,7 +213,7 @@ export function CheckoutLegalConsentModal({
                             className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/30 active:bg-[#1a2031] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-white/80"
                             disabled={!acceptedRequiredDocs || !acceptedImmediateStart}
                         >
-                            {tPlans('checkoutLegal.continue')}
+                            {continueLabel ?? tPlans('checkoutLegal.continue')}
                         </button>
                     </div>
                 </form>

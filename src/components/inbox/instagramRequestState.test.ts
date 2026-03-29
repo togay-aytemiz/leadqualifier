@@ -5,6 +5,7 @@ import type { ConversationListItem } from '@/lib/inbox/actions'
 import {
     isInstagramRequestConversation,
     resolveInboxContactDisplayName,
+    resolveUnresolvedInstagramContactId,
     resolveInstagramEventSource
 } from './instagramRequestState'
 
@@ -163,6 +164,23 @@ describe('instagramRequestState helpers', () => {
         ]
 
         expect(resolveInboxContactDisplayName(conversation, messages)).toBe('itsalinayalin')
+    })
+
+    it('uses a friendly localized fallback label when instagram contact identity stays unresolved', () => {
+        const conversation = buildConversation()
+
+        expect(
+            resolveInboxContactDisplayName(conversation, [], 'Instagram kullanicisi')
+        ).toBe('Instagram kullanicisi')
+    })
+
+    it('keeps the raw instagram scoped id available as a secondary identifier when identity is unresolved', () => {
+        const conversation = buildConversation({
+            contact_phone: '1907776776594113',
+            contact_name: '1907776776594113'
+        })
+
+        expect(resolveUnresolvedInstagramContactId(conversation, [])).toBe('1907776776594113')
     })
 
     it('keeps stored contact name for non-instagram conversations', () => {

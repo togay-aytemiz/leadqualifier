@@ -83,6 +83,8 @@ export interface IyzicoTopupCheckoutInitInput {
     }>
 }
 
+export type IyzicoSubscriptionUpgradePeriod = 'NOW' | 'NEXT_PERIOD'
+
 export type IyzicoClientErrorCode =
     | 'provider_not_configured'
     | 'request_failed'
@@ -227,12 +229,14 @@ export async function retrieveIyzicoTopupCheckoutResult(token: string, conversat
 export async function upgradeIyzicoSubscription(input: {
     subscriptionReferenceCode: string
     newPricingPlanReferenceCode: string
+    upgradePeriod?: IyzicoSubscriptionUpgradePeriod
 }) {
     const client = createIyzicoSdkClient()
     return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.upgrade({
         subscriptionReferenceCode: input.subscriptionReferenceCode,
         newPricingPlanReferenceCode: input.newPricingPlanReferenceCode,
-        upgradePeriod: Iyzipay.SUBSCRIPTION_UPGRADE_PERIOD.NOW
+        // Iyzico samples document NEXT_PERIOD even though the SDK constant map only exposes NOW.
+        upgradePeriod: input.upgradePeriod ?? 'NOW'
     }, cb))
 }
 

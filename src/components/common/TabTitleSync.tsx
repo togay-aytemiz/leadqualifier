@@ -164,7 +164,6 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
   }, [isDesktopViewport, organizationId, refreshUnread, routeId])
 
   useEffect(() => {
-    if (isDesktopViewport !== true) return
     if (routeId !== 'inbox' || !organizationId) return
 
     return listenForInboxUnreadState((detail) => {
@@ -172,7 +171,7 @@ export function TabTitleSync({ organizationId = null, brandTitle = 'Qualy' }: Ta
       if (typeof detail.hasUnread !== 'boolean') return
       setHasUnread(detail.hasUnread)
     })
-  }, [isDesktopViewport, organizationId, routeId])
+  }, [organizationId, routeId])
 
   useEffect(() => {
     const pageTitle = routeId ? titleMap[routeId] : null

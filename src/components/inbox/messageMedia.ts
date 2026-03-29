@@ -1,3 +1,5 @@
+import { isInstagramDeletedEventMessage } from './instagramMessageEvents'
+
 type MediaPreviewLabelMap = {
     image: string
     document: string
@@ -113,6 +115,13 @@ function isOutboundSenderType(senderType: unknown) {
     return normalized === 'user' || normalized === 'bot'
 }
 
+function normalizeMessageSenderType(value: unknown) {
+    if (value === 'contact' || value === 'user' || value === 'bot' || value === 'system') {
+        return value
+    }
+    return undefined
+}
+
 function resolveReceivedPreviewLabel(
     mediaType: InboxMessageMediaType,
     labels: MediaPreviewLabelMap
@@ -190,6 +199,7 @@ export function resolveMessagePreviewContent(args: {
     senderType?: string | null
     fallbackNoMessage: string
     unsupportedInstagramAttachment?: string
+    instagramDeletedMessage?: string
     labels: MediaPreviewLabelMap
 }) {
     const media = extractMediaFromMessageMetadata(args.metadata)
@@ -199,6 +209,15 @@ export function resolveMessagePreviewContent(args: {
             senderType: args.senderType,
             labels: args.labels
         })
+    }
+
+    if (args.instagramDeletedMessage && isInstagramDeletedEventMessage({
+        platform: 'instagram',
+        senderType: normalizeMessageSenderType(args.senderType),
+        metadata: args.metadata,
+        content: args.content
+    })) {
+        return args.instagramDeletedMessage
     }
 
     if (
