@@ -19,6 +19,7 @@ import {
     getWhatsAppEligibilityOptions,
     getWhatsAppExistingApiOptions,
     getWhatsAppOnboardingOptions,
+    getWhatsAppSupportChatUrl,
     resolveWhatsAppBackScreen,
     resolveWhatsAppConnectMode,
     resolveWhatsAppEligibilityOutcome,
@@ -92,6 +93,20 @@ function getWizardStepNumberClasses(state: WizardStepState) {
     }
 
     return 'bg-white/95 text-slate-500'
+}
+
+function getDisconnectErrorMessage(t: ReturnType<typeof useTranslations<'Channels'>>, error: unknown) {
+    const message = getErrorMessage(error, t('whatsappConnect.disconnectFailed'))
+
+    if (message === 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED') {
+        return t('whatsappConnect.disconnectCoexistenceRequired')
+    }
+
+    if (message === 'WHATSAPP_PROVIDER_DISCONNECT_FAILED') {
+        return t('whatsappConnect.disconnectFailed')
+    }
+
+    return message
 }
 
 export function WhatsAppOnboardingPage({
@@ -262,6 +277,7 @@ export function WhatsAppOnboardingPage({
 
             const result = await completeWhatsAppEmbeddedSignupChannel(organizationId, {
                 authCode,
+                mode,
                 phoneNumberId: signupEvent.phoneNumberId,
                 businessAccountId: signupEvent.businessAccountId
             })
@@ -302,7 +318,7 @@ export function WhatsAppOnboardingPage({
             router.push(getLocalizedHref(locale, '/settings/channels'))
             router.refresh()
         } catch (disconnectError) {
-            setError(getErrorMessage(disconnectError, t('connectWhatsAppError')))
+            setError(getDisconnectErrorMessage(t, disconnectError))
         } finally {
             setIsDisconnecting(false)
         }
@@ -932,7 +948,9 @@ export function WhatsAppOnboardingPage({
                             <p className="text-sm leading-6">
                                 {t('onboarding.whatsapp.supportBannerPrefix')}{' '}
                                 <a
-                                    href="mailto:askqualy@gmail.com?subject=WhatsApp%20Kurulum%20Deste%C4%9Fi"
+                                    href={getWhatsAppSupportChatUrl()}
+                                    target="_blank"
+                                    rel="noreferrer"
                                     className="font-medium text-[#7fb2ff] hover:underline"
                                 >
                                     {t('onboarding.whatsapp.supportBannerCta')}

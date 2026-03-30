@@ -140,6 +140,28 @@ describe('WhatsAppClient', () => {
         )
     })
 
+    it('deregisters a business phone number from cloud api use', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ success: true })
+        })) as unknown as typeof fetch
+        vi.stubGlobal('fetch', fetchMock)
+
+        const client = new WhatsAppClient('token-1')
+        const result = await client.deregisterPhoneNumber('phone-1')
+
+        expect(result).toEqual({ success: true })
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://graph.facebook.com/v21.0/phone-1/deregister',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp'
+                })
+            })
+        )
+    })
+
     it('subscribes the app to a business account and can override callback settings', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import enMessages from '../../../messages/en.json'
+import trMessages from '../../../messages/tr.json'
 
 import {
     getDefaultWhatsAppOnboardingPath,
@@ -6,6 +8,7 @@ import {
     getWhatsAppEligibilityOptions,
     getWhatsAppExistingApiOptions,
     getWhatsAppOnboardingOptions,
+    getWhatsAppSupportChatUrl,
     resolveWhatsAppExistingApiOutcome,
     resolveWhatsAppAlternativeJourneyFromMigrationWarning,
     resolveWhatsAppBackScreen,
@@ -114,5 +117,16 @@ describe('whatsappOnboarding', () => {
 
     it('defaults to the new API account path', () => {
         expect(getDefaultWhatsAppOnboardingPath()).toBe('newApi')
+    })
+
+    it('opens support through the team WhatsApp chat', () => {
+        expect(getWhatsAppSupportChatUrl()).toBe('https://wa.me/905074699692')
+    })
+
+    it('clarifies that the new-api path also covers numbers currently tied to WhatsApp Personal', () => {
+        expect(trMessages.Channels.whatsappConnect.options.newApi.description).toContain('WhatsApp Personal')
+        expect(enMessages.Channels.whatsappConnect.options.newApi.description).toContain('WhatsApp Personal')
+        expect(trMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business uygulamasında')
+        expect(enMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business app')
     })
 })

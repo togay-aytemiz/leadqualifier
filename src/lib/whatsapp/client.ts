@@ -295,6 +295,17 @@ export class WhatsAppClient {
         })
     }
 
+    async deregisterPhoneNumber(
+        phoneNumberId: string
+    ): Promise<WhatsAppProvisioningSuccessResponse> {
+        return this.request<WhatsAppProvisioningSuccessResponse>(`${phoneNumberId}/deregister`, {
+            method: 'POST',
+            body: JSON.stringify({
+                messaging_product: 'whatsapp'
+            })
+        })
+    }
+
     async subscribeAppToBusinessAccount(
         businessAccountId: string,
         overrides?: WhatsAppWebhookSubscriptionOverrides

@@ -720,7 +720,7 @@
         "sidebarDescription": "WhatsApp Business Platform bağlayın; Qualy AI ile cevap versin, lead kalifikasyonu yapsın ve her şeyi tek gelen kutusunda toplasın.",
         "supportBanner": "WhatsApp bağlarken yardıma mı ihtiyacınız var? Önce doğru kurulum yolunu seçin, hesap ve numara hazır olduğunda Meta'yı açın.",
         "supportBannerPrefix": "WhatsApp bağlarken yardıma mı ihtiyacınız var?",
-        "supportBannerCta": "Ekiple konuş",
+        "supportBannerCta": "Ekiple konuşun",
         "heading": "WhatsApp Business Platform (API) bağla",
         "subheading": "Bugünkü durumunuza uyan API yoluyla başlayın. WhatsApp Business uygulamasını zaten kullanıyorsanız, yanlış Meta kurulumunu açmak yerine taşıma akışına geçin.",
         "connectedHeading": "Bağlı WhatsApp kanalınızı yönetin",
@@ -868,10 +868,12 @@
       "embeddedSignupCancelledStep": "WhatsApp kurulumu şu adımda iptal edildi: {step}.",
       "embeddedSignupFailedReason": "WhatsApp kurulumu başarısız: {reason}",
       "embeddedSignupSuccess": "WhatsApp başarıyla bağlandı.",
+      "disconnectFailed": "WhatsApp Cloud API bağlantısı kesilemedi. Lütfen tekrar deneyin.",
+      "disconnectCoexistenceRequired": "Bu numara WhatsApp Business uygulamasıyla birlikte kullanılıyor. Önce telefondaki WhatsApp Business uygulamasında Ayarlar > Hesap > Business Platform yolundan Cloud API bağlantısını kesin, sonra burada tekrar deneyin.",
       "options": {
         "newApi": {
           "title": "Yeni bir WhatsApp API hesabı oluşturup bağla",
-          "description": "Yeni bir WhatsApp Business Platform (API) hesabı oluşturup bunu yeni bir telefon numarasıyla bağlamak istiyorsanız bu seçeneği kullanın."
+          "description": "Henüz bir WhatsApp Business Platform (API) hesabınız yoksa ve ilk kurulumu yeni bir numarayla ya da şu an WhatsApp Personal hesabına bağlı numarayla yapacaksanız bu seçeneği kullanın."
         },
         "existingApi": {
           "title": "Mevcut WhatsApp API hesabını bağla",

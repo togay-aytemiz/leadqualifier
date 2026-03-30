@@ -266,6 +266,7 @@ export function ConnectWhatsAppModal({
 
             const result = await completeWhatsAppEmbeddedSignupChannel(organizationId, {
                 authCode,
+                mode,
                 phoneNumberId: signupEvent.phoneNumberId,
                 businessAccountId: signupEvent.businessAccountId
             })

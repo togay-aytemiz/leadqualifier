@@ -19,6 +19,7 @@ export type WhatsAppConnectMode = 'new' | 'existing'
 
 export const WHATSAPP_MIGRATION_GUIDE_URL =
     'https://respond.io/help/whatsapp/migrating-from-whatsapp-personal-or-whatsapp-business-app'
+export const WHATSAPP_SUPPORT_CHAT_URL = 'https://wa.me/905074699692'
 
 export interface WhatsAppOnboardingOption {
     path: WhatsAppOnboardingPath
@@ -82,6 +83,10 @@ export function getWhatsAppOnboardingOptions() {
 
 export function getDefaultWhatsAppOnboardingPath(): WhatsAppOnboardingPath {
     return 'newApi'
+}
+
+export function getWhatsAppSupportChatUrl() {
+    return WHATSAPP_SUPPORT_CHAT_URL
 }
 
 export function getWhatsAppEligibilityOptions() {

@@ -720,7 +720,7 @@
         "sidebarDescription": "Connect WhatsApp Business Platform so Qualy can answer with AI, qualify leads, and keep everything in one inbox.",
         "supportBanner": "Need help with connecting WhatsApp? Pick the right setup path first, then open Meta only when the account and number are ready.",
         "supportBannerPrefix": "Need help with connecting WhatsApp?",
-        "supportBannerCta": "Talk to our support team",
+        "supportBannerCta": "Talk to the team",
         "heading": "Connect WhatsApp Business Platform (API)",
         "subheading": "Start with the API path that matches your business today. If you already use the WhatsApp Business app, move into the migration flow instead of opening the wrong Meta setup.",
         "connectedHeading": "Manage your connected WhatsApp channel",
@@ -868,10 +868,12 @@
       "embeddedSignupCancelledStep": "WhatsApp setup was cancelled at step: {step}.",
       "embeddedSignupFailedReason": "WhatsApp setup failed: {reason}",
       "embeddedSignupSuccess": "WhatsApp connected successfully.",
+      "disconnectFailed": "Failed to disconnect WhatsApp Cloud API. Please try again.",
+      "disconnectCoexistenceRequired": "This number is still being used with the WhatsApp Business app. First disconnect Cloud API inside the WhatsApp Business app under Settings > Account > Business Platform, then retry here.",
       "options": {
         "newApi": {
           "title": "Create and connect a new WhatsApp API account",
-          "description": "Select this option if you want to create a new WhatsApp Business Platform (API) account and connect it with a new phone number."
+          "description": "Start here if you do not have a WhatsApp Business Platform (API) account yet and want to complete your first setup with either a new phone number or a number currently tied to WhatsApp Personal."
         },
         "existingApi": {
           "title": "Connect an existing WhatsApp API account",

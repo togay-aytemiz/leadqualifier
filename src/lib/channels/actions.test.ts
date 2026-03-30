@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
     assertTenantWriteAllowedMock,
     createClientMock,
+    deregisterPhoneNumberMock,
     exchangeMetaCodeForTokenMock,
     exchangeMetaForLongLivedTokenMock,
     getPhoneNumberMock,
@@ -16,6 +17,7 @@ const {
 } = vi.hoisted(() => ({
     assertTenantWriteAllowedMock: vi.fn(),
     createClientMock: vi.fn(),
+    deregisterPhoneNumberMock: vi.fn(),
     exchangeMetaCodeForTokenMock: vi.fn(),
     exchangeMetaForLongLivedTokenMock: vi.fn(),
     getPhoneNumberMock: vi.fn(),
@@ -54,6 +56,7 @@ vi.mock('@/lib/whatsapp/client', () => ({
 
         getPhoneNumber = getPhoneNumberMock
         getMessageTemplates = getMessageTemplatesMock
+        deregisterPhoneNumber = deregisterPhoneNumberMock
         registerPhoneNumber = registerPhoneNumberMock
         sendTemplate = sendTemplateMock
         subscribeAppToBusinessAccount = subscribeAppToBusinessAccountMock
@@ -65,6 +68,7 @@ import {
     connectWhatsAppChannel,
     debugInstagramChannel,
     debugWhatsAppChannel,
+    disconnectChannel,
     listWhatsAppMessageTemplates,
     sendWhatsAppTemplateMessage
 } from '@/lib/channels/actions'
@@ -118,6 +122,36 @@ function createDebugSupabaseMock(channelData: unknown) {
     }
 }
 
+function createDisconnectSupabaseMock(channelData: unknown, deleteResult: { error: unknown } = { error: null }) {
+    const singleMock = vi.fn(async () => ({ data: channelData }))
+    const selectEqMock = vi.fn(() => ({ single: singleMock }))
+    const selectMock = vi.fn(() => ({ eq: selectEqMock }))
+    const deleteEqMock = vi.fn(async () => deleteResult)
+    const deleteMock = vi.fn(() => ({ eq: deleteEqMock }))
+    const fromMock = vi.fn((table: string) => {
+        if (table !== 'channels') {
+            throw new Error(`Unexpected table ${table}`)
+        }
+
+        return {
+            select: selectMock,
+            delete: deleteMock
+        }
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        fromMock,
+        selectMock,
+        selectEqMock,
+        singleMock,
+        deleteMock,
+        deleteEqMock
+    }
+}
+
 describe('channels actions: WhatsApp core flows', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -134,6 +168,7 @@ describe('channels actions: WhatsApp core flows', () => {
             quality_rating: 'GREEN'
         })
         registerPhoneNumberMock.mockResolvedValue({ success: true })
+        deregisterPhoneNumberMock.mockResolvedValue({ success: true })
         getMessageTemplatesMock.mockResolvedValue({
             data: [
                 {
@@ -172,6 +207,22 @@ describe('channels actions: WhatsApp core flows', () => {
 
         expect(result).toEqual({ error: 'Missing required WhatsApp channel fields.' })
         expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(whatsAppCtorMock).not.toHaveBeenCalled()
+        expect(revalidatePathMock).not.toHaveBeenCalled()
+    })
+
+    it('returns a specific validation error when embedded signup mode is invalid', async () => {
+        const { supabase } = createUpsertSupabaseMock()
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await completeWhatsAppEmbeddedSignupChannel('org-1', {
+            authCode: 'auth-code-1',
+            mode: 'legacy' as never,
+            phoneNumberId: 'phone-1',
+            businessAccountId: 'waba-1'
+        })
+
+        expect(result).toEqual({ error: 'Invalid WhatsApp embedded signup mode.' })
         expect(whatsAppCtorMock).not.toHaveBeenCalled()
         expect(revalidatePathMock).not.toHaveBeenCalled()
     })
@@ -233,6 +284,7 @@ describe('channels actions: WhatsApp core flows', () => {
 
         const result = await completeWhatsAppEmbeddedSignupChannel('org-1', {
             authCode: 'auth-code-1',
+            mode: 'new',
             phoneNumberId: 'phone-1',
             businessAccountId: 'waba-1'
         })
@@ -272,6 +324,7 @@ describe('channels actions: WhatsApp core flows', () => {
                     permanent_access_token: 'long-token-1',
                     verify_token: 'global-verify-token',
                     connected_via: 'embedded_signup',
+                    embedded_signup_mode: 'new',
                     two_step_verification_pin: generatedPin,
                     display_phone_number: '+90 555 111 22 33',
                     webhook_verified_at: null
@@ -298,6 +351,7 @@ describe('channels actions: WhatsApp core flows', () => {
 
         await completeWhatsAppEmbeddedSignupChannel('org-1', {
             authCode: 'auth-code-1',
+            mode: 'new',
             phoneNumberId: 'phone-1',
             businessAccountId: 'waba-1'
         })
@@ -318,6 +372,7 @@ describe('channels actions: WhatsApp core flows', () => {
 
         await completeWhatsAppEmbeddedSignupChannel('org-1', {
             authCode: 'auth-code-1',
+            mode: 'new',
             phoneNumberId: 'phone-1',
             businessAccountId: 'waba-1'
         })
@@ -328,6 +383,45 @@ describe('channels actions: WhatsApp core flows', () => {
             verifyToken: expect.any(String)
         })
         expect((subscribeOverrides as { verifyToken?: string } | undefined)?.verifyToken).not.toBe('global-verify-token')
+    })
+
+    it('skips phone registration and PIN persistence for existing-number embedded signup', async () => {
+        const { supabase, upsertMock, rpcMock } = createUpsertSupabaseMock()
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await completeWhatsAppEmbeddedSignupChannel('org-1', {
+            authCode: 'auth-code-1',
+            mode: 'existing',
+            phoneNumberId: 'phone-1',
+            businessAccountId: 'waba-1'
+        })
+
+        expect(result).toEqual({ success: true })
+        expect(registerPhoneNumberMock).not.toHaveBeenCalled()
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledTimes(1)
+        expect(upsertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                config: expect.not.objectContaining({
+                    two_step_verification_pin: expect.any(String)
+                }),
+                status: 'active'
+            }),
+            { onConflict: 'organization_id,type' }
+        )
+        expect(upsertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                config: expect.objectContaining({
+                    embedded_signup_mode: 'existing'
+                })
+            }),
+            { onConflict: 'organization_id,type' }
+        )
+        expect(rpcMock).toHaveBeenCalledWith('enforce_org_trial_business_policy', {
+            target_organization_id: 'org-1',
+            input_whatsapp_business_account_id: 'waba-1',
+            input_phone: '+90 555 111 22 33',
+            input_source: 'whatsapp_connect'
+        })
     })
 
     it('returns normalized debug info for WhatsApp channel', async () => {
@@ -482,6 +576,46 @@ describe('channels actions: WhatsApp core flows', () => {
             success: true,
             messageId: 'wamid.template.1'
         })
+    })
+
+    it('deregisters whatsapp cloud api before deleting the local channel', async () => {
+        const { supabase, deleteEqMock } = createDisconnectSupabaseMock({
+            id: 'channel-1',
+            type: 'whatsapp',
+            config: {
+                permanent_access_token: 'token-1',
+                phone_number_id: 'phone-1'
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        await disconnectChannel('channel-1')
+
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
+        expect(deregisterPhoneNumberMock).toHaveBeenCalledWith('phone-1')
+        expect(deleteEqMock).toHaveBeenCalledWith('id', 'channel-1')
+        expect(revalidatePathMock).toHaveBeenCalledWith('/settings/channels')
+    })
+
+    it('keeps whatsapp channel when coexistence must be disconnected from the business app first', async () => {
+        const { supabase, deleteEqMock } = createDisconnectSupabaseMock({
+            id: 'channel-1',
+            type: 'whatsapp',
+            config: {
+                permanent_access_token: 'token-1',
+                phone_number_id: 'phone-1'
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+        deregisterPhoneNumberMock.mockRejectedValueOnce(
+            new Error(
+                'You cannot use the POST /<WHATSAPP_BUSINESS_PHONE_NUMBER_ID>/deregister endpoint to deregister a business phone number from Cloud API if it is already in use with both Cloud API and the WhatsApp Business app.'
+            )
+        )
+
+        await expect(disconnectChannel('channel-1')).rejects.toThrow('WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED')
+        expect(deleteEqMock).not.toHaveBeenCalled()
     })
 
     it('returns validation error when send template fields are missing', async () => {

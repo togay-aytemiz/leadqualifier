@@ -13,6 +13,7 @@ import {
     exchangeMetaForLongLivedToken,
     resolveMetaInstagramConnectionCandidate
 } from '@/lib/channels/meta-oauth'
+import type { MetaEmbeddedSignupMode } from '@/lib/channels/meta-embedded-signup'
 import {
     getChannelConnectionState,
     getMetaWebhookStatus,
@@ -95,9 +96,13 @@ export interface ConnectInstagramChannelInput {
 
 export interface CompleteWhatsAppEmbeddedSignupInput {
     authCode: string
+    mode: MetaEmbeddedSignupMode
     phoneNumberId: string
     businessAccountId: string
 }
+
+const WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR = 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED'
+const WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR = 'WHATSAPP_PROVIDER_DISCONNECT_FAILED'
 
 function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
@@ -125,6 +130,34 @@ function readConfigStringArray(config: Json, key: string): string[] | null {
         .filter((item) => item.length > 0)
 
     return normalized.length > 0 ? normalized : null
+}
+
+function isWhatsAppCoexistenceDisconnectError(error: unknown) {
+    const message = getErrorMessage(error, '').toLowerCase()
+    return message.includes('/deregister')
+        && message.includes('already in use with both cloud api and the whatsapp business app')
+}
+
+async function disconnectWhatsAppCloudApi(channel: { config: Json }) {
+    const accessToken = readConfigString(channel.config, 'permanent_access_token')
+    const phoneNumberId = readConfigString(channel.config, 'phone_number_id')
+
+    if (!accessToken || !phoneNumberId) {
+        throw new Error(WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR)
+    }
+
+    try {
+        const client = new WhatsAppClient(accessToken)
+        await client.deregisterPhoneNumber(phoneNumberId)
+    } catch (error) {
+        console.error('Failed to deregister WhatsApp phone number from Cloud API', error)
+
+        if (isWhatsAppCoexistenceDisconnectError(error)) {
+            throw new Error(WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR)
+        }
+
+        throw new Error(WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR)
+    }
 }
 
 function normalizeTemplateSummary(value: unknown): WhatsAppTemplateSummary | null {
@@ -363,6 +396,11 @@ export async function completeWhatsAppEmbeddedSignupChannel(
         return { error: 'Missing required WhatsApp embedded signup fields.' }
     }
 
+    const mode = input.mode === 'existing' || input.mode === 'new' ? input.mode : null
+    if (!mode) {
+        return { error: 'Invalid WhatsApp embedded signup mode.' }
+    }
+
     if (!appId || !appSecret) {
         return { error: 'Meta app configuration is missing.' }
     }
@@ -384,14 +422,18 @@ export async function completeWhatsAppEmbeddedSignupChannel(
         const client = new WhatsAppClient(permanentAccessToken)
         const verifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || uuidv4()
         const webhookOverrides = resolveWhatsAppWebhookSubscriptionOverrides(verifyToken)
-        const twoStepVerificationPin = createWhatsAppTwoStepVerificationPin({
-            organizationId,
-            businessAccountId,
-            phoneNumberId,
-            appSecret
-        })
+        const twoStepVerificationPin = mode === 'new'
+            ? createWhatsAppTwoStepVerificationPin({
+                organizationId,
+                businessAccountId,
+                phoneNumberId,
+                appSecret
+            })
+            : null
 
-        await client.registerPhoneNumber(phoneNumberId, twoStepVerificationPin)
+        if (twoStepVerificationPin) {
+            await client.registerPhoneNumber(phoneNumberId, twoStepVerificationPin)
+        }
         await client.subscribeAppToBusinessAccount(
             businessAccountId,
             webhookOverrides
@@ -418,14 +460,17 @@ export async function completeWhatsAppEmbeddedSignupChannel(
                     permanent_access_token: permanentAccessToken,
                     verify_token: verifyToken,
                     connected_via: 'embedded_signup',
+                    embedded_signup_mode: mode,
                     oauth_connected_at: new Date().toISOString(),
-                    two_step_verification_pin: twoStepVerificationPin,
                     display_phone_number: displayPhoneNumber,
                     webhook_status: 'pending',
                     webhook_callback_uri: webhookOverrides?.overrideCallbackUri ?? null,
                     webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
                     webhook_subscription_error: null,
-                    webhook_verified_at: null
+                    webhook_verified_at: null,
+                    ...(twoStepVerificationPin
+                        ? { two_step_verification_pin: twoStepVerificationPin }
+                        : {})
                 }
             }, {
                 onConflict: 'organization_id,type'
@@ -481,6 +526,10 @@ export async function disconnectChannel(channelId: string) {
             console.error('Failed to delete Telegram webhook', e)
             // Continue with DB deletion even if webhook fails
         }
+    }
+
+    if (channel && channel.type === 'whatsapp') {
+        await disconnectWhatsAppCloudApi(channel)
     }
 
     const { error } = await supabase
