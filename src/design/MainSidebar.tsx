@@ -147,6 +147,7 @@ interface SidebarHoverTooltipProps {
   children: ReactNode
   content: ReactNode
   enabled?: boolean
+  immediate?: boolean
   className?: string
   panelClassName?: string
 }
@@ -155,6 +156,7 @@ function SidebarHoverTooltip({
   children,
   content,
   enabled = true,
+  immediate = false,
   className,
   panelClassName,
 }: SidebarHoverTooltipProps) {
@@ -167,7 +169,10 @@ function SidebarHoverTooltip({
       {children}
       <div
         className={cn(
-          'pointer-events-none absolute left-full top-1/2 z-[140] ml-2 w-max max-w-64 -translate-y-1/2 translate-x-[-2px] rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 shadow-lg opacity-0 invisible transition-all duration-150 ease-out motion-reduce:transition-none',
+          'pointer-events-none absolute left-full top-1/2 z-[140] ml-2 w-max max-w-64 -translate-y-1/2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 shadow-lg opacity-0 invisible',
+          immediate
+            ? 'translate-x-0 transition-none'
+            : 'translate-x-[-2px] transition-all duration-150 ease-out motion-reduce:transition-none',
           'group-hover/sidebar-tooltip:visible group-hover/sidebar-tooltip:translate-x-0 group-hover/sidebar-tooltip:opacity-100',
           'group-has-[:focus-visible]/sidebar-tooltip:visible group-has-[:focus-visible]/sidebar-tooltip:translate-x-0 group-has-[:focus-visible]/sidebar-tooltip:opacity-100',
           panelClassName
@@ -1284,8 +1289,10 @@ export function MainSidebar({
   return (
     <aside
       className={cn(
-        'dashboard-sidebar-type-scale relative flex h-screen shrink-0 flex-col border-r border-slate-200/80 bg-slate-50/70 text-slate-900 transition-[width] duration-200 motion-reduce:transition-none',
-        collapsed ? 'w-[76px]' : 'w-[264px]'
+        'dashboard-sidebar-type-scale relative flex h-screen shrink-0 flex-col border-r transition-[width] duration-200 motion-reduce:transition-none',
+        collapsed
+          ? 'w-[76px] border-[#2B3354]/90 bg-[#202744] text-slate-100'
+          : 'w-[264px] border-slate-200/80 bg-slate-50/70 text-slate-900'
       )}
       style={sidebarTypographyStyle}
       data-collapsed={collapsed ? 'true' : 'false'}
@@ -1307,7 +1314,7 @@ export function MainSidebar({
               )}
             >
               <Image
-                src={collapsed ? '/icon-black.svg' : '/logo-black.svg'}
+                src={collapsed ? '/icon-white.svg' : '/logo-black.svg'}
                 alt={tCommon('appName')}
                 width={collapsed ? 44 : 85}
                 height={collapsed ? 44 : 27}
@@ -1324,8 +1331,10 @@ export function MainSidebar({
               type="button"
               onClick={() => setCollapsed((prev) => !prev)}
               className={cn(
-                'inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-slate-900 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/20',
-                'motion-reduce:transition-none'
+                'inline-flex h-7 w-7 items-center justify-center rounded-md transition focus:outline-none focus-visible:ring-2 motion-reduce:transition-none',
+                collapsed
+                  ? 'bg-white/10 text-white shadow-none ring-1 ring-white/10 hover:bg-white/16 hover:text-white hover:ring-white/20 focus-visible:ring-white/20'
+                  : 'bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 hover:text-slate-900 hover:ring-slate-300 focus-visible:ring-[#242A40]/20'
               )}
               aria-label={toggleLabel}
               aria-expanded={!collapsed}
@@ -1358,7 +1367,12 @@ export function MainSidebar({
                 type="button"
                 onClick={() => setIsOrgPickerOpen(true)}
                 title={undefined}
-                className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+                className={cn(
+                  'mx-auto flex h-9 w-9 items-center justify-center rounded-lg border transition',
+                  collapsed
+                    ? 'border-white/10 bg-white/10 text-slate-200 shadow-none hover:border-white/15 hover:bg-white/16 hover:text-white'
+                    : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900'
+                )}
               >
                 <Building2 size={15} />
               </button>
@@ -1764,7 +1778,8 @@ export function MainSidebar({
                   id={sectionPanelId}
                   aria-hidden={!isSectionExpanded}
                   className={cn(
-                    'grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none',
+                    'grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none',
+                    collapsed ? 'overflow-visible' : 'overflow-hidden',
                     isSectionExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
                   )}
                 >
@@ -1795,35 +1810,53 @@ export function MainSidebar({
                           ? `${item.label} (${tSidebar('lockedLabel')})`
                           : item.label
                         const navItemClassName = cn(
-                          'group flex items-center rounded-xl text-[14px] font-medium text-slate-600 transition-colors duration-150 motion-reduce:transition-none',
+                          'group flex items-center rounded-xl text-[14px] font-medium transition-colors duration-150 motion-reduce:transition-none',
                           collapsed
                             ? 'mx-auto h-10 w-10 justify-center gap-0'
-                            : 'w-full gap-2.5 px-3 py-2',
+                            : 'w-full gap-2.5 px-3 py-2 text-slate-600',
                           isActive
-                            ? 'bg-slate-200/80 text-slate-900'
+                            ? collapsed
+                              ? 'bg-white/12 text-white'
+                              : 'bg-slate-200/80 text-slate-900'
                             : isLockedItem
-                              ? 'cursor-not-allowed bg-slate-100/80 text-slate-400'
-                              : 'hover:bg-white hover:text-slate-900'
+                              ? collapsed
+                                ? 'cursor-not-allowed bg-white/5 text-white/30'
+                                : 'cursor-not-allowed bg-slate-100/80 text-slate-400'
+                              : collapsed
+                                ? 'text-slate-300 hover:bg-white/8 hover:text-white'
+                                : 'hover:bg-white hover:text-slate-900'
                         )
                         const iconClassName = cn(
                           'shrink-0',
                           isActive
-                            ? 'text-slate-800'
+                            ? collapsed
+                              ? 'text-white'
+                              : 'text-slate-800'
                             : isLockedItem
-                              ? 'text-slate-400'
-                              : 'text-slate-500 group-hover:text-slate-900'
+                              ? collapsed
+                                ? 'text-white/30'
+                                : 'text-slate-400'
+                              : collapsed
+                                ? 'text-slate-300 group-hover:text-white'
+                                : 'text-slate-500 group-hover:text-slate-900'
                         )
-                        const lockIconClassName = isActive ? 'text-slate-700' : 'text-slate-400'
+                        const lockIconClassName = isActive
+                          ? collapsed
+                            ? 'text-white'
+                            : 'text-slate-700'
+                          : collapsed
+                            ? 'text-white/45'
+                            : 'text-slate-400'
 
                         const navItemContent = (
                           <>
                             <span className="relative flex items-center">
                               <Icon size={17} className={iconClassName} />
                               {showIndicator && collapsed && (
-                                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#242A40] ring-2 ring-slate-50" />
+                                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-white ring-2 ring-[#202744]" />
                               )}
                               {isLockedItem && collapsed && (
-                                <span className="absolute -bottom-1 -right-1 rounded-full border border-slate-200 bg-white p-[1px]">
+                                <span className="absolute -bottom-1 -right-1 rounded-full border border-white/15 bg-[#1a2038] p-[1px]">
                                   <Lock size={8} className={lockIconClassName} />
                                 </span>
                               )}
@@ -1884,6 +1917,7 @@ export function MainSidebar({
                                 key={item.id}
                                 className="flex justify-center"
                                 content={collapsedNavTooltipContent}
+                                immediate
                               >
                                 {lockedButton}
                               </SidebarHoverTooltip>
@@ -1914,6 +1948,7 @@ export function MainSidebar({
                               key={item.id}
                               className="flex justify-center"
                               content={collapsedNavTooltipContent}
+                              immediate
                             >
                               {navLink}
                             </SidebarHoverTooltip>
@@ -2056,15 +2091,17 @@ export function MainSidebar({
               onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
               onClick={(event) => handleDashboardNavClick(event, '/settings/plans')}
               className={cn(
-                'mx-auto flex h-11 w-11 items-center justify-center rounded-xl border bg-white shadow-sm transition hover:border-slate-300',
-                showLowCreditWarning ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                'mx-auto flex h-11 w-11 items-center justify-center rounded-xl border transition',
+                showLowCreditWarning
+                  ? 'border-amber-300/70 bg-amber-400/10 hover:border-amber-200'
+                  : 'border-white/10 bg-white/10 hover:border-white/15 hover:bg-white/14'
               )}
             >
               <div
                 className="relative flex h-8 w-8 items-center justify-center rounded-full p-[2px]"
                 style={{ background: collapsedBillingRingBackground }}
               >
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-[9px] font-semibold text-slate-700">
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-[#18203A] text-[9px] font-semibold text-slate-100">
                   {formatSidebarBillingCompactCredits(locale, billingDisplayCredits)}
                 </div>
               </div>
@@ -2108,8 +2145,10 @@ export function MainSidebar({
         <div className="relative group">
           <button
             className={cn(
-              'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white hover:text-slate-900',
-              collapsed && 'justify-center px-2'
+              'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition',
+              collapsed
+                ? 'justify-center px-2 text-slate-200 hover:bg-white/10 hover:text-white'
+                : 'hover:bg-white hover:text-slate-900'
             )}
             title={userName}
             type="button"
@@ -2118,7 +2157,10 @@ export function MainSidebar({
               name={userName || tCommon('defaultUserName')}
               src={userAvatarUrl}
               size="sm"
-              className="border border-white/80 ring-1 ring-slate-200"
+              className={cn(
+                'border ring-1',
+                collapsed ? 'border-white/10 ring-white/10' : 'border-white/80 ring-slate-200'
+              )}
             />
             <div
               className={cn(

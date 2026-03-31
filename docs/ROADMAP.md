@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-03-31):** Collapsed desktop sidebar nav-item tooltips now appear with zero transition delay. Slim-rail hover labels should surface immediately instead of fading/sliding in after a perceptible pause.
+> **Update Note (2026-03-31):** Collapsed desktop main sidebar now uses a darker rail surface with white brand/icon treatment and higher-contrast active pills, so the slim navigation state reads closer to the intended mock instead of looking like a reduced light sidebar.
 > **Update Note (2026-03-31):** WhatsApp Business app / coexistence Embedded Signup launch now sends Meta's required `featureType = whatsapp_business_app_onboarding` flag from both client entry points. Supplying only the existing-number config ID was not enough to open the real Business app onboarding flow.
 > **Update Note (2026-03-31):** Media-backed first-contact inquiries now avoid false `cold` classification when the customer is clearly asking for commercial information about the shared attachment. Attachment-backed prompts such as `bunun hakkında daha fazla bilgi alabilir miyim?` are promoted to at least `informational_commercial` / `warm` even before the exact service name is explicit.
 > **Update Note (2026-03-31):** `Settings > Channels` gallery order is now fixed to `WhatsApp`, `Instagram`, `Facebook Messenger`, `Telegram`, and the responsive card grid now tops out at 3 columns so the fourth card wraps to a second row on wide desktop screens instead of stretching to 4-up.
@@ -48,7 +50,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-03-31 (Updated `Settings > Channels` gallery ordering to `WhatsApp`, `Instagram`, `Facebook Messenger`, `Telegram` and capped the responsive grid at 3 columns on wide desktop layouts so the fourth card wraps cleanly.)
+> **Last Updated:** 2026-03-31 (Collapsed desktop sidebar now uses a dark rail with white branding/icons and immediate nav-item hover tooltips in slim mode, while `Settings > Channels` keeps the `WhatsApp`, `Instagram`, `Facebook Messenger`, `Telegram` order and 3-column desktop cap.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -430,11 +432,12 @@
   - [x] Crisp-inspired main sidebar with collapse toggle and persisted state
   - [x] Refined collapsed icon layout and toggle placement (Netlify-style)
   - [x] Centered collapsed logo alignment
-  - [x] Sidebar header branding uses `logo-black.svg` when expanded and `icon-black.svg` when collapsed
+  - [x] Sidebar header branding uses `logo-black.svg` when expanded and `icon-white.svg` when collapsed
   - [x] Browser tab branding now uses `Qualy` title metadata and `/icon-black.svg` favicon/icons
   - [x] Browser tab title is route-aware (`Page | Qualy`) and Inbox title uses a dot indicator `(●)` for unread instead of numeric count
   - [x] Route layouts/pages now own localized browser-tab metadata so labels stay stable after Next App Router transitions (`Takvim`, `Kişiler`, `Yetenekler`, `Ayarlar`, auth pages, and admin surfaces)
   - [x] Collapsed sidebar brand icon scaled up to match active navigation item size
+  - [x] Collapsed sidebar now switches to a dark rail surface with white icon contrast and stronger active pills
   - [x] Eyebrow section labels for grouped navigation
   - [x] Increased spacing between header and first sidebar section
   - [x] Sidebar nav icons use active/passive variants per item
