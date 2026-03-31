@@ -641,7 +641,7 @@ describe('channels actions: WhatsApp core flows', () => {
         })
         createClientMock.mockResolvedValueOnce(supabase)
 
-        await disconnectChannel('channel-1')
+        await expect(disconnectChannel('channel-1')).resolves.toEqual({ success: true })
 
         expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
         expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
@@ -666,7 +666,10 @@ describe('channels actions: WhatsApp core flows', () => {
             )
         )
 
-        await expect(disconnectChannel('channel-1')).rejects.toThrow('WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED')
+        await expect(disconnectChannel('channel-1')).resolves.toEqual({
+            success: false,
+            error: 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED'
+        })
         expect(deleteEqMock).not.toHaveBeenCalled()
     })
 

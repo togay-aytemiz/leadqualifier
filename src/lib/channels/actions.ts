@@ -79,6 +79,10 @@ export type InstagramDebugResult =
     | { success: true; info: unknown }
     | { success: false; error: string }
 
+export type DisconnectChannelResult =
+    | { success: true }
+    | { success: false; error: string }
+
 export interface ConnectWhatsAppChannelInput {
     phoneNumberId: string
     businessAccountId: string
@@ -530,7 +534,7 @@ export async function completeWhatsAppEmbeddedSignupChannel(
     }
 }
 
-export async function disconnectChannel(channelId: string) {
+export async function disconnectChannel(channelId: string): Promise<DisconnectChannelResult> {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
 
@@ -556,7 +560,26 @@ export async function disconnectChannel(channelId: string) {
     }
 
     if (channel && channel.type === 'whatsapp') {
-        await disconnectWhatsAppCloudApi(channel)
+        try {
+            await disconnectWhatsAppCloudApi(channel)
+        } catch (error) {
+            const message = getErrorMessage(error, WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR)
+
+            if (
+                message === WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR
+                || message === WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR
+            ) {
+                return {
+                    success: false,
+                    error: message
+                }
+            }
+
+            return {
+                success: false,
+                error: getErrorMessage(error, 'Failed to disconnect channel')
+            }
+        }
     }
 
     const { error } = await supabase
@@ -566,10 +589,14 @@ export async function disconnectChannel(channelId: string) {
 
     if (error) {
         console.error('Error disconnecting channel:', error)
-        throw error
+        return {
+            success: false,
+            error: getErrorMessage(error, 'Failed to disconnect channel')
+        }
     }
 
     revalidatePath('/settings/channels')
+    return { success: true }
 }
 
 export async function debugTelegramChannel(channelId: string): Promise<TelegramDebugResult> {

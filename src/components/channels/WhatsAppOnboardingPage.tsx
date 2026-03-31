@@ -320,7 +320,12 @@ export function WhatsAppOnboardingPage({
 
         setIsDisconnecting(true)
         try {
-            await disconnectChannel(channel.id)
+            const result = await disconnectChannel(channel.id)
+            if (!result.success) {
+                setError(getDisconnectErrorMessage(t, new Error(result.error)))
+                return
+            }
+
             setShowConfirm(false)
             router.push(getLocalizedHref(locale, '/settings/channels'))
             router.refresh()

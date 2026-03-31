@@ -84,7 +84,12 @@ export function TelegramOnboardingPage({
 
         setIsDisconnecting(true)
         try {
-            await disconnectChannel(channel.id)
+            const result = await disconnectChannel(channel.id)
+            if (!result.success) {
+                setError(result.error)
+                return
+            }
+
             setShowConfirm(false)
             router.push(getLocalizedHref(locale, '/settings/channels'))
             router.refresh()
