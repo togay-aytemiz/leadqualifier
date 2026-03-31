@@ -83,6 +83,12 @@ export function WhatsAppTemplateModal({
         onClose()
     }, [onClose])
 
+    const handleGuideModalClose = useCallback(() => {
+        window.setTimeout(() => {
+            setIsGuideModalOpen(false)
+        }, 0)
+    }, [])
+
     useEffect(() => {
         if (!isOpen) return
         const timeoutId = window.setTimeout(() => {
@@ -161,21 +167,6 @@ export function WhatsAppTemplateModal({
                 <div className="space-y-4">
                     <Alert variant="info">
                         {t('templateTools.description')}
-                    </Alert>
-
-                    <Alert variant="warning">
-                        <p className="font-medium">{t('templateTools.requirementTitle')}</p>
-                        <p className="mt-1 text-sm leading-6">
-                            {t('templateTools.requirementBody')}{' '}
-                            <a
-                                href={WHATSAPP_OVERVIEW_URL}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-medium text-amber-800 underline underline-offset-2"
-                            >
-                                {t('templateTools.requirementLinkLabel')}
-                            </a>
-                        </p>
                     </Alert>
 
                     <div className="flex items-center justify-between gap-2">
@@ -282,7 +273,7 @@ export function WhatsAppTemplateModal({
 
             <Modal
                 isOpen={isGuideModalOpen}
-                onClose={() => setIsGuideModalOpen(false)}
+                onClose={handleGuideModalClose}
                 title={t('templateTools.guideTitle')}
             >
                 <div>
@@ -312,7 +303,7 @@ export function WhatsAppTemplateModal({
                         {t('templateTools.guideFooter')}
                     </Alert>
                     <div className="mt-4 flex justify-end">
-                        <Button type="button" variant="secondary" onClick={() => setIsGuideModalOpen(false)}>
+                        <Button type="button" variant="secondary" onClick={handleGuideModalClose}>
                             {t('templateTools.guideClose')}
                         </Button>
                     </div>

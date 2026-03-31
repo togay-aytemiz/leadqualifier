@@ -13,10 +13,19 @@ describe('WhatsAppTemplateModal source guard', () => {
     expect(source).not.toContain("if (isOpen) return\n        setIsGuideModalOpen(false)")
   })
 
-  it('surfaces WABA guidance and a Meta help link in the modal source', () => {
+  it('keeps WABA guidance only inside the how-it-works modal', () => {
     const source = fs.readFileSync(FILE_PATH, 'utf8')
 
-    expect(source).toContain('WHATSAPP_OVERVIEW_URL')
-    expect(source).toContain("templateTools.requirementLinkLabel")
+    expect(source.match(/templateTools\.requirementTitle/g)?.length ?? 0).toBe(1)
+    expect(source.match(/templateTools\.requirementBody/g)?.length ?? 0).toBe(1)
+    expect(source.match(/templateTools\.requirementLinkLabel/g)?.length ?? 0).toBe(1)
+  })
+
+  it('closes the guide modal through a dedicated close handler', () => {
+    const source = fs.readFileSync(FILE_PATH, 'utf8')
+
+    expect(source).toContain('const handleGuideModalClose = useCallback(() => {')
+    expect(source).not.toContain('onClose={() => setIsGuideModalOpen(false)}')
+    expect(source).not.toContain('onClick={() => setIsGuideModalOpen(false)}')
   })
 })
