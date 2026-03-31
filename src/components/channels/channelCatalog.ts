@@ -1,5 +1,8 @@
 import type { Channel } from '@/types/database'
-import { WHATSAPP_MIGRATION_GUIDE_URL } from '@/components/channels/whatsappOnboarding'
+import {
+    WHATSAPP_MIGRATION_GUIDE_URL,
+    WHATSAPP_OVERVIEW_URL
+} from '@/components/channels/whatsappOnboarding'
 
 export type ChannelCardType = Channel['type'] | 'messenger'
 export type ChannelCardTone = 'emerald' | 'sky' | 'indigo' | 'sunset'
@@ -29,7 +32,7 @@ const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
         resources: [
             {
                 labelKey: 'whatsappOverview',
-                href: 'https://www.facebook.com/help/2783732558314697/'
+                href: WHATSAPP_OVERVIEW_URL
             },
             {
                 labelKey: 'whatsappMigration',

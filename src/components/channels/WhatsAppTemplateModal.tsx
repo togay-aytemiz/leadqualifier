@@ -8,6 +8,7 @@ import {
     type WhatsAppTemplateSummary
 } from '@/lib/channels/actions'
 import { useTranslations } from 'next-intl'
+import { WHATSAPP_OVERVIEW_URL } from '@/components/channels/whatsappOnboarding'
 
 interface WhatsAppTemplateModalProps {
     channelId: string
@@ -162,6 +163,21 @@ export function WhatsAppTemplateModal({
                         {t('templateTools.description')}
                     </Alert>
 
+                    <Alert variant="warning">
+                        <p className="font-medium">{t('templateTools.requirementTitle')}</p>
+                        <p className="mt-1 text-sm leading-6">
+                            {t('templateTools.requirementBody')}{' '}
+                            <a
+                                href={WHATSAPP_OVERVIEW_URL}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-amber-800 underline underline-offset-2"
+                            >
+                                {t('templateTools.requirementLinkLabel')}
+                            </a>
+                        </p>
+                    </Alert>
+
                     <div className="flex items-center justify-between gap-2">
                         <Button
                             type="button"
@@ -271,6 +287,20 @@ export function WhatsAppTemplateModal({
             >
                 <div>
                     <p className="text-sm text-gray-700">{t('templateTools.guideDescription')}</p>
+                    <Alert variant="warning" className="mt-4">
+                        <p className="font-medium">{t('templateTools.requirementTitle')}</p>
+                        <p className="mt-1 text-sm leading-6">
+                            {t('templateTools.requirementBody')}{' '}
+                            <a
+                                href={WHATSAPP_OVERVIEW_URL}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-amber-800 underline underline-offset-2"
+                            >
+                                {t('templateTools.requirementLinkLabel')}
+                            </a>
+                        </p>
+                    </Alert>
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-gray-700">
                         <li>{t('templateTools.guideStep1')}</li>
                         <li>{t('templateTools.guideStep2')}</li>

@@ -769,9 +769,12 @@
       }
     },
     "templateTools": {
-      "openAction": "Template tools",
-      "title": "WhatsApp Template Tools",
-      "description": "View approved templates and send a template message to the customer.",
+      "openAction": "WhatsApp templates",
+      "title": "WhatsApp Templates",
+      "description": "This screen shows Meta WhatsApp templates only. It is separate from Qualy's regular saved messages.",
+      "requirementTitle": "This screen requires a WABA",
+      "requirementBody": "To use this feature, the channel must be connected to a WhatsApp Business Account (WABA). Templates are created and approved on Meta's side.",
+      "requirementLinkLabel": "Learn about WABA on Meta",
       "openGuide": "How it works",
       "refreshTemplates": "Refresh templates",
       "loadingTemplates": "Loading templates...",
@@ -793,13 +796,13 @@
       "sendFailed": "Failed to send template message: {error}",
       "loadFailed": "Failed to load templates: {error}",
       "guideTitle": "How to send a template",
-      "guideDescription": "Use this screen to restart messaging with a customer, especially when the 24-hour free-form window has expired.",
-      "guideStep1": "Click \"Refresh templates\" to load approved templates from your connected account.",
+      "guideDescription": "Use this screen to restart messaging with a customer, especially when the 24-hour free-form window has expired. The templates shown here are Meta-approved WhatsApp templates.",
+      "guideStep1": "Click \"Refresh templates\" to load approved WhatsApp templates from your connected WABA.",
       "guideStep2": "Choose a template and verify its language/status.",
       "guideStep3": "Enter the recipient number with country code and no spaces (e.g. 905551112233).",
       "guideStep4": "If the template has variables, enter one value per line in order.",
       "guideStep5": "Click \"Send template\" and confirm the returned message ID in the success state.",
-      "guideFooter": "Note: This is a manual sending utility and does not change automated bot runtime behavior.",
+      "guideFooter": "Note: This tool is only for WhatsApp template sends; it does not change Qualy's regular saved messages or automated bot runtime.",
       "guideClose": "Close"
     },
     "debug": {
