@@ -42,6 +42,28 @@ export function wait(ms: number) {
     })
 }
 
+export function waitForEmbeddedSignupEventOrFallback(
+    eventPromise: Promise<MetaEmbeddedSignupEvent>,
+    options?: {
+        graceMs?: number
+        waitFn?: (ms: number) => Promise<null>
+    }
+) {
+    const graceMs = options?.graceMs ?? 2500
+    const waitFn = options?.waitFn ?? wait
+
+    return Promise.race<MetaEmbeddedSignupEvent | null>([
+        eventPromise.catch((error) => {
+            if (isEmbeddedSignupStatusTimeoutError(error)) {
+                return null
+            }
+
+            throw error
+        }),
+        waitFn(graceMs).then(() => null)
+    ])
+}
+
 export async function loadMetaSdk(appId: string): Promise<MetaSdk> {
     const metaWindow = window as MetaWindow
 

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Update Note (2026-03-31):** WhatsApp Business app / coexistence Embedded Signup completion now recovers from long-running Meta flows where auth code returns but the final `FINISH` event is missed or times out. Server-side asset discovery still persists the local channel row so Settings and Inbox do not stay disconnected while the phone already shows Business Platform linked.
+> **Update Note (2026-03-31):** WhatsApp Business app / coexistence Embedded Signup completion now recovers immediately after auth code returns if the final `FINISH` event never arrives. The UI waits only a short grace window before switching to server-side asset discovery, so Settings no longer sits in `Bağlanıyor...` for minutes while the phone already shows Business Platform linked.
 > **Update Note (2026-03-31):** Turkish login now maps common Supabase credential failures to localized UI copy instead of rendering raw English provider text. Invalid sign-in attempts should show `Geçersiz e-posta veya şifre` on the TR auth surface.
 > **Update Note (2026-03-31):** Collapsed desktop sidebar nav-item tooltips now appear with zero transition delay. Slim-rail hover labels should surface immediately instead of fading/sliding in after a perceptible pause.
 > **Update Note (2026-03-31):** Collapsed desktop main sidebar now uses a darker rail surface with white brand/icon treatment and higher-contrast active pills, so the slim navigation state reads closer to the intended mock instead of looking like a reduced light sidebar.
@@ -206,7 +206,7 @@
   - [x] Keep current server OAuth discovery as an explicit fallback only for pre-existing Meta Cloud API assets
   - [x] Add deterministic blocked/unconfigured guidance when Embedded Signup is unavailable instead of dropping users into a dead-end Meta flow
   - [x] Complete Embedded Signup post-auth provisioning with mode-aware behavior: `new number` onboarding registers the business phone number for Cloud API use and persists the managed two-step verification PIN, while `existing number / Business app number` onboarding skips phone registration and PIN persistence before subscribing app webhooks on the customer WABA
-  - [x] Recover long-running Embedded Signup completions when Meta returns auth code but the client misses/times out on the final `FINISH` event by discovering `business_account_id` + `phone_number_id` server-side and still upserting the local WhatsApp channel
+  - [x] Recover Embedded Signup completions immediately after auth-code return when the client misses/times out on the final `FINISH` event by using a short grace window, then discovering `business_account_id` + `phone_number_id` server-side and still upserting the local WhatsApp channel
   - [x] Persist WhatsApp webhook provisioning state across manual/OAuth/Embedded connect flows and treat the channel as ready only after webhook verification succeeds
   - [x] Route `another BSP migration` through existing-number Embedded Signup instead of the generic WhatsApp OAuth asset-discovery fallback
 - [x] **Telegram (Sandbox)**
