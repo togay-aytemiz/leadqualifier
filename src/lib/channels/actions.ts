@@ -83,6 +83,10 @@ export type DisconnectChannelResult =
     | { success: true }
     | { success: false; error: string }
 
+export type RetryWhatsAppWebhookResult =
+    | { success: true }
+    | { success: false; error: string }
+
 export interface ConnectWhatsAppChannelInput {
     phoneNumberId: string
     businessAccountId: string
@@ -597,6 +601,76 @@ export async function disconnectChannel(channelId: string): Promise<DisconnectCh
 
     revalidatePath('/settings/channels')
     return { success: true }
+}
+
+export async function retryWhatsAppWebhookVerification(
+    channelId: string
+): Promise<RetryWhatsAppWebhookResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('id', channelId)
+        .single()
+
+    const accessToken = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'permanent_access_token')
+        : null
+    const businessAccountId = channel && channel.type === 'whatsapp'
+        ? readConfigString(channel.config, 'business_account_id')
+        : null
+    const verifyToken = channel && channel.type === 'whatsapp'
+        ? (readConfigString(channel.config, 'verify_token') || process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || null)
+        : null
+
+    if (!channel || channel.type !== 'whatsapp' || !accessToken || !businessAccountId || !verifyToken) {
+        return { success: false, error: 'Channel not found or not whatsapp' }
+    }
+
+    const webhookOverrides = resolveWhatsAppWebhookSubscriptionOverrides(verifyToken)
+    const webhookSubscriptionRequestedAt = new Date().toISOString()
+    const baseConfig = asConfigRecord(channel.config)
+
+    try {
+        const client = new WhatsAppClient(accessToken)
+        await client.subscribeAppToBusinessAccount(businessAccountId, webhookOverrides)
+
+        const nextConfig = {
+            ...baseConfig,
+            verify_token: verifyToken,
+            webhook_status: 'pending',
+            webhook_callback_uri: webhookOverrides?.overrideCallbackUri ?? null,
+            webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
+            webhook_subscription_error: null
+        }
+
+        await supabase
+            .from('channels')
+            .update({ config: nextConfig })
+            .eq('id', channel.id)
+
+        revalidatePath('/settings/channels')
+        return { success: true }
+    } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error, 'Failed to retry WhatsApp webhook verification')
+        const nextConfig = {
+            ...baseConfig,
+            verify_token: verifyToken,
+            webhook_status: 'error',
+            webhook_callback_uri: webhookOverrides?.overrideCallbackUri ?? null,
+            webhook_subscription_requested_at: webhookSubscriptionRequestedAt,
+            webhook_subscription_error: errorMessage
+        }
+
+        await supabase
+            .from('channels')
+            .update({ config: nextConfig })
+            .eq('id', channel.id)
+
+        return { success: false, error: errorMessage }
+    }
 }
 
 export async function debugTelegramChannel(channelId: string): Promise<TelegramDebugResult> {

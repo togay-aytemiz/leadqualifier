@@ -870,6 +870,10 @@
       "embeddedSignupSuccess": "WhatsApp connected successfully.",
       "disconnectFailed": "Failed to disconnect WhatsApp Cloud API. Please try again.",
       "disconnectCoexistenceRequired": "This number is still being used with the WhatsApp Business app. First disconnect Cloud API inside the WhatsApp Business app under Settings > Account > Business Platform, then retry here.",
+      "retryVerificationAction": "Retry webhook",
+      "retryVerificationLoading": "Retrying webhook...",
+      "retryVerificationSuccess": "Webhook subscription was requested again. Send a fresh WhatsApp message from another number; the channel will flip to ready when the first valid webhook arrives.",
+      "retryVerificationFailed": "Failed to retry webhook verification.",
       "options": {
         "newApi": {
           "title": "Create and connect a new WhatsApp API account",

@@ -73,6 +73,7 @@ import {
     debugWhatsAppChannel,
     disconnectChannel,
     listWhatsAppMessageTemplates,
+    retryWhatsAppWebhookVerification,
     sendWhatsAppTemplateMessage
 } from '@/lib/channels/actions'
 
@@ -152,6 +153,36 @@ function createDisconnectSupabaseMock(channelData: unknown, deleteResult: { erro
         singleMock,
         deleteMock,
         deleteEqMock
+    }
+}
+
+function createRetryWebhookSupabaseMock(channelData: unknown, updateResult: { error: unknown } = { error: null }) {
+    const singleMock = vi.fn(async () => ({ data: channelData }))
+    const selectEqMock = vi.fn(() => ({ single: singleMock }))
+    const selectMock = vi.fn(() => ({ eq: selectEqMock }))
+    const updateEqMock = vi.fn(async () => updateResult)
+    const updateMock = vi.fn(() => ({ eq: updateEqMock }))
+    const fromMock = vi.fn((table: string) => {
+        if (table !== 'channels') {
+            throw new Error(`Unexpected table ${table}`)
+        }
+
+        return {
+            select: selectMock,
+            update: updateMock
+        }
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        fromMock,
+        selectMock,
+        selectEqMock,
+        singleMock,
+        updateMock,
+        updateEqMock
     }
 }
 
@@ -671,6 +702,45 @@ describe('channels actions: WhatsApp core flows', () => {
             error: 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED'
         })
         expect(deleteEqMock).not.toHaveBeenCalled()
+    })
+
+    it('retries whatsapp webhook subscription without disconnecting the channel', async () => {
+        const { supabase, updateMock, updateEqMock } = createRetryWebhookSupabaseMock({
+            id: 'channel-1',
+            type: 'whatsapp',
+            status: 'active',
+            config: {
+                permanent_access_token: 'token-1',
+                business_account_id: 'waba-1',
+                verify_token: 'verify-1',
+                webhook_status: 'pending',
+                webhook_verified_at: null
+            }
+        })
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        await expect(retryWhatsAppWebhookVerification('channel-1')).resolves.toEqual({ success: true })
+
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledWith('waba-1', {
+            overrideCallbackUri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+            verifyToken: 'verify-1'
+        })
+        expect(updateMock).toHaveBeenCalledWith({
+            config: expect.objectContaining({
+                permanent_access_token: 'token-1',
+                business_account_id: 'waba-1',
+                verify_token: 'verify-1',
+                webhook_status: 'pending',
+                webhook_callback_uri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+                webhook_subscription_requested_at: expect.any(String),
+                webhook_subscription_error: null
+            })
+        })
+        expect(updateEqMock).toHaveBeenCalledWith('id', 'channel-1')
+        expect(revalidatePathMock).toHaveBeenCalledWith('/settings/channels')
+        expect(deregisterPhoneNumberMock).not.toHaveBeenCalled()
     })
 
     it('returns validation error when send template fields are missing', async () => {

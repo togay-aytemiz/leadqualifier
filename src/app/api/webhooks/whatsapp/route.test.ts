@@ -59,6 +59,8 @@ import { GET, POST } from '@/app/api/webhooks/whatsapp/route'
 
 function createChannelLookupSupabaseMock(channelData: unknown) {
     const maybeSingleMock = vi.fn(async () => ({ data: channelData }))
+    const updateEqMock = vi.fn(async () => ({ error: null }))
+    const updateMock = vi.fn(() => ({ eq: updateEqMock }))
     const eqThird = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
     const eqSecond = vi.fn(() => ({ eq: eqThird }))
     const eqFirst = vi.fn(() => ({ eq: eqSecond }))
@@ -68,7 +70,8 @@ function createChannelLookupSupabaseMock(channelData: unknown) {
             throw new Error(`Unexpected table ${table}`)
         }
         return {
-            select: selectMock
+            select: selectMock,
+            update: updateMock
         }
     })
 
@@ -81,7 +84,9 @@ function createChannelLookupSupabaseMock(channelData: unknown) {
         },
         fromMock,
         selectMock,
-        maybeSingleMock
+        maybeSingleMock,
+        updateMock,
+        updateEqMock
     }
 }
 
@@ -203,13 +208,15 @@ describe('WhatsApp webhook route', () => {
             text: 'Merhaba',
             timestamp: '1738000000'
         }
-        const { supabase, selectMock } = createChannelLookupSupabaseMock({
+        const { supabase, selectMock, updateMock, updateEqMock } = createChannelLookupSupabaseMock({
             id: 'channel-1',
             organization_id: 'org-1',
             config: {
                 phone_number_id: 'phone-1',
                 app_secret: 'app-secret',
-                permanent_access_token: 'token-1'
+                permanent_access_token: 'token-1',
+                webhook_status: 'pending',
+                webhook_verified_at: null
             }
         })
 
@@ -238,6 +245,15 @@ describe('WhatsApp webhook route', () => {
         await expect(res.json()).resolves.toEqual({ ok: true })
         expect(selectMock).toHaveBeenCalledWith('id, organization_id, config')
         expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
+        expect(updateMock).toHaveBeenCalledWith({
+            config: expect.objectContaining({
+                phone_number_id: 'phone-1',
+                webhook_status: 'verified',
+                webhook_subscription_error: null,
+                webhook_verified_at: expect.any(String)
+            })
+        })
+        expect(updateEqMock).toHaveBeenCalledWith('id', 'channel-1')
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 organizationId: 'org-1',

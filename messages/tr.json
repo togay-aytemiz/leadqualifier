@@ -870,6 +870,10 @@
       "embeddedSignupSuccess": "WhatsApp başarıyla bağlandı.",
       "disconnectFailed": "WhatsApp Cloud API bağlantısı kesilemedi. Lütfen tekrar deneyin.",
       "disconnectCoexistenceRequired": "Bu numara WhatsApp Business uygulamasıyla birlikte kullanılıyor. Önce telefondaki WhatsApp Business uygulamasında Ayarlar > Hesap > Business Platform yolundan Cloud API bağlantısını kesin, sonra burada tekrar deneyin.",
+      "retryVerificationAction": "Webhook'u Yeniden Dene",
+      "retryVerificationLoading": "Webhook yeniden deneniyor...",
+      "retryVerificationSuccess": "Webhook aboneliği yeniden istendi. Farklı bir numaradan yeni bir WhatsApp mesajı gönderin; ilk geçerli webhook geldiğinde kanal hazır görünecek.",
+      "retryVerificationFailed": "Webhook doğrulaması yeniden denenemedi.",
       "options": {
         "newApi": {
           "title": "Yeni bir WhatsApp API hesabı oluşturup bağla",

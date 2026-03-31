@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Bug, FileText } from 'lucide-react'
+import { AlertCircle, Bug, FileText, RefreshCw } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 
@@ -42,7 +42,8 @@ import { ConfirmDialog } from '@/design/primitives'
 import {
     completeWhatsAppEmbeddedSignupChannel,
     debugWhatsAppChannel,
-    disconnectChannel
+    disconnectChannel,
+    retryWhatsAppWebhookVerification
 } from '@/lib/channels/actions'
 import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
 import { getMetaChannelConnectedCopy } from '@/lib/channels/meta-connection-copy'
@@ -149,6 +150,7 @@ export function WhatsAppOnboardingPage({
     const [signupJourney, setSignupJourney] = useState<WhatsAppEmbeddedSignupJourney>('newNumber')
     const [isConnecting, setIsConnecting] = useState(false)
     const [isDisconnecting, setIsDisconnecting] = useState(false)
+    const [isRetryingWebhook, setIsRetryingWebhook] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
     const [showTemplateModal, setShowTemplateModal] = useState(false)
     const [error, setError] = useState('')
@@ -333,6 +335,29 @@ export function WhatsAppOnboardingPage({
             setError(getDisconnectErrorMessage(t, disconnectError))
         } finally {
             setIsDisconnecting(false)
+        }
+    }
+
+    const handleRetryWebhookVerification = async () => {
+        if (!channel || isReadOnly) return
+
+        setIsRetryingWebhook(true)
+        setError('')
+        setInfo('')
+
+        try {
+            const result = await retryWhatsAppWebhookVerification(channel.id)
+            if (!result.success) {
+                setError(result.error || t('whatsappConnect.retryVerificationFailed'))
+                return
+            }
+
+            setInfo(t('whatsappConnect.retryVerificationSuccess'))
+            router.refresh()
+        } catch (retryError) {
+            setError(getErrorMessage(retryError, t('whatsappConnect.retryVerificationFailed')))
+        } finally {
+            setIsRetryingWebhook(false)
         }
     }
 
@@ -930,6 +955,18 @@ export function WhatsAppOnboardingPage({
                         <Bug size={16} className="mr-2" />
                         {t('debug.tooltip')}
                     </Button>
+                    {connectionState !== 'ready' && (
+                        <Button
+                            onClick={handleRetryWebhookVerification}
+                            disabled={isRetryingWebhook || isReadOnly}
+                            variant="outline"
+                        >
+                            <RefreshCw size={16} className="mr-2" />
+                            {isRetryingWebhook
+                                ? t('whatsappConnect.retryVerificationLoading')
+                                : t('whatsappConnect.retryVerificationAction')}
+                        </Button>
+                    )}
                     <Button
                         onClick={() => setShowConfirm(true)}
                         disabled={isDisconnecting || isReadOnly}

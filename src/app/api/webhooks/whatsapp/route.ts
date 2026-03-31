@@ -97,6 +97,35 @@ function toErrorMessage(error: unknown) {
     return typeof error === 'string' ? error : 'Unknown error'
 }
 
+async function markWhatsAppChannelWebhookVerified(
+    supabase: { from: (table: string) => unknown },
+    channel: WhatsAppChannelRecord
+) {
+    if (readConfigString(channel.config, 'webhook_verified_at')) {
+        return channel
+    }
+
+    const nextConfig = {
+        ...asConfigRecord(channel.config),
+        webhook_status: 'verified',
+        webhook_subscription_error: null,
+        webhook_verified_at: new Date().toISOString()
+    }
+
+    const channelsTable = supabase.from('channels') as {
+        update: (values: { config: Record<string, Json | undefined> }) => {
+            eq: (column: string, value: string) => Promise<unknown>
+        }
+    }
+
+    await channelsTable.update({ config: nextConfig }).eq('id', channel.id)
+
+    return {
+        ...channel,
+        config: nextConfig
+    } as WhatsAppChannelRecord
+}
+
 async function storeInboundMedia(args: {
     supabase: MediaStorageCapableClient
     client: WhatsAppClient
@@ -284,6 +313,8 @@ export async function POST(req: NextRequest) {
                 console.warn('WhatsApp Webhook: Invalid signature')
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
             }
+
+            channel = await markWhatsAppChannelWebhookVerified(supabase, channel)
 
             const accessToken = readConfigString(channel.config, 'permanent_access_token')
             if (!accessToken) {
