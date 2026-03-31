@@ -21,6 +21,7 @@ import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-re
 
 export type LoginActionState = {
     error?: string
+    errorCode?: 'invalid_credentials'
     redirectPath?: string
 }
 
@@ -29,6 +30,28 @@ export type RegisterActionState = {
     errorCode?: 'signup_rate_limited' | 'captcha_required' | 'captcha_failed' | 'trial_already_used_business'
     cooldownSeconds?: number
     redirectPath?: string
+}
+
+function resolveLoginErrorCode(error: unknown): LoginActionState['errorCode'] | null {
+    if (!error || typeof error !== 'object') {
+        return null
+    }
+
+    const errorCode = 'code' in error && typeof error.code === 'string'
+        ? error.code.trim().toLowerCase()
+        : ''
+    if (errorCode === 'invalid_credentials') {
+        return 'invalid_credentials'
+    }
+
+    const errorMessage = 'message' in error && typeof error.message === 'string'
+        ? error.message.trim().toLowerCase()
+        : ''
+    if (errorMessage === 'invalid login credentials') {
+        return 'invalid_credentials'
+    }
+
+    return null
 }
 
 async function buildPostAuthRedirectPath(
@@ -61,6 +84,11 @@ export async function login(formData: FormData) {
     const { data: authResult, error } = await supabase.auth.signInWithPassword(data)
 
     if (error) {
+        const errorCode = resolveLoginErrorCode(error)
+        if (errorCode) {
+            return { errorCode }
+        }
+
         return { error: error.message }
     }
 

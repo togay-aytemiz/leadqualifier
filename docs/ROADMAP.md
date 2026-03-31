@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-03-31):** WhatsApp Business app / coexistence Embedded Signup completion now recovers from long-running Meta flows where auth code returns but the final `FINISH` event is missed or times out. Server-side asset discovery still persists the local channel row so Settings and Inbox do not stay disconnected while the phone already shows Business Platform linked.
+> **Update Note (2026-03-31):** Turkish login now maps common Supabase credential failures to localized UI copy instead of rendering raw English provider text. Invalid sign-in attempts should show `Geçersiz e-posta veya şifre` on the TR auth surface.
 > **Update Note (2026-03-31):** Collapsed desktop sidebar nav-item tooltips now appear with zero transition delay. Slim-rail hover labels should surface immediately instead of fading/sliding in after a perceptible pause.
 > **Update Note (2026-03-31):** Collapsed desktop main sidebar now uses a darker rail surface with white brand/icon treatment and higher-contrast active pills, so the slim navigation state reads closer to the intended mock instead of looking like a reduced light sidebar.
 > **Update Note (2026-03-31):** WhatsApp Business app / coexistence Embedded Signup launch now sends Meta's required `featureType = whatsapp_business_app_onboarding` flag from both client entry points. Supplying only the existing-number config ID was not enough to open the real Business app onboarding flow.
@@ -50,7 +52,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-03-31 (Collapsed desktop sidebar now uses a dark rail with white branding/icons and immediate nav-item hover tooltips in slim mode, while `Settings > Channels` keeps the `WhatsApp`, `Instagram`, `Facebook Messenger`, `Telegram` order and 3-column desktop cap.)
+> **Last Updated:** 2026-03-31 (WhatsApp Embedded Signup now recovers local channel completion from auth code when long-running Business app onboarding misses the final Meta `FINISH` event, while Turkish login localizes invalid-credential errors, the collapsed desktop sidebar keeps its dark rail with immediate slim-mode tooltips, and `Settings > Channels` keeps the `WhatsApp`, `Instagram`, `Facebook Messenger`, `Telegram` order with a 3-column desktop cap.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -156,6 +158,7 @@
   - [x] Supabase Auth integration
   - [x] User-organization relationship
   - [x] Role-based access (admin, member)
+  - [x] Login now maps common provider credential failures into localized auth copy instead of surfacing raw English Supabase messages on the TR sign-in form
   - [x] Signout redirect now resolves `register` URL from runtime request origin instead of static app URL env fallback
   - [x] Sign Up now redirects unconfirmed users to a dedicated check-email checkpoint page (submitted email, spam hint, quick change-email return, and sign-in shortcut)
   - [x] Sign Up confirm-email success now returns client redirect state so the register form reliably transitions to the dedicated check-email checkpoint
@@ -203,6 +206,7 @@
   - [x] Keep current server OAuth discovery as an explicit fallback only for pre-existing Meta Cloud API assets
   - [x] Add deterministic blocked/unconfigured guidance when Embedded Signup is unavailable instead of dropping users into a dead-end Meta flow
   - [x] Complete Embedded Signup post-auth provisioning with mode-aware behavior: `new number` onboarding registers the business phone number for Cloud API use and persists the managed two-step verification PIN, while `existing number / Business app number` onboarding skips phone registration and PIN persistence before subscribing app webhooks on the customer WABA
+  - [x] Recover long-running Embedded Signup completions when Meta returns auth code but the client misses/times out on the final `FINISH` event by discovering `business_account_id` + `phone_number_id` server-side and still upserting the local WhatsApp channel
   - [x] Persist WhatsApp webhook provisioning state across manual/OAuth/Embedded connect flows and treat the channel as ready only after webhook verification succeeds
   - [x] Route `another BSP migration` through existing-number Embedded Signup instead of the generic WhatsApp OAuth asset-discovery fallback
 - [x] **Telegram (Sandbox)**

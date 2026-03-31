@@ -514,6 +514,49 @@ export async function resolveMetaInstagramConnectionCandidate(userAccessToken: s
     return profileCandidate
 }
 
+export async function resolveMetaWhatsAppConnectionCandidate(params: {
+    userAccessToken: string
+    appId?: string | null
+    appSecret?: string | null
+}) {
+    let directError: unknown = null
+
+    try {
+        const directPayload = await fetchMetaWhatsAppBusinessAccounts(params.userAccessToken)
+        const hydratedDirectPayload = await hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers({
+            userAccessToken: params.userAccessToken,
+            payload: directPayload
+        })
+        const directCandidate = pickWhatsAppConnectionCandidate(hydratedDirectPayload)
+        if (directCandidate) return directCandidate
+    } catch (error) {
+        directError = error
+    }
+
+    const appId = asString(params.appId)
+    const appSecret = asString(params.appSecret)
+    if (!appId || !appSecret) {
+        if (directError) throw directError
+        return null
+    }
+
+    try {
+        const debugPayload = await fetchMetaWhatsAppBusinessAccountsFromDebugToken({
+            userAccessToken: params.userAccessToken,
+            appId,
+            appSecret
+        })
+        const hydratedDebugPayload = await hydrateMetaWhatsAppBusinessAccountsWithPhoneNumbers({
+            userAccessToken: params.userAccessToken,
+            payload: debugPayload
+        })
+        return pickWhatsAppConnectionCandidate(hydratedDebugPayload)
+    } catch (error) {
+        if (directError) throw directError
+        throw error
+    }
+}
+
 export async function fetchMetaWhatsAppBusinessAccounts(userAccessToken: string) {
     const directUrl = new URL('https://graph.facebook.com/v21.0/me/whatsapp_business_accounts')
     directUrl.searchParams.set('access_token', userAccessToken)

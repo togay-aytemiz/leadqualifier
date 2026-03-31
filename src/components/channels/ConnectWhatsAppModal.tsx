@@ -9,9 +9,13 @@ import {
     buildMetaEmbeddedSignupLaunchOptions,
     getMetaEmbeddedSignupConfig,
     parseMetaEmbeddedSignupMessage,
-    type MetaEmbeddedSignupMode,
-    type MetaEmbeddedSignupEvent
+    type MetaEmbeddedSignupEvent,
+    type MetaEmbeddedSignupMode
 } from '@/lib/channels/meta-embedded-signup'
+import {
+    getErrorMessage as getSharedErrorMessage,
+    isEmbeddedSignupStatusTimeoutError
+} from '@/components/channels/metaEmbeddedSignupClient'
 
 interface ConnectWhatsAppModalProps {
     isOpen: boolean
@@ -48,6 +52,16 @@ type MetaWindow = Window & typeof globalThis & {
 function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
     return fallback
+}
+
+function getEmbeddedSignupErrorMessage(t: ReturnType<typeof useTranslations<'Channels'>>, error: unknown) {
+    const message = getSharedErrorMessage(error, t('connectWhatsAppError'))
+
+    if (message === 'WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING') {
+        return t('oauthStatus.missingWhatsAppAssets')
+    }
+
+    return message
 }
 
 function wait(ms: number) {
@@ -239,29 +253,41 @@ export function ConnectWhatsAppModal({
                 return
             }
 
-            const signupEvent = await signupSubscription.promise
+            let resolvedPhoneNumberId: string | undefined
+            let resolvedBusinessAccountId: string | undefined
 
-            if (signupEvent.type === 'cancel') {
-                setInfo(
-                    signupEvent.currentStep
-                        ? t('whatsappConnect.embeddedSignupCancelledStep', { step: signupEvent.currentStep })
-                        : t('whatsappConnect.embeddedSignupCancelled')
-                )
-                return
-            }
+            try {
+                const signupEvent = await signupSubscription.promise
 
-            if (signupEvent.type === 'error') {
-                setError(t('whatsappConnect.embeddedSignupFailedReason', {
-                    reason: signupEvent.message || t('oauthErrors.unknown')
-                }))
-                return
+                if (signupEvent.type === 'cancel') {
+                    setInfo(
+                        signupEvent.currentStep
+                            ? t('whatsappConnect.embeddedSignupCancelledStep', { step: signupEvent.currentStep })
+                            : t('whatsappConnect.embeddedSignupCancelled')
+                    )
+                    return
+                }
+
+                if (signupEvent.type === 'error') {
+                    setError(t('whatsappConnect.embeddedSignupFailedReason', {
+                        reason: signupEvent.message || t('oauthErrors.unknown')
+                    }))
+                    return
+                }
+
+                resolvedPhoneNumberId = signupEvent.phoneNumberId
+                resolvedBusinessAccountId = signupEvent.businessAccountId
+            } catch (signupEventError) {
+                if (!isEmbeddedSignupStatusTimeoutError(signupEventError)) {
+                    throw signupEventError
+                }
             }
 
             const result = await completeWhatsAppEmbeddedSignupChannel(organizationId, {
                 authCode,
                 mode,
-                phoneNumberId: signupEvent.phoneNumberId,
-                businessAccountId: signupEvent.businessAccountId
+                phoneNumberId: resolvedPhoneNumberId,
+                businessAccountId: resolvedBusinessAccountId
             })
 
             if (result.error) {
@@ -272,7 +298,7 @@ export function ConnectWhatsAppModal({
             router.refresh()
             window.alert(t('whatsappConnect.embeddedSignupSuccess'))
         } catch (error) {
-            setError(getErrorMessage(error, t('connectWhatsAppError')))
+            setError(getEmbeddedSignupErrorMessage(t, error))
         } finally {
             signupSubscription.cancel()
             setIsConnecting(false)

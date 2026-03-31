@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { ChannelOnboardingShell } from '@/components/channels/ChannelOnboardingShell'
 import {
     getErrorMessage,
+    isEmbeddedSignupStatusTimeoutError,
     loadMetaSdk,
     subscribeToEmbeddedSignupEvents,
     wait
@@ -108,6 +109,16 @@ function getDisconnectErrorMessage(t: ReturnType<typeof useTranslations<'Channel
 
     if (message === 'WHATSAPP_PROVIDER_DISCONNECT_FAILED') {
         return t('whatsappConnect.disconnectFailed')
+    }
+
+    return message
+}
+
+function getEmbeddedSignupErrorMessage(t: ReturnType<typeof useTranslations<'Channels'>>, error: unknown) {
+    const message = getErrorMessage(error, t('connectWhatsAppError'))
+
+    if (message === 'WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING') {
+        return t('oauthStatus.missingWhatsAppAssets')
     }
 
     return message
@@ -253,29 +264,41 @@ export function WhatsAppOnboardingPage({
                 return
             }
 
-            const signupEvent = await signupSubscription.promise
+            let resolvedPhoneNumberId: string | undefined
+            let resolvedBusinessAccountId: string | undefined
 
-            if (signupEvent.type === 'cancel') {
-                setInfo(
-                    signupEvent.currentStep
-                        ? t('whatsappConnect.embeddedSignupCancelledStep', { step: signupEvent.currentStep })
-                        : t('whatsappConnect.embeddedSignupCancelled')
-                )
-                return
-            }
+            try {
+                const signupEvent = await signupSubscription.promise
 
-            if (signupEvent.type === 'error') {
-                setError(t('whatsappConnect.embeddedSignupFailedReason', {
-                    reason: signupEvent.message || t('oauthErrors.unknown')
-                }))
-                return
+                if (signupEvent.type === 'cancel') {
+                    setInfo(
+                        signupEvent.currentStep
+                            ? t('whatsappConnect.embeddedSignupCancelledStep', { step: signupEvent.currentStep })
+                            : t('whatsappConnect.embeddedSignupCancelled')
+                    )
+                    return
+                }
+
+                if (signupEvent.type === 'error') {
+                    setError(t('whatsappConnect.embeddedSignupFailedReason', {
+                        reason: signupEvent.message || t('oauthErrors.unknown')
+                    }))
+                    return
+                }
+
+                resolvedPhoneNumberId = signupEvent.phoneNumberId
+                resolvedBusinessAccountId = signupEvent.businessAccountId
+            } catch (signupEventError) {
+                if (!isEmbeddedSignupStatusTimeoutError(signupEventError)) {
+                    throw signupEventError
+                }
             }
 
             const result = await completeWhatsAppEmbeddedSignupChannel(organizationId, {
                 authCode,
                 mode,
-                phoneNumberId: signupEvent.phoneNumberId,
-                businessAccountId: signupEvent.businessAccountId
+                phoneNumberId: resolvedPhoneNumberId,
+                businessAccountId: resolvedBusinessAccountId
             })
 
             if (result.error) {
@@ -285,7 +308,7 @@ export function WhatsAppOnboardingPage({
             setInfo(t('whatsappConnect.embeddedSignupSuccess'))
             router.refresh()
         } catch (signupError) {
-            setError(getErrorMessage(signupError, t('connectWhatsAppError')))
+            setError(getEmbeddedSignupErrorMessage(t, signupError))
         } finally {
             signupSubscription.cancel()
             setIsConnecting(false)

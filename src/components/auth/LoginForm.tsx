@@ -12,6 +12,18 @@ import {
     shouldEnableManualRoutePrefetch
 } from '@/design/manual-prefetch'
 
+type TranslateFn = (key: string, values?: Record<string, string | number>) => string
+
+function resolveLoginErrorMessage(state: LoginActionState | null, t: TranslateFn) {
+    if (!state) return null
+
+    if (state.errorCode === 'invalid_credentials') {
+        return t('errors.invalidCredentials')
+    }
+
+    return state.error ?? null
+}
+
 export function LoginForm() {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
@@ -24,6 +36,7 @@ export function LoginForm() {
         },
         null
     )
+    const errorMessage = resolveLoginErrorMessage(state, t)
     const isRedirecting = Boolean(state?.redirectPath)
 
     useEffect(() => {
@@ -50,9 +63,9 @@ export function LoginForm() {
 
             <form action={formAction} className="space-y-6">
                 <input type="hidden" name="locale" value={locale} />
-                {state?.error && (
+                {errorMessage && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        {state.error}
+                        {errorMessage}
                     </div>
                 )}
 

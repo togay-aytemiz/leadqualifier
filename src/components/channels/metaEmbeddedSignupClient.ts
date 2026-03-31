@@ -2,6 +2,8 @@
 
 import { parseMetaEmbeddedSignupMessage, type MetaEmbeddedSignupEvent } from '@/lib/channels/meta-embedded-signup'
 
+const EMBEDDED_SIGNUP_STATUS_TIMEOUT_MESSAGE = 'Timed out waiting for Meta embedded signup status.'
+
 interface MetaLoginResponse {
     authResponse?: {
         code?: string | null
@@ -28,6 +30,10 @@ type MetaWindow = Window & typeof globalThis & {
 export function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
     return fallback
+}
+
+export function isEmbeddedSignupStatusTimeoutError(error: unknown) {
+    return getErrorMessage(error, '') === EMBEDDED_SIGNUP_STATUS_TIMEOUT_MESSAGE
 }
 
 export function wait(ms: number) {
@@ -118,7 +124,7 @@ export function subscribeToEmbeddedSignupEvents(timeoutMs = 180000) {
     window.addEventListener('message', onMessage)
     timer = window.setTimeout(() => {
         cleanup()
-        rejectPromise(new Error('Timed out waiting for Meta embedded signup status.'))
+        rejectPromise(new Error(EMBEDDED_SIGNUP_STATUS_TIMEOUT_MESSAGE))
     }, timeoutMs)
 
     return {

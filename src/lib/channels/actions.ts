@@ -11,7 +11,8 @@ import { InstagramClient } from '@/lib/instagram/client'
 import {
     exchangeMetaCodeForToken,
     exchangeMetaForLongLivedToken,
-    resolveMetaInstagramConnectionCandidate
+    resolveMetaInstagramConnectionCandidate,
+    resolveMetaWhatsAppConnectionCandidate
 } from '@/lib/channels/meta-oauth'
 import type { MetaEmbeddedSignupMode } from '@/lib/channels/meta-embedded-signup'
 import {
@@ -97,16 +98,23 @@ export interface ConnectInstagramChannelInput {
 export interface CompleteWhatsAppEmbeddedSignupInput {
     authCode: string
     mode: MetaEmbeddedSignupMode
-    phoneNumberId: string
-    businessAccountId: string
+    phoneNumberId?: string | null
+    businessAccountId?: string | null
 }
 
 const WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR = 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED'
 const WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR = 'WHATSAPP_PROVIDER_DISCONNECT_FAILED'
+const WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING_ERROR = 'WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING'
 
 function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
     return fallback
+}
+
+function normalizeOptionalString(value: string | null | undefined) {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
 }
 
 function asConfigRecord(value: Json): Record<string, Json | undefined> {
@@ -389,10 +397,10 @@ export async function completeWhatsAppEmbeddedSignupChannel(
     const appId = process.env.META_WHATSAPP_APP_ID?.trim() || process.env.META_APP_ID?.trim()
     const appSecret = process.env.META_WHATSAPP_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim()
     const authCode = input.authCode.trim()
-    const phoneNumberId = input.phoneNumberId.trim()
-    const businessAccountId = input.businessAccountId.trim()
+    let phoneNumberId = normalizeOptionalString(input.phoneNumberId)
+    let businessAccountId = normalizeOptionalString(input.businessAccountId)
 
-    if (!authCode || !phoneNumberId || !businessAccountId) {
+    if (!authCode) {
         return { error: 'Missing required WhatsApp embedded signup fields.' }
     }
 
@@ -418,6 +426,25 @@ export async function completeWhatsAppEmbeddedSignupChannel(
             appSecret,
             shortLivedToken
         })
+
+        if (!phoneNumberId || !businessAccountId) {
+            const candidate = await resolveMetaWhatsAppConnectionCandidate({
+                userAccessToken: permanentAccessToken,
+                appId,
+                appSecret
+            })
+
+            if (!candidate) {
+                return { error: WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING_ERROR }
+            }
+
+            phoneNumberId = phoneNumberId ?? candidate.phoneNumberId
+            businessAccountId = businessAccountId ?? candidate.businessAccountId
+        }
+
+        if (!phoneNumberId || !businessAccountId) {
+            return { error: WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING_ERROR }
+        }
 
         const client = new WhatsAppClient(permanentAccessToken)
         const verifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() || uuidv4()

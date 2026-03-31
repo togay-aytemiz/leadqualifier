@@ -11,6 +11,7 @@ const {
     revalidatePathMock,
     registerPhoneNumberMock,
     resolveMetaInstagramConnectionCandidateMock,
+    resolveMetaWhatsAppConnectionCandidateMock,
     sendTemplateMock,
     subscribeAppToBusinessAccountMock,
     whatsAppCtorMock
@@ -25,6 +26,7 @@ const {
     revalidatePathMock: vi.fn(),
     registerPhoneNumberMock: vi.fn(),
     resolveMetaInstagramConnectionCandidateMock: vi.fn(),
+    resolveMetaWhatsAppConnectionCandidateMock: vi.fn(),
     sendTemplateMock: vi.fn(),
     subscribeAppToBusinessAccountMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
@@ -45,7 +47,8 @@ vi.mock('@/lib/organizations/active-context', () => ({
 vi.mock('@/lib/channels/meta-oauth', () => ({
     exchangeMetaCodeForToken: exchangeMetaCodeForTokenMock,
     exchangeMetaForLongLivedToken: exchangeMetaForLongLivedTokenMock,
-    resolveMetaInstagramConnectionCandidate: resolveMetaInstagramConnectionCandidateMock
+    resolveMetaInstagramConnectionCandidate: resolveMetaInstagramConnectionCandidateMock,
+    resolveMetaWhatsAppConnectionCandidate: resolveMetaWhatsAppConnectionCandidateMock
 }))
 
 vi.mock('@/lib/whatsapp/client', () => ({
@@ -191,6 +194,12 @@ describe('channels actions: WhatsApp core flows', () => {
             instagramBusinessAccountId: '17841444965056435',
             instagramUsername: 'itsalinayalin'
         })
+        resolveMetaWhatsAppConnectionCandidateMock.mockResolvedValue({
+            businessAccountId: 'waba-discovered-1',
+            businessAccountName: 'Qualy Business',
+            phoneNumberId: 'phone-discovered-1',
+            displayPhoneNumber: '+90 555 444 33 22'
+        })
     })
 
     it('returns validation error when required WhatsApp fields are missing', async () => {
@@ -335,6 +344,49 @@ describe('channels actions: WhatsApp core flows', () => {
         expect(rpcMock).toHaveBeenCalledWith('enforce_org_trial_business_policy', {
             target_organization_id: 'org-1',
             input_whatsapp_business_account_id: 'waba-1',
+            input_phone: '+90 555 111 22 33',
+            input_source: 'whatsapp_connect'
+        })
+    })
+
+    it('falls back to server-side WhatsApp asset discovery when embedded-signup finish ids are missing', async () => {
+        const { supabase, upsertMock, rpcMock } = createUpsertSupabaseMock()
+        createClientMock.mockResolvedValueOnce(supabase)
+
+        const result = await completeWhatsAppEmbeddedSignupChannel('org-1', {
+            authCode: 'auth-code-1',
+            mode: 'existing',
+            phoneNumberId: '',
+            businessAccountId: ''
+        })
+
+        expect(result).toEqual({ success: true })
+        expect(resolveMetaWhatsAppConnectionCandidateMock).toHaveBeenCalledWith({
+            userAccessToken: 'long-token-1',
+            appId: 'meta-app-1',
+            appSecret: 'meta-secret-1'
+        })
+        expect(registerPhoneNumberMock).not.toHaveBeenCalled()
+        expect(subscribeAppToBusinessAccountMock).toHaveBeenCalledWith('waba-discovered-1', {
+            overrideCallbackUri: 'https://app.askqualy.com/api/webhooks/whatsapp',
+            verifyToken: 'global-verify-token'
+        })
+        expect(getPhoneNumberMock).toHaveBeenCalledWith('phone-discovered-1')
+        expect(upsertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                config: expect.objectContaining({
+                    embedded_signup_mode: 'existing',
+                    business_account_id: 'waba-discovered-1',
+                    phone_number_id: 'phone-discovered-1'
+                }),
+                name: 'WhatsApp (+90 555 111 22 33)',
+                status: 'active'
+            }),
+            { onConflict: 'organization_id,type' }
+        )
+        expect(rpcMock).toHaveBeenCalledWith('enforce_org_trial_business_policy', {
+            target_organization_id: 'org-1',
+            input_whatsapp_business_account_id: 'waba-discovered-1',
             input_phone: '+90 555 111 22 33',
             input_source: 'whatsapp_connect'
         })

@@ -114,6 +114,29 @@ describe('auth login action', () => {
         })
         expect(resolveActiveOrganizationContextMock).not.toHaveBeenCalled()
     })
+
+    it('maps invalid login credentials into a localized error code instead of returning raw provider text', async () => {
+        const signInWithPasswordMock = vi.fn(async () => ({
+            data: {
+                user: null,
+                session: null,
+            },
+            error: {
+                code: 'invalid_credentials',
+                message: 'Invalid login credentials',
+            },
+        }))
+
+        createClientMock.mockResolvedValue({
+            auth: {
+                signInWithPassword: signInWithPasswordMock,
+            },
+        })
+
+        await expect(login(createLoginFormData())).resolves.toEqual({
+            errorCode: 'invalid_credentials',
+        })
+    })
 })
 
 describe('auth register action', () => {
