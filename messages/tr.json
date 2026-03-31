@@ -879,17 +879,17 @@
       "retryVerificationFailed": "Webhook doğrulaması yeniden denenemedi.",
       "options": {
         "newApi": {
-          "title": "Yeni bir WhatsApp API hesabı oluşturup bağla",
-          "description": "Henüz bir WhatsApp Business Platform (API) hesabınız yoksa ve ilk kurulumu yeni bir numarayla ya da şu an WhatsApp Personal hesabına bağlı numarayla yapacaksanız bu seçeneği kullanın."
+          "title": "Yeni numarayla başla",
+          "description": "WhatsApp Business Platform (API) için sıfırdan kurulum yapacak ve yeni bir numara kullanacaksanız bunu seçin."
         },
         "existingApi": {
           "title": "Mevcut WhatsApp API hesabını bağla",
-          "description": "Daha önce bir WhatsApp Business Platform (API) hesabı oluşturduysanız bu seçeneği kullanın."
+          "description": "Numaranız ve WhatsApp Business Account (WABA) zaten Meta'da hazırsa bunu seçin."
         },
         "businessApp": {
-          "title": "WhatsApp Business uygulamasındaki mevcut numaramı taşıyarak bağla",
-          "description": "Henüz WhatsApp API hesabınız yoksa ama WhatsApp Business uygulamasında aktif kullandığınız numarayı aynı numarayla API'ye geçirmek istiyorsanız bu seçeneği kullanın.",
-          "badge": "Beta"
+          "title": "WhatsApp Business kullandığım numarayı bağla",
+          "description": "Telefonunuzda aktif olarak WhatsApp Business kullanıyorsanız ve bu numara henüz WhatsApp Business Account (WABA) ile bağlı değilse genelde doğru seçenek budur.",
+          "badge": "Önerilir"
         }
       },
       "existingApi": {
@@ -941,9 +941,9 @@
         "secondary": "Daha sonra oluşturacağım"
       },
       "businessApp": {
-        "heading": "WhatsApp Business Uygulamasını Bağla",
-        "description": "Mevcut WhatsApp Business numaranızı koruyun ve var olan uygulama numaraları için hazırlanan yönlendirmeli Meta akışıyla devam edin.",
-        "badge": "Beta"
+        "heading": "WhatsApp Business numaranızı bağlayın",
+        "description": "Telefonunuzda aktif kullandığınız WhatsApp Business numarasını aynı numarayla bağlamak için bu akışı kullanın. Henüz bir WhatsApp Business Account (WABA) bağlantınız yoksa genelde doğru yol budur.",
+        "badge": "Önerilir"
       },
       "connectReady": {
         "heading": "WhatsApp Business Platform (API) bağla",

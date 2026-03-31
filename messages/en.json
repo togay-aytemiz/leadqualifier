@@ -879,17 +879,17 @@
       "retryVerificationFailed": "Failed to retry webhook verification.",
       "options": {
         "newApi": {
-          "title": "Create and connect a new WhatsApp API account",
-          "description": "Start here if you do not have a WhatsApp Business Platform (API) account yet and want to complete your first setup with either a new phone number or a number currently tied to WhatsApp Personal."
+          "title": "Start with a new number",
+          "description": "Choose this if you are setting up WhatsApp Business Platform (API) from scratch with a brand-new number."
         },
         "existingApi": {
           "title": "Connect an existing WhatsApp API account",
-          "description": "Select this option if you have created a WhatsApp Business Platform (API) account before."
+          "description": "Choose this if your number and WhatsApp Business Account (WABA) already exist in Meta."
         },
         "businessApp": {
-          "title": "Migrate and connect my existing WhatsApp Business app number",
-          "description": "Use this if you do not have a WhatsApp API account yet and want to move your active WhatsApp Business app number to the API while keeping the same number.",
-          "badge": "Beta"
+          "title": "Connect my WhatsApp Business number",
+          "description": "This is usually the right option if you actively use WhatsApp Business on your phone and that number is not connected through a WhatsApp Business Account (WABA) yet.",
+          "badge": "Recommended"
         }
       },
       "existingApi": {
@@ -941,9 +941,9 @@
         "secondary": "I will create one later"
       },
       "businessApp": {
-        "heading": "Connect WhatsApp Business App",
-        "description": "Keep your current WhatsApp Business number and continue through the guided Meta flow built for existing app numbers.",
-        "badge": "Beta"
+        "heading": "Connect your WhatsApp Business number",
+        "description": "Use this flow to connect the WhatsApp Business number you already use on your phone. If it is not connected through a WhatsApp Business Account (WABA) yet, this is usually the right path.",
+        "badge": "Recommended"
       },
       "connectReady": {
         "heading": "Connect WhatsApp Business Platform (API)",

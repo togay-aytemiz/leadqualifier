@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import enMessages from '../../../messages/en.json'
 import trMessages from '../../../messages/tr.json'
@@ -20,14 +22,16 @@ import {
     resolveWhatsAppWizardScreenFromMetaAccess
 } from '@/components/channels/whatsappOnboarding'
 
+const ONBOARDING_PAGE_PATH = path.resolve(process.cwd(), 'src/components/channels/WhatsAppOnboardingPage.tsx')
+
 describe('whatsappOnboarding', () => {
-    it('includes new-api, existing-api, and business-app choices on the main decision screen', () => {
+    it('places the business-app choice first on the main decision screen', () => {
         const options = getWhatsAppOnboardingOptions()
 
         expect(options.map((option) => option.path)).toEqual([
+            'businessApp',
             'newApi',
-            'existingApi',
-            'businessApp'
+            'existingApi'
         ])
     })
 
@@ -115,18 +119,27 @@ describe('whatsappOnboarding', () => {
         expect(resolveWhatsAppBackScreen('businessApp', 'migratingNumber')).toBe('landing')
     })
 
-    it('defaults to the new API account path', () => {
-        expect(getDefaultWhatsAppOnboardingPath()).toBe('newApi')
+    it('defaults to the business-app path', () => {
+        expect(getDefaultWhatsAppOnboardingPath()).toBe('businessApp')
     })
 
     it('opens support through the team WhatsApp chat', () => {
         expect(getWhatsAppSupportChatUrl()).toBe('https://wa.me/905074699692')
     })
 
-    it('clarifies that the new-api path also covers numbers currently tied to WhatsApp Personal', () => {
-        expect(trMessages.Channels.whatsappConnect.options.newApi.description).toContain('WhatsApp Personal')
-        expect(enMessages.Channels.whatsappConnect.options.newApi.description).toContain('WhatsApp Personal')
-        expect(trMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business uygulamasında')
-        expect(enMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business app')
+    it('uses simpler copy and recommends the business-app path for WhatsApp Business numbers without WABA', () => {
+        expect(trMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business')
+        expect(trMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business Account (WABA)')
+        expect(trMessages.Channels.whatsappConnect.options.businessApp.badge).toBe('Önerilir')
+        expect(enMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business')
+        expect(enMessages.Channels.whatsappConnect.options.businessApp.description).toContain('WhatsApp Business Account (WABA)')
+        expect(enMessages.Channels.whatsappConnect.options.businessApp.badge).toBe('Recommended')
+    })
+
+    it('renders a badge next to the recommended landing option', () => {
+        const source = fs.readFileSync(ONBOARDING_PAGE_PATH, 'utf8')
+
+        expect(source).toContain("badge: path === 'businessApp' ? t(`whatsappConnect.options.${path}.badge`) : undefined")
+        expect(source).toContain('<Badge variant="info">{badge}</Badge>')
     })
 })

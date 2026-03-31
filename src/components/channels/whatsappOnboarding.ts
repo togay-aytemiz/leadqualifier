@@ -39,16 +39,16 @@ export interface WhatsAppExistingApiOption {
 
 const WHATSAPP_ONBOARDING_OPTIONS: WhatsAppOnboardingOption[] = [
     {
+        path: 'businessApp',
+        action: 'embeddedSignupExisting'
+    },
+    {
         path: 'newApi',
         action: 'wizard'
     },
     {
         path: 'existingApi',
         action: 'existingApiChoice'
-    },
-    {
-        path: 'businessApp',
-        action: 'embeddedSignupExisting'
     }
 ]
 
@@ -83,7 +83,7 @@ export function getWhatsAppOnboardingOptions() {
 }
 
 export function getDefaultWhatsAppOnboardingPath(): WhatsAppOnboardingPath {
-    return 'newApi'
+    return 'businessApp'
 }
 
 export function getWhatsAppSupportChatUrl() {

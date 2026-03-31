@@ -37,7 +37,7 @@ import {
     type WhatsAppSetupScreen
 } from '@/components/channels/whatsappOnboarding'
 import { WhatsAppTemplateModal } from '@/components/channels/WhatsAppTemplateModal'
-import { Alert, Button } from '@/design'
+import { Alert, Badge, Button } from '@/design'
 import { ConfirmDialog } from '@/design/primitives'
 import {
     completeWhatsAppEmbeddedSignupChannel,
@@ -433,11 +433,13 @@ export function WhatsAppOnboardingPage({
         isSelected,
         title,
         description,
+        badge,
         onSelect
     }: {
         isSelected: boolean
         title: string
         description?: string
+        badge?: string
         onSelect: () => void
     }) => (
         <label
@@ -456,8 +458,11 @@ export function WhatsAppOnboardingPage({
             />
             {renderRadioMarker(isSelected)}
             <span className="block min-w-0">
-                <span className="block text-base font-semibold leading-6 text-slate-900">
-                    {title}
+                <span className="flex flex-wrap items-center gap-2">
+                    <span className="block text-base font-semibold leading-6 text-slate-900">
+                        {title}
+                    </span>
+                    {badge && <Badge variant="info">{badge}</Badge>}
                 </span>
                 {description && (
                     <span className="mt-1 block text-sm leading-6 text-slate-600">
@@ -477,6 +482,7 @@ export function WhatsAppOnboardingPage({
                     isSelected,
                     title: t(`whatsappConnect.options.${path}.title`),
                     description: t(`whatsappConnect.options.${path}.description`),
+                    badge: path === 'businessApp' ? t(`whatsappConnect.options.${path}.badge`) : undefined,
                     onSelect: () => setActivePath(path)
                 })}
             </div>
