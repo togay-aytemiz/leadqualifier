@@ -20,9 +20,9 @@ describe('getChannelCardConfigs', () => {
 
         expect(configs.map(config => config.type)).toEqual([
             'whatsapp',
-            'telegram',
+            'instagram',
             'messenger',
-            'instagram'
+            'telegram'
         ])
 
         const instagramCard = configs.find(config => config.type === 'instagram')
@@ -58,6 +58,6 @@ describe('getChannelCardConfigs', () => {
         expect(classes).toContain('grid')
         expect(classes).toContain('md:grid-cols-2')
         expect(classes).toContain('xl:grid-cols-3')
-        expect(classes).toContain('2xl:grid-cols-4')
+        expect(classes).not.toContain('2xl:grid-cols-4')
     })
 })

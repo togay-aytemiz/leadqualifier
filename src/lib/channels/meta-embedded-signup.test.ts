@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
+    buildMetaEmbeddedSignupLaunchOptions,
     getMetaEmbeddedSignupConfig,
     parseMetaEmbeddedSignupMessage
 } from '@/lib/channels/meta-embedded-signup'
@@ -82,6 +83,29 @@ describe('meta embedded signup helpers', () => {
         expect(getMetaEmbeddedSignupConfig('existing')).toEqual({
             appId: 'app-1',
             configId: 'existing-config'
+        })
+    })
+
+    it('adds the coexistence feature flag only for existing-number onboarding launches', () => {
+        expect(buildMetaEmbeddedSignupLaunchOptions('config-new', 'new')).toEqual({
+            config_id: 'config-new',
+            response_type: 'code',
+            override_default_response_type: true,
+            extras: {
+                feature: 'whatsapp_embedded_signup',
+                sessionInfoVersion: 3
+            }
+        })
+
+        expect(buildMetaEmbeddedSignupLaunchOptions('config-existing', 'existing')).toEqual({
+            config_id: 'config-existing',
+            response_type: 'code',
+            override_default_response_type: true,
+            extras: {
+                feature: 'whatsapp_embedded_signup',
+                featureType: 'whatsapp_business_app_onboarding',
+                sessionInfoVersion: 3
+            }
         })
     })
 })

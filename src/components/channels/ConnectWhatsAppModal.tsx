@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { Alert, Button, Modal } from '@/design'
 import { completeWhatsAppEmbeddedSignupChannel } from '@/lib/channels/actions'
 import {
+    buildMetaEmbeddedSignupLaunchOptions,
     getMetaEmbeddedSignupConfig,
     parseMetaEmbeddedSignupMessage,
     type MetaEmbeddedSignupMode,
@@ -209,15 +210,7 @@ export function ConnectWhatsAppModal({
             const sdk = await loadMetaSdk(embeddedSignupConfig.appId)
 
             const loginResponse = await new Promise<MetaLoginResponse>((resolve) => {
-                sdk.login(resolve, {
-                    config_id: embeddedSignupConfig.configId,
-                    response_type: 'code',
-                    override_default_response_type: true,
-                    extras: {
-                        feature: 'whatsapp_embedded_signup',
-                        sessionInfoVersion: 3
-                    }
-                })
+                sdk.login(resolve, buildMetaEmbeddedSignupLaunchOptions(embeddedSignupConfig.configId, mode))
             })
 
             const authCode = typeof loginResponse.authResponse?.code === 'string'

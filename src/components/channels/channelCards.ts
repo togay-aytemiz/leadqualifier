@@ -29,5 +29,5 @@ export function getChannelCardConfigs(channels: Channel[]): ChannelCardConfig[] 
 }
 
 export function getChannelsListLayoutClasses() {
-    return 'grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+    return 'grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3'
 }

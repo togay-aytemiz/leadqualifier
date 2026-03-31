@@ -12,16 +12,16 @@ describe('channelCatalog', () => {
 
         expect(catalog.map((entry) => entry.type)).toEqual([
             'whatsapp',
-            'telegram',
+            'instagram',
             'messenger',
-            'instagram'
+            'telegram'
         ])
 
         expect(catalog.map((entry) => entry.href)).toEqual([
             '/settings/channels/whatsapp',
-            '/settings/channels/telegram',
+            '/settings/channels/instagram',
             '/settings/channels/messenger',
-            '/settings/channels/instagram'
+            '/settings/channels/telegram'
         ])
     })
 

@@ -170,7 +170,9 @@ export async function register(formData: FormData) {
         } satisfies RegisterActionState
     }
 
-    redirect(`${buildLocalizedPath('/register/check-email', normalizeAppLocale(locale))}?email=${encodeURIComponent(email)}`)
+    return {
+        redirectPath: `${buildLocalizedPath('/register/check-email', normalizeAppLocale(locale))}?email=${encodeURIComponent(email)}`,
+    } satisfies RegisterActionState
 }
 
 export async function logout() {

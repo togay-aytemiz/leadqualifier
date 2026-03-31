@@ -422,6 +422,64 @@ describe('calibrateLeadScoreFromExtraction', () => {
     })
 })
 
+describe('media-backed commercial inquiry promotion', () => {
+    it('promotes attachment-backed generic info requests to warm commercial intent', async () => {
+        const moduleExports = await import('@/lib/leads/extraction')
+        const promoteMediaBackedCommercialIntent = (
+            moduleExports as Record<string, unknown>
+        ).promoteMediaBackedCommercialIntent as
+            | ((args: {
+                extracted: ReturnType<typeof safeParseLeadExtraction>
+                messages: Array<{
+                    sender_type: string
+                    content: string
+                    metadata: Record<string, unknown>
+                }>
+            }) => ReturnType<typeof safeParseLeadExtraction>)
+            | undefined
+
+        expect(promoteMediaBackedCommercialIntent).toBeTypeOf('function')
+
+        const promoted = promoteMediaBackedCommercialIntent?.({
+            extracted: safeParseLeadExtraction(`{
+                "service_type": null,
+                "services": [],
+                "desired_date": null,
+                "location": null,
+                "budget_signals": [],
+                "intent_signals": [],
+                "risk_signals": [],
+                "required_intake_collected": {},
+                "intent_stage": "none",
+                "non_business": false,
+                "summary": "Müşteri bunun hakkında daha fazla bilgi almak istiyor.",
+                "score": 1,
+                "status": "cold"
+            }`),
+            messages: [
+                {
+                    sender_type: 'contact',
+                    content: '[Instagram image]',
+                    metadata: {
+                        instagram_event_type: 'attachment',
+                        instagram_media: {
+                            type: 'image',
+                            storage_url: 'https://cdn.example.com/instagram-media-1.jpg',
+                            caption: 'Merhaba, bunun hakkında daha fazla bilgi alabilir miyim?'
+                        }
+                    }
+                }
+            ]
+        })
+
+        expect(promoted?.intent_stage).toBe('informational_commercial')
+
+        const calibrated = calibrateLeadScoreFromExtraction(promoted ?? safeParseLeadExtraction('{}'))
+        expect(calibrated.totalScore).toBe(5)
+        expect(calibrated.status).toBe('warm')
+    })
+})
+
 describe('resolveLeadExtractionLocale', () => {
     it('respects explicit locale override', () => {
         const locale = resolveLeadExtractionLocale({

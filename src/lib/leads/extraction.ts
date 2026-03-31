@@ -90,6 +90,37 @@ const URGENT_SIGNAL_TOKENS = ['urgent', 'asap', 'acil', 'today', 'bugun', 'bugü
 const INDECISIVE_SIGNAL_TOKENS = ['indecisive', 'unsure', 'kararsiz', 'kararsız', 'bilmiyorum']
 const FAR_FUTURE_SIGNAL_TOKENS = ['far future', 'far_future', 'months later', 'next season', 'ileride', 'aylar sonra']
 const OPT_OUT_TOKENS = ['vazgecti', 'vazgeçti', 'vazgectim', 'vazgeçtim', 'istemiyor', 'istemiyorum', 'iptal', 'cancel']
+const MEDIA_BACKED_COMMERCIAL_TOPIC_TOKENS = [
+    'bilgi',
+    'detay',
+    'fiyat',
+    'ucret',
+    'price',
+    'pricing',
+    'detail',
+    'details',
+    'availability',
+    'quote',
+    'cost',
+    'package',
+    'packages',
+    'paket'
+]
+const MEDIA_BACKED_COMMERCIAL_REQUEST_TOKENS = [
+    'alabilir miyim',
+    'almak istiyorum',
+    'ogrenebilir miyim',
+    'ogrenmek istiyorum',
+    'verir misiniz',
+    'paylasir misiniz',
+    'istiyorum',
+    'can i',
+    'could i',
+    'i want',
+    'learn more',
+    'more info',
+    'tell me more'
+]
 
 function isLikelyTurkishText(value: string) {
     const text = (value ?? '').trim()
@@ -480,7 +511,7 @@ export function resolvePersistedServiceTypes(options: {
     return persisted
 }
 
-interface LeadExtractionMessageRecord {
+export interface LeadExtractionMessageRecord {
     sender_type?: string | null
     content?: string | null
     created_at?: string | null
@@ -557,6 +588,27 @@ function resolveLeadExtractionMessageContent(message: LeadExtractionMessageRecor
     if (content && !isKnownMediaPlaceholderContent(content)) return content
     if (caption) return caption
     return ''
+}
+
+function isMediaBackedCommercialInquiryText(content: string) {
+    const normalized = normalizeForMatch(content)
+    if (!normalized || isGenericGreetingOnly(content)) return false
+
+    const hasCommercialTopic = MEDIA_BACKED_COMMERCIAL_TOPIC_TOKENS.some((token) => normalized.includes(token))
+    if (!hasCommercialTopic) return false
+
+    return MEDIA_BACKED_COMMERCIAL_REQUEST_TOKENS.some((token) => normalized.includes(token))
+}
+
+function hasRecentMediaBackedCommercialInquiry(messages: LeadExtractionMessageRecord[]) {
+    return messages.some((message) => {
+        if (toLeadConversationRole(message.sender_type) !== 'customer') return false
+
+        const metadata = parseMessageMetadataRecord(message.metadata)
+        if (!metadata || !hasMediaMetadata(metadata)) return false
+
+        return isMediaBackedCommercialInquiryText(resolveLeadExtractionMessageContent(message))
+    })
 }
 
 export function buildLeadExtractionConversationContext(options: {
@@ -1248,6 +1300,25 @@ export function normalizeLowSignalLeadStatus(options: {
     } satisfies NormalizedLeadExtraction
 }
 
+export function promoteMediaBackedCommercialIntent(options: {
+    extracted: NormalizedLeadExtraction
+    messages?: LeadExtractionMessageRecord[]
+}) {
+    const extracted = options.extracted
+
+    if (!hasRecentMediaBackedCommercialInquiry(options.messages ?? [])) {
+        return extracted
+    }
+
+    return {
+        ...extracted,
+        intent_stage: mergeCommercialIntentStage('informational_commercial', extracted.intent_stage),
+        non_business: false,
+        score: Math.max(extracted.score, 5),
+        status: extracted.status === 'hot' ? 'hot' : 'warm'
+    } satisfies NormalizedLeadExtraction
+}
+
 export function repairLeadExtractionRequiredIntake(options: {
     extracted: NormalizedLeadExtraction
     requiredFields: string[]
@@ -1464,6 +1535,10 @@ export async function runLeadExtraction(options: {
         services: persistedServiceTypes
     }
     extracted = normalizeLowSignalLeadStatus({ extracted, customerMessages })
+    extracted = promoteMediaBackedCommercialIntent({
+        extracted,
+        messages: (messages ?? []) as LeadExtractionMessageRecord[]
+    })
     extracted = repairLeadExtractionRequiredIntake({
         extracted,
         requiredFields: requiredIntakeFields,

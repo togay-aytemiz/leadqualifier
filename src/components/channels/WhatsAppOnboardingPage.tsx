@@ -45,7 +45,11 @@ import {
 } from '@/lib/channels/actions'
 import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
 import { getMetaChannelConnectedCopy } from '@/lib/channels/meta-connection-copy'
-import { getMetaEmbeddedSignupConfig, type MetaEmbeddedSignupMode } from '@/lib/channels/meta-embedded-signup'
+import {
+    buildMetaEmbeddedSignupLaunchOptions,
+    getMetaEmbeddedSignupConfig,
+    type MetaEmbeddedSignupMode
+} from '@/lib/channels/meta-embedded-signup'
 import type { Channel } from '@/types/database'
 
 interface WhatsAppOnboardingPageProps {
@@ -220,15 +224,7 @@ export function WhatsAppOnboardingPage({
             const sdk = await loadMetaSdk(embeddedSignupConfig.appId)
 
             const loginResponse = await new Promise<MetaLoginResponse>((resolve) => {
-                sdk.login(resolve, {
-                    config_id: embeddedSignupConfig.configId,
-                    response_type: 'code',
-                    override_default_response_type: true,
-                    extras: {
-                        feature: 'whatsapp_embedded_signup',
-                        sessionInfoVersion: 3
-                    }
-                })
+                sdk.login(resolve, buildMetaEmbeddedSignupLaunchOptions(embeddedSignupConfig.configId, mode))
             })
 
             const authCode = typeof loginResponse.authResponse?.code === 'string'

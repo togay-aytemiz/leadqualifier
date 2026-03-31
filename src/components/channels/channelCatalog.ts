@@ -42,14 +42,14 @@ const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
         ]
     },
     {
-        type: 'telegram',
-        href: '/settings/channels/telegram',
-        tone: 'sky',
+        type: 'instagram',
+        href: '/settings/channels/instagram',
+        tone: 'sunset',
         onboardingSurface: 'interactive',
         resources: [
             {
-                labelKey: 'telegramOverview',
-                href: 'https://core.telegram.org/bots/tutorial'
+                labelKey: 'instagramOverview',
+                href: 'https://www.facebook.com/help/502981923235522'
             }
         ]
     },
@@ -67,14 +67,14 @@ const CHANNEL_CATALOG: ChannelCatalogEntry[] = [
         ]
     },
     {
-        type: 'instagram',
-        href: '/settings/channels/instagram',
-        tone: 'sunset',
+        type: 'telegram',
+        href: '/settings/channels/telegram',
+        tone: 'sky',
         onboardingSurface: 'interactive',
         resources: [
             {
-                labelKey: 'instagramOverview',
-                href: 'https://www.facebook.com/help/502981923235522'
+                labelKey: 'telegramOverview',
+                href: 'https://core.telegram.org/bots/tutorial'
             }
         ]
     }

@@ -221,7 +221,7 @@ describe('auth register action', () => {
         expect(rpcMock).not.toHaveBeenCalled()
     })
 
-    it('redirects to check-email page when signup requires email confirmation', async () => {
+    it('returns a check-email redirect path when signup requires email confirmation', async () => {
         const rpcMock = vi.fn(async (fn: string) => {
             if (fn === 'check_signup_trial_rate_limit') {
                 return {
@@ -270,9 +270,10 @@ describe('auth register action', () => {
             },
         })
 
-        await expect(register(createRegisterFormData())).rejects.toThrow('NEXT_REDIRECT')
-
-        expect(redirectMock).toHaveBeenCalledWith('/register/check-email?email=jane%40example.com')
+        await expect(register(createRegisterFormData())).resolves.toEqual({
+            redirectPath: '/register/check-email?email=jane%40example.com',
+        })
+        expect(redirectMock).not.toHaveBeenCalled()
         expect(rpcMock).toHaveBeenCalledWith('record_signup_trial_attempt', expect.objectContaining({
             input_succeeded: true,
         }))

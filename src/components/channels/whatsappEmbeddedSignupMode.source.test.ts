@@ -11,6 +11,7 @@ describe('WhatsApp embedded signup mode source guard', () => {
 
         expect(source).toContain('const result = await completeWhatsAppEmbeddedSignupChannel(organizationId, {')
         expect(source).toContain('                mode,')
+        expect(source).toContain('buildMetaEmbeddedSignupLaunchOptions(embeddedSignupConfig.configId, mode)')
     })
 
     it('passes the selected mode from the connect modal into signup completion', () => {
@@ -18,5 +19,6 @@ describe('WhatsApp embedded signup mode source guard', () => {
 
         expect(source).toContain('const result = await completeWhatsAppEmbeddedSignupChannel(organizationId, {')
         expect(source).toContain('                mode,')
+        expect(source).toContain('buildMetaEmbeddedSignupLaunchOptions(embeddedSignupConfig.configId, mode)')
     })
 })

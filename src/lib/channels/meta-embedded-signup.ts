@@ -5,6 +5,18 @@ export interface MetaEmbeddedSignupConfig {
 
 export type MetaEmbeddedSignupMode = 'new' | 'existing'
 
+export interface MetaEmbeddedSignupLaunchOptions {
+    [key: string]: unknown
+    config_id: string
+    response_type: 'code'
+    override_default_response_type: true
+    extras: {
+        feature: 'whatsapp_embedded_signup'
+        sessionInfoVersion: 3
+        featureType?: 'whatsapp_business_app_onboarding'
+    }
+}
+
 export type MetaEmbeddedSignupEvent =
     | {
         type: 'finish'
@@ -57,6 +69,22 @@ export function getMetaEmbeddedSignupConfig(mode: MetaEmbeddedSignupMode = 'new'
     return {
         appId,
         configId
+    }
+}
+
+export function buildMetaEmbeddedSignupLaunchOptions(
+    configId: string,
+    mode: MetaEmbeddedSignupMode
+): MetaEmbeddedSignupLaunchOptions {
+    return {
+        config_id: configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+            feature: 'whatsapp_embedded_signup',
+            sessionInfoVersion: 3,
+            ...(mode === 'existing' ? { featureType: 'whatsapp_business_app_onboarding' as const } : {})
+        }
     }
 }
 
