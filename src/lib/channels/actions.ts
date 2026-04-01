@@ -110,8 +110,6 @@ export interface CompleteWhatsAppEmbeddedSignupInput {
     businessAccountId?: string | null
 }
 
-const WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR = 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED'
-const WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR = 'WHATSAPP_PROVIDER_DISCONNECT_FAILED'
 const WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING_ERROR = 'WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING'
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -146,34 +144,6 @@ function readConfigStringArray(config: Json, key: string): string[] | null {
         .filter((item) => item.length > 0)
 
     return normalized.length > 0 ? normalized : null
-}
-
-function isWhatsAppCoexistenceDisconnectError(error: unknown) {
-    const message = getErrorMessage(error, '').toLowerCase()
-    return message.includes('/deregister')
-        && message.includes('already in use with both cloud api and the whatsapp business app')
-}
-
-async function disconnectWhatsAppCloudApi(channel: { config: Json }) {
-    const accessToken = readConfigString(channel.config, 'permanent_access_token')
-    const phoneNumberId = readConfigString(channel.config, 'phone_number_id')
-
-    if (!accessToken || !phoneNumberId) {
-        throw new Error(WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR)
-    }
-
-    try {
-        const client = new WhatsAppClient(accessToken)
-        await client.deregisterPhoneNumber(phoneNumberId)
-    } catch (error) {
-        console.error('Failed to deregister WhatsApp phone number from Cloud API', error)
-
-        if (isWhatsAppCoexistenceDisconnectError(error)) {
-            throw new Error(WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR)
-        }
-
-        throw new Error(WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR)
-    }
 }
 
 function normalizeTemplateSummary(value: unknown): WhatsAppTemplateSummary | null {
@@ -560,29 +530,6 @@ export async function disconnectChannel(channelId: string): Promise<DisconnectCh
         } catch (e) {
             console.error('Failed to delete Telegram webhook', e)
             // Continue with DB deletion even if webhook fails
-        }
-    }
-
-    if (channel && channel.type === 'whatsapp') {
-        try {
-            await disconnectWhatsAppCloudApi(channel)
-        } catch (error) {
-            const message = getErrorMessage(error, WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR)
-
-            if (
-                message === WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED_ERROR
-                || message === WHATSAPP_PROVIDER_DISCONNECT_FAILED_ERROR
-            ) {
-                return {
-                    success: false,
-                    error: message
-                }
-            }
-
-            return {
-                success: false,
-                error: getErrorMessage(error, 'Failed to disconnect channel')
-            }
         }
     }
 

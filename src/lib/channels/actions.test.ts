@@ -661,7 +661,7 @@ describe('channels actions: WhatsApp core flows', () => {
         })
     })
 
-    it('deregisters whatsapp cloud api before deleting the local channel', async () => {
+    it('deletes the local whatsapp channel without deregistering cloud api assets', async () => {
         const { supabase, deleteEqMock } = createDisconnectSupabaseMock({
             id: 'channel-1',
             type: 'whatsapp',
@@ -675,13 +675,13 @@ describe('channels actions: WhatsApp core flows', () => {
         await expect(disconnectChannel('channel-1')).resolves.toEqual({ success: true })
 
         expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
-        expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
-        expect(deregisterPhoneNumberMock).toHaveBeenCalledWith('phone-1')
+        expect(whatsAppCtorMock).not.toHaveBeenCalled()
+        expect(deregisterPhoneNumberMock).not.toHaveBeenCalled()
         expect(deleteEqMock).toHaveBeenCalledWith('id', 'channel-1')
         expect(revalidatePathMock).toHaveBeenCalledWith('/settings/channels')
     })
 
-    it('keeps whatsapp channel when coexistence must be disconnected from the business app first', async () => {
+    it('still deletes the local whatsapp channel even when coexistence metadata exists', async () => {
         const { supabase, deleteEqMock } = createDisconnectSupabaseMock({
             id: 'channel-1',
             type: 'whatsapp',
@@ -691,17 +691,11 @@ describe('channels actions: WhatsApp core flows', () => {
             }
         })
         createClientMock.mockResolvedValueOnce(supabase)
-        deregisterPhoneNumberMock.mockRejectedValueOnce(
-            new Error(
-                'You cannot use the POST /<WHATSAPP_BUSINESS_PHONE_NUMBER_ID>/deregister endpoint to deregister a business phone number from Cloud API if it is already in use with both Cloud API and the WhatsApp Business app.'
-            )
-        )
 
-        await expect(disconnectChannel('channel-1')).resolves.toEqual({
-            success: false,
-            error: 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED'
-        })
-        expect(deleteEqMock).not.toHaveBeenCalled()
+        await expect(disconnectChannel('channel-1')).resolves.toEqual({ success: true })
+        expect(whatsAppCtorMock).not.toHaveBeenCalled()
+        expect(deregisterPhoneNumberMock).not.toHaveBeenCalled()
+        expect(deleteEqMock).toHaveBeenCalledWith('id', 'channel-1')
     })
 
     it('retries whatsapp webhook subscription without disconnecting the channel', async () => {

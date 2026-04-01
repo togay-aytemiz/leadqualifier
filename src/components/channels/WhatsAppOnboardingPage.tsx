@@ -102,17 +102,7 @@ function getWizardStepNumberClasses(state: WizardStepState) {
 }
 
 function getDisconnectErrorMessage(t: ReturnType<typeof useTranslations<'Channels'>>, error: unknown) {
-    const message = getErrorMessage(error, t('whatsappConnect.disconnectFailed'))
-
-    if (message === 'WHATSAPP_COEXISTENCE_DISCONNECT_REQUIRED') {
-        return t('whatsappConnect.disconnectCoexistenceRequired')
-    }
-
-    if (message === 'WHATSAPP_PROVIDER_DISCONNECT_FAILED') {
-        return t('whatsappConnect.disconnectFailed')
-    }
-
-    return message
+    return getErrorMessage(error, t('whatsappConnect.disconnectFailed'))
 }
 
 function getEmbeddedSignupErrorMessage(t: ReturnType<typeof useTranslations<'Channels'>>, error: unknown) {
@@ -1034,8 +1024,8 @@ export function WhatsAppOnboardingPage({
             {!isReadOnly && (
                 <ConfirmDialog
                     isOpen={showConfirm}
-                    title={t('confirmDisconnectTitle')}
-                    description={t('confirmDisconnectDesc')}
+                    title={t('whatsappConnect.confirmDisconnectTitle')}
+                    description={t('whatsappConnect.confirmDisconnectDesc')}
                     confirmText={t('actions.disconnect')}
                     cancelText={t('actions.cancel')}
                     isDestructive

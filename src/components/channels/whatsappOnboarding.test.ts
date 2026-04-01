@@ -142,4 +142,17 @@ describe('whatsappOnboarding', () => {
         expect(source).toContain("badge: path === 'businessApp' ? t(`whatsappConnect.options.${path}.badge`) : undefined")
         expect(source).toContain('<Badge variant="info">{badge}</Badge>')
     })
+
+    it('uses explicit local-only disconnect copy for the connected WhatsApp channel flow', () => {
+        const source = fs.readFileSync(ONBOARDING_PAGE_PATH, 'utf8')
+
+        expect(source).toContain("title={t('whatsappConnect.confirmDisconnectTitle')}")
+        expect(source).toContain("description={t('whatsappConnect.confirmDisconnectDesc')}")
+        expect(enMessages.Channels.whatsappConnect.confirmDisconnectTitle).toContain('Qualy')
+        expect(enMessages.Channels.whatsappConnect.confirmDisconnectDesc).toContain('only removes this channel from Qualy')
+        expect(enMessages.Channels.whatsappConnect.confirmDisconnectDesc).toContain('does not disconnect your WhatsApp Business')
+        expect(trMessages.Channels.whatsappConnect.confirmDisconnectTitle).toContain('Qualy')
+        expect(trMessages.Channels.whatsappConnect.confirmDisconnectDesc).toContain("yalnızca bu kanalı Qualy'den kaldırır")
+        expect(trMessages.Channels.whatsappConnect.confirmDisconnectDesc).toContain('WhatsApp Business')
+    })
 })
