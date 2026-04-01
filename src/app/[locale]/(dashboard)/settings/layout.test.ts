@@ -19,4 +19,11 @@ describe('settings layout source', () => {
         expect(source).not.toContain('resolveWorkspaceAccessState')
         expect(source).not.toContain('billingOnlyMode={')
     })
+
+    it('keeps onboarding state off the settings shell critical path because dashboard layout owns it', () => {
+        const source = fs.readFileSync(SETTINGS_LAYOUT_PATH, 'utf8')
+
+        expect(source).not.toContain('getOrganizationOnboardingState')
+        expect(source).not.toContain('OnboardingTrialBanner')
+    })
 })

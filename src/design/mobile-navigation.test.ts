@@ -27,6 +27,10 @@ describe('resolveMobileNavActiveItem', () => {
         expect(resolveMobileNavActiveItem('/settings/channels')).toBe('other')
     })
 
+    it('marks onboarding route under other tab', () => {
+        expect(resolveMobileNavActiveItem('/onboarding')).toBe('other')
+    })
+
     it('falls back to inbox for unknown dashboard paths', () => {
         expect(resolveMobileNavActiveItem('/admin')).toBe('inbox')
     })

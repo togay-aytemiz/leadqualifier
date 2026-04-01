@@ -23,6 +23,11 @@ import {
     DEFAULT_STRICT_FALLBACK_TEXT,
     normalizeBotName
 } from '@/lib/ai/prompts'
+import { resolveEffectiveBotMode } from '@/lib/ai/bot-mode'
+import {
+    getOrganizationOnboardingState,
+    type OrganizationOnboardingShellState
+} from '@/lib/onboarding/state'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 type AiSettingsLegacyRow = Partial<OrganizationAiSettings> & {
@@ -34,6 +39,8 @@ type AiSettingsLegacyRow = Partial<OrganizationAiSettings> & {
 const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'> = {
     mode: 'flexible',
     bot_mode: 'active',
+    bot_mode_unlock_required: false,
+    bot_mode_unlocked_at: null,
     match_threshold: 0.6,
     prompt: DEFAULT_FLEXIBLE_PROMPT,
     bot_name: DEFAULT_BOT_NAME,
@@ -45,6 +52,12 @@ const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'cre
     hot_lead_action: 'notify_only',
     hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
     hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+}
+
+interface GetOrgAiSettingsOptions {
+    supabase?: SupabaseClientLike
+    locale?: string | null
+    onboardingState?: OrganizationOnboardingShellState | null
 }
 
 const EN_DEFAULT_PROMPT_SIGNATURES = [
@@ -76,6 +89,17 @@ function normalizeBotMode(mode: string | null | undefined): AiBotMode {
         return mode
     }
     return 'active'
+}
+
+function normalizeBotModeUnlockRequired(value: boolean | null | undefined) {
+    if (typeof value === 'boolean') return value
+    return false
+}
+
+function normalizeBotModeUnlockedAt(value: string | null | undefined) {
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
 }
 
 function normalizeHotLeadAction(action: string | null | undefined): HumanEscalationAction {
@@ -182,15 +206,24 @@ function resolvePromptForLocale(prompt: string | null | undefined, locale: strin
 
 function applyAiDefaults(
     settings: Partial<OrganizationAiSettings> | null,
-    locale: string | null | undefined = 'en'
+    locale: string | null | undefined = 'en',
+    onboardingState?: OrganizationOnboardingShellState | null
 ): Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'> {
     const mode = normalizeMode()
     const localizedHandoverMessages = resolveLocalizedHandoverMessages(settings)
     const localizedBotDisclaimerMessages = resolveLocalizedBotDisclaimerMessages(settings)
+    const onboardingLockRequired =
+        normalizeBotModeUnlockRequired(settings?.bot_mode_unlock_required)
+        || onboardingState?.isComplete === false
 
     return {
         mode,
-        bot_mode: normalizeBotMode(settings?.bot_mode ?? DEFAULT_AI_SETTINGS.bot_mode),
+        bot_mode: resolveEffectiveBotMode({
+            botMode: normalizeBotMode(settings?.bot_mode ?? DEFAULT_AI_SETTINGS.bot_mode),
+            botModeUnlockRequired: onboardingLockRequired,
+        }),
+        bot_mode_unlock_required: onboardingLockRequired,
+        bot_mode_unlocked_at: normalizeBotModeUnlockedAt(settings?.bot_mode_unlocked_at),
         match_threshold: clamp(Number(settings?.match_threshold ?? DEFAULT_AI_SETTINGS.match_threshold), 0, 1),
         prompt: resolvePromptForLocale(settings?.prompt, locale),
         bot_name: normalizeBotName(settings?.bot_name),
@@ -213,7 +246,7 @@ function applyAiDefaults(
 
 export async function getOrgAiSettings(
     organizationId: string,
-    options?: { supabase?: SupabaseClientLike; locale?: string | null }
+    options?: GetOrgAiSettingsOptions
 ) {
     const supabase = options?.supabase ?? await createClient()
 
@@ -227,10 +260,10 @@ export async function getOrgAiSettings(
         if (process.env.AI_SETTINGS_DEBUG === '1') {
             console.error('Failed to load AI settings:', error)
         }
-        return applyAiDefaults(null, options?.locale)
+        return applyAiDefaults(null, options?.locale, options?.onboardingState)
     }
 
-    return applyAiDefaults(data as Partial<OrganizationAiSettings>, options?.locale)
+    return applyAiDefaults(data as Partial<OrganizationAiSettings>, options?.locale, options?.onboardingState)
 }
 
 async function getOrganizationIdForUser(supabase: SupabaseClientLike) {
@@ -257,7 +290,14 @@ export async function updateOrgAiSettings(updates: Partial<OrganizationAiSetting
         throw new Error('Forbidden')
     }
 
+    const onboardingState = await getOrganizationOnboardingState(member.organization_id, { supabase })
     const current = await getOrgAiSettings(member.organization_id, { supabase })
+    const isBotModeLockedByOnboarding =
+        current.bot_mode_unlock_required || onboardingState.isComplete === false
+
+    if (isBotModeLockedByOnboarding && updates.bot_mode && updates.bot_mode !== 'off') {
+        throw new Error('BOT_MODE_LOCKED_BY_ONBOARDING')
+    }
     const normalized = applyAiDefaults({
         ...current,
         ...updates,

@@ -10,11 +10,16 @@ const TEST_HANDOVER_MESSAGE = 'handover_message'
 const TEST_BOT_DISCLAIMER_MESSAGE = 'bot_disclaimer_message'
 const TEST_PROMPT = 'ai_prompt'
 
-function renderForm(activeTab: 'general' | 'behaviorAndLogic' | 'escalation') {
+function renderForm(
+    activeTab: 'general' | 'behaviorAndLogic' | 'escalation',
+    options?: { isBotModeLocked?: boolean; botModeLockHelperText?: string }
+) {
     return renderToStaticMarkup(
         <AiSettingsForm
             botName="Qualy"
             botMode="active"
+            isBotModeLocked={options?.isBotModeLocked ?? false}
+            botModeLockHelperText={options?.botModeLockHelperText ?? null}
             botDisclaimerEnabled={true}
             botDisclaimerMessage={TEST_BOT_DISCLAIMER_MESSAGE}
             allowLeadExtractionDuringOperator={true}
@@ -58,6 +63,19 @@ describe('AiSettingsForm', () => {
         expect(markup).not.toContain('operatorLeadExtractionTitle')
         expect(markup).not.toContain('promptTitle')
         expect(markup).not.toContain('humanEscalationTitle')
+    })
+
+    it('shows locked helper copy and disables bot mode cards while onboarding lock is active', () => {
+        const lockedMessage = 'Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.'
+        const markup = renderForm('general', {
+            isBotModeLocked: true,
+            botModeLockHelperText: lockedMessage
+        })
+
+        expect(markup).toContain(lockedMessage)
+        expect(markup.split(lockedMessage)).toHaveLength(2)
+        expect(markup).toContain('bg-violet-50')
+        expect(markup).toContain('disabled=""')
     })
 
     it('shows behavior settings in Behavior and Logic tab', () => {

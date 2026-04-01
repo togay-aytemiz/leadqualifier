@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { resolveDefaultHomeRoute } from '@/lib/navigation/default-home-route'
+import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import { hasSupabaseAuthCookie } from '@/lib/auth/supabase-auth-cookie'
 
 export default async function LocaleEntryPage() {
@@ -11,5 +12,9 @@ export default async function LocaleEntryPage() {
     }
 
     const orgContext = await resolveActiveOrganizationContext()
-    redirect(resolveDefaultHomeRoute(orgContext))
+    const onboardingState = orgContext?.activeOrganizationId
+        ? await getOrganizationOnboardingState(orgContext.activeOrganizationId)
+        : null
+
+    redirect(resolveDefaultHomeRoute(orgContext, { onboarding: onboardingState }))
 }

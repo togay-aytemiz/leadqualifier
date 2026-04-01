@@ -7,7 +7,8 @@ export const DASHBOARD_SHELL_MESSAGE_NAMESPACES = [
     'common',
     'nav',
     'mainSidebar',
-    'aiSettings'
+    'aiSettings',
+    'onboarding'
 ] as const
 
 export function mergeMessageNamespaceLists(

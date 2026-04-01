@@ -9,6 +9,11 @@ import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { TabTitleSync } from '@/components/common/TabTitleSync'
 import { DASHBOARD_SHELL_MESSAGE_NAMESPACES, getScopedMessages } from '@/i18n/messages'
 import { resolveDashboardTypographyVariables } from '@/design/dashboard-typography'
+import { getOrganizationBillingSnapshot } from '@/lib/billing/server'
+import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
+import { OnboardingTrialBanner } from '@/components/onboarding/OnboardingTrialBanner'
+import { getOrgAiSettings } from '@/lib/ai/settings'
+import { OnboardingCompletionModal } from '@/components/onboarding/OnboardingCompletionModal'
 
 export default async function DashboardLayout({
     children,
@@ -30,6 +35,18 @@ export default async function DashboardLayout({
         userEmail: orgContext?.userEmail,
         isSystemAdmin: orgContext?.isSystemAdmin ?? false
     })
+    const onboardingOrganizationId = orgContext?.readOnlyTenantMode
+        ? null
+        : (orgContext?.activeOrganizationId ?? null)
+    const [billingSnapshot, onboardingState] = onboardingOrganizationId
+        ? await Promise.all([
+            getOrganizationBillingSnapshot(onboardingOrganizationId),
+            getOrganizationOnboardingState(onboardingOrganizationId)
+        ])
+        : [null, null]
+    const aiSettings = onboardingOrganizationId
+        ? await getOrgAiSettings(onboardingOrganizationId, { locale, onboardingState })
+        : null
 
     const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
     const userAvatarUrl = orgContext?.userAvatarUrl ?? null
@@ -48,18 +65,37 @@ export default async function DashboardLayout({
                         activeOrganizationId={sidebarOrganizationId}
                         readOnlyTenantMode={orgContext?.readOnlyTenantMode ?? false}
                         canAccessQaLabAdmin={canAccessQaLabAdmin}
+                        onboardingState={onboardingState}
+                        initialBotMode={aiSettings?.bot_mode ?? null}
+                        initialBotModeUnlockRequired={aiSettings?.bot_mode_unlock_required ?? false}
                     />
                 </div>
                 <div
                     className="dashboard-content-type-scale relative flex min-w-0 flex-1 flex-col overflow-hidden"
                     style={dashboardContentTypographyStyle}
                 >
+                    {onboardingState?.showBanner && billingSnapshot ? (
+                        <OnboardingTrialBanner
+                            billingSnapshot={billingSnapshot}
+                            showChecklistCta={onboardingState.showChecklistCta}
+                        />
+                    ) : null}
+                    {onboardingOrganizationId && onboardingState?.isComplete ? (
+                        <OnboardingCompletionModal
+                            organizationId={onboardingOrganizationId}
+                            isOpen={Boolean(aiSettings?.bot_mode_unlock_required)}
+                            botModeUnlockRequired={aiSettings?.bot_mode_unlock_required ?? false}
+                        />
+                    ) : null}
                     <div className="flex min-h-0 flex-1 overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
                         <DashboardRouteTransitionViewport>
                             {children}
                         </DashboardRouteTransitionViewport>
                     </div>
-                    <MobileBottomNav activeOrganizationId={orgContext?.activeOrganizationId ?? null} />
+                    <MobileBottomNav
+                        activeOrganizationId={orgContext?.activeOrganizationId ?? null}
+                        onboardingState={onboardingState}
+                    />
                 </div>
             </div>
         </NextIntlClientProvider>

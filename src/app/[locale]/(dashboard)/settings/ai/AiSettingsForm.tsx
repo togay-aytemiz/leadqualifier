@@ -10,6 +10,8 @@ export type AiSettingsTabId = 'general' | 'behaviorAndLogic' | 'escalation'
 interface AiSettingsFormProps {
     botName: string
     botMode: AiBotMode
+    isBotModeLocked: boolean
+    botModeLockHelperText: string | null
     botDisclaimerEnabled: boolean
     botDisclaimerMessage: string
     allowLeadExtractionDuringOperator: boolean
@@ -36,18 +38,25 @@ interface SelectionCardProps {
     label: string
     description: string
     selected: boolean
+    disabled?: boolean
     onSelect: () => void
 }
 
-function SelectionCard({ label, description, selected, onSelect }: SelectionCardProps) {
+function SelectionCard({ label, description, selected, disabled = false, onSelect }: SelectionCardProps) {
+    const stateClassName = disabled
+        ? selected
+            ? 'border-blue-500 bg-blue-50/50 cursor-not-allowed'
+            : 'border-gray-200 bg-white cursor-not-allowed'
+        : selected
+            ? 'border-blue-500 bg-blue-50/50'
+            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+
     return (
         <button
             type="button"
             onClick={onSelect}
-            className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition-colors ${selected
-                ? 'border-blue-500 bg-blue-50/50'
-                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
+            disabled={disabled}
+            className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition-colors disabled:opacity-100 ${stateClassName}`}
         >
             <div className="flex items-start gap-2.5">
                 <div
@@ -67,6 +76,8 @@ function SelectionCard({ label, description, selected, onSelect }: SelectionCard
 export default function AiSettingsForm({
     botName,
     botMode,
+    isBotModeLocked,
+    botModeLockHelperText,
     botDisclaimerEnabled,
     botDisclaimerMessage,
     allowLeadExtractionDuringOperator,
@@ -131,6 +142,13 @@ export default function AiSettingsForm({
                                     title={t('botModeTitle')}
                                     description={t('botModeDescription')}
                                 >
+                                    {isBotModeLocked && botModeLockHelperText ? (
+                                        <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+                                            <p className="text-sm font-semibold leading-6 text-violet-950">
+                                                {botModeLockHelperText}
+                                            </p>
+                                        </div>
+                                    ) : null}
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                         {options.map(option => {
                                             const isSelected = botMode === option.value
@@ -140,6 +158,7 @@ export default function AiSettingsForm({
                                                     label={option.label}
                                                     description={option.description}
                                                     selected={isSelected}
+                                                    disabled={isBotModeLocked}
                                                     onSelect={() => onBotModeChange(option.value)}
                                                 />
                                             )

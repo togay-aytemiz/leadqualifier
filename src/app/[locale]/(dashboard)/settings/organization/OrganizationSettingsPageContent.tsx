@@ -24,7 +24,8 @@ export default async function OrganizationSettingsPageContent({
         offeringProfile,
         offeringProfileSuggestions,
         serviceCatalogItems,
-        serviceCandidates
+        serviceCandidates,
+        { count: processingKnowledgeDocumentCount }
     ] = await Promise.all([
         supabase
             .from('organizations')
@@ -34,7 +35,12 @@ export default async function OrganizationSettingsPageContent({
         getOfferingProfile(organizationId),
         getOfferingProfileSuggestions(organizationId, locale, { includeArchived: true }),
         getServiceCatalogItems(organizationId),
-        getServiceCandidates(organizationId)
+        getServiceCandidates(organizationId),
+        supabase
+            .from('knowledge_documents')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', organizationId)
+            .eq('status', 'processing')
     ])
 
     return (
@@ -45,6 +51,7 @@ export default async function OrganizationSettingsPageContent({
             offeringProfileSuggestions={offeringProfileSuggestions}
             serviceCatalogItems={serviceCatalogItems}
             serviceCandidates={serviceCandidates}
+            initialKnowledgeExtractionInProgress={(processingKnowledgeDocumentCount ?? 0) > 0}
             isReadOnly={isReadOnly}
         />
     )

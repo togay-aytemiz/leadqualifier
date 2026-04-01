@@ -4,6 +4,7 @@ import AiSettingsClient from './AiSettingsClient'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 
 export default async function AiSettingsPage() {
     const supabase = await createClient()
@@ -32,7 +33,13 @@ export default async function AiSettingsPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const aiSettings = await getOrgAiSettings(organizationId, { supabase, locale })
+    const onboardingState = await getOrganizationOnboardingState(organizationId, { supabase })
+    const aiSettings = await getOrgAiSettings(organizationId, { supabase, locale, onboardingState })
 
-    return <AiSettingsClient initialSettings={aiSettings} />
+    return (
+        <AiSettingsClient
+            initialSettings={aiSettings}
+            onboardingState={onboardingState}
+        />
+    )
 }

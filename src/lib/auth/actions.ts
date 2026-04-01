@@ -7,6 +7,7 @@ import { ACTIVE_ORG_COOKIE } from '@/lib/organizations/active-context'
 import { resolvePostAuthRedirectPath } from '@/lib/auth/post-auth-redirect'
 import type { PostAuthSupabase } from '@/lib/auth/post-auth-redirect'
 import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
+import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import {
     checkTrialBusinessIdentity,
     checkSignupVelocityGuard,
@@ -56,7 +57,7 @@ function resolveLoginErrorCode(error: unknown): LoginActionState['errorCode'] | 
 
 async function buildPostAuthRedirectPath(
     locale: string | null | undefined,
-    supabase: PostAuthSupabase,
+    supabase: Awaited<ReturnType<typeof createClient>>,
     userId: string | null | undefined
 ) {
     if (!userId) {
@@ -64,12 +65,47 @@ async function buildPostAuthRedirectPath(
     }
 
     const cookieStore = await cookies()
+    const organizationId = await resolvePostAuthOrganizationId(
+        supabase,
+        userId
+    )
+    const onboardingState = organizationId
+        ? await getOrganizationOnboardingState(organizationId, {
+            supabase
+        })
+        : null
+
     return resolvePostAuthRedirectPath({
         cookieOrganizationId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null,
         locale,
-        supabase,
+        onboarding: {
+            shouldAutoOpen: onboardingState?.shouldAutoOpen ?? false,
+            resolveOrganizationId: async () => organizationId
+        },
+        supabase: supabase as unknown as PostAuthSupabase,
         userId
     })
+}
+
+async function resolvePostAuthOrganizationId(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    userId: string
+) {
+    const { data, error } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle()
+
+    if (error) {
+        console.warn('Failed to resolve post-auth organization for onboarding:', error)
+        return null
+    }
+
+    return typeof data?.organization_id === 'string'
+        ? data.organization_id
+        : null
 }
 
 export async function login(formData: FormData) {
@@ -95,7 +131,7 @@ export async function login(formData: FormData) {
     return {
         redirectPath: await buildPostAuthRedirectPath(
             locale,
-            supabase as unknown as PostAuthSupabase,
+            supabase,
             authResult.user?.id ?? authResult.session?.user?.id
         )
     } satisfies LoginActionState
@@ -192,7 +228,7 @@ export async function register(formData: FormData) {
         return {
             redirectPath: await buildPostAuthRedirectPath(
                 locale,
-                supabase as unknown as PostAuthSupabase,
+                supabase,
                 data.user?.id ?? data.session?.user?.id
             )
         } satisfies RegisterActionState

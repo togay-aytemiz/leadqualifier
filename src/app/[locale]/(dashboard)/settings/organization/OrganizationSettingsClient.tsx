@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from 'next/dynamic'
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePathname, useRouter as useLocaleRouter } from '@/i18n/navigation'
@@ -25,6 +25,10 @@ import { mergeOfferingProfileItems, serializeOfferingProfileItems } from '@/lib/
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
+import { createClient } from '@/lib/supabase/client'
+import { LoaderCircle } from 'lucide-react'
+
+const STATUS_ARIA_LIVE = 'polite' as const
 
 function OrganizationDetailsSectionSkeleton() {
     return (
@@ -60,6 +64,7 @@ interface OrganizationSettingsClientProps {
     offeringProfileSuggestions: OfferingProfileSuggestion[]
     serviceCatalogItems: ServiceCatalogItem[]
     serviceCandidates: ServiceCandidate[]
+    initialKnowledgeExtractionInProgress?: boolean
     isReadOnly?: boolean
 }
 
@@ -67,6 +72,7 @@ type OrganizationSettingsTabId = 'general' | 'organizationDetails' | 'securityAn
 
 function resolveOrganizationTabFromFocus(focusTarget: string | null): OrganizationSettingsTabId {
     if (focusTarget === 'offering-suggestions') return 'organizationDetails'
+    if (focusTarget === 'organization-details') return 'organizationDetails'
     if (focusTarget === 'data-deletion') return 'securityAndData'
     return 'general'
 }
@@ -78,6 +84,7 @@ export default function OrganizationSettingsClient({
     offeringProfileSuggestions: initialSuggestions,
     serviceCatalogItems: initialServiceCatalogItemsData,
     serviceCandidates: initialServiceCandidatesData,
+    initialKnowledgeExtractionInProgress = false,
     isReadOnly = false
 }: OrganizationSettingsClientProps) {
     const t = useTranslations('organizationSettings')
@@ -138,6 +145,8 @@ export default function OrganizationSettingsClient({
     const [deletionModalOpen, setDeletionModalOpen] = useState(false)
     const [isDeletingContactData, setIsDeletingContactData] = useState(false)
     const [activeTab, setActiveTab] = useState<OrganizationSettingsTabId>(() => resolveOrganizationTabFromFocus(searchParams.get('focus')))
+    const [knowledgeExtractionInProgress, setKnowledgeExtractionInProgress] = useState(initialKnowledgeExtractionInProgress)
+    const knowledgeExtractionInProgressRef = useRef(initialKnowledgeExtractionInProgress)
 
     const normalizedRequiredIntakeFields = useMemo(() => {
         return normalizeIntakeFields(requiredIntakeFields)
@@ -251,6 +260,11 @@ export default function OrganizationSettingsClient({
     }, [locale])
 
     useEffect(() => {
+        setKnowledgeExtractionInProgress(initialKnowledgeExtractionInProgress)
+        knowledgeExtractionInProgressRef.current = initialKnowledgeExtractionInProgress
+    }, [initialKnowledgeExtractionInProgress])
+
+    useEffect(() => {
         if (!offeringProfile || localeSynced) return
         if (offeringProfile.ai_suggestions_locale === locale) {
             setLocaleSynced(true)
@@ -281,7 +295,11 @@ export default function OrganizationSettingsClient({
 
     useEffect(() => {
         const focusTarget = searchParams.get('focus')
-        if (focusTarget !== 'offering-suggestions' && focusTarget !== 'data-deletion') return
+        if (
+            focusTarget !== 'offering-suggestions' &&
+            focusTarget !== 'organization-details' &&
+            focusTarget !== 'data-deletion'
+        ) return
         setActiveTab(resolveOrganizationTabFromFocus(focusTarget))
     }, [searchParams])
 
@@ -292,6 +310,48 @@ export default function OrganizationSettingsClient({
         }, 2500)
         return () => window.clearTimeout(timeout)
     }, [saved])
+
+    useEffect(() => {
+        if (!knowledgeExtractionInProgress) return
+
+        const supabase = createClient()
+        let isMounted = true
+
+        const refreshKnowledgeExtractionState = async () => {
+            const { count, error } = await supabase
+                .from('knowledge_documents')
+                .select('id', { count: 'exact', head: true })
+                .eq('organization_id', organizationId)
+                .eq('status', 'processing')
+
+            if (!isMounted) return
+            if (error) {
+                console.error('Failed to load knowledge extraction status', error)
+                return
+            }
+
+            const nextInProgress = (count ?? 0) > 0
+            const previousInProgress = knowledgeExtractionInProgressRef.current
+
+            knowledgeExtractionInProgressRef.current = nextInProgress
+            setKnowledgeExtractionInProgress(nextInProgress)
+
+            if (previousInProgress && !nextInProgress) {
+                router.refresh()
+            }
+        }
+
+        void refreshKnowledgeExtractionState()
+
+        const intervalId = window.setInterval(() => {
+            void refreshKnowledgeExtractionState()
+        }, 5000)
+
+        return () => {
+            isMounted = false
+            window.clearInterval(intervalId)
+        }
+    }, [knowledgeExtractionInProgress, organizationId, router])
 
     const deriveSummaryFromApprovedSuggestions = (allSuggestions: OfferingProfileSuggestion[], customNote: string) => {
         const approvedItems = allSuggestions
@@ -573,6 +633,19 @@ export default function OrganizationSettingsClient({
             <div className="flex-1 overflow-auto p-8">
                 <div className="max-w-5xl">
                     {saveError && <p className="mb-4 text-sm text-red-600">{saveError}</p>}
+                    {knowledgeExtractionInProgress && (
+                        <div
+                            role="status"
+                            aria-live={STATUS_ARIA_LIVE}
+                            className="mb-4 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950"
+                        >
+                            <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600" />
+                            <div className="space-y-1">
+                                <p className="text-sm font-semibold">{t('knowledgeExtractionInProgressTitle')}</p>
+                                <p className="text-sm text-blue-900/80">{t('knowledgeExtractionInProgressDescription')}</p>
+                            </div>
+                        </div>
+                    )}
                     <SettingsTabs
                         tabs={[
                             { id: 'general', label: t('tabs.general') },

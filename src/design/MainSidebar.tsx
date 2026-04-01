@@ -52,6 +52,8 @@ import {
   HiOutlineSparkles,
   HiMiniSquare3Stack3D,
   HiOutlineSquare3Stack3D,
+  HiMiniRocketLaunch,
+  HiOutlineRocketLaunch,
   HiMiniCog6Tooth,
   HiOutlineCog6Tooth,
   HiMiniBeaker,
@@ -104,6 +106,7 @@ import {
   toggleMainSidebarSection,
 } from '@/design/main-sidebar-sections'
 import { resolveDashboardTypographyVariables } from '@/design/dashboard-typography'
+import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'leadqualifier.sidebarCollapsed'
 
@@ -193,6 +196,9 @@ interface MainSidebarProps {
   activeOrganizationId?: string | null
   readOnlyTenantMode?: boolean
   canAccessQaLabAdmin?: boolean
+  onboardingState?: OrganizationOnboardingShellState | null
+  initialBotMode?: AiBotMode | null
+  initialBotModeUnlockRequired?: boolean
 }
 
 export function MainSidebar({
@@ -203,6 +209,9 @@ export function MainSidebar({
   activeOrganizationId = null,
   readOnlyTenantMode = false,
   canAccessQaLabAdmin = false,
+  onboardingState = null,
+  initialBotMode = null,
+  initialBotModeUnlockRequired = false,
 }: MainSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -226,9 +235,12 @@ export function MainSidebar({
   const [hasLoadedOrganizationOptions, setHasLoadedOrganizationOptions] = useState(!isSystemAdmin)
   const initialBotModeState = resolveMainSidebarInitialBotModeState({
     organizationId: activeOrganizationId,
-    initialBotMode: null,
+    initialBotMode,
   })
   const [botMode, setBotMode] = useState<AiBotMode>(initialBotModeState.botMode)
+  const [botModeUnlockRequired, setBotModeUnlockRequired] = useState(
+    Boolean(initialBotModeUnlockRequired)
+  )
   const [isBotModeLoading, setIsBotModeLoading] = useState(initialBotModeState.isLoading)
   const [isBotModeDropdownOpen, setIsBotModeDropdownOpen] = useState(false)
   const [isUpdatingBotMode, setIsUpdatingBotMode] = useState(false)
@@ -367,16 +379,22 @@ export function MainSidebar({
     async (orgId: string) => {
       const { data, error } = await supabase
         .from('organization_ai_settings')
-        .select('bot_mode')
+        .select('bot_mode, bot_mode_unlock_required')
         .eq('organization_id', orgId)
         .maybeSingle()
 
       if (error) {
         console.error('Failed to load bot mode', error)
-        return 'active' as AiBotMode
+        return {
+          botMode: 'active' as AiBotMode,
+          botModeUnlockRequired: false,
+        }
       }
 
-      return normalizeMainSidebarBotMode(data?.bot_mode)
+      return {
+        botMode: normalizeMainSidebarBotMode(data?.bot_mode),
+        botModeUnlockRequired: data?.bot_mode_unlock_required === true,
+      }
     },
     [supabase]
   )
@@ -518,6 +536,7 @@ export function MainSidebar({
       setHasUnread(false)
       setHasPendingSuggestions(false)
       setBotMode('active')
+      setBotModeUnlockRequired(false)
       setIsBotModeLoading(false)
       setIsBotModeDropdownOpen(false)
       setIsUpdatingBotMode(false)
@@ -529,9 +548,10 @@ export function MainSidebar({
 
     const initialBotModeState = resolveMainSidebarInitialBotModeState({
       organizationId,
-      initialBotMode: null,
+      initialBotMode,
     })
     setBotMode(initialBotModeState.botMode)
+    setBotModeUnlockRequired(Boolean(initialBotModeUnlockRequired))
     setIsBotModeLoading(initialBotModeState.isLoading)
 
     refreshUnread(organizationId)
@@ -540,9 +560,10 @@ export function MainSidebar({
       void refreshBillingSnapshot(organizationId)
 
       const loadBotMode = async () => {
-        const nextBotMode = await fetchBotMode(organizationId)
+        const nextBotModeState = await fetchBotMode(organizationId)
         if (!isMounted) return
-        setBotMode(nextBotMode)
+        setBotMode(nextBotModeState.botMode)
+        setBotModeUnlockRequired(nextBotModeState.botModeUnlockRequired)
         setIsBotModeLoading(false)
         setBotModeUpdateError(null)
       }
@@ -557,6 +578,8 @@ export function MainSidebar({
     }
   }, [
     fetchBotMode,
+    initialBotMode,
+    initialBotModeUnlockRequired,
     isDesktopViewport,
     organizationId,
     refreshBillingSnapshot,
@@ -692,9 +715,10 @@ export function MainSidebar({
     let isMounted = true
     const handler = () => {
       const loadBotMode = async () => {
-        const nextBotMode = await fetchBotMode(organizationId)
+        const nextBotModeState = await fetchBotMode(organizationId)
         if (!isMounted) return
-        setBotMode(nextBotMode)
+        setBotMode(nextBotModeState.botMode)
+        setBotModeUnlockRequired(nextBotModeState.botModeUnlockRequired)
         setIsBotModeLoading(false)
         setBotModeUpdateError(null)
       }
@@ -939,9 +963,11 @@ export function MainSidebar({
     [billingSnapshot]
   )
   const shouldRestrictToBilling = workspaceAccess.isLocked && !isSystemAdmin
+  const isBotModeLockedByOnboarding =
+    botModeUnlockRequired || onboardingState?.isComplete === false
   const effectiveBotMode = resolveMainSidebarBotMode({
     botMode,
-    isWorkspaceLocked: shouldRestrictToBilling,
+    isWorkspaceLocked: shouldRestrictToBilling || isBotModeLockedByOnboarding,
   })
   const botModeTone = resolveMainSidebarBotModeTone(effectiveBotMode)
   const botModeToneClassMap = {
@@ -1009,7 +1035,11 @@ export function MainSidebar({
     ]
   }, [tAiSettings])
   const canQuickSwitchBotMode =
-    Boolean(organizationId) && !shouldRestrictToBilling && !readOnlyTenantMode && !isBotModeLoading
+    Boolean(organizationId)
+    && !shouldRestrictToBilling
+    && !readOnlyTenantMode
+    && !isBotModeLoading
+    && !isBotModeLockedByOnboarding
   const handleQuickBotModeChange = useCallback(
     async (nextBotMode: AiBotMode) => {
       if (!organizationId || isUpdatingBotMode || !canQuickSwitchBotMode) {
@@ -1027,13 +1057,19 @@ export function MainSidebar({
           bot_mode: nextBotMode,
         })
         setBotMode(savedSettings.bot_mode)
+        setBotModeUnlockRequired(savedSettings.bot_mode_unlock_required)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('ai-settings-updated'))
         }
       } catch (error) {
         console.error('Failed to quick switch bot mode', error)
         setBotMode(previousBotMode)
-        setBotModeUpdateError(tSidebar('botStatusQuickSaveError'))
+        const message = error instanceof Error ? error.message : ''
+        setBotModeUpdateError(
+          message === 'BOT_MODE_LOCKED_BY_ONBOARDING'
+            ? tSidebar('botStatusQuickSwitchOnboardingLocked')
+            : tSidebar('botStatusQuickSaveError')
+        )
       } finally {
         setIsUpdatingBotMode(false)
       }
@@ -1044,8 +1080,17 @@ export function MainSidebar({
     if (isBotModeLoading) return tSidebar('botStatusQuickSwitchSaving')
     if (readOnlyTenantMode) return tSidebar('botStatusQuickSwitchReadOnly')
     if (shouldRestrictToBilling) return tSidebar('botStatusQuickSwitchLocked')
+    if (onboardingState?.isComplete === false) return tSidebar('botStatusQuickSwitchOnboardingLocked')
+    if (isBotModeLockedByOnboarding) return tSidebar('botStatusQuickSwitchOnboardingLocked')
     return tSidebar('botStatusQuickSwitchHelp')
-  }, [isBotModeLoading, readOnlyTenantMode, shouldRestrictToBilling, tSidebar])
+  }, [
+    isBotModeLoading,
+    isBotModeLockedByOnboarding,
+    onboardingState?.isComplete,
+    readOnlyTenantMode,
+    shouldRestrictToBilling,
+    tSidebar
+  ])
   const currentBotModeOption = useMemo(() => {
     if (isBotModeLoading) {
       return {
@@ -1285,6 +1330,13 @@ export function MainSidebar({
     () => resolveDashboardTypographyVariables('sidebar') as CSSProperties,
     []
   )
+  const isOnboardingActive = activePath.startsWith('/onboarding')
+  const onboardingHighlightProgressLabel = onboardingState
+    ? tSidebar('onboardingProgress', {
+        completed: String(onboardingState.completedSteps),
+        total: String(onboardingState.totalSteps),
+      })
+    : ''
 
   return (
     <aside
@@ -1631,9 +1683,6 @@ export function MainSidebar({
                       {botModeLabel}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    {botModeQuickSwitchHelperText}
-                  </p>
                   {isUpdatingBotMode && (
                     <p className="mt-2 text-xs font-medium text-slate-600">
                       {tSidebar('botStatusQuickSwitchSaving')}
@@ -1646,10 +1695,13 @@ export function MainSidebar({
 
                 <div className="p-2">
                   {!canQuickSwitchBotMode && (
-                    <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                      <p className="text-xs leading-5 text-slate-600">
-                        {botModeQuickSwitchHelperText}
-                      </p>
+                    <div className="mb-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <Lock size={14} className="shrink-0 text-violet-700" />
+                        <p className="text-sm font-semibold leading-6 text-violet-950">
+                          {botModeQuickSwitchHelperText}
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -1660,10 +1712,14 @@ export function MainSidebar({
                         botModeToneClassMap[resolveMainSidebarBotModeTone(option.value)]
                       const optionClassName = cn(
                         'rounded-xl border px-2.5 py-2 text-left',
-                        isSelected
-                          ? optionToneClasses.selected
-                          : cn('border-slate-200 bg-white', optionToneClasses.hover),
-                        !canQuickSwitchBotMode && 'cursor-default'
+                        !canQuickSwitchBotMode
+                          ? isSelected
+                            ? optionToneClasses.selected
+                            : 'border-slate-200 bg-white'
+                          : isSelected
+                            ? optionToneClasses.selected
+                            : cn('border-slate-200 bg-white', optionToneClasses.hover),
+                        !canQuickSwitchBotMode && 'cursor-not-allowed opacity-80'
                       )
                       const optionContent = (
                         <div className="flex w-full items-start gap-2.5">
@@ -1744,7 +1800,69 @@ export function MainSidebar({
       )}
 
       <nav className="flex-1 px-3 pt-3">
-        <div className={cn('space-y-5', !collapsed && 'space-y-6')}>
+        <div className={cn('space-y-4', !collapsed && 'space-y-5')}>
+          {onboardingState?.showNavigationEntry &&
+            (collapsed ? (
+              <SidebarHoverTooltip
+                className="flex justify-center"
+                content={
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-slate-900">{tNav('onboarding')}</p>
+                    <p className="text-slate-600">{onboardingHighlightProgressLabel}</p>
+                  </div>
+                }
+                immediate
+              >
+                <Link
+                  href="/onboarding"
+                  title={tNav('onboarding')}
+                  aria-label={tNav('onboarding')}
+                  className={cn(
+                    'group flex h-11 w-11 items-center justify-center rounded-2xl border transition-all duration-150 motion-reduce:transition-none',
+                    isOnboardingActive
+                      ? 'border-violet-300/70 bg-violet-400/25 text-violet-50 shadow-[0_12px_24px_-18px_rgba(139,92,246,0.9)]'
+                      : 'border-violet-300/40 bg-violet-400/16 text-violet-100 hover:border-violet-200/80 hover:bg-violet-400/24'
+                  )}
+                  onMouseEnter={() => warmDashboardHotRoute('/onboarding')}
+                  onFocus={() => warmDashboardHotRoute('/onboarding')}
+                  onTouchStart={() => warmDashboardHotRoute('/onboarding')}
+                  onClick={(event) => handleDashboardNavClick(event, '/onboarding')}
+                >
+                  <HiOutlineRocketLaunch size={19} />
+                </Link>
+              </SidebarHoverTooltip>
+            ) : (
+                <Link
+                  href="/onboarding"
+                  aria-label={tNav('onboarding')}
+                  className={cn(
+                    'group flex items-center gap-3 rounded-2xl border px-3 py-3 transition-all duration-150 motion-reduce:transition-none',
+                  isOnboardingActive
+                    ? 'border-violet-300 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-white shadow-[0_18px_35px_-24px_rgba(139,92,246,0.95)]'
+                    : 'border-violet-200/80 bg-gradient-to-br from-violet-50 via-fuchsia-50 to-white hover:border-violet-300 hover:shadow-[0_18px_35px_-24px_rgba(139,92,246,0.7)]'
+                )}
+                onMouseEnter={() => warmDashboardHotRoute('/onboarding')}
+                onFocus={() => warmDashboardHotRoute('/onboarding')}
+                onTouchStart={() => warmDashboardHotRoute('/onboarding')}
+                onClick={(event) => handleDashboardNavClick(event, '/onboarding')}
+              >
+                <HiMiniRocketLaunch
+                  size={22}
+                  className="shrink-0 text-violet-500"
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-semibold text-slate-900">
+                    {tNav('onboarding')}
+                  </p>
+                  <p className="mt-1 truncate text-xs font-medium text-violet-900/80">
+                    {onboardingHighlightProgressLabel}
+                  </p>
+                </div>
+              </Link>
+            ))}
+
+          <div className={cn('space-y-5', !collapsed && 'space-y-6')}>
           {navigationSections.map((section) => {
             const sectionPanelId = `main-sidebar-section-${section.id}`
             const isSectionExpanded = collapsed ? true : expandedSections[section.id] !== false
@@ -1963,6 +2081,7 @@ export function MainSidebar({
               </section>
             )
           })}
+          </div>
         </div>
       </nav>
 

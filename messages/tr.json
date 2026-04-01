@@ -235,6 +235,7 @@
     "inbox": "Gelen Kutusu",
     "calendar": "Takvim",
     "simulator": "Simülatör",
+    "onboarding": "Başlangıç",
     "ai": "AI",
     "other": "Diğer",
     "signout": "Çıkış Yap",
@@ -272,6 +273,8 @@
     "botStatusQuickSwitchHelp": "Modu buradan hızlıca değiştir. Simülatör etkilenmez.",
     "botStatusQuickSwitchReadOnly": "Salt okunur impersonation modunda hızlı değişim kapalıdır.",
     "botStatusQuickSwitchLocked": "Faturalandırma kilidi varken hızlı değişim kullanılamaz.",
+    "botStatusQuickSwitchOnboardingLocked": "Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.",
+    "botStatusQuickSwitchOnboardingLockedProgress": "Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.",
     "botStatusQuickSwitchSaving": "Bot durumu kaydediliyor...",
     "botStatusQuickSaveError": "Bot durumu güncellenemedi. Lütfen tekrar deneyin.",
     "botStatusQuickSwitchOpenSettings": "Ayarlar'a git",
@@ -306,7 +309,140 @@
     "billingBreakdownTopup": "Ek kredi",
     "billingLowCreditWarning": "Kullanım limitine yaklaşılıyor",
     "billingPackageRenewalDate": "Paket yenileme: {date}",
-    "billingPackageRenewalUnknown": "Paket yenileme tarihi hazırlanıyor"
+    "billingPackageRenewalUnknown": "Paket yenileme tarihi hazırlanıyor",
+    "onboardingProgress": "{completed}/{total} adım tamamlandı"
+  },
+  "onboarding": {
+    "banner": {
+      "message": "Deneme süreniz <strong>{days} gün sonra</strong>, {date} tarihinde bitiyor. Hizmet kesintisini önlemek için şimdi yükseltin.",
+      "checklistCta": "Başlangıç",
+      "upgradeCta": "Şimdi yükselt"
+    },
+    "completionModal": {
+      "title": "Başlangıç tamamlandı",
+      "description": "Qualy artık canlı kullanıma hazır. Bot şu anda kapalı durumda. İsterseniz şimdi dinleyici veya aktif moda geçebilir ya da şimdilik kapalı bırakabilirsiniz.",
+      "currentState": "Mevcut bot durumu: Kapalı",
+      "options": {
+        "active": {
+          "title": "Aktif",
+          "body": "Mesajları yanıtlar, kişi çıkarımı yapar ve Qualy'yi tam olarak devreye alır."
+        },
+        "shadow": {
+          "title": "Dinleyici",
+          "body": "Mesajları kaydeder, kişi çıkarımı yapar, fakat müşteriye yanıt göndermez."
+        },
+        "off": {
+          "title": "Şimdilik kapalı kalsın",
+          "body": "Bot kapalı kalır. İsterseniz daha sonra dinleyici veya aktif moda geçebilirsiniz."
+        }
+      }
+    },
+    "checklist": {
+      "greeting": "Merhaba {name}, hadi başlayalım.",
+      "defaultName": "orada",
+      "progressLabel": "İlerleme",
+      "steps": {
+        "intro": {
+          "title": "Qualy'yi tanıyın",
+          "description": "Qualy konuşmaları hızlıca karşılar, gerekli bilgileri toplar, randevu akışını netleştirir ve özel ilgi gerektiren mesajları görünür tutar.",
+          "primaryCta": "Devam et",
+          "chips": {
+            "instantReplies": "Hızlı ilk yanıt",
+            "qualifiesLeads": "Gerekli bilgileri toplar",
+            "handoffReady": "Ekibe hazır"
+          },
+          "visuals": {
+            "instantReplies": {
+              "title": "İlk mesajı kaçırmaz",
+              "body": "Müşteriler çalışma saati dışında bile beklemeden ilk cevabını alır."
+            },
+            "leadInfo": {
+              "title": "Doğru bilgileri toplar",
+              "body": "Qualy, siz devralmadan önce gerçekten ihtiyaç duyduğunuz alanları sorar."
+            },
+            "appointments": {
+              "title": "Randevuyu erkenden netleştirir",
+              "body": "Hizmet, uygun zaman ve temel ihtiyaçları daha en başta düzenli şekilde toplar."
+            },
+            "prioritization": {
+              "title": "Önceliği korur",
+              "body": "Özel ilgi gerektiren konuşmalar daha görünür olur; önemli fırsatları gözden kaçırmazsınız."
+            }
+          }
+        },
+        "agent_setup": {
+          "title": "Yapay zeka asistanınızı hazırlayın",
+          "description": "Bilgi Bankası ile işletmenizi anlatın, Yetenekler ile sık sorular için net yanıtları ve davranışları tanımlayın.",
+          "primaryCta": "Bilgi Bankası'na git",
+          "secondaryCta": "Yetenekleri gözden geçir",
+          "visuals": {
+            "knowledge": {
+              "title": "Bilgi Bankası",
+              "body": "Yapay zekanın güvenle kullanacağı işletme bilgilerini ekleyin."
+            },
+            "skills": {
+              "title": "Yetenekler",
+              "body": "Düşük krediyle çalışır; ne söyleyeceğini siz belirlersiniz ve gereksiz yorum alanı bırakmaz."
+            },
+            "availability": {
+              "title": "Daha güvenli başlangıç",
+              "body": "Hazır bir asistan, canlı konuşmalar başlamadan önce yanlış cevap riskini azaltır."
+            }
+          }
+        },
+        "business_review": {
+          "title": "İşletme bilgilerinizi gözden geçirin",
+          "description": "Hizmet özeti, alınması gereken bilgiler ve hizmet listenizi gözden geçirin. Yapay zeka, Bilgi Bankası'na eklediğiniz dokümanlardan bu alanları otomatik olarak çıkarır. İsterseniz siz de manuel olarak girebilir veya düzenleyebilirsiniz.",
+          "primaryCta": "İşletme ayarlarını gözden geçir",
+          "panelTitle": "Canlıya çıkmadan önce kontrol edin",
+          "checks": {
+            "serviceProfile": "Hizmet profili ve sunduğunuz hizmet özeti",
+            "requiredInfo": "Müşteriden alınması gereken bilgiler",
+            "serviceCatalog": "Hizmet listesi"
+          }
+        },
+        "ai_settings_review": {
+          "title": "Qualy AI ayarlarını gözden geçirin",
+          "description": "Bot adı, cevap tarzı ve insan devri ayarlarını işleyişinize göre düzenleyin.",
+          "primaryCta": "AI ayarlarını gözden geçir",
+          "visuals": {
+            "botMode": {
+              "title": "Bot adını kişiselleştirin",
+              "body": "Qualy'nin görünen adını ve bot notunu işletmenize göre düzenleyin."
+            },
+            "responseLogic": {
+              "title": "Yanıt mantığını netleştirin",
+              "body": "Eşik, prompt ve cevap çerçevesini gözden geçirerek istenen davranışı koruyun."
+            },
+            "handover": {
+              "title": "İnsan devrini doğrulayın",
+              "body": "Önemli konuşmalar ne zaman size bırakılacak, bunu netleştirin."
+            }
+          }
+        },
+        "connect_whatsapp": {
+          "title": "Kanallarınızı bağlayın",
+          "description": "Hazır olduğunuzda kanallarınızı bağlayın ve tüm yeni konuşmaları tek yerden yönetin.",
+          "primaryCta": "Kanallara git",
+          "channels": {
+            "title": "Bağlayabileceğiniz kanallar",
+            "whatsapp": {
+              "title": "WhatsApp"
+            },
+            "instagram": {
+              "title": "Instagram"
+            },
+            "telegram": {
+              "title": "Telegram"
+            },
+            "messenger": {
+              "title": "Messenger",
+              "comingSoon": "Yakında"
+            }
+          }
+        }
+      }
+    }
   },
   "inbox": {
     "title": "Gelen Kutusu",
@@ -702,6 +838,98 @@
     "onboarding": {
       "pageTitle": "{channel} kurulumu",
       "back": "Geri",
+      "banner": {
+        "message": "Deneme süreniz {date} tarihinde, {days} gün sonra bitiyor. Hizmet kesintisini önlemek için şimdi yükseltin.",
+        "checklistCta": "Onboarding checklist",
+        "upgradeCta": "Şimdi yükselt"
+      },
+      "checklist": {
+        "pageTitle": "Onboarding",
+        "kicker": "Yeni workspace kurulumu",
+        "title": "WhatsApp bağlamadan önce Qualy'yi hazır hale getirin.",
+        "subtitle": "Bu sırayı bir kez takip edin. Önce AI'yi öğretin, sonra business bilgisini gözden geçirin, canlı kanalı en son bağlayın.",
+        "progressLabel": "Checklist ilerlemesi",
+        "steps": {
+        "intro": {
+            "title": "Qualy'yi tanıyın",
+            "description": "Qualy konuşmaları hızlıca karşılar, gerekli bilgileri toplar, randevu akışını netleştirir ve özel ilgi gerektiren mesajları görünür tutar.",
+            "primaryCta": "Devam et",
+            "chips": {
+              "instantReplies": "7/24 yanıt",
+              "qualifiesLeads": "Lead kalifikasyonu",
+              "handoffReady": "İnsan devrine hazır"
+            },
+            "visuals": {
+              "instantReplies": {
+                "title": "Hızlı ilk yanıt",
+                "body": "Müşteriler çalışma saati dışında bile hemen bir cevap alır."
+              },
+              "leadInfo": {
+                "title": "Doğru bilgileri toplar",
+                "body": "Qualy, siz devralmadan önce gerçekten ihtiyaç duyduğunuz alanları sorar."
+              },
+              "appointments": {
+                "title": "Randevuyu erkenden netleştirir",
+                "body": "Hizmet, uygun zaman ve temel ihtiyaçları daha en başta düzenli şekilde toplar."
+              },
+              "prioritization": {
+                "title": "Önceliği korur",
+                "body": "Özel ilgi gerektiren konuşmalar daha görünür olur; önemli fırsatları gözden kaçırmazsınız."
+              }
+            }
+          },
+          "agent_setup": {
+            "title": "AI agent'inizi kurun",
+            "description": "Önce Knowledge Base ile ajana hizmetlerinizi, fiyat mantığınızı ve sık sorulan soruları öğretin. Ardından Skills ile sık sorular için net yanıtları ve davranışları tanımlayın.",
+            "primaryCta": "Knowledge Base'e git",
+            "secondaryCta": "Skills'i gözden geçir",
+            "visuals": {
+              "knowledge": {
+                "title": "Knowledge Base",
+                "body": "AI'nin güvenle kullanacağı işletme bilgisini yükleyin."
+              },
+              "skills": {
+                "title": "Skills",
+                "body": "Düşük krediyle çalışır; ne söyleyeceğini siz belirlersiniz ve gereksiz yorum alanı bırakmaz."
+              },
+              "availability": {
+                "title": "Daha güvenli canlıya geçiş",
+                "body": "Daha iyi eğitilmiş bir agent, WhatsApp trafiği başlamadan önce hatalı cevap riskini düşürür."
+              }
+            }
+          },
+          "business_review": {
+            "title": "AI'nin business'iniz hakkında neleri bilmesi gerektiğini gözden geçirin",
+            "description": "Canlıya çıkmadan önce kalifikasyonu besleyen business profilini doğrulayın: hizmet özeti, gerekli intake alanları ve hizmet kataloğu. Böylece AI'nin soruları iş akışınızla uyumlu kalır.",
+            "primaryCta": "Business ayarlarını gözden geçir",
+            "panelTitle": "Canlıya çıkmadan önce bunları kontrol edin",
+            "checks": {
+              "serviceProfile": "Hizmet profili ve offering özeti",
+              "requiredInfo": "Gerekli müşteri bilgileri ve intake alanları",
+              "serviceCatalog": "Hizmet listesi ve servis kataloğu"
+            }
+          },
+          "connect_whatsapp": {
+            "title": "WhatsApp'ı en son bağlayın",
+            "description": "Agent ve business bağlamı hazır olduğunda WhatsApp'ı bağlayın. Böylece canlı konuşmalar eksik kurulumla başlamaz ve açılış sonrası geri dönüp düzeltme yapmak zorunda kalmazsınız.",
+            "primaryCta": "WhatsApp bağla",
+            "visuals": {
+              "readyFirst": {
+                "title": "Önce AI'yi öğretin",
+                "body": "Gerçek trafik gelmeden önce knowledge, skills ve business kuralları hazır olmalı."
+              },
+              "launchLast": {
+                "title": "Kurulum tekrarını azaltın",
+                "body": "Kanalı en son bağlamak; metinleri, intake alanlarını ve servis bağlamını tekrar düzenleme ihtiyacını azaltır."
+              },
+              "goLive": {
+                "title": "Daha güvenli canlıya çıkın",
+                "body": "İlk WhatsApp konuşmalarınız, ekibinizin beklediği kurallarla başlar."
+              }
+            }
+          }
+        }
+      },
       "resourcesTitle": "Ek kaynaklar",
       "resources": {
         "whatsappOverview": "WhatsApp Business Platform hakkında bilmeniz gerekenler",
@@ -1434,6 +1662,8 @@
     "botModeShadowDescription": "Yanıt göndermez; arka planda kişi çıkarımı çalışır.",
     "botModeOff": "Kapalı",
     "botModeOffDescription": "Bot işlemez; yalnızca mesajlar kaydedilir.",
+    "botModeLockedByOnboarding": "Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.",
+    "botModeLockedByOnboardingProgress": "Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.",
     "operatorLeadExtractionTitle": "Operatör sırasında kişi çıkarımı",
     "operatorLeadExtractionDescription": "Operatör devredeyken kişi çıkarımının devam edip etmeyeceğini belirleyin.",
     "operatorLeadExtractionLabel": "Operatör devraldığında kişi çıkarımı devam etsin",
@@ -1838,6 +2068,8 @@
     "offeringProfileSuggestionsEmptyArchivedTitle": "Arşivde öneri yok",
     "offeringProfileSuggestionsEmptyArchivedDesc": "Arşivlenen öneriler denetim için saklanır ve AI bağlamından çıkarılır.",
     "offeringProfileSuggestionsEmpty": "Henüz öneri yok.",
+    "knowledgeExtractionInProgressTitle": "AI çıkarımı sürüyor",
+    "knowledgeExtractionInProgressDescription": "Bilgi Bankası dökümanlarınızdan hizmet profili, hizmet listesi ve gerekli bilgiler hazırlanıyor. İşlem bittiğinde bu sayfa otomatik güncellenecek; isterseniz bu alanları şimdiden manuel düzenleyebilirsiniz.",
     "save": "Değişiklikleri Kaydet",
     "saving": "Kaydediliyor...",
     "saved": "Kaydedildi",
@@ -1865,6 +2097,19 @@
     "failedToSave": "İçerik kaydedilemedi",
     "createTitle": "İçerik Oluştur",
     "editTitle": "İçeriği Düzenle",
+    "firstDocumentGuidance": {
+      "title": "İlk dokümanınız eklendi",
+      "description": "Tebrikler, ilk dokümanınızı başarıyla eklediniz. Qualy AI bu içerikten aşağıdaki alanları otomatik olarak çıkarır:",
+      "items": {
+        "businessProfile": "İşletme profilinizi ve hizmet özetinizi oluşturur.",
+        "requiredFields": "Müşteriden alınması gereken bilgileri belirler.",
+        "serviceCatalog": "Hizmet listeniz için başlangıç önerileri çıkarır."
+      },
+      "actions": {
+        "goToOnboarding": "Başlangıç adımlarına git",
+        "reviewBusiness": "İşletme bilgilerinizi gözden geçirin"
+      }
+    },
     "form": {
       "title": "Başlık",
       "titlePlaceholder": "örn. İade Politikası",

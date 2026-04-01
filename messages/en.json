@@ -235,6 +235,7 @@
     "inbox": "Inbox",
     "calendar": "Calendar",
     "simulator": "Simulator",
+    "onboarding": "Getting started",
     "ai": "AI",
     "other": "Other",
     "signout": "Sign out",
@@ -272,6 +273,8 @@
     "botStatusQuickSwitchHelp": "Switch mode quickly here. Simulator is unaffected.",
     "botStatusQuickSwitchReadOnly": "Quick switch is disabled in read-only impersonation mode.",
     "botStatusQuickSwitchLocked": "Quick switch is unavailable while workspace access is billing-locked.",
+    "botStatusQuickSwitchOnboardingLocked": "You can change bot mode after the getting started steps are complete.",
+    "botStatusQuickSwitchOnboardingLockedProgress": "You can change bot mode after the getting started steps are complete.",
     "botStatusQuickSwitchSaving": "Saving bot mode...",
     "botStatusQuickSaveError": "Could not update bot mode. Please try again.",
     "botStatusQuickSwitchOpenSettings": "Open settings",
@@ -306,7 +309,140 @@
     "billingBreakdownTopup": "Extra credits",
     "billingLowCreditWarning": "Approaching usage limit",
     "billingPackageRenewalDate": "Package renews: {date}",
-    "billingPackageRenewalUnknown": "Package renewal date is being prepared"
+    "billingPackageRenewalUnknown": "Package renewal date is being prepared",
+    "onboardingProgress": "{completed}/{total} steps complete"
+  },
+  "onboarding": {
+    "banner": {
+      "message": "Your trial ends in <strong>{days} days</strong> on {date}. Upgrade now to avoid service interruption.",
+      "checklistCta": "Getting started",
+      "upgradeCta": "Upgrade now"
+    },
+    "completionModal": {
+      "title": "Getting started is complete",
+      "description": "Qualy is now ready for live use. The bot is currently off. You can switch to shadow or active mode now, or keep it off for the moment.",
+      "currentState": "Current bot mode: Off",
+      "options": {
+        "active": {
+          "title": "Active",
+          "body": "Replies to messages, runs lead extraction, and fully activates Qualy."
+        },
+        "shadow": {
+          "title": "Shadow",
+          "body": "Stores messages and runs lead extraction, but does not send replies."
+        },
+        "off": {
+          "title": "Keep it off for now",
+          "body": "Leaves the bot off. You can switch to shadow or active later."
+        }
+      }
+    },
+    "checklist": {
+      "greeting": "Hello {name}, let's get started.",
+      "defaultName": "there",
+      "progressLabel": "Progress",
+      "steps": {
+        "intro": {
+          "title": "Get to know Qualy",
+          "description": "Qualy handles the first response, collects the right details, clarifies appointment flow early, and keeps high-priority conversations visible.",
+          "primaryCta": "Continue",
+          "chips": {
+            "instantReplies": "Fast first reply",
+            "qualifiesLeads": "Collects key details",
+            "handoffReady": "Routes to your team"
+          },
+          "visuals": {
+            "instantReplies": {
+              "title": "Never misses the first message",
+              "body": "Customers get an answer quickly, even outside working hours."
+            },
+            "leadInfo": {
+              "title": "Collects the right details",
+              "body": "Qualy asks for the fields you actually need before follow-up."
+            },
+            "appointments": {
+              "title": "Clarifies appointments early",
+              "body": "It organizes service choice, timing, and core needs from the very beginning."
+            },
+            "prioritization": {
+              "title": "Protects your priorities",
+              "body": "Conversations that need closer attention stay visible so you do not miss important opportunities."
+            }
+          }
+        },
+        "agent_setup": {
+          "title": "Prepare your AI agent",
+          "description": "Use Knowledge Base to describe your business, then use Skills to define precise replies and behaviors for repeated questions.",
+          "primaryCta": "Go to Knowledge Base",
+          "secondaryCta": "Review Skills",
+          "visuals": {
+            "knowledge": {
+              "title": "Knowledge Base",
+              "body": "Upload the business facts the AI can safely rely on."
+            },
+            "skills": {
+              "title": "Skills",
+              "body": "Runs on very low credits; you define exactly what it says and leave little room for made-up answers."
+            },
+            "availability": {
+              "title": "Safer launch",
+              "body": "A well-prepared agent reduces wrong answers before live traffic starts."
+            }
+          }
+        },
+        "business_review": {
+          "title": "Review your business details",
+          "description": "Review your service summary, required details, and service list. AI automatically extracts these fields from the documents you add to Knowledge Base. If you prefer, you can also enter or edit them manually.",
+          "primaryCta": "Review business settings",
+          "panelTitle": "Review these before launch",
+          "checks": {
+            "serviceProfile": "Service profile and offering summary",
+            "requiredInfo": "Required customer information and intake fields",
+            "serviceCatalog": "Service list and offer catalog"
+          }
+        },
+        "ai_settings_review": {
+          "title": "Review your Qualy AI settings",
+          "description": "Adjust the bot name, reply behavior, and human handoff settings to fit how your business works.",
+          "primaryCta": "Review AI settings",
+          "visuals": {
+            "botMode": {
+              "title": "Personalize the bot name",
+              "body": "Update Qualy's visible name and bot note so they match your business."
+            },
+            "responseLogic": {
+              "title": "Refine reply logic",
+              "body": "Review the threshold, prompt, and response framing to keep answers on track."
+            },
+            "handover": {
+              "title": "Confirm human handoff",
+              "body": "Decide when important conversations should be handed back to you."
+            }
+          }
+        },
+        "connect_whatsapp": {
+          "title": "Connect your channels",
+          "description": "When you're ready, connect your channels and manage every new conversation from one place.",
+          "primaryCta": "Open channels",
+          "channels": {
+            "title": "Channels you can connect",
+            "whatsapp": {
+              "title": "WhatsApp"
+            },
+            "instagram": {
+              "title": "Instagram"
+            },
+            "telegram": {
+              "title": "Telegram"
+            },
+            "messenger": {
+              "title": "Messenger",
+              "comingSoon": "Coming soon"
+            }
+          }
+        }
+      }
+    }
   },
   "inbox": {
     "title": "Inbox",
@@ -702,6 +838,98 @@
     "onboarding": {
       "pageTitle": "{channel} setup",
       "back": "Back",
+      "banner": {
+        "message": "Your trial ends in {days} days on {date}. Upgrade now to avoid service interruption.",
+        "checklistCta": "Onboarding checklist",
+        "upgradeCta": "Upgrade now"
+      },
+      "checklist": {
+        "pageTitle": "Onboarding",
+        "kicker": "New workspace setup",
+        "title": "Let's get Qualy ready before you connect WhatsApp.",
+        "subtitle": "Follow this order once. Teach the AI first, review your business context, then connect the live channel last.",
+        "progressLabel": "Checklist progress",
+        "steps": {
+        "intro": {
+            "title": "Get to know Qualy",
+            "description": "Qualy handles the first response, collects the right details, clarifies appointment flow early, and keeps high-priority conversations visible.",
+            "primaryCta": "Continue",
+            "chips": {
+              "instantReplies": "24/7 replies",
+              "qualifiesLeads": "Lead qualification",
+              "handoffReady": "Human handoff ready"
+            },
+            "visuals": {
+              "instantReplies": {
+                "title": "Fast first response",
+                "body": "Customers get an answer immediately, even outside working hours."
+              },
+              "leadInfo": {
+                "title": "Collects the right details",
+                "body": "Qualy asks for the fields you actually need before follow-up."
+              },
+              "appointments": {
+                "title": "Clarifies appointments early",
+                "body": "It organizes service choice, timing, and core needs from the very beginning."
+              },
+              "prioritization": {
+                "title": "Protects your priorities",
+                "body": "Conversations that need closer attention stay visible so you do not miss important opportunities."
+              }
+            }
+          },
+          "agent_setup": {
+            "title": "Set up your AI agent",
+            "description": "Start with Knowledge Base so the agent knows your services, pricing logic, and common questions. Then review Skills to shape tone, constraints, and task-specific behavior.",
+            "primaryCta": "Go to Knowledge Base",
+            "secondaryCta": "Review Skills",
+            "visuals": {
+              "knowledge": {
+                "title": "Knowledge Base",
+                "body": "Upload the business facts the AI can safely rely on."
+              },
+              "skills": {
+                "title": "Skills",
+                "body": "Control how the AI replies, what it asks, and when it leaves the conversation to you."
+              },
+              "availability": {
+                "title": "Safer go-live",
+                "body": "A better-trained agent reduces wrong answers before WhatsApp traffic starts."
+              }
+            }
+          },
+          "business_review": {
+            "title": "Review what AI should know about your business",
+            "description": "Before going live, confirm the business profile that powers qualification: service summary, required intake fields, and service catalog. This keeps AI questions aligned with your workflow.",
+            "primaryCta": "Review business settings",
+            "panelTitle": "Review these before launch",
+            "checks": {
+              "serviceProfile": "Service profile and offering summary",
+              "requiredInfo": "Required customer information and intake fields",
+              "serviceCatalog": "Service list and offer catalog"
+            }
+          },
+          "connect_whatsapp": {
+            "title": "Connect WhatsApp last",
+            "description": "Once the agent and business context are ready, connect WhatsApp so live conversations start with the right setup instead of forcing rework after launch.",
+            "primaryCta": "Connect WhatsApp",
+            "visuals": {
+              "readyFirst": {
+                "title": "Teach the AI first",
+                "body": "Knowledge, skills, and business rules should be ready before real traffic enters."
+              },
+              "launchLast": {
+                "title": "Reduce setup churn",
+                "body": "Connecting the channel last avoids redoing copy, intake fields, and service context."
+              },
+              "goLive": {
+                "title": "Go live with confidence",
+                "body": "Your first WhatsApp conversations start with the same rules your team expects."
+              }
+            }
+          }
+        }
+      },
       "resourcesTitle": "Additional resources",
       "resources": {
         "whatsappOverview": "Everything you need to know about WhatsApp Business Platform",
@@ -1434,6 +1662,8 @@
     "botModeShadowDescription": "No replies; lead extraction only.",
     "botModeOff": "Off",
     "botModeOffDescription": "No AI processing; only messages are stored.",
+    "botModeLockedByOnboarding": "You can change bot mode after the getting started steps are complete.",
+    "botModeLockedByOnboardingProgress": "You can change bot mode after the getting started steps are complete.",
     "operatorLeadExtractionTitle": "Lead extraction during operator",
     "operatorLeadExtractionDescription": "Control whether lead extraction continues when an operator takes over.",
     "operatorLeadExtractionLabel": "Keep lead extraction running during operator takeover",
@@ -1838,6 +2068,8 @@
     "offeringProfileSuggestionsEmptyArchivedTitle": "No archived suggestions",
     "offeringProfileSuggestionsEmptyArchivedDesc": "Archived suggestions are kept for audit and are excluded from AI context.",
     "offeringProfileSuggestionsEmpty": "No suggestions yet.",
+    "knowledgeExtractionInProgressTitle": "AI extraction is in progress",
+    "knowledgeExtractionInProgressDescription": "We are preparing your offering profile, service list, and required fields from your Knowledge Base documents. This page will refresh automatically when it finishes, and you can still edit these fields manually in the meantime.",
     "save": "Save changes",
     "saving": "Saving...",
     "saved": "Saved",
@@ -1865,6 +2097,19 @@
     "failedToSave": "Failed to save content",
     "createTitle": "Create Content",
     "editTitle": "Edit Content",
+    "firstDocumentGuidance": {
+      "title": "Your first document is ready",
+      "description": "You successfully added your first document. Qualy AI will automatically extract the following from this content:",
+      "items": {
+        "businessProfile": "Your business profile and service summary.",
+        "requiredFields": "The information that should be collected from customers.",
+        "serviceCatalog": "Starter suggestions for your service list."
+      },
+      "actions": {
+        "goToOnboarding": "Go to getting started",
+        "reviewBusiness": "Review your business details"
+      }
+    },
     "form": {
       "title": "Title",
       "titlePlaceholder": "e.g. Return Policy",

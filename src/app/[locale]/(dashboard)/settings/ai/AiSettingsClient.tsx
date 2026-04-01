@@ -9,12 +9,14 @@ import type { OrganizationAiSettings } from '@/types/database'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
 import { useUnsavedChangesGuard } from '@/components/settings/useUnsavedChangesGuard'
+import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
 
 interface AiSettingsClientProps {
     initialSettings: Omit<OrganizationAiSettings, 'organization_id' | 'created_at' | 'updated_at'>
+    onboardingState: Pick<OrganizationOnboardingShellState, 'completedSteps' | 'totalSteps' | 'isComplete'> | null
 }
 
-export default function AiSettingsClient({ initialSettings }: AiSettingsClientProps) {
+export default function AiSettingsClient({ initialSettings, onboardingState }: AiSettingsClientProps) {
     const locale = useLocale()
     const t = useTranslations('aiSettings')
     const tSidebar = useTranslations('Sidebar')
@@ -39,6 +41,15 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
+    const isBotModeLocked = baseline.bot_mode_unlock_required || onboardingState?.isComplete === false
+    const botModeLockHelperText = isBotModeLocked
+        ? onboardingState?.isComplete === false
+            ? t('botModeLockedByOnboardingProgress', {
+                completed: String(onboardingState.completedSteps),
+                total: String(onboardingState.totalSteps)
+            })
+            : t('botModeLockedByOnboarding')
+        : null
 
     const isDirty = useMemo(() => {
         return (
@@ -164,7 +175,12 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
             return true
         } catch (error) {
             console.error(error)
-            setSaveError(t('saveError'))
+            const message = error instanceof Error ? error.message : ''
+            setSaveError(
+                message === 'BOT_MODE_LOCKED_BY_ONBOARDING'
+                    ? t('botModeLockedByOnboarding')
+                    : t('saveError')
+            )
             return false
         } finally {
             setIsSaving(false)
@@ -215,6 +231,8 @@ export default function AiSettingsClient({ initialSettings }: AiSettingsClientPr
                     <AiSettingsForm
                         botName={botName}
                         botMode={botMode}
+                        isBotModeLocked={isBotModeLocked}
+                        botModeLockHelperText={botModeLockHelperText}
                         botDisclaimerEnabled={botDisclaimerEnabled}
                         botDisclaimerMessage={localizedDisclaimerMessage}
                         allowLeadExtractionDuringOperator={allowLeadExtractionDuringOperator}

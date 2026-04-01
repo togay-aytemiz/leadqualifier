@@ -31,6 +31,8 @@ export interface OrganizationAiSettings {
     match_threshold: number
     prompt: string
     bot_mode: AiBotMode
+    bot_mode_unlock_required: boolean
+    bot_mode_unlocked_at: string | null
     bot_name: string
     bot_disclaimer_enabled: boolean
     bot_disclaimer_message_tr: string
@@ -240,6 +242,15 @@ export interface OrganizationMember {
     user_id: string
     role: UserRole
     created_at: string
+}
+
+export interface OrganizationOnboardingState {
+    organization_id: string
+    first_seen_at: string | null
+    intro_acknowledged_at: string | null
+    ai_settings_reviewed_at: string | null
+    created_at: string
+    updated_at: string
 }
 
 export interface Profile {

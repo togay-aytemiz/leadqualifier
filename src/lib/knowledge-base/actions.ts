@@ -37,6 +37,10 @@ export interface KnowledgeBaseEntry {
 }
 
 export type KnowledgeBaseInsert = Pick<KnowledgeBaseEntry, 'content' | 'title' | 'type' | 'collection_id'>
+export interface CreateKnowledgeBaseEntryResult {
+    document: KnowledgeBaseEntry
+    showFirstDocumentGuidance: boolean
+}
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 type KnowledgeCountRow = { collection_id: string | null }
 type KnowledgeCollectionCountRow = { collection_id: string | null; document_count: number | string | null }
@@ -199,10 +203,23 @@ export async function createCollection(name: string, description?: string, icon:
  * --- ENTRIES ---
  */
 
-export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
+export async function createKnowledgeBaseEntry(
+    entry: KnowledgeBaseInsert
+): Promise<CreateKnowledgeBaseEntryResult> {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
     const organizationId = await getUserOrganization(supabase)
+    const { count, error: countError } = await supabase
+        .from('knowledge_documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+
+    if (countError) {
+        console.error('Failed to count knowledge documents before create:', countError)
+        throw new Error(countError.message)
+    }
+
+    const existingDocumentCount = Number.isFinite(count) ? Number(count) : 0
 
     // 1. Insert document in processing state
     const { data, error } = await supabase
@@ -225,7 +242,10 @@ export async function createKnowledgeBaseEntry(entry: KnowledgeBaseInsert) {
     }
 
     revalidatePath('/knowledge')
-    return data as KnowledgeBaseEntry
+    return {
+        document: data as KnowledgeBaseEntry,
+        showFirstDocumentGuidance: existingDocumentCount === 0
+    }
 }
 
 export async function deleteKnowledgeBaseEntry(id: string) {

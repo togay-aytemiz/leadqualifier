@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { resolveDefaultHomeRoute } from '@/lib/navigation/default-home-route'
 import type { ActiveOrganizationContext } from '@/lib/organizations/active-context'
+import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
 
 function createContext(overrides: Partial<ActiveOrganizationContext>): ActiveOrganizationContext {
     return {
@@ -12,6 +13,23 @@ function createContext(overrides: Partial<ActiveOrganizationContext>): ActiveOrg
         activeOrganization: null,
         source: 'none',
         readOnlyTenantMode: true,
+        ...overrides
+    }
+}
+
+function createOnboardingState(
+    overrides?: Partial<OrganizationOnboardingShellState>
+): OrganizationOnboardingShellState {
+    return {
+        organizationId: 'org-1',
+        isComplete: false,
+        completedSteps: 0,
+        totalSteps: 4,
+        showBanner: true,
+        showChecklistCta: true,
+        showNavigationEntry: true,
+        shouldAutoOpen: false,
+        steps: [],
         ...overrides
     }
 }
@@ -53,5 +71,23 @@ describe('resolveDefaultHomeRoute', () => {
         })
 
         expect(resolveDefaultHomeRoute(context)).toBe('/inbox')
+    })
+
+    it('routes tenant users to onboarding before inbox when onboarding should auto-open', () => {
+        const context = createContext({
+            isSystemAdmin: false,
+            activeOrganizationId: 'org-3',
+            activeOrganization: { id: 'org-3', name: 'Org 3', slug: 'org-3' },
+            source: 'fallback',
+            readOnlyTenantMode: false
+        })
+
+        expect(
+            resolveDefaultHomeRoute(context, {
+                onboarding: createOnboardingState({
+                    shouldAutoOpen: true
+                })
+            })
+        ).toBe('/onboarding')
     })
 })

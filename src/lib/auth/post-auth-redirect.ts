@@ -25,6 +25,10 @@ export interface PostAuthSupabase {
 interface ResolvePostAuthRedirectPathInput {
   cookieOrganizationId: string | null
   locale: string | null | undefined
+  onboarding?: {
+    shouldAutoOpen?: boolean
+    resolveOrganizationId?: () => Promise<string | null>
+  }
   supabase: PostAuthSupabase
   userId: string
 }
@@ -67,6 +71,7 @@ async function isExplicitOrganizationSelectionValid(
 export async function resolvePostAuthRedirectPath({
   cookieOrganizationId,
   locale,
+  onboarding,
   supabase,
   userId,
 }: ResolvePostAuthRedirectPathInput) {
@@ -85,11 +90,17 @@ export async function resolvePostAuthRedirectPath({
     ? await isExplicitOrganizationSelectionValid(supabase, cookieOrganizationId)
     : true
 
+  const homeRoute = resolvePostAuthHomeRoute({
+    isSystemAdmin,
+    hasExplicitOrganizationSelection,
+  })
+
+  if (homeRoute === '/inbox' && onboarding?.shouldAutoOpen) {
+    return buildLocalizedPath('/onboarding', normalizeAppLocale(locale))
+  }
+
   return buildLocalizedPath(
-    resolvePostAuthHomeRoute({
-      isSystemAdmin,
-      hasExplicitOrganizationSelection,
-    }),
+    homeRoute,
     normalizeAppLocale(locale)
   )
 }

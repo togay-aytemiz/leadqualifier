@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
     createClientMock,
-    revalidatePathMock
+    revalidatePathMock,
+    assertTenantWriteAllowedMock,
+    resolveActiveOrganizationContextMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
-    revalidatePathMock: vi.fn()
+    revalidatePathMock: vi.fn(),
+    assertTenantWriteAllowedMock: vi.fn(async () => {}),
+    resolveActiveOrganizationContextMock: vi.fn(async () => ({ activeOrganizationId: 'org-1' }))
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -16,7 +20,12 @@ vi.mock('next/cache', () => ({
     revalidatePath: revalidatePathMock
 }))
 
-import { getCollections } from '@/lib/knowledge-base/actions'
+vi.mock('@/lib/organizations/active-context', () => ({
+    assertTenantWriteAllowed: assertTenantWriteAllowedMock,
+    resolveActiveOrganizationContext: resolveActiveOrganizationContextMock
+}))
+
+import { createKnowledgeBaseEntry, getCollections } from '@/lib/knowledge-base/actions'
 
 function createCollectionsSupabase() {
     const collectionsEqMock = vi.fn(async () => ({
@@ -77,6 +86,88 @@ function createCollectionsSupabase() {
     }
 }
 
+function createKnowledgeCreateSupabase(existingCount: number) {
+    const insertSingleMock = vi.fn(async () => ({
+        data: {
+            id: 'doc-1',
+            organization_id: 'org-1',
+            collection_id: 'col-1',
+            title: 'İlk doküman',
+            type: 'article',
+            content: 'İçerik',
+            source: 'manual',
+            status: 'processing',
+            created_at: '2026-04-01T09:00:00.000Z',
+            updated_at: '2026-04-01T09:00:00.000Z'
+        },
+        error: null
+    }))
+    const insertSelectMock = vi.fn(() => ({
+        single: insertSingleMock
+    }))
+    const insertMock = vi.fn(() => ({
+        select: insertSelectMock
+    }))
+
+    const countEqMock = vi.fn(async () => ({
+        count: existingCount,
+        error: null
+    }))
+    const countSelectMock = vi.fn(() => ({
+        eq: countEqMock
+    }))
+
+    const orgMemberSingleMock = vi.fn(async () => ({
+        data: { organization_id: 'org-1' },
+        error: null
+    }))
+    const orgMemberLimitMock = vi.fn(() => ({
+        single: orgMemberSingleMock
+    }))
+    const orgMemberEqMock = vi.fn(() => ({
+        limit: orgMemberLimitMock
+    }))
+    const orgMemberSelectMock = vi.fn(() => ({
+        eq: orgMemberEqMock
+    }))
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'knowledge_documents') {
+            return {
+                select: countSelectMock,
+                insert: insertMock
+            }
+        }
+
+        if (table === 'organization_members') {
+            return {
+                select: orgMemberSelectMock
+            }
+        }
+
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return {
+        supabase: {
+            auth: {
+                getUser: vi.fn(async () => ({
+                    data: {
+                        user: {
+                            id: 'user-1'
+                        }
+                    }
+                }))
+            },
+            from: fromMock
+        },
+        countSelectMock,
+        countEqMock,
+        insertMock,
+        insertSingleMock
+    }
+}
+
 describe('getCollections', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -96,5 +187,55 @@ describe('getCollections', () => {
             expect.objectContaining({ id: 'col-1', count: 3 }),
             expect.objectContaining({ id: 'col-2', count: 1 })
         ])
+    })
+})
+
+describe('createKnowledgeBaseEntry', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('flags the first knowledge document so the UI can show onboarding guidance once', async () => {
+        const { supabase, countEqMock, insertMock } = createKnowledgeCreateSupabase(0)
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await createKnowledgeBaseEntry({
+            title: 'İlk doküman',
+            content: 'İçerik',
+            type: 'article',
+            collection_id: 'col-1'
+        })
+
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(countEqMock).toHaveBeenCalledWith('organization_id', 'org-1')
+        expect(insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organization_id: 'org-1',
+                source: 'manual',
+                status: 'processing'
+            })
+        )
+        expect(result).toEqual({
+            document: expect.objectContaining({ id: 'doc-1', title: 'İlk doküman' }),
+            showFirstDocumentGuidance: true
+        })
+        expect(revalidatePathMock).toHaveBeenCalledWith('/knowledge')
+    })
+
+    it('skips the first-document guidance after the first knowledge document exists', async () => {
+        const { supabase } = createKnowledgeCreateSupabase(2)
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await createKnowledgeBaseEntry({
+            title: 'İkinci doküman',
+            content: 'İçerik',
+            type: 'article',
+            collection_id: null
+        })
+
+        expect(result).toEqual({
+            document: expect.objectContaining({ id: 'doc-1' }),
+            showFirstDocumentGuidance: false
+        })
     })
 })

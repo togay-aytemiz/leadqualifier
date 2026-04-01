@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolvePostAuthHomeRoute } from '@/lib/auth/post-auth-redirect'
+import {
+    resolvePostAuthHomeRoute,
+    resolvePostAuthRedirectPath
+} from '@/lib/auth/post-auth-redirect'
 
 describe('resolvePostAuthHomeRoute', () => {
     it('routes tenant users directly to inbox', () => {
@@ -22,5 +25,51 @@ describe('resolvePostAuthHomeRoute', () => {
             isSystemAdmin: true,
             hasExplicitOrganizationSelection: true
         })).toBe('/inbox')
+    })
+
+    it('routes tenant users to onboarding when onboarding should auto-open', async () => {
+        const path = await resolvePostAuthRedirectPath({
+            cookieOrganizationId: null,
+            locale: 'tr',
+            userId: 'user-1',
+            supabase: {
+                from: (table: string) => ({
+                    select: () => ({
+                        eq: () => ({
+                            maybeSingle: async () => {
+                                if (table === 'profiles') {
+                                    return {
+                                        data: { is_system_admin: false },
+                                        error: null
+                                    }
+                                }
+
+                                if (table === 'organization_onboarding_states') {
+                                    return {
+                                        data: {
+                                            organization_id: 'org-1',
+                                            first_seen_at: null,
+                                            intro_acknowledged_at: null
+                                        },
+                                        error: null
+                                    }
+                                }
+
+                                return {
+                                    data: null,
+                                    error: null
+                                }
+                            }
+                        })
+                    })
+                })
+            },
+            onboarding: {
+                shouldAutoOpen: true,
+                resolveOrganizationId: async () => 'org-1'
+            }
+        })
+
+        expect(path).toBe('/onboarding')
     })
 })

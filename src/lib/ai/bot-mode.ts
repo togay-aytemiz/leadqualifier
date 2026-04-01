@@ -1,5 +1,16 @@
 import type { AiBotMode } from '@/types/database'
 
+export function resolveEffectiveBotMode(options: {
+    botMode: AiBotMode
+    botModeUnlockRequired: boolean
+}) {
+    if (options.botModeUnlockRequired) {
+        return 'off' satisfies AiBotMode
+    }
+
+    return options.botMode
+}
+
 export function resolveBotModeAction(botMode: AiBotMode) {
     if (botMode === 'shadow') {
         return { allowReplies: false, allowLeadExtraction: true }

@@ -14,6 +14,7 @@ export function resolveMobileNavActiveItem(pathname: string): MobileNavItemId {
     if (path.startsWith('/inbox')) return 'inbox'
     if (path.startsWith('/leads')) return 'contacts'
     if (path.startsWith('/skills') || path.startsWith('/knowledge')) return 'other'
+    if (path.startsWith('/onboarding')) return 'other'
     if (path.startsWith('/simulator') || path.startsWith('/settings')) return 'other'
 
     return 'inbox'

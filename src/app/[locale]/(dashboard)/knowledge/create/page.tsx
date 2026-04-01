@@ -3,10 +3,18 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
-import { Button, PageHeader, Input, TextArea } from '@/design'
+import { Button, PageHeader, Input, TextArea, Modal } from '@/design'
 import { createKnowledgeBaseEntry, getCollections, KnowledgeCollection } from '@/lib/knowledge-base/actions'
-import { processKnowledgeDocumentInBackground } from '@/lib/knowledge-base/process-client'
+import {
+    KNOWLEDGE_UPDATED_EVENT,
+    PENDING_SUGGESTIONS_UPDATED_EVENT,
+    processKnowledgeDocumentInBackground
+} from '@/lib/knowledge-base/process-client'
 import { useTranslations } from 'next-intl'
+
+interface FirstDocumentGuidanceState {
+    target: string
+}
 
 export default function CreateContentPage() {
     const t = useTranslations('knowledge')
@@ -20,10 +28,20 @@ export default function CreateContentPage() {
     const [collections, setCollections] = useState<KnowledgeCollection[]>([])
 
     const [loading, setLoading] = useState(false)
+    const [firstDocumentGuidance, setFirstDocumentGuidance] = useState<FirstDocumentGuidanceState | null>(null)
 
     useEffect(() => {
         getCollections().then(setCollections)
     }, [])
+
+    function getFirstDocumentGuidanceKey(organizationId: string) {
+        return `knowledge:first-document-guidance:${organizationId}`
+    }
+
+    function handleNavigateAfterFirstDocument(target: string) {
+        setFirstDocumentGuidance(null)
+        router.push(target)
+    }
 
     async function handleSubmit() {
         if (!title.trim() || !content.trim()) return
@@ -31,26 +49,36 @@ export default function CreateContentPage() {
         setLoading(true)
         try {
             const target = collectionId ? `/knowledge?collectionId=${collectionId}` : '/knowledge'
-            const createPromise = createKnowledgeBaseEntry({
+            const created = await createKnowledgeBaseEntry({
                 title,
                 content,
                 type: 'article', // Default for now
                 collection_id: collectionId || null
             })
 
-            router.push(target)
             router.refresh()
 
-            const created = await createPromise
+            window.dispatchEvent(new Event(KNOWLEDGE_UPDATED_EVENT))
+            window.dispatchEvent(new Event(PENDING_SUGGESTIONS_UPDATED_EVENT))
 
-            window.dispatchEvent(new Event('knowledge-updated'))
-            window.dispatchEvent(new Event('pending-suggestions-updated'))
-
-            if (created?.id) {
-                void processKnowledgeDocumentInBackground(created.id).catch((error) => {
+            if (created.document?.id) {
+                void processKnowledgeDocumentInBackground(created.document.id).catch((error) => {
                     console.error('Failed to process knowledge document', error)
                 })
             }
+
+            const firstDocumentGuidanceKey = getFirstDocumentGuidanceKey(created.document.organization_id)
+            const hasSeenFirstDocumentGuidance = window.localStorage.getItem(firstDocumentGuidanceKey)
+
+            if (created.showFirstDocumentGuidance && !hasSeenFirstDocumentGuidance) {
+                window.localStorage.setItem(firstDocumentGuidanceKey, new Date().toISOString())
+                setFirstDocumentGuidance({ target })
+                setLoading(false)
+                return
+            }
+
+            router.push(target)
+            router.refresh()
         } catch (error) {
             console.error(error)
             alert(t('failedToSave'))
@@ -136,6 +164,54 @@ export default function CreateContentPage() {
                     />
                 </div>
             </div>
+
+            <Modal
+                isOpen={Boolean(firstDocumentGuidance)}
+                onClose={() => {
+                    if (!firstDocumentGuidance) return
+                    handleNavigateAfterFirstDocument(firstDocumentGuidance.target)
+                }}
+                title={t('firstDocumentGuidance.title')}
+                panelClassName="max-w-xl"
+            >
+                <div className="space-y-5">
+                    <p className="text-sm leading-6 text-slate-600">
+                        {t('firstDocumentGuidance.description')}
+                    </p>
+
+                    <ul className="space-y-3 text-sm leading-6 text-slate-700">
+                        <li className="flex items-start gap-3">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-violet-500" />
+                            <span>{t('firstDocumentGuidance.items.businessProfile')}</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-violet-500" />
+                            <span>{t('firstDocumentGuidance.items.requiredFields')}</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-violet-500" />
+                            <span>{t('firstDocumentGuidance.items.serviceCatalog')}</span>
+                        </li>
+                    </ul>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                        <Button
+                            variant="ghost"
+                            onClick={() => handleNavigateAfterFirstDocument('/onboarding')}
+                        >
+                            {t('firstDocumentGuidance.actions.goToOnboarding')}
+                        </Button>
+                        <Button
+                            onClick={() =>
+                                handleNavigateAfterFirstDocument('/settings/organization?focus=organization-details')
+                            }
+                            className="bg-violet-600 text-white hover:bg-violet-700"
+                        >
+                            {t('firstDocumentGuidance.actions.reviewBusiness')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     )
 }

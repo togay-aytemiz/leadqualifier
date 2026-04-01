@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import enMessages from '../../messages/en.json'
 import trMessages from '../../messages/tr.json'
 import {
     DASHBOARD_SHELL_MESSAGE_NAMESPACES,
@@ -35,7 +36,43 @@ describe('pickMessageNamespaces', () => {
             'common',
             'nav',
             'mainSidebar',
-            'aiSettings'
+            'aiSettings',
+            'onboarding'
         ])
+    })
+
+    it('keeps onboarding copy at the top level for dashboard shell consumers', () => {
+        expect(enMessages).toHaveProperty('onboarding.banner.message')
+        expect(trMessages).toHaveProperty('onboarding.banner.message')
+        expect(trMessages.nav.onboarding).toBe('Başlangıç')
+        expect(trMessages.onboarding.checklist.greeting).toContain('{name}')
+        expect(trMessages.onboarding.checklist.steps.intro.primaryCta).toBe('Devam et')
+        expect(trMessages.onboarding.banner.checklistCta).toBe('Başlangıç')
+        expect(trMessages.onboarding.checklist.steps.agent_setup.primaryCta).toBe("Bilgi Bankası'na git")
+        expect(trMessages.onboarding.checklist.steps.agent_setup.visuals.knowledge.title).toBe('Bilgi Bankası')
+        expect(trMessages.onboarding.checklist.steps.agent_setup.visuals.skills.body.toLowerCase()).toContain('kredi')
+        expect(trMessages.onboarding.checklist.steps.agent_setup.visuals.skills.body.toLowerCase()).not.toContain('ekip')
+        expect(trMessages.onboarding.checklist.steps.business_review.description.toLowerCase()).toContain('otomatik')
+        expect(trMessages.onboarding.checklist.steps.business_review.description.toLowerCase()).toContain('yapay zeka')
+        expect(trMessages.onboarding.checklist.steps.business_review.description.toLowerCase()).toContain('çıkar')
+        expect(trMessages.onboarding.checklist.steps.business_review.description.toLowerCase()).toContain('manuel')
+        expect(trMessages.onboarding.checklist.steps.business_review.description.toLowerCase()).not.toContain('gelebilir')
+        expect(trMessages.onboarding.checklist.steps.ai_settings_review.primaryCta).toBe('AI ayarlarını gözden geçir')
+        expect(trMessages.onboarding.checklist.steps.ai_settings_review.description.toLowerCase()).toContain('bot adı')
+        expect(trMessages.onboarding.checklist.steps.ai_settings_review.description.toLowerCase()).not.toContain('bot modu')
+        expect(trMessages.onboarding.checklist.steps.ai_settings_review.visuals.botMode.title).toBe('Bot adını kişiselleştirin')
+        expect(trMessages.onboarding.checklist.steps.connect_whatsapp.channels.messenger.comingSoon).toBe('Yakında')
+        expect(trMessages.onboarding.checklist.steps.intro.title.toLowerCase()).not.toContain('lead')
+        expect(trMessages.onboarding.checklist.steps.intro.description.toLowerCase()).toContain('randevu')
+        expect(trMessages.onboarding.checklist.steps.intro.description.toLowerCase()).not.toContain('ekip')
+        expect(trMessages.knowledge.firstDocumentGuidance.title).toBe('İlk dokümanınız eklendi')
+        expect(trMessages.knowledge.firstDocumentGuidance.description.toLowerCase()).toContain('otomatik')
+        expect(trMessages.knowledge.firstDocumentGuidance.actions.reviewBusiness).toBe('İşletme bilgilerinizi gözden geçirin')
+        expect(trMessages.mainSidebar.botStatusQuickSwitchOnboardingLocked).toBe('Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.')
+        expect(trMessages.aiSettings.botModeLockedByOnboarding).toBe('Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.')
+        expect(trMessages.onboarding.completionModal.title.toLowerCase()).toContain('tamamlandı')
+        expect(trMessages.onboarding.completionModal.options.active.title).toBe('Aktif')
+        expect(trMessages.onboarding.completionModal.options.shadow.title).toBe('Dinleyici')
+        expect(trMessages.onboarding.completionModal.options.off.title.toLowerCase()).toContain('kapalı')
     })
 })

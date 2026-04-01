@@ -21,7 +21,7 @@ import {
   HiOutlineSquare3Stack3D,
   HiOutlineUser,
 } from 'react-icons/hi2'
-import { AlertCircle, LogOut, Lock, MoreHorizontal, Puzzle, Settings } from 'lucide-react'
+import { AlertCircle, LogOut, Lock, MoreHorizontal, Puzzle, Rocket, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { resolveMobileNavActiveItem, type MobileNavItemId } from '@/design/mobile-navigation'
@@ -47,6 +47,7 @@ import {
 import { formatSidebarBillingCredits, formatSidebarBillingDate } from '@/lib/billing/sidebar-format'
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
+import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
 
 interface NavItem {
   id: Exclude<MobileNavItemId, 'other'>
@@ -59,9 +60,13 @@ interface NavItem {
 
 interface MobileBottomNavProps {
   activeOrganizationId?: string | null
+  onboardingState?: OrganizationOnboardingShellState | null
 }
 
-export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNavProps) {
+export function MobileBottomNav({
+  activeOrganizationId = null,
+  onboardingState = null,
+}: MobileBottomNavProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -195,6 +200,7 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
       '/leads',
       '/skills',
       '/knowledge',
+      '/onboarding',
       '/simulator',
       '/settings',
       '/settings/plans',
@@ -539,6 +545,28 @@ export function MobileBottomNav({ activeOrganizationId = null }: MobileBottomNav
               )}
             </div>
             <div className="mt-3 space-y-1">
+              {onboardingState?.showNavigationEntry && (
+                <Link
+                  href="/onboarding"
+                  prefetch={false}
+                  onMouseEnter={() => warmDashboardHotRoute('/onboarding')}
+                  onFocus={() => warmDashboardHotRoute('/onboarding')}
+                  onTouchStart={() => warmDashboardHotRoute('/onboarding')}
+                  onClick={(event) => {
+                    handleDashboardNavClick(event, '/onboarding')
+                    setOtherMenuPath(null)
+                  }}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
+                    pathname?.includes('/onboarding')
+                      ? 'bg-[#242A40]/8 text-[#242A40]'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  )}
+                >
+                  <Rocket size={16} />
+                  {tNav('onboarding')}
+                </Link>
+              )}
               {simulatorMenuNavState.isLocked ? (
                 <button
                   type="button"

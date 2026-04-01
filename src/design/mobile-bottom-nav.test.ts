@@ -23,4 +23,11 @@ describe('MobileBottomNav source', () => {
     expect(source).toContain('loadedBillingSnapshot?.organizationId === activeOrganizationId')
     expect(source).toContain('if (!activeOrganizationId || isDesktopViewport !== false) return')
   })
+
+  it('adds onboarding to the other menu without a dedicated bottom-tab slot', () => {
+    const source = fs.readFileSync(MOBILE_BOTTOM_NAV_PATH, 'utf8')
+
+    expect(source).toContain('onboardingState?.showNavigationEntry')
+    expect(source).toContain("href=\"/onboarding\"")
+  })
 })

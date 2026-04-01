@@ -6,6 +6,7 @@ import {
     DEFAULT_BOT_DISCLAIMER_MESSAGE_EN,
     DEFAULT_BOT_DISCLAIMER_MESSAGE_TR
 } from './bot-disclaimer'
+import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
 
 type GetOrgAiSettingsSupabase = NonNullable<Parameters<typeof getOrgAiSettings>[1]>['supabase']
 
@@ -19,6 +20,88 @@ function createSupabaseMock(data: Record<string, unknown>, error: unknown = null
 }
 
 describe('getOrgAiSettings handover message localization', () => {
+    it('forces bot mode to off while onboarding is still incomplete even if legacy lock flag is false', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'shadow',
+            bot_mode_unlock_required: false,
+            bot_mode_unlocked_at: null,
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const onboardingState = {
+            organizationId: 'org-1',
+            isComplete: false,
+            completedSteps: 4,
+            totalSteps: 5,
+            showBanner: true,
+            showChecklistCta: true,
+            showNavigationEntry: true,
+            shouldAutoOpen: false,
+            steps: []
+        } satisfies OrganizationOnboardingShellState
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            onboardingState
+        })
+
+        expect(settings.bot_mode).toBe('off')
+        expect(settings.bot_mode_unlock_required).toBe(true)
+    })
+
+    it('forces bot mode to off for locked onboarding workspaces and exposes lock metadata', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'active',
+            bot_mode_unlock_required: true,
+            bot_mode_unlocked_at: null,
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase
+        })
+
+        expect(settings.bot_mode).toBe('off')
+        expect(settings.bot_mode_unlock_required).toBe(true)
+        expect(settings.bot_mode_unlocked_at).toBeNull()
+    })
+
+    it('falls back to unlocked behavior when onboarding lock columns are missing', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'active',
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase
+        })
+
+        expect(settings.bot_mode).toBe('active')
+        expect(settings.bot_mode_unlock_required).toBe(false)
+        expect(settings.bot_mode_unlocked_at).toBeNull()
+    })
+
     it('repairs TR message when both localized columns equal EN default', async () => {
         const supabase = createSupabaseMock({
             bot_mode: 'active',

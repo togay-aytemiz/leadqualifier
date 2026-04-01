@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { resolveLeadExtractionAllowance } from '@/lib/ai/bot-mode'
+import { resolveEffectiveBotMode, resolveLeadExtractionAllowance } from '@/lib/ai/bot-mode'
+
+describe('resolveEffectiveBotMode', () => {
+    it('forces bot mode to off while onboarding lock is active', () => {
+        expect(resolveEffectiveBotMode({
+            botMode: 'active',
+            botModeUnlockRequired: true
+        })).toBe('off')
+    })
+
+    it('keeps configured bot mode after onboarding lock is cleared', () => {
+        expect(resolveEffectiveBotMode({
+            botMode: 'shadow',
+            botModeUnlockRequired: false
+        })).toBe('shadow')
+    })
+})
 
 describe('resolveLeadExtractionAllowance', () => {
     it('disables extraction when bot mode is off even if operator allows', () => {

@@ -25,6 +25,13 @@ describe('SettingsResponsiveShell source', () => {
     expect(source).toContain(".from('offering_profile_suggestions')")
   })
 
+  it('does not put onboarding polling on the client navigation critical path', () => {
+    const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+
+    expect(source).not.toContain(".from('organization_onboarding_states')")
+    expect(source).not.toContain('refreshOnboardingState')
+  })
+
   it('hydrates billing-only navigation locks on the client', () => {
     const source = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
 
