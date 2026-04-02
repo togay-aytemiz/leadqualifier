@@ -1,8 +1,9 @@
 'use client'
 
+import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { clearPlansStatusSearch } from './status-query'
+import { clearPlansStatusSearch, hasPlansStatusSearch } from './status-query'
 
 interface PlansStatusBannerProps {
     className: string
@@ -20,6 +21,14 @@ export function PlansStatusBanner({
     const pathname = usePathname()
     const router = useRouter()
     const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const currentSearch = new URLSearchParams(searchParams.toString())
+        if (!hasPlansStatusSearch(currentSearch)) return
+
+        const nextQuery = clearPlansStatusSearch(currentSearch)
+        router.replace(`${pathname}${nextQuery}`)
+    }, [pathname, router, searchParams])
 
     const handleDismiss = () => {
         const nextQuery = clearPlansStatusSearch(new URLSearchParams(searchParams.toString()))

@@ -181,6 +181,21 @@ function parseSubscriptionMetadata(metadata: unknown): SubscriptionMetadataState
     }
 }
 
+function resolvePendingPlanEffectiveAt(input: {
+    pendingPlanChange: PendingPlanChange | null
+    periodEnd: string | null
+}) {
+    const { pendingPlanChange, periodEnd } = input
+    if (!pendingPlanChange) return null
+    if (pendingPlanChange.changeType !== 'downgrade') return pendingPlanChange
+    if (!periodEnd) return pendingPlanChange
+
+    return {
+        ...pendingPlanChange,
+        effectiveAt: periodEnd
+    }
+}
+
 export async function getSubscriptionRenewalState(input: {
     organizationId: string
     supabase?: SupabaseClient
@@ -230,7 +245,11 @@ export async function getSubscriptionRenewalState(input: {
     const metadataState = parseSubscriptionMetadata(row.metadata)
     return {
         ...metadataState,
-        periodEnd: row.period_end
+        periodEnd: row.period_end,
+        pendingPlanChange: resolvePendingPlanEffectiveAt({
+            pendingPlanChange: metadataState.pendingPlanChange,
+            periodEnd: row.period_end
+        })
     }
 }
 

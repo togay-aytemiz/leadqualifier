@@ -1444,6 +1444,7 @@
       "continue": "Continue to payment screen",
       "continueDirectAction": "Apply plan change",
       "continueDirectActionWithCharge": "Pay {price}",
+      "processing": "Processing...",
       "updatePaymentMethodBeforeChange": "Update payment method",
       "updatePaymentMethodInlineAction": "click here.",
       "savedPaymentMethodBannerNotice": "Payment is charged to your saved card.",

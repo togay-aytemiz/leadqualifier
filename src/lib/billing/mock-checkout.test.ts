@@ -702,6 +702,67 @@ describe('mock checkout simulation wrappers', () => {
         }))
     })
 
+    it('prefers the current period end over provider startDate when scheduling iyzico downgrades', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+        process.env.IYZICO_SUBSCRIPTION_PLAN_GROWTH_REF = 'growth-plan-ref'
+
+        const serviceSupabase = createServiceSupabaseMock()
+        createServiceClientMock.mockReturnValue(serviceSupabase.client)
+        upgradeIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {
+                startDate: String(Date.parse('2026-04-02T19:44:00.000Z'))
+            }
+        })
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 4000,
+                monthly_package_credit_used: 1200,
+                topup_credit_balance: 0
+            },
+            activeSubscriptionRow: {
+                id: 'sub_row_1',
+                status: 'active',
+                provider_subscription_id: 'sub_ref_scale',
+                period_start: '2026-04-02T19:44:00.000Z',
+                period_end: '2026-05-02T19:44:00.000Z',
+                metadata: {
+                    source: 'iyzico_checkout_form'
+                }
+            }
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 649,
+            monthlyCredits: 2000,
+            planId: 'growth'
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            status: 'scheduled',
+            error: null,
+            changeType: 'downgrade',
+            effectiveAt: '2026-05-02T19:44:00.000Z'
+        })
+        expect(serviceSupabase.spies.subscriptionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                pending_plan_change: expect.objectContaining({
+                    effective_at: '2026-05-02T19:44:00.000Z'
+                })
+            })
+        }))
+    })
+
     it('upgrades active premium subscription through iyzico when a higher plan is selected', async () => {
         process.env.BILLING_PROVIDER = 'iyzico'
         process.env.IYZICO_API_KEY = 'api-key'
@@ -786,6 +847,71 @@ describe('mock checkout simulation wrappers', () => {
                 change_type: 'upgrade',
                 requested_monthly_credits: 2000
             })
+        }))
+    })
+
+    it('keeps the current billing period boundaries when iyzico upgrades immediately without resetting recurrence', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+        process.env.IYZICO_SUBSCRIPTION_PLAN_GROWTH_REF = 'growth-plan-ref'
+
+        const serviceSupabase = createServiceSupabaseMock()
+        createServiceClientMock.mockReturnValue(serviceSupabase.client)
+        upgradeIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {
+                referenceCode: 'sub_ref_growth',
+                startDate: String(Date.parse('2026-04-02T19:44:00.000Z')),
+                endDate: String(Date.parse('2026-12-02T19:44:00.000Z'))
+            }
+        })
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 1000,
+                monthly_package_credit_used: 150,
+                topup_credit_balance: 20
+            },
+            activeSubscriptionRow: {
+                id: 'sub_row_1',
+                status: 'active',
+                provider_subscription_id: 'sub_ref_starter',
+                period_start: '2026-03-02T19:44:00.000Z',
+                period_end: '2026-05-02T19:44:00.000Z',
+                metadata: {
+                    source: 'iyzico_checkout_form',
+                    requested_monthly_price_try: 349
+                }
+            }
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 649,
+            monthlyCredits: 2000,
+            planId: 'growth'
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            status: 'success',
+            error: null,
+            changeType: 'upgrade',
+            effectiveAt: null
+        })
+        expect(serviceSupabase.spies.billingUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            current_period_start: '2026-03-02T19:44:00.000Z',
+            current_period_end: '2026-05-02T19:44:00.000Z'
+        }))
+        expect(serviceSupabase.spies.subscriptionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            period_start: '2026-03-02T19:44:00.000Z',
+            period_end: '2026-05-02T19:44:00.000Z'
         }))
     })
 

@@ -12,6 +12,10 @@ const TRANSIENT_STATUS_PARAMS = [
     'payment_recovery_error'
 ] as const
 
+export function hasPlansStatusSearch(searchParams: URLSearchParams) {
+    return TRANSIENT_STATUS_PARAMS.some((key) => searchParams.has(key))
+}
+
 export function clearPlansStatusSearch(searchParams: URLSearchParams) {
     const nextSearchParams = new URLSearchParams(searchParams.toString())
 

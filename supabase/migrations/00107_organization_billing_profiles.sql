@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.organization_billing_profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DROP TRIGGER IF EXISTS update_organization_billing_profiles_updated_at ON public.organization_billing_profiles;
 CREATE TRIGGER update_organization_billing_profiles_updated_at
     BEFORE UPDATE ON public.organization_billing_profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

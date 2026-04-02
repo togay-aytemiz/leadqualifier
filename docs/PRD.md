@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-04-02):** Supabase migration numbering must remain globally unique across the repo. The organization billing-profile schema is tracked as `00107_organization_billing_profiles.sql` because `00106` is already reserved by onboarding-channel completion; reusing the same version breaks `supabase_migrations.schema_migrations` inserts during deploy.
+
 > **Update Note (2026-04-02):** In `Settings > Plans > Fatura bilgileri`, the page-level section body should stay light. Remove the extra outer card wrapper around renewal/history/profile actions, keep only the highlighted `Bir sonraki yenileme` box wrapped, and place `Geçmiş` plus `Fatura bilgilerini güncelle` as underlined text actions directly beneath it.
 >
 > **Update Note (2026-04-02):** Trial countdown UI must use calendar-day remaining values that match the displayed trial end date. Partial-day remainder must not round the sidebar, plans, or dashboard banner up by one extra day when the visible dates imply `2 Apr → 14 Apr = 12 days`.
@@ -11,6 +13,8 @@
 > **Update Note (2026-04-02):** Trial banner rich text must preserve a visible gap before the emphasized remaining-days phrase. Operator copy such as `Deneme süreniz 12 gün sonra...` should never collapse to `süreniz12`, even if whitespace around the rich `<strong>` slot is trimmed by the renderer.
 >
 > **Update Note (2026-04-02):** `Settings` routes must never render a blank white page after external billing redirects. If active organization context cannot be resolved on return from Iyzico, the shared settings layout should redirect the user back to login.
+>
+> **Update Note (2026-04-02):** Billing callback query params on `Settings > Plans` should be treated as flash-only transport. After the resulting checkout/renewal/payment-recovery banner is rendered, the app should immediately remove those transient params from the visible URL with a client-side replace so callback links do not stay long and noisy in the address bar.
 >
 > **Update Note (2026-04-02):** Localhost billing tests must keep the callback on the active local origin. When the operator is running the app on `localhost`, Iyzico checkout and related billing return URLs should not be forced to the configured production app URL.
 >
@@ -24,9 +28,15 @@
 >
 > **Update Note (2026-04-02):** Immediate Iyzico plan upgrades should preserve the original billing anchor by sending `resetRecurrenceCount=false` together with `upgradePeriod=NOW`. The entitlement can expand right away, but the next full recurring charge should stay on the existing renewal date unless product policy intentionally resets it.
 >
+> **Update Note (2026-04-02):** Scheduled Iyzico downgrades should always surface the current period end as the effective date. If the provider scheduling response includes a `startDate` equal to `now`, the Plans UI must still treat the downgrade as taking effect on the existing renewal boundary, not immediately.
+>
+> **Update Note (2026-04-02):** Live Iyzico renewal sync must use the exact matched subscription order period and price. For `subscription.order.success`, Qualy should read `orders[].startPeriod/endPeriod` plus the matching order amount from provider detail, and it must not treat same-cycle success events (initial activation, immediate upgrade charge, successful retry) as a new renewal that resets usage or grants another full package.
+>
 > **Update Note (2026-04-02):** Immediate upgrade confirmation must now show the product-level true-up contract explicitly: today’s full plan-difference charge, today’s full credit-delta unlock, and the unchanged next renewal date. Credit-based upgrades must not keep vague provider-calculated copy in the operator-facing summary.
 >
 > **Update Note (2026-04-02):** Existing-subscriber immediate upgrades should set saved-card expectations inside the confirmation modal without adding another dominant button. The summary may show a concise `Payment method` row, but the main guidance should live in an amber footer banner that says the charge is taken from the saved subscription card and exposes a subtle inline `Update payment method` link before confirmation.
+>
+> **Update Note (2026-04-02):** Direct plan-change confirmation must show an obvious submit-pending state. After the operator clicks the apply/pay CTA, the button should immediately become disabled and switch to a short `İşleniyor... / Processing...` loading state with a spinner so saved-card billing does not appear unresponsive.
 >
 > **Update Note (2026-04-02):** Direct-change confirmation should visually prioritize the charged amount whenever money is taken immediately. Put the `today's charge` row last, render it with stronger emphasis than the informational rows, and let the CTA repeat that exact amount (`Pay ₺300`) instead of a generic apply label.
 >
@@ -1371,8 +1381,9 @@ Common competitor capabilities that are visible in the market but intentionally 
 - **Billing Ledger Table Layout Stability (Implementation v1.9):** `Settings > Usage` credit ledger uses fixed column sizing so collapsed and expanded row modes keep identical column widths.
 - **TR Payment Provider Strategy (Locked v1):** Prioritize a TR-valid recurring provider (Iyzico first, PayTR alternative); use Stripe only with a supported non-TR entity/account model.
 - **Iyzico Checkout Finalization Strategy (Implementation v1):** Initial subscription and top-up purchases finalize from checkout callback token retrieval (`retrieve` APIs) and apply idempotent ledger/account updates server-side before user redirect; recurring subscription lifecycle then continues through provider webhook sync for renewal success/failure/cancellation.
-- **Iyzico Lifecycle Sync Strategy (Implementation v1.29):** Recurring subscription lifecycle is now reconciled through `/api/billing/iyzico/webhook` with signature validation (`X-IYZ-SIGNATURE-V3` using merchant secret key), event idempotency based on provider order references, and local state transitions for `subscription.order.success`, `subscription.order.failure`, and `subscription.canceled`.
+  - **Iyzico Lifecycle Sync Strategy (Implementation v1.29):** Recurring subscription lifecycle is now reconciled through `/api/billing/iyzico/webhook` with signature validation (`X-IYZ-SIGNATURE-V3` using merchant secret key), event idempotency based on provider order references, and local state transitions for `subscription.order.success`, `subscription.order.failure`, and `subscription.canceled`.
   - **Iyzico Renewal Consistency Guard (Implementation v1.31):** `subscription.order.success` must delegate persistence to a single DB RPC so retries cannot produce partial state (for example, period advanced without ledger grant), and premium expiry must allow a short grace window after `current_period_end` before local entitlement flips to `canceled`.
+  - **Iyzico Order-Period Canonicalization (Implementation v1.61):** Renewal billing windows must come from the exact provider order matched by webhook `orderReferenceCode` (`orders[].startPeriod/endPeriod`), not from generic subscription item `startDate/endDate`. Same-cycle success events for initial activation, immediate upgrade true-up, or successful past-due retry are settlement events, not renewals, so they may update paid-state metadata and exact charged amount but must not reset usage or grant a new monthly package.
   - **Iyzico Period-End Cancellation Strategy (Implementation v1.30):** Because Iyzico exposes provider-side cancel but not a documented `cancel at period end / resume auto-renew` toggle, self-serve cancel calls the provider immediately, stores `auto_renew=false` + `cancel_at_period_end=true` metadata locally, keeps workspace access active until the stored `current_period_end`, and then treats entitlement as effectively `canceled` in both TS snapshot logic and SQL entitlement guards.
   - **Iyzico Provider Error Surface (Implementation v1.32):** Checkout callback finalization must catch provider retrieve failures and normalize Iyzico card/issuer decline codes (for example insufficient funds, expired card, invalid CVC, internet-shopping disabled, unsupported card) into explicit checkout error reasons instead of throwing a generic `request_failed` or `500`.
   - **Iyzico Sandbox Verification Baseline (Implementation v1.32):** Go-live confidence requires sandbox coverage for at least: successful initial subscription, successful top-up, successful provider-backed cancellation with access retained until `current_period_end`, and a representative decline-card matrix that validates mapped user-facing failure states.

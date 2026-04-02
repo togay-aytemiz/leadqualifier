@@ -213,6 +213,37 @@ describe('subscription renewal controls', () => {
         })
     })
 
+    it('prefers the current period end for pending downgrade effective dates when stale metadata points to now', async () => {
+        const { supabase } = createSupabaseMock({
+            renewalRow: {
+                metadata: {
+                    auto_renew: true,
+                    pending_plan_change: {
+                        change_type: 'downgrade',
+                        requested_monthly_credits: 2000,
+                        requested_monthly_price_try: 649,
+                        effective_at: '2026-04-02T19:44:00.000Z',
+                        requested_at: '2026-04-02T19:44:00.000Z'
+                    }
+                },
+                period_end: '2026-05-02T19:44:00.000Z'
+            }
+        })
+
+        const result = await getSubscriptionRenewalState({
+            organizationId: 'org_1',
+            supabase: supabase as never
+        })
+
+        expect(result.pendingPlanChange).toEqual({
+            changeType: 'downgrade',
+            requestedMonthlyCredits: 2000,
+            requestedMonthlyPriceTry: 649,
+            effectiveAt: '2026-05-02T19:44:00.000Z',
+            requestedAt: '2026-04-02T19:44:00.000Z'
+        })
+    })
+
     it('returns unauthorized when cancel action has no user session', async () => {
         const { supabase } = createSupabaseMock({ userId: null })
         createClientMock.mockResolvedValue(supabase)

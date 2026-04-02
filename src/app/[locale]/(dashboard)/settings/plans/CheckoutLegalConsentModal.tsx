@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { X } from 'lucide-react'
+import { LoaderCircle, X } from 'lucide-react'
+import { useFormStatus } from 'react-dom'
 import { getRegisterConsentLinkClasses } from '@/components/auth/registerConsentStyles'
 import {
     CHECKOUT_LEGAL_ACCEPTED_VALUE,
@@ -42,6 +43,66 @@ interface CheckoutLegalConsentModalProps {
         value: string
     }>
     onClose: () => void
+}
+
+function CheckoutLegalActionRow(props: {
+    hiddenFields: CheckoutLegalConsentModalProps['hiddenFields']
+    isPlanChangeConsent: boolean
+    canSubmit: boolean
+    continueLabel: string
+    onClose: () => void
+    tPlans: ReturnType<typeof useTranslations>
+}) {
+    const { pending } = useFormStatus()
+    const {
+        hiddenFields,
+        isPlanChangeConsent,
+        canSubmit,
+        continueLabel,
+        onClose,
+        tPlans
+    } = props
+
+    return (
+        <div className="mt-6 flex justify-end gap-3">
+            {hiddenFields.map((field) => (
+                <input
+                    key={field.name}
+                    type="hidden"
+                    name={field.name}
+                    value={field.value}
+                />
+            ))}
+            {isPlanChangeConsent && (
+                <input
+                    type="hidden"
+                    name={CHECKOUT_LEGAL_FORM_FIELD_NAMES.requiredDocs}
+                    value={CHECKOUT_LEGAL_ACCEPTED_VALUE}
+                />
+            )}
+            <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+                disabled={pending}
+            >
+                {tPlans('checkoutLegal.back')}
+            </button>
+            <button
+                type="submit"
+                aria-busy={pending}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/30 active:bg-[#1a2031] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-white/80"
+                disabled={pending || !canSubmit}
+            >
+                {pending ? (
+                    <>
+                        <LoaderCircle size={16} className="animate-spin" />
+                        {tPlans('checkoutLegal.processing')}
+                    </>
+                ) : continueLabel}
+            </button>
+        </div>
+    )
 }
 
 export function CheckoutLegalConsentModal({
@@ -258,7 +319,7 @@ export function CheckoutLegalConsentModal({
                                         formAction={secondaryAction.action}
                                         formNoValidate
                                         aria-label={tPlans('checkoutLegal.updatePaymentMethodBeforeChange')}
-                                        className="font-medium underline decoration-amber-500 underline-offset-2 transition hover:text-amber-900"
+                                        className="font-medium underline decoration-amber-500 underline-offset-2 transition hover:text-amber-900 disabled:cursor-not-allowed disabled:text-amber-700/70"
                                     >
                                         {secondaryAction.label}
                                     </button>
@@ -275,41 +336,18 @@ export function CheckoutLegalConsentModal({
                         )}
                     </div>
 
-                    <div className="mt-6 flex justify-end gap-3">
-                        {hiddenFields.map((field) => (
-                            <input
-                                key={field.name}
-                                type="hidden"
-                                name={field.name}
-                                value={field.value}
-                            />
-                        ))}
-                        {isPlanChangeConsent && (
-                            <input
-                                type="hidden"
-                                name={CHECKOUT_LEGAL_FORM_FIELD_NAMES.requiredDocs}
-                                value={CHECKOUT_LEGAL_ACCEPTED_VALUE}
-                            />
+                    <CheckoutLegalActionRow
+                        hiddenFields={hiddenFields}
+                        isPlanChangeConsent={isPlanChangeConsent}
+                        canSubmit={canSubmit}
+                        continueLabel={continueLabel ?? (
+                            isPlanChangeConsent
+                                ? tPlans('checkoutLegal.continueDirectAction')
+                                : tPlans('checkoutLegal.continue')
                         )}
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100"
-                        >
-                            {tPlans('checkoutLegal.back')}
-                        </button>
-                        <button
-                            type="submit"
-                            className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/30 active:bg-[#1a2031] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-white/80"
-                            disabled={!canSubmit}
-                        >
-                            {continueLabel ?? (
-                                isPlanChangeConsent
-                                    ? tPlans('checkoutLegal.continueDirectAction')
-                                    : tPlans('checkoutLegal.continue')
-                            )}
-                        </button>
-                    </div>
+                        onClose={onClose}
+                        tPlans={tPlans}
+                    />
                 </form>
             </div>
         </div>

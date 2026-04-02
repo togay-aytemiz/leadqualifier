@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-02):** Supabase migration versions must stay globally unique. The billing-profile schema rollout uses `00107_organization_billing_profiles.sql` because `00106` was already consumed by the onboarding channel-completion migration; otherwise `supabase db push` fails with duplicate `schema_migrations.version`.
+
 > **Update Note (2026-04-02):** `Settings > Plans > Fatura bilgileri` should no longer wrap the whole renewal/history/action surface inside one outer card. Only the highlighted `Bir sonraki yenileme` box stays wrapped, while `Geçmiş` and `Fatura bilgilerini güncelle` sit immediately below it as underlined text actions in the section body.
 >
 > **Update Note (2026-04-02):** Trial countdown copy now uses calendar-day remaining values that match the displayed end date. Partial-day remainder must not round up `13` when the workspace visibly expires on `14 Apr` and today is `2 Apr`; sidebar, mobile usage card, and dashboard trial banner should all show `12`.
@@ -11,6 +13,8 @@
 > **Update Note (2026-04-02):** Trial banner rich-text rendering now forces a visible gap before the bold remaining-days phrase, so copy like `Deneme süreniz 12 gün sonra...` cannot visually collapse into `süreniz12` even if surrounding rich-text whitespace is trimmed.
 >
 > **Update Note (2026-04-02):** `Settings` routes now fail safe after external billing redirects. If active organization context cannot be resolved after an Iyzico return, the shared settings layout redirects to login instead of rendering a blank white page.
+>
+> **Update Note (2026-04-02):** Billing callback query params should behave like flash state, not persistent URL state. After `Settings > Plans` renders a checkout/renewal/payment-recovery banner, the page should immediately `replace` away the transient billing query params so long callback URLs do not linger in the address bar.
 >
 > **Update Note (2026-04-02):** Local billing callbacks now honor the actual localhost origin. When developers test Iyzico from `localhost`, checkout return URLs must resolve back to the current local app instead of being forced to `NEXT_PUBLIC_APP_URL` production domain.
 >
@@ -24,9 +28,15 @@
 >
 > **Update Note (2026-04-02):** Immediate Iyzico subscription upgrades now explicitly preserve the existing billing anchor. Upgrade calls send `upgradePeriod=NOW` together with `resetRecurrenceCount=false`, so entitlement can expand immediately without intentionally resetting the next renewal date to the day of the upgrade.
 >
+> **Update Note (2026-04-02):** Scheduled Iyzico downgrades must keep the effective date anchored to the current period end. If the provider upgrade response echoes a `startDate` equal to `now`, `Settings > Plans` should still show the pending downgrade as starting on the existing renewal date rather than immediately.
+>
+> **Update Note (2026-04-02):** Live Iyzico renewal correctness now depends on provider order periods, not generic subscription item dates. Renewal sync must read the matching `orders[].startPeriod/endPeriod` and exact order price from subscription detail, while same-cycle `subscription.order.success` events (initial activation, immediate upgrade charge, successful retry) must not be treated as a new renewal or double-grant monthly credits.
+>
 > **Update Note (2026-04-02):** Immediate upgrade confirmation now spells out the chosen true-up model inside the popup: today’s full plan-difference charge, today’s full credit-delta unlock, and the preserved next renewal date are all shown explicitly instead of vague provider-calculated wording.
 >
 > **Update Note (2026-04-02):** Direct upgrade confirmation now keeps saved-card expectations inside the footer area instead of a separate secondary button. The popup shows a concise `saved card` payment-method row in the summary, then an amber banner below the legal links that says the charge will be taken from the saved card and offers a subtle inline `Update payment method` link before confirmation.
+>
+> **Update Note (2026-04-02):** Direct plan-change confirmation now needs an explicit submit-pending state. Once the operator clicks the apply/pay CTA, the button should immediately switch into a disabled `İşleniyor... / Processing...` state with a spinner so direct saved-card charges do not look like a no-op while the server action is running.
 >
 > **Update Note (2026-04-02):** When a direct plan change charges money today, the confirmation popup now treats that amount as the primary summary outcome: the `today's charge` row moves to the bottom, renders with stronger emphasis, and the primary CTA mirrors the same amount (for example `₺300 ödeme yap`).
 >
@@ -988,6 +998,7 @@
   - [x] Redirect missing-auth settings returns to login instead of rendering a blank screen after external Iyzico callbacks
   - [x] Keep localhost Iyzico checkout callbacks on the active local origin instead of forcing production app URL
   - [x] Preserve the existing renewal anchor on immediate Iyzico upgrades by sending `resetRecurrenceCount=false` together with `upgradePeriod=NOW`
+  - [x] Reconcile Iyzico `subscription.order.success` using exact order periods/prices and ignore same-cycle success events as renewals
   - [x] Spell immediate upgrade true-up terms in the popup: full delta charge today, full delta credits today, renewal anchor unchanged
   - [x] Soften `Settings > Plans` subscription-action hierarchy by moving cancel into the manage modal and rendering payment recovery as text actions
   - [x] Simplify direct plan-change confirmation to a single explicit approval with concise summary and upgrade true-up wording instead of repeated full legal re-acceptance copy

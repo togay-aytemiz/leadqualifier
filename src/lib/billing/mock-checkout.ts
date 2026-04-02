@@ -97,6 +97,26 @@ function toErrorMessage(error: unknown) {
     return typeof error === 'string' ? error : 'Unknown error'
 }
 
+function resolveScheduledDowngradeEffectiveAt(input: {
+    providerStartAt: string | null
+    currentPeriodEnd: string | null
+}) {
+    const { providerStartAt, currentPeriodEnd } = input
+    if (!providerStartAt) return currentPeriodEnd
+    if (!currentPeriodEnd) return providerStartAt
+
+    const providerStartAtMs = Date.parse(providerStartAt)
+    const currentPeriodEndMs = Date.parse(currentPeriodEnd)
+
+    if (!Number.isFinite(providerStartAtMs) || !Number.isFinite(currentPeriodEndMs)) {
+        return currentPeriodEnd
+    }
+
+    return providerStartAtMs > currentPeriodEndMs
+        ? providerStartAt
+        : currentPeriodEnd
+}
+
 function errorResult(error: MockCheckoutError): MockCheckoutResult {
     return {
         ok: false,
@@ -734,7 +754,10 @@ export async function simulateMockSubscriptionCheckout(input: {
                 const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(scheduleResult)
                     ?? activeSubscription.provider_subscription_id
                 const { startAt } = extractIyzicoSubscriptionStartEnd(scheduleResult)
-                const effectiveAt = startAt ?? activeSubscription.period_end ?? null
+                const effectiveAt = resolveScheduledDowngradeEffectiveAt({
+                    providerStartAt: startAt,
+                    currentPeriodEnd: activeSubscription.period_end ?? null
+                })
                 const nowIso = new Date().toISOString()
                 const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
 
@@ -791,7 +814,6 @@ export async function simulateMockSubscriptionCheckout(input: {
             })
             const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(upgradeResult)
                 ?? activeSubscription.provider_subscription_id
-            const { startAt, endAt } = extractIyzicoSubscriptionStartEnd(upgradeResult)
             const currentUsed = Math.round(toNonNegativeNumber(billing.monthly_package_credit_used))
             const topupBalance = toNonNegativeNumber(billing.topup_credit_balance)
             const nextPackageBalance = Math.max(0, requestedCredits - currentUsed)
@@ -800,8 +822,8 @@ export async function simulateMockSubscriptionCheckout(input: {
             const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
             const currentMonthlyPriceTry = toNonNegativeNumber(metadata.requested_monthly_price_try)
             const chargedAmountTry = Math.max(0, toNonNegativeNumber(input.monthlyPriceTry) - currentMonthlyPriceTry)
-            const periodStart = startAt ?? activeSubscription.period_start
-            const periodEnd = endAt ?? activeSubscription.period_end
+            const periodStart = activeSubscription.period_start ?? null
+            const periodEnd = activeSubscription.period_end ?? null
 
             await serviceSupabase
                 .from('organization_billing_accounts')

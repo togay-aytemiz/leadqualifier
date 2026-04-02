@@ -43,6 +43,7 @@ function buildSignature(input: {
 function createServiceSupabaseMock(options: {
     subscriptionRow?: Record<string, unknown> | null
     billingRow?: Record<string, unknown> | null
+    ledgerRows?: Array<Record<string, unknown>> | null
     rpcResult?: { data: unknown; error: unknown }
 }) {
     const subscriptionMaybeSingleMock = vi.fn(async () => ({
@@ -84,6 +85,26 @@ function createServiceSupabaseMock(options: {
         eq: billingUpdateEqMock
     }))
 
+    const ledgerLimitMock = vi.fn(async () => ({
+        data: options.ledgerRows ?? [],
+        error: null
+    }))
+    const ledgerOrderMock = vi.fn(() => ({
+        limit: ledgerLimitMock
+    }))
+    const ledgerEqSecondMock = vi.fn(() => ({
+        order: ledgerOrderMock
+    }))
+    const ledgerEqFirstMock = vi.fn(() => ({
+        eq: ledgerEqSecondMock
+    }))
+    const ledgerSelectMock = vi.fn(() => ({
+        eq: ledgerEqFirstMock
+    }))
+    const ledgerUpdateEqMock = vi.fn(async () => ({ error: null }))
+    const ledgerUpdateMock = vi.fn(() => ({
+        eq: ledgerUpdateEqMock
+    }))
     const ledgerInsertMock = vi.fn(async () => ({ error: null }))
     const rpcMock = vi.fn(async () => (
         options.rpcResult ?? {
@@ -112,6 +133,8 @@ function createServiceSupabaseMock(options: {
 
         if (table === 'organization_credit_ledger') {
             return {
+                select: ledgerSelectMock,
+                update: ledgerUpdateMock,
                 insert: ledgerInsertMock
             }
         }
@@ -129,6 +152,9 @@ function createServiceSupabaseMock(options: {
             subscriptionUpdateMock,
             subscriptionUpdateEqMock,
             billingUpdateEqMock,
+            ledgerSelectMock,
+            ledgerUpdateMock,
+            ledgerUpdateEqMock,
             ledgerInsertMock,
             rpcMock
         }
@@ -172,6 +198,7 @@ describe('iyzico webhook route', () => {
                 organization_id: 'org_1',
                 provider_subscription_id: 'sub_ref_1',
                 status: 'active',
+                period_end: '2026-04-02T19:44:00.000Z',
                 metadata: {
                     requested_monthly_credits: 1000,
                     requested_monthly_price_try: 349
@@ -179,6 +206,7 @@ describe('iyzico webhook route', () => {
             },
             billingRow: {
                 organization_id: 'org_1',
+                current_period_end: '2026-04-02T19:44:00.000Z',
                 topup_credit_balance: 100,
                 premium_assigned_at: '2026-02-01T00:00:00.000Z'
             }
@@ -190,8 +218,16 @@ describe('iyzico webhook route', () => {
                 items: [{
                     referenceCode: 'sub_ref_1',
                     status: 'ACTIVE',
-                    startDate: 1760000000000,
-                    endDate: 1762592000000
+                    startDate: Date.UTC(2026, 0, 1, 0, 0, 0),
+                    endDate: Date.UTC(2027, 0, 1, 0, 0, 0),
+                    orders: [{
+                        referenceCode: 'order_ref_renew_1',
+                        price: 349,
+                        currencyCode: 'TRY',
+                        orderStatus: 'SUCCESS',
+                        startPeriod: Date.UTC(2026, 3, 2, 19, 44, 0),
+                        endPeriod: Date.UTC(2026, 4, 2, 19, 44, 0)
+                    }]
                 }]
             }
         })
@@ -230,8 +266,8 @@ describe('iyzico webhook route', () => {
         expect(spies.rpcMock).toHaveBeenCalledWith('apply_iyzico_subscription_renewal_success', expect.objectContaining({
             target_subscription_record_id: 'sub_row_1',
             target_order_reference_code: 'order_ref_renew_1',
-            next_period_start: expect.any(String),
-            next_period_end: expect.any(String),
+            next_period_start: '2026-04-02T19:44:00.000Z',
+            next_period_end: '2026-05-02T19:44:00.000Z',
             requested_monthly_credits: 1000,
             requested_monthly_price_try: 349
         }))
@@ -330,7 +366,15 @@ describe('iyzico webhook route', () => {
                     referenceCode: 'sub_ref_1',
                     status: 'ACTIVE',
                     startDate,
-                    endDate
+                    endDate,
+                    orders: [{
+                        referenceCode: 'order_ref_initial_1',
+                        price: 649,
+                        currencyCode: 'TRY',
+                        orderStatus: 'SUCCESS',
+                        startPeriod: startDate,
+                        endPeriod: endDate
+                    }]
                 }]
             }
         })
@@ -363,8 +407,186 @@ describe('iyzico webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true, status: 'ignored' })
+        expect(spies.rpcMock).not.toHaveBeenCalled()
         expect(spies.billingUpdateEqMock).not.toHaveBeenCalled()
         expect(spies.ledgerInsertMock).not.toHaveBeenCalled()
+    })
+
+    it('recovers a same-cycle successful retry without reapplying a renewal grant', async () => {
+        const { client: serviceSupabase, spies } = createServiceSupabaseMock({
+            subscriptionRow: {
+                id: 'sub_row_1',
+                organization_id: 'org_1',
+                provider_subscription_id: 'sub_ref_1',
+                status: 'past_due',
+                period_end: '2026-05-02T19:44:00.000Z',
+                metadata: {
+                    requested_monthly_credits: 1000,
+                    requested_monthly_price_try: 349,
+                    last_failed_order_reference_code: 'order_ref_failed_1'
+                }
+            },
+            billingRow: {
+                organization_id: 'org_1',
+                current_period_end: '2026-05-02T19:44:00.000Z',
+                topup_credit_balance: 100,
+                premium_assigned_at: '2026-02-01T00:00:00.000Z'
+            }
+        })
+        createServiceClientMock.mockReturnValue(serviceSupabase)
+        retrieveIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {
+                items: [{
+                    referenceCode: 'sub_ref_1',
+                    status: 'ACTIVE',
+                    startDate: Date.UTC(2026, 0, 1, 0, 0, 0),
+                    endDate: Date.UTC(2027, 0, 1, 0, 0, 0),
+                    orders: [{
+                        referenceCode: 'order_ref_retry_1',
+                        price: 349,
+                        currencyCode: 'TRY',
+                        orderStatus: 'SUCCESS',
+                        startPeriod: Date.UTC(2026, 3, 2, 19, 44, 0),
+                        endPeriod: Date.UTC(2026, 4, 2, 19, 44, 0)
+                    }]
+                }]
+            }
+        })
+        const body = {
+            merchantId: 'merchant_1',
+            iyziEventType: 'subscription.order.success',
+            iyziReferenceCode: 'event_ref_retry_1',
+            subscriptionReferenceCode: 'sub_ref_1',
+            orderReferenceCode: 'order_ref_retry_1',
+            customerReferenceCode: 'customer_ref_1'
+        }
+        const signature = buildSignature({
+            secretKey: 'secret-key',
+            merchantId: body.merchantId,
+            eventType: body.iyziEventType,
+            subscriptionReferenceCode: body.subscriptionReferenceCode,
+            orderReferenceCode: body.orderReferenceCode,
+            customerReferenceCode: body.customerReferenceCode
+        })
+
+        const req = new NextRequest('http://localhost/api/billing/iyzico/webhook', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-iyz-signature-v3': signature
+            },
+            body: JSON.stringify(body)
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true, status: 'recovered' })
+        expect(spies.rpcMock).not.toHaveBeenCalled()
+        expect(spies.subscriptionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'active',
+            metadata: expect.objectContaining({
+                payment_status: 'paid',
+                last_paid_order_reference_code: 'order_ref_retry_1',
+                last_paid_event_reference_code: 'event_ref_retry_1',
+                last_paid_order_amount_try: 349,
+                last_failed_order_reference_code: null
+            })
+        }))
+        expect(spies.billingUpdateEqMock).toHaveBeenCalledWith('organization_id', 'org_1')
+        expect(spies.ledgerInsertMock).not.toHaveBeenCalled()
+    })
+
+    it('backfills the exact provider charge for same-cycle upgrades without treating them as renewals', async () => {
+        const { client: serviceSupabase, spies } = createServiceSupabaseMock({
+            subscriptionRow: {
+                id: 'sub_row_1',
+                organization_id: 'org_1',
+                provider_subscription_id: 'sub_ref_1',
+                status: 'active',
+                period_end: '2026-05-02T19:44:00.000Z',
+                metadata: {
+                    change_type: 'upgrade',
+                    requested_monthly_credits: 2000,
+                    requested_monthly_price_try: 649,
+                    upgraded_at: '2026-04-02T19:44:00.000Z'
+                }
+            },
+            billingRow: {
+                organization_id: 'org_1',
+                current_period_end: '2026-05-02T19:44:00.000Z',
+                topup_credit_balance: 100,
+                premium_assigned_at: '2026-02-01T00:00:00.000Z'
+            },
+            ledgerRows: [{
+                id: 'ledger_1',
+                reason: 'Iyzico subscription upgrade success',
+                metadata: {
+                    subscription_id: 'sub_row_1',
+                    change_type: 'upgrade',
+                    charged_amount_try: 300
+                }
+            }]
+        })
+        createServiceClientMock.mockReturnValue(serviceSupabase)
+        retrieveIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {
+                items: [{
+                    referenceCode: 'sub_ref_1',
+                    status: 'UPGRADED',
+                    startDate: Date.UTC(2026, 0, 1, 0, 0, 0),
+                    endDate: Date.UTC(2027, 0, 1, 0, 0, 0),
+                    orders: [{
+                        referenceCode: 'order_ref_upgrade_1',
+                        price: 325,
+                        currencyCode: 'TRY',
+                        orderStatus: 'SUCCESS',
+                        startPeriod: Date.UTC(2026, 3, 2, 19, 44, 0),
+                        endPeriod: Date.UTC(2026, 4, 2, 19, 44, 0)
+                    }]
+                }]
+            }
+        })
+        const body = {
+            merchantId: 'merchant_1',
+            iyziEventType: 'subscription.order.success',
+            iyziReferenceCode: 'event_ref_upgrade_1',
+            subscriptionReferenceCode: 'sub_ref_1',
+            orderReferenceCode: 'order_ref_upgrade_1',
+            customerReferenceCode: 'customer_ref_1'
+        }
+        const signature = buildSignature({
+            secretKey: 'secret-key',
+            merchantId: body.merchantId,
+            eventType: body.iyziEventType,
+            subscriptionReferenceCode: body.subscriptionReferenceCode,
+            orderReferenceCode: body.orderReferenceCode,
+            customerReferenceCode: body.customerReferenceCode
+        })
+
+        const req = new NextRequest('http://localhost/api/billing/iyzico/webhook', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-iyz-signature-v3': signature
+            },
+            body: JSON.stringify(body)
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true, status: 'ignored' })
+        expect(spies.rpcMock).not.toHaveBeenCalled()
+        expect(spies.ledgerUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                charged_amount_try: 325,
+                order_reference_code: 'order_ref_upgrade_1'
+            })
+        }))
+        expect(spies.ledgerUpdateEqMock).toHaveBeenCalledWith('id', 'ledger_1')
     })
 
     it('marks subscription as past_due on renewal failure', async () => {

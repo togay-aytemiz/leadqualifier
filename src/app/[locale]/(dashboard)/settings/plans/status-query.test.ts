@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearPlansStatusSearch } from './status-query'
+import { clearPlansStatusSearch, hasPlansStatusSearch } from './status-query'
 
 describe('clearPlansStatusSearch', () => {
     it('removes transient checkout and renewal status params', () => {
@@ -29,5 +29,15 @@ describe('clearPlansStatusSearch', () => {
         })
 
         expect(clearPlansStatusSearch(searchParams)).toBe('')
+    })
+
+    it('detects whether transient billing status params are present', () => {
+        expect(hasPlansStatusSearch(new URLSearchParams({
+            checkout_status: 'success'
+        }))).toBe(true)
+
+        expect(hasPlansStatusSearch(new URLSearchParams({
+            page: '2'
+        }))).toBe(false)
     })
 })

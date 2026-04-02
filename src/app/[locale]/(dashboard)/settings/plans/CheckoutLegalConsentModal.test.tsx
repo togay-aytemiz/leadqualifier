@@ -12,6 +12,10 @@ describe('CheckoutLegalConsentModal', () => {
         expect(checkoutLegalMessages.details.chargeFullDelta).toBe('{price} plan farkı')
     })
 
+    it('defines a localized pending submit label for direct plan changes', () => {
+        expect(checkoutLegalMessages.processing).toBe('İşleniyor...')
+    })
+
     it('renders optional summary details and a custom provider notice', () => {
         const html = renderToStaticMarkup(
             <NextIntlClientProvider locale="tr" messages={messages} timeZone="Europe/Istanbul">

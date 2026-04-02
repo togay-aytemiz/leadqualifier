@@ -80,3 +80,52 @@ export function extractIyzicoRetrievedSubscriptionItem(
         endAt: toIsoFromEpochMs(itemRecord.endDate)
     }
 }
+
+export function extractIyzicoRetrievedSubscriptionOrder(
+    value: unknown,
+    subscriptionReferenceCode: string | null,
+    orderReferenceCode: string | null
+): {
+    referenceCode: string | null
+    price: number | null
+    currencyCode: string | null
+    orderStatus: string | null
+    startAt: string | null
+    endAt: string | null
+} | null {
+    if (!orderReferenceCode) return null
+
+    const record = asRecord(value)
+    const data = asRecord(record.data)
+    const items = Array.isArray(data.items) ? data.items : []
+
+    const matchingItem = items.find((item) => {
+        const itemRecord = asRecord(item)
+        const itemReferenceCode = readString(itemRecord.referenceCode)
+        if (!subscriptionReferenceCode) return Boolean(itemReferenceCode)
+        return itemReferenceCode === subscriptionReferenceCode
+    })
+
+    if (!matchingItem) return null
+
+    const itemRecord = asRecord(matchingItem)
+    const orders = Array.isArray(itemRecord.orders) ? itemRecord.orders : []
+    const matchingOrder = orders.find((order) => {
+        const orderRecord = asRecord(order)
+        return readString(orderRecord.referenceCode) === orderReferenceCode
+    })
+
+    if (!matchingOrder) return null
+
+    const orderRecord = asRecord(matchingOrder)
+    const parsedPrice = Number(orderRecord.price)
+
+    return {
+        referenceCode: readString(orderRecord.referenceCode),
+        price: Number.isFinite(parsedPrice) ? parsedPrice : null,
+        currencyCode: readString(orderRecord.currencyCode),
+        orderStatus: readString(orderRecord.orderStatus),
+        startAt: toIsoFromEpochMs(orderRecord.startPeriod),
+        endAt: toIsoFromEpochMs(orderRecord.endPeriod)
+    }
+}

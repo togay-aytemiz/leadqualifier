@@ -1444,6 +1444,7 @@
       "continue": "Ödeme ekranına devam et",
       "continueDirectAction": "Plan değişikliğini uygula",
       "continueDirectActionWithCharge": "{price} ödeme yap",
+      "processing": "İşleniyor...",
       "updatePaymentMethodBeforeChange": "Ödeme yöntemini güncelle",
       "updatePaymentMethodInlineAction": "buraya tıklayın.",
       "savedPaymentMethodBannerNotice": "Ödeme kayıtlı kartınızdan tahsil edilir.",
