@@ -40,6 +40,30 @@ describe('buildOrganizationBillingSnapshot', () => {
         expect(snapshot.trial.remainingDays).toBe(7)
     })
 
+    it('reports remaining trial time as calendar days instead of rounding partial days up', () => {
+        const snapshot = buildOrganizationBillingSnapshot(
+            createBillingAccount({
+                trial_started_at: '2026-03-31T10:00:00.000Z',
+                trial_ends_at: '2026-04-14T10:00:00.000Z'
+            }),
+            { nowIso: '2026-04-02T08:30:00.000Z' }
+        )
+
+        expect(snapshot.trial.remainingDays).toBe(12)
+    })
+
+    it('shows zero days left once the trial reaches its end date', () => {
+        const snapshot = buildOrganizationBillingSnapshot(
+            createBillingAccount({
+                trial_started_at: '2026-03-31T10:00:00.000Z',
+                trial_ends_at: '2026-04-14T10:00:00.000Z'
+            }),
+            { nowIso: '2026-04-14T08:30:00.000Z' }
+        )
+
+        expect(snapshot.trial.remainingDays).toBe(0)
+    })
+
     it('marks trial as time-expired when trial end passes', () => {
         const snapshot = buildOrganizationBillingSnapshot(
             createBillingAccount(),

@@ -70,6 +70,8 @@ describe('pickMessageNamespaces', () => {
         expect(trMessages.knowledge.firstDocumentGuidance.actions.reviewBusiness).toBe('İşletme bilgilerinizi gözden geçirin')
         expect(trMessages.mainSidebar.botStatusQuickSwitchOnboardingLocked).toBe('Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.')
         expect(trMessages.aiSettings.botModeLockedByOnboarding).toBe('Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.')
+        expect(trMessages.Channels.channelConnectionLocked.message).toBe('Başlangıç adımları tamamlanınca kanallarınızı bağlayabilirsiniz.')
+        expect(trMessages.Channels.channelConnectionLocked.goToOnboarding).toBe('Başlangıç adımlarına git')
         expect(trMessages.onboarding.completionModal.title.toLowerCase()).toContain('tamamlandı')
         expect(trMessages.onboarding.completionModal.options.active.title).toBe('Aktif')
         expect(trMessages.onboarding.completionModal.options.shadow.title).toBe('Dinleyici')

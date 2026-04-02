@@ -2,8 +2,13 @@ import { getChannels } from '@/lib/channels/actions'
 import { shouldCountChannelAsConnected } from '@/lib/channels/connection-readiness'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ChannelsList } from '@/components/channels/ChannelsList'
+import { ChannelsOnboardingLockBanner } from '@/components/channels/ChannelsOnboardingLockBanner'
 import { PageHeader } from '@/design'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import {
+    getOrganizationOnboardingState,
+    isChannelConnectionPrerequisitesComplete
+} from '@/lib/onboarding/state'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 
 export default async function ChannelsPage() {
@@ -32,9 +37,13 @@ export default async function ChannelsPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const channels = await getChannels(organizationId)
+    const [channels, onboardingState] = await Promise.all([
+        getChannels(organizationId),
+        getOrganizationOnboardingState(organizationId)
+    ])
     const totalChannels = 4
     const connectedChannels = (channels || []).filter(channel => shouldCountChannelAsConnected(channel)).length
+    const isChannelConnectionLocked = !isChannelConnectionPrerequisitesComplete(onboardingState.steps)
 
     return (
         <>
@@ -42,6 +51,16 @@ export default async function ChannelsPage() {
 
             <div className="flex-1 overflow-auto p-8">
                 <div className="w-full">
+                    {isChannelConnectionLocked && (
+                        <ChannelsOnboardingLockBanner
+                            className="mb-5"
+                            message={tChannels('channelConnectionLocked.message')}
+                            description={tChannels('channelConnectionLocked.description')}
+                            ctaLabel={tChannels('channelConnectionLocked.goToOnboarding')}
+                            ctaHref="/onboarding"
+                        />
+                    )}
+
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                         <p className="text-sm text-slate-500">
                             {tChannels('description')}
@@ -56,6 +75,7 @@ export default async function ChannelsPage() {
                         organizationId={organizationId}
                         showDescription={false}
                         isReadOnly={orgContext?.readOnlyTenantMode ?? false}
+                        isChannelConnectionLocked={isChannelConnectionLocked}
                     />
                 </div>
             </div>

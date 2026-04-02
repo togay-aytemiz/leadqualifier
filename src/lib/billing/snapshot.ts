@@ -50,6 +50,8 @@ interface BuildSnapshotOptions {
     nowIso?: string
 }
 
+const DAY_IN_MS = 1000 * 60 * 60 * 24
+
 function toNonNegativeNumber(value: unknown): number {
     const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     if (!Number.isFinite(parsed)) return 0
@@ -66,6 +68,19 @@ function parseDate(dateIso: string | null | undefined): Date | null {
 function clampPercentage(value: number) {
     if (!Number.isFinite(value)) return 0
     return Math.max(0, Math.min(100, value))
+}
+
+function toCalendarDayTimestamp(date: Date) {
+    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function calculateRemainingCalendarDays(trialEndsAt: Date | null, nowDate: Date) {
+    if (!trialEndsAt) return 0
+
+    return Math.max(
+        0,
+        (toCalendarDayTimestamp(trialEndsAt) - toCalendarDayTimestamp(nowDate)) / DAY_IN_MS
+    )
 }
 
 function resolveEffectiveMembershipState(options: {
@@ -186,10 +201,10 @@ export function buildOrganizationBillingSnapshot(
         : 0
 
     const remainingDays = trialEndsAt
-        ? Math.max(0, Math.ceil((trialEndsAt.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24)))
+        ? calculateRemainingCalendarDays(trialEndsAt, nowDate)
         : 0
     const totalDays = trialDurationMs > 0
-        ? Math.max(1, Math.ceil(trialDurationMs / (1000 * 60 * 60 * 24)))
+        ? Math.max(1, Math.ceil(trialDurationMs / DAY_IN_MS))
         : 0
     const effectiveMembershipState = resolveEffectiveMembershipState({
         membershipState: accountRow.membership_state,

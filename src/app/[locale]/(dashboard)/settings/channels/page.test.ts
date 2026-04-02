@@ -9,4 +9,13 @@ describe('settings channels page source', () => {
     expect(source).not.toContain('max-w-6xl')
     expect(source).toContain('w-full')
   })
+
+  it('locks new channel connections behind the first four getting-started steps', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/[locale]/(dashboard)/settings/channels/page.tsx'), 'utf8')
+
+    expect(source).toContain('getOrganizationOnboardingState')
+    expect(source).toContain('isChannelConnectionPrerequisitesComplete')
+    expect(source).toContain('isChannelConnectionLocked')
+    expect(source).toContain('ChannelsOnboardingLockBanner')
+  })
 })

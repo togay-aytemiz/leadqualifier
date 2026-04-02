@@ -27,13 +27,14 @@ interface ChannelCardProps {
     onConnect: () => void
     isComingSoon?: boolean
     isReadOnly?: boolean
+    isConnectLocked?: boolean
 }
 
-function getChannelSurfaceClasses(tone: ChannelCardTone) {
-    if (tone === 'emerald') return 'border-slate-200 hover:border-slate-300'
-    if (tone === 'sky') return 'border-slate-200 hover:border-slate-300'
-    if (tone === 'sunset') return 'border-slate-200 hover:border-slate-300'
-    return 'border-slate-200 hover:border-slate-300'
+function getChannelSurfaceClasses(tone: ChannelCardTone, isConnectLocked: boolean) {
+    if (tone === 'emerald') return isConnectLocked ? 'border-slate-200' : 'border-slate-200 hover:border-slate-300'
+    if (tone === 'sky') return isConnectLocked ? 'border-slate-200' : 'border-slate-200 hover:border-slate-300'
+    if (tone === 'sunset') return isConnectLocked ? 'border-slate-200' : 'border-slate-200 hover:border-slate-300'
+    return isConnectLocked ? 'border-slate-200' : 'border-slate-200 hover:border-slate-300'
 }
 
 function getChannelSurfaceStyle(tone: ChannelCardTone) {
@@ -81,7 +82,8 @@ export function ChannelCard({
     badge,
     onConnect,
     isComingSoon = false,
-    isReadOnly = false
+    isReadOnly = false,
+    isConnectLocked = false
 }: ChannelCardProps) {
     const t = useTranslations('Channels')
     const [showTemplateModal, setShowTemplateModal] = useState(false)
@@ -123,8 +125,10 @@ export function ChannelCard({
         <>
             <article
                 className={cn(
-                    'group relative flex min-h-[212px] flex-col overflow-hidden rounded-[22px] border p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-                    getChannelSurfaceClasses(tone)
+                    'group relative flex min-h-[212px] flex-col overflow-hidden rounded-[22px] border p-5 shadow-sm transition-all duration-200',
+                    !isConnectLocked && 'hover:-translate-y-0.5 hover:shadow-md',
+                    isConnectLocked && 'cursor-not-allowed opacity-80',
+                    getChannelSurfaceClasses(tone, isConnectLocked)
                 )}
                 style={getChannelSurfaceStyle(tone)}
             >
@@ -210,7 +214,7 @@ export function ChannelCard({
                             ) : (
                                 <Button
                                     onClick={onConnect}
-                                    disabled={isReadOnly}
+                                    disabled={isReadOnly || isConnectLocked}
                                     variant="secondary"
                                     size="sm"
                                     className="min-w-[112px] bg-white"

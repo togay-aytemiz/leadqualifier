@@ -785,9 +785,15 @@
     "title": "Kanallar",
     "noOrganization": "Organizasyon Bulunamadı",
     "noOrganizationDesc": "Kanalları yönetmek için bir organizasyonun parçası olmalısınız.",
-    "description": "Gelen kutunuza müşteri almaya başlamak için mesajlaşma platformlarını bağlayın.",
-    "summary": "Bağlı: {connected} / {total}",
-    "save": "Değişiklikleri Kaydet",
+  "description": "Gelen kutunuza müşteri almaya başlamak için mesajlaşma platformlarını bağlayın.",
+  "summary": "Bağlı: {connected} / {total}",
+  "channelConnectionLocked": {
+    "message": "Başlangıç adımları tamamlanınca kanallarınızı bağlayabilirsiniz.",
+    "description": "Önce Qualy'yi hazırlayın. Kanal bağlantısı son adımda açılır.",
+    "goToOnboarding": "Başlangıç adımlarına git",
+    "pageDescription": "{channel} bağlantısı, başlangıçtaki ilk dört adım tamamlandıktan sonra açılır."
+  },
+  "save": "Değişiklikleri Kaydet",
     "whatsappComingSoon": "WhatsApp entegrasyonu yakında! Erken erişim için destekle iletişime geçin.",
     "types": {
       "telegram": "Telegram",

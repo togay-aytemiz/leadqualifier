@@ -13,6 +13,7 @@ interface ChannelsListProps {
     organizationId: string
     showDescription?: boolean
     isReadOnly?: boolean
+    isChannelConnectionLocked?: boolean
 }
 
 function getLocalizedHref(locale: string, href: string) {
@@ -20,15 +21,23 @@ function getLocalizedHref(locale: string, href: string) {
     return `/${locale}${href}`
 }
 
-export function ChannelsList({ channels, showDescription = true, isReadOnly = false }: ChannelsListProps) {
+export function ChannelsList({
+    channels,
+    showDescription = true,
+    isReadOnly = false,
+    isChannelConnectionLocked = false
+}: ChannelsListProps) {
     const t = useTranslations('Channels')
     const locale = useLocale()
     const router = useRouter()
 
     const channelCards = useMemo(() => getChannelCardConfigs(channels), [channels])
     const channelPrefetchHrefs = useMemo(
-        () => channelCards.map((card) => getLocalizedHref(locale, card.href)),
-        [channelCards, locale]
+        () =>
+            channelCards
+                .filter((card) => !isChannelConnectionLocked || Boolean(card.channel))
+                .map((card) => getLocalizedHref(locale, card.href)),
+        [channelCards, isChannelConnectionLocked, locale]
     )
     const channelsListLayoutClasses = getChannelsListLayoutClasses()
 
@@ -56,6 +65,7 @@ export function ChannelsList({ channels, showDescription = true, isReadOnly = fa
                         }}
                         isComingSoon={card.isComingSoon}
                         isReadOnly={isReadOnly}
+                        isConnectLocked={!card.channel && isChannelConnectionLocked}
                     />
                 ))}
             </div>

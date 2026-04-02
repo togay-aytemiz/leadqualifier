@@ -6,6 +6,7 @@ import { getDefaultSystemSkillTemplates } from '@/lib/skills/default-system-skil
 
 import {
   countCustomSkillsForOnboarding,
+  isChannelConnectionPrerequisitesComplete,
   resolveOnboardingState,
   type OrganizationOnboardingStateRow,
 } from '@/lib/onboarding/state'
@@ -112,6 +113,28 @@ function createSkill(overrides?: Partial<Skill>): Skill {
 }
 
 describe('resolveOnboardingState', () => {
+  it('treats only the first four steps as the channel-connection prerequisite set', () => {
+    expect(
+      isChannelConnectionPrerequisitesComplete([
+        { id: 'intro', isComplete: true, isExpandedByDefault: false },
+        { id: 'agent_setup', isComplete: true, isExpandedByDefault: false },
+        { id: 'business_review', isComplete: true, isExpandedByDefault: false },
+        { id: 'ai_settings_review', isComplete: false, isExpandedByDefault: false },
+        { id: 'connect_whatsapp', isComplete: true, isExpandedByDefault: false },
+      ])
+    ).toBe(false)
+
+    expect(
+      isChannelConnectionPrerequisitesComplete([
+        { id: 'intro', isComplete: true, isExpandedByDefault: false },
+        { id: 'agent_setup', isComplete: true, isExpandedByDefault: false },
+        { id: 'business_review', isComplete: true, isExpandedByDefault: false },
+        { id: 'ai_settings_review', isComplete: true, isExpandedByDefault: false },
+        { id: 'connect_whatsapp', isComplete: false, isExpandedByDefault: false },
+      ])
+    ).toBe(true)
+  })
+
   it('does not count untouched default skills as custom onboarding skills', () => {
     const defaultTemplates = getDefaultSystemSkillTemplates('tr')
     const skills = defaultTemplates.map((template, index) =>
@@ -243,18 +266,22 @@ describe('resolveOnboardingState', () => {
     expect(state.isComplete).toBe(false)
   })
 
-  it('counts any ready live channel as complete for the final connection step', () => {
+  it('counts any ready live channel as complete for the final connection step once prerequisites are complete', () => {
     const state = resolveOnboardingState({
       organizationId: 'org-1',
       onboardingRow: createOnboardingRow({
         first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+        ai_settings_reviewed_at: '2026-04-01T10:01:30.000Z',
       }),
       billingSnapshot: createBillingSnapshot(),
-      knowledgeDocumentCount: 0,
+      knowledgeDocumentCount: 1,
       customSkillCount: 0,
       aiSettingsReviewCookieSeen: false,
-      offeringProfile: createOfferingProfile(),
-      serviceCatalogCount: 0,
+      offeringProfile: createOfferingProfile({
+        summary: 'Sunulanlar: Cilt bakimi.',
+      }),
+      serviceCatalogCount: 1,
       connectedChannels: [
         createChannel({
           type: 'instagram',
@@ -268,6 +295,72 @@ describe('resolveOnboardingState', () => {
     })
 
     expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
+  })
+
+  it('keeps the final connection step incomplete until the first four steps are complete', () => {
+    const state = resolveOnboardingState({
+      organizationId: 'org-1',
+      onboardingRow: createOnboardingRow({
+        first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+      }),
+      billingSnapshot: createBillingSnapshot(),
+      knowledgeDocumentCount: 1,
+      customSkillCount: 0,
+      aiSettingsReviewCookieSeen: false,
+      offeringProfile: createOfferingProfile({
+        summary: 'Sunulanlar: Cilt bakimi.',
+      }),
+      serviceCatalogCount: 1,
+      connectedChannels: [
+        createChannel({
+          type: 'instagram',
+          name: 'Instagram',
+          config: {
+            webhook_verified_at: '2026-04-01T10:02:00.000Z',
+          },
+        }),
+      ],
+      nowIso: '2026-04-01T10:03:00.000Z',
+    })
+
+    expect(state.steps.find((step) => step.id === 'business_review')?.isComplete).toBe(true)
+    expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(false)
+    expect(state.isComplete).toBe(false)
+    expect(state.completedSteps).toBe(3)
+  })
+
+  it('counts the final connection step once the first four onboarding steps are complete', () => {
+    const state = resolveOnboardingState({
+      organizationId: 'org-1',
+      onboardingRow: createOnboardingRow({
+        first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+        ai_settings_reviewed_at: '2026-04-01T10:01:30.000Z',
+      }),
+      billingSnapshot: createBillingSnapshot(),
+      knowledgeDocumentCount: 1,
+      customSkillCount: 0,
+      aiSettingsReviewCookieSeen: false,
+      offeringProfile: createOfferingProfile({
+        summary: 'Sunulanlar: Cilt bakimi.',
+      }),
+      serviceCatalogCount: 1,
+      connectedChannels: [
+        createChannel({
+          type: 'instagram',
+          name: 'Instagram',
+          config: {
+            webhook_verified_at: '2026-04-01T10:02:00.000Z',
+          },
+        }),
+      ],
+      nowIso: '2026-04-01T10:03:00.000Z',
+    })
+
+    expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
+    expect(state.isComplete).toBe(true)
+    expect(state.completedSteps).toBe(5)
   })
 
   it('marks agent setup complete when a custom skill exists without knowledge documents', () => {

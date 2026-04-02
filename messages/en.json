@@ -785,9 +785,15 @@
     "title": "Channels",
     "noOrganization": "No Organization Found",
     "noOrganizationDesc": "You need to be part of an organization to manage channels.",
-    "description": "Connect messaging platforms to start receiving leads into your inbox.",
-    "summary": "Connected: {connected} / {total}",
-    "save": "Save changes",
+  "description": "Connect messaging platforms to start receiving leads into your inbox.",
+  "summary": "Connected: {connected} / {total}",
+  "channelConnectionLocked": {
+    "message": "You can connect your channels after the getting started steps are complete.",
+    "description": "Prepare Qualy first. Channel connection opens as the final step.",
+    "goToOnboarding": "Go to getting started",
+    "pageDescription": "{channel} connection unlocks after the first four getting-started steps are complete."
+  },
+  "save": "Save changes",
     "whatsappComingSoon": "WhatsApp integration coming soon! Contact support for early access.",
     "types": {
       "telegram": "Telegram",

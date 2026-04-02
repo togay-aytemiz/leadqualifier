@@ -63,6 +63,13 @@ interface OnboardingCountQueryResult {
 
 type OnboardingSkillCandidate = Pick<Skill, 'title' | 'trigger_examples' | 'response_text'>
 
+const CHANNEL_CONNECTION_PREREQUISITE_STEP_IDS: OrganizationOnboardingStepId[] = [
+  'intro',
+  'agent_setup',
+  'business_review',
+  'ai_settings_review',
+]
+
 function isMissingRelationError(error: unknown, relationName: string) {
   if (!error || typeof error !== 'object') return false
 
@@ -131,6 +138,14 @@ export function countCustomSkillsForOnboarding(skills: OnboardingSkillCandidate[
   }, 0)
 }
 
+export function isChannelConnectionPrerequisitesComplete(
+  steps: Pick<OrganizationOnboardingStepState, 'id' | 'isComplete'>[]
+) {
+  return CHANNEL_CONNECTION_PREREQUISITE_STEP_IDS.every((stepId) =>
+    steps.some((step) => step.id === stepId && step.isComplete)
+  )
+}
+
 export function resolveOnboardingState({
   organizationId,
   onboardingRow,
@@ -143,8 +158,7 @@ export function resolveOnboardingState({
   connectedChannels,
 }: ResolveOnboardingStateInput): OrganizationOnboardingShellState {
   const showBanner = shouldShowTrialBanner(billingSnapshot)
-
-  const steps: OrganizationOnboardingStepState[] = [
+  const prerequisiteSteps: OrganizationOnboardingStepState[] = [
     {
       id: 'intro',
       isComplete: Boolean(onboardingRow?.intro_acknowledged_at),
@@ -165,9 +179,16 @@ export function resolveOnboardingState({
       isComplete: Boolean(onboardingRow?.ai_settings_reviewed_at) || aiSettingsReviewCookieSeen,
       isExpandedByDefault: false,
     },
+  ]
+  const channelConnectionComplete =
+    isChannelConnectionPrerequisitesComplete(prerequisiteSteps) &&
+    hasAnyConnectedChannel(connectedChannels)
+
+  const steps: OrganizationOnboardingStepState[] = [
+    ...prerequisiteSteps,
     {
       id: 'connect_whatsapp',
-      isComplete: hasAnyConnectedChannel(connectedChannels),
+      isComplete: channelConnectionComplete,
       isExpandedByDefault: false,
     },
   ]
