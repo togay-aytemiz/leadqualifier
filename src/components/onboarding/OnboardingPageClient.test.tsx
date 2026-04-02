@@ -87,6 +87,16 @@ describe('OnboardingPageClient source', () => {
     expect(source).toContain('bg-violet-500 transition-all')
   })
 
+  it('shows a mobile-only recommendation banner for completing onboarding on a larger screen', () => {
+    const source = fs.readFileSync(ONBOARDING_PAGE_CLIENT_PATH, 'utf8')
+
+    expect(source).toContain("t('recommendedBanner.title')")
+    expect(source).toContain("t('recommendedBanner.body')")
+    expect(source).toContain('lg:hidden')
+    expect(source).toContain('border-amber-200')
+    expect(source).toContain('bg-amber-50')
+  })
+
   it('uses a simpler respond-style layout instead of nested wrapper cards', () => {
     const source = fs.readFileSync(ONBOARDING_PAGE_CLIENT_PATH, 'utf8')
 

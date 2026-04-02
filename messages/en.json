@@ -315,6 +315,7 @@
   "onboarding": {
     "banner": {
       "message": "Your trial ends in <strong>{days} days</strong> on {date}. Upgrade now to avoid service interruption.",
+      "mobileMessage": "Your trial ends in <strong>{days} days</strong> on {date}. To avoid service interruption, <upgrade>upgrade now</upgrade>.",
       "checklistCta": "Getting started",
       "upgradeCta": "Upgrade now"
     },
@@ -341,6 +342,10 @@
       "greeting": "Hello {name}, let's get started.",
       "defaultName": "there",
       "progressLabel": "Progress",
+      "recommendedBanner": {
+        "title": "We recommend doing this on a larger screen",
+        "body": "Setup and review steps feel more comfortable on desktop."
+      },
       "steps": {
         "intro": {
           "title": "Get to know Qualy",

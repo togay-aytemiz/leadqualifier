@@ -44,8 +44,11 @@ describe('pickMessageNamespaces', () => {
     it('keeps onboarding copy at the top level for dashboard shell consumers', () => {
         expect(enMessages).toHaveProperty('onboarding.banner.message')
         expect(trMessages).toHaveProperty('onboarding.banner.message')
+        expect(trMessages).toHaveProperty('onboarding.banner.mobileMessage')
         expect(trMessages.nav.onboarding).toBe('Başlangıç')
         expect(trMessages.onboarding.checklist.greeting).toContain('{name}')
+        expect(trMessages.onboarding.checklist.recommendedBanner.title.toLowerCase()).toContain('öner')
+        expect(trMessages.onboarding.banner.mobileMessage.toLowerCase()).toContain('şimdi yükselt')
         expect(trMessages.onboarding.checklist.steps.intro.primaryCta).toBe('Devam et')
         expect(trMessages.onboarding.banner.checklistCta).toBe('Başlangıç')
         expect(trMessages.onboarding.checklist.steps.agent_setup.primaryCta).toBe("Bilgi Bankası'na git")

@@ -2,6 +2,10 @@
 
 > **Update Note (2026-04-02):** Trial countdown UI must use calendar-day remaining values that match the displayed trial end date. Partial-day remainder must not round the sidebar, plans, or dashboard banner up by one extra day when the visible dates imply `2 Apr → 14 Apr = 12 days`.
 >
+> **Update Note (2026-04-02):** The mobile trial banner should stay compact: instead of a second stacked primary button, the small-screen version should render the upgrade CTA inline inside the sentence as a text-style underlined link. The info icon should also stay plain, filled, and smaller without a visible wrapper chip, and desktop banner copy should stay vertically centered against that icon. The onboarding page should also show a mobile-only banner recommending a larger screen for setup and checklist work, while desktop keeps the cleaner uninterrupted checklist layout.
+>
+> **Update Note (2026-04-02):** Trial banner rich text must preserve a visible gap before the emphasized remaining-days phrase. Operator copy such as `Deneme süreniz 12 gün sonra...` should never collapse to `süreniz12`, even if whitespace around the rich `<strong>` slot is trimmed by the renderer.
+>
 > **Update Note (2026-04-02):** Once the final onboarding step (`Kanal bağlantısı`) has been validly completed after steps 1-4, that completion must stay sticky. Removing the previously connected channel later should not make onboarding regress, because the operator has already learned how to connect a channel.
 >
 > **Update Note (2026-04-01):** `Settings > Channels` must visually enforce the same onboarding prerequisite as the checklist itself. Until the first four `Başlangıç` steps are complete, new channel connection actions must stay disabled, the channels page must show a bold colored onboarding-required banner, and direct setup routes for not-yet-connected interactive channels must render a locked state instead of live connect controls.

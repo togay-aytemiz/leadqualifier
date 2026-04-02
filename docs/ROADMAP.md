@@ -2,6 +2,10 @@
 
 > **Update Note (2026-04-02):** Trial countdown copy now uses calendar-day remaining values that match the displayed end date. Partial-day remainder must not round up `13` when the workspace visibly expires on `14 Apr` and today is `2 Apr`; sidebar, mobile usage card, and dashboard trial banner should all show `12`.
 >
+> **Update Note (2026-04-02):** On smaller screens, the trial banner now uses a more compact inline `Şimdi yükselt / Upgrade now` text link inside the sentence instead of a separate primary button, the info icon is rendered as a smaller plain filled icon without a visible wrapper chip, desktop text is vertically centered against that icon, and the onboarding page adds a mobile-only larger-screen recommendation banner so setup/checklist work can be nudged toward desktop without cluttering the desktop layout.
+>
+> **Update Note (2026-04-02):** Trial banner rich-text rendering now forces a visible gap before the bold remaining-days phrase, so copy like `Deneme süreniz 12 gün sonra...` cannot visually collapse into `süreniz12` even if surrounding rich-text whitespace is trimmed.
+>
 > **Update Note (2026-04-02):** The final `Başlangıç` channel step is now sticky once it has been legitimately learned. After steps 1-4 are complete, completing channel connection should persist that knowledge so removing the channel later does not make onboarding regress back to incomplete.
 >
 > **Update Note (2026-04-01):** `Settings > Channels` now mirrors the onboarding gate visually: until the first four `Başlangıç` steps are complete, fresh channel connections stay disabled, the channels index shows a bold purple onboarding-required banner, and direct setup routes for unconnected interactive channels render the same locked state instead of exposing connect UI early.

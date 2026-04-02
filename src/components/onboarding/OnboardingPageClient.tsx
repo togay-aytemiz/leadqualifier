@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   CalendarDays,
+  CircleAlert,
   CheckCircle2,
   Clock3,
   MessageCircleMore,
@@ -452,6 +453,22 @@ export function OnboardingPageClient({
               <span className="min-w-fit whitespace-nowrap text-sm font-medium text-violet-600">
                 {completedSteps} / {totalSteps}
               </span>
+            </div>
+          </div>
+
+          <div className="lg:hidden">
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-amber-500">
+                <CircleAlert size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900">
+                  {t('recommendedBanner.title')}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-700">
+                  {t('recommendedBanner.body')}
+                </p>
+              </div>
             </div>
           </div>
 

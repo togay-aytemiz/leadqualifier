@@ -315,6 +315,7 @@
   "onboarding": {
     "banner": {
       "message": "Deneme süreniz <strong>{days} gün sonra</strong>, {date} tarihinde bitiyor. Hizmet kesintisini önlemek için şimdi yükseltin.",
+      "mobileMessage": "Deneme süreniz <strong>{days} gün sonra</strong>, {date} tarihinde bitiyor. Hizmet kesintisini önlemek için <upgrade>şimdi yükselt</upgrade>.",
       "checklistCta": "Başlangıç",
       "upgradeCta": "Şimdi yükselt"
     },
@@ -341,6 +342,10 @@
       "greeting": "Merhaba {name}, hadi başlayalım.",
       "defaultName": "orada",
       "progressLabel": "İlerleme",
+      "recommendedBanner": {
+        "title": "Daha büyük ekranda yapmanızı öneriyoruz",
+        "body": "Kurulum ve kontrol adımları masaüstünde daha rahat ilerler."
+      },
       "steps": {
         "intro": {
           "title": "Qualy'yi tanıyın",

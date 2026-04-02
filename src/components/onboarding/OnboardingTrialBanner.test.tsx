@@ -8,13 +8,16 @@ const ONBOARDING_TRIAL_BANNER_PATH = path.resolve(
 )
 
 describe('OnboardingTrialBanner source', () => {
-  it('shows both onboarding and upgrade actions with responsive wrapping and centered alignment', () => {
+  it('keeps desktop actions separate while using an inline text-based upgrade CTA on mobile', () => {
     const source = fs.readFileSync(ONBOARDING_TRIAL_BANNER_PATH, 'utf8')
 
     expect(source).toContain('/onboarding')
     expect(source).toContain('/settings/plans')
-    expect(source).toContain('flex-wrap')
-    expect(source).toContain('items-center')
+    expect(source).toContain("t.rich('mobileMessage'")
+    expect(source).toContain('sm:hidden')
+    expect(source).toContain('hidden flex-wrap')
+    expect(source).toContain('sm:flex')
+    expect(source).toContain('underline underline-offset-4')
   })
 
   it('renders the checklist CTA conditionally from shared onboarding state', () => {
@@ -23,7 +26,9 @@ describe('OnboardingTrialBanner source', () => {
     expect(source).toContain('showChecklistCta')
     expect(source).toContain("useTranslations('onboarding.banner')")
     expect(source).toContain("t.rich('message'")
+    expect(source).toContain("t.rich('mobileMessage'")
     expect(source).toContain('font-semibold')
+    expect(source).not.toContain('rounded-full bg-blue-600 text-white')
     expect(source).not.toContain("useEffect(() => {")
     expect(source).not.toContain(".from('organization_onboarding_states')")
   })
