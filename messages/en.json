@@ -1334,6 +1334,7 @@
       },
       "month": "month",
       "creditsIncluded": "{credits} credits included",
+      "packageCreditsValue": "{credits} credits",
       "approxConversations": "~{min}-{max} conversations / month",
       "unitPrice": "{price} / credit",
       "planCta": {
@@ -1361,14 +1362,16 @@
         "title": "Manage plan",
         "description": "Review your current package, upgrade, or switch for the next billing period.",
         "close": "Close",
+        "cancelHintPrefix": "If you want to end the subscription,",
+        "cancelHintAction": "you can cancel it here.",
         "current": "Current plan",
         "upgrade": "Upgrade to this",
         "upgradeContinue": "Select this plan and continue",
         "downgrade": "Switch at period end",
-        "downgradeContinue": "Select this plan (period end) and continue",
+        "downgradeContinue": "Select this plan and continue",
         "switch": "Go to this plan",
         "switchContinue": "Select this plan and continue",
-        "downgradeHint": "Lower-tier changes apply at period end."
+        "downgradeHint": "Plan change applies at period end."
       },
       "cancelModal": {
         "title": "Are you sure you want to cancel your subscription?",
@@ -1428,17 +1431,23 @@
     },
     "checkoutLegal": {
       "title": "Pre-payment confirmation",
+      "titleDirectAction": "Plan change confirmation",
       "description": "Review the documents below and complete the required confirmations before you continue to the Iyzico payment screen.",
-      "descriptionDirectAction": "Review the documents below and complete the required confirmations before you confirm this change.",
+      "descriptionDirectAction": "Review the summary below and confirm the plan change.",
       "summaryLabel": "Selected product",
       "providerNotice": "Payment is completed on the Iyzico screen in the next step.",
       "providerNoticeDirectAction": "After confirmation, the plan change is processed in Iyzico subscription billing. No separate payment screen opens in this flow.",
       "infoDocsTitle": "Informational documents",
       "acceptRequiredDocs": "I have read and accept the <preInformation>Pre-Information Form</preInformation>, <distanceSalesAgreement>Distance Sales Agreement</distanceSalesAgreement>, and <terms>Terms of Service</terms>.",
       "acceptImmediateStart": "I want the digital service to become available right after payment is completed.",
-      "acceptPlanChange": "I want the plan change to be applied according to the details above.",
+      "acceptPlanChange": "I confirm that the plan change should be applied according to the details above.",
       "continue": "Continue to payment screen",
-      "continueDirectAction": "Confirm and continue",
+      "continueDirectAction": "Apply plan change",
+      "continueDirectActionWithCharge": "Pay {price}",
+      "updatePaymentMethodBeforeChange": "Update payment method",
+      "updatePaymentMethodInlineAction": "click here.",
+      "savedPaymentMethodBannerNotice": "Payment is charged to your saved card.",
+      "savedPaymentMethodBannerHint": "If you want to update your payment method,",
       "back": "Back",
       "close": "Close",
       "subscriptionSummary": "{plan} • {price} / month • {credits} credits",
@@ -1451,9 +1460,15 @@
         "effectiveImmediate": "Applies immediately.",
         "effectiveNextPeriod": "Applies at the start of the next billing period.",
         "todayChargeLabel": "Today's charge",
-        "chargeProviderCalculated": "The exact amount is not shown at this step. Any charge is processed with the saved payment method under Iyzico subscription rules.",
+        "chargeFullDelta": "Plan difference: {price}",
+        "chargeProviderCalculated": "The amount is calculated by Iyzico at the moment of the change and charged to the saved payment method.",
         "chargeNoCharge": "No new charge is taken today. The new price starts next period.",
-        "chargeFullPrice": "The first subscription payment of {price} is charged today."
+        "chargeFullPrice": "The first subscription payment of {price} is charged today.",
+        "savedPaymentMethodLabel": "Payment method",
+        "savedPaymentMethodGeneric": "The charge is collected from your saved card.",
+        "todayCreditDeltaLabel": "Extra access unlocked today",
+        "creditDeltaValue": "+{credits} credits",
+        "nextRenewalLabel": "Next renewal"
       },
       "docs": {
         "preInformation": "Pre-Information Form",
@@ -1470,6 +1485,58 @@
       "topupAfterPackageExhausted": "Top-ups require an active monthly package.",
       "topupUnavailable": "Top-ups are unavailable right now.",
       "viewUsageLink": "View usage"
+    },
+    "billingInfo": {
+      "sectionTitle": "Billing information",
+      "sectionDescription": "View the next renewal, review purchase history, and manage the billing details used for charges.",
+      "cardTitle": "Billing information",
+      "cardDescription": "Check the next renewal, open past purchases, and update billing details.",
+      "nextBillingDateLabel": "Next renewal",
+      "nextBillingDateUnavailable": "Not available yet",
+      "historyCta": "History",
+      "updateCta": "Update billing information",
+      "historyModalTitle": "Purchase history",
+      "historyModalDescription": "Successful purchases and renewals appear here.",
+      "historyEmpty": "There is no purchase history yet.",
+      "historyColumns": {
+        "date": "Date",
+        "amount": "Amount",
+        "status": "Status",
+        "details": "Details"
+      },
+      "historyDetails": {
+        "packageStart": "Package start",
+        "packageUpgrade": "Package upgrade",
+        "packageRenewal": "Package renewal",
+        "packageUpdate": "Plan update",
+        "topupPurchase": "Top-up purchase"
+      },
+      "status": {
+        "success": "Success"
+      },
+      "amountUnavailable": "—",
+      "formModalTitle": "Update billing information",
+      "formModalDescription": "Save the company and address details used for Iyzico charges.",
+      "fields": {
+        "companyName": "Company name",
+        "billingEmail": "Billing email",
+        "billingPhone": "Billing phone",
+        "taxIdentityNumber": "Tax / identity number",
+        "addressLine1": "Address",
+        "city": "City",
+        "postalCode": "Postal code",
+        "country": "Country"
+      },
+      "messages": {
+        "saveSuccess": "Billing information saved.",
+        "saveError": "Billing information could not be saved.",
+        "invalidInput": "Complete the required billing fields.",
+        "unauthorized": "You are not allowed to update billing details for this organization."
+      },
+      "save": "Save",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "close": "Close"
     },
     "checkoutStatus": {
       "successTitle": "Payment completed",

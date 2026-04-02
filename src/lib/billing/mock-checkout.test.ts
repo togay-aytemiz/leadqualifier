@@ -60,6 +60,7 @@ interface SupabaseMockOptions {
     activeSubscriptionError?: unknown
     profileRow?: Record<string, unknown> | null
     organizationRow?: Record<string, unknown> | null
+    billingProfileRow?: Record<string, unknown> | null
 }
 
 function createSupabaseMock(options: SupabaseMockOptions = {}) {
@@ -142,6 +143,17 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
         eq: organizationEqMock
     }))
 
+    const billingProfileMaybeSingleMock = vi.fn(async () => ({
+        data: options.billingProfileRow ?? null,
+        error: null
+    }))
+    const billingProfileEqMock = vi.fn(() => ({
+        maybeSingle: billingProfileMaybeSingleMock
+    }))
+    const billingProfileSelectMock = vi.fn(() => ({
+        eq: billingProfileEqMock
+    }))
+
     const fromMock = vi.fn((table: string) => {
         if (table === 'organization_billing_accounts') {
             return {
@@ -167,6 +179,12 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
             }
         }
 
+        if (table === 'organization_billing_profiles') {
+            return {
+                select: billingProfileSelectMock
+            }
+        }
+
         throw new Error(`Unexpected tenant table: ${table}`)
     })
 
@@ -183,6 +201,9 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
         billingSelectMock,
         billingEqMock,
         billingMaybeSingleMock,
+        billingProfileSelectMock,
+        billingProfileEqMock,
+        billingProfileMaybeSingleMock,
         subscriptionSelectMock,
         subscriptionFirstEqMock,
         subscriptionSecondEqMock,
@@ -370,6 +391,78 @@ describe('mock checkout simulation wrappers', () => {
             changeType: null,
             effectiveAt: null
         })
+    })
+
+    it('prefers saved billing profile values when initializing iyzico subscription checkout', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+        process.env.IYZICO_SUBSCRIPTION_PLAN_STARTER_REF = 'starter-ref'
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'trial_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 0,
+                monthly_package_credit_used: 0,
+                topup_credit_balance: 0
+            },
+            profileRow: {
+                full_name: 'Ayse Yilmaz',
+                email: 'operator@example.com'
+            },
+            organizationRow: {
+                name: 'Qualy Klinik'
+            },
+            billingProfileRow: {
+                company_name: 'Qualy Klinik A.S.',
+                billing_email: 'finance@qualy.com',
+                billing_phone: '+905551112233',
+                tax_identity_number: '11111111111',
+                address_line_1: 'Bagdat Cad. 10',
+                city: 'Istanbul',
+                postal_code: '34740',
+                country: 'Turkey'
+            }
+        })
+        const { client: serviceClient } = createServiceSupabaseMock()
+
+        createClientMock.mockResolvedValue(supabase)
+        createServiceClientMock.mockReturnValue(serviceClient)
+        initializeIyzicoSubscriptionCheckoutMock.mockResolvedValue({
+            status: 'success',
+            token: 'subscription-token',
+            checkoutFormContent: '<div id="iyzico-checkout"></div>'
+        })
+
+        await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 349,
+            monthlyCredits: 1000,
+            planId: 'starter',
+            callbackUrl: 'http://127.0.0.1:3001/api/billing/iyzico/callback?action=subscribe&locale=tr',
+            locale: 'tr'
+        })
+
+        expect(initializeIyzicoSubscriptionCheckoutMock).toHaveBeenCalledWith(expect.objectContaining({
+            customer: expect.objectContaining({
+                email: 'finance@qualy.com',
+                gsmNumber: '+905551112233',
+                identityNumber: '11111111111',
+                billingAddress: expect.objectContaining({
+                    contactName: 'Qualy Klinik A.S.',
+                    address: 'Bagdat Cad. 10',
+                    city: 'Istanbul',
+                    country: 'Turkey',
+                    zipCode: '34740'
+                }),
+                shippingAddress: expect.objectContaining({
+                    contactName: 'Qualy Klinik A.S.'
+                })
+            })
+        }))
     })
 
     it('returns provider_not_configured for top-up checkout when mock is requested without explicit opt-in', async () => {
@@ -666,7 +759,8 @@ describe('mock checkout simulation wrappers', () => {
         expect(upgradeIyzicoSubscriptionMock).toHaveBeenCalledWith({
             subscriptionReferenceCode: 'sub_ref_starter',
             newPricingPlanReferenceCode: 'growth-plan-ref',
-            upgradePeriod: 'NOW'
+            upgradePeriod: 'NOW',
+            resetRecurrenceCount: false
         })
         expect(serviceSupabase.spies.billingUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
             monthly_package_credit_limit: 2000,

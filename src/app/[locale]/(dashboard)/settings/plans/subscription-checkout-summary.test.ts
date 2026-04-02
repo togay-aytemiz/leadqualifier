@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSubscriptionCheckoutSummary } from './subscription-checkout-summary'
+import {
+    buildSubscriptionCheckoutSummaryDetails,
+    resolveSubscriptionCheckoutContinueLabel,
+    resolveSubscriptionCheckoutSummary
+} from './subscription-checkout-summary'
 
 describe('resolveSubscriptionCheckoutSummary', () => {
     it('treats a first subscription as an immediate full-price checkout', () => {
@@ -17,7 +21,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         expect(summary.chargeMode).toBe('full_price')
     })
 
-    it('treats higher-tier changes as immediate upgrades with provider-calculated charging', () => {
+    it('treats higher-tier changes as immediate upgrades with full delta charging', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -33,8 +37,9 @@ describe('resolveSubscriptionCheckoutSummary', () => {
 
         expect(summary.changeType).toBe('upgrade')
         expect(summary.effectiveTiming).toBe('immediate')
-        expect(summary.chargeMode).toBe('provider_calculated')
+        expect(summary.chargeMode).toBe('full_delta')
         expect(summary.monthlyPriceDelta).toBe(300)
+        expect(summary.creditDelta).toBe(1000)
     })
 
     it('treats lower-tier changes as next-period downgrades with no charge today', () => {
@@ -55,5 +60,161 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         expect(summary.effectiveTiming).toBe('next_period')
         expect(summary.chargeMode).toBe('no_charge')
         expect(summary.monthlyPriceDelta).toBe(-300)
+    })
+
+    it('builds full true-up popup details for immediate upgrades', () => {
+        const summary = resolveSubscriptionCheckoutSummary({
+            currentPlan: {
+                id: 'starter',
+                credits: 1000,
+                localizedPrice: 349
+            },
+            targetPlan: {
+                id: 'growth',
+                credits: 2000,
+                localizedPrice: 649
+            }
+        })
+
+        const details = buildSubscriptionCheckoutSummaryDetails({
+            currentPlan: {
+                id: 'starter',
+                credits: 1000,
+                localizedPrice: 349
+            },
+            targetPlan: {
+                id: 'growth',
+                credits: 2000,
+                localizedPrice: 649
+            },
+            summary,
+            currentPlanName: 'Temel',
+            targetPlanName: 'Gelişmiş',
+            renewalPeriodEnd: '2026-05-01T00:00:00.000Z',
+            formatCurrency: (value) => `₺${value}`,
+            formatCredits: (value) => String(value),
+            formatRenewalDate: (value) => value.slice(0, 10),
+            savedPaymentMethod: {
+                type: 'saved_subscription_card'
+            },
+            labels: {
+                currentPlan: 'Mevcut plan',
+                newPlan: 'Yeni plan',
+                planValue: ({ plan, price }) => `${plan} • ${price} / ay`,
+                effectiveLabel: 'Geçiş zamanı',
+                effectiveImmediate: 'Hemen uygulanır.',
+                effectiveNextPeriod: 'Bir sonraki dönem başında uygulanır.',
+                todayChargeLabel: 'Bugünkü tahsilat',
+                chargeFullDelta: ({ price }) => `${price} plan farkı`,
+                chargeNoCharge: 'Bugün yeni tahsilat yapılmaz.',
+                chargeFullPrice: ({ price }) => `Bugün ${price} tahsil edilir.`,
+                savedPaymentMethodLabel: 'Ödeme yöntemi',
+                savedPaymentMethodGeneric: 'Tahsilat kayıtlı kartınızdan alınır.',
+                todayCreditDeltaLabel: 'Bugün açılacak ek hak',
+                creditDeltaValue: ({ credits }) => `+${credits} kredi`,
+                nextRenewalLabel: 'Bir sonraki yenileme'
+            }
+        })
+
+        expect(details).toEqual([
+            { label: 'Mevcut plan', value: 'Temel • ₺349 / ay' },
+            { label: 'Yeni plan', value: 'Gelişmiş • ₺649 / ay' },
+            { label: 'Geçiş zamanı', value: 'Hemen uygulanır.' },
+            { label: 'Ödeme yöntemi', value: 'Tahsilat kayıtlı kartınızdan alınır.' },
+            { label: 'Bugün açılacak ek hak', value: '+1000 kredi' },
+            { label: 'Bir sonraki yenileme', value: '2026-05-01' },
+            { label: 'Bugünkü tahsilat', value: '₺300 plan farkı', emphasis: 'strong' }
+        ])
+    })
+
+    it('keeps saved-card messaging generic even if masked digits are available later', () => {
+        const summary = resolveSubscriptionCheckoutSummary({
+            currentPlan: {
+                id: 'starter',
+                credits: 1000,
+                localizedPrice: 349
+            },
+            targetPlan: {
+                id: 'growth',
+                credits: 2000,
+                localizedPrice: 649
+            }
+        })
+
+        const details = buildSubscriptionCheckoutSummaryDetails({
+            currentPlan: {
+                id: 'starter',
+                credits: 1000,
+                localizedPrice: 349
+            },
+            targetPlan: {
+                id: 'growth',
+                credits: 2000,
+                localizedPrice: 649
+            },
+            summary,
+            currentPlanName: 'Temel',
+            targetPlanName: 'Gelişmiş',
+            renewalPeriodEnd: '2026-05-01T00:00:00.000Z',
+            formatCurrency: (value) => `₺${value}`,
+            formatCredits: (value) => String(value),
+            formatRenewalDate: (value) => value.slice(0, 10),
+            savedPaymentMethod: {
+                type: 'saved_subscription_card'
+            },
+            labels: {
+                currentPlan: 'Mevcut plan',
+                newPlan: 'Yeni plan',
+                planValue: ({ plan, price }) => `${plan} • ${price} / ay`,
+                effectiveLabel: 'Geçiş zamanı',
+                effectiveImmediate: 'Hemen uygulanır.',
+                effectiveNextPeriod: 'Bir sonraki dönem başında uygulanır.',
+                todayChargeLabel: 'Bugünkü tahsilat',
+                chargeFullDelta: ({ price }) => `${price} plan farkı`,
+                chargeNoCharge: 'Bugün yeni tahsilat yapılmaz.',
+                chargeFullPrice: ({ price }) => `Bugün ${price} tahsil edilir.`,
+                savedPaymentMethodLabel: 'Ödeme yöntemi',
+                savedPaymentMethodGeneric: 'Tahsilat kayıtlı kartınızdan alınır.',
+                todayCreditDeltaLabel: 'Bugün açılacak ek hak',
+                creditDeltaValue: ({ credits }) => `+${credits} kredi`,
+                nextRenewalLabel: 'Bir sonraki yenileme'
+            }
+        })
+
+        expect(details).toContainEqual({
+            label: 'Ödeme yöntemi',
+            value: 'Tahsilat kayıtlı kartınızdan alınır.'
+        })
+    })
+
+    it('builds a price-first CTA label when the change charges today', () => {
+        const summary = resolveSubscriptionCheckoutSummary({
+            currentPlan: {
+                id: 'starter',
+                credits: 1000,
+                localizedPrice: 649
+            },
+            targetPlan: {
+                id: 'scale',
+                credits: 4000,
+                localizedPrice: 949
+            }
+        })
+
+        const label = resolveSubscriptionCheckoutContinueLabel({
+            summary,
+            targetPlan: {
+                id: 'scale',
+                credits: 4000,
+                localizedPrice: 949
+            },
+            formatCurrency: (value) => `₺${value}`,
+            labels: {
+                defaultLabel: 'Plan değişikliğini uygula',
+                chargeLabel: ({ price }) => `${price} ödeme yap`
+            }
+        })
+
+        expect(label).toBe('₺300 ödeme yap')
     })
 })

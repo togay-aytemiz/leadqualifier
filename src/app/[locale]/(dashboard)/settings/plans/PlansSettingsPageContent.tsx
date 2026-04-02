@@ -44,12 +44,14 @@ import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
-import { getOrganizationBillingSnapshot } from '@/lib/billing/server'
+import { getOrganizationBillingLedger, getOrganizationBillingSnapshot } from '@/lib/billing/server'
+import { buildBillingHistoryRows } from '@/lib/billing/history'
 import { getOrganizationTopupStatusSummary } from '@/lib/billing/topup-status'
 import { readCheckoutLegalConsent } from '@/lib/billing/checkout-legal'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 import { AlertCircle } from 'lucide-react'
+import { PlansBillingInformationCard } from './PlansBillingInformationCard'
 import { PlansStatusBanner } from './PlansStatusBanner'
 import { SubscriptionPlanCatalog } from './SubscriptionPlanCatalog'
 import { SubscriptionPlanManager, type SubscriptionPlanOption } from './SubscriptionPlanManager'
@@ -74,6 +76,52 @@ interface PlansSettingsPageContentProps {
     organizationId: string
     locale: string
     search: PlansSettingsSearchParams
+}
+
+interface BillingProfileRow {
+    company_name: string
+    billing_email: string
+    billing_phone: string | null
+    tax_identity_number: string | null
+    address_line_1: string | null
+    city: string | null
+    postal_code: string | null
+    country: string | null
+}
+
+interface BillingHistorySubscriptionLookupRow {
+    metadata: unknown
+}
+
+interface BillingHistoryOrderLookupRow {
+    credits: number
+    amountTry: number
+    currency: string | null
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
+}
+
+function readString(record: Record<string, unknown> | null, key: string): string | null {
+    const value = record?.[key]
+    return typeof value === 'string' && value.trim().length > 0 ? value : null
+}
+
+function formatLedgerCurrency(locale: string, amount: number, currency: string | null) {
+    if (!Number.isFinite(amount)) return null
+    const normalizedCurrency = currency && currency.trim().length > 0 ? currency.trim().toUpperCase() : 'TRY'
+    try {
+        return new Intl.NumberFormat(locale, {
+            style: 'currency',
+            currency: normalizedCurrency,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        }).format(amount)
+    } catch {
+        return null
+    }
 }
 
 function resolveMembershipLabel(
@@ -106,6 +154,18 @@ function readHeaderValue(value: string | null | undefined) {
 
 function normalizeCheckoutLocale(locale: string) {
     return locale.toLowerCase().startsWith('en') ? 'en' : 'tr'
+}
+
+function resolveRequestOriginFromHeaders(requestHeaders: Awaited<ReturnType<typeof headers>>) {
+    const host = readHeaderValue(requestHeaders.get('x-forwarded-host'))
+        ?? readHeaderValue(requestHeaders.get('host'))
+        ?? 'localhost:3000'
+    const proto = readHeaderValue(requestHeaders.get('x-forwarded-proto'))
+        ?? (host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0')
+            ? 'http'
+            : 'https')
+
+    return `${proto}://${host}`
 }
 
 function buildCheckoutRedirect(
@@ -217,19 +277,29 @@ export default async function PlansSettingsPageContent({
     const requestHeaders = await headers()
     const tPlans = await getTranslations('billingPlans')
     const [
+        { data: authData },
         { data: organizationRecord, error: organizationError },
+        { data: billingProfileData, error: billingProfileError },
         snapshot,
+        billingLedger,
         pricingCatalog,
         topupStatusSummary,
         subscriptionRenewalState,
         paymentRecoveryState
     ] = await Promise.all([
+        supabase.auth.getUser(),
         supabase
             .from('organizations')
-            .select('billing_region')
+            .select('name, billing_region')
             .eq('id', organizationId)
             .maybeSingle(),
+        supabase
+            .from('organization_billing_profiles')
+            .select('company_name, billing_email, billing_phone, tax_identity_number, address_line_1, city, postal_code, country')
+            .eq('organization_id', organizationId)
+            .maybeSingle(),
         getOrganizationBillingSnapshot(organizationId, { supabase }),
+        getOrganizationBillingLedger(organizationId, { supabase, limit: 20 }),
         getBillingPricingCatalog({
             supabase
         }),
@@ -248,13 +318,17 @@ export default async function PlansSettingsPageContent({
         console.error('Failed to load organization billing region for plans page:', organizationError)
     }
 
+    if (billingProfileError) {
+        console.error('Failed to load billing profile for plans page:', billingProfileError)
+    }
+
     const requestBillingRegion = resolveBillingRegionFromRequestHeaders(requestHeaders)
     const appOrigin = resolveMetaOrigin({
         appUrl: process.env.NEXT_PUBLIC_APP_URL,
         siteUrl: process.env.SITE_URL ?? null,
         forwardedHost: requestHeaders.get('x-forwarded-host'),
         forwardedProto: requestHeaders.get('x-forwarded-proto'),
-        requestOrigin: `https://${requestHeaders.get('host') ?? 'localhost:3000'}`
+        requestOrigin: resolveRequestOriginFromHeaders(requestHeaders)
     })
     const checkoutLocale = normalizeCheckoutLocale(locale)
     const customerIp = readHeaderValue(requestHeaders.get('x-forwarded-for')) ?? '127.0.0.1'
@@ -298,6 +372,88 @@ export default async function PlansSettingsPageContent({
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
+    })
+    const formatDate = new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    })
+    const authEmail = authData.user?.email?.trim() ?? ''
+    const organizationName = organizationRecord?.name?.trim() ?? ''
+    const billingProfile = (billingProfileData ?? null) as BillingProfileRow | null
+    const relatedSubscriptionIds: string[] = []
+    const relatedOrderIds: string[] = []
+
+    for (const entry of billingLedger) {
+        const metadata = toRecord(entry.metadata)
+        const subscriptionId = readString(metadata, 'subscription_id')
+            ?? readString(metadata, 'subscription_record_id')
+        const orderId = readString(metadata, 'order_id')
+
+        if (subscriptionId && !relatedSubscriptionIds.includes(subscriptionId)) {
+            relatedSubscriptionIds.push(subscriptionId)
+        }
+        if (orderId && !relatedOrderIds.includes(orderId)) {
+            relatedOrderIds.push(orderId)
+        }
+    }
+
+    const subscriptionsById = new Map<string, BillingHistorySubscriptionLookupRow>()
+    const ordersById = new Map<string, BillingHistoryOrderLookupRow>()
+
+    if (relatedSubscriptionIds.length > 0) {
+        const { data, error } = await supabase
+            .from('organization_subscription_records')
+            .select('id, metadata')
+            .eq('organization_id', organizationId)
+            .in('id', relatedSubscriptionIds)
+
+        if (error) {
+            console.error('Failed to load plans billing subscription history rows:', error)
+        } else {
+            for (const row of data ?? []) {
+                subscriptionsById.set(row.id, {
+                    metadata: row.metadata
+                })
+            }
+        }
+    }
+
+    if (relatedOrderIds.length > 0) {
+        const { data, error } = await supabase
+            .from('credit_purchase_orders')
+            .select('id, credits, amount_try, currency')
+            .eq('organization_id', organizationId)
+            .in('id', relatedOrderIds)
+
+        if (error) {
+            console.error('Failed to load plans billing order history rows:', error)
+        } else {
+            for (const row of data ?? []) {
+                ordersById.set(row.id, {
+                    credits: Number(row.credits ?? 0),
+                    amountTry: Number(row.amount_try ?? 0),
+                    currency: row.currency
+                })
+            }
+        }
+    }
+
+    const historyRows = buildBillingHistoryRows({
+        entries: billingLedger,
+        subscriptions: subscriptionsById,
+        orders: ordersById,
+        formatDate: (value) => formatDate.format(new Date(value)),
+        formatCurrency: (amount, currency) => formatLedgerCurrency(locale, amount, currency),
+        labels: {
+            statusSuccess: tPlans('billingInfo.status.success'),
+            amountUnavailable: tPlans('billingInfo.amountUnavailable'),
+            packageStart: tPlans('billingInfo.historyDetails.packageStart'),
+            packageUpgrade: tPlans('billingInfo.historyDetails.packageUpgrade'),
+            packageRenewal: tPlans('billingInfo.historyDetails.packageRenewal'),
+            packageUpdate: tPlans('billingInfo.historyDetails.packageUpdate'),
+            topupPurchase: tPlans('billingInfo.historyDetails.topupPurchase')
+        }
     })
 
     const localizedPlanTiers = pricingCatalog.plans.map((plan) => {
@@ -349,9 +505,6 @@ export default async function PlansSettingsPageContent({
     const activePlanCredits = activePlanId
         ? localizedPlanTiers.find((plan) => plan.id === activePlanId)?.credits ?? 0
         : 0
-    const activePlanOption = activePlanId
-        ? localizedPlanTiers.find((plan) => plan.id === activePlanId) ?? null
-        : null
     const canSubmitPlanSelection = snapshot
         ? snapshot.membershipState !== 'admin_locked'
         : false
@@ -460,6 +613,30 @@ export default async function PlansSettingsPageContent({
     const supportsAutoRenewResume = getBillingProviderConfig().provider !== 'iyzico'
     const autoRenewEnabled = subscriptionRenewalState.autoRenew
     const renewalPeriodEnd = subscriptionRenewalState.periodEnd ?? snapshot?.package.periodEnd ?? null
+    const nextBillingDateLabel = renewalPeriodEnd
+        ? formatDate.format(new Date(renewalPeriodEnd))
+        : tPlans('billingInfo.nextBillingDateUnavailable')
+    const defaultCountry = (() => {
+        const savedCountry = billingProfile?.country?.trim()
+        if (savedCountry) {
+            if (locale.toLowerCase().startsWith('tr') && savedCountry === 'Turkey') {
+                return 'Türkiye'
+            }
+            return savedCountry
+        }
+
+        return locale.toLowerCase().startsWith('tr') ? 'Türkiye' : ''
+    })()
+    const billingFormValues = {
+        companyName: billingProfile?.company_name ?? organizationName,
+        billingEmail: billingProfile?.billing_email ?? authEmail,
+        billingPhone: billingProfile?.billing_phone ?? '',
+        taxIdentityNumber: billingProfile?.tax_identity_number ?? '',
+        addressLine1: billingProfile?.address_line_1 ?? '',
+        city: billingProfile?.city ?? '',
+        postalCode: billingProfile?.postal_code ?? '',
+        country: defaultCountry
+    }
     const pendingPlanChange = subscriptionRenewalState.pendingPlanChange
     const hasPendingDowngrade = pendingPlanChange?.changeType === 'downgrade'
     const pendingPlanId = hasPendingDowngrade
@@ -518,6 +695,14 @@ export default async function PlansSettingsPageContent({
         consumedTopupCreditsTotal: topupStatusSummary.consumedTopupCreditsTotal,
         hasTrialCreditCarryover: topupStatusSummary.hasTrialCreditCarryover
     })
+    const usageViewLink = (
+        <Link
+            href="/settings/billing"
+            className="text-sm font-medium text-[#242A40] underline decoration-1 underline-offset-2 hover:text-[#1f2437]"
+        >
+            {tPlans('actions.viewUsageLink')}
+        </Link>
+    )
 
     const getCheckoutTitle = () => {
         if (!checkoutStatus) return ''
@@ -866,22 +1051,25 @@ export default async function PlansSettingsPageContent({
                 <SettingsSection
                     title={tPlans('status.title')}
                     description={tPlans('status.description')}
+                    descriptionAddon={isManagedSubscriptionMembership ? usageViewLink : undefined}
                 >
                     {snapshot ? (
                         <div className="space-y-4">
-                            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.membershipLabel')}</p>
-                                    <p className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">{membershipLabel}</p>
+                            {!isManagedSubscriptionMembership && (
+                                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.membershipLabel')}</p>
+                                        <p className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800">{membershipLabel}</p>
+                                    </div>
+                                    {isPremiumMembership && (
+                                        <p className="mt-2 text-sm text-gray-700">
+                                            {activePlanName
+                                                ? tPlans('status.currentPackage', { plan: activePlanName })
+                                                : tPlans('status.currentPackageUnknown')}
+                                        </p>
+                                    )}
                                 </div>
-                                {isPremiumMembership && (
-                                    <p className="mt-2 text-sm text-gray-700">
-                                        {activePlanName
-                                            ? tPlans('status.currentPackage', { plan: activePlanName })
-                                            : tPlans('status.currentPackageUnknown')}
-                                    </p>
-                                )}
-                            </div>
+                            )}
 
                             {isTrialMembership && (
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -934,6 +1122,27 @@ export default async function PlansSettingsPageContent({
 
                             {isPremiumMembership && (
                                 <div className="space-y-4">
+                                    {isManagedSubscriptionMembership && (
+                                        <SubscriptionPlanManager
+                                            organizationId={organizationId}
+                                            plans={subscriptionPlanOptions}
+                                            activePlanId={activePlanId}
+                                            activePlanCredits={activePlanCredits}
+                                            canManage={canSubmitPlanSelection}
+                                            autoRenewEnabled={autoRenewEnabled}
+                                            renewalPeriodEnd={renewalPeriodEnd}
+                                            pendingPlanId={hasPendingDowngrade ? pendingPlanId : null}
+                                            pendingPlanName={hasPendingDowngrade ? pendingPlanName : null}
+                                            pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
+                                            supportsAutoRenewResume={supportsAutoRenewResume}
+                                            paymentRecoveryState={paymentRecoveryState}
+                                            planAction={handleMockSubscribe}
+                                            cancelAction={handleCancelRenewal}
+                                            retryPaymentAction={handleRetryFailedPayment}
+                                            updatePaymentMethodAction={handleUpdatePaymentMethod}
+                                        />
+                                    )}
+
                                     {premiumStatusVisibility.showTotalCreditsCard && (
                                         <div className="rounded-2xl border border-gray-200 bg-white p-4">
                                             <p className="text-xs uppercase tracking-wider text-gray-400">{tPlans('status.totalCreditsTitle')}</p>
@@ -1015,98 +1224,34 @@ export default async function PlansSettingsPageContent({
                     )}
                 </SettingsSection>
 
-                <SettingsSection
-                    title={tPlans('packageCatalog.title')}
-                    description={tPlans('packageCatalog.description')}
-                    descriptionAddon={(
-                        <Link
-                            href="/settings/billing"
-                            className="text-sm font-medium text-[#242A40] underline decoration-1 underline-offset-2 hover:text-[#1f2437]"
-                        >
-                            {tPlans('actions.viewUsageLink')}
-                        </Link>
-                    )}
-                >
-                    <div className="space-y-4">
-                        {isManagedSubscriptionMembership && activePlanOption ? (
-                            <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wider text-gray-400">
-                                            {tPlans('packageCatalog.currentPackageLabel')}
-                                        </p>
-                                        <p className="mt-1 text-xl font-semibold text-gray-900">
-                                            {activePlanName ?? tPlans('status.currentPackageUnknown')}
-                                        </p>
-                                        <p className="mt-3 text-sm text-gray-700">
-                                            {tPlans('packageCatalog.creditsIncluded', {
-                                                credits: formatNumber.format(activePlanOption.credits)
-                                            })}
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-600">
-                                            {tPlans('packageCatalog.approxConversations', {
-                                                min: formatNumber.format(activePlanOption.conversationRange.min),
-                                                max: formatNumber.format(activePlanOption.conversationRange.max)
-                                            })}
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            {tPlans('packageCatalog.unitPrice', {
-                                                price: formatCurrency.format(activePlanOption.unitPrice)
-                                            })}
-                                        </p>
-                                    </div>
-
-                                    <p className="tabular-nums text-4xl font-semibold leading-tight text-gray-900 md:text-right">
-                                        {formatCurrency.format(activePlanOption.localizedPrice)}
-                                        <span className="ml-1 text-base font-medium text-gray-500">
-                                            / {tPlans('packageCatalog.month')}
-                                        </span>
-                                    </p>
-                                </div>
-                            </article>
-                        ) : (
+                {!isManagedSubscriptionMembership && (
+                    <SettingsSection
+                        title={tPlans('packageCatalog.title')}
+                        description={tPlans('packageCatalog.description')}
+                        descriptionAddon={usageViewLink}
+                    >
+                        <div className="space-y-4">
                             <p className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
                                 {activePlanName
                                     ? tPlans('packageCatalog.currentPackageActive', { plan: activePlanName })
                                     : tPlans('packageCatalog.currentPackageInactive')}
                             </p>
-                        )}
 
-                        {isManagedSubscriptionMembership ? (
-                            <SubscriptionPlanManager
-                                organizationId={organizationId}
-                                plans={subscriptionPlanOptions}
-                                activePlanId={activePlanId}
-                                activePlanCredits={activePlanCredits}
-                                canManage={canSubmitPlanSelection}
-                                autoRenewEnabled={autoRenewEnabled}
-                                renewalPeriodEnd={renewalPeriodEnd}
-                                pendingPlanId={hasPendingDowngrade ? pendingPlanId : null}
-                                pendingPlanName={hasPendingDowngrade ? pendingPlanName : null}
-                                pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
-                                supportsAutoRenewResume={supportsAutoRenewResume}
-                                paymentRecoveryState={paymentRecoveryState}
-                                planAction={handleMockSubscribe}
-                                cancelAction={handleCancelRenewal}
-                                retryPaymentAction={handleRetryFailedPayment}
-                                updatePaymentMethodAction={handleUpdatePaymentMethod}
-                            />
-                        ) : (
                             <SubscriptionPlanCatalog
                                 organizationId={organizationId}
                                 plans={localizedPlanTiers}
                                 canSubmit={canSubmitPlanSelection}
                                 planAction={handleMockSubscribe}
                             />
-                        )}
 
-                        {!canSubmitPlanSelection && (
-                            <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                                {tPlans('actions.adminLocked')}
-                            </p>
-                        )}
-                    </div>
-                </SettingsSection>
+                            {!canSubmitPlanSelection && (
+                                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                                    {tPlans('actions.adminLocked')}
+                                </p>
+                            )}
+                        </div>
+                    </SettingsSection>
+                )}
 
                 <SettingsSection
                     title={tPlans('topups.sectionTitle')}
@@ -1140,6 +1285,19 @@ export default async function PlansSettingsPageContent({
                             </div>
                         </article>
                     </div>
+                </SettingsSection>
+
+                <SettingsSection
+                    title={tPlans('billingInfo.sectionTitle')}
+                    description={tPlans('billingInfo.sectionDescription')}
+                >
+                    <PlansBillingInformationCard
+                        locale={locale}
+                        organizationId={organizationId}
+                        nextBillingDateLabel={nextBillingDateLabel}
+                        formValues={billingFormValues}
+                        historyRows={historyRows}
+                    />
                 </SettingsSection>
             </div>
         </div>

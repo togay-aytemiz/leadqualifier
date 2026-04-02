@@ -180,6 +180,20 @@ export interface OrganizationBillingAccount {
     updated_at: string
 }
 
+export interface OrganizationBillingProfile {
+    organization_id: string
+    company_name: string
+    billing_email: string
+    billing_phone: string | null
+    tax_identity_number: string | null
+    address_line_1: string | null
+    city: string | null
+    postal_code: string | null
+    country: string | null
+    created_at: string
+    updated_at: string
+}
+
 export interface OrganizationCreditLedger {
     id: string
     organization_id: string
@@ -662,6 +676,11 @@ export interface Database {
                 Row: OrganizationBillingAccount
                 Insert: Omit<OrganizationBillingAccount, 'created_at' | 'updated_at'>
                 Update: Partial<Omit<OrganizationBillingAccount, 'organization_id' | 'created_at' | 'updated_at'>>
+            }
+            organization_billing_profiles: {
+                Row: OrganizationBillingProfile
+                Insert: Omit<OrganizationBillingProfile, 'created_at' | 'updated_at'>
+                Update: Partial<Omit<OrganizationBillingProfile, 'organization_id' | 'created_at' | 'updated_at'>>
             }
             organization_credit_ledger: {
                 Row: OrganizationCreditLedger

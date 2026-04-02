@@ -5,7 +5,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { resolveSubscriptionCheckoutSummary } from './subscription-checkout-summary'
+import {
+    buildSubscriptionCheckoutSummaryDetails,
+    resolveSubscriptionCheckoutContinueLabel,
+    resolveSubscriptionCheckoutSummary
+} from './subscription-checkout-summary'
 
 const CheckoutLegalConsentModal = dynamic(() => import('./CheckoutLegalConsentModal').then((module) => module.CheckoutLegalConsentModal), {
     loading: () => null
@@ -96,8 +100,19 @@ export function SubscriptionPlanManager({
         }),
         [locale]
     )
+    const formatDate = useMemo(
+        () => new Intl.DateTimeFormat(locale, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }),
+        [locale]
+    )
     const hasHigherPlan = plans.some((plan) => plan.credits > activePlanCredits)
     const activePlan = plans.find((plan) => plan.id === activePlanId) ?? null
+    const activePlanName = activePlan
+        ? tPlans(`packageCatalog.planNames.${activePlan.id}`)
+        : tPlans('status.currentPackageUnknown')
     const checkoutPlan = plans.find((plan) => plan.id === checkoutPlanId) ?? null
     const checkoutSummary = checkoutPlan
         ? resolveSubscriptionCheckoutSummary({
@@ -116,42 +131,72 @@ export function SubscriptionPlanManager({
         })
         : null
     const checkoutSummaryDetails = checkoutPlan && checkoutSummary
-        ? [
-            ...(activePlan
-                ? [{
-                    label: tPlans('checkoutLegal.details.currentPlan'),
-                    value: tPlans('checkoutLegal.details.planValue', {
-                        plan: tPlans(`packageCatalog.planNames.${activePlan.id}`),
-                        price: formatCurrency.format(activePlan.localizedPrice)
-                    })
-                }]
-                : []),
-            {
-                label: tPlans('checkoutLegal.details.newPlan'),
-                value: tPlans('checkoutLegal.details.planValue', {
-                    plan: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
-                    price: formatCurrency.format(checkoutPlan.localizedPrice)
-                })
+        ? buildSubscriptionCheckoutSummaryDetails({
+            currentPlan: activePlan
+                ? {
+                    id: activePlan.id,
+                    credits: activePlan.credits,
+                    localizedPrice: activePlan.localizedPrice
+                }
+                : null,
+            targetPlan: {
+                id: checkoutPlan.id,
+                credits: checkoutPlan.credits,
+                localizedPrice: checkoutPlan.localizedPrice
             },
-            {
-                label: tPlans('checkoutLegal.details.effectiveLabel'),
-                value: checkoutSummary.effectiveTiming === 'next_period'
-                    ? tPlans('checkoutLegal.details.effectiveNextPeriod')
-                    : tPlans('checkoutLegal.details.effectiveImmediate')
-            },
-            {
-                label: tPlans('checkoutLegal.details.todayChargeLabel'),
-                value: checkoutSummary.chargeMode === 'provider_calculated'
-                    ? tPlans('checkoutLegal.details.chargeProviderCalculated')
-                    : checkoutSummary.chargeMode === 'no_charge'
-                        ? tPlans('checkoutLegal.details.chargeNoCharge')
-                        : tPlans('checkoutLegal.details.chargeFullPrice', {
-                            price: formatCurrency.format(checkoutPlan.localizedPrice)
-                        })
+            summary: checkoutSummary,
+            currentPlanName: activePlan
+                ? tPlans(`packageCatalog.planNames.${activePlan.id}`)
+                : null,
+            targetPlanName: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
+            renewalPeriodEnd,
+            savedPaymentMethod: checkoutSummary.changeType === 'upgrade'
+                ? {
+                    type: 'saved_subscription_card'
+                }
+                : null,
+            formatCurrency: (value) => formatCurrency.format(value),
+            formatCredits: (value) => formatNumber.format(value),
+            formatRenewalDate: (value) => formatDate.format(new Date(value)),
+            labels: {
+                currentPlan: tPlans('checkoutLegal.details.currentPlan'),
+                newPlan: tPlans('checkoutLegal.details.newPlan'),
+                planValue: ({ plan, price }) => tPlans('checkoutLegal.details.planValue', { plan, price }),
+                effectiveLabel: tPlans('checkoutLegal.details.effectiveLabel'),
+                effectiveImmediate: tPlans('checkoutLegal.details.effectiveImmediate'),
+                effectiveNextPeriod: tPlans('checkoutLegal.details.effectiveNextPeriod'),
+                todayChargeLabel: tPlans('checkoutLegal.details.todayChargeLabel'),
+                chargeFullDelta: ({ price }) => tPlans('checkoutLegal.details.chargeFullDelta', { price }),
+                chargeNoCharge: tPlans('checkoutLegal.details.chargeNoCharge'),
+                chargeFullPrice: ({ price }) => tPlans('checkoutLegal.details.chargeFullPrice', { price }),
+                savedPaymentMethodLabel: tPlans('checkoutLegal.details.savedPaymentMethodLabel'),
+                savedPaymentMethodGeneric: tPlans('checkoutLegal.details.savedPaymentMethodGeneric'),
+                todayCreditDeltaLabel: tPlans('checkoutLegal.details.todayCreditDeltaLabel'),
+                creditDeltaValue: ({ credits }) => tPlans('checkoutLegal.details.creditDeltaValue', { credits }),
+                nextRenewalLabel: tPlans('checkoutLegal.details.nextRenewalLabel')
             }
-        ]
+        })
         : []
+    const checkoutContinueLabel = checkoutPlan && checkoutSummary
+        ? resolveSubscriptionCheckoutContinueLabel({
+            summary: checkoutSummary,
+            targetPlan: {
+                id: checkoutPlan.id,
+                credits: checkoutPlan.credits,
+                localizedPrice: checkoutPlan.localizedPrice
+            },
+            formatCurrency: (value) => formatCurrency.format(value),
+            labels: {
+                defaultLabel: tPlans('checkoutLegal.continueDirectAction'),
+                chargeLabel: ({ price }) => tPlans('checkoutLegal.continueDirectActionWithCharge', { price })
+            }
+        })
+        : tPlans('checkoutLegal.continueDirectAction')
     const canRenderPortal = typeof document !== 'undefined'
+    const openCancelFromPlanModal = () => {
+        setIsPlanModalOpen(false)
+        setIsCancelModalOpen(true)
+    }
 
     useEffect(() => {
         if (!isPlanModalOpen && !isCancelModalOpen) return
@@ -277,7 +322,7 @@ export function SubscriptionPlanManager({
                                     </button>
                                 </div>
                                 {isDowngrade && (
-                                    <p className="mt-2 text-[11px] text-gray-500">
+                                    <p className="mt-2 text-[11px] text-amber-700">
                                         {tPlans('packageCatalog.planModal.downgradeHint')}
                                     </p>
                                 )}
@@ -285,6 +330,21 @@ export function SubscriptionPlanManager({
                         )
                     })}
                 </div>
+
+                {autoRenewEnabled && (
+                    <div className="mt-5 border-t border-gray-200 pt-4 text-sm text-gray-500">
+                        <span>{tPlans('packageCatalog.planModal.cancelHintPrefix')}</span>
+                        {' '}
+                        <button
+                            type="button"
+                            onClick={openCancelFromPlanModal}
+                            className="font-medium text-gray-700 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-900 hover:decoration-gray-500 disabled:cursor-not-allowed disabled:text-gray-400"
+                            disabled={!canManage}
+                        >
+                            {tPlans('packageCatalog.planModal.cancelHintAction')}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -346,93 +406,120 @@ export function SubscriptionPlanManager({
 
     return (
         <>
-            <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                        <p className="text-base font-semibold text-gray-900">
-                            {tPlans('packageCatalog.manager.title')}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                            {tPlans('packageCatalog.manager.description')}
-                        </p>
-                        {!autoRenewEnabled && (
-                            <>
-                                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                                    {renewalPeriodEnd
-                                        ? tPlans('packageCatalog.manager.cancelScheduledWithDate', {
-                                            date: formatDateTime.format(new Date(renewalPeriodEnd))
-                                        })
-                                        : tPlans('packageCatalog.manager.cancelScheduledNoDate')}
-                                </p>
-                                {!supportsAutoRenewResume && (
-                                    <p className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-                                        {tPlans('packageCatalog.manager.resumeUnavailable')}
+            <article className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p className="text-xs uppercase tracking-wider text-gray-400">
+                                {tPlans('packageCatalog.currentPackageLabel')}
+                            </p>
+                            <p className="mt-2 text-2xl font-semibold text-gray-900">
+                                {activePlanName}
+                            </p>
+                            {activePlan && (
+                                <>
+                                    <p className="mt-4 text-sm text-gray-700">
+                                        {tPlans('packageCatalog.packageCreditsValue', {
+                                            credits: formatNumber.format(activePlan.credits)
+                                        })}
                                     </p>
-                                )}
-                            </>
-                        )}
-                        {pendingPlanName && (
-                            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-                                {pendingPlanEffectiveAt
-                                    ? tPlans('packageCatalog.manager.pendingPlanWithDate', {
-                                        plan: pendingPlanName,
-                                        date: formatDateTime.format(new Date(pendingPlanEffectiveAt))
-                                    })
-                                    : tPlans('packageCatalog.manager.pendingPlanNoDate', {
-                                        plan: pendingPlanName
-                                    })}
+                                    <p className="mt-1 text-xs text-gray-600">
+                                        {tPlans('packageCatalog.approxConversations', {
+                                            min: formatNumber.format(activePlan.conversationRange.min),
+                                            max: formatNumber.format(activePlan.conversationRange.max)
+                                        })}
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {tPlans('packageCatalog.unitPrice', {
+                                            price: formatCurrency.format(activePlan.unitPrice)
+                                        })}
+                                    </p>
+                                </>
+                            )}
+                        </div>
+
+                        {activePlan && (
+                            <p className="tabular-nums text-4xl font-semibold leading-tight text-gray-900 md:text-right">
+                                {formatCurrency.format(activePlan.localizedPrice)}
+                                <span className="ml-1 text-base font-medium text-gray-500">
+                                    / {tPlans('packageCatalog.month')}
+                                </span>
                             </p>
                         )}
                     </div>
 
-                    <div className="flex w-full flex-col gap-2 sm:w-auto">
-                        <button
-                            type="button"
-                            onClick={() => setIsPlanModalOpen(true)}
-                            className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
-                            disabled={!canManage}
-                        >
-                            {hasHigherPlan
-                                ? tPlans('packageCatalog.manager.manageCtaPrimary')
-                                : tPlans('packageCatalog.manager.manageCtaFallback')}
-                        </button>
+                    {(!autoRenewEnabled || pendingPlanName) && (
+                        <div className="space-y-2">
+                            {!autoRenewEnabled && (
+                                <>
+                                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                        {renewalPeriodEnd
+                                            ? tPlans('packageCatalog.manager.cancelScheduledWithDate', {
+                                                date: formatDateTime.format(new Date(renewalPeriodEnd))
+                                            })
+                                            : tPlans('packageCatalog.manager.cancelScheduledNoDate')}
+                                    </p>
+                                    {!supportsAutoRenewResume && (
+                                        <p className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                                            {tPlans('packageCatalog.manager.resumeUnavailable')}
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                            {pendingPlanName && (
+                                <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                                    {pendingPlanEffectiveAt
+                                        ? tPlans('packageCatalog.manager.pendingPlanWithDate', {
+                                            plan: pendingPlanName,
+                                            date: formatDateTime.format(new Date(pendingPlanEffectiveAt))
+                                        })
+                                        : tPlans('packageCatalog.manager.pendingPlanNoDate', {
+                                            plan: pendingPlanName
+                                        })}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                        {autoRenewEnabled ? (
+                    <div className="border-t border-gray-200 pt-4">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                             <button
                                 type="button"
-                                onClick={() => setIsCancelModalOpen(true)}
-                                className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                                onClick={() => setIsPlanModalOpen(true)}
+                                className="inline-flex items-center font-medium text-[#242A40] underline decoration-[#242A40]/30 underline-offset-4 transition hover:text-[#1f2437] hover:decoration-[#1f2437]/40 disabled:cursor-not-allowed disabled:text-gray-400"
                                 disabled={!canManage}
                             >
-                            {tPlans('packageCatalog.manager.cancelCta')}
-                        </button>
-                        ) : null}
+                                {hasHigherPlan
+                                    ? tPlans('packageCatalog.manager.manageCtaPrimary')
+                                    : tPlans('packageCatalog.manager.manageCtaFallback')}
+                            </button>
 
-                        {paymentRecoveryState?.canUpdateCard && updatePaymentMethodAction ? (
-                            <form action={updatePaymentMethodAction}>
-                                <input type="hidden" name="organizationId" value={organizationId} />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                                    disabled={!canManage}
-                                >
-                                    {tPlans('packageCatalog.manager.updatePaymentMethodCta')}
-                                </button>
-                            </form>
-                        ) : null}
+                            {paymentRecoveryState?.canUpdateCard && updatePaymentMethodAction ? (
+                                <form action={updatePaymentMethodAction}>
+                                    <input type="hidden" name="organizationId" value={organizationId} />
+                                    <button
+                                        type="submit"
+                                        className="inline-flex items-center font-medium text-gray-600 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-900 hover:decoration-gray-500 disabled:cursor-not-allowed disabled:text-gray-400"
+                                        disabled={!canManage}
+                                    >
+                                        {tPlans('packageCatalog.manager.updatePaymentMethodCta')}
+                                    </button>
+                                </form>
+                            ) : null}
 
-                        {paymentRecoveryState?.canRetry && retryPaymentAction ? (
-                            <form action={retryPaymentAction}>
-                                <input type="hidden" name="organizationId" value={organizationId} />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                                    disabled={!canManage}
-                                >
-                                    {tPlans('packageCatalog.manager.retryPaymentCta')}
-                                </button>
-                            </form>
-                        ) : null}
+                            {paymentRecoveryState?.canRetry && retryPaymentAction ? (
+                                <form action={retryPaymentAction}>
+                                    <input type="hidden" name="organizationId" value={organizationId} />
+                                    <button
+                                        type="submit"
+                                        className="inline-flex items-center font-medium text-gray-700 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-900 hover:decoration-gray-500 disabled:cursor-not-allowed disabled:text-gray-400"
+                                        disabled={!canManage}
+                                    >
+                                        {tPlans('packageCatalog.manager.retryPaymentCta')}
+                                    </button>
+                                </form>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             </article>
@@ -442,6 +529,8 @@ export function SubscriptionPlanManager({
             {canRenderPortal && checkoutPlan && createPortal(
                 <CheckoutLegalConsentModal
                     flowType="subscription"
+                    consentVariant="plan_change"
+                    title={tPlans('checkoutLegal.titleDirectAction')}
                     description={tPlans('checkoutLegal.descriptionDirectAction')}
                     summary={tPlans('checkoutLegal.subscriptionSummary', {
                         plan: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
@@ -449,9 +538,17 @@ export function SubscriptionPlanManager({
                         credits: formatNumber.format(checkoutPlan.credits)
                     })}
                     summaryDetails={checkoutSummaryDetails}
-                    providerNotice={tPlans('checkoutLegal.providerNoticeDirectAction')}
-                    continueLabel={tPlans('checkoutLegal.continueDirectAction')}
+                    continueLabel={checkoutContinueLabel}
                     immediateStartLabel={tPlans('checkoutLegal.acceptPlanChange')}
+                    secondaryAction={checkoutSummary?.changeType === 'upgrade' && paymentRecoveryState?.canUpdateCard && updatePaymentMethodAction
+                        ? {
+                            label: tPlans('checkoutLegal.updatePaymentMethodInlineAction'),
+                            action: updatePaymentMethodAction,
+                            hiddenFields: [
+                                { name: 'organizationId', value: organizationId }
+                            ]
+                        }
+                        : undefined}
                     action={planAction}
                     hiddenFields={[
                         { name: 'organizationId', value: organizationId },

@@ -1334,6 +1334,7 @@
       },
       "month": "ay",
       "creditsIncluded": "{credits} kredi dahil",
+      "packageCreditsValue": "{credits} kredi",
       "approxConversations": "Ayda yaklaşık {min}-{max} konuşma",
       "unitPrice": "Kredi başı {price}",
       "planCta": {
@@ -1361,14 +1362,16 @@
         "title": "Planı yönet",
         "description": "Mevcut planını gör, yükselt veya bir sonraki dönem için farklı plana geç.",
         "close": "Kapat",
+        "cancelHintPrefix": "Aboneliği sonlandırmak istersen",
+        "cancelHintAction": "buradan iptal edebilirsin.",
         "current": "Mevcut planın",
         "upgrade": "Bu plana yükselt",
         "upgradeContinue": "Bu planı seç ve devam et",
         "downgrade": "Bu plana geç (dönem sonu)",
-        "downgradeContinue": "Bu planı seç (dönem sonu) ve devam et",
+        "downgradeContinue": "Bu planı seç ve devam et",
         "switch": "Bu plana geç",
         "switchContinue": "Bu planı seç ve devam et",
-        "downgradeHint": "Daha düşük plan değişikliği dönem sonunda uygulanır."
+        "downgradeHint": "Plan değişikliği dönem sonunda uygulanır."
       },
       "cancelModal": {
         "title": "Aboneliği iptal etmek istediğine emin misin?",
@@ -1428,17 +1431,23 @@
     },
     "checkoutLegal": {
       "title": "Ödeme öncesi onay",
+      "titleDirectAction": "Plan değişikliği onayı",
       "description": "Iyzico ödeme ekranına geçmeden önce aşağıdaki dökümanları inceleyin ve zorunlu onayları tamamlayın.",
-      "descriptionDirectAction": "İşlemi onaylamadan önce aşağıdaki dökümanları inceleyin ve zorunlu onayları tamamlayın.",
+      "descriptionDirectAction": "Aşağıdaki özeti kontrol edip plan değişikliğini onaylayın.",
       "summaryLabel": "Seçilen ürün",
       "providerNotice": "Ödeme bu adımdan sonra Iyzico ekranında tamamlanır.",
       "providerNoticeDirectAction": "Onaydan sonra plan değişikliği Iyzico abonelik altyapısında işlenir. Bu akışta ayrı bir ödeme ekranı açılmaz.",
       "infoDocsTitle": "Bilgilendirme dökümanları",
       "acceptRequiredDocs": "<preInformation>Ön Bilgilendirme Formu</preInformation>, <distanceSalesAgreement>Mesafeli Hizmet Sözleşmesi</distanceSalesAgreement> ve <terms>Hizmet Şartları</terms>'nı okudum ve kabul ediyorum.",
       "acceptImmediateStart": "Ödeme tamamlandıktan sonra dijital hizmetin hemen kullanıma açılmasını istiyorum.",
-      "acceptPlanChange": "Plan değişikliğinin yukarıdaki bilgilere göre uygulanmasını istiyorum.",
+      "acceptPlanChange": "Plan değişikliğinin yukarıdaki bilgilere göre uygulanmasını onaylıyorum.",
       "continue": "Ödeme ekranına devam et",
-      "continueDirectAction": "Onayla ve devam et",
+      "continueDirectAction": "Plan değişikliğini uygula",
+      "continueDirectActionWithCharge": "{price} ödeme yap",
+      "updatePaymentMethodBeforeChange": "Ödeme yöntemini güncelle",
+      "updatePaymentMethodInlineAction": "buraya tıklayın.",
+      "savedPaymentMethodBannerNotice": "Ödeme kayıtlı kartınızdan tahsil edilir.",
+      "savedPaymentMethodBannerHint": "Ödeme yöntemini güncellemek isterseniz",
       "back": "Geri",
       "close": "Kapat",
       "subscriptionSummary": "{plan} • {price} / ay • {credits} kredi",
@@ -1451,9 +1460,15 @@
         "effectiveImmediate": "Hemen uygulanır.",
         "effectiveNextPeriod": "Bir sonraki dönem başında uygulanır.",
         "todayChargeLabel": "Bugünkü tahsilat",
-        "chargeProviderCalculated": "Kesin tutar bu adımda gösterilmez. İşlem Iyzico abonelik kurallarına göre mevcut ödeme yöntemiyle işlenir.",
+        "chargeFullDelta": "{price} plan farkı",
+        "chargeProviderCalculated": "Tutar Iyzico tarafından değişiklik anında hesaplanır ve kayıtlı ödeme yöntemiyle tahsil edilir.",
         "chargeNoCharge": "Bugün yeni tahsilat yapılmaz. Yeni fiyat bir sonraki dönemde devreye girer.",
-        "chargeFullPrice": "Bugün {price} tutarında ilk abonelik ödemesi alınır."
+        "chargeFullPrice": "Bugün {price} tutarında ilk abonelik ödemesi alınır.",
+        "savedPaymentMethodLabel": "Ödeme yöntemi",
+        "savedPaymentMethodGeneric": "Tahsilat kayıtlı kartınızdan alınır.",
+        "todayCreditDeltaLabel": "Bugün açılacak ek hak",
+        "creditDeltaValue": "+{credits} kredi",
+        "nextRenewalLabel": "Bir sonraki yenileme"
       },
       "docs": {
         "preInformation": "Ön Bilgilendirme Formu",
@@ -1470,6 +1485,58 @@
       "topupAfterPackageExhausted": "Ek kredi için aktif aylık paket gerekir.",
       "topupUnavailable": "Ek kredi şu anda kullanılamıyor.",
       "viewUsageLink": "Kullanımı gör"
+    },
+    "billingInfo": {
+      "sectionTitle": "Fatura bilgileri",
+      "sectionDescription": "Bir sonraki yenilemeyi gör, satın alma geçmişini incele ve tahsilatta kullanılacak fatura bilgilerini yönet.",
+      "cardTitle": "Fatura bilgileri",
+      "cardDescription": "Bir sonraki yenilemeyi gör, geçmiş satın alma kayıtlarını aç ve fatura bilgilerini güncelle.",
+      "nextBillingDateLabel": "Bir sonraki yenileme",
+      "nextBillingDateUnavailable": "Henüz belli değil",
+      "historyCta": "Geçmiş",
+      "updateCta": "Fatura bilgilerini güncelle",
+      "historyModalTitle": "Satın alma geçmişi",
+      "historyModalDescription": "Başarılı satın alma ve yenileme işlemleri burada görünür.",
+      "historyEmpty": "Henüz görüntülenecek bir satın alma kaydı yok.",
+      "historyColumns": {
+        "date": "Tarih",
+        "amount": "Tutar",
+        "status": "Durum",
+        "details": "Detay"
+      },
+      "historyDetails": {
+        "packageStart": "Paket başlangıcı",
+        "packageUpgrade": "Paket yükseltmesi",
+        "packageRenewal": "Paket yenilemesi",
+        "packageUpdate": "Plan güncellemesi",
+        "topupPurchase": "Ek kredi satın alımı"
+      },
+      "status": {
+        "success": "Başarılı"
+      },
+      "amountUnavailable": "—",
+      "formModalTitle": "Fatura bilgilerini güncelle",
+      "formModalDescription": "Iyzico tahsilatlarında kullanılacak şirket ve adres bilgilerini kaydedin.",
+      "fields": {
+        "companyName": "Şirket adı",
+        "billingEmail": "Fatura e-postası",
+        "billingPhone": "Telefon",
+        "taxIdentityNumber": "Vergi / kimlik numarası",
+        "addressLine1": "Adres",
+        "city": "Şehir",
+        "postalCode": "Posta kodu",
+        "country": "Ülke"
+      },
+      "messages": {
+        "saveSuccess": "Fatura bilgileri kaydedildi.",
+        "saveError": "Fatura bilgileri kaydedilemedi.",
+        "invalidInput": "Zorunlu fatura alanlarını tamamlayın.",
+        "unauthorized": "Bu organizasyon için fatura bilgilerini güncelleme yetkiniz yok."
+      },
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "cancel": "İptal",
+      "close": "Kapat"
     },
     "checkoutStatus": {
       "successTitle": "Ödeme tamamlandı",

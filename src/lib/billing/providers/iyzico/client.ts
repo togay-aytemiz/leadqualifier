@@ -260,13 +260,15 @@ export async function upgradeIyzicoSubscription(input: {
     subscriptionReferenceCode: string
     newPricingPlanReferenceCode: string
     upgradePeriod?: IyzicoSubscriptionUpgradePeriod
+    resetRecurrenceCount?: boolean
 }) {
     const client = createIyzicoSdkClient()
     return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.upgrade({
         subscriptionReferenceCode: input.subscriptionReferenceCode,
         newPricingPlanReferenceCode: input.newPricingPlanReferenceCode,
         // Iyzico samples document NEXT_PERIOD even though the SDK constant map only exposes NOW.
-        upgradePeriod: input.upgradePeriod ?? 'NOW'
+        upgradePeriod: input.upgradePeriod ?? 'NOW',
+        resetRecurrenceCount: input.resetRecurrenceCount
     }, cb))
 }
 

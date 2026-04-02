@@ -15,6 +15,18 @@ describe('resolveMetaOrigin', () => {
         expect(origin).toBe('https://app.askqualy.com')
     })
 
+    it('prefers localhost request origin over configured production app url', () => {
+        const origin = resolveMetaOrigin({
+            appUrl: 'https://app.askqualy.com',
+            siteUrl: 'https://www.askqualy.com',
+            forwardedHost: '',
+            forwardedProto: '',
+            requestOrigin: 'http://localhost:3000'
+        })
+
+        expect(origin).toBe('http://localhost:3000')
+    })
+
     it('uses site url when app url is missing', () => {
         const origin = resolveMetaOrigin({
             appUrl: null,
@@ -63,4 +75,3 @@ describe('resolveMetaOrigin', () => {
         expect(origin).toBe('https://main--leadqualifier.netlify.app')
     })
 })
-

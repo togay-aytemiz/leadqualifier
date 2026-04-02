@@ -67,6 +67,17 @@ interface OrganizationRow {
     name: string
 }
 
+interface BillingProfileRow {
+    company_name: string
+    billing_email: string
+    billing_phone: string | null
+    tax_identity_number: string | null
+    address_line_1: string | null
+    city: string | null
+    postal_code: string | null
+    country: string | null
+}
+
 interface ActiveSubscriptionRecordRow {
     id: string
     status: string
@@ -556,7 +567,7 @@ async function resolveProfileAndOrganization(input: {
     userId: string
     organizationId: string
 }) {
-    const [{ data: profile }, { data: organization }] = await Promise.all([
+    const [{ data: profile }, { data: organization }, { data: billingProfile }] = await Promise.all([
         input.tenantSupabase
             .from('profiles')
             .select('full_name, email')
@@ -566,12 +577,18 @@ async function resolveProfileAndOrganization(input: {
             .from('organizations')
             .select('name')
             .eq('id', input.organizationId)
+            .maybeSingle(),
+        input.tenantSupabase
+            .from('organization_billing_profiles')
+            .select('company_name, billing_email, billing_phone, tax_identity_number, address_line_1, city, postal_code, country')
+            .eq('organization_id', input.organizationId)
             .maybeSingle()
     ])
 
     return {
         profile: (profile ?? null) as ProfileRow | null,
-        organization: (organization ?? null) as OrganizationRow | null
+        organization: (organization ?? null) as OrganizationRow | null,
+        billingProfile: (billingProfile ?? null) as BillingProfileRow | null
     }
 }
 
@@ -769,7 +786,8 @@ export async function simulateMockSubscriptionCheckout(input: {
             const upgradeResult = await upgradeIyzicoSubscription({
                 subscriptionReferenceCode: activeSubscription.provider_subscription_id,
                 newPricingPlanReferenceCode: pricingPlanReferenceCode,
-                upgradePeriod: 'NOW'
+                upgradePeriod: 'NOW',
+                resetRecurrenceCount: false
             })
             const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(upgradeResult)
                 ?? activeSubscription.provider_subscription_id
@@ -780,6 +798,8 @@ export async function simulateMockSubscriptionCheckout(input: {
             const creditDelta = Math.max(0, requestedCredits - currentCredits)
             const nowIso = new Date().toISOString()
             const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
+            const currentMonthlyPriceTry = toNonNegativeNumber(metadata.requested_monthly_price_try)
+            const chargedAmountTry = Math.max(0, toNonNegativeNumber(input.monthlyPriceTry) - currentMonthlyPriceTry)
             const periodStart = startAt ?? activeSubscription.period_start
             const periodEnd = endAt ?? activeSubscription.period_end
 
@@ -829,6 +849,7 @@ export async function simulateMockSubscriptionCheckout(input: {
                             subscription_id: activeSubscription.id,
                             requested_monthly_credits: requestedCredits,
                             requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                            charged_amount_try: chargedAmountTry,
                             change_type: 'upgrade'
                         }
                     })
@@ -873,20 +894,28 @@ export async function simulateMockSubscriptionCheckout(input: {
         return errorResult('request_failed')
     }
 
-    const { profile, organization } = await resolveProfileAndOrganization({
+    const { profile, organization, billingProfile } = await resolveProfileAndOrganization({
         tenantSupabase: supabase,
         userId: user.id,
         organizationId: input.organizationId
     })
     const nameParts = splitNameParts(profile?.full_name)
-    const contactName = `${nameParts.name} ${nameParts.surname}`.trim()
-    const defaultEmail = profile?.email?.trim() || 'billing@example.com'
-    const defaultAddress = process.env.IYZICO_DEFAULT_ADDRESS?.trim() || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
-    const defaultCity = process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
-    const defaultCountry = process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
-    const defaultZipCode = process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
-    const defaultIdentity = process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim() || '11111111111'
-    const defaultGsm = process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim() || '+905555555555'
+    const contactName = billingProfile?.company_name?.trim()
+        || organization?.name?.trim()
+        || `${nameParts.name} ${nameParts.surname}`.trim()
+    const defaultEmail = billingProfile?.billing_email?.trim() || profile?.email?.trim() || 'billing@example.com'
+    const defaultAddress = billingProfile?.address_line_1?.trim()
+        || process.env.IYZICO_DEFAULT_ADDRESS?.trim()
+        || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
+    const defaultCity = billingProfile?.city?.trim() || process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
+    const defaultCountry = billingProfile?.country?.trim() || process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
+    const defaultZipCode = billingProfile?.postal_code?.trim() || process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
+    const defaultIdentity = billingProfile?.tax_identity_number?.trim()
+        || process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim()
+        || '11111111111'
+    const defaultGsm = billingProfile?.billing_phone?.trim()
+        || process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim()
+        || '+905555555555'
     const now = new Date().toISOString()
 
     const pendingInsert = await serviceSupabase
@@ -1092,22 +1121,30 @@ export async function simulateMockTopupCheckout(input: {
         return errorResult('request_failed')
     }
 
-    const { profile } = await resolveProfileAndOrganization({
+    const { profile, organization, billingProfile } = await resolveProfileAndOrganization({
         tenantSupabase: supabase,
         userId: user.id,
         organizationId: input.organizationId
     })
     const nameParts = splitNameParts(profile?.full_name)
-    const contactName = `${nameParts.name} ${nameParts.surname}`.trim()
+    const contactName = billingProfile?.company_name?.trim()
+        || organization?.name?.trim()
+        || `${nameParts.name} ${nameParts.surname}`.trim()
     const now = new Date()
     const nowFormatted = formatIyzicoDate(now)
-    const defaultEmail = profile?.email?.trim() || 'billing@example.com'
-    const defaultAddress = process.env.IYZICO_DEFAULT_ADDRESS?.trim() || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
-    const defaultCity = process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
-    const defaultCountry = process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
-    const defaultZipCode = process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
-    const defaultIdentity = process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim() || '11111111111'
-    const defaultGsm = process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim() || '+905555555555'
+    const defaultEmail = billingProfile?.billing_email?.trim() || profile?.email?.trim() || 'billing@example.com'
+    const defaultAddress = billingProfile?.address_line_1?.trim()
+        || process.env.IYZICO_DEFAULT_ADDRESS?.trim()
+        || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
+    const defaultCity = billingProfile?.city?.trim() || process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
+    const defaultCountry = billingProfile?.country?.trim() || process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
+    const defaultZipCode = billingProfile?.postal_code?.trim() || process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
+    const defaultIdentity = billingProfile?.tax_identity_number?.trim()
+        || process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim()
+        || '11111111111'
+    const defaultGsm = billingProfile?.billing_phone?.trim()
+        || process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim()
+        || '+905555555555'
     const ipAddress = input.customerIp?.trim() || process.env.IYZICO_DEFAULT_IP?.trim() || '127.0.0.1'
 
     const pendingOrderInsert = await serviceSupabase

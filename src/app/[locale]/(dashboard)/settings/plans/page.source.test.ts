@@ -62,4 +62,71 @@ describe('plans page source guard', () => {
         expect(source).toContain('retryPaymentAction=')
         expect(source).toContain('updatePaymentMethodAction=')
     })
+
+    it('loads billing profile data and renders billing info/history inside plans', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain(".from('organization_billing_profiles')")
+        expect(source).toContain('PlansBillingInformationCard')
+        expect(source).toContain('buildBillingHistoryRows')
+    })
+
+    it('defaults billing country to Türkiye only for Turkish locale when no saved country exists', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain("savedCountry === 'Turkey'")
+        expect(source).toContain("return locale.toLowerCase().startsWith('tr') ? 'Türkiye' : ''")
+    })
+
+    it('keeps monthly package selection as a separate section only when there is no managed subscription', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('{!isManagedSubscriptionMembership && (')
+        expect(source).toContain("title={tPlans('packageCatalog.title')}")
+    })
+
+    it('renders billing info below the top-up section', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        const topupsSectionIndex = source.indexOf("title={tPlans('topups.sectionTitle')}")
+        const billingInfoSectionIndex = source.indexOf("title={tPlans('billingInfo.sectionTitle')}")
+
+        expect(topupsSectionIndex).toBeGreaterThan(-1)
+        expect(billingInfoSectionIndex).toBeGreaterThan(-1)
+        expect(billingInfoSectionIndex).toBeGreaterThan(topupsSectionIndex)
+    })
+
+    it('hides the old membership status card for managed subscriptions and places package management before premium credit cards', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('{!isManagedSubscriptionMembership && (')
+        expect(source).toContain("{tPlans('status.membershipLabel')}")
+
+        const managerIndex = source.indexOf('<SubscriptionPlanManager')
+        const totalCreditsIndex = source.indexOf("tPlans('status.totalCreditsTitle')")
+
+        expect(managerIndex).toBeGreaterThan(-1)
+        expect(totalCreditsIndex).toBeGreaterThan(-1)
+        expect(managerIndex).toBeLessThan(totalCreditsIndex)
+    })
 })
