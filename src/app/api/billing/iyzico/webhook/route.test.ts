@@ -126,6 +126,7 @@ function createServiceSupabaseMock(options: {
         },
         spies: {
             fromMock,
+            subscriptionUpdateMock,
             subscriptionUpdateEqMock,
             billingUpdateEqMock,
             ledgerInsertMock,
@@ -413,6 +414,14 @@ describe('iyzico webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(spies.subscriptionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'past_due',
+            metadata: expect.objectContaining({
+                last_failed_order_reference_code: 'order_ref_failed_1',
+                last_failed_event_reference_code: 'event_ref_1',
+                payment_status: 'failed'
+            })
+        }))
         expect(spies.subscriptionUpdateEqMock).toHaveBeenCalledWith('id', 'sub_row_1')
         expect(spies.billingUpdateEqMock).toHaveBeenCalledWith('organization_id', 'org_1')
         expect(spies.ledgerInsertMock).not.toHaveBeenCalled()
@@ -425,14 +434,14 @@ describe('iyzico webhook route', () => {
                 organization_id: 'org_1',
                 provider_subscription_id: 'sub_ref_1',
                 status: 'active',
-                period_end: '2026-04-01T00:00:00.000Z',
+                period_end: '2099-04-01T00:00:00.000Z',
                 metadata: {
                     requested_monthly_credits: 1000
                 }
             },
             billingRow: {
                 organization_id: 'org_1',
-                current_period_end: '2026-04-01T00:00:00.000Z',
+                current_period_end: '2099-04-01T00:00:00.000Z',
                 topup_credit_balance: 100
             }
         })

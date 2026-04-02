@@ -1,3 +1,4 @@
+import { createElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NextIntlClientProvider } from 'next-intl'
@@ -34,21 +35,27 @@ const plans: SubscriptionPlanOption[] = [
 function renderManager() {
     return renderToStaticMarkup(
         <NextIntlClientProvider locale="tr" messages={messages} timeZone="Europe/Istanbul">
-            <SubscriptionPlanManager
-                organizationId="org_1"
-                plans={plans}
-                activePlanId="starter"
-                activePlanCredits={1000}
-                canManage
-                autoRenewEnabled={false}
-                renewalPeriodEnd="2026-04-01T00:00:00.000Z"
-                pendingPlanId={null}
-                pendingPlanName={null}
-                pendingPlanEffectiveAt={null}
-                supportsAutoRenewResume={false}
-                planAction={() => {}}
-                cancelAction={() => {}}
-            />
+            {createElement(SubscriptionPlanManager as never, {
+                organizationId: 'org_1',
+                plans,
+                activePlanId: 'starter',
+                activePlanCredits: 1000,
+                canManage: true,
+                autoRenewEnabled: false,
+                renewalPeriodEnd: '2026-04-01T00:00:00.000Z',
+                pendingPlanId: null,
+                pendingPlanName: null,
+                pendingPlanEffectiveAt: null,
+                supportsAutoRenewResume: false,
+                planAction: () => {},
+                cancelAction: () => {},
+                paymentRecoveryState: {
+                    canRetry: true,
+                    canUpdateCard: true
+                },
+                retryPaymentAction: () => {},
+                updatePaymentMethodAction: () => {}
+            } as never)}
         </NextIntlClientProvider>
     )
 }
@@ -60,5 +67,12 @@ describe('SubscriptionPlanManager', () => {
         expect(html).toContain('Abonelik iptali planlandı.')
         expect(html).not.toContain('İptali geri al')
         expect(html).toContain('Iyzico tarafında kapatılan yenilemeyi uygulama içinden tekrar açamazsın.')
+    })
+
+    it('renders payment recovery actions for past-due subscriptions', () => {
+        const html = renderManager()
+
+        expect(html).toContain('Ödeme yöntemini güncelle')
+        expect(html).toContain('Ödemeyi tekrar dene')
     })
 })

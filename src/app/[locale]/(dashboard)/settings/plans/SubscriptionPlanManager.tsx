@@ -38,8 +38,14 @@ interface SubscriptionPlanManagerProps {
     pendingPlanName: string | null
     pendingPlanEffectiveAt: string | null
     supportsAutoRenewResume: boolean
+    paymentRecoveryState?: {
+        canRetry: boolean
+        canUpdateCard: boolean
+    } | null
     planAction: (formData: FormData) => void | Promise<void>
     cancelAction: (formData: FormData) => void | Promise<void>
+    retryPaymentAction?: (formData: FormData) => void | Promise<void>
+    updatePaymentMethodAction?: (formData: FormData) => void | Promise<void>
 }
 
 export function SubscriptionPlanManager({
@@ -54,8 +60,11 @@ export function SubscriptionPlanManager({
     pendingPlanName,
     pendingPlanEffectiveAt,
     supportsAutoRenewResume,
+    paymentRecoveryState,
     planAction,
-    cancelAction
+    cancelAction,
+    retryPaymentAction,
+    updatePaymentMethodAction
 }: SubscriptionPlanManagerProps) {
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
@@ -397,6 +406,32 @@ export function SubscriptionPlanManager({
                             >
                             {tPlans('packageCatalog.manager.cancelCta')}
                         </button>
+                        ) : null}
+
+                        {paymentRecoveryState?.canUpdateCard && updatePaymentMethodAction ? (
+                            <form action={updatePaymentMethodAction}>
+                                <input type="hidden" name="organizationId" value={organizationId} />
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                                    disabled={!canManage}
+                                >
+                                    {tPlans('packageCatalog.manager.updatePaymentMethodCta')}
+                                </button>
+                            </form>
+                        ) : null}
+
+                        {paymentRecoveryState?.canRetry && retryPaymentAction ? (
+                            <form action={retryPaymentAction}>
+                                <input type="hidden" name="organizationId" value={organizationId} />
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-10 min-w-[200px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                                    disabled={!canManage}
+                                >
+                                    {tPlans('packageCatalog.manager.retryPaymentCta')}
+                                </button>
+                            </form>
                         ) : null}
                     </div>
                 </div>

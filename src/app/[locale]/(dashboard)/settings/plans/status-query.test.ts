@@ -12,6 +12,9 @@ describe('clearPlansStatusSearch', () => {
             renewal_action: 'cancel',
             renewal_status: 'success',
             renewal_error: 'request_failed',
+            payment_recovery_action: 'retry_payment',
+            payment_recovery_status: 'success',
+            payment_recovery_error: 'request_failed',
             page: '2',
             filter: 'active'
         })

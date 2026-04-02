@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 import { SettingsResponsiveShell } from '@/components/settings/SettingsResponsiveShell'
 import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 
 export async function generateMetadata(): Promise<Metadata> {
   const tNav = await getTranslations('nav')
@@ -12,9 +14,18 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default async function SettingsLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ locale: string }>
+}) {
+  const { locale } = await params
   const orgContext = await resolveActiveOrganizationContext()
-  if (!orgContext) return null
+  if (!orgContext) {
+    redirect(buildLocalizedPath('/login', locale))
+  }
 
   return (
     <DashboardRouteIntlProvider

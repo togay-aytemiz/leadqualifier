@@ -6,7 +6,10 @@ const TRANSIENT_STATUS_PARAMS = [
     'checkout_effective_at',
     'renewal_action',
     'renewal_status',
-    'renewal_error'
+    'renewal_error',
+    'payment_recovery_action',
+    'payment_recovery_status',
+    'payment_recovery_error'
 ] as const
 
 export function clearPlansStatusSearch(searchParams: URLSearchParams) {

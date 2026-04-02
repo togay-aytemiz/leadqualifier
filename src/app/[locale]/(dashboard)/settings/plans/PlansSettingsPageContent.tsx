@@ -34,6 +34,13 @@ import {
     type RenewalActionStatus
 } from '@/lib/billing/subscription-renewal'
 import {
+    beginSubscriptionPaymentMethodUpdate,
+    getSubscriptionPaymentRecoveryState,
+    retryFailedSubscriptionPayment,
+    type PaymentRecoveryActionError,
+    type SubscriptionPaymentRecoveryActionResult
+} from '@/lib/billing/subscription-payment-recovery'
+import {
     calculateSidebarBillingProgress,
     isLowCreditWarningVisible
 } from '@/lib/billing/sidebar-progress'
@@ -58,6 +65,9 @@ export interface PlansSettingsSearchParams {
     renewal_action?: string
     renewal_status?: string
     renewal_error?: string
+    payment_recovery_action?: string
+    payment_recovery_status?: string
+    payment_recovery_error?: string
 }
 
 interface PlansSettingsPageContentProps {
@@ -132,6 +142,20 @@ function buildRenewalRedirect(
     return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
 }
 
+function buildPaymentRecoveryRedirect(
+    locale: string,
+    action: 'card_update' | 'retry_payment',
+    result: SubscriptionPaymentRecoveryActionResult
+) {
+    const query = new URLSearchParams()
+    query.set('payment_recovery_action', action)
+    query.set('payment_recovery_status', result.status)
+    if (result.error) {
+        query.set('payment_recovery_error', result.error)
+    }
+    return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
+}
+
 function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): {
     allowed: boolean
     reasonKey: 'topupBlockedTrial' | 'topupRequiresPremium' | 'adminLocked' | 'topupUnavailable' | null
@@ -197,7 +221,8 @@ export default async function PlansSettingsPageContent({
         snapshot,
         pricingCatalog,
         topupStatusSummary,
-        subscriptionRenewalState
+        subscriptionRenewalState,
+        paymentRecoveryState
     ] = await Promise.all([
         supabase
             .from('organizations')
@@ -210,6 +235,10 @@ export default async function PlansSettingsPageContent({
         }),
         getOrganizationTopupStatusSummary(organizationId, supabase),
         getSubscriptionRenewalState({
+            organizationId,
+            supabase
+        }),
+        getSubscriptionPaymentRecoveryState({
             organizationId,
             supabase
         })
@@ -231,6 +260,7 @@ export default async function PlansSettingsPageContent({
     const customerIp = readHeaderValue(requestHeaders.get('x-forwarded-for')) ?? '127.0.0.1'
     const subscriptionCallbackUrl = `${appOrigin}/api/billing/iyzico/callback?action=subscribe&locale=${checkoutLocale}`
     const topupCallbackUrl = `${appOrigin}/api/billing/iyzico/callback?action=topup&locale=${checkoutLocale}`
+    const paymentMethodUpdateCallbackUrl = `${appOrigin}/api/billing/iyzico/card-update/callback?locale=${checkoutLocale}`
     const organizationBillingRegion = resolveBillingRegionForOrganization({
         organizationBillingRegion: organizationRecord?.billing_region,
         headers: requestHeaders
@@ -306,7 +336,9 @@ export default async function PlansSettingsPageContent({
         }
     })
 
-    const activePlanId = snapshot?.membershipState === 'premium_active'
+    const isManagedSubscriptionMembership = snapshot?.membershipState === 'premium_active'
+        || snapshot?.membershipState === 'past_due'
+    const activePlanId = isManagedSubscriptionMembership
         ? localizedPlanTiers.find(
             (plan) => Math.round(plan.credits) === Math.round(snapshot.package.credits.limit)
         )?.id ?? null
@@ -393,6 +425,32 @@ export default async function PlansSettingsPageContent({
             || value === 'premium_required'
         ) {
             return value as RenewalActionError
+        }
+        return null
+    })()
+    const paymentRecoveryAction = (() => {
+        const value = search.payment_recovery_action
+        if (value === 'card_update' || value === 'retry_payment') {
+            return value as 'card_update' | 'retry_payment'
+        }
+        return null
+    })()
+    const paymentRecoveryStatus = (() => {
+        const value = search.payment_recovery_status
+        if (value === 'success' || value === 'error') {
+            return value as 'success' | 'error'
+        }
+        return null
+    })()
+    const paymentRecoveryError = (() => {
+        const value = search.payment_recovery_error
+        if (
+            value === 'unauthorized'
+            || value === 'invalid_input'
+            || value === 'not_available'
+            || value === 'request_failed'
+        ) {
+            return value as PaymentRecoveryActionError
         }
         return null
     })()
@@ -593,6 +651,34 @@ export default async function PlansSettingsPageContent({
         }
     }
 
+    const getPaymentRecoveryTitle = () => {
+        if (!paymentRecoveryStatus) return ''
+        return paymentRecoveryStatus === 'success'
+            ? tPlans('paymentRecoveryStatus.successTitle')
+            : tPlans('paymentRecoveryStatus.errorTitle')
+    }
+
+    const getPaymentRecoveryDescription = () => {
+        if (!paymentRecoveryStatus || !paymentRecoveryAction) return ''
+
+        if (paymentRecoveryStatus === 'success') {
+            return paymentRecoveryAction === 'card_update'
+                ? tPlans('paymentRecoveryStatus.successCardUpdate')
+                : tPlans('paymentRecoveryStatus.successRetryPayment')
+        }
+
+        switch (paymentRecoveryError) {
+        case 'unauthorized':
+            return tPlans('paymentRecoveryStatus.errors.unauthorized')
+        case 'invalid_input':
+            return tPlans('paymentRecoveryStatus.errors.invalidInput')
+        case 'not_available':
+            return tPlans('paymentRecoveryStatus.errors.notAvailable')
+        default:
+            return tPlans('paymentRecoveryStatus.errors.requestFailed')
+        }
+    }
+
     const handleMockSubscribe = async (formData: FormData) => {
         'use server'
 
@@ -683,6 +769,42 @@ export default async function PlansSettingsPageContent({
         redirect(buildRenewalRedirect(locale, 'cancel', result))
     }
 
+    const handleUpdatePaymentMethod = async (formData: FormData) => {
+        'use server'
+
+        const orgId = String(formData.get('organizationId') ?? '')
+
+        const result = await beginSubscriptionPaymentMethodUpdate({
+            organizationId: orgId,
+            locale: checkoutLocale,
+            callbackUrl: paymentMethodUpdateCallbackUrl
+        })
+
+        revalidatePath(`/${locale}/settings/plans`)
+        revalidatePath(`/${locale}/settings/billing`)
+
+        if (result.ok && result.recordId) {
+            redirect(buildLocalizedPath(`/settings/plans/payment-method-update/${result.recordId}`, locale))
+        }
+
+        redirect(buildPaymentRecoveryRedirect(locale, 'card_update', result))
+    }
+
+    const handleRetryFailedPayment = async (formData: FormData) => {
+        'use server'
+
+        const orgId = String(formData.get('organizationId') ?? '')
+
+        const result = await retryFailedSubscriptionPayment({
+            organizationId: orgId,
+            locale: checkoutLocale
+        })
+
+        revalidatePath(`/${locale}/settings/plans`)
+        revalidatePath(`/${locale}/settings/billing`)
+        redirect(buildPaymentRecoveryRedirect(locale, 'retry_payment', result))
+    }
+
     return (
         <div className="flex-1 overflow-auto p-8">
             <div className="max-w-6xl space-y-6">
@@ -717,6 +839,19 @@ export default async function PlansSettingsPageContent({
                         dismissLabel={tPlans('statusBanner.dismiss')}
                         title={getRenewalTitle()}
                         description={getRenewalDescription()}
+                    />
+                )}
+
+                {paymentRecoveryStatus && paymentRecoveryAction && (
+                    <PlansStatusBanner
+                        className={
+                            paymentRecoveryStatus === 'success'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                : 'border-rose-200 bg-rose-50 text-rose-900'
+                        }
+                        dismissLabel={tPlans('statusBanner.dismiss')}
+                        title={getPaymentRecoveryTitle()}
+                        description={getPaymentRecoveryDescription()}
                     />
                 )}
 
@@ -893,7 +1028,7 @@ export default async function PlansSettingsPageContent({
                     )}
                 >
                     <div className="space-y-4">
-                        {isPremiumMembership && activePlanOption ? (
+                        {isManagedSubscriptionMembership && activePlanOption ? (
                             <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                     <div>
@@ -937,7 +1072,7 @@ export default async function PlansSettingsPageContent({
                             </p>
                         )}
 
-                        {isPremiumMembership ? (
+                        {isManagedSubscriptionMembership ? (
                             <SubscriptionPlanManager
                                 organizationId={organizationId}
                                 plans={subscriptionPlanOptions}
@@ -950,8 +1085,11 @@ export default async function PlansSettingsPageContent({
                                 pendingPlanName={hasPendingDowngrade ? pendingPlanName : null}
                                 pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
                                 supportsAutoRenewResume={supportsAutoRenewResume}
+                                paymentRecoveryState={paymentRecoveryState}
                                 planAction={handleMockSubscribe}
                                 cancelAction={handleCancelRenewal}
+                                retryPaymentAction={handleRetryFailedPayment}
+                                updatePaymentMethodAction={handleUpdatePaymentMethod}
                             />
                         ) : (
                             <SubscriptionPlanCatalog

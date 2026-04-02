@@ -45,4 +45,21 @@ describe('plans page source guard', () => {
         expect(topupCardIndex).toBeLessThan(customPackageIndex)
         expect(source).toMatch(/border border-gray-300[\s\S]*bg-white[\s\S]*text-gray-700/)
     })
+
+    it('wires payment-recovery actions and query states into the plans page source', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain("payment_recovery_action?: string")
+        expect(source).toContain("payment_recovery_status?: string")
+        expect(source).toContain('buildPaymentRecoveryRedirect')
+        expect(source).toContain('beginSubscriptionPaymentMethodUpdate')
+        expect(source).toContain('retryFailedSubscriptionPayment')
+        expect(source).toContain('paymentRecoveryState=')
+        expect(source).toContain('retryPaymentAction=')
+        expect(source).toContain('updatePaymentMethodAction=')
+    })
 })

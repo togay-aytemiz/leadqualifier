@@ -1349,6 +1349,8 @@
         "manageCtaPrimary": "Upgrade or switch",
         "manageCtaFallback": "Manage plan",
         "cancelCta": "Cancel subscription",
+        "updatePaymentMethodCta": "Update payment method",
+        "retryPaymentCta": "Retry payment",
         "cancelScheduledWithDate": "Cancellation scheduled. Your plan stays active until {date}.",
         "cancelScheduledNoDate": "Cancellation scheduled. Your plan stays active until the current period ends.",
         "resumeUnavailable": "After Iyzico turns auto-renew off, you can't turn it back on from inside the app. Subscribe again when the period ends if needed.",
@@ -1515,6 +1517,23 @@
         "adminLocked": "This organization is admin-locked.",
         "premiumRequired": "This action requires an active monthly package."
       }
+    },
+    "paymentRecoveryStatus": {
+      "successTitle": "Payment action started",
+      "errorTitle": "Action failed",
+      "successCardUpdate": "Your card was updated. Retry the payment to reactivate the subscription.",
+      "successRetryPayment": "Payment retry requested. Access will unlock automatically after Iyzico confirms it.",
+      "errors": {
+        "unauthorized": "Your session is not authenticated.",
+        "invalidInput": "Invalid request values. Please retry.",
+        "notAvailable": "This action is not available right now.",
+        "requestFailed": "The request failed. Please retry."
+      }
+    },
+    "paymentMethodUpdatePage": {
+      "title": "Update payment method",
+      "description": "Update your card on the secure Iyzico payment screen. You will return to your plans after the flow finishes.",
+      "backToPlans": "Back to plans"
     },
     "renewalFailureNotice": {
       "title": "Renewal failed",

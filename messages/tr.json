@@ -1349,6 +1349,8 @@
         "manageCtaPrimary": "Yükselt veya değiştir",
         "manageCtaFallback": "Planı yönet",
         "cancelCta": "Aboneliği iptal et",
+        "updatePaymentMethodCta": "Ödeme yöntemini güncelle",
+        "retryPaymentCta": "Ödemeyi tekrar dene",
         "cancelScheduledWithDate": "Abonelik iptali planlandı. Planın {date} tarihine kadar aktif kalacak.",
         "cancelScheduledNoDate": "Abonelik iptali planlandı. Planın mevcut dönem sonuna kadar aktif kalacak.",
         "resumeUnavailable": "Iyzico tarafında kapatılan yenilemeyi uygulama içinden tekrar açamazsın. Gerekirse dönem sonunda yeniden abone olursun.",
@@ -1515,6 +1517,23 @@
         "adminLocked": "Bu organizasyon yönetici tarafından kilitli.",
         "premiumRequired": "Bu işlem için aktif aylık paket gerekir."
       }
+    },
+    "paymentRecoveryStatus": {
+      "successTitle": "Ödeme işlemi başlatıldı",
+      "errorTitle": "İşlem başarısız",
+      "successCardUpdate": "Kart bilgisi güncellendi. Aboneliği yeniden etkinleştirmek için ödemeyi tekrar deneyin.",
+      "successRetryPayment": "Ödeme tekrar denendi. Iyzico onayı geldiğinde erişim otomatik açılacak.",
+      "errors": {
+        "unauthorized": "Oturum doğrulanamadı.",
+        "invalidInput": "İstek verileri geçersiz. Lütfen tekrar deneyin.",
+        "notAvailable": "Bu işlem şu anda kullanılamıyor.",
+        "requestFailed": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
+      }
+    },
+    "paymentMethodUpdatePage": {
+      "title": "Ödeme yöntemini güncelle",
+      "description": "Kartını güvenli Iyzico ödeme ekranında güncelle. İşlem tamamlanınca tekrar planlarına döneceksin.",
+      "backToPlans": "Planlara dön"
     },
     "renewalFailureNotice": {
       "title": "Yenileme alınamadı",

@@ -85,6 +85,13 @@ export interface IyzicoTopupCheckoutInitInput {
 
 export type IyzicoSubscriptionUpgradePeriod = 'NOW' | 'NEXT_PERIOD'
 
+export interface IyzicoSubscriptionCardUpdateInitInput {
+    locale: IyzicoLocale
+    conversationId: string
+    callbackUrl: string
+    subscriptionReferenceCode: string
+}
+
 export type IyzicoClientErrorCode =
     | 'provider_not_configured'
     | 'request_failed'
@@ -223,6 +230,29 @@ export async function retrieveIyzicoTopupCheckoutResult(token: string, conversat
         locale: Iyzipay.LOCALE.TR,
         conversationId,
         token
+    }, cb))
+}
+
+export async function initializeIyzicoSubscriptionCardUpdateCheckout(input: IyzicoSubscriptionCardUpdateInitInput) {
+    const client = createIyzicoSdkClient()
+    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscriptionCard.updateWithSubscriptionReferenceCode({
+        locale: input.locale,
+        conversationId: input.conversationId,
+        subscriptionReferenceCode: input.subscriptionReferenceCode,
+        callbackUrl: input.callbackUrl
+    }, cb))
+}
+
+export async function retryIyzicoSubscriptionPayment(input: {
+    locale: IyzicoLocale
+    conversationId: string
+    referenceCode: string
+}) {
+    const client = createIyzicoSdkClient()
+    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscriptionPayment.retry({
+        locale: input.locale,
+        conversationId: input.conversationId,
+        referenceCode: input.referenceCode
     }, cb))
 }
 
