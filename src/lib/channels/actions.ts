@@ -4,6 +4,7 @@ import { createHmac } from 'node:crypto'
 
 import { createClient } from '@/lib/supabase/server'
 import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
+import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import { revalidatePath } from 'next/cache'
 import { TelegramClient } from '@/lib/telegram/client'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
@@ -25,7 +26,7 @@ import {
     resolveWhatsAppWebhookSubscriptionOverrides
 } from '@/lib/channels/whatsapp-webhook-config'
 import { v4 as uuidv4 } from 'uuid'
-import type { Json } from '@/types/database'
+import type { Channel, Json } from '@/types/database'
 
 export async function getChannels(organizationId: string) {
     const supabase = await createClient()
@@ -111,16 +112,119 @@ export interface CompleteWhatsAppEmbeddedSignupInput {
 }
 
 const WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING_ERROR = 'WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING'
+const ONBOARDING_RELATION_NAME = 'organization_onboarding_states'
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
 function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
     return fallback
 }
 
+function isMissingRelationError(error: unknown, relationName: string) {
+    if (!error || typeof error !== 'object') return false
+
+    const candidate = error as { code?: string | null; message?: string | null }
+    if (candidate.code === '42P01') return true
+
+    return (
+        typeof candidate.message === 'string' &&
+        candidate.message.toLowerCase().includes(relationName.toLowerCase())
+    )
+}
+
+function isMissingColumnError(error: unknown, columnName: string) {
+    if (!error || typeof error !== 'object') return false
+
+    const candidate = error as { code?: string | null; message?: string | null }
+    if (candidate.code === '42703' || candidate.code === 'PGRST204') return true
+
+    return (
+        typeof candidate.message === 'string' &&
+        candidate.message.toLowerCase().includes(columnName.toLowerCase())
+    )
+}
+
 function normalizeOptionalString(value: string | null | undefined) {
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
+}
+
+async function persistOnboardingChannelConnectionCompletion(
+    supabase: SupabaseClient,
+    organizationId: string
+) {
+    const { data: current, error: readError } = await supabase
+        .from(ONBOARDING_RELATION_NAME)
+        .select('*')
+        .eq('organization_id', organizationId)
+        .maybeSingle()
+
+    if (readError) {
+        if (!isMissingRelationError(readError, ONBOARDING_RELATION_NAME)) {
+            console.error('Failed to read onboarding state before persisting channel completion:', readError)
+        }
+        return
+    }
+
+    if (current?.channel_connection_completed_at) {
+        return
+    }
+
+    const nowIso = new Date().toISOString()
+    const payload = {
+        organization_id: organizationId,
+        first_seen_at: current?.first_seen_at ?? nowIso,
+        intro_acknowledged_at: current?.intro_acknowledged_at ?? null,
+        ai_settings_reviewed_at: current?.ai_settings_reviewed_at ?? null,
+        channel_connection_completed_at: nowIso
+    }
+    const upsert = async (value: typeof payload | Omit<typeof payload, 'ai_settings_reviewed_at'>) =>
+        supabase.from(ONBOARDING_RELATION_NAME).upsert(value, { onConflict: 'organization_id' })
+
+    let { error } = await upsert(payload)
+
+    if (isMissingColumnError(error, 'ai_settings_reviewed_at')) {
+        console.warn(
+            'Retrying onboarding channel completion persistence without ai_settings_reviewed_at because the column is unavailable:',
+            error
+        )
+
+        const { ai_settings_reviewed_at, ...legacyPayload } = payload
+        const retryResult = await upsert(legacyPayload)
+        error = retryResult.error
+    }
+
+    if (
+        isMissingRelationError(error, ONBOARDING_RELATION_NAME) ||
+        isMissingColumnError(error, 'channel_connection_completed_at')
+    ) {
+        console.warn('Skipping onboarding channel completion persistence because the schema is unavailable:', error)
+        return
+    }
+
+    if (error) {
+        console.error('Failed to persist onboarding channel completion:', error)
+    }
+}
+
+async function rememberCompletedChannelConnectionIfNeeded(
+    supabase: SupabaseClient,
+    channel: Pick<Channel, 'organization_id'> | null
+) {
+    if (!channel?.organization_id) {
+        return
+    }
+
+    const onboardingState = await getOrganizationOnboardingState(channel.organization_id, { supabase })
+    const finalStep = onboardingState.steps.find((step) => step.id === 'connect_whatsapp')
+
+    if (!finalStep?.isComplete) {
+        return
+    }
+
+    await persistOnboardingChannelConnectionCompletion(supabase, channel.organization_id)
 }
 
 function asConfigRecord(value: Json): Record<string, Json | undefined> {
@@ -532,6 +636,8 @@ export async function disconnectChannel(channelId: string): Promise<DisconnectCh
             // Continue with DB deletion even if webhook fails
         }
     }
+
+    await rememberCompletedChannelConnectionIfNeeded(supabase, channel)
 
     const { error } = await supabase
         .from('channels')

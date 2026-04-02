@@ -57,6 +57,7 @@ function createOnboardingRow(
     organization_id: 'org-1',
     first_seen_at: null,
     intro_acknowledged_at: null,
+    channel_connection_completed_at: null,
     created_at: '2026-04-01T00:00:00.000Z',
     updated_at: '2026-04-01T00:00:00.000Z',
     ...overrides,
@@ -230,6 +231,33 @@ describe('resolveOnboardingState', () => {
     expect(state.completedSteps).toBe(5)
   })
 
+  it('keeps the final channel step complete after channel learning has already been recorded', () => {
+    const state = resolveOnboardingState({
+      organizationId: 'org-1',
+      onboardingRow: createOnboardingRow({
+        first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+        ai_settings_reviewed_at: '2026-04-01T10:02:00.000Z',
+        channel_connection_completed_at: '2026-04-01T10:03:00.000Z',
+      }),
+      billingSnapshot: createBillingSnapshot(),
+      knowledgeDocumentCount: 1,
+      customSkillCount: 0,
+      aiSettingsReviewCookieSeen: false,
+      offeringProfile: createOfferingProfile({
+        summary: 'Cilt bakimi ve randevu destegi.',
+        required_intake_fields: ['Ad soyad'],
+      }),
+      serviceCatalogCount: 1,
+      connectedChannels: [],
+      nowIso: '2026-04-01T10:04:00.000Z',
+    })
+
+    expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
+    expect(state.completedSteps).toBe(5)
+    expect(state.isComplete).toBe(true)
+  })
+
   it('hides the banner after upgrade but keeps navigation entry when onboarding is incomplete', () => {
     const state = resolveOnboardingState({
       organizationId: 'org-1',
@@ -361,6 +389,31 @@ describe('resolveOnboardingState', () => {
     expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
     expect(state.isComplete).toBe(true)
     expect(state.completedSteps).toBe(5)
+  })
+
+  it('keeps the final connection step complete after a previous successful completion even if no channels remain', () => {
+    const state = resolveOnboardingState({
+      organizationId: 'org-1',
+      onboardingRow: createOnboardingRow({
+        first_seen_at: '2026-04-01T10:00:00.000Z',
+        intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+        ai_settings_reviewed_at: '2026-04-01T10:01:30.000Z',
+        channel_connection_completed_at: '2026-04-01T10:02:00.000Z',
+      }),
+      billingSnapshot: createBillingSnapshot(),
+      knowledgeDocumentCount: 1,
+      customSkillCount: 0,
+      aiSettingsReviewCookieSeen: false,
+      offeringProfile: createOfferingProfile({
+        summary: 'Sunulanlar: Cilt bakimi.',
+      }),
+      serviceCatalogCount: 1,
+      connectedChannels: [],
+      nowIso: '2026-04-01T10:03:00.000Z',
+    })
+
+    expect(state.steps.find((step) => step.id === 'connect_whatsapp')?.isComplete).toBe(true)
+    expect(state.isComplete).toBe(true)
   })
 
   it('marks agent setup complete when a custom skill exists without knowledge documents', () => {

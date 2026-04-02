@@ -6,6 +6,7 @@ const {
     deregisterPhoneNumberMock,
     exchangeMetaCodeForTokenMock,
     exchangeMetaForLongLivedTokenMock,
+    getOrganizationOnboardingStateMock,
     getPhoneNumberMock,
     getMessageTemplatesMock,
     revalidatePathMock,
@@ -21,6 +22,7 @@ const {
     deregisterPhoneNumberMock: vi.fn(),
     exchangeMetaCodeForTokenMock: vi.fn(),
     exchangeMetaForLongLivedTokenMock: vi.fn(),
+    getOrganizationOnboardingStateMock: vi.fn(),
     getPhoneNumberMock: vi.fn(),
     getMessageTemplatesMock: vi.fn(),
     revalidatePathMock: vi.fn(),
@@ -42,6 +44,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/organizations/active-context', () => ({
     assertTenantWriteAllowed: assertTenantWriteAllowedMock
+}))
+
+vi.mock('@/lib/onboarding/state', () => ({
+    getOrganizationOnboardingState: getOrganizationOnboardingStateMock
 }))
 
 vi.mock('@/lib/channels/meta-oauth', () => ({
@@ -230,6 +236,15 @@ describe('channels actions: WhatsApp core flows', () => {
             businessAccountName: 'Qualy Business',
             phoneNumberId: 'phone-discovered-1',
             displayPhoneNumber: '+90 555 444 33 22'
+        })
+        getOrganizationOnboardingStateMock.mockResolvedValue({
+            steps: [
+                { id: 'intro', isComplete: false, isExpandedByDefault: false },
+                { id: 'agent_setup', isComplete: false, isExpandedByDefault: false },
+                { id: 'business_review', isComplete: false, isExpandedByDefault: false },
+                { id: 'ai_settings_review', isComplete: false, isExpandedByDefault: false },
+                { id: 'connect_whatsapp', isComplete: false, isExpandedByDefault: false }
+            ]
         })
     })
 
@@ -695,6 +710,87 @@ describe('channels actions: WhatsApp core flows', () => {
         await expect(disconnectChannel('channel-1')).resolves.toEqual({ success: true })
         expect(whatsAppCtorMock).not.toHaveBeenCalled()
         expect(deregisterPhoneNumberMock).not.toHaveBeenCalled()
+        expect(deleteEqMock).toHaveBeenCalledWith('id', 'channel-1')
+    })
+
+    it('records sticky onboarding completion before removing a channel that already completed the final step', async () => {
+        const maybeSingleMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                data: {
+                    organization_id: 'org-1',
+                    first_seen_at: '2026-04-01T10:00:00.000Z',
+                    intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+                    ai_settings_reviewed_at: '2026-04-01T10:02:00.000Z',
+                    channel_connection_completed_at: null
+                },
+                error: null
+            })
+
+        const onboardingEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+        const onboardingSelectMock = vi.fn(() => ({ eq: onboardingEqMock }))
+        const onboardingUpsertMock = vi.fn(async () => ({ error: null }))
+        const deleteEqMock = vi.fn(async () => ({ error: null }))
+        const deleteMock = vi.fn(() => ({ eq: deleteEqMock }))
+        const channelSingleMock = vi.fn(async () => ({
+            data: {
+                id: 'channel-1',
+                organization_id: 'org-1',
+                type: 'whatsapp',
+                config: {
+                    permanent_access_token: 'token-1',
+                    phone_number_id: 'phone-1'
+                }
+            }
+        }))
+        const channelSelectEqMock = vi.fn(() => ({ single: channelSingleMock }))
+        const channelSelectMock = vi.fn(() => ({ eq: channelSelectEqMock }))
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'channels') {
+                return {
+                    select: channelSelectMock,
+                    delete: deleteMock
+                }
+            }
+
+            if (table === 'organization_onboarding_states') {
+                return {
+                    select: onboardingSelectMock,
+                    upsert: onboardingUpsertMock
+                }
+            }
+
+            throw new Error(`Unexpected table ${table}`)
+        })
+
+        createClientMock.mockResolvedValueOnce({
+            from: fromMock
+        })
+        getOrganizationOnboardingStateMock.mockResolvedValueOnce({
+            steps: [
+                { id: 'intro', isComplete: true, isExpandedByDefault: false },
+                { id: 'agent_setup', isComplete: true, isExpandedByDefault: false },
+                { id: 'business_review', isComplete: true, isExpandedByDefault: false },
+                { id: 'ai_settings_review', isComplete: true, isExpandedByDefault: false },
+                { id: 'connect_whatsapp', isComplete: true, isExpandedByDefault: false }
+            ]
+        })
+
+        await expect(disconnectChannel('channel-1')).resolves.toEqual({ success: true })
+
+        expect(getOrganizationOnboardingStateMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.objectContaining({ from: fromMock })
+        })
+        expect(onboardingUpsertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                organization_id: 'org-1',
+                first_seen_at: '2026-04-01T10:00:00.000Z',
+                intro_acknowledged_at: '2026-04-01T10:01:00.000Z',
+                ai_settings_reviewed_at: '2026-04-01T10:02:00.000Z',
+                channel_connection_completed_at: expect.any(String)
+            }),
+            { onConflict: 'organization_id' }
+        )
         expect(deleteEqMock).toHaveBeenCalledWith('id', 'channel-1')
     })
 

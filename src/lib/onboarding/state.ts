@@ -115,6 +115,10 @@ function hasAnyConnectedChannel(channels: Channel[]) {
   return channels.some((channel) => shouldCountChannelAsConnected(channel))
 }
 
+function hasLearnedChannelConnection(onboardingRow: OrganizationOnboardingStateRow | null) {
+  return Boolean(onboardingRow?.channel_connection_completed_at)
+}
+
 function buildSkillSignature(skill: OnboardingSkillCandidate) {
   const normalizedTitle = skill.title.trim().toLocaleLowerCase('tr-TR')
   const normalizedResponse = skill.response_text.trim().toLocaleLowerCase('tr-TR')
@@ -181,8 +185,9 @@ export function resolveOnboardingState({
     },
   ]
   const channelConnectionComplete =
-    isChannelConnectionPrerequisitesComplete(prerequisiteSteps) &&
-    hasAnyConnectedChannel(connectedChannels)
+    hasLearnedChannelConnection(onboardingRow) ||
+    (isChannelConnectionPrerequisitesComplete(prerequisiteSteps) &&
+      hasAnyConnectedChannel(connectedChannels))
 
   const steps: OrganizationOnboardingStepState[] = [
     ...prerequisiteSteps,

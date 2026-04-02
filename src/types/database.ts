@@ -249,6 +249,7 @@ export interface OrganizationOnboardingState {
     first_seen_at: string | null
     intro_acknowledged_at: string | null
     ai_settings_reviewed_at: string | null
+    channel_connection_completed_at: string | null
     created_at: string
     updated_at: string
 }
