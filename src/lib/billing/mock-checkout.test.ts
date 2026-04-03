@@ -531,6 +531,60 @@ describe('mock checkout simulation wrappers', () => {
         })
     })
 
+    it('redirects iyzico top-up checkout into the in-app embed route and stores hosted checkout html', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 1000,
+                monthly_package_credit_used: 0,
+                topup_credit_balance: 0
+            }
+        })
+        const serviceSupabase = createServiceSupabaseMock()
+
+        createClientMock.mockResolvedValue(supabase)
+        createServiceClientMock.mockReturnValue(serviceSupabase.client)
+        initializeIyzicoTopupCheckoutMock.mockResolvedValue({
+            status: 'success',
+            token: 'topup-token',
+            paymentPageUrl: 'https://sandbox-cpp.iyzipay.com/pay-with-form',
+            checkoutFormContent: '<div id="iyzipay-checkout-form"></div>'
+        })
+
+        const result = await simulateMockTopupCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            credits: 500,
+            amountTry: 200,
+            callbackUrl: 'http://127.0.0.1:3001/api/billing/iyzico/callback?action=topup&locale=tr',
+            locale: 'tr',
+            customerIp: '127.0.0.1'
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            status: 'redirect',
+            error: null,
+            changeType: null,
+            effectiveAt: null,
+            redirectUrl: '/settings/plans/topup-checkout/order_1'
+        })
+        expect(serviceSupabase.spies.purchaseUpdateEqMock).toHaveBeenCalledWith('id', 'order_1')
+        expect(serviceSupabase.spies.purchaseUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            provider_checkout_id: 'topup-token',
+            metadata: expect.objectContaining({
+                checkout_token: 'topup-token',
+                checkout_form_content: '<div id="iyzipay-checkout-form"></div>'
+            })
+        }))
+    })
+
     it('returns invalid_input for malformed subscription payload', async () => {
         const result = await simulateMockSubscriptionCheckout({
             organizationId: '',

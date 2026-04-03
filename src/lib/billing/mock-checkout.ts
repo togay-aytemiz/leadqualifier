@@ -1252,10 +1252,13 @@ export async function simulateMockTopupCheckout(input: {
         const checkoutToken = typeof checkoutResult.token === 'string'
             ? checkoutResult.token.trim()
             : ''
+        const checkoutFormContent = typeof checkoutResult.checkoutFormContent === 'string'
+            ? checkoutResult.checkoutFormContent
+            : ''
         const paymentPageUrl = typeof checkoutResult.paymentPageUrl === 'string'
             ? checkoutResult.paymentPageUrl.trim()
             : ''
-        if (!checkoutToken || !paymentPageUrl) {
+        if (!checkoutToken || !checkoutFormContent) {
             await serviceSupabase
                 .from('credit_purchase_orders')
                 .update({
@@ -1278,6 +1281,7 @@ export async function simulateMockTopupCheckout(input: {
                 metadata: {
                     ...asRecord(pendingOrderInsert.data.metadata),
                     checkout_token: checkoutToken,
+                    checkout_form_content: checkoutFormContent,
                     checkout_page_url: paymentPageUrl,
                     checkout_initialize_response: checkoutResult
                 }
@@ -1290,7 +1294,7 @@ export async function simulateMockTopupCheckout(input: {
             error: null,
             changeType: null,
             effectiveAt: null,
-            redirectUrl: paymentPageUrl
+            redirectUrl: buildLocalizedPath(`/settings/plans/topup-checkout/${orderId}`, input.locale)
         }
     } catch (error) {
         await serviceSupabase

@@ -3,11 +3,11 @@
 import { useEffect, useRef } from 'react'
 import { resetIyzicoCheckoutRuntime } from '@/lib/billing/providers/iyzico/checkout-embed'
 
-interface SubscriptionCheckoutEmbedProps {
+interface HostedCheckoutEmbedProps {
     checkoutFormContent: string
 }
 
-export function SubscriptionCheckoutEmbed({ checkoutFormContent }: SubscriptionCheckoutEmbedProps) {
+export function HostedCheckoutEmbed({ checkoutFormContent }: HostedCheckoutEmbedProps) {
     const containerRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {

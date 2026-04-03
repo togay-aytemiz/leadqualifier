@@ -773,7 +773,27 @@
     "skillId": "Skill ID",
     "emptyDebug": "Send a message to see how the bot works.",
     "noOrganization": "No Organization Found",
-    "noOrganizationDesc": "You need to be part of an organization to use the simulator."
+    "noOrganizationDesc": "You need to be part of an organization to use the simulator.",
+    "introModal": {
+      "title": "Test AI replies in Simulator before going live",
+      "description": "This screen is for safely checking how your bot responds. Conversations here are not saved.",
+      "primaryCta": "Start simulation",
+      "secondaryCta": "Open AI settings",
+      "items": {
+        "realMessage": {
+          "title": "Write like a real customer",
+          "body": "Try common questions, objections, and missing-information scenarios here."
+        },
+        "seeAiReply": {
+          "title": "See the AI reply",
+          "body": "Quickly check how the assistant responds and whether it stays clear."
+        },
+        "debugDesktop": {
+          "title": "Inspect the details on desktop",
+          "body": "On desktop you can also see the matched skill, confidence score, and token usage."
+        }
+      }
+    }
   },
   "General": {
     "title": "General Settings",
@@ -790,15 +810,15 @@
     "title": "Channels",
     "noOrganization": "No Organization Found",
     "noOrganizationDesc": "You need to be part of an organization to manage channels.",
-  "description": "Connect messaging platforms to start receiving leads into your inbox.",
-  "summary": "Connected: {connected} / {total}",
-  "channelConnectionLocked": {
-    "message": "You can connect your channels after the getting started steps are complete.",
-    "description": "Prepare Qualy first. Channel connection opens as the final step.",
-    "goToOnboarding": "Go to getting started",
-    "pageDescription": "{channel} connection unlocks after the first four getting-started steps are complete."
-  },
-  "save": "Save changes",
+    "description": "Connect messaging platforms to start receiving leads into your inbox.",
+    "summary": "Connected: {connected} / {total}",
+    "channelConnectionLocked": {
+      "message": "You can connect your channels after the getting started steps are complete.",
+      "description": "Prepare Qualy first. Channel connection opens as the final step.",
+      "goToOnboarding": "Go to getting started",
+      "pageDescription": "{channel} connection unlocks after the first four getting-started steps are complete."
+    },
+    "save": "Save changes",
     "whatsappComingSoon": "WhatsApp integration coming soon! Contact support for early access.",
     "types": {
       "telegram": "Telegram",
@@ -861,7 +881,7 @@
         "subtitle": "Follow this order once. Teach the AI first, review your business context, then connect the live channel last.",
         "progressLabel": "Checklist progress",
         "steps": {
-        "intro": {
+          "intro": {
             "title": "Get to know Qualy",
             "description": "Qualy handles the first response, collects the right details, clarifies appointment flow early, and keeps high-priority conversations visible.",
             "primaryCta": "Continue",
@@ -1308,7 +1328,7 @@
       "usedVsLimit": "{used} / {limit}",
       "daysUnit": "days",
       "trialEndsAt": "Trial ends at: {date}",
-      "packageResetAt": "Resets at: {date}",
+      "packageResetAt": "Renews at: {date}",
       "lowCreditWarning": "Approaching usage limit",
       "unavailable": "Plan status is unavailable."
     },
@@ -2674,6 +2694,26 @@
     "readOnlyBanner": "Read-only mode: admin impersonation can review calendar data but cannot modify bookings or settings.",
     "minutesShort": "min",
     "minutesLabel": "minutes",
+    "introModal": {
+      "title": "Manage appointments from one place with Calendar",
+      "description": "Qualy uses the same rules here for both operator tracking and AI slot suggestions.",
+      "primaryCta": "Review calendar",
+      "secondaryCta": "Open calendar settings",
+      "items": {
+        "workingHours": {
+          "title": "Set your business hours",
+          "body": "Define open days, time ranges, and service durations."
+        },
+        "aiSuggestions": {
+          "title": "AI suggests slots using these rules",
+          "body": "Availability shown to customers follows your calendar settings."
+        },
+        "googleSoon": {
+          "title": "Google Calendar integration is coming soon",
+          "body": "Once it lands, you will be able to track busy times from one place."
+        }
+      }
+    },
     "actions": {
       "newBooking": "New booking",
       "openSettings": "Calendar settings",

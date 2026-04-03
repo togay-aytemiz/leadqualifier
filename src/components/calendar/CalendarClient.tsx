@@ -10,8 +10,10 @@ import {
   Clock3,
   Link2,
   SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react'
 import { Alert, Button, Modal, PageHeader, Select } from '@/design'
+import { WorkspaceIntroModal } from '@/components/common/WorkspaceIntroModal'
 import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 import type {
@@ -58,6 +60,7 @@ interface CalendarClientProps {
   initialHasExplicitView: boolean
   initialView: CalendarView
   locale: string
+  userId: string
   readOnlyTenantMode?: boolean
 }
 
@@ -134,9 +137,11 @@ export function CalendarClient({
   initialHasExplicitView,
   initialView,
   locale,
+  userId,
   readOnlyTenantMode = false,
 }: CalendarClientProps) {
   const t = useTranslations('calendar')
+  const tIntro = useTranslations('calendar.introModal')
   const router = useRouter()
   const pathname = usePathname()
   const [isMobile, setIsMobile] = useState(false)
@@ -890,6 +895,39 @@ export function CalendarClient({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
+      {data.organizationId ? (
+        <WorkspaceIntroModal
+          storageScope="calendar"
+          userId={userId}
+          organizationId={data.organizationId}
+          title={tIntro('title')}
+          description={tIntro('description')}
+          primaryCta={tIntro('primaryCta')}
+          secondaryCta={tIntro('secondaryCta')}
+          secondaryHref="/settings/calendar"
+          items={[
+            {
+              id: 'working-hours',
+              icon: <CalendarClock size={18} />,
+              title: tIntro('items.workingHours.title'),
+              body: tIntro('items.workingHours.body'),
+            },
+            {
+              id: 'ai-suggestions',
+              icon: <Sparkles size={18} />,
+              title: tIntro('items.aiSuggestions.title'),
+              body: tIntro('items.aiSuggestions.body'),
+            },
+            {
+              id: 'google-soon',
+              icon: <Clock3 size={18} />,
+              title: tIntro('items.googleSoon.title'),
+              body: tIntro('items.googleSoon.body'),
+            },
+          ]}
+        />
+      ) : null}
+
       <PageHeader
         title={t('title')}
         actions={

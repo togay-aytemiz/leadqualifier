@@ -88,6 +88,7 @@ export default async function CalendarWorkspacePage({ searchParams }: PageProps)
       initialHasExplicitView={Boolean(params.view)}
       initialView={initialView}
       locale={locale}
+      userId={orgContext.userId}
       readOnlyTenantMode={orgContext.readOnlyTenantMode ?? false}
     />
   )

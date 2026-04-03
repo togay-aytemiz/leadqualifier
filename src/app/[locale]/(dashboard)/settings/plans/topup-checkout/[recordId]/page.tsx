@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 import { HostedCheckoutEmbed } from '../../HostedCheckoutEmbed'
 
-interface SubscriptionCheckoutPageProps {
+interface TopupCheckoutPageProps {
     params: Promise<{
         locale: string
         recordId: string
@@ -15,31 +15,31 @@ function asRecord(value: unknown): Record<string, unknown> {
     return value as Record<string, unknown>
 }
 
-export default async function SubscriptionCheckoutPage({ params }: SubscriptionCheckoutPageProps) {
+export default async function TopupCheckoutPage({ params }: TopupCheckoutPageProps) {
     const { locale, recordId } = await params
     if (!recordId) {
         notFound()
     }
 
     const supabase = await createClient()
-    const { data: subscriptionRecord, error } = await supabase
-        .from('organization_subscription_records')
+    const { data: orderRecord, error } = await supabase
+        .from('credit_purchase_orders')
         .select('id, provider, status, metadata')
         .eq('id', recordId)
         .eq('provider', 'iyzico')
         .maybeSingle()
 
-    if (error || !subscriptionRecord) {
+    if (error || !orderRecord) {
         notFound()
     }
 
-    const metadata = asRecord(subscriptionRecord.metadata)
+    const metadata = asRecord(orderRecord.metadata)
     const checkoutFormContent = typeof metadata.checkout_form_content === 'string'
         ? metadata.checkout_form_content
         : null
 
     if (!checkoutFormContent || !checkoutFormContent.trim()) {
-        redirect(`${buildLocalizedPath('/settings/plans', locale)}?checkout_action=subscribe&checkout_status=error&checkout_error=request_failed`)
+        redirect(`${buildLocalizedPath('/settings/plans', locale)}?checkout_action=topup&checkout_status=error&checkout_error=request_failed`)
     }
 
     return (

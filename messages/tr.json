@@ -773,7 +773,27 @@
     "skillId": "Yetenek ID",
     "emptyDebug": "Botun nasıl işlediğini görmek için bir mesaj gönderin.",
     "noOrganization": "Organizasyon Bulunamadı",
-    "noOrganizationDesc": "Simülatörü kullanmak için bir organizasyon oluşturun."
+    "noOrganizationDesc": "Simülatörü kullanmak için bir organizasyon oluşturun.",
+    "introModal": {
+      "title": "Simülatör ile AI cevabını canlıya almadan test edin",
+      "description": "Bu ekran, botun nasıl cevap verdiğini güvenli şekilde denemen için. Buradaki konuşmalar kaydedilmez.",
+      "primaryCta": "Simülasyonu başlat",
+      "secondaryCta": "AI ayarlarına git",
+      "items": {
+        "realMessage": {
+          "title": "Gerçek müşteri gibi yaz",
+          "body": "Sık soruları, itirazları ve eksik bilgi senaryolarını burada dene."
+        },
+        "seeAiReply": {
+          "title": "AI cevabını gör",
+          "body": "Asistanın nasıl yanıt verdiğini ve ne kadar net kaldığını hızlıca kontrol et."
+        },
+        "debugDesktop": {
+          "title": "Detayı masaüstünde izle",
+          "body": "Masaüstünde eşleşen yetenek, güven skoru ve token kullanımını da görebilirsin."
+        }
+      }
+    }
   },
   "General": {
     "title": "Genel Ayarlar",
@@ -790,15 +810,15 @@
     "title": "Kanallar",
     "noOrganization": "Organizasyon Bulunamadı",
     "noOrganizationDesc": "Kanalları yönetmek için bir organizasyonun parçası olmalısınız.",
-  "description": "Gelen kutunuza müşteri almaya başlamak için mesajlaşma platformlarını bağlayın.",
-  "summary": "Bağlı: {connected} / {total}",
-  "channelConnectionLocked": {
-    "message": "Başlangıç adımları tamamlanınca kanallarınızı bağlayabilirsiniz.",
-    "description": "Önce Qualy'yi hazırlayın. Kanal bağlantısı son adımda açılır.",
-    "goToOnboarding": "Başlangıç adımlarına git",
-    "pageDescription": "{channel} bağlantısı, başlangıçtaki ilk dört adım tamamlandıktan sonra açılır."
-  },
-  "save": "Değişiklikleri Kaydet",
+    "description": "Gelen kutunuza müşteri almaya başlamak için mesajlaşma platformlarını bağlayın.",
+    "summary": "Bağlı: {connected} / {total}",
+    "channelConnectionLocked": {
+      "message": "Başlangıç adımları tamamlanınca kanallarınızı bağlayabilirsiniz.",
+      "description": "Önce Qualy'yi hazırlayın. Kanal bağlantısı son adımda açılır.",
+      "goToOnboarding": "Başlangıç adımlarına git",
+      "pageDescription": "{channel} bağlantısı, başlangıçtaki ilk dört adım tamamlandıktan sonra açılır."
+    },
+    "save": "Değişiklikleri Kaydet",
     "whatsappComingSoon": "WhatsApp entegrasyonu yakında! Erken erişim için destekle iletişime geçin.",
     "types": {
       "telegram": "Telegram",
@@ -861,7 +881,7 @@
         "subtitle": "Bu sırayı bir kez takip edin. Önce AI'yi öğretin, sonra business bilgisini gözden geçirin, canlı kanalı en son bağlayın.",
         "progressLabel": "Checklist ilerlemesi",
         "steps": {
-        "intro": {
+          "intro": {
             "title": "Qualy'yi tanıyın",
             "description": "Qualy konuşmaları hızlıca karşılar, gerekli bilgileri toplar, randevu akışını netleştirir ve özel ilgi gerektiren mesajları görünür tutar.",
             "primaryCta": "Devam et",
@@ -1308,7 +1328,7 @@
       "usedVsLimit": "{used} / {limit}",
       "daysUnit": "gün",
       "trialEndsAt": "Ücretsiz deneme bitişi: {date}",
-      "packageResetAt": "Sıfırlanma: {date}",
+      "packageResetAt": "Yenileme: {date}",
       "lowCreditWarning": "Kullanım limitine yaklaşılıyor",
       "unavailable": "Plan durumu alınamıyor."
     },
@@ -2674,6 +2694,26 @@
     "readOnlyBanner": "Salt okunur mod: yönetici bu takvim verilerini inceleyebilir ama randevu veya ayar değiştiremez.",
     "minutesShort": "dk",
     "minutesLabel": "dakika",
+    "introModal": {
+      "title": "Takvim ile randevuyu tek yerden yönetin",
+      "description": "Qualy burada hem operatör takibini hem de AI'ın uygun saat önermesini aynı kuralla yönetir.",
+      "primaryCta": "Takvimi incele",
+      "secondaryCta": "Takvim ayarlarına git",
+      "items": {
+        "workingHours": {
+          "title": "Çalışma saatlerini belirle",
+          "body": "Açık günleri, saat aralıklarını ve hizmet sürelerini tanımla."
+        },
+        "aiSuggestions": {
+          "title": "AI bu kurallara göre saat önerir",
+          "body": "Müşteriye verilen uygunluk ve randevu akışı takvim ayarlarına göre çalışır."
+        },
+        "googleSoon": {
+          "title": "Google Takvim entegrasyonu çok yakında",
+          "body": "Bağlantı açıldığında meşgul zamanları tek yerden takip edebileceksin."
+        }
+      }
+    },
     "actions": {
       "newBooking": "Yeni randevu",
       "openSettings": "Takvim ayarları",
