@@ -103,6 +103,12 @@ export function SubscriptionPlanCatalog({
                     )
                 })}
             </div>
+            <p className="mt-3 text-xs text-gray-500">
+                {tPlans('packageCatalog.vatIncluded')}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+                {tPlans('packageCatalog.conversationRangeDisclaimer')}
+            </p>
 
             {isClient && checkoutPlan && createPortal(
                 <CheckoutLegalConsentModal

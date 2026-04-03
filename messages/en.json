@@ -1337,6 +1337,8 @@
       "packageCreditsValue": "{credits} credits",
       "approxConversations": "~{min}-{max} conversations / month",
       "unitPrice": "{price} / credit",
+      "vatIncluded": "Prices include VAT.",
+      "conversationRangeDisclaimer": "Conversation range can vary based on message length, language, and response complexity.",
       "planCta": {
         "start": "Select plan and continue",
         "upgrade": "Upgrade",
@@ -1416,6 +1418,8 @@
       "sectionDescription": "When credits run low, continue with a one-time credit purchase.",
       "title": "One-Time Extra Credits",
       "oneTimeNotice": "Extra credits are one-time purchases and do not auto-renew.",
+      "vatIncluded": "Prices include VAT.",
+      "conversationRangeDisclaimer": "Conversation range can vary based on message length, language, and response complexity.",
       "openModal": "Add one-time credits",
       "approxConversations": "~{min}-{max} conversations",
       "unavailable": "Top-up packages are unavailable right now.",

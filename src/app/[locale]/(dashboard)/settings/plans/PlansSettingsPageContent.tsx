@@ -443,7 +443,7 @@ export default async function PlansSettingsPageContent({
         entries: billingLedger,
         subscriptions: subscriptionsById,
         orders: ordersById,
-        formatDate: (value) => formatDate.format(new Date(value)),
+        formatDate: (value) => formatDateTime.format(new Date(value)),
         formatCurrency: (amount, currency) => formatLedgerCurrency(locale, amount, currency),
         labels: {
             statusSuccess: tPlans('billingInfo.status.success'),

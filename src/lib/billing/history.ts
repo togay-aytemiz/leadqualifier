@@ -28,6 +28,8 @@ interface BillingHistoryLabels {
     topupPurchase: string
 }
 
+type BillingPackageHistoryKind = 'start' | 'upgrade' | 'renewal' | 'update'
+
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null
     return value as Record<string, unknown>
@@ -44,34 +46,104 @@ function readNumber(record: Record<string, unknown> | null, key: string): number
     return Number.isFinite(parsed) ? parsed : null
 }
 
-function resolvePackageHistoryDetailLabel(input: {
+function resolvePackageHistoryKind(input: {
     entry: BillingLedgerEntry
     subscriptionMetadata: Record<string, unknown> | null
-    labels: BillingHistoryLabels
-}) {
+}): BillingPackageHistoryKind {
     const entryMetadata = toRecord(input.entry.metadata)
     const source = readString(entryMetadata, 'source')
-    const changeType = readString(input.subscriptionMetadata, 'change_type')
+    const entryChangeType = readString(entryMetadata, 'change_type')
+    const subscriptionChangeType = readString(input.subscriptionMetadata, 'change_type')
     const normalizedReason = input.entry.reason?.trim().toLowerCase() ?? ''
 
     if (source === 'iyzico_subscription_webhook' || normalizedReason === 'iyzico recurring renewal success') {
+        return 'renewal'
+    }
+
+    if (
+        source === 'iyzico_subscription_checkout_form'
+        || normalizedReason === 'iyzico subscription checkout success'
+        || entryChangeType === 'start'
+        || subscriptionChangeType === 'start'
+    ) {
+        return 'start'
+    }
+
+    if (
+        source === 'iyzico_subscription_upgrade'
+        || normalizedReason === 'iyzico subscription upgrade success'
+        || entryChangeType === 'upgrade'
+        || subscriptionChangeType === 'upgrade'
+    ) {
+        return 'upgrade'
+    }
+
+    return 'update'
+}
+
+function resolvePackageHistoryDetailLabel(input: {
+    kind: BillingPackageHistoryKind
+    labels: BillingHistoryLabels
+}) {
+    switch (input.kind) {
+    case 'renewal':
         return input.labels.packageRenewal
-    }
-
-    if (changeType === 'upgrade' || normalizedReason === 'iyzico subscription upgrade success') {
-        return input.labels.packageUpgrade
-    }
-
-    if (changeType === 'start' || normalizedReason === 'iyzico subscription checkout success') {
+    case 'start':
         return input.labels.packageStart
+    case 'upgrade':
+        return input.labels.packageUpgrade
+    default:
+        return input.labels.packageUpdate
+    }
+}
+
+function readPackageHistoryPrice(
+    entry: BillingLedgerEntry,
+    subscriptionMetadata: Record<string, unknown> | null
+) {
+    const entryMetadata = toRecord(entry.metadata)
+    return readNumber(entryMetadata, 'requested_monthly_price_try')
+        ?? readNumber(subscriptionMetadata, 'requested_monthly_price_try')
+        ?? readNumber(subscriptionMetadata, 'monthly_price_try')
+}
+
+function resolvePreviousPackagePrice(input: {
+    entries: BillingLedgerEntry[]
+    subscriptions: Map<string, BillingHistorySubscriptionRow>
+    entryIndex: number
+    subscriptionId: string | null
+}) {
+    if (!input.subscriptionId) return null
+
+    for (let index = input.entryIndex + 1; index < input.entries.length; index += 1) {
+        const candidate = input.entries[index]
+        if (!candidate) continue
+        if (candidate.entryType !== 'package_grant') continue
+
+        const candidateMetadata = toRecord(candidate.metadata)
+        const candidateSubscriptionId = readString(candidateMetadata, 'subscription_id')
+            ?? readString(candidateMetadata, 'subscription_record_id')
+
+        if (candidateSubscriptionId !== input.subscriptionId) continue
+
+        const candidateSubscriptionMetadata = candidateSubscriptionId
+            ? toRecord(input.subscriptions.get(candidateSubscriptionId)?.metadata ?? null)
+            : null
+        const candidatePrice = readPackageHistoryPrice(candidate, candidateSubscriptionMetadata)
+
+        if (candidatePrice !== null) return candidatePrice
     }
 
-    return input.labels.packageUpdate
+    return null
 }
 
 function resolvePackageHistoryAmountLabel(input: {
     entry: BillingLedgerEntry
     subscriptionMetadata: Record<string, unknown> | null
+    subscriptions: Map<string, BillingHistorySubscriptionRow>
+    entries: BillingLedgerEntry[]
+    entryIndex: number
+    kind: BillingPackageHistoryKind
     formatCurrency: (amount: number, currency: string | null) => string | null
     labels: BillingHistoryLabels
 }) {
@@ -81,11 +153,25 @@ function resolvePackageHistoryAmountLabel(input: {
         return input.formatCurrency(chargedAmount, 'TRY') ?? input.labels.amountUnavailable
     }
 
-    const requestedPrice = readNumber(entryMetadata, 'requested_monthly_price_try')
-        ?? readNumber(input.subscriptionMetadata, 'requested_monthly_price_try')
-        ?? readNumber(input.subscriptionMetadata, 'monthly_price_try')
+    const requestedPrice = readPackageHistoryPrice(input.entry, input.subscriptionMetadata)
 
     if (requestedPrice === null) return input.labels.amountUnavailable
+
+    if (input.kind === 'upgrade') {
+        const subscriptionId = readString(entryMetadata, 'subscription_id')
+            ?? readString(entryMetadata, 'subscription_record_id')
+        const previousPrice = resolvePreviousPackagePrice({
+            entries: input.entries,
+            subscriptions: input.subscriptions,
+            entryIndex: input.entryIndex,
+            subscriptionId
+        })
+
+        if (previousPrice === null) return input.labels.amountUnavailable
+
+        return input.formatCurrency(Math.max(0, requestedPrice - previousPrice), 'TRY') ?? input.labels.amountUnavailable
+    }
+
     return input.formatCurrency(requestedPrice, 'TRY') ?? input.labels.amountUnavailable
 }
 
@@ -97,7 +183,7 @@ export function buildBillingHistoryRows(input: {
     formatCurrency: (amount: number, currency: string | null) => string | null
     labels: BillingHistoryLabels
 }): BillingHistoryRow[] {
-    return input.entries.flatMap((entry) => {
+    return input.entries.flatMap((entry, entryIndex) => {
         const entryMetadata = toRecord(entry.metadata)
 
         if (entry.entryType === 'package_grant') {
@@ -106,6 +192,10 @@ export function buildBillingHistoryRows(input: {
             const subscriptionMetadata = subscriptionId
                 ? toRecord(input.subscriptions.get(subscriptionId)?.metadata ?? null)
                 : null
+            const kind = resolvePackageHistoryKind({
+                entry,
+                subscriptionMetadata
+            })
 
             return [{
                 id: entry.id,
@@ -113,13 +203,16 @@ export function buildBillingHistoryRows(input: {
                 amountLabel: resolvePackageHistoryAmountLabel({
                     entry,
                     subscriptionMetadata,
+                    subscriptions: input.subscriptions,
+                    entries: input.entries,
+                    entryIndex,
+                    kind,
                     formatCurrency: input.formatCurrency,
                     labels: input.labels
                 }),
                 statusLabel: input.labels.statusSuccess,
                 detailLabel: resolvePackageHistoryDetailLabel({
-                    entry,
-                    subscriptionMetadata,
+                    kind,
                     labels: input.labels
                 })
             }]

@@ -66,6 +66,13 @@ describe('SubscriptionPlanCatalog', () => {
     expect(html.match(/mt-auto pt-4/g)).toHaveLength(plans.length)
   })
 
+  it('shows that package prices are VAT-inclusive', () => {
+    const html = renderCatalog()
+
+    expect(html).toContain('Prices include VAT.')
+    expect(html).toContain('Conversation range can vary based on message length, language, and response complexity.')
+  })
+
   it('does not gate the checkout portal with client-only state sync', () => {
     const source = fs.readFileSync(
       path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/SubscriptionPlanCatalog.tsx'),

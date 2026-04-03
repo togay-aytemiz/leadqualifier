@@ -181,6 +181,12 @@ export function TopupCheckoutCard({
                         <p className="text-sm text-gray-500">{tPlans('topups.unavailable')}</p>
                     )}
                 </div>
+                <p className="mt-3 text-xs text-gray-500">
+                    {tPlans('topups.vatIncluded')}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                    {tPlans('topups.conversationRangeDisclaimer')}
+                </p>
 
                 <div className="mt-6 flex justify-end gap-3">
                     <button
@@ -211,6 +217,8 @@ export function TopupCheckoutCard({
                     <div>
                         <h3 className="text-base font-semibold text-gray-900">{tPlans('topups.title')}</h3>
                         <p className="mt-1 text-sm text-gray-600">{tPlans('topups.oneTimeNotice')}</p>
+                        <p className="mt-1 text-xs text-gray-500">{tPlans('topups.vatIncluded')}</p>
+                        <p className="mt-1 text-xs text-gray-500">{tPlans('topups.conversationRangeDisclaimer')}</p>
                         {!topupAllowed && blockedReason && (
                             <p className="mt-1 text-sm text-amber-700">{blockedReason}</p>
                         )}

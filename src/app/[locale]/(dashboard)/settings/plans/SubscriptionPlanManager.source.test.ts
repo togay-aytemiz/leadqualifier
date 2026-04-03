@@ -54,6 +54,17 @@ describe('subscription plan manager source guard', () => {
         expect(source).not.toContain("tPlans('packageCatalog.manager.description')")
     })
 
+    it('surfaces VAT-inclusive copy on subscribed pricing surfaces', () => {
+        expect(fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)).toBe(true)
+
+        const source = fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)
+            ? fs.readFileSync(SUBSCRIPTION_PLAN_MANAGER_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain("tPlans('packageCatalog.vatIncluded')")
+        expect(source).toContain("tPlans('packageCatalog.conversationRangeDisclaimer')")
+    })
+
     it('renders management actions as text links instead of a primary filled button', () => {
         expect(fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)).toBe(true)
 

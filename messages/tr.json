@@ -1337,6 +1337,8 @@
       "packageCreditsValue": "{credits} kredi",
       "approxConversations": "Ayda yaklaşık {min}-{max} konuşma",
       "unitPrice": "Kredi başı {price}",
+      "vatIncluded": "Fiyatlara KDV dahildir.",
+      "conversationRangeDisclaimer": "Konuşma aralığı; mesaj uzunluğu, dil ve yanıt karmaşıklığına göre değişebilir.",
       "planCta": {
         "start": "Planı seç ve devam et",
         "upgrade": "Yükselt",
@@ -1416,6 +1418,8 @@
       "sectionDescription": "Kredin bittiğinde tek seferlik ek kredi alarak devam edebilirsin.",
       "title": "Tek Seferlik Ek Kredi",
       "oneTimeNotice": "Ek krediler tek seferliktir, otomatik yenilenmez.",
+      "vatIncluded": "Fiyatlara KDV dahildir.",
+      "conversationRangeDisclaimer": "Konuşma aralığı; mesaj uzunluğu, dil ve yanıt karmaşıklığına göre değişebilir.",
       "openModal": "Tek seferlik kredi ekle",
       "approxConversations": "Yaklaşık {min}-{max} konuşma",
       "unavailable": "Ek kredi paketleri şu anda kullanılamıyor.",

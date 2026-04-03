@@ -330,6 +330,12 @@ export function SubscriptionPlanManager({
                         )
                     })}
                 </div>
+                <p className="mt-4 text-xs text-gray-500">
+                    {tPlans('packageCatalog.vatIncluded')}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                    {tPlans('packageCatalog.conversationRangeDisclaimer')}
+                </p>
 
                 {autoRenewEnabled && (
                     <div className="mt-5 border-t border-gray-200 pt-4 text-sm text-gray-500">
@@ -447,6 +453,16 @@ export function SubscriptionPlanManager({
                             </p>
                         )}
                     </div>
+                    {activePlan && (
+                        <p className="text-xs text-gray-500">
+                            {tPlans('packageCatalog.vatIncluded')}
+                        </p>
+                    )}
+                    {activePlan && (
+                        <p className="mt-1 text-xs text-gray-500">
+                            {tPlans('packageCatalog.conversationRangeDisclaimer')}
+                        </p>
+                    )}
 
                     {(!autoRenewEnabled || pendingPlanName) && (
                         <div className="space-y-2">

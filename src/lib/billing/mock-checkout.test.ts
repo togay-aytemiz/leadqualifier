@@ -702,6 +702,85 @@ describe('mock checkout simulation wrappers', () => {
         }))
     })
 
+    it('overwrites an existing pending downgrade when a lower plan is selected before period end', async () => {
+        process.env.BILLING_PROVIDER = 'iyzico'
+        process.env.IYZICO_API_KEY = 'api-key'
+        process.env.IYZICO_SECRET_KEY = 'secret-key'
+        process.env.IYZICO_BASE_URL = 'https://sandbox-api.iyzipay.com'
+        process.env.IYZICO_SUBSCRIPTION_PLAN_STARTER_REF = 'starter-plan-ref'
+
+        const serviceSupabase = createServiceSupabaseMock()
+        createServiceClientMock.mockReturnValue(serviceSupabase.client)
+        upgradeIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {}
+        })
+
+        const { supabase } = createSupabaseMock({
+            billingAccountRow: {
+                membership_state: 'premium_active',
+                lock_reason: 'none',
+                monthly_package_credit_limit: 4000,
+                monthly_package_credit_used: 600,
+                topup_credit_balance: 50
+            },
+            activeSubscriptionRow: {
+                id: 'sub_row_1',
+                status: 'active',
+                provider_subscription_id: 'sub_ref_scale',
+                period_start: '2026-04-02T19:44:00.000Z',
+                period_end: '2026-05-02T19:44:00.000Z',
+                metadata: {
+                    source: 'iyzico_subscription_downgrade',
+                    change_type: 'downgrade',
+                    requested_plan_id: 'growth',
+                    requested_monthly_credits: 2000,
+                    requested_monthly_price_try: 649,
+                    pending_plan_change: {
+                        change_type: 'downgrade',
+                        requested_monthly_credits: 2000,
+                        requested_monthly_price_try: 649,
+                        effective_at: '2026-05-02T19:44:00.000Z',
+                        requested_at: '2026-04-02T20:00:00.000Z'
+                    }
+                }
+            }
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await simulateMockSubscriptionCheckout({
+            organizationId: 'org_1',
+            simulatedOutcome: 'success',
+            monthlyPriceTry: 349,
+            monthlyCredits: 1000,
+            planId: 'starter'
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            status: 'scheduled',
+            error: null,
+            changeType: 'downgrade',
+            effectiveAt: '2026-05-02T19:44:00.000Z'
+        })
+
+        const updatePayload = serviceSupabase.spies.subscriptionUpdateMock.mock.calls[0]?.[0]
+        expect(updatePayload).toEqual(expect.objectContaining({
+            metadata: expect.objectContaining({
+                change_type: 'downgrade',
+                requested_plan_id: 'starter',
+                requested_monthly_credits: 1000,
+                requested_monthly_price_try: 349,
+                pending_plan_change: expect.objectContaining({
+                    change_type: 'downgrade',
+                    requested_monthly_credits: 1000,
+                    requested_monthly_price_try: 349,
+                    effective_at: '2026-05-02T19:44:00.000Z'
+                })
+            })
+        }))
+    })
+
     it('prefers the current period end over provider startDate when scheduling iyzico downgrades', async () => {
         process.env.BILLING_PROVIDER = 'iyzico'
         process.env.IYZICO_API_KEY = 'api-key'

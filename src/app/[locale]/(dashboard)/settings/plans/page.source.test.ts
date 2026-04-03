@@ -112,6 +112,16 @@ describe('plans page source guard', () => {
         expect(billingInfoSectionIndex).toBeGreaterThan(topupsSectionIndex)
     })
 
+    it('formats billing history rows with time as well as date', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('formatDate: (value) => formatDateTime.format(new Date(value))')
+    })
+
     it('hides the old membership status card for managed subscriptions and places package management before premium credit cards', () => {
         expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
 
