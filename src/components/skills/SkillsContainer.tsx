@@ -26,6 +26,8 @@ interface SkillsContainerProps {
 }
 
 const MAX_SKILL_ACTIONS = 3
+// Keep runtime support in place, but hide the editor until coverage is restored.
+const SKILL_ACTIONS_EDITOR_ENABLED = false
 
 function createActionId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -620,91 +622,93 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <label className="block text-xs font-semibold text-gray-500 tracking-wider">
-                                        {t('actionsLabel')} {actionCount}
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddAction}
-                                        disabled={isReadOnly}
-                                        className="text-sm text-blue-600 font-medium hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
-                                    >
-                                        <Plus size={16} />
-                                        {t('addAction')}
-                                    </button>
-                                </div>
-                                <p className="text-xs text-gray-400">{t('actionsHint')}</p>
-
-                                {actionLimitExceeded && (
-                                    <div className="rounded-lg px-3 py-2 text-xs border bg-amber-50 border-amber-200 text-amber-900">
-                                        {t('actionsOverflowBanner', { limit: MAX_SKILL_ACTIONS })}
-                                    </div>
-                                )}
-
-                                {actionCount === 0 && (
-                                    <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-                                        {t('actionsEmpty')}
-                                    </p>
-                                )}
-
-                                {formData.skill_actions.map((action) => (
-                                    <div key={action.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
-                                        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-                                            <input
-                                                value={action.label}
-                                                onChange={(event) => handleActionLabelChange(action.id, event.target.value)}
-                                                placeholder={t('actionLabelPlaceholder')}
-                                                disabled={isReadOnly}
-                                                className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveAction(action.id)}
-                                                disabled={isReadOnly}
-                                                className="h-[42px] px-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
-                                            >
-                                                {t('removeAction')}
-                                            </button>
-                                        </div>
-
-                                        <select
-                                            value={action.type}
-                                            onChange={(event) => handleActionTypeChange(action.id, event.target.value as 'trigger_skill' | 'open_url')}
+                            {SKILL_ACTIONS_EDITOR_ENABLED && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                            {t('actionsLabel')} {actionCount}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddAction}
                                             disabled={isReadOnly}
-                                            className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                            className="text-sm text-blue-600 font-medium hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
                                         >
-                                            <option value="trigger_skill">{t('actionTypeTriggerSkill')}</option>
-                                            <option value="open_url">{t('actionTypeOpenUrl')}</option>
-                                        </select>
+                                            <Plus size={16} />
+                                            {t('addAction')}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-gray-400">{t('actionsHint')}</p>
 
-                                        {action.type === 'trigger_skill' ? (
+                                    {actionLimitExceeded && (
+                                        <div className="rounded-lg px-3 py-2 text-xs border bg-amber-50 border-amber-200 text-amber-900">
+                                            {t('actionsOverflowBanner', { limit: MAX_SKILL_ACTIONS })}
+                                        </div>
+                                    )}
+
+                                    {actionCount === 0 && (
+                                        <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                                            {t('actionsEmpty')}
+                                        </p>
+                                    )}
+
+                                    {formData.skill_actions.map((action) => (
+                                        <div key={action.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
+                                            <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                                                <input
+                                                    value={action.label}
+                                                    onChange={(event) => handleActionLabelChange(action.id, event.target.value)}
+                                                    placeholder={t('actionLabelPlaceholder')}
+                                                    disabled={isReadOnly}
+                                                    className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveAction(action.id)}
+                                                    disabled={isReadOnly}
+                                                    className="h-[42px] px-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                                >
+                                                    {t('removeAction')}
+                                                </button>
+                                            </div>
+
                                             <select
-                                                value={action.target_skill_id}
-                                                onChange={(event) => handleActionTargetSkillChange(action.id, event.target.value)}
+                                                value={action.type}
+                                                onChange={(event) => handleActionTypeChange(action.id, event.target.value as 'trigger_skill' | 'open_url')}
                                                 disabled={isReadOnly}
                                                 className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
                                             >
-                                                <option value="">{t('actionTargetSkillPlaceholder')}</option>
-                                                {availableActionTargetSkills.map((skillOption) => (
-                                                    <option key={skillOption.id} value={skillOption.id}>
-                                                        {skillOption.title}
-                                                    </option>
-                                                ))}
+                                                <option value="trigger_skill">{t('actionTypeTriggerSkill')}</option>
+                                                <option value="open_url">{t('actionTypeOpenUrl')}</option>
                                             </select>
-                                        ) : (
-                                            <input
-                                                value={action.url}
-                                                onChange={(event) => handleActionUrlChange(action.id, event.target.value)}
-                                                placeholder={t('actionUrlPlaceholder')}
-                                                disabled={isReadOnly}
-                                                className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
-                                            />
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+
+                                            {action.type === 'trigger_skill' ? (
+                                                <select
+                                                    value={action.target_skill_id}
+                                                    onChange={(event) => handleActionTargetSkillChange(action.id, event.target.value)}
+                                                    disabled={isReadOnly}
+                                                    className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                                >
+                                                    <option value="">{t('actionTargetSkillPlaceholder')}</option>
+                                                    {availableActionTargetSkills.map((skillOption) => (
+                                                        <option key={skillOption.id} value={skillOption.id}>
+                                                            {skillOption.title}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <input
+                                                    value={action.url}
+                                                    onChange={(event) => handleActionUrlChange(action.id, event.target.value)}
+                                                    placeholder={t('actionUrlPlaceholder')}
+                                                    disabled={isReadOnly}
+                                                    className="w-full h-[42px] px-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
                             <div className="space-y-3">
                                 <label className="flex items-center gap-2 text-sm text-gray-700">

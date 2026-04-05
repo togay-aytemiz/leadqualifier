@@ -202,6 +202,7 @@ export async function register(formData: FormData) {
                 full_name: fullName,
                 company_name: companyName,
                 billing_region: billingRegion,
+                locale: normalizeAppLocale(locale),
             },
         },
     })

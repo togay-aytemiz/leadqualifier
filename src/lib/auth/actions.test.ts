@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
     createClientMock,
     cookiesMock,
+    getOrganizationOnboardingStateMock,
     headersMock,
     redirectMock,
     resolveActiveOrganizationContextMock,
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
     cookiesMock: vi.fn(),
+    getOrganizationOnboardingStateMock: vi.fn(async () => ({
+        shouldAutoOpen: false,
+    })),
     headersMock: vi.fn(),
     redirectMock: vi.fn(),
     resolveActiveOrganizationContextMock: vi.fn(),
@@ -32,6 +36,10 @@ vi.mock('@/lib/organizations/active-context', () => ({
     resolveActiveOrganizationContext: resolveActiveOrganizationContextMock,
 }))
 
+vi.mock('@/lib/onboarding/state', () => ({
+    getOrganizationOnboardingState: getOrganizationOnboardingStateMock,
+}))
+
 import { login, register, requestPasswordReset } from '@/lib/auth/actions'
 
 function createRegisterFormData(values?: Partial<Record<'email' | 'password' | 'fullName' | 'companyName' | 'locale', string>>) {
@@ -50,6 +58,45 @@ function createLoginFormData(values?: Partial<Record<'email' | 'password' | 'loc
     formData.set('password', values?.password ?? 'password123')
     formData.set('locale', values?.locale ?? 'tr')
     return formData
+}
+
+function createPostAuthLookupFromMock() {
+    return vi.fn((table: string) => ({
+        select: vi.fn(() => ({
+            eq: vi.fn(() => {
+                if (table === 'organization_members') {
+                    return {
+                        limit: vi.fn(() => ({
+                            maybeSingle: vi.fn(async () => ({
+                                data: { organization_id: 'org-1' },
+                                error: null,
+                            }))
+                        })),
+                    }
+                }
+
+                if (table === 'profiles') {
+                    return {
+                        maybeSingle: vi.fn(async () => ({
+                            data: { is_system_admin: false },
+                            error: null,
+                        })),
+                    }
+                }
+
+                if (table === 'organizations') {
+                    return {
+                        maybeSingle: vi.fn(async () => ({
+                            data: { id: 'org-1' },
+                            error: null,
+                        })),
+                    }
+                }
+
+                throw new Error(`Unexpected table ${table}`)
+            })
+        }))
+    }))
 }
 
 describe('auth login action', () => {
@@ -84,29 +131,12 @@ describe('auth login action', () => {
             error: null,
         }))
 
-        const fromMock = vi.fn((table: string) => ({
-            select: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                    maybeSingle: vi.fn(async () => {
-                        if (table === 'profiles') {
-                            return {
-                                data: { is_system_admin: false },
-                                error: null,
-                            }
-                        }
-
-                        throw new Error(`Unexpected table ${table}`)
-                    })
-                }))
-            }))
-        }))
-
         createClientMock.mockResolvedValue({
             auth: {
                 signInWithPassword: signInWithPasswordMock,
                 getUser: vi.fn(),
             },
-            from: fromMock,
+            from: createPostAuthLookupFromMock(),
         })
 
         await expect(login(createLoginFormData({ locale: 'en' }))).resolves.toEqual({
@@ -302,6 +332,71 @@ describe('auth register action', () => {
         }))
     })
 
+    it('persists locale in signup metadata for localized organization defaults', async () => {
+        const rpcMock = vi.fn(async (fn: string) => {
+            if (fn === 'check_signup_trial_rate_limit') {
+                return {
+                    data: {
+                        allowed: true,
+                        cooldown_seconds: 0,
+                        reason: null,
+                    },
+                    error: null,
+                }
+            }
+
+            if (fn === 'check_trial_business_identity') {
+                return {
+                    data: {
+                        eligible: true,
+                        conflict_signal_type: null,
+                    },
+                    error: null,
+                }
+            }
+
+            if (fn === 'record_signup_trial_attempt') {
+                return {
+                    data: {
+                        recorded: true,
+                    },
+                    error: null,
+                }
+            }
+
+            throw new Error(`Unexpected rpc ${fn}`)
+        })
+
+        const signUpMock = vi.fn(async () => ({
+            data: {
+                session: null,
+            },
+            error: null,
+        }))
+
+        createClientMock.mockResolvedValue({
+            rpc: rpcMock,
+            auth: {
+                signUp: signUpMock,
+            },
+        })
+
+        await expect(register(createRegisterFormData({ locale: 'en' }))).resolves.toEqual({
+            redirectPath: '/en/register/check-email?email=jane%40example.com',
+        })
+
+        expect(signUpMock).toHaveBeenCalledWith(expect.objectContaining({
+            options: expect.objectContaining({
+                data: expect.objectContaining({
+                    full_name: 'Jane Doe',
+                    company_name: '',
+                    billing_region: 'TR',
+                    locale: 'en',
+                }),
+            }),
+        }))
+    })
+
     it('redirects directly to the localized home route when signup returns a session', async () => {
         const rpcMock = vi.fn(async (fn: string) => {
             if (fn === 'check_signup_trial_rate_limit') {
@@ -345,30 +440,13 @@ describe('auth register action', () => {
             error: null,
         }))
 
-        const fromMock = vi.fn((table: string) => ({
-            select: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                    maybeSingle: vi.fn(async () => {
-                        if (table === 'profiles') {
-                            return {
-                                data: { is_system_admin: false },
-                                error: null,
-                            }
-                        }
-
-                        throw new Error(`Unexpected table ${table}`)
-                    })
-                }))
-            }))
-        }))
-
         createClientMock.mockResolvedValue({
             rpc: rpcMock,
             auth: {
                 signUp: signUpMock,
                 getUser: vi.fn(),
             },
-            from: fromMock,
+            from: createPostAuthLookupFromMock(),
         })
 
         await expect(register(createRegisterFormData({ locale: 'en' }))).resolves.toEqual({

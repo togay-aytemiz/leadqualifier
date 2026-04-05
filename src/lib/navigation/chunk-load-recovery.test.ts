@@ -40,4 +40,16 @@ describe('buildChunkRecoveryUrl', () => {
             'https://app.askqualy.com/inbox?conversation=123&__chunk_retry=42#details'
         )
     })
+
+    it('retries the pending dashboard route instead of reloading the current page', () => {
+        expect(buildChunkRecoveryUrl('https://app.askqualy.com/inbox?conversation=123#details', 42, '/skills')).toBe(
+            'https://app.askqualy.com/skills?__chunk_retry=42'
+        )
+    })
+
+    it('preserves the active locale prefix when retrying a pending dashboard route', () => {
+        expect(buildChunkRecoveryUrl('https://app.askqualy.com/en/inbox', 42, '/skills')).toBe(
+            'https://app.askqualy.com/en/skills?__chunk_retry=42'
+        )
+    })
 })
