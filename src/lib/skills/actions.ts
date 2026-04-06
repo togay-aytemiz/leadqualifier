@@ -1,12 +1,17 @@
 'use server'
 
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import type { Skill, SkillInsert, SkillUpdate, SkillMatch } from '@/types/database'
 import { buildDefaultSystemSkills } from '@/lib/skills/default-system-skills'
 import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 import { sanitizeSkillActions } from '@/lib/skills/skill-actions'
-import { assertTenantWriteAllowed } from '@/lib/organizations/active-context'
+import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import {
+    SKILL_IMAGE_BUCKET,
+    buildSkillImageStoragePath
+} from '@/lib/skills/image'
 import {
     appendServiceCatalogCandidates,
     appendOfferingProfileSuggestion,
@@ -14,6 +19,62 @@ import {
 } from '@/lib/leads/offering-profile'
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
+
+function requireSupabaseStorageEnv() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+
+    if (!supabaseUrl || !serviceRoleKey) {
+        throw new Error('Missing Supabase storage configuration')
+    }
+
+    return { supabaseUrl, serviceRoleKey }
+}
+
+function createSkillImageStorageClient() {
+    const { supabaseUrl, serviceRoleKey } = requireSupabaseStorageEnv()
+    return createServiceClient(supabaseUrl, serviceRoleKey).storage.from(SKILL_IMAGE_BUCKET)
+}
+
+function createSkillImageUploadVersion() {
+    const timestamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14)
+    const uniqueSuffix = typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+    return `${timestamp}-${uniqueSuffix}`
+}
+
+async function requireActiveSkillImageOrganizationId(
+    supabase: SupabaseClientLike,
+    requestedOrganizationId: string
+) {
+    await assertTenantWriteAllowed(supabase)
+    const normalizedRequestedOrganizationId = requestedOrganizationId.trim()
+    const activeContext = await resolveActiveOrganizationContext(supabase)
+    const activeOrganizationId = activeContext?.activeOrganizationId?.trim() ?? ''
+
+    if (!normalizedRequestedOrganizationId || !activeOrganizationId || normalizedRequestedOrganizationId !== activeOrganizationId) {
+        throw new Error('Skill image upload path does not belong to the active organization')
+    }
+
+    return activeOrganizationId
+}
+
+async function removeStoredSkillImageObject(storagePath: string | null | undefined) {
+    const normalizedStoragePath = storagePath?.trim()
+    if (!normalizedStoragePath) return
+
+    try {
+        const storage = createSkillImageStorageClient()
+        const { error } = await storage.remove([normalizedStoragePath])
+        if (error) {
+            console.warn('Failed to remove stored skill image object:', error)
+        }
+    } catch (error) {
+        console.warn('Failed to initialize skill image storage cleanup:', error)
+    }
+}
 
 function buildSkillsListQuery(
     supabase: SupabaseClientLike,
@@ -149,6 +210,61 @@ export async function createSkill(skill: SkillInsert): Promise<Skill> {
     return data
 }
 
+export async function prepareSkillImageUpload(organizationId: string) {
+    if (!organizationId.trim()) {
+        return { ok: false as const, reason: 'validation' as const }
+    }
+
+    const supabase = await createClient()
+    const activeOrganizationId = await requireActiveSkillImageOrganizationId(supabase, organizationId)
+
+    try {
+        const version = createSkillImageUploadVersion()
+        const storagePath = buildSkillImageStoragePath({
+            organizationId: activeOrganizationId,
+            version
+        })
+        const storage = createSkillImageStorageClient()
+        const { data: signedUploadData, error: signedUploadError } = await storage.createSignedUploadUrl(storagePath)
+
+        if (signedUploadError || !signedUploadData?.token) {
+            throw signedUploadError ?? new Error('Missing signed upload token')
+        }
+
+        const { data: publicUrlData } = storage.getPublicUrl(storagePath)
+        const publicUrl = publicUrlData?.publicUrl?.trim() ?? ''
+        if (!publicUrl) {
+            throw new Error('Could not resolve public URL for skill image upload')
+        }
+
+        return {
+            ok: true as const,
+            bucket: SKILL_IMAGE_BUCKET,
+            storagePath,
+            uploadToken: signedUploadData.token,
+            publicUrl
+        }
+    } catch (error) {
+        console.error('Failed to prepare skill image upload:', error)
+        return { ok: false as const, reason: 'request_failed' as const }
+    }
+}
+
+export async function removeSkillImageUpload(organizationId: string, storagePath: string) {
+    const normalizedStoragePath = storagePath.trim()
+    if (!organizationId.trim() || !normalizedStoragePath) {
+        throw new Error('Skill image upload path does not belong to the active organization')
+    }
+
+    const supabase = await createClient()
+    const activeOrganizationId = await requireActiveSkillImageOrganizationId(supabase, organizationId)
+    if (!normalizedStoragePath.startsWith(`${activeOrganizationId}/`)) {
+        throw new Error('Skill image upload path does not belong to the active organization')
+    }
+
+    await removeStoredSkillImageObject(normalizedStoragePath)
+}
+
 /**
  * Update a skill and regenerate embeddings if triggers changed
  */
@@ -159,6 +275,14 @@ export async function updateSkill(
 ): Promise<Skill> {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
+    const { data: existingSkill, error: existingSkillError } = await supabase
+        .from('skills')
+        .select('id, organization_id, image_storage_path')
+        .eq('id', skillId)
+        .single()
+
+    if (existingSkillError) throw new Error(existingSkillError.message)
+
     const updatesWithSanitizedSkillActions = updates.skill_actions
         ? {
             ...updates,
@@ -175,6 +299,12 @@ export async function updateSkill(
 
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Failed to update skill')
+
+    const previousImageStoragePath = existingSkill?.image_storage_path?.trim() ?? ''
+    const nextImageStoragePath = data.image_storage_path?.trim() ?? ''
+    if (previousImageStoragePath && previousImageStoragePath !== nextImageStoragePath) {
+        await removeStoredSkillImageObject(previousImageStoragePath)
+    }
 
     // Regenerate embeddings when title or triggers change.
     if (updates.trigger_examples || updates.title) {
@@ -241,10 +371,21 @@ export async function updateSkill(
 export async function deleteSkill(skillId: string): Promise<void> {
     const supabase = await createClient()
     await assertTenantWriteAllowed(supabase)
+    const { data: existingSkill, error: existingSkillError } = await supabase
+        .from('skills')
+        .select('id, image_storage_path')
+        .eq('id', skillId)
+        .single()
+
+    if (existingSkillError) throw new Error(existingSkillError.message)
 
     const { error } = await supabase.from('skills').delete().eq('id', skillId)
 
     if (error) throw new Error(error.message)
+
+    if (existingSkill?.image_storage_path) {
+        await removeStoredSkillImageObject(existingSkill.image_storage_path)
+    }
 }
 
 /**

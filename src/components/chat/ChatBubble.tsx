@@ -25,7 +25,20 @@ export function ChatBubble({ message }: ChatBubbleProps) {
                     getSimulatorBubbleClasses(message.role)
                 )}
             >
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                {message.kind === 'image' && message.imageUrl ? (
+                    <div className="space-y-2">
+                        <img
+                            src={message.imageUrl}
+                            alt={message.content || t('imagePreviewAlt')}
+                            className="max-h-72 w-full rounded-lg object-contain bg-white"
+                        />
+                        {message.content ? (
+                            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        ) : null}
+                    </div>
+                ) : (
+                    <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                )}
                 <div className="mt-1 space-y-1">
                     <div className="flex items-center justify-end">
                         <span className={cn('text-[10px]', getSimulatorTimestampClasses(message.role))}>

@@ -19,7 +19,10 @@ interface AiSettingsFormProps {
     hotLeadAction: HumanEscalationAction
     hotLeadHandoverMessage: string
     matchThreshold: number
-    prompt: string
+    assistantRole: string
+    assistantIntakeRule: string
+    assistantNeverDo: string
+    assistantOtherInstructions: string
     activeTab: AiSettingsTabId
     onActiveTabChange: (value: AiSettingsTabId) => void
     onBotNameChange: (value: string) => void
@@ -31,7 +34,11 @@ interface AiSettingsFormProps {
     onHotLeadActionChange: (value: HumanEscalationAction) => void
     onHotLeadHandoverMessageChange: (value: string) => void
     onMatchThresholdChange: (value: number) => void
-    onPromptChange: (value: string) => void
+    onAssistantRoleChange: (value: string) => void
+    onAssistantIntakeRuleChange: (value: string) => void
+    onAssistantNeverDoChange: (value: string) => void
+    onAssistantOtherInstructionsChange: (value: string) => void
+    onOpenHowItWorks: () => void
 }
 
 interface SelectionCardProps {
@@ -73,6 +80,33 @@ function SelectionCard({ label, description, selected, disabled = false, onSelec
     )
 }
 
+interface InstructionTextareaProps {
+    id: string
+    label: string
+    description: string
+    value: string
+    onChange: (value: string) => void
+}
+
+function InstructionTextarea({ id, label, description, value, onChange }: InstructionTextareaProps) {
+    return (
+        <div className="space-y-2">
+            <label htmlFor={id} className="block text-sm font-medium text-gray-800">
+                {label}
+            </label>
+            <p className="text-xs leading-5 text-gray-500">{description}</p>
+            <textarea
+                id={id}
+                rows={4}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                aria-label={label}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus-visible:border-blue-500"
+            />
+        </div>
+    )
+}
+
 export default function AiSettingsForm({
     botName,
     botMode,
@@ -85,7 +119,10 @@ export default function AiSettingsForm({
     hotLeadAction,
     hotLeadHandoverMessage,
     matchThreshold,
-    prompt,
+    assistantRole,
+    assistantIntakeRule,
+    assistantNeverDo,
+    assistantOtherInstructions,
     activeTab,
     onActiveTabChange,
     onBotNameChange,
@@ -97,7 +134,11 @@ export default function AiSettingsForm({
     onHotLeadActionChange,
     onHotLeadHandoverMessageChange,
     onMatchThresholdChange,
-    onPromptChange
+    onAssistantRoleChange,
+    onAssistantIntakeRuleChange,
+    onAssistantNeverDoChange,
+    onAssistantOtherInstructionsChange,
+    onOpenHowItWorks
 }: AiSettingsFormProps) {
     const t = useTranslations('aiSettings')
     const options: Array<{ value: AiBotMode; label: string; description: string }> = [
@@ -239,16 +280,48 @@ export default function AiSettingsForm({
                                 </SettingsSection>
 
                                 <SettingsSection
-                                    title={t('promptTitle')}
-                                    description={t('promptDescription')}
+                                    title={t('assistantInstructionsTitle')}
+                                    description={t('assistantInstructionsDescription')}
+                                    descriptionAddon={(
+                                        <button
+                                            type="button"
+                                            onClick={onOpenHowItWorks}
+                                            className="inline-flex items-center text-sm font-medium text-[#242A40] underline decoration-1 underline-offset-2 transition hover:text-[#1f2437] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#242A40]/15 focus-visible:ring-offset-2"
+                                        >
+                                            {t('howItWorksAction')}
+                                        </button>
+                                    )}
                                 >
-                                    <textarea
-                                        rows={6}
-                                        value={prompt}
-                                        onChange={(e) => onPromptChange(e.target.value)}
-                                        aria-label={t('promptLabel')}
-                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-                                    />
+                                    <div className="grid gap-5">
+                                        <InstructionTextarea
+                                            id="assistant-role"
+                                            label={t('assistantRoleLabel')}
+                                            description={t('assistantRoleDescription')}
+                                            value={assistantRole}
+                                            onChange={onAssistantRoleChange}
+                                        />
+                                        <InstructionTextarea
+                                            id="assistant-intake-rule"
+                                            label={t('assistantIntakeRuleLabel')}
+                                            description={t('assistantIntakeRuleDescription')}
+                                            value={assistantIntakeRule}
+                                            onChange={onAssistantIntakeRuleChange}
+                                        />
+                                        <InstructionTextarea
+                                            id="assistant-never-do"
+                                            label={t('assistantNeverDoLabel')}
+                                            description={t('assistantNeverDoDescription')}
+                                            value={assistantNeverDo}
+                                            onChange={onAssistantNeverDoChange}
+                                        />
+                                        <InstructionTextarea
+                                            id="assistant-other-instructions"
+                                            label={t('assistantOtherInstructionsLabel')}
+                                            description={t('assistantOtherInstructionsDescription')}
+                                            value={assistantOtherInstructions}
+                                            onChange={onAssistantOtherInstructionsChange}
+                                        />
+                                    </div>
                                 </SettingsSection>
                             </>
                         )}

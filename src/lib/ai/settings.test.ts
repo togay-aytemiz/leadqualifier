@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getOrgAiSettings } from './settings'
 import { DEFAULT_HANDOVER_MESSAGE_EN, DEFAULT_HANDOVER_MESSAGE_TR } from './escalation'
-import { DEFAULT_FLEXIBLE_PROMPT, DEFAULT_FLEXIBLE_PROMPT_TR } from './prompts'
+import {
+    DEFAULT_ASSISTANT_INTAKE_RULE_EN,
+    DEFAULT_ASSISTANT_INTAKE_RULE_TR,
+    DEFAULT_ASSISTANT_NEVER_DO_EN,
+    DEFAULT_ASSISTANT_NEVER_DO_TR,
+    DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_EN,
+    DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_TR,
+    DEFAULT_ASSISTANT_ROLE_EN,
+    DEFAULT_ASSISTANT_ROLE_TR,
+    DEFAULT_FLEXIBLE_PROMPT
+} from './prompts'
 import {
     DEFAULT_BOT_DISCLAIMER_MESSAGE_EN,
     DEFAULT_BOT_DISCLAIMER_MESSAGE_TR
@@ -145,7 +155,7 @@ describe('getOrgAiSettings handover message localization', () => {
         expect(settings.hot_lead_handover_message_en).toBe(DEFAULT_HANDOVER_MESSAGE_EN)
     })
 
-    it('returns Turkish default prompt for TR locale when stored prompt is EN default', async () => {
+    it('returns Turkish starter assistant instructions for TR locale when structured fields are still untouched', async () => {
         const supabase = createSupabaseMock({
             bot_mode: 'active',
             match_threshold: 0.6,
@@ -163,16 +173,39 @@ describe('getOrgAiSettings handover message localization', () => {
             locale: 'tr'
         })
 
-        expect(settings.prompt).toBe(DEFAULT_FLEXIBLE_PROMPT_TR)
+        expect(settings.assistant_role).toBe(DEFAULT_ASSISTANT_ROLE_TR)
+        expect(settings.assistant_intake_rule).toBe(DEFAULT_ASSISTANT_INTAKE_RULE_TR)
+        expect(settings.assistant_never_do).toBe(DEFAULT_ASSISTANT_NEVER_DO_TR)
+        expect(settings.assistant_other_instructions).toBe(DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_TR)
+        expect(settings.prompt).toContain(DEFAULT_ASSISTANT_NEVER_DO_TR)
     })
 
-    it('returns Turkish default prompt for TR locale when stored prompt is legacy EN default variant', async () => {
-        const legacyPrompt = `You are the AI assistant for a business.
-Be concise, friendly, and respond in the user's language.
-Never invent prices, policies, services, or guarantees.
-If you are unsure, ask a single clarifying question.
-When generating fallback guidance, only use the provided list of topics.
-If the user's message is a greeting or small talk, respond briefly and friendly, then ask how you can help.`
+    it('returns English starter assistant instructions for EN locale when structured fields are still untouched', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'active',
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            locale: 'en'
+        })
+
+        expect(settings.assistant_role).toBe(DEFAULT_ASSISTANT_ROLE_EN)
+        expect(settings.assistant_intake_rule).toBe(DEFAULT_ASSISTANT_INTAKE_RULE_EN)
+        expect(settings.assistant_never_do).toBe(DEFAULT_ASSISTANT_NEVER_DO_EN)
+        expect(settings.assistant_other_instructions).toBe(DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_EN)
+    })
+
+    it('carries a legacy custom prompt into assistant_other_instructions before the workspace saves the new model', async () => {
+        const legacyPrompt = 'Before giving any price, first learn which service the customer wants.'
 
         const supabase = createSupabaseMock({
             bot_mode: 'active',
@@ -191,7 +224,45 @@ If the user's message is a greeting or small talk, respond briefly and friendly,
             locale: 'tr'
         })
 
-        expect(settings.prompt).toBe(DEFAULT_FLEXIBLE_PROMPT_TR)
+        expect(settings.assistant_role).toBe('')
+        expect(settings.assistant_intake_rule).toBe('')
+        expect(settings.assistant_never_do).toBe('')
+        expect(settings.assistant_other_instructions).toBe(legacyPrompt)
+        expect(settings.prompt).toBe(legacyPrompt)
+    })
+
+    it('compiles structured assistant instructions into the compatibility prompt in hard-soft order and skips empty sections', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'active',
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            assistant_role: 'Önce ihtiyacı anla ve kısa cevap ver.',
+            assistant_intake_rule: 'Kritik bilgi eksikse önce tek soru sor.',
+            assistant_never_do: 'Fiyat uydurma.',
+            assistant_other_instructions: '',
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            locale: 'tr'
+        })
+
+        expect(settings.prompt).toContain('Fiyat uydurma.')
+        expect(settings.prompt).toContain('Önce ihtiyacı anla ve kısa cevap ver.')
+        expect(settings.prompt).toContain('Kritik bilgi eksikse önce tek soru sor.')
+        expect(settings.prompt).not.toContain('Diğer talimatlar')
+        expect(settings.prompt.indexOf('Fiyat uydurma.')).toBeLessThan(
+            settings.prompt.indexOf('Önce ihtiyacı anla ve kısa cevap ver.')
+        )
+        expect(settings.prompt.indexOf('Önce ihtiyacı anla ve kısa cevap ver.')).toBeLessThan(
+            settings.prompt.indexOf('Kritik bilgi eksikse önce tek soru sor.')
+        )
     })
 
     it('defaults bot disclaimer settings when columns are missing', async () => {

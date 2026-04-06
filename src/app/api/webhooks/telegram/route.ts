@@ -43,6 +43,16 @@ function readTrimmedString(value: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function buildTelegramSkillImagePlaceholder(responseLanguage: 'tr' | 'en') {
+    return responseLanguage === 'tr' ? '[Yetenek görseli]' : '[Skill image]'
+}
+
+function buildTelegramSkillImageFailureNotice(responseLanguage: 'tr' | 'en') {
+    return responseLanguage === 'tr'
+        ? '[Yetenek görseli gönderilemedi]'
+        : '[Skill image could not be delivered]'
+}
+
 async function resolveTelegramContactAvatarUrl(args: {
     botToken: string | null
     telegramUserId: number | string | null | undefined
@@ -483,7 +493,7 @@ export async function POST(req: NextRequest) {
     for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await supabase
             .from('skills')
-            .select('requires_human_handover, title')
+            .select('requires_human_handover, title, image_public_url, image_mime_type, image_original_filename')
             .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
@@ -509,6 +519,61 @@ export async function POST(req: NextRequest) {
             matched_skill_title: matchedSkillTitle,
             skill_requires_human_handover: skillRequiresHumanHandover
         })
+
+        const imageUrl = readTrimmedString(matchedSkillDetails?.image_public_url)
+        if (imageUrl) {
+            try {
+                await client.sendImage(chatId, imageUrl)
+                await persistBotMessage(buildTelegramSkillImagePlaceholder(responseLanguage), {
+                    skill_id: candidateMatch.skill_id,
+                    skill_title: matchedSkillTitle,
+                    matched_skill_title: matchedSkillTitle,
+                    skill_requires_human_handover: skillRequiresHumanHandover,
+                    skill_has_image: true,
+                    telegram_message_type: 'image',
+                    telegram_media_type: 'image',
+                    telegram_media_mime_type: matchedSkillDetails?.image_mime_type ?? 'image/webp',
+                    telegram_media_filename: matchedSkillDetails?.image_original_filename ?? null,
+                    telegram_outbound_status: 'sent',
+                    telegram_is_media_placeholder: true,
+                    telegram_media: {
+                        type: 'image',
+                        mime_type: matchedSkillDetails?.image_mime_type ?? 'image/webp',
+                        filename: matchedSkillDetails?.image_original_filename ?? null,
+                        caption: null,
+                        storage_url: imageUrl,
+                        delivery_status: 'sent'
+                    }
+                })
+            } catch (error) {
+                console.warn('Telegram Webhook: Failed to deliver skill image', {
+                    skill_id: candidateMatch.skill_id,
+                    error
+                })
+                await persistBotMessage(buildTelegramSkillImageFailureNotice(responseLanguage), {
+                    skill_id: candidateMatch.skill_id,
+                    skill_title: matchedSkillTitle,
+                    matched_skill_title: matchedSkillTitle,
+                    skill_requires_human_handover: skillRequiresHumanHandover,
+                    skill_has_image: true,
+                    skill_image_delivery_failed: true,
+                    telegram_message_type: 'image',
+                    telegram_media_type: 'image',
+                    telegram_media_mime_type: matchedSkillDetails?.image_mime_type ?? 'image/webp',
+                    telegram_media_filename: matchedSkillDetails?.image_original_filename ?? null,
+                    telegram_outbound_status: 'failed',
+                    telegram_is_media_placeholder: true,
+                    telegram_media: {
+                        type: 'image',
+                        mime_type: matchedSkillDetails?.image_mime_type ?? 'image/webp',
+                        filename: matchedSkillDetails?.image_original_filename ?? null,
+                        caption: null,
+                        storage_url: imageUrl,
+                        delivery_status: 'failed'
+                    }
+                })
+            }
+        }
         console.log('Telegram Webhook: Sent matched response')
 
         await applyEscalationAfterReply({

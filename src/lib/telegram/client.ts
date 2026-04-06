@@ -104,6 +104,15 @@ export class TelegramClient {
             text,
         })
     }
+
+    async sendImage(chatId: number | string, imageUrl: string, caption?: string) {
+        return this.request('sendPhoto', {
+            chat_id: chatId,
+            photo: imageUrl,
+            ...(caption?.trim() ? { caption: caption.trim() } : {})
+        })
+    }
+
     async getWebhookInfo(): Promise<Record<string, unknown>> {
         return this.request('getWebhookInfo')
     }

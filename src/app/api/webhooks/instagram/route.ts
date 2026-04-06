@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { InstagramClient } from '@/lib/instagram/client'
 import { extractInstagramInboundEvents, isValidMetaSignature } from '@/lib/instagram/webhook'
-import { normalizeOutboundMessage } from '@/lib/channels/outbound-message'
+import { isOutboundImageMessage, normalizeOutboundMessage } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { resolveMetaInstagramConnectionCandidate } from '@/lib/channels/meta-oauth'
 
@@ -723,6 +723,15 @@ export async function POST(req: NextRequest) {
       inboundMessageMetadata: messageMetadata,
       skipAutomation: event.skipAutomation,
       sendOutbound: async (content) => {
+        if (isOutboundImageMessage(content)) {
+          await client.sendImage({
+            instagramBusinessAccountId: event.instagramBusinessAccountId,
+            to: event.contactId,
+            imageUrl: content.imageUrl,
+          })
+          return
+        }
+
         const normalized = normalizeOutboundMessage(content)
         await client.sendText({
           instagramBusinessAccountId: event.instagramBusinessAccountId,

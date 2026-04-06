@@ -98,6 +98,22 @@ describe('extractMediaFromMessageMetadata', () => {
         expect(extractMediaFromMessageMetadata({})).toBeNull()
         expect(extractMediaFromMessageMetadata(null)).toBeNull()
     })
+
+    it('ignores failed skill image delivery metadata so the failure text stays visible', () => {
+        const media = extractMediaFromMessageMetadata({
+            skill_image_delivery_failed: true,
+            whatsapp_media: {
+                type: 'image',
+                storage_url: 'https://cdn.example.com/skill-image.webp',
+                mime_type: 'image/webp',
+                download_status: 'stored',
+                delivery_status: 'failed'
+            },
+            whatsapp_is_media_placeholder: true
+        })
+
+        expect(media).toBeNull()
+    })
 })
 
 describe('shouldAttemptInlineImagePreview', () => {
@@ -322,6 +338,22 @@ describe('resolveVisibleMessageContent', () => {
         expect(content).toBe(
             'This Instagram content cannot be previewed in Qualy yet. Open Instagram to view it.'
         )
+    })
+
+    it('keeps the skill image failure notice visible when delivery failed', () => {
+        const content = resolveVisibleMessageContent({
+            content: '[Skill image could not be delivered]',
+            metadata: {
+                skill_image_delivery_failed: true,
+                whatsapp_media: {
+                    type: 'image',
+                    storage_url: 'https://cdn.example.com/skill-image.webp',
+                    delivery_status: 'failed'
+                }
+            }
+        })
+
+        expect(content).toBe('[Skill image could not be delivered]')
     })
 })
 

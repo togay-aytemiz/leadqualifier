@@ -1044,9 +1044,135 @@ describe('processInboundAiPipeline guardrails', () => {
                 })
             })
         )
-        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions')
+        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
         expect(decideHumanEscalationMock).toHaveBeenCalled()
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('sends matched skill text first and image second when the skill has an image', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botTextInsert = createInsertBuilder()
+        const botImageInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotText = createUpdateBuilder()
+        const conversationUpdateAfterBotImage = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({
+            requires_human_handover: false,
+            title: 'Bilgi',
+            skill_actions: [],
+            image_public_url: 'https://cdn.example.com/skill-image.webp',
+            image_storage_path: 'org-1/skill-image.webp',
+            image_mime_type: 'image/webp',
+            image_original_filename: 'offer.webp'
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botTextInsert.builder, botImageInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotText.builder,
+                conversationUpdateAfterBotImage.builder
+            ],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(sendOutbound).toHaveBeenNthCalledWith(
+            1,
+            'Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+        )
+        expect(sendOutbound).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                type: 'image',
+                imageUrl: 'https://cdn.example.com/skill-image.webp'
+            })
+        )
+        expect(botImageInsert.insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sender_type: 'bot',
+                metadata: expect.objectContaining({
+                    whatsapp_media: expect.objectContaining({
+                        storage_url: 'https://cdn.example.com/skill-image.webp',
+                        mime_type: 'image/webp'
+                    })
+                })
+            })
+        )
+    })
+
+    it('continues human handover even when the skill image send fails', async () => {
+        const sendOutbound = vi
+            .fn()
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce(new Error('media send failed'))
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botTextInsert = createInsertBuilder()
+        const botImageInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotText = createUpdateBuilder()
+        const conversationUpdateAfterBotImage = createUpdateBuilder()
+        const escalationUpdate = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({
+            requires_human_handover: true,
+            title: 'Bilgi',
+            skill_actions: [],
+            image_public_url: 'https://cdn.example.com/skill-image.webp',
+            image_storage_path: 'org-1/skill-image.webp',
+            image_mime_type: 'image/webp',
+            image_original_filename: 'offer.webp'
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botTextInsert.builder, botImageInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotText.builder,
+                conversationUpdateAfterBotImage.builder,
+                escalationUpdate.builder
+            ],
+            skills: [skillDetails.builder]
+        })
+
+        decideHumanEscalationMock.mockReturnValueOnce({
+            shouldEscalate: true,
+            reason: 'skill_handover',
+            action: 'switch_to_operator',
+            noticeMode: 'none',
+            noticeMessage: null
+        })
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await expect(processInboundAiPipeline(buildInput(supabase, sendOutbound))).resolves.toBeUndefined()
+
+        expect(decideHumanEscalationMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                skillRequiresHumanHandover: true
+            })
+        )
+        expect(escalationUpdate.updateMock).toHaveBeenCalled()
     })
 
     it('uses instagram disclaimer formatting for instagram bot replies', async () => {
@@ -1141,7 +1267,7 @@ describe('processInboundAiPipeline guardrails', () => {
                 { id: 'skill_action:skill-1:action-url-1', title: 'Instagram' }
             ]
         })
-        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions')
+        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
     })
 
     it('handles open_url skill action deterministically when inbound button maps to a skill action', async () => {
@@ -1453,7 +1579,7 @@ describe('processInboundAiPipeline guardrails', () => {
         )
 
         expect(sendOutbound).toHaveBeenCalledWith('Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
-        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions')
+        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
@@ -1607,7 +1733,7 @@ describe('processInboundAiPipeline guardrails', () => {
         )
 
         expect(sendOutbound).toHaveBeenCalledWith('Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
-        expect(firstSkillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions')
+        expect(firstSkillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
         expect(secondSkillDetails.selectMock).not.toHaveBeenCalled()
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })

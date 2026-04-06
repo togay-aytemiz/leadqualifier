@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation'
 import type { Skill, SkillAction } from '@/types/database'
 import { ClientSearchInput } from '@/components/common/ClientSearchInput'
 import { Badge, ConfirmDialog } from '@/design/primitives'
-import { createSkill, updateSkill, deleteSkill, toggleSkill } from '@/lib/skills/actions'
+import {
+    createSkill,
+    deleteSkill,
+    prepareSkillImageUpload,
+    removeSkillImageUpload,
+    toggleSkill,
+    updateSkill
+} from '@/lib/skills/actions'
 import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import { cn } from '@/lib/utils'
@@ -13,10 +20,26 @@ import {
     getSkillsMobileDetailPaneClasses,
     getSkillsMobileListPaneClasses
 } from '@/components/skills/mobilePaneState'
-
 import { useTranslations } from 'next-intl'
 import { useLocale } from 'next-intl'
 import { getAvailableActionTargetSkills } from '@/components/skills/action-target-skills'
+import { createClient } from '@/lib/supabase/client'
+import {
+    SKILL_IMAGE_INPUT_ACCEPT,
+    convertSkillImageToWebP,
+    validateSkillImageFile
+} from '@/lib/skills/image-client'
+
+type SkillImageFormState = {
+    image_storage_path: string | null
+    image_public_url: string | null
+    image_mime_type: string | null
+    image_width: number | null
+    image_height: number | null
+    image_size_bytes: number | null
+    image_original_filename: string | null
+    image_updated_at: string | null
+}
 
 interface SkillsContainerProps {
     initialSkills: Skill[]
@@ -45,18 +68,58 @@ function isValidHttpUrl(value: string) {
     }
 }
 
+const EMPTY_SKILL_IMAGE_STATE: SkillImageFormState = {
+    image_storage_path: null,
+    image_public_url: null,
+    image_mime_type: null,
+    image_width: null,
+    image_height: null,
+    image_size_bytes: null,
+    image_original_filename: null,
+    image_updated_at: null
+}
+
+type SkillImageSource = SkillImageFormState | Pick<
+    Skill,
+    | 'image_storage_path'
+    | 'image_public_url'
+    | 'image_mime_type'
+    | 'image_width'
+    | 'image_height'
+    | 'image_size_bytes'
+    | 'image_original_filename'
+    | 'image_updated_at'
+>
+
+function readSkillImageState(skill?: SkillImageSource | null): SkillImageFormState {
+    return {
+        image_storage_path: skill?.image_storage_path ?? null,
+        image_public_url: skill?.image_public_url ?? null,
+        image_mime_type: skill?.image_mime_type ?? null,
+        image_width: skill?.image_width ?? null,
+        image_height: skill?.image_height ?? null,
+        image_size_bytes: skill?.image_size_bytes ?? null,
+        image_original_filename: skill?.image_original_filename ?? null,
+        image_updated_at: skill?.image_updated_at ?? null
+    }
+}
+
 export function SkillsContainer({ initialSkills, organizationId, handoverMessage, isReadOnly = false }: SkillsContainerProps) {
     const t = useTranslations('skills')
     const tc = useTranslations('common')
     const locale = useLocale()
     const router = useRouter()
+    const supabase = useMemo(() => createClient(), [])
     const [skills, setSkills] = useState<Skill[]>(initialSkills)
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [isImageUploading, setIsImageUploading] = useState(false)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [validationError, setValidationError] = useState<string | null>(null)
     const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
+    const [imageError, setImageError] = useState<string | null>(null)
+    const [imageStatus, setImageStatus] = useState<string | null>(null)
 
     // Form state
     const [formData, setFormData] = useState({
@@ -64,7 +127,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         response_text: '',
         triggers: [''], // Start with one empty trigger
         requires_human_handover: false,
-        skill_actions: [] as SkillAction[]
+        skill_actions: [] as SkillAction[],
+        ...EMPTY_SKILL_IMAGE_STATE
     })
 
     // To track dirty state
@@ -73,7 +137,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         response_text: '',
         triggers: [''],
         requires_human_handover: false,
-        skill_actions: [] as SkillAction[]
+        skill_actions: [] as SkillAction[],
+        ...EMPTY_SKILL_IMAGE_STATE
     })
 
     // Sync skills when initialSkills changes (e.g. after search)
@@ -92,12 +157,15 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     // Ensure at least 3 triggers for editing consistency if backend data is sparse
                     triggers: ensureMinTriggers(skill.trigger_examples, 3),
                     requires_human_handover: skill.requires_human_handover ?? false,
-                    skill_actions: Array.isArray(skill.skill_actions) ? skill.skill_actions : []
+                    skill_actions: Array.isArray(skill.skill_actions) ? skill.skill_actions : [],
+                    ...readSkillImageState(skill)
                 }
                 setFormData(initialData)
                 setInitialFormState(initialData)
                 setIsCreating(false)
                 setShowDeleteConfirm(false)
+                setImageError(null)
+                setImageStatus(null)
             }
         } else if (isCreating) {
             const initialData = {
@@ -105,11 +173,14 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                 response_text: '',
                 triggers: ['', '', ''], // 3 empty triggers for new skill
                 requires_human_handover: false,
-                skill_actions: []
+                skill_actions: [],
+                ...EMPTY_SKILL_IMAGE_STATE
             }
             setFormData(initialData)
             setInitialFormState(initialData)
             setShowDeleteConfirm(false)
+            setImageError(null)
+            setImageStatus(null)
         }
     }, [selectedSkillId, isCreating, skills])
 
@@ -145,6 +216,97 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
 
     const handleBackToSkillList = () => {
         setIsMobileDetailOpen(false)
+    }
+
+    const handleSelectImage = async (file: File | null) => {
+        if (!file || isReadOnly || isImageUploading) return
+
+        const validationError = validateSkillImageFile(file)
+        if (validationError) {
+            setImageStatus(null)
+            setImageError(
+                validationError === 'file_too_large'
+                    ? t('imageTooLarge')
+                    : t('imageInvalidType')
+            )
+            return
+        }
+
+        setIsImageUploading(true)
+        setImageError(null)
+        setImageStatus(null)
+
+        try {
+            const converted = await convertSkillImageToWebP(file)
+            const prepareResult = await prepareSkillImageUpload(organizationId)
+            if (!prepareResult.ok) {
+                throw new Error('Failed to prepare skill image upload')
+            }
+
+            const { error: uploadError } = await supabase.storage
+                .from(prepareResult.bucket)
+                .uploadToSignedUrl(prepareResult.storagePath, prepareResult.uploadToken, converted.file)
+
+            if (uploadError) {
+                throw uploadError
+            }
+
+            const previousUnsavedUploadPath = formData.image_storage_path
+            const initialUploadPath = initialFormState.image_storage_path
+            if (
+                previousUnsavedUploadPath &&
+                previousUnsavedUploadPath !== initialUploadPath &&
+                previousUnsavedUploadPath !== prepareResult.storagePath
+            ) {
+                await removeSkillImageUpload(organizationId, previousUnsavedUploadPath).catch((error) => {
+                    console.warn('Failed to remove stale unsaved skill image upload:', error)
+                })
+            }
+
+            setFormData((prev) => ({
+                ...prev,
+                image_storage_path: prepareResult.storagePath,
+                image_public_url: prepareResult.publicUrl,
+                image_mime_type: converted.file.type,
+                image_width: converted.width,
+                image_height: converted.height,
+                image_size_bytes: converted.file.size,
+                image_original_filename: file.name,
+                image_updated_at: new Date().toISOString()
+            }))
+            setImageStatus(t('imageUploaded'))
+        } catch (error) {
+            console.error('Failed to upload skill image:', error)
+            setImageError(t('imageUploadFailed'))
+        } finally {
+            setIsImageUploading(false)
+        }
+    }
+
+    const handleRemoveImage = async () => {
+        if (isReadOnly || isImageUploading || !formData.image_storage_path) return
+
+        const currentStoragePath = formData.image_storage_path
+        const initialStoragePath = initialFormState.image_storage_path
+
+        setImageError(null)
+        setImageStatus(null)
+
+        if (currentStoragePath && currentStoragePath !== initialStoragePath) {
+            try {
+                await removeSkillImageUpload(organizationId, currentStoragePath)
+            } catch (error) {
+                console.error('Failed to remove unsaved skill image upload:', error)
+                setImageError(t('imageRemoveFailed'))
+                return
+            }
+        }
+
+        setFormData((prev) => ({
+            ...prev,
+            ...EMPTY_SKILL_IMAGE_STATE
+        }))
+        setImageStatus(t('imageRemoved'))
     }
 
     const handleArchiveToggle = async () => {
@@ -312,6 +474,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         }
 
         setIsSaving(true)
+        const nextImageState = readSkillImageState(formData)
+        const previousImageStoragePath = initialFormState.image_storage_path
         try {
             const cleanTriggers = formData.triggers.map(t => t.trim()).filter(Boolean)
             const cleanActions = formData.skill_actions.map((action) => {
@@ -338,7 +502,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     trigger_examples: cleanTriggers,
                     enabled: true,
                     requires_human_handover: formData.requires_human_handover,
-                    skill_actions: cleanActions
+                    skill_actions: cleanActions,
+                    ...nextImageState
                 })
 
                 // Refresh and select the new skill
@@ -359,7 +524,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                     response_text: formData.response_text,
                     trigger_examples: cleanTriggers,
                     requires_human_handover: formData.requires_human_handover,
-                    skill_actions: cleanActions
+                    skill_actions: cleanActions,
+                    ...nextImageState
                 })
                 router.refresh()
 
@@ -371,13 +537,19 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                         response_text: formData.response_text,
                         trigger_examples: cleanTriggers,
                         requires_human_handover: formData.requires_human_handover,
-                        skill_actions: cleanActions
+                        skill_actions: cleanActions,
+                        ...nextImageState
                     } : s
                 ))
                 setInitialFormState(formData)
             }
         } catch (error) {
             console.error('Failed to save skill', error)
+            if (nextImageState.image_storage_path && nextImageState.image_storage_path !== previousImageStoragePath) {
+                await removeSkillImageUpload(organizationId, nextImageState.image_storage_path).catch((cleanupError) => {
+                    console.warn('Failed to clean up unsaved skill image after save error:', cleanupError)
+                })
+            }
             setValidationError(t('validation.saveFailed'))
         } finally {
             setIsSaving(false)
@@ -433,8 +605,8 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                         </span>
                     </div>
                     <button
-                        onClick={handleCreateNew}
-                        disabled={isReadOnly}
+                                    onClick={handleCreateNew}
+                        disabled={isReadOnly || isImageUploading}
                         className="h-10 bg-[#242A40] hover:bg-[#1B2033] text-white px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm shrink-0"
                     >
                         <Plus size={18} />
@@ -517,14 +689,14 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     <>
                                         <button
                                             onClick={handleArchiveToggle}
-                                            disabled={isReadOnly}
+                                            disabled={isReadOnly || isImageUploading}
                                             className="px-2.5 lg:px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
                                         >
                                             {selectedSkill?.enabled ? t('archive') : t('activate')}
                                         </button>
                                         <button
                                             onClick={() => setShowDeleteConfirm(true)}
-                                            disabled={isReadOnly}
+                                            disabled={isReadOnly || isImageUploading}
                                             className="px-2.5 lg:px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-1.5"
                                         >
                                             <Trash2 size={16} className="shrink-0" />
@@ -534,12 +706,12 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                 )}
                                 <button
                                     onClick={handleSave}
-                                    disabled={isReadOnly || !isDirty || isSaving}
+                                    disabled={isReadOnly || !isDirty || isSaving || isImageUploading}
                                     className="px-3 lg:px-4 py-2 bg-[#242A40] text-white rounded-lg text-sm font-medium hover:bg-[#1B2033] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center gap-2"
                                 >
                                     <Save size={16} className="shrink-0" />
-                                    <span className="lg:hidden">{tc('save')}</span>
-                                    <span className="hidden lg:inline">{t('saveChanges')}</span>
+                                    <span className="lg:hidden">{isImageUploading ? t('imageUploading') : tc('save')}</span>
+                                    <span className="hidden lg:inline">{isImageUploading ? t('imageUploading') : t('saveChanges')}</span>
                                 </button>
                             </div>
                         </div>
@@ -620,6 +792,82 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
                                     disabled={isReadOnly}
                                     className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base min-h-[150px] resize-none leading-relaxed"
                                 />
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-semibold text-gray-500 tracking-wider">
+                                        {t('imageLabel')}
+                                    </label>
+                                    <span className="text-xs text-gray-400">{t('imageUploadHint')}</span>
+                                </div>
+                                <p className="text-sm text-gray-500">
+                                    {t('imageDeliveryHint')}
+                                </p>
+
+                                {formData.image_public_url ? (
+                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                                        <img
+                                            src={formData.image_public_url}
+                                            alt={formData.image_original_filename ?? t('imagePreviewAlt')}
+                                            className="max-h-72 w-full rounded-lg object-contain bg-white"
+                                        />
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                            <span>{formData.image_original_filename ?? t('imagePreviewReady')}</span>
+                                            {typeof formData.image_width === 'number' && typeof formData.image_height === 'number' ? (
+                                                <span>{t('imageDimensions', { width: formData.image_width, height: formData.image_height })}</span>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+                                        {t('imageEmpty')}
+                                    </div>
+                                )}
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <label className={cn(
+                                        'inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50',
+                                        (isReadOnly || isImageUploading) && 'cursor-not-allowed opacity-60'
+                                    )}>
+                                        <input
+                                            type="file"
+                                            accept={SKILL_IMAGE_INPUT_ACCEPT}
+                                            disabled={isReadOnly || isImageUploading}
+                                            className="hidden"
+                                            onChange={(event) => {
+                                                void handleSelectImage(event.target.files?.[0] ?? null)
+                                                event.currentTarget.value = ''
+                                            }}
+                                        />
+                                        {isImageUploading
+                                            ? t('imageUploading')
+                                            : formData.image_public_url
+                                                ? t('imageReplace')
+                                                : t('imageUpload')}
+                                    </label>
+
+                                    {formData.image_public_url ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void handleRemoveImage()
+                                            }}
+                                            disabled={isReadOnly || isImageUploading}
+                                            className="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {t('imageRemove')}
+                                        </button>
+                                    ) : null}
+                                </div>
+
+                                {imageError ? (
+                                    <p className="text-sm text-red-600">{imageError}</p>
+                                ) : null}
+
+                                {imageStatus ? (
+                                    <p className="text-sm text-green-600">{imageStatus}</p>
+                                ) : null}
                             </div>
 
                             {SKILL_ACTIONS_EDITOR_ENABLED && (

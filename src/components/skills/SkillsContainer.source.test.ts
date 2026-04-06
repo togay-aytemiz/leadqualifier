@@ -18,4 +18,23 @@ describe('skills container source guard', () => {
         expect(source).toContain('const SKILL_ACTIONS_EDITOR_ENABLED = false')
         expect(source).toContain('{SKILL_ACTIONS_EDITOR_ENABLED && (')
     })
+
+    it('tracks skill image upload loading state in the editor source', () => {
+        const source = fs.existsSync(SKILLS_CONTAINER_PATH)
+            ? fs.readFileSync(SKILLS_CONTAINER_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('isImageUploading')
+        expect(source).toContain("t('imageUploading')")
+        expect(source).toContain("t('imageUploadHint')")
+    })
+
+    it('persists skill image metadata during skill updates', () => {
+        const source = fs.existsSync(SKILLS_CONTAINER_PATH)
+            ? fs.readFileSync(SKILLS_CONTAINER_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('await updateSkill(selectedSkillId, {')
+        expect(source).toContain('...nextImageState')
+    })
 })

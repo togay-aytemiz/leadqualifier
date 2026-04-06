@@ -514,7 +514,7 @@ describe('Telegram webhook route', () => {
         expect(res.status).toBe(200)
         expect(telegramCtorMock).toHaveBeenCalledTimes(1)
         expect(telegramSendMessageMock).toHaveBeenCalledTimes(1)
-        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title')
+        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, image_public_url, image_mime_type, image_original_filename')
         expect(escalationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
             active_agent: 'operator',
             human_attention_required: true,

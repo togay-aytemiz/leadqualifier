@@ -3,16 +3,41 @@ export interface OutboundReplyButton {
     title: string
 }
 
-export interface OutboundMessagePayload {
+export interface OutboundTextMessagePayload {
     content: string
     replyButtons?: OutboundReplyButton[]
 }
 
+export interface OutboundImageMessagePayload {
+    type: 'image'
+    imageUrl: string
+    mimeType?: string | null
+    fileName?: string | null
+    caption?: string | null
+}
+
+export type OutboundMessagePayload = OutboundTextMessagePayload | OutboundImageMessagePayload
+
 export type OutboundMessageInput = string | OutboundMessagePayload
 
-export function normalizeOutboundMessage(input: OutboundMessageInput): OutboundMessagePayload {
+export function isOutboundImageMessage(input: OutboundMessageInput): input is OutboundImageMessagePayload {
+    return (
+        typeof input === 'object' &&
+        input !== null &&
+        'type' in input &&
+        input.type === 'image'
+    )
+}
+
+export function normalizeOutboundMessage(input: OutboundMessageInput): OutboundTextMessagePayload {
     if (typeof input === 'string') {
         return { content: input }
+    }
+
+    if (isOutboundImageMessage(input)) {
+        return {
+            content: input.caption ?? ''
+        }
     }
 
     return {

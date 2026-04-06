@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useSearchParams } from 'next/navigation'
 import { Button, PageHeader } from '@/design'
 import AiSettingsForm, { type AiSettingsTabId } from './AiSettingsForm'
+import { AiInstructionsHelpModal } from './AiInstructionsHelpModal'
 import type { OrganizationAiSettings } from '@/types/database'
 import { updateOrgAiSettings } from '@/lib/ai/settings'
 import { UnsavedChangesDialog } from '@/components/settings/UnsavedChangesDialog'
@@ -36,8 +37,12 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
     const [hotLeadHandoverMessageTr, setHotLeadHandoverMessageTr] = useState(initialSettings.hot_lead_handover_message_tr)
     const [hotLeadHandoverMessageEn, setHotLeadHandoverMessageEn] = useState(initialSettings.hot_lead_handover_message_en)
     const [matchThreshold, setMatchThreshold] = useState(initialSettings.match_threshold)
-    const [prompt, setPrompt] = useState(initialSettings.prompt)
+    const [assistantRole, setAssistantRole] = useState(initialSettings.assistant_role)
+    const [assistantIntakeRule, setAssistantIntakeRule] = useState(initialSettings.assistant_intake_rule)
+    const [assistantNeverDo, setAssistantNeverDo] = useState(initialSettings.assistant_never_do)
+    const [assistantOtherInstructions, setAssistantOtherInstructions] = useState(initialSettings.assistant_other_instructions)
     const [activeTab, setActiveTab] = useState<AiSettingsTabId>('general')
+    const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [saved, setSaved] = useState(false)
@@ -64,7 +69,10 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
             hotLeadHandoverMessageTr !== baseline.hot_lead_handover_message_tr ||
             hotLeadHandoverMessageEn !== baseline.hot_lead_handover_message_en ||
             matchThreshold !== baseline.match_threshold ||
-            prompt !== baseline.prompt
+            assistantRole !== baseline.assistant_role ||
+            assistantIntakeRule !== baseline.assistant_intake_rule ||
+            assistantNeverDo !== baseline.assistant_never_do ||
+            assistantOtherInstructions !== baseline.assistant_other_instructions
         )
     }, [
         botName,
@@ -78,7 +86,10 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
         hotLeadHandoverMessageTr,
         hotLeadHandoverMessageEn,
         matchThreshold,
-        prompt,
+        assistantRole,
+        assistantIntakeRule,
+        assistantNeverDo,
+        assistantOtherInstructions,
         baseline
     ])
 
@@ -153,7 +164,10 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
                 hot_lead_handover_message_tr: hotLeadHandoverMessageTr,
                 hot_lead_handover_message_en: hotLeadHandoverMessageEn,
                 match_threshold: matchThreshold,
-                prompt
+                assistant_role: assistantRole,
+                assistant_intake_rule: assistantIntakeRule,
+                assistant_never_do: assistantNeverDo,
+                assistant_other_instructions: assistantOtherInstructions
             })
             setBaseline(savedSettings)
             setBotName(savedSettings.bot_name)
@@ -167,7 +181,10 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
             setHotLeadHandoverMessageTr(savedSettings.hot_lead_handover_message_tr)
             setHotLeadHandoverMessageEn(savedSettings.hot_lead_handover_message_en)
             setMatchThreshold(savedSettings.match_threshold)
-            setPrompt(savedSettings.prompt)
+            setAssistantRole(savedSettings.assistant_role)
+            setAssistantIntakeRule(savedSettings.assistant_intake_rule)
+            setAssistantNeverDo(savedSettings.assistant_never_do)
+            setAssistantOtherInstructions(savedSettings.assistant_other_instructions)
             setSaved(true)
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('ai-settings-updated'))
@@ -199,7 +216,10 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
         setHotLeadHandoverMessageTr(baseline.hot_lead_handover_message_tr)
         setHotLeadHandoverMessageEn(baseline.hot_lead_handover_message_en)
         setMatchThreshold(baseline.match_threshold)
-        setPrompt(baseline.prompt)
+        setAssistantRole(baseline.assistant_role)
+        setAssistantIntakeRule(baseline.assistant_intake_rule)
+        setAssistantNeverDo(baseline.assistant_never_do)
+        setAssistantOtherInstructions(baseline.assistant_other_instructions)
         setSaved(false)
         setSaveError(null)
     }
@@ -240,7 +260,10 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
                         hotLeadAction={hotLeadAction}
                         hotLeadHandoverMessage={localizedHandoverMessage}
                         matchThreshold={matchThreshold}
-                        prompt={prompt}
+                        assistantRole={assistantRole}
+                        assistantIntakeRule={assistantIntakeRule}
+                        assistantNeverDo={assistantNeverDo}
+                        assistantOtherInstructions={assistantOtherInstructions}
                         activeTab={activeTab}
                         onActiveTabChange={setActiveTab}
                         onBotNameChange={setBotName}
@@ -252,10 +275,19 @@ export default function AiSettingsClient({ initialSettings, onboardingState }: A
                         onHotLeadActionChange={setHotLeadAction}
                         onHotLeadHandoverMessageChange={handleLocalizedHandoverMessageChange}
                         onMatchThresholdChange={setMatchThreshold}
-                        onPromptChange={setPrompt}
+                        onAssistantRoleChange={setAssistantRole}
+                        onAssistantIntakeRuleChange={setAssistantIntakeRule}
+                        onAssistantNeverDoChange={setAssistantNeverDo}
+                        onAssistantOtherInstructionsChange={setAssistantOtherInstructions}
+                        onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
                     />
                 </div>
             </div>
+
+            <AiInstructionsHelpModal
+                isOpen={isHowItWorksOpen}
+                onClose={() => setIsHowItWorksOpen(false)}
+            />
 
             <UnsavedChangesDialog
                 isOpen={guard.isDialogOpen}

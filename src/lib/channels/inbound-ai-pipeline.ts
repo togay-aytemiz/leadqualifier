@@ -111,6 +111,69 @@ function readMessageMetadataString(metadata: unknown, key: string) {
     return readTrimmedString(metadata[key])
 }
 
+function buildSkillImagePlaceholder(responseLanguage: 'tr' | 'en') {
+    return responseLanguage === 'tr' ? '[Yetenek görseli]' : '[Skill image]'
+}
+
+function buildSkillImageFailureNotice(responseLanguage: 'tr' | 'en') {
+    return responseLanguage === 'tr'
+        ? '[Yetenek görseli gönderilemedi]'
+        : '[Skill image could not be delivered]'
+}
+
+function buildSkillImageMetadata(
+    platform: InboundAiPipelineInput['platform'],
+    image: {
+        imageUrl: string
+        mimeType?: string | null
+        fileName?: string | null
+    },
+    status: 'sent' | 'failed'
+) {
+    const baseMedia = {
+        type: 'image',
+        mime_type: image.mimeType ?? 'image/webp',
+        filename: image.fileName ?? null,
+        caption: null,
+        storage_url: image.imageUrl,
+        delivery_status: status
+    }
+
+    if (platform === 'instagram') {
+        return {
+            instagram_message_type: 'image',
+            instagram_media_type: 'image',
+            instagram_media_mime_type: image.mimeType ?? 'image/webp',
+            instagram_media_filename: image.fileName ?? null,
+            instagram_outbound_status: status,
+            instagram_is_media_placeholder: true,
+            instagram_media: baseMedia
+        }
+    }
+
+    if (platform === 'telegram') {
+        return {
+            telegram_message_type: 'image',
+            telegram_media_type: 'image',
+            telegram_media_mime_type: image.mimeType ?? 'image/webp',
+            telegram_media_filename: image.fileName ?? null,
+            telegram_outbound_status: status,
+            telegram_is_media_placeholder: true,
+            telegram_media: baseMedia
+        }
+    }
+
+    return {
+        whatsapp_message_type: 'image',
+        whatsapp_media_type: 'image',
+        whatsapp_media_mime_type: image.mimeType ?? 'image/webp',
+        whatsapp_media_filename: image.fileName ?? null,
+        whatsapp_outbound_status: status,
+        whatsapp_is_media_placeholder: true,
+        whatsapp_media: baseMedia
+    }
+}
+
 function mergeConversationTags(existingTags: unknown, ensureTag: string | null): string[] {
     const normalized = readStringArray(existingTags)
     if (!ensureTag) return normalized
@@ -657,6 +720,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         responseText: string
         skillRequiresHumanHandover: boolean
         rawSkillActions: unknown
+        imagePublicUrl?: string | null
+        imageMimeType?: string | null
+        imageOriginalFilename?: string | null
         metadata: Record<string, unknown>
     }) => {
         const formattedSkillReply = formatOutboundBotMessage(args.responseText)
@@ -677,6 +743,52 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             skill_requires_human_handover: args.skillRequiresHumanHandover,
             ...args.metadata
         })
+
+        const imageUrl = readTrimmedString(args.imagePublicUrl)
+        if (imageUrl) {
+            try {
+                await options.sendOutbound({
+                    type: 'image',
+                    imageUrl,
+                    mimeType: args.imageMimeType ?? 'image/webp',
+                    fileName: args.imageOriginalFilename ?? null
+                })
+                await persistBotMessage(buildSkillImagePlaceholder(responseLanguage), {
+                    skill_id: args.skillId,
+                    skill_title: args.skillTitle,
+                    matched_skill_title: args.skillTitle,
+                    skill_requires_human_handover: args.skillRequiresHumanHandover,
+                    skill_has_image: true,
+                    ...buildSkillImageMetadata(options.platform, {
+                        imageUrl,
+                        mimeType: args.imageMimeType ?? 'image/webp',
+                        fileName: args.imageOriginalFilename ?? null
+                    }, 'sent'),
+                    ...args.metadata
+                })
+            } catch (error) {
+                console.warn(`${options.logPrefix}: Failed to deliver skill image`, {
+                    skill_id: args.skillId,
+                    organization_id: orgId,
+                    conversation_id: conversation.id,
+                    error: error instanceof Error ? error.message : String(error)
+                })
+                await persistBotMessage(buildSkillImageFailureNotice(responseLanguage), {
+                    skill_id: args.skillId,
+                    skill_title: args.skillTitle,
+                    matched_skill_title: args.skillTitle,
+                    skill_requires_human_handover: args.skillRequiresHumanHandover,
+                    skill_has_image: true,
+                    skill_image_delivery_failed: true,
+                    ...buildSkillImageMetadata(options.platform, {
+                        imageUrl,
+                        mimeType: args.imageMimeType ?? 'image/webp',
+                        fileName: args.imageOriginalFilename ?? null
+                    }, 'failed'),
+                    ...args.metadata
+                })
+            }
+        }
 
         await applyEscalationAfterReply({
             skillRequiresHumanHandover: args.skillRequiresHumanHandover
@@ -756,7 +868,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             if (matchedAction?.type === 'trigger_skill') {
                 const { data: targetSkill, error: targetSkillError } = await options.supabase
                     .from('skills')
-                    .select('id, organization_id, title, response_text, enabled, requires_human_handover, skill_actions')
+                    .select('id, organization_id, title, response_text, enabled, requires_human_handover, skill_actions, image_public_url, image_mime_type, image_original_filename')
                     .eq('id', matchedAction.target_skill_id)
                     .maybeSingle()
 
@@ -782,6 +894,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         responseText: targetSkill.response_text,
                         skillRequiresHumanHandover: Boolean(targetSkill.requires_human_handover),
                         rawSkillActions: targetSkill.skill_actions,
+                        imagePublicUrl: targetSkill.image_public_url,
+                        imageMimeType: targetSkill.image_mime_type,
+                        imageOriginalFilename: targetSkill.image_original_filename,
                         metadata: {
                             is_skill_action: true,
                             skill_action_type: matchedAction.type,
@@ -894,7 +1009,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
             .from('skills')
-            .select('requires_human_handover, title, skill_actions')
+            .select('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
             .eq('id', candidateMatch.skill_id)
             .maybeSingle()
 
@@ -917,6 +1032,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             responseText: candidateMatch.response_text,
             skillRequiresHumanHandover,
             rawSkillActions: matchedSkillDetails?.skill_actions,
+            imagePublicUrl: matchedSkillDetails?.image_public_url,
+            imageMimeType: matchedSkillDetails?.image_mime_type,
+            imageOriginalFilename: matchedSkillDetails?.image_original_filename,
             metadata: {
                 skill_match_source: 'semantic_top_match'
             }

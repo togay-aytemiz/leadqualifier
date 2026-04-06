@@ -1,6 +1,6 @@
 'use server'
 
-import { matchSkills } from '@/lib/skills/actions'
+import { getSkill, matchSkills } from '@/lib/skills/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
@@ -62,6 +62,8 @@ export interface ChatMessage {
     content: string
     timestamp: Date
     status: 'sent' | 'delivered' | 'read'
+    kind?: 'image'
+    imageUrl?: string
     tokenUsage?: {
         inputTokens: number
         outputTokens: number
@@ -75,6 +77,11 @@ export interface SimulationResponse {
         id: string
         title: string
         similarity: number
+    }
+    skillImage?: {
+        imageUrl: string
+        mimeType?: string | null
+        fileName?: string | null
     }
     tokenUsage?: {
         inputTokens: number
@@ -180,13 +187,23 @@ export async function simulateChat(
 
     // 2. Determine response
     if (bestMatch && bestMatch.similarity >= activeThreshold) {
+        const matchedSkillDetails = await getSkill(bestMatch.skill_id)
         return {
             response: bestMatch.response_text,
             matchedSkill: {
                 id: bestMatch.skill_id,
-                title: bestMatch.title,
+                title: matchedSkillDetails?.title ?? bestMatch.title,
                 similarity: bestMatch.similarity,
             },
+            ...(matchedSkillDetails?.image_public_url
+                ? {
+                    skillImage: {
+                        imageUrl: matchedSkillDetails.image_public_url,
+                        mimeType: matchedSkillDetails.image_mime_type ?? 'image/webp',
+                        fileName: matchedSkillDetails.image_original_filename ?? null
+                    }
+                }
+                : {}),
             tokenUsage: {
                 inputTokens: 0,
                 outputTokens: 0,

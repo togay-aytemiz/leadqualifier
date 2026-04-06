@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Json } from '@/types/database'
 import { WhatsAppClient } from '@/lib/whatsapp/client'
-import { normalizeOutboundMessage, type OutboundMessageInput } from '@/lib/channels/outbound-message'
+import {
+    isOutboundImageMessage,
+    normalizeOutboundMessage,
+    type OutboundMessageInput
+} from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { parseSkillActionButtonId } from '@/lib/skills/skill-actions'
 import { resolveWhatsAppMediaPlaceholder } from '@/lib/whatsapp/media-placeholders'
@@ -330,6 +334,16 @@ export async function POST(req: NextRequest) {
         if (!channel || !client) continue
 
         const sendOutboundForEvent = async (message: OutboundMessageInput) => {
+            if (isOutboundImageMessage(message)) {
+                await client.sendImage({
+                    phoneNumberId: event.phoneNumberId,
+                    to: event.contactPhone,
+                    imageUrl: message.imageUrl,
+                    caption: message.caption ?? undefined
+                })
+                return
+            }
+
             const normalized = normalizeOutboundMessage(message)
             if (normalized.replyButtons && normalized.replyButtons.length > 0) {
                 try {

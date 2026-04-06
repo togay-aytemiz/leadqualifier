@@ -15,6 +15,30 @@ Fiyat, politika, hizmet veya garanti uydurma.
 Emin değilsen tek bir netleştirici soru sor.
 Yönlendirici fallback yanıtı üretirken yalnızca verilen konu listesini kullan.`
 
+export const DEFAULT_ASSISTANT_ROLE_EN =
+    'Start by understanding what the customer is trying to do. Then reply with a short, clear, and helpful answer that moves the conversation one step forward. Ask one clarifying question only when it is truly needed.'
+
+export const DEFAULT_ASSISTANT_ROLE_TR =
+    'Önce kullanıcının ne yapmak istediğini anlamaya çalış. Ardından konuşmayı bir adım ileri taşıyan kısa, net ve yardımcı bir yanıt ver. Yalnızca gerçekten gerekiyorsa tek bir açıklayıcı soru sor.'
+
+export const DEFAULT_ASSISTANT_INTAKE_RULE_EN =
+    'If a correct answer or next step depends on a missing detail, ask one short question first. If the customer does not want to share it or does not know it, adapt and do not keep pushing for the same detail.'
+
+export const DEFAULT_ASSISTANT_INTAKE_RULE_TR =
+    'Doğru cevap veya sonraki adım eksik bir bilgiye bağlıysa önce tek kısa soru sor. Kullanıcı paylaşmak istemezse ya da bilmiyorsa uyum sağla ve aynı bilgiyi tekrar zorlama.'
+
+export const DEFAULT_ASSISTANT_NEVER_DO_EN =
+    'Do not give information you are not sure about. Do not invent facts, prices, outcomes, availability, or guarantees. Do not sound pushy, blaming, or impatient.'
+
+export const DEFAULT_ASSISTANT_NEVER_DO_TR =
+    'Emin olmadığın bilgi verme. Gerçek olmayan bilgi, fiyat, sonuç, müsaitlik veya garanti uydurma. Baskıcı, suçlayıcı veya sabırsız bir dil kullanma.'
+
+export const DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_EN =
+    'For example: if the request could match more than one service, option, or next step, first learn the minimum detail needed to guide the customer correctly.'
+
+export const DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_TR =
+    'Örneğin: Talep birden fazla hizmete, seçeneğe veya sonraki adıma uyuyorsa, doğru yönlendirme için önce gereken en kısa ek bilgiyi öğren.'
+
 export const DEFAULT_BOT_NAME = 'Bot'
 
 export const DEFAULT_STRICT_BASE_PROMPT =

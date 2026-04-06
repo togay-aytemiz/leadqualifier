@@ -25,6 +25,7 @@ export interface InboxMessageMedia {
     caption: string | null
     isPlaceholder: boolean
     downloadStatus: string | null
+    deliveryStatus?: string | null
     originalType?: string | null
     previewKind?: 'image' | 'link'
 }
@@ -162,14 +163,21 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
 
     const whatsappMediaNode = isRecord(parsedMetadata.whatsapp_media) ? parsedMetadata.whatsapp_media : null
     const instagramMediaNode = isRecord(parsedMetadata.instagram_media) ? parsedMetadata.instagram_media : null
-    const mediaNode = whatsappMediaNode || instagramMediaNode
+    const telegramMediaNode = isRecord(parsedMetadata.telegram_media) ? parsedMetadata.telegram_media : null
+    const mediaNode = whatsappMediaNode || instagramMediaNode || telegramMediaNode
     if (!mediaNode) return null
 
     const isPlaceholder = parsedMetadata.whatsapp_is_media_placeholder === true
         || parsedMetadata.instagram_is_media_placeholder === true
+        || parsedMetadata.telegram_is_media_placeholder === true
 
     const originalType = toNullableString(mediaNode.original_type)
     const previewKind = toPreviewKind(mediaNode.preview_kind)
+    const deliveryStatus = toNullableString(mediaNode.delivery_status)
+
+    if (parsedMetadata.skill_image_delivery_failed === true && deliveryStatus === 'failed') {
+        return null
+    }
 
     return {
         type: normalizeMediaType(mediaNode.type),
@@ -179,6 +187,7 @@ export function extractMediaFromMessageMetadata(metadata: unknown): InboxMessage
         caption: toNullableString(mediaNode.caption),
         isPlaceholder,
         downloadStatus: toNullableString(mediaNode.download_status),
+        ...(deliveryStatus ? { deliveryStatus } : {}),
         ...(originalType ? { originalType } : {}),
         ...(previewKind ? { previewKind } : {})
     }

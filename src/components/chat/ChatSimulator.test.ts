@@ -14,4 +14,12 @@ describe('ChatSimulator source', () => {
     expect(source).toContain('userId')
     expect(source).toContain('organizationId')
   })
+
+  it('renders a second simulator bubble when a matched skill has an image', () => {
+    const source = fs.readFileSync(FILE_PATH, 'utf8')
+
+    expect(source).toContain('response.skillImage')
+    expect(source).toContain("kind: 'image'")
+    expect(source).toContain('setMessages((prev) => [...prev, ...nextMessages])')
+  })
 })

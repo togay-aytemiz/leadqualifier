@@ -30,6 +30,10 @@ export interface OrganizationAiSettings {
     mode: AiMode
     match_threshold: number
     prompt: string
+    assistant_role: string
+    assistant_intake_rule: string
+    assistant_never_do: string
+    assistant_other_instructions: string
     bot_mode: AiBotMode
     bot_mode_unlock_required: boolean
     bot_mode_unlocked_at: string | null
@@ -313,6 +317,14 @@ export interface Skill {
     trigger_examples: string[]
     response_text: string
     skill_actions?: SkillAction[]
+    image_storage_path?: string | null
+    image_public_url?: string | null
+    image_mime_type?: string | null
+    image_width?: number | null
+    image_height?: number | null
+    image_size_bytes?: number | null
+    image_original_filename?: string | null
+    image_updated_at?: string | null
     enabled: boolean
     requires_human_handover: boolean
     created_at: string

@@ -8,7 +8,10 @@ vi.mock('next-intl', () => ({
 
 const TEST_HANDOVER_MESSAGE = 'handover_message'
 const TEST_BOT_DISCLAIMER_MESSAGE = 'bot_disclaimer_message'
-const TEST_PROMPT = 'ai_prompt'
+const TEST_ASSISTANT_ROLE = 'assistant_role'
+const TEST_ASSISTANT_INTAKE_RULE = 'assistant_intake_rule'
+const TEST_ASSISTANT_NEVER_DO = 'assistant_never_do'
+const TEST_ASSISTANT_OTHER = 'assistant_other'
 
 function renderForm(
     activeTab: 'general' | 'behaviorAndLogic' | 'escalation',
@@ -27,7 +30,10 @@ function renderForm(
             hotLeadAction="notify_only"
             hotLeadHandoverMessage={TEST_HANDOVER_MESSAGE}
             matchThreshold={0.8}
-            prompt={TEST_PROMPT}
+            assistantRole={TEST_ASSISTANT_ROLE}
+            assistantIntakeRule={TEST_ASSISTANT_INTAKE_RULE}
+            assistantNeverDo={TEST_ASSISTANT_NEVER_DO}
+            assistantOtherInstructions={TEST_ASSISTANT_OTHER}
             activeTab={activeTab}
             onActiveTabChange={() => {}}
             onBotNameChange={() => {}}
@@ -39,7 +45,11 @@ function renderForm(
             onHotLeadActionChange={() => {}}
             onHotLeadHandoverMessageChange={() => {}}
             onMatchThresholdChange={() => {}}
-            onPromptChange={() => {}}
+            onAssistantRoleChange={() => {}}
+            onAssistantIntakeRuleChange={() => {}}
+            onAssistantNeverDoChange={() => {}}
+            onAssistantOtherInstructionsChange={() => {}}
+            onOpenHowItWorks={() => {}}
         />
     )
 }
@@ -82,11 +92,17 @@ describe('AiSettingsForm', () => {
         const markup = renderForm('behaviorAndLogic')
 
         expect(markup).toContain('thresholdTitle')
-        expect(markup).toContain('promptTitle')
+        expect(markup).toContain('assistantInstructionsTitle')
+        expect(markup).toContain('assistantRoleLabel')
+        expect(markup).toContain('assistantIntakeRuleLabel')
+        expect(markup).toContain('assistantNeverDoLabel')
+        expect(markup).toContain('assistantOtherInstructionsLabel')
+        expect(markup).toContain('howItWorksAction')
         expect(markup).not.toContain('operatorLeadExtractionTitle')
         expect(markup).not.toContain('botModeTitle')
         expect(markup).not.toContain('botNameTitle')
         expect(markup).not.toContain('humanEscalationTitle')
+        expect(markup).not.toContain('promptTitle')
     })
 
     it('shows escalation settings in Escalation tab', () => {
@@ -99,6 +115,6 @@ describe('AiSettingsForm', () => {
         expect(markup).toContain('humanEscalationMessageLabel')
         expect(markup).not.toContain('humanEscalationTitle')
         expect(markup).not.toContain('botModeTitle')
-        expect(markup).not.toContain('promptTitle')
+        expect(markup).not.toContain('assistantInstructionsTitle')
     })
 })

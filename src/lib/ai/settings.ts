@@ -19,10 +19,9 @@ import {
 import {
     DEFAULT_BOT_NAME,
     DEFAULT_FLEXIBLE_PROMPT,
-    DEFAULT_FLEXIBLE_PROMPT_TR,
-    DEFAULT_STRICT_FALLBACK_TEXT,
     normalizeBotName
 } from '@/lib/ai/prompts'
+import { resolveStructuredAssistantInstructions } from '@/lib/ai/assistant-instructions'
 import { resolveEffectiveBotMode } from '@/lib/ai/bot-mode'
 import {
     getOrganizationOnboardingState,
@@ -31,6 +30,10 @@ import {
 
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 type AiSettingsLegacyRow = Partial<OrganizationAiSettings> & {
+    assistant_role?: string | null
+    assistant_intake_rule?: string | null
+    assistant_never_do?: string | null
+    assistant_other_instructions?: string | null
     hot_lead_handover_message?: string | null
     hot_lead_handover_message_tr?: string | null
     hot_lead_handover_message_en?: string | null
@@ -43,6 +46,10 @@ const DEFAULT_AI_SETTINGS: Omit<OrganizationAiSettings, 'organization_id' | 'cre
     bot_mode_unlocked_at: null,
     match_threshold: 0.6,
     prompt: DEFAULT_FLEXIBLE_PROMPT,
+    assistant_role: '',
+    assistant_intake_rule: '',
+    assistant_never_do: '',
+    assistant_other_instructions: '',
     bot_name: DEFAULT_BOT_NAME,
     bot_disclaimer_enabled: true,
     bot_disclaimer_message_tr: DEFAULT_BOT_DISCLAIMER_MESSAGE_TR,
@@ -59,22 +66,6 @@ interface GetOrgAiSettingsOptions {
     locale?: string | null
     onboardingState?: OrganizationOnboardingShellState | null
 }
-
-const EN_DEFAULT_PROMPT_SIGNATURES = [
-    'you are the ai assistant for a business.',
-    "be concise, friendly, and respond in the user's language.",
-    'never invent prices, policies, services, or guarantees.',
-    'if you are unsure, ask a single clarifying question.',
-    'when generating fallback guidance, only use the provided list of topics.'
-]
-
-const TR_DEFAULT_PROMPT_SIGNATURES = [
-    'sen bir işletme için yapay zeka asistanısın.',
-    'kısa, samimi ve kullanıcının dilinde yanıt ver.',
-    'fiyat, politika, hizmet veya garanti uydurma.',
-    'emin değilsen tek bir netleştirici soru sor.',
-    'yönlendirici fallback yanıtı üretirken yalnızca verilen konu listesini kullan.'
-]
 
 function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value))
@@ -179,31 +170,6 @@ function resolveLocalizedBotDisclaimerMessages(settings: Partial<OrganizationAiS
     }
 }
 
-function resolvePromptForLocale(prompt: string | null | undefined, locale: string | null | undefined) {
-    const normalizedLocale = (locale ?? '').toString().toLowerCase()
-    const localizedDefaultPrompt = normalizedLocale.startsWith('tr')
-        ? DEFAULT_FLEXIBLE_PROMPT_TR
-        : DEFAULT_FLEXIBLE_PROMPT
-
-    const trimmed = (prompt ?? '').toString().trim()
-    if (trimmed) {
-        if (trimmed === DEFAULT_STRICT_FALLBACK_TEXT) {
-            return localizedDefaultPrompt
-        }
-        if (trimmed === DEFAULT_FLEXIBLE_PROMPT || trimmed === DEFAULT_FLEXIBLE_PROMPT_TR) {
-            return localizedDefaultPrompt
-        }
-        const normalized = trimmed.toLowerCase()
-        const matchesEnDefaultFamily = EN_DEFAULT_PROMPT_SIGNATURES.every(signature => normalized.includes(signature))
-        const matchesTrDefaultFamily = TR_DEFAULT_PROMPT_SIGNATURES.every(signature => normalized.includes(signature))
-        if (matchesEnDefaultFamily || matchesTrDefaultFamily) {
-            return localizedDefaultPrompt
-        }
-        return trimmed
-    }
-    return localizedDefaultPrompt
-}
-
 function applyAiDefaults(
     settings: Partial<OrganizationAiSettings> | null,
     locale: string | null | undefined = 'en',
@@ -212,6 +178,7 @@ function applyAiDefaults(
     const mode = normalizeMode()
     const localizedHandoverMessages = resolveLocalizedHandoverMessages(settings)
     const localizedBotDisclaimerMessages = resolveLocalizedBotDisclaimerMessages(settings)
+    const assistantInstructions = resolveStructuredAssistantInstructions(settings, locale)
     const onboardingLockRequired =
         normalizeBotModeUnlockRequired(settings?.bot_mode_unlock_required)
         || onboardingState?.isComplete === false
@@ -225,7 +192,11 @@ function applyAiDefaults(
         bot_mode_unlock_required: onboardingLockRequired,
         bot_mode_unlocked_at: normalizeBotModeUnlockedAt(settings?.bot_mode_unlocked_at),
         match_threshold: clamp(Number(settings?.match_threshold ?? DEFAULT_AI_SETTINGS.match_threshold), 0, 1),
-        prompt: resolvePromptForLocale(settings?.prompt, locale),
+        prompt: assistantInstructions.prompt,
+        assistant_role: assistantInstructions.assistant_role,
+        assistant_intake_rule: assistantInstructions.assistant_intake_rule,
+        assistant_never_do: assistantInstructions.assistant_never_do,
+        assistant_other_instructions: assistantInstructions.assistant_other_instructions,
         bot_name: normalizeBotName(settings?.bot_name),
         bot_disclaimer_enabled: normalizeBotDisclaimerEnabled(settings?.bot_disclaimer_enabled),
         bot_disclaimer_message_tr: localizedBotDisclaimerMessages.bot_disclaimer_message_tr,

@@ -123,7 +123,21 @@ export default function ChatSimulator({
               }
             : undefined,
         }
-        setMessages((prev) => [...prev, systemMsg])
+        const nextMessages: ChatMessage[] = [systemMsg]
+
+        if (response.skillImage) {
+          nextMessages.push({
+            id: uuidv4(),
+            role: 'system',
+            kind: 'image',
+            imageUrl: response.skillImage.imageUrl,
+            content: response.skillImage.fileName ?? '',
+            timestamp: new Date(),
+            status: 'read',
+          })
+        }
+
+        setMessages((prev) => [...prev, ...nextMessages])
 
         if (response.matchedSkill) {
           setDebugInfo(response.matchedSkill)
