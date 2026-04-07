@@ -171,7 +171,7 @@ export function ChannelCard({
                                     {t('gallery.pendingVerificationTitle')}
                                 </p>
                                 <p className="mt-1 text-xs leading-5 text-amber-800">
-                                    {t('gallery.pendingVerificationDescription')}
+                                    {t('gallery.pendingVerificationDescription', { name: channel.name })}
                                 </p>
                             </div>
                         )}

@@ -444,7 +444,7 @@
         },
         "connect_whatsapp": {
           "title": "Connect your channels",
-          "description": "After you connect a channel, send a test message to the connected account yourself. Once that first message arrives, Qualy verifies the connection automatically and then asks you to choose the bot mode explicitly.",
+          "description": "After you connect a channel, send a test message to the connected account from another account or number. You can use one of your other accounts if you want. Once that first message arrives, Qualy verifies the connection automatically and then asks you to choose the bot mode explicitly.",
           "primaryCta": "Open channels",
           "channels": {
             "title": "Channels you can connect",
@@ -857,8 +857,8 @@
       "category": "Business Messaging",
       "statusLabel": "Status",
       "connectedAs": "Connected as {name}",
-      "pendingVerificationTitle": "Waiting for a test message",
-      "pendingVerificationDescription": "To verify the connection, send a test message to the connected account yourself. Once that first message arrives, Qualy verifies the connection automatically and asks you to choose the bot mode.",
+      "pendingVerificationTitle": "Action required",
+      "pendingVerificationDescription": "Send at least one test message to the connected account above from another account or number. You can use one of your other accounts if you want. Once that first message arrives, Qualy verifies the connection automatically and then asks you to choose the bot mode.",
       "badges": {
         "popular": "Popular",
         "comingSoon": "Soon"
@@ -1005,8 +1005,8 @@
         "connectedHeading": "Manage your connected WhatsApp channel",
         "connectedDescription": "Your WhatsApp channel is already active. Use the actions below to manage templates, debug webhook health, or remove Qualy's connection without changing your WhatsApp Business setup.",
         "connectedBanner": "{name} is connected and ready to receive conversations.",
-        "pendingDescription": "Your WhatsApp account is connected. To verify the connection, send a test message to the connected account yourself. Once that first message arrives, Qualy verifies the connection automatically and asks you to choose the bot mode.",
-        "pendingBanner": "{name} is connected. Send a test message to verify it.",
+        "pendingDescription": "Your WhatsApp account is connected. Complete the verification step below to continue.",
+        "pendingBanner": "{name} is connected. Send a test message to this account from another number.",
         "errorDescription": "Your WhatsApp assets are attached, but webhook setup needs attention before this channel can receive conversations reliably.",
         "errorBanner": "{name} needs webhook attention before it is ready."
       },
@@ -1034,8 +1034,8 @@
         "connectedHeading": "Manage your connected Instagram channel",
         "connectedDescription": "Your Instagram channel is already active. You can verify webhook health or disconnect it from this workspace.",
         "connectedBanner": "{name} is connected and ready to receive conversations.",
-        "pendingDescription": "Your Instagram account is connected. To verify the connection, send a test message to the connected account yourself. Once that first message arrives, Qualy verifies the connection automatically and asks you to choose the bot mode.",
-        "pendingBanner": "{name} is connected. Send a test message to verify it.",
+        "pendingDescription": "Your Instagram account is connected. Complete the verification step below to continue.",
+        "pendingBanner": "{name} is connected. Send a test message to this account from another Instagram account.",
         "errorDescription": "Your Instagram account is connected, but webhook health needs attention before this channel can receive conversations reliably.",
         "errorBanner": "{name} needs webhook attention before it is ready."
       },

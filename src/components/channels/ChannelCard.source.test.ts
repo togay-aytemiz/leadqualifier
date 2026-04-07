@@ -18,6 +18,6 @@ describe('ChannelCard source guards', () => {
 
     expect(source).toContain("connectionState === 'pending'")
     expect(source).toContain("t('gallery.pendingVerificationTitle')")
-    expect(source).toContain("t('gallery.pendingVerificationDescription')")
+    expect(source).toContain("t('gallery.pendingVerificationDescription', { name: channel.name })")
   })
 })

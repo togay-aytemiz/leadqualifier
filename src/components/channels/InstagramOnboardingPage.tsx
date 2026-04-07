@@ -178,7 +178,7 @@ export function InstagramOnboardingPage({
                     {channel ? (
                         (() => {
                             const connectedCopy = getMetaChannelConnectedCopy('instagram', connectionState)
-                            const connectedDescription = t(connectedCopy.descriptionKey)
+                            const connectedDescription = t(connectedCopy.descriptionKey, { name: channel.name })
                             const connectedBanner = t(connectedCopy.bannerKey, { name: channel.name })
 
                             return (
@@ -190,11 +190,29 @@ export function InstagramOnboardingPage({
                                         <p className={sectionLeadClass}>
                                             {connectedDescription}
                                         </p>
+                                        <p className="mt-3 text-sm font-medium text-slate-700">
+                                            {t('gallery.connectedAs', { name: channel.name })}
+                                        </p>
                                     </div>
 
-                                    <Alert variant={connectedCopy.bannerVariant}>
-                                        {connectedBanner}
-                                    </Alert>
+                                    {connectionState === 'pending' ? (
+                                        <Alert variant={connectedCopy.bannerVariant} className="w-full">
+                                                <div className="space-y-1">
+                                                    <p className="font-semibold">
+                                                        {t('gallery.pendingVerificationTitle')}
+                                                    </p>
+                                                    <p className="text-sm leading-6">
+                                                        {t('gallery.pendingVerificationDescription', {
+                                                            name: channel.name
+                                                        })}
+                                                    </p>
+                                                </div>
+                                            </Alert>
+                                        ) : (
+                                        <Alert variant={connectedCopy.bannerVariant} className="w-full">
+                                            {connectedBanner}
+                                        </Alert>
+                                    )}
 
                                     <div className="flex flex-wrap gap-3">
                                         <Button onClick={handleDebug} disabled={isReadOnly} variant="outline">

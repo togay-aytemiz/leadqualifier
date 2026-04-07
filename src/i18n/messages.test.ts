@@ -93,6 +93,9 @@ describe('pickMessageNamespaces', () => {
     expect(
       trMessages.onboarding.checklist.steps.connect_whatsapp.description.toLowerCase()
     ).toContain('bot durumunu')
+    expect(
+      trMessages.onboarding.checklist.steps.connect_whatsapp.description.toLowerCase()
+    ).toContain('başka bir hesap')
     expect(trMessages.onboarding.checklist.steps.ai_settings_review.visuals.botMode.title).toBe(
       'Bot adını kişiselleştirin'
     )
@@ -126,9 +129,23 @@ describe('pickMessageNamespaces', () => {
       'Başlangıç adımlarına git'
     )
     expect(trMessages.Channels.status.pending).toBe('Test mesajı bekleniyor')
-    expect(trMessages.Channels.gallery.pendingVerificationTitle).toBe('Test mesajı bekleniyor')
+    expect(trMessages.Channels.gallery.pendingVerificationTitle).toBe('Aksiyon gerekli')
     expect(trMessages.Channels.gallery.pendingVerificationDescription.toLowerCase()).toContain(
-      'kendiniz bir test mesajı'
+      'yukarıdaki bağlı hesaba'
+    )
+    expect(trMessages.Channels.gallery.pendingVerificationDescription.toLowerCase()).toContain(
+      'başka bir hesap'
+    )
+    expect(trMessages.Channels.gallery.pendingVerificationDescription.toLowerCase()).toContain(
+      'kendi başka hesabınızdan'
+    )
+    expect(trMessages.Channels.onboarding.whatsapp.pendingDescription).not.toContain('{name}')
+    expect(trMessages.Channels.onboarding.instagram.pendingDescription).not.toContain('{name}')
+    expect(trMessages.Channels.onboarding.whatsapp.pendingDescription.toLowerCase()).toContain(
+      'aşağıdaki'
+    )
+    expect(trMessages.Channels.onboarding.instagram.pendingDescription.toLowerCase()).toContain(
+      'aşağıdaki'
     )
     expect(trMessages.onboarding.completionModal.title.toLowerCase()).toContain('tamamlandı')
     expect(trMessages.onboarding.completionModal.options.active.title).toBe('Aktif')

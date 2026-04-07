@@ -938,7 +938,9 @@ export function WhatsAppOnboardingPage({
 
     const renderConnectedState = () => {
         const connectedCopy = getMetaChannelConnectedCopy('whatsapp', connectionState)
-        const connectedDescription = t(connectedCopy.descriptionKey)
+        const connectedDescription = t(connectedCopy.descriptionKey, {
+            name: channel?.name ?? t('types.whatsapp')
+        })
         const connectedBanner = t(connectedCopy.bannerKey, {
             name: channel?.name ?? t('types.whatsapp')
         })
@@ -953,11 +955,31 @@ export function WhatsAppOnboardingPage({
                     <p className={sectionLeadClass}>
                         {connectedDescription}
                     </p>
+                    <p className="mt-3 text-sm font-medium text-slate-700">
+                        {t('gallery.connectedAs', {
+                            name: channel?.name ?? t('types.whatsapp')
+                        })}
+                    </p>
                 </div>
 
-                <Alert variant={bannerVariant}>
-                    {connectedBanner}
-                </Alert>
+                {connectionState === 'pending' ? (
+                    <Alert variant={bannerVariant} className="w-full">
+                        <div className="space-y-1">
+                            <p className="font-semibold">
+                                {t('gallery.pendingVerificationTitle')}
+                            </p>
+                            <p className="text-sm leading-6">
+                                {t('gallery.pendingVerificationDescription', {
+                                    name: channel?.name ?? t('types.whatsapp')
+                                })}
+                            </p>
+                        </div>
+                    </Alert>
+                ) : (
+                    <Alert variant={bannerVariant} className="w-full">
+                        {connectedBanner}
+                    </Alert>
+                )}
 
                 <div className="flex flex-wrap gap-3">
                     <Button
