@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
 import { chunkText } from '@/lib/knowledge-base/chunking'
 import {
+    generateKnowledgeBaseDraftFromBrief,
+    type KnowledgeBaseDraftBrief,
+    type KnowledgeBaseDraftResult
+} from '@/lib/knowledge-base/ai-draft'
+import {
     appendServiceCatalogCandidates,
     appendOfferingProfileSuggestion,
     appendRequiredIntakeFields
@@ -41,6 +46,7 @@ export interface CreateKnowledgeBaseEntryResult {
     document: KnowledgeBaseEntry
     showFirstDocumentGuidance: boolean
 }
+
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 type KnowledgeCountRow = { collection_id: string | null }
 type KnowledgeCollectionCountRow = { collection_id: string | null; document_count: number | string | null }
@@ -246,6 +252,24 @@ export async function createKnowledgeBaseEntry(
         document: data as KnowledgeBaseEntry,
         showFirstDocumentGuidance: existingDocumentCount === 0
     }
+}
+
+export async function generateKnowledgeBaseDraft(options: {
+    locale: string
+    brief: KnowledgeBaseDraftBrief
+}): Promise<KnowledgeBaseDraftResult> {
+    const supabase = await createClient()
+    await assertTenantWriteAllowed(supabase)
+
+    const scopedOrganizationId = await getScopedOrganizationId(supabase)
+    const organizationId = scopedOrganizationId ?? await getUserOrganization(supabase)
+
+    return generateKnowledgeBaseDraftFromBrief({
+        organizationId,
+        locale: options.locale,
+        brief: options.brief,
+        supabase
+    })
 }
 
 export async function deleteKnowledgeBaseEntry(id: string) {

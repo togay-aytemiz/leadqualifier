@@ -3,14 +3,21 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
+import { HiMiniSparkles } from 'react-icons/hi2'
 import { Button, PageHeader, Input, TextArea, Modal } from '@/design'
-import { createKnowledgeBaseEntry, getCollections, KnowledgeCollection } from '@/lib/knowledge-base/actions'
+import {
+    createKnowledgeBaseEntry,
+    generateKnowledgeBaseDraft,
+    getCollections,
+    KnowledgeCollection
+} from '@/lib/knowledge-base/actions'
 import {
     KNOWLEDGE_UPDATED_EVENT,
     PENDING_SUGGESTIONS_UPDATED_EVENT,
     processKnowledgeDocumentInBackground
 } from '@/lib/knowledge-base/process-client'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
+import { KnowledgeAiFillModal } from '../components/KnowledgeAiFillModal'
 
 interface FirstDocumentGuidanceState {
     target: string
@@ -18,6 +25,7 @@ interface FirstDocumentGuidanceState {
 
 export default function CreateContentPage() {
     const t = useTranslations('knowledge')
+    const locale = useLocale()
     const router = useRouter()
     const searchParams = useSearchParams()
     const initialCollectionId = searchParams.get('collectionId')
@@ -28,6 +36,7 @@ export default function CreateContentPage() {
     const [collections, setCollections] = useState<KnowledgeCollection[]>([])
 
     const [loading, setLoading] = useState(false)
+    const [isAiFillModalOpen, setIsAiFillModalOpen] = useState(false)
     const [firstDocumentGuidance, setFirstDocumentGuidance] = useState<FirstDocumentGuidanceState | null>(null)
 
     useEffect(() => {
@@ -41,6 +50,23 @@ export default function CreateContentPage() {
     function handleNavigateAfterFirstDocument(target: string) {
         setFirstDocumentGuidance(null)
         router.push(target)
+    }
+
+    async function handleAiFillGenerate(brief: {
+        businessBasics: string
+        processDetails: string
+        botGuidelines: string
+        extraNotes: string
+    }) {
+        const draft = await generateKnowledgeBaseDraft({
+            locale,
+            brief
+        })
+
+        setContent(draft.content)
+        if (!title.trim()) {
+            setTitle(draft.title)
+        }
     }
 
     async function handleSubmit() {
@@ -124,6 +150,31 @@ export default function CreateContentPage() {
 
             <div className="flex-1 overflow-auto bg-white p-8">
                 <div className="max-w-4xl space-y-8">
+                    <div className="relative overflow-hidden rounded-[28px] border border-[#DCD8FF] bg-[linear-gradient(135deg,#F7F3FF_0%,#F5FAFF_55%,#FFF8EF_100%)] px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-6">
+                        <div className="pointer-events-none absolute -right-10 top-0 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(168,85,247,0.16),rgba(168,85,247,0))]" />
+                        <div className="pointer-events-none absolute bottom-0 right-10 h-24 w-24 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.12),rgba(56,189,248,0))]" />
+                        <div className="relative flex items-start gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#242A40] text-white shadow-[0_12px_30px_rgba(36,42,64,0.18)]">
+                                <HiMiniSparkles size={20} />
+                            </div>
+                            <div className="min-w-0">
+                                <h2 className="text-base font-semibold text-slate-950 sm:text-lg">
+                                    {t('aiFill.bannerTitle')}
+                                </h2>
+                                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                                    {t('aiFill.bannerDescription')}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAiFillModalOpen(true)}
+                                    className="mt-3 inline-flex w-fit items-center rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-[#242A40] shadow-[0_10px_24px_rgba(36,42,64,0.08)] ring-1 ring-[#242A40]/10 transition hover:bg-white hover:text-[#1B2033]"
+                                >
+                                    {t('aiFill.bannerAction')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <Input
                         label={t('form.title')}
                         value={title}
@@ -164,6 +215,12 @@ export default function CreateContentPage() {
                     />
                 </div>
             </div>
+
+            <KnowledgeAiFillModal
+                isOpen={isAiFillModalOpen}
+                onClose={() => setIsAiFillModalOpen(false)}
+                onGenerate={handleAiFillGenerate}
+            />
 
             <Modal
                 isOpen={Boolean(firstDocumentGuidance)}

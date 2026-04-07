@@ -116,6 +116,10 @@ describe('pickMessageNamespaces', () => {
     expect(trMessages.knowledge.firstDocumentGuidance.actions.reviewBusiness).toBe(
       'İşletme bilgilerinizi gözden geçirin'
     )
+    expect(trMessages.knowledge.aiFill.loadingDescription.toLowerCase()).toContain('kontrol')
+    expect(trMessages.knowledge.aiFill.loadingDescription.toLowerCase()).not.toContain('modal')
+    expect(enMessages.knowledge.aiFill.loadingDescription.toLowerCase()).toContain('review')
+    expect(enMessages.knowledge.aiFill.loadingDescription.toLowerCase()).not.toContain('modal')
     expect(trMessages.mainSidebar.botStatusQuickSwitchOnboardingLocked).toBe(
       'Başlangıç adımları tamamlanınca bot durumunu değiştirebilirsiniz.'
     )

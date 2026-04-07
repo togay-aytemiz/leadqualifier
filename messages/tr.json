@@ -2326,6 +2326,27 @@
       "notion": "Notion",
       "website": "Web Sitesi",
       "comingSoon": "Yakında"
+    },
+    "aiFill": {
+      "bannerTitle": "Qualy AI ile içeriğini daha hızlı hazırla.",
+      "bannerDescription": "İşletmenizi ve çalışma düzeninizi kısa kısa yazın. Qualy AI bunlara göre düzenli bir Bilgi Bankası taslağı oluştursun.",
+      "bannerAction": "Qualy AI ile doldur",
+      "modalTitle": "Qualy AI ile içerik oluştur",
+      "modalDescription": "İşletmenizi ve botunuzun dikkat etmesi gerekenleri kısa kısa yazın. Qualy AI bunlara göre düzenli bir Bilgi Bankası taslağı oluştursun.",
+      "businessBasicsLabel": "İşletmeniz ne yapıyor?",
+      "businessBasicsPlaceholder": "Örn. İstanbul'da ortodonti ve implant tedavileri sunuyoruz.",
+      "processDetailsLabel": "Süreci nasıl yürütüyorsunuz?",
+      "processDetailsPlaceholder": "Örn. Önce muayene yaparız, sonra uygun tedavi planını paylaşırız.",
+      "botGuidelinesLabel": "Yapay zeka asistanının dikkat etmesi gerekenler",
+      "botGuidelinesPlaceholder": "Örn. Yapay zeka asistanı kesin fiyat vermesin, önce muayene gerektiğini söylesin.",
+      "extraNotesLabel": "Ek notlar / kaçınılacak ifadeler",
+      "extraNotesPlaceholder": "Örn. Baskıcı konuşmasın, net ve sakin bir dil kullansın.",
+      "reviewBeforeSave": "AI sadece verdiğiniz bilgilere göre taslak oluşturur. Kaydetmeden önce kontrol edin.",
+      "loadingTitle": "Taslak hazırlanıyor",
+      "loadingDescription": "Qualy AI verdiğiniz notlardan düzenli bir taslak hazırlıyor. Hazır olunca içerik, kontrol etmeniz için editörde görünecek.",
+      "generate": "Taslak oluştur",
+      "generating": "Qualy AI yazıyor...",
+      "error": "Taslak oluşturulamadı. Lütfen tekrar deneyin."
     }
   },
   "folderModal": {

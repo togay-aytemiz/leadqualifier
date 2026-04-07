@@ -172,6 +172,11 @@ describe('billing usage helpers', () => {
                     created_at: '2026-02-08T12:25:00.000Z',
                     credits_delta: -0.2,
                     metadata: { category: 'lead_extraction', source: 'required_intake_fields' }
+                },
+                {
+                    created_at: '2026-02-08T12:30:00.000Z',
+                    credits_delta: -0.4,
+                    metadata: { category: 'lead_extraction', source: 'knowledge_ai_fill' }
                 }
             ],
             {
@@ -183,7 +188,7 @@ describe('billing usage helpers', () => {
         expect(summary.monthly.breakdown.aiReplies).toBeCloseTo(1.0, 5)
         expect(summary.monthly.breakdown.conversationSummary).toBeCloseTo(0.2, 5)
         expect(summary.monthly.breakdown.leadExtraction).toBeCloseTo(0.3, 5)
-        expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(0.7, 5)
+        expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(1.1, 5)
     })
 
     it('routes embedding and follow-up costs into visible billing buckets', () => {

@@ -20,13 +20,86 @@ import {
 type SupabaseClientLike = Awaited<ReturnType<typeof createClient>>
 
 const DEFAULT_SUGGESTION_LOCALE = 'tr'
+const MAX_BATCH_SKILLS = 6
+const MAX_BATCH_DOCS = 6
+const MAX_BATCH_TRIGGER_CHARS = 220
+const MAX_BATCH_RESPONSE_CHARS = 420
+const MAX_BATCH_DOC_CONTENT_CHARS = 900
 
 const SUGGESTION_LANGUAGE_BY_LOCALE: Record<string, string> = {
     tr: 'Turkish',
     en: 'English'
 }
 
-const buildSuggestionSystemPrompt = (language: string, labels: string) => `You generate a service offering profile suggestion for a business.
+function normalizeBatchSnippet(value: string) {
+    return value.trim().replace(/\s+/g, ' ')
+}
+
+function truncateBatchSnippet(value: string, maxChars: number) {
+    const normalized = normalizeBatchSnippet(value)
+    if (normalized.length <= maxChars) return normalized
+    return `${normalized.slice(0, maxChars).trimEnd()}...`
+}
+
+function buildBatchSuggestionContent(options: {
+    skills: Array<{ title?: string | null; trigger_examples?: string | null; response_text?: string | null }>
+    docs: Array<{ title?: string | null; content?: string | null }>
+}) {
+    const skillBlocks = options.skills
+        .slice(0, MAX_BATCH_SKILLS)
+        .map((skill, index) => {
+            const lines = [
+                `Skill ${index + 1} title: ${(skill.title ?? '').trim() || 'Untitled'}`,
+                skill.trigger_examples?.trim()
+                    ? `Skill ${index + 1} trigger examples: ${truncateBatchSnippet(skill.trigger_examples, MAX_BATCH_TRIGGER_CHARS)}`
+                    : null,
+                skill.response_text?.trim()
+                    ? `Skill ${index + 1} response guidance: ${truncateBatchSnippet(skill.response_text, MAX_BATCH_RESPONSE_CHARS)}`
+                    : null
+            ].filter(Boolean)
+
+            return lines.join('\n')
+        })
+        .filter(Boolean)
+
+    const docBlocks = options.docs
+        .slice(0, MAX_BATCH_DOCS)
+        .map((doc, index) => {
+            const lines = [
+                `Knowledge document ${index + 1} title: ${(doc.title ?? '').trim() || 'Untitled'}`,
+                doc.content?.trim()
+                    ? `Knowledge document ${index + 1} content: ${truncateBatchSnippet(doc.content, MAX_BATCH_DOC_CONTENT_CHARS)}`
+                    : null
+            ].filter(Boolean)
+
+            return lines.join('\n')
+        })
+        .filter(Boolean)
+
+    const skillsBlock = skillBlocks.length > 0 ? skillBlocks.join('\n\n') : 'none'
+    const docsBlock = docBlocks.length > 0 ? docBlocks.join('\n\n') : 'none'
+
+    return `Skills:\n${skillsBlock}\n\nKnowledge Base:\n${docsBlock}`
+}
+
+const buildSuggestionShapeInstructions = (labels: string[]) => {
+    const offeredLabel = labels[0] ?? 'Offered'
+    const notOfferedLabel = labels[1] ?? 'Not offered'
+    const conditionsLabel = labels[2] ?? 'Conditions'
+
+    return [
+        'The "suggestion" value must be newline-separated text, never a single paragraph.',
+        'Use this exact structure:',
+        'Intro sentence',
+        `- ${offeredLabel}: ...`,
+        `- ${notOfferedLabel}: ...`,
+        `- ${conditionsLabel}: ...`,
+        'Add 1 or 2 extra bullet lines only when the content clearly supports them.',
+        `If the content has no explicit "${notOfferedLabel}" detail, add another "${conditionsLabel}" bullet instead of inventing exclusions.`
+    ].join('\n')
+}
+
+const buildSuggestionSystemPrompt = (language: string, labels: string, labelList: string[]) => `You generate a service offering profile suggestion for a business.
 Only use the provided content. Do not give business advice.
 Use the offering profile summary plus approved/rejected suggestions as context.
 Treat approved suggestions as confirmed scope.
@@ -38,6 +111,7 @@ Format:
 - Keep the intro and bullets information-rich (avoid terse fragments). Include concrete scope details in each bullet.
 - Include concrete constraints (e.g., time window, eligibility limits, not-offered items) when present.
 Use labels in the same language. Allowed labels: ${labels}.
+${buildSuggestionShapeInstructions(labelList)}
 If existing approved suggestions are provided and new content conflicts or overlaps, set update_index to the 1-based item to update.
 Otherwise, set update_index to null.
 Return JSON: { suggestion: string, update_index: number | null } only.`
@@ -70,13 +144,25 @@ const hasValidHybridFormat = (text: string, labels: string[]) => {
 const isSuggestionUsable = (text: string, labels: string[]) =>
     hasValidHybridFormat(text, labels) && hasSufficientOfferingProfileDetail(text)
 
-const buildRepairSystemPrompt = (language: string, labels: string) => `Rewrite the draft into the required service offering profile format.
+const buildRepairSystemPrompt = (language: string, labels: string, labelList: string[]) => `Rewrite the draft into the required service offering profile format.
 Write in ${language}. Keep the same meaning but add missing details from the provided content.
 Format:
 - One short intro sentence.
 - 3 to 5 bullet points total. Each bullet starts with a category label and a colon.
 - Expand terse bullets into fuller, concrete statements grounded in the content.
 Use labels in the same language. Allowed labels: ${labels}.
+${buildSuggestionShapeInstructions(labelList)}
+Return JSON: { suggestion: string, update_index: number | null } only.`
+
+const buildStrictRepairSystemPrompt = (language: string, labels: string, labelList: string[]) => `The previous draft was invalid because it was too short or missing the required bullet structure.
+Rewrite it now in ${language} using only the provided content.
+Rules:
+- Return JSON only.
+- The suggestion must contain 1 intro sentence on its own line plus at least 3 bullet lines.
+- Every bullet line must start with "- " followed by one of these labels: ${labels}.
+- Do not return a single paragraph.
+- Expand terse drafts into concrete, information-rich bullets grounded in the content.
+${buildSuggestionShapeInstructions(labelList)}
 Return JSON: { suggestion: string, update_index: number | null } only.`
 
 const buildRequiredIntakeFieldsPrompt = (language: string) => `You propose missing intake fields for lead qualification.
@@ -257,7 +343,7 @@ async function createSuggestion(options: {
     const language = resolveSuggestionLanguage(locale)
     const labels = resolveSuggestionLabels(locale)
     const labelsText = labels.join(', ')
-    const systemPrompt = buildSuggestionSystemPrompt(language, labelsText)
+    const systemPrompt = buildSuggestionSystemPrompt(language, labelsText, labels)
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const { data: approvedSuggestions } = await supabase
@@ -335,36 +421,54 @@ async function createSuggestion(options: {
             return null
         }
 
-        const repairSystemPrompt = buildRepairSystemPrompt(language, labelsText)
-        const repairUserPrompt = `New content:\n${options.content}\n\n${summaryBlock}\n\n${approvedBlock}\n\n${rejectedBlock}\n\nDraft:\n${parsed.suggestion}`
-        const repairCompletion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            temperature: 0.2,
-            max_tokens: 320,
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: repairSystemPrompt },
-                { role: 'user', content: repairUserPrompt }
-            ]
-        })
-        const repairResponse = repairCompletion.choices[0]?.message?.content?.trim()
-        if (!repairResponse) return null
-        await recordSuggestionUsage({
-            organizationId: options.organizationId,
-            supabase,
-            systemPrompt: repairSystemPrompt,
-            userPrompt: repairUserPrompt,
-            response: repairResponse,
-            usage: repairCompletion.usage,
-            sourceType: options.sourceType
-        })
-        const repaired = parseSuggestionPayload(repairResponse)
-        if (!repaired || !isSuggestionUsable(repaired.suggestion, labels)) return null
-        parsed = repaired
+        let repairDraft = parsed.suggestion
+        const repairPrompts = [
+            buildRepairSystemPrompt(language, labelsText, labels),
+            buildStrictRepairSystemPrompt(language, labelsText, labels)
+        ]
+
+        let repairedSuccessfully = false
+
+        for (const repairSystemPrompt of repairPrompts) {
+            const repairUserPrompt = `New content:\n${options.content}\n\n${summaryBlock}\n\n${approvedBlock}\n\n${rejectedBlock}\n\nDraft:\n${repairDraft}`
+            const repairCompletion = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                temperature: 0.2,
+                max_tokens: 420,
+                response_format: { type: 'json_object' },
+                messages: [
+                    { role: 'system', content: repairSystemPrompt },
+                    { role: 'user', content: repairUserPrompt }
+                ]
+            })
+            const repairResponse = repairCompletion.choices[0]?.message?.content?.trim()
+            if (!repairResponse) return null
+            await recordSuggestionUsage({
+                organizationId: options.organizationId,
+                supabase,
+                systemPrompt: repairSystemPrompt,
+                userPrompt: repairUserPrompt,
+                response: repairResponse,
+                usage: repairCompletion.usage,
+                sourceType: options.sourceType
+            })
+
+            const repaired = parseSuggestionPayload(repairResponse)
+            if (!repaired) return null
+            repairDraft = repaired.suggestion
+
+            if (isSuggestionUsable(repaired.suggestion, labels)) {
+                parsed = repaired
+                repairedSuccessfully = true
+                break
+            }
+        }
+
+        if (!repairedSuccessfully) return null
     }
     const updateTarget = parsed.updateIndex ? approvedSuggestions?.[parsed.updateIndex - 1] : null
 
-    await supabase.from('offering_profile_suggestions').insert({
+    const { error: insertError } = await supabase.from('offering_profile_suggestions').insert({
         organization_id: options.organizationId,
         source_type: options.sourceType,
         source_id: options.sourceId ?? null,
@@ -373,6 +477,10 @@ async function createSuggestion(options: {
         locale,
         update_of: updateTarget?.id ?? null
     })
+
+    if (insertError) {
+        throw new Error(`Failed to insert offering profile suggestion: ${insertError.message}`)
+    }
 
     return parsed.suggestion
 }
@@ -641,10 +749,10 @@ export async function generateInitialOfferingSuggestion(options: {
 
     if (skills.length === 0 && docs.length === 0) return null
 
-    const skillLines = skills.map((skill: { title?: string | null }) => `- ${skill.title}`).join('\n')
-    const docLines = docs.map((doc: { title?: string | null }) => `- ${doc.title}`).join('\n')
-
-    const content = `Skills:\n${skillLines}\n\nKnowledge Base:\n${docLines}`
+    const content = buildBatchSuggestionContent({
+        skills,
+        docs
+    })
 
     return createSuggestion({
         organizationId: options.organizationId,

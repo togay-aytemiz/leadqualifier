@@ -4,12 +4,14 @@ const {
     createClientMock,
     revalidatePathMock,
     assertTenantWriteAllowedMock,
-    resolveActiveOrganizationContextMock
+    resolveActiveOrganizationContextMock,
+    generateKnowledgeBaseDraftFromBriefMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
     revalidatePathMock: vi.fn(),
     assertTenantWriteAllowedMock: vi.fn(async () => {}),
-    resolveActiveOrganizationContextMock: vi.fn(async () => ({ activeOrganizationId: 'org-1' }))
+    resolveActiveOrganizationContextMock: vi.fn(async () => ({ activeOrganizationId: 'org-1' })),
+    generateKnowledgeBaseDraftFromBriefMock: vi.fn()
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -25,7 +27,11 @@ vi.mock('@/lib/organizations/active-context', () => ({
     resolveActiveOrganizationContext: resolveActiveOrganizationContextMock
 }))
 
-import { createKnowledgeBaseEntry, getCollections } from '@/lib/knowledge-base/actions'
+vi.mock('@/lib/knowledge-base/ai-draft', () => ({
+    generateKnowledgeBaseDraftFromBrief: generateKnowledgeBaseDraftFromBriefMock
+}))
+
+import { createKnowledgeBaseEntry, generateKnowledgeBaseDraft, getCollections } from '@/lib/knowledge-base/actions'
 
 function createCollectionsSupabase() {
     const collectionsEqMock = vi.fn(async () => ({
@@ -168,6 +174,52 @@ function createKnowledgeCreateSupabase(existingCount: number) {
     }
 }
 
+function createKnowledgeDraftSupabase() {
+    const orgMemberSingleMock = vi.fn(async () => ({
+        data: { organization_id: 'org-1' },
+        error: null
+    }))
+    const orgMemberLimitMock = vi.fn(() => ({
+        single: orgMemberSingleMock
+    }))
+    const orgMemberEqMock = vi.fn(() => ({
+        limit: orgMemberLimitMock
+    }))
+    const orgMemberSelectMock = vi.fn(() => ({
+        eq: orgMemberEqMock
+    }))
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'organization_members') {
+            return {
+                select: orgMemberSelectMock
+            }
+        }
+
+        if (table === 'knowledge_documents') {
+            throw new Error('draft generation should not write knowledge_documents')
+        }
+
+        throw new Error(`Unexpected table ${table}`)
+    })
+
+    return {
+        supabase: {
+            auth: {
+                getUser: vi.fn(async () => ({
+                    data: {
+                        user: {
+                            id: 'user-1'
+                        }
+                    }
+                }))
+            },
+            from: fromMock
+        },
+        fromMock
+    }
+}
+
 describe('getCollections', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -236,6 +288,49 @@ describe('createKnowledgeBaseEntry', () => {
         expect(result).toEqual({
             document: expect.objectContaining({ id: 'doc-1' }),
             showFirstDocumentGuidance: false
+        })
+    })
+})
+
+describe('generateKnowledgeBaseDraft', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('delegates structured brief generation without touching knowledge_documents rows', async () => {
+        const { supabase, fromMock } = createKnowledgeDraftSupabase()
+        createClientMock.mockResolvedValue(supabase)
+        generateKnowledgeBaseDraftFromBriefMock.mockResolvedValue({
+            title: 'Tedavi Süreci',
+            content: 'Önce muayene yapılır.'
+        })
+
+        const result = await generateKnowledgeBaseDraft({
+            locale: 'tr',
+            brief: {
+                businessBasics: 'Diş kliniği',
+                processDetails: 'Muayene ile başlar',
+                botGuidelines: 'Kesin fiyat verme',
+                extraNotes: ''
+            }
+        })
+
+        expect(assertTenantWriteAllowedMock).toHaveBeenCalledWith(supabase)
+        expect(generateKnowledgeBaseDraftFromBriefMock).toHaveBeenCalledWith({
+            organizationId: 'org-1',
+            locale: 'tr',
+            brief: {
+                businessBasics: 'Diş kliniği',
+                processDetails: 'Muayene ile başlar',
+                botGuidelines: 'Kesin fiyat verme',
+                extraNotes: ''
+            },
+            supabase
+        })
+        expect(fromMock).not.toHaveBeenCalledWith('knowledge_documents')
+        expect(result).toEqual({
+            title: 'Tedavi Süreci',
+            content: 'Önce muayene yapılır.'
         })
     })
 })

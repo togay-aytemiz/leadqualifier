@@ -8,6 +8,26 @@ const CREATE_PAGE_PATH = path.resolve(
 )
 
 describe('knowledge create page source', () => {
+  it('shows a persistent ai helper banner with the filled sidebar ai icon and stacked cta', () => {
+    const source = fs.readFileSync(CREATE_PAGE_PATH, 'utf8')
+
+    expect(source).toContain('HiMiniSparkles')
+    expect(source).not.toContain("t('aiFill.bannerEyebrow')")
+    expect(source).toContain("t('aiFill.bannerTitle')")
+    expect(source).toContain("t('aiFill.bannerDescription')")
+    expect(source).toContain("t('aiFill.bannerAction')")
+    expect(source).toContain('mt-3 inline-flex')
+    expect(source).toContain('<KnowledgeAiFillModal')
+  })
+
+  it('replaces content on ai fill and only uses generated title when the title is blank', () => {
+    const source = fs.readFileSync(CREATE_PAGE_PATH, 'utf8')
+
+    expect(source).toContain('setContent(draft.content)')
+    expect(source).toContain('if (!title.trim()) {')
+    expect(source).toContain('setTitle(draft.title)')
+  })
+
   it('awaits document creation before deciding between redirect and first-document guidance modal', () => {
     const source = fs.readFileSync(CREATE_PAGE_PATH, 'utf8')
 

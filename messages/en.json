@@ -2326,6 +2326,27 @@
       "notion": "Notion",
       "website": "Website URL",
       "comingSoon": "Coming Soon"
+    },
+    "aiFill": {
+      "bannerTitle": "Create your content faster with Qualy AI.",
+      "bannerDescription": "Briefly describe your business and workflow. Qualy AI will turn that into a clean Knowledge Base draft.",
+      "bannerAction": "Fill with Qualy AI",
+      "modalTitle": "Create content with Qualy AI",
+      "modalDescription": "Briefly describe your business and what the bot should pay attention to. Qualy AI will turn that into a clean Knowledge Base draft.",
+      "businessBasicsLabel": "What does your business do?",
+      "businessBasicsPlaceholder": "e.g. We provide orthodontics and implant treatments in Istanbul.",
+      "processDetailsLabel": "How do you usually run the process?",
+      "processDetailsPlaceholder": "e.g. We start with an examination, then share the suitable treatment plan.",
+      "botGuidelinesLabel": "What should the AI assistant pay attention to?",
+      "botGuidelinesPlaceholder": "e.g. The AI assistant should not give final pricing. Explain that an examination comes first.",
+      "extraNotesLabel": "Extra notes / phrases to avoid",
+      "extraNotesPlaceholder": "e.g. Keep the tone calm and direct. Do not sound pushy.",
+      "reviewBeforeSave": "AI creates a draft only from the information you provide. Review it before saving.",
+      "loadingTitle": "Preparing your draft",
+      "loadingDescription": "Qualy AI is turning your notes into a clean draft. When it is ready, the content will appear in the editor for review.",
+      "generate": "Create draft",
+      "generating": "Qualy AI is writing...",
+      "error": "The draft could not be created. Please try again."
     }
   },
   "folderModal": {

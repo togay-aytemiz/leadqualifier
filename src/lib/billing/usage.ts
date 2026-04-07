@@ -134,7 +134,8 @@ const STORAGE_LIST_PAGE_SIZE = 1000
 const DOCUMENT_PROCESSING_SOURCES = new Set([
     'offering_profile_suggestion',
     'required_intake_fields',
-    'service_catalog_candidates'
+    'service_catalog_candidates',
+    'knowledge_ai_fill'
 ])
 const AI_REPLY_EMBEDDING_SOURCES = new Set([
     'knowledge_search_query_embedding',
