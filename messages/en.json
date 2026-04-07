@@ -2262,6 +2262,8 @@
     "emptyFolderDesc": "This folder has no content yet.",
     "noContentYet": "No content yet",
     "noContentYetDesc": "Create a folder or add content to set up your knowledge base.",
+    "aiSuggestionsProcessingBannerTitle": "Service profile suggestions are being prepared",
+    "aiSuggestionsProcessingBannerDescription": "Your content is still being processed. Please wait; once it is ready, you can review the suggestions here.",
     "aiSuggestionsBannerTitle": "Service profile suggestions are ready",
     "aiSuggestionsBannerDescription": "{count, plural, one {# suggestion is waiting for review.} other {# suggestions are waiting for review.}}",
     "aiSuggestionsBannerCta": "Review",
@@ -2817,6 +2819,10 @@
       "googleCalendar": "Google Calendar",
       "connected": "Connected",
       "notConnected": "Not connected"
+    },
+    "bookingStatus": {
+      "active": "Booking active",
+      "closed": "Booking closed"
     },
     "views": {
       "day": "Day",

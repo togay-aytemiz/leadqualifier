@@ -88,7 +88,7 @@ function resolveSourceDimensions(source: ImageBitmap | HTMLImageElement) {
     return { width: SKILL_IMAGE_MAX_EDGE_PX, height: SKILL_IMAGE_MAX_EDGE_PX }
 }
 
-export async function convertSkillImageToWebP(file: File) {
+export async function convertSkillImageToJpeg(file: File) {
     const source = await loadImageSource(file)
     const sourceDimensions = resolveSourceDimensions(source)
     const targetSize = resolveSkillImageTargetSize(sourceDimensions)
@@ -101,6 +101,9 @@ export async function convertSkillImageToWebP(file: File) {
         throw new Error('Canvas is not available for skill image conversion')
     }
 
+    // JPEG does not preserve transparency; flatten onto white first.
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, targetSize.width, targetSize.height)
     context.drawImage(source, 0, 0, targetSize.width, targetSize.height)
 
     const blob = await new Promise<Blob | null>((resolve) => {

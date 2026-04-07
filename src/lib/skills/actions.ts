@@ -9,7 +9,9 @@ import { buildSkillEmbeddingTexts } from '@/lib/skills/embeddings'
 import { sanitizeSkillActions } from '@/lib/skills/skill-actions'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import {
+    SKILL_IMAGE_ALLOWED_MIME_TYPES,
     SKILL_IMAGE_BUCKET,
+    SKILL_IMAGE_MAX_BYTES,
     buildSkillImageStoragePath
 } from '@/lib/skills/image'
 import {
@@ -36,6 +38,20 @@ function createSkillImageStorageClient() {
     return createServiceClient(supabaseUrl, serviceRoleKey).storage.from(SKILL_IMAGE_BUCKET)
 }
 
+async function ensureSkillImageBucketUploadPolicy() {
+    const { supabaseUrl, serviceRoleKey } = requireSupabaseStorageEnv()
+    const serviceClient = createServiceClient(supabaseUrl, serviceRoleKey)
+    const { error } = await serviceClient.storage.updateBucket(SKILL_IMAGE_BUCKET, {
+        public: true,
+        fileSizeLimit: SKILL_IMAGE_MAX_BYTES,
+        allowedMimeTypes: [...SKILL_IMAGE_ALLOWED_MIME_TYPES]
+    })
+
+    if (error) {
+        throw error
+    }
+}
+
 function createSkillImageUploadVersion() {
     const timestamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14)
     const uniqueSuffix = typeof globalThis.crypto?.randomUUID === 'function'
@@ -43,6 +59,28 @@ function createSkillImageUploadVersion() {
         : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
     return `${timestamp}-${uniqueSuffix}`
+}
+
+function normalizeSkillText(value: string | null | undefined) {
+    return (value ?? '').trim()
+}
+
+function normalizeSkillTriggers(value: string[] | null | undefined) {
+    return (value ?? []).map(trigger => trigger.trim()).filter(Boolean)
+}
+
+function areSkillTriggersEqual(
+    previousValue: string[] | null | undefined,
+    nextValue: string[] | null | undefined
+) {
+    const previousTriggers = normalizeSkillTriggers(previousValue)
+    const nextTriggers = normalizeSkillTriggers(nextValue)
+
+    if (previousTriggers.length !== nextTriggers.length) {
+        return false
+    }
+
+    return previousTriggers.every((trigger, index) => trigger === nextTriggers[index])
 }
 
 async function requireActiveSkillImageOrganizationId(
@@ -224,6 +262,7 @@ export async function prepareSkillImageUpload(organizationId: string) {
             organizationId: activeOrganizationId,
             version
         })
+        await ensureSkillImageBucketUploadPolicy()
         const storage = createSkillImageStorageClient()
         const { data: signedUploadData, error: signedUploadError } = await storage.createSignedUploadUrl(storagePath)
 
@@ -277,7 +316,7 @@ export async function updateSkill(
     await assertTenantWriteAllowed(supabase)
     const { data: existingSkill, error: existingSkillError } = await supabase
         .from('skills')
-        .select('id, organization_id, image_storage_path')
+        .select('id, organization_id, title, response_text, trigger_examples, image_storage_path')
         .eq('id', skillId)
         .single()
 
@@ -306,14 +345,21 @@ export async function updateSkill(
         await removeStoredSkillImageObject(previousImageStoragePath)
     }
 
+    const titleChanged = typeof updates.title === 'string'
+        && normalizeSkillText(updates.title) !== normalizeSkillText(existingSkill?.title)
+    const responseTextChanged = typeof updates.response_text === 'string'
+        && normalizeSkillText(updates.response_text) !== normalizeSkillText(existingSkill?.response_text)
+    const triggersChanged = Array.isArray(updates.trigger_examples)
+        && !areSkillTriggersEqual(existingSkill?.trigger_examples ?? currentTriggers ?? [], updates.trigger_examples)
+
     // Regenerate embeddings when title or triggers change.
-    if (updates.trigger_examples || updates.title) {
+    if (titleChanged || triggersChanged) {
         // Delete old embeddings
         await supabase.from('skill_embeddings').delete().eq('skill_id', skillId)
 
         // Generate new embeddings
-        const nextTitle = updates.title ?? data.title
-        const nextTriggers = updates.trigger_examples ?? currentTriggers ?? data.trigger_examples
+        const nextTitle = data.title
+        const nextTriggers = data.trigger_examples
         await generateAndStoreEmbeddings(
             skillId,
             data.organization_id,
@@ -322,9 +368,9 @@ export async function updateSkill(
         )
     }
 
-    const shouldPropose = Boolean(updates.title || updates.response_text || updates.trigger_examples)
+    const shouldPropose = titleChanged || responseTextChanged || triggersChanged
     if (shouldPropose) {
-        const profileContent = `${data.title}\n${(updates.trigger_examples ?? currentTriggers ?? []).join('\n')}\n${data.response_text}`
+        const profileContent = `${data.title}\n${data.trigger_examples.join('\n')}\n${data.response_text}`
 
         try {
             await appendServiceCatalogCandidates({

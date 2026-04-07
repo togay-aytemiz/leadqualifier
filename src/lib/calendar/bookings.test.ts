@@ -37,6 +37,7 @@ import {
   cancelCalendarBookingRecord,
   createCalendarBookingRecord,
   disconnectGoogleCalendarConnection,
+  getBookingSettingsByOrganizationId,
   lookupBookingAvailability,
 } from '@/lib/calendar/bookings'
 
@@ -210,6 +211,23 @@ describe('calendar bookings hardening', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('defaults missing booking settings to disabled for new organizations', async () => {
+    const settingsLookup = createMaybeSingleBuilder(null)
+    const supabase = createSupabaseMock({
+      booking_settings: [settingsLookup.builder],
+    })
+
+    const settings = await getBookingSettingsByOrganizationId(supabase as never, 'org-1')
+
+    expect(settings).toEqual(
+      expect.objectContaining({
+        organization_id: 'org-1',
+        booking_enabled: false,
+        timezone: 'Europe/Istanbul',
+      })
+    )
   })
 
   it('rejects availability lookup when booking is disabled', async () => {

@@ -26,7 +26,7 @@ import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
 import { matchSkillsSafely } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
-import type { OutboundMessageInput, OutboundReplyButton } from '@/lib/channels/outbound-message'
+import type { OutboundMessageInput, OutboundReplyButton, OutboundSendResult } from '@/lib/channels/outbound-message'
 import {
     isMvpResponseLanguageAmbiguous,
     resolveMvpResponseLanguage,
@@ -59,7 +59,7 @@ export interface InboundAiPipelineInput {
         buttonTitle: string | null
     }
     skipAutomation?: boolean
-    sendOutbound: (content: OutboundMessageInput) => Promise<void>
+    sendOutbound: (content: OutboundMessageInput) => Promise<OutboundSendResult | void>
     logPrefix: string
 }
 
@@ -171,6 +171,39 @@ function buildSkillImageMetadata(
         whatsapp_outbound_status: status,
         whatsapp_is_media_placeholder: true,
         whatsapp_media: baseMedia
+    }
+}
+
+function buildOutboundProviderMetadata(
+    platform: InboundAiPipelineInput['platform'],
+    outboundResult: OutboundSendResult | void
+) {
+    const metadata = isRecord(outboundResult?.providerMetadata)
+        ? { ...outboundResult.providerMetadata }
+        : {}
+    const providerMessageId = readTrimmedString(outboundResult?.providerMessageId)
+
+    if (!providerMessageId) {
+        return metadata
+    }
+
+    if (platform === 'instagram') {
+        return {
+            ...metadata,
+            instagram_message_id: providerMessageId
+        }
+    }
+
+    if (platform === 'telegram') {
+        return {
+            ...metadata,
+            telegram_message_id: providerMessageId
+        }
+    }
+
+    return {
+        ...metadata,
+        whatsapp_message_id: providerMessageId
     }
 }
 
@@ -542,6 +575,11 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             .eq('id', conversation.id)
     }
 
+    const sendOutboundAndCollectMetadata = async (content: OutboundMessageInput) => {
+        const outboundResult = await options.sendOutbound(content)
+        return buildOutboundProviderMetadata(options.platform, outboundResult)
+    }
+
     const applyDeferredLeadEscalation = async () => {
         const { data: leadForEscalation, error: leadForEscalationError } = await options.supabase
             .from('leads')
@@ -576,8 +614,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             && conversation.active_agent !== 'operator'
         ) {
             const formattedEscalationNotice = formatOutboundBotMessage(escalation.noticeMessage)
-            await options.sendOutbound(formattedEscalationNotice)
+            const outboundMetadata = await sendOutboundAndCollectMetadata(formattedEscalationNotice)
             await persistBotMessage(formattedEscalationNotice, {
+                ...outboundMetadata,
                 is_handover_notice: true,
                 escalation_reason: escalation.reason,
                 escalation_action: escalation.action
@@ -655,8 +694,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             && conversation.active_agent !== 'operator'
         ) {
             const formattedEscalationNotice = formatOutboundBotMessage(escalation.noticeMessage)
-            await options.sendOutbound(formattedEscalationNotice)
+            const outboundMetadata = await sendOutboundAndCollectMetadata(formattedEscalationNotice)
             await persistBotMessage(formattedEscalationNotice, {
+                ...outboundMetadata,
                 is_handover_notice: true,
                 escalation_reason: escalation.reason,
                 escalation_action: escalation.action
@@ -706,8 +746,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
     const sendSkillActionUnavailableReply = async (metadata: Record<string, unknown>) => {
         const unavailableReply = formatOutboundBotMessage(buildSkillActionUnavailableMessage())
-        await options.sendOutbound(unavailableReply)
+        const outboundMetadata = await sendOutboundAndCollectMetadata(unavailableReply)
         await persistBotMessage(unavailableReply, {
+            ...outboundMetadata,
             is_skill_action: true,
             skill_action_unavailable: true,
             ...metadata
@@ -727,16 +768,15 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     }) => {
         const formattedSkillReply = formatOutboundBotMessage(args.responseText)
         const replyButtons = buildSkillReplyButtons(args.skillId, args.rawSkillActions)
-        if (replyButtons.length > 0) {
-            await options.sendOutbound({
+        const outboundMetadata = replyButtons.length > 0
+            ? await sendOutboundAndCollectMetadata({
                 content: formattedSkillReply,
                 replyButtons
             })
-        } else {
-            await options.sendOutbound(formattedSkillReply)
-        }
+            : await sendOutboundAndCollectMetadata(formattedSkillReply)
 
         await persistBotMessage(formattedSkillReply, {
+            ...outboundMetadata,
             skill_id: args.skillId,
             skill_title: args.skillTitle,
             matched_skill_title: args.skillTitle,
@@ -747,7 +787,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         const imageUrl = readTrimmedString(args.imagePublicUrl)
         if (imageUrl) {
             try {
-                await options.sendOutbound({
+                const imageOutboundMetadata = await sendOutboundAndCollectMetadata({
                     type: 'image',
                     imageUrl,
                     mimeType: args.imageMimeType ?? 'image/webp',
@@ -764,6 +804,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         mimeType: args.imageMimeType ?? 'image/webp',
                         fileName: args.imageOriginalFilename ?? null
                     }, 'sent'),
+                    ...imageOutboundMetadata,
                     ...args.metadata
                 })
             } catch (error) {
@@ -852,8 +893,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
             if (matchedAction?.type === 'open_url') {
                 const formattedUrlReply = formatOutboundBotMessage(matchedAction.url)
-                await options.sendOutbound(formattedUrlReply)
+                const outboundMetadata = await sendOutboundAndCollectMetadata(formattedUrlReply)
                 await persistBotMessage(formattedUrlReply, {
+                    ...outboundMetadata,
                     is_skill_action: true,
                     skill_action_type: matchedAction.type,
                     skill_action_id: matchedAction.id,
@@ -973,8 +1015,9 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             ? 'Takvim işlemini şu anda tamamlayamadım. Ekibimiz buradan devam edecek.'
             : 'I could not complete the calendar action right now. Our team will continue from here.'
         const formattedSchedulingFailureReply = formatOutboundBotMessage(schedulingFailureReply)
-        await options.sendOutbound(formattedSchedulingFailureReply)
+        const outboundMetadata = await sendOutboundAndCollectMetadata(formattedSchedulingFailureReply)
         await persistBotMessage(formattedSchedulingFailureReply, {
+            ...outboundMetadata,
             is_booking_response: true,
             booking_action: 'handoff',
             booking_error: 'scheduling_branch_failure'
@@ -1223,8 +1266,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
 
                 if (guardedRagResponse && !guardedRagResponse.includes(noAnswerToken)) {
                     const formattedRagReply = formatOutboundBotMessage(guardedRagResponse)
-                    await options.sendOutbound(formattedRagReply)
+                    const outboundMetadata = await sendOutboundAndCollectMetadata(formattedRagReply)
                     await persistBotMessage(formattedRagReply, {
+                        ...outboundMetadata,
                         is_rag: true,
                         sources: chunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
@@ -1276,8 +1320,11 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     })
 
     const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
-    await options.sendOutbound(formattedFallbackReply)
-    await persistBotMessage(formattedFallbackReply, { is_fallback: true })
+    const outboundMetadata = await sendOutboundAndCollectMetadata(formattedFallbackReply)
+    await persistBotMessage(formattedFallbackReply, {
+        ...outboundMetadata,
+        is_fallback: true
+    })
     await recordAiLatencyEvent({
         organizationId: orgId,
         conversationId: conversation.id,

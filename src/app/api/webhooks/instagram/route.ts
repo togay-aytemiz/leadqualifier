@@ -7,6 +7,7 @@ import { InstagramClient } from '@/lib/instagram/client'
 import { extractInstagramInboundEvents, isValidMetaSignature } from '@/lib/instagram/webhook'
 import { isOutboundImageMessage, normalizeOutboundMessage } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
+import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { resolveMetaInstagramConnectionCandidate } from '@/lib/channels/meta-oauth'
 
 export const runtime = 'nodejs'
@@ -63,6 +64,14 @@ function readTrimmedString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
+function readInstagramSendMessageId(response: unknown) {
+  if (!isRecord(response)) return null
+
+  return readTrimmedString(response.message_id)
+    || readTrimmedString(response.id)
+    || readTrimmedString(response.mid)
+}
+
 function readStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value
@@ -80,6 +89,25 @@ function isInstagramWebhookDebugEnabled() {
   if (!value) return false
   const normalized = value.trim().toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes'
+}
+
+function shouldProxyInstagramImage(imageUrl: string, mimeType: string | null | undefined) {
+  const normalizedMimeType = readTrimmedString(mimeType)?.toLowerCase()
+  if (normalizedMimeType === 'image/webp') return true
+  return /\.webp(?:[?#].*)?$/i.test(imageUrl)
+}
+
+function buildInstagramImageProxyUrl(req: NextRequest, sourceUrl: string) {
+  const origin = resolveMetaOrigin({
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+    forwardedHost: req.headers.get('x-forwarded-host'),
+    forwardedProto: req.headers.get('x-forwarded-proto'),
+    requestOrigin: req.nextUrl.origin,
+  })
+  const proxyUrl = new URL('/api/media/instagram-skill-image', origin)
+  proxyUrl.searchParams.set('source', sourceUrl)
+  return proxyUrl.toString()
 }
 
 function summarizeInstagramPayloadShape(payload: unknown) {
@@ -724,20 +752,28 @@ export async function POST(req: NextRequest) {
       skipAutomation: event.skipAutomation,
       sendOutbound: async (content) => {
         if (isOutboundImageMessage(content)) {
-          await client.sendImage({
+          const imageUrl = shouldProxyInstagramImage(content.imageUrl, content.mimeType)
+            ? buildInstagramImageProxyUrl(req, content.imageUrl)
+            : content.imageUrl
+          const response = await client.sendImage({
             instagramBusinessAccountId: event.instagramBusinessAccountId,
             to: event.contactId,
-            imageUrl: content.imageUrl,
+            imageUrl,
           })
-          return
+          return {
+            providerMessageId: readInstagramSendMessageId(response),
+          }
         }
 
         const normalized = normalizeOutboundMessage(content)
-        await client.sendText({
+        const response = await client.sendText({
           instagramBusinessAccountId: event.instagramBusinessAccountId,
           to: event.contactId,
           text: normalized.content,
         })
+        return {
+          providerMessageId: readInstagramSendMessageId(response),
+        }
       },
       logPrefix: 'Instagram Webhook',
     })

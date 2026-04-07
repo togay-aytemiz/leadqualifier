@@ -105,6 +105,7 @@ import {
   extractSkillTitleFromMetadata,
   splitBotMessageDisclaimer,
 } from '@/components/inbox/botMessageContent'
+import { filterInstagramEchoDuplicates } from '@/components/inbox/instagramEchoDuplicates'
 import {
   collectOptimisticPreviewUrls,
   extractMediaFromMessageMetadata,
@@ -3135,7 +3136,8 @@ export function InboxContainer({
     loadedConversationId
   )
   const visibleMessages = useMemo(
-    () => (showConversationSkeleton ? EMPTY_VISIBLE_MESSAGES : messages),
+    () =>
+      showConversationSkeleton ? EMPTY_VISIBLE_MESSAGES : filterInstagramEchoDuplicates(messages),
     [messages, showConversationSkeleton]
   )
   const selectedConversationUnresolvedInstagramContactId = selectedConversation

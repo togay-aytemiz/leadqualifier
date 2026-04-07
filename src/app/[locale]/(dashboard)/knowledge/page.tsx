@@ -26,7 +26,7 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
     const orgContext = await resolveActiveOrganizationContext()
     const organizationId = orgContext?.activeOrganizationId ?? null
 
-    const [entries, allCollections, offeringProfileResult, pendingSuggestions] = await Promise.all([
+    const [entries, allCollections, offeringProfileResult, pendingSuggestions, processingKnowledgeResult] = await Promise.all([
         getKnowledgeBaseEntries(collectionId, organizationId),
         getCollections(organizationId),
         organizationId
@@ -38,7 +38,14 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
             : Promise.resolve({ data: null }),
         organizationId
             ? getPendingOfferingProfileSuggestionCount(organizationId)
-            : Promise.resolve(0)
+            : Promise.resolve(0),
+        organizationId
+            ? supabase
+                .from('knowledge_documents')
+                .select('id', { count: 'exact', head: true })
+                .eq('organization_id', organizationId)
+                .eq('status', 'processing')
+            : Promise.resolve({ count: 0 })
     ])
 
     // Filter logic currently in action but good to double check or prepare collections
@@ -56,6 +63,7 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
     }
 
     const aiSuggestionsEnabled = offeringProfileResult?.data?.ai_suggestions_enabled ?? false
+    const initialKnowledgeExtractionInProgress = (processingKnowledgeResult?.count ?? 0) > 0
 
     return (
         <KnowledgeContainer
@@ -66,6 +74,7 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
             organizationId={organizationId}
             aiSuggestionsEnabled={aiSuggestionsEnabled}
             initialPendingSuggestions={pendingSuggestions}
+            initialKnowledgeExtractionInProgress={initialKnowledgeExtractionInProgress}
             isReadOnly={orgContext?.readOnlyTenantMode ?? false}
         />
     )

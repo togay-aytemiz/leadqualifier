@@ -116,6 +116,18 @@ describe('pickMessageNamespaces', () => {
     expect(trMessages.knowledge.firstDocumentGuidance.actions.reviewBusiness).toBe(
       'İşletme bilgilerinizi gözden geçirin'
     )
+    expect(trMessages.knowledge.aiSuggestionsProcessingBannerTitle).toBe(
+      'Hizmet profili önerileri hazırlanıyor'
+    )
+    expect(trMessages.knowledge.aiSuggestionsProcessingBannerDescription.toLowerCase()).toContain(
+      'lütfen bekleyin'
+    )
+    expect(enMessages.knowledge.aiSuggestionsProcessingBannerTitle).toBe(
+      'Service profile suggestions are being prepared'
+    )
+    expect(enMessages.knowledge.aiSuggestionsProcessingBannerDescription.toLowerCase()).toContain(
+      'please wait'
+    )
     expect(trMessages.knowledge.aiFill.loadingDescription.toLowerCase()).toContain('kontrol')
     expect(trMessages.knowledge.aiFill.loadingDescription.toLowerCase()).not.toContain('modal')
     expect(enMessages.knowledge.aiFill.loadingDescription.toLowerCase()).toContain('review')

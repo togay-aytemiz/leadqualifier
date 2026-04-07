@@ -57,7 +57,7 @@ function formatMinutesAsTime(totalMinutes: number) {
 
 export function buildCalendarSettingsDraft(settings: BookingSettings | null): CalendarSettingsDraft {
     return {
-        bookingEnabled: settings?.booking_enabled ?? true,
+        bookingEnabled: settings?.booking_enabled ?? false,
         timezone: settings?.timezone ?? 'Europe/Istanbul',
         defaultDuration: String(settings?.default_booking_duration_minutes ?? 60),
         slotInterval: String(settings?.slot_interval_minutes ?? 30),

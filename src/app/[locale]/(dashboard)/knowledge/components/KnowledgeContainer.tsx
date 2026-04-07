@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FolderPlus, Home, ChevronRight, MoreHorizontal, ArrowLeft } from 'lucide-react'
+import { FolderPlus, Home, ChevronRight, MoreHorizontal, ArrowLeft, LoaderCircle } from 'lucide-react'
 import { Button, PageHeader, ConfirmDialog } from '@/design'
 import { KnowledgeTable } from './KnowledgeTable'
 import { FolderCard } from './FolderCard'
@@ -27,6 +27,7 @@ interface KnowledgeContainerProps {
     organizationId?: string | null
     aiSuggestionsEnabled?: boolean
     initialPendingSuggestions?: number
+    initialKnowledgeExtractionInProgress?: boolean
     isReadOnly?: boolean
 }
 
@@ -38,6 +39,7 @@ export function KnowledgeContainer({
     organizationId,
     aiSuggestionsEnabled = false,
     initialPendingSuggestions = 0,
+    initialKnowledgeExtractionInProgress = false,
     isReadOnly = false
 }: KnowledgeContainerProps) {
     const t = useTranslations('knowledge')
@@ -49,6 +51,7 @@ export function KnowledgeContainer({
     const [entries, setEntries] = useState<KnowledgeBaseEntry[]>(initialEntries)
     const [collections, setCollections] = useState<KnowledgeCollection[]>(initialCollections)
     const [pendingSuggestions, setPendingSuggestions] = useState(initialPendingSuggestions)
+    const [knowledgeExtractionInProgress, setKnowledgeExtractionInProgress] = useState(initialKnowledgeExtractionInProgress)
 
     // Sync state if props change (re-validation)
     useEffect(() => {
@@ -59,6 +62,10 @@ export function KnowledgeContainer({
     useEffect(() => {
         setPendingSuggestions(initialPendingSuggestions)
     }, [initialPendingSuggestions])
+
+    useEffect(() => {
+        setKnowledgeExtractionInProgress(initialKnowledgeExtractionInProgress)
+    }, [initialKnowledgeExtractionInProgress])
 
     const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
     if (!supabaseRef.current) {
@@ -183,8 +190,7 @@ export function KnowledgeContainer({
     const isEmpty = entries.length === 0 && collections.length === 0
 
     useEffect(() => {
-        const hasProcessing = entries.some(entry => entry.status === 'processing')
-        if (!hasProcessing) return
+        if (!knowledgeExtractionInProgress) return
 
         const intervalId = window.setInterval(() => {
             router.refresh()
@@ -192,7 +198,7 @@ export function KnowledgeContainer({
         }, 5000)
 
         return () => window.clearInterval(intervalId)
-    }, [entries, router])
+    }, [knowledgeExtractionInProgress, router])
 
     const pageTitle = currentCollection ? currentCollection.name : tSidebar('allContent')
     const totalVisibleItems = entries.length + collections.length
@@ -286,9 +292,23 @@ export function KnowledgeContainer({
                 />
             </div>
 
-            {aiSuggestionsEnabled && pendingSuggestions > 0 && (
+            {aiSuggestionsEnabled && knowledgeExtractionInProgress && (
                 <div className="mt-3 px-4 lg:mt-4 lg:px-8">
-                    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-100/80 px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-4">
+                    <div className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-100/80 px-4 py-3 text-sm text-amber-900">
+                        <div className="flex items-start gap-3">
+                            <LoaderCircle size={18} className="mt-0.5 shrink-0 animate-spin text-amber-700" />
+                            <div>
+                                <p className="font-semibold">{t('aiSuggestionsProcessingBannerTitle')}</p>
+                                <p className="text-xs text-amber-800">{t('aiSuggestionsProcessingBannerDescription')}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {aiSuggestionsEnabled && !knowledgeExtractionInProgress && pendingSuggestions > 0 && (
+                <div className="mt-3 px-4 lg:mt-4 lg:px-8">
+                    <div className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-100/80 px-4 py-3 text-sm text-amber-900">
                         <div>
                             <p className="font-semibold">{t('aiSuggestionsBannerTitle')}</p>
                             <p className="text-xs text-amber-800">{t('aiSuggestionsBannerDescription', { count: pendingSuggestions })}</p>

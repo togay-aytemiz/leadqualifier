@@ -16,6 +16,11 @@ export interface OutboundImageMessagePayload {
     caption?: string | null
 }
 
+export interface OutboundSendResult {
+    providerMessageId?: string | null
+    providerMetadata?: Record<string, unknown> | null
+}
+
 export type OutboundMessagePayload = OutboundTextMessagePayload | OutboundImageMessagePayload
 
 export type OutboundMessageInput = string | OutboundMessagePayload

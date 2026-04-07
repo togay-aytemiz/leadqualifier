@@ -1,6 +1,7 @@
 export const SKILL_IMAGE_BUCKET = 'skill-images'
-export const SKILL_IMAGE_OUTPUT_EXTENSION = 'webp'
-export const SKILL_IMAGE_OUTPUT_MIME_TYPE = 'image/webp'
+export const SKILL_IMAGE_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/webp'] as const
+export const SKILL_IMAGE_OUTPUT_EXTENSION = 'jpg'
+export const SKILL_IMAGE_OUTPUT_MIME_TYPE = 'image/jpeg'
 export const SKILL_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export const SKILL_IMAGE_MAX_EDGE_PX = 1600
 export const SKILL_IMAGE_TARGET_QUALITY = 0.92

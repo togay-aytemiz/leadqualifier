@@ -2262,6 +2262,8 @@
     "emptyFolderDesc": "Bu klasörde henüz içerik yok.",
     "noContentYet": "Henüz içerik yok",
     "noContentYetDesc": "Bilgi bankanızı oluşturmak için bir klasör oluşturun veya içerik ekleyin.",
+    "aiSuggestionsProcessingBannerTitle": "Hizmet profili önerileri hazırlanıyor",
+    "aiSuggestionsProcessingBannerDescription": "İçerikleriniz işleniyor. Lütfen bekleyin; hazır olunca önerileri burada inceleyebilirsiniz.",
     "aiSuggestionsBannerTitle": "Hizmet profili önerileri hazır",
     "aiSuggestionsBannerDescription": "{count} öneri inceleme bekliyor.",
     "aiSuggestionsBannerCta": "İncele",
@@ -2817,6 +2819,10 @@
       "googleCalendar": "Google Calendar",
       "connected": "Bağlı",
       "notConnected": "Bağlı değil"
+    },
+    "bookingStatus": {
+      "active": "Randevu aktif",
+      "closed": "Randevu kapalı"
     },
     "views": {
       "day": "Gün",

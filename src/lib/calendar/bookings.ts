@@ -55,7 +55,7 @@ function buildDefaultBookingSettings(organizationId: string): BookingSettings {
   const now = new Date().toISOString()
   return {
     organization_id: organizationId,
-    booking_enabled: true,
+    booking_enabled: false,
     timezone: 'Europe/Istanbul',
     default_booking_duration_minutes: 60,
     slot_interval_minutes: 30,

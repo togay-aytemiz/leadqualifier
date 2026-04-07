@@ -1114,6 +1114,84 @@ describe('processInboundAiPipeline guardrails', () => {
         )
     })
 
+    it('persists instagram provider message ids for skill text and image replies', async () => {
+        const sendOutbound = vi
+            .fn()
+            .mockResolvedValueOnce({ providerMessageId: 'ig-outbound-text-1' })
+            .mockResolvedValueOnce({ providerMessageId: 'ig-outbound-image-1' })
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({ platform: 'instagram' }))
+        const inboundInsert = createInsertBuilder()
+        const botTextInsert = createInsertBuilder()
+        const botImageInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotText = createUpdateBuilder()
+        const conversationUpdateAfterBotImage = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({
+            requires_human_handover: false,
+            title: 'Bilgi',
+            skill_actions: [],
+            image_public_url: 'https://cdn.example.com/skill-image.webp',
+            image_storage_path: 'org-1/skill-image.webp',
+            image_mime_type: 'image/webp',
+            image_original_filename: 'offer.webp'
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botTextInsert.builder, botImageInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterBotText.builder,
+                conversationUpdateAfterBotImage.builder
+            ],
+            skills: [skillDetails.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'instagram',
+            source: 'instagram',
+            contactId: 'ig-user-1',
+            inboundMessageId: 'ig-mid-1',
+            inboundMessageIdMetadataKey: 'instagram_message_id',
+            inboundMessageMetadata: {
+                instagram_message_id: 'ig-mid-1',
+                instagram_event_type: 'message'
+            },
+            logPrefix: 'Instagram Webhook'
+        }))
+
+        expect(botTextInsert.insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sender_type: 'bot',
+                metadata: expect.objectContaining({
+                    instagram_message_id: 'ig-outbound-text-1',
+                    skill_id: 'skill-1'
+                })
+            })
+        )
+        expect(botImageInsert.insertMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sender_type: 'bot',
+                metadata: expect.objectContaining({
+                    instagram_message_id: 'ig-outbound-image-1',
+                    instagram_media: expect.objectContaining({
+                        storage_url: 'https://cdn.example.com/skill-image.webp',
+                        mime_type: 'image/webp'
+                    })
+                })
+            })
+        )
+    })
+
     it('continues human handover even when the skill image send fails', async () => {
         const sendOutbound = vi
             .fn()

@@ -181,6 +181,10 @@ export function CalendarClient({
   const desiredRangeCacheKeyRef = useRef(buildRangeCacheKey(data.rangeStartIso, data.rangeEndIso))
 
   const settings = calendarData.settings
+  const isBookingEnabled = Boolean(settings?.booking_enabled)
+  const bookingStatusLabel = isBookingEnabled
+    ? t('bookingStatus.active')
+    : t('bookingStatus.closed')
   const currentTimeZone = settings?.timezone ?? 'Europe/Istanbul'
   const activeView = viewOverride ?? resolveDefaultCalendarView(isMobile)
 
@@ -931,7 +935,23 @@ export function CalendarClient({
       <PageHeader
         title={t('title')}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex h-9 items-center rounded-lg border px-3 text-sm font-semibold shadow-sm',
+                isBookingEnabled
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-slate-100 text-slate-600'
+              )}
+            >
+              <span
+                className={cn(
+                  'mr-2 h-2 w-2 rounded-full',
+                  isBookingEnabled ? 'bg-emerald-500' : 'bg-slate-400'
+                )}
+              />
+              {bookingStatusLabel}
+            </span>
             <Link
               href="/settings/calendar"
               className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
@@ -941,7 +961,7 @@ export function CalendarClient({
             </Link>
             <Button
               onClick={openCreateBooking}
-              disabled={isPending || readOnlyTenantMode}
+              disabled={isPending || readOnlyTenantMode || !isBookingEnabled}
               className="bg-[#242A40] hover:bg-[#1B2033] border-transparent text-white"
             >
               {t('actions.newBooking')}

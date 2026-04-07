@@ -1,21 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+    appendOfferingProfileSuggestionMock,
+    appendRequiredIntakeFieldsMock,
+    appendServiceCatalogCandidatesMock,
     assertTenantWriteAllowedMock,
     createClientMock,
     createServiceClientMock,
+    generateEmbeddingsMock,
     resolveActiveOrganizationContextMock,
     storageCreateSignedUploadUrlMock,
     storageGetPublicUrlMock,
-    storageRemoveMock
+    storageRemoveMock,
+    storageUpdateBucketMock
 } = vi.hoisted(() => ({
+    appendOfferingProfileSuggestionMock: vi.fn(),
+    appendRequiredIntakeFieldsMock: vi.fn(),
+    appendServiceCatalogCandidatesMock: vi.fn(),
     assertTenantWriteAllowedMock: vi.fn(),
     createClientMock: vi.fn(),
     createServiceClientMock: vi.fn(),
+    generateEmbeddingsMock: vi.fn(),
     resolveActiveOrganizationContextMock: vi.fn(),
     storageCreateSignedUploadUrlMock: vi.fn(),
     storageGetPublicUrlMock: vi.fn(),
-    storageRemoveMock: vi.fn()
+    storageRemoveMock: vi.fn(),
+    storageUpdateBucketMock: vi.fn()
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -36,7 +46,7 @@ vi.mock('@/lib/skills/skill-actions', () => ({
 }))
 
 vi.mock('@/lib/ai/embeddings', () => ({
-    generateEmbeddings: vi.fn(),
+    generateEmbeddings: generateEmbeddingsMock,
     formatEmbeddingForPgvector: vi.fn()
 }))
 
@@ -45,9 +55,9 @@ vi.mock('@/lib/skills/default-system-skills', () => ({
 }))
 
 vi.mock('@/lib/leads/offering-profile', () => ({
-    appendServiceCatalogCandidates: vi.fn(),
-    appendOfferingProfileSuggestion: vi.fn(),
-    appendRequiredIntakeFields: vi.fn()
+    appendServiceCatalogCandidates: appendServiceCatalogCandidatesMock,
+    appendOfferingProfileSuggestion: appendOfferingProfileSuggestionMock,
+    appendRequiredIntakeFields: appendRequiredIntakeFieldsMock
 }))
 
 vi.mock('@/lib/skills/maintenance-cache', () => ({
@@ -84,9 +94,11 @@ describe('skill image server actions', () => {
                 publicUrl: `https://project.supabase.co/storage/v1/object/public/skill-images/${storagePath}`
             }
         }))
+        storageUpdateBucketMock.mockResolvedValue({ data: null, error: null })
 
         createServiceClientMock.mockReturnValue({
             storage: {
+                updateBucket: storageUpdateBucketMock,
                 from: vi.fn(() => ({
                     createSignedUploadUrl: storageCreateSignedUploadUrlMock,
                     getPublicUrl: storageGetPublicUrlMock,
@@ -109,9 +121,14 @@ describe('skill image server actions', () => {
         expect(result.ok).toBe(true)
         if (!result.ok) return
         expect(result.storagePath).toContain('org-1/skill-image-')
-        expect(result.storagePath.endsWith('.webp')).toBe(true)
+        expect(result.storagePath.endsWith('.jpg')).toBe(true)
         expect(result.uploadToken).toBe('upload-token-1')
         expect(result.publicUrl).toContain('/skill-images/org-1/')
+        expect(storageUpdateBucketMock).toHaveBeenCalledWith('skill-images', {
+            public: true,
+            fileSizeLimit: 5 * 1024 * 1024,
+            allowedMimeTypes: ['image/jpeg', 'image/webp']
+        })
     })
 
     it('creates unique upload targets when two uploads start in the same second', async () => {
@@ -191,6 +208,70 @@ describe('skill image server actions', () => {
         })
 
         expect(storageRemoveMock).toHaveBeenCalledWith(['org-1/skill-image-old.webp'])
+    })
+
+    it('does not propose organization details when only an existing skill image changes', async () => {
+        const singleMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                data: {
+                    id: 'skill-1',
+                    organization_id: 'org-1',
+                    title: 'Fiyat bilgisi',
+                    response_text: 'Fiyat detayları paylaşılır.',
+                    trigger_examples: ['fiyat', 'ücret', 'paket'],
+                    image_storage_path: 'org-1/skill-image-old.jpg'
+                },
+                error: null
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    id: 'skill-1',
+                    organization_id: 'org-1',
+                    title: 'Fiyat bilgisi',
+                    response_text: 'Fiyat detayları paylaşılır.',
+                    trigger_examples: ['fiyat', 'ücret', 'paket'],
+                    enabled: true,
+                    requires_human_handover: false,
+                    image_storage_path: 'org-1/skill-image-new.jpg',
+                    created_at: '2026-04-06T10:00:00.000Z',
+                    updated_at: '2026-04-07T17:30:00.000Z'
+                },
+                error: null
+            })
+        const selectMock = vi.fn(() => ({ eq: vi.fn(() => ({ single: singleMock })) }))
+        const updateEqMock = vi.fn(() => ({ select: vi.fn(() => ({ single: singleMock })) }))
+        const updateMock = vi.fn(() => ({ eq: updateEqMock }))
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table !== 'skills') throw new Error(`Unexpected table ${table}`)
+                if (selectMock.mock.calls.length === 0) {
+                    return { select: selectMock }
+                }
+                return { update: updateMock }
+            })
+        }
+        createClientMock.mockResolvedValue(supabase)
+        storageRemoveMock.mockResolvedValue({ data: null, error: null })
+
+        await updateSkill('skill-1', {
+            title: 'Fiyat bilgisi',
+            response_text: 'Fiyat detayları paylaşılır.',
+            trigger_examples: ['fiyat', 'ücret', 'paket'],
+            image_storage_path: 'org-1/skill-image-new.jpg',
+            image_public_url: 'https://cdn.example.com/skill-image-new.jpg',
+            image_mime_type: 'image/jpeg',
+            image_width: 1600,
+            image_height: 900,
+            image_size_bytes: 120000,
+            image_original_filename: 'offer.jpg'
+        })
+
+        expect(storageRemoveMock).toHaveBeenCalledWith(['org-1/skill-image-old.jpg'])
+        expect(generateEmbeddingsMock).not.toHaveBeenCalled()
+        expect(appendServiceCatalogCandidatesMock).not.toHaveBeenCalled()
+        expect(appendOfferingProfileSuggestionMock).not.toHaveBeenCalled()
+        expect(appendRequiredIntakeFieldsMock).not.toHaveBeenCalled()
     })
 
     it('removes the stored image object when deleting a skill', async () => {

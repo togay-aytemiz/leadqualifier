@@ -71,6 +71,10 @@ describe('calendar page source', () => {
   it('keeps header actions aligned with the knowledge workspace sizing and dark primary CTA styling', () => {
     const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
 
+    expect(source).toContain('const isBookingEnabled = Boolean(settings?.booking_enabled)')
+    expect(source).toContain('const bookingStatusLabel = isBookingEnabled')
+    expect(source).toContain("t('bookingStatus.active')")
+    expect(source).toContain("t('bookingStatus.closed')")
     expect(source).toContain(
       'className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"'
     )

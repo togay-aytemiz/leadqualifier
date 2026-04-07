@@ -10,6 +10,7 @@ const {
     isValidMetaSignatureMock,
     processInboundAiPipelineMock,
     resolveMetaInstagramConnectionCandidateMock,
+    sendImageMock,
     sendTextMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
@@ -20,6 +21,7 @@ const {
     isValidMetaSignatureMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
     resolveMetaInstagramConnectionCandidateMock: vi.fn(),
+    sendImageMock: vi.fn(),
     sendTextMock: vi.fn()
 }))
 
@@ -48,6 +50,7 @@ vi.mock('@/lib/instagram/client', () => ({
 
         getBusinessAccount = getBusinessAccountMock
         getUserProfile = getUserProfileMock
+        sendImage = sendImageMock
         sendText = sendTextMock
     }
 }))
@@ -540,7 +543,9 @@ describe('Instagram webhook route', () => {
             profile_picture_url: null
         })
 
-        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+        process.env.NEXT_PUBLIC_APP_URL = 'https://app.askqualy.com'
+
+        const req = new NextRequest('https://app.askqualy.com/api/webhooks/instagram', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -577,6 +582,151 @@ describe('Instagram webhook route', () => {
                 webhook_verified_at: expect.any(String)
             })
         }))
+    })
+
+    it('returns provider message ids from instagram outbound send callbacks', async () => {
+        const event = {
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-user-1',
+            contactName: 'Ayse',
+            messageId: 'ig-mid-1',
+            text: 'Merhaba',
+            timestamp: '1738000000',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'inbound',
+            skipAutomation: false
+        }
+
+        const { supabase } = createInstagramSupabaseMock({
+            directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+                ? {
+                    id: 'channel-ig-1',
+                    organization_id: 'org-1',
+                    config: {
+                        page_id: 'page-1',
+                        instagram_business_account_id: 'ig-biz-1',
+                        instagram_app_scoped_id: 'ig-app-1',
+                        app_secret: 'app-secret',
+                        page_access_token: 'token-ig-1'
+                    }
+                }
+                : null,
+            listData: []
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([event])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getUserProfileMock.mockResolvedValue({
+            id: 'ig-user-1',
+            username: 'ayse',
+            name: 'Ayse',
+            profile_picture_url: null
+        })
+        sendTextMock.mockResolvedValueOnce({ message_id: 'ig-outbound-text-1' })
+        sendImageMock.mockResolvedValueOnce({ message_id: 'ig-outbound-image-1' })
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        expect(processInboundAiPipelineMock).toHaveBeenCalledTimes(1)
+
+        const pipelineInput = processInboundAiPipelineMock.mock.calls[0]?.[0]
+        await expect(pipelineInput.sendOutbound('Bot reply')).resolves.toEqual({
+            providerMessageId: 'ig-outbound-text-1'
+        })
+        await expect(pipelineInput.sendOutbound({
+            type: 'image',
+            imageUrl: 'https://example.supabase.co/storage/v1/object/public/skill-images/org-1/skill-image.webp',
+            mimeType: 'image/webp'
+        })).resolves.toEqual({
+            providerMessageId: 'ig-outbound-image-1'
+        })
+        expect(sendImageMock).toHaveBeenCalledWith({
+            instagramBusinessAccountId: 'page-1',
+            to: 'ig-user-1',
+            imageUrl: 'http://localhost/api/media/instagram-skill-image?source=https%3A%2F%2Fexample.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fskill-images%2Forg-1%2Fskill-image.webp'
+        })
+    })
+
+    it('normalizes alternate instagram send response ids for outbound callbacks', async () => {
+        const event = {
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-user-1',
+            contactName: 'Ayse',
+            messageId: 'ig-mid-1',
+            text: 'Merhaba',
+            timestamp: '1738000000',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'inbound',
+            skipAutomation: false
+        }
+
+        const { supabase } = createInstagramSupabaseMock({
+            directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+                ? {
+                    id: 'channel-ig-1',
+                    organization_id: 'org-1',
+                    config: {
+                        page_id: 'page-1',
+                        instagram_business_account_id: 'ig-biz-1',
+                        instagram_app_scoped_id: 'ig-app-1',
+                        app_secret: 'app-secret',
+                        page_access_token: 'token-ig-1'
+                    }
+                }
+                : null,
+            listData: []
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([event])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        resolveMetaInstagramConnectionCandidateMock.mockResolvedValue(null)
+        getUserProfileMock.mockResolvedValue({
+            id: 'ig-user-1',
+            username: 'ayse',
+            name: 'Ayse',
+            profile_picture_url: null
+        })
+        sendTextMock.mockResolvedValueOnce({ id: 'ig-outbound-text-alt-1' })
+        sendImageMock.mockResolvedValueOnce({ mid: 'ig-outbound-image-alt-1' })
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        const pipelineInput = processInboundAiPipelineMock.mock.calls[0]?.[0]
+        await expect(pipelineInput.sendOutbound('Bot reply')).resolves.toEqual({
+            providerMessageId: 'ig-outbound-text-alt-1'
+        })
+        await expect(pipelineInput.sendOutbound({
+            type: 'image',
+            imageUrl: 'https://cdn.example.com/skill-image.jpg',
+            mimeType: 'image/jpeg'
+        })).resolves.toEqual({
+            providerMessageId: 'ig-outbound-image-alt-1'
+        })
     })
 
     it('persists structured instagram reaction metadata into inbound message metadata', async () => {

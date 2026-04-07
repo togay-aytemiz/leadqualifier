@@ -26,7 +26,7 @@ import { getAvailableActionTargetSkills } from '@/components/skills/action-targe
 import { createClient } from '@/lib/supabase/client'
 import {
     SKILL_IMAGE_INPUT_ACCEPT,
-    convertSkillImageToWebP,
+    convertSkillImageToJpeg,
     validateSkillImageFile
 } from '@/lib/skills/image-client'
 
@@ -237,7 +237,7 @@ export function SkillsContainer({ initialSkills, organizationId, handoverMessage
         setImageStatus(null)
 
         try {
-            const converted = await convertSkillImageToWebP(file)
+            const converted = await convertSkillImageToJpeg(file)
             const prepareResult = await prepareSkillImageUpload(organizationId)
             if (!prepareResult.ok) {
                 throw new Error('Failed to prepare skill image upload')

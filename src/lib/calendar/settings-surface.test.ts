@@ -26,6 +26,10 @@ describe('getCalendarSettingsSectionIds', () => {
 })
 
 describe('calendar settings dirty helpers', () => {
+    it('defaults the booking switch to disabled until a workspace explicitly enables booking', () => {
+        expect(buildCalendarSettingsDraft(null).bookingEnabled).toBe(false)
+    })
+
     it('treats unchanged general settings as clean but ignores Google-only differences', () => {
         const baseline = buildCalendarSettingsDraft({
             booking_enabled: true,
