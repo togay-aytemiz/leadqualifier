@@ -1626,7 +1626,7 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
-    it('uses the top matched skill directly without handover-intent guard filtering', async () => {
+    it('passes general intent-gate context into skill matching', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
         const lookup = createConversationLookupBuilder(createConversation())
@@ -1656,9 +1656,13 @@ describe('processInboundAiPipeline guardrails', () => {
             buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
         )
 
-        expect(sendOutbound).toHaveBeenCalledWith('Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(matchSkillsSafelyMock).toHaveBeenCalledWith(expect.objectContaining({
+            intentGate: {
+                message: 'hizmetleriniz hakkında bilgi almak istiyorum',
+                threshold: 0.7
+            }
+        }))
         expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
-        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
     it('keeps typo complaint intents on handover skill path and switches active agent', async () => {
@@ -1772,7 +1776,7 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
-    it('returns on the first successful match from top candidates', async () => {
+    it('uses the first candidate returned by the gated matcher', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
         const lookup = createConversationLookupBuilder(createConversation())
@@ -1780,23 +1784,15 @@ describe('processInboundAiPipeline guardrails', () => {
         const botInsert = createInsertBuilder()
         const conversationUpdateAfterInbound = createUpdateBuilder()
         const conversationUpdateAfterBotReply = createUpdateBuilder()
-        const firstSkillDetails = createSkillDetailsBuilder({ requires_human_handover: true })
-        const secondSkillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
 
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
             conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
-            skills: [firstSkillDetails.builder, secondSkillDetails.builder]
+            skills: [skillDetails.builder]
         })
 
         matchSkillsSafelyMock.mockResolvedValueOnce([
-            {
-                skill_id: 'skill-complaint',
-                title: 'Şikayet ve Memnuniyetsizlik',
-                response_text: 'Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.',
-                trigger_text: 'Bu konuda destek istiyorum',
-                similarity: 0.72
-            },
             {
                 skill_id: 'skill-service-info',
                 title: 'Hizmet Bilgisi',
@@ -1810,9 +1806,8 @@ describe('processInboundAiPipeline guardrails', () => {
             buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
         )
 
-        expect(sendOutbound).toHaveBeenCalledWith('Yaşadığınız olumsuz deneyim için üzgünüz. Konuyu hemen ekibimize iletiyorum.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
-        expect(firstSkillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
-        expect(secondSkillDetails.selectMock).not.toHaveBeenCalled()
+        expect(sendOutbound).toHaveBeenCalledWith('Elbette, hizmetlerimiz hakkında bilgi paylaşabilirim.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, skill_actions, image_public_url, image_mime_type, image_original_filename')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 

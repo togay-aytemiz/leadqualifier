@@ -217,6 +217,35 @@ describe('getOrgAiSettings handover message localization', () => {
         expect(settings.prompt).toContain(DEFAULT_ASSISTANT_NEVER_DO_TR)
     })
 
+    it('repairs saved English starter assistant instructions to Turkish for TR locale', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'active',
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            assistant_role: DEFAULT_ASSISTANT_ROLE_EN,
+            assistant_intake_rule: DEFAULT_ASSISTANT_INTAKE_RULE_EN,
+            assistant_never_do: DEFAULT_ASSISTANT_NEVER_DO_EN,
+            assistant_other_instructions: DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_EN,
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            locale: 'tr'
+        })
+
+        expect(settings.assistant_role).toBe(DEFAULT_ASSISTANT_ROLE_TR)
+        expect(settings.assistant_intake_rule).toBe(DEFAULT_ASSISTANT_INTAKE_RULE_TR)
+        expect(settings.assistant_never_do).toBe(DEFAULT_ASSISTANT_NEVER_DO_TR)
+        expect(settings.assistant_other_instructions).toBe(DEFAULT_ASSISTANT_OTHER_INSTRUCTIONS_TR)
+        expect(settings.prompt).toContain(DEFAULT_ASSISTANT_ROLE_TR)
+    })
+
     it('returns English starter assistant instructions for EN locale when structured fields are still untouched', async () => {
         const supabase = createSupabaseMock({
             bot_mode: 'active',

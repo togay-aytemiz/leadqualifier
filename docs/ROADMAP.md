@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-07):** `Settings > Qualy AI` now repairs exact saved EN/TR starter assistant-instruction sets into the active UI locale, so a Turkish interface does not show English default textarea content just because an older row persisted the English starter values. Custom operator-written instruction text remains unchanged.
+
+> **Update Note (2026-04-07):** Skill matching now uses a general sector-independent intent gate before running deterministic skill replies. Embedding similarity remains the primary signal, but ambiguous matches must have either a strong semantic score, a clear score lead over other candidates, or a fuzzy non-generic trigger/title anchor with the customer message; otherwise the flow continues to KB/RAG/fallback instead of firing an unrelated skill.
+
 > **Update Note (2026-04-07):** New workspaces now start with calendar booking closed by default. `booking_settings.booking_enabled` defaults to `false` for fresh rows and runtime fallback settings, while `/calendar` shows an active/closed header chip and disables the new-booking CTA when appointments are closed.
 
 > **Update Note (2026-04-07):** Instagram skill-image echo dedupe now covers image-only echo rows too. Outbound send callbacks normalize provider ids from alternate Meta response fields, and Inbox hides legacy outbound image echo rows near bot skill-image placeholders so a single skill image does not render once as `Yapay Zeka Asistanı` and again as the Instagram business user.
@@ -179,7 +183,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-04-07 (Freeform Knowledge Base authoring now includes a persistent `Qualy AI ile doldur` helper card with the filled AI icon, stacked CTA, reusable mobile-friendly drafting modal input, explicit in-modal loading state, repeated draft generation replaces the content body while leaving non-empty titles untouched, the assistant-guidance field now reads `Yapay zeka asistanının dikkat etmesi gerekenler`, billing keeps the new usage inside the existing `İçerik işleme / Content processing` breakdown, offering-profile suggestion generation now uses real Skill/Knowledge content with a stricter second repair pass so pending banners remain reliable after AI-filled saves, the `Knowledge` page now keeps a visible wait-state suggestions banner until it can switch into the ready-state review banner, Instagram bot replies now persist provider ids while new skill images are stored as JPEG, legacy WebP skill images are proxied as JPEG, provider-id/text/image duplicate echo rows are filtered out of Inbox threads, and existing Skill image-only edits no longer create Organization Detail AI suggestions.)
+> **Last Updated:** 2026-04-07 (Freeform Knowledge Base authoring now includes a persistent `Qualy AI ile doldur` helper card with the filled AI icon, stacked CTA, reusable mobile-friendly drafting modal input, explicit in-modal loading state, repeated draft generation replaces the content body while leaving non-empty titles untouched, the assistant-guidance field now reads `Yapay zeka asistanının dikkat etmesi gerekenler`, billing keeps the new usage inside the existing `İçerik işleme / Content processing` breakdown, offering-profile suggestion generation now uses real Skill/Knowledge content with a stricter second repair pass so pending banners remain reliable after AI-filled saves, the `Knowledge` page now keeps a visible wait-state suggestions banner until it can switch into the ready-state review banner, Instagram bot replies now persist provider ids while new skill images are stored as JPEG, legacy WebP skill images are proxied as JPEG, provider-id/text/image duplicate echo rows are filtered out of Inbox threads, existing Skill image-only edits no longer create Organization Detail AI suggestions, and Skill matching now uses a general semantic-confidence + fuzzy trigger-anchor gate before running deterministic skill replies.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -440,6 +444,7 @@
   - [x] Similarity search (top-5)
   - [x] LLM re-ranking
   - [x] Confidence threshold logic
+  - [x] General sector-independent intent gate for ambiguous matches: require strong semantic confidence, a clear top-candidate margin, or fuzzy non-generic trigger/title anchoring before running a deterministic skill reply
 - [x] **Skill Testing**
   - [x] Simulator is the canonical skill testing surface for MVP (no separate per-skill playground)
 
@@ -646,7 +651,7 @@
   - [x] Conversation list lead payloads are normalized for one-to-one nested responses so lead chips remain visible after full page refresh (without opening each thread)
   - [x] Conversation list relative-time labels now use deterministic base-time formatting to prevent SSR/CSR hydration mismatches
   - [x] Escalation runtime now persists conversation-level human-attention queue state (`human_attention_required/reason/requested_at/resolved_at`) for skill-handover and hot-lead escalations
-  - [x] Skill routing now applies the first successful top-ranked match directly (no extra handover-intent guard); when matched skill has `requires_human_handover=true`, escalation switches conversation to operator
+  - [x] Skill routing now uses the first candidate returned by the general gated matcher; when matched skill has `requires_human_handover=true`, escalation switches conversation to operator
   - [x] MVP response-language detection now treats ASCII Turkish complaint turns (for example `Sikayetim var`) as Turkish and, when current turn is ambiguous, falls back to recent customer-message history to keep escalation/handover notices in the correct language
   - [x] Inbox bot-message parsing now strips trailing quoted disclaimer lines reliably (LF/CRLF tolerant) and supports skill-title extraction from JSON-string metadata payloads
   - [x] Inbox skill footer label now hides raw `skill_id` fallback (UUID) and shows only skill title; inbound runtimes now also fetch `skills.title` as a fallback source when matcher title is empty
@@ -735,6 +740,7 @@
   - [x] Dedicated localized bot messages (TR/EN) per guardrail skill
   - [x] Keep low-confidence/no-safe-answer automatic handover out of scope (KB/fallback continues)
 - [x] **AI Settings Instructions:** Locale-aware starter instructions now populate `Yapay zeka asistan talimatları` in TR/EN workspaces
+- [x] **AI Settings Instructions:** Exact saved EN/TR starter instruction sets now re-resolve into the active UI locale instead of rendering stale default copy
 - [x] **AI Settings Instructions:** Legacy custom prompts now carry into `Diğer talimatlar` instead of staying as a raw prompt textarea
 - [x] **Inbox UI:** Show configured bot name in chat labels
 - [x] **Usage & Billing:** Track monthly calendar-month + all-time AI credit usage using ledger debits (`organization_credit_ledger` / `usage_debit`)
@@ -778,7 +784,7 @@
 - [x] **AI Settings IA:** Reorganize AI settings into 3 tabs (`General`, `Behavior and Logic`, `Escalation`) and move sections accordingly (Bot mode/name, sensitivity + structured assistant instructions, and escalation controls with primary `Automatic Escalation` + `Skill Based Handover` sections)
 - [x] **Settings Components:** Add reusable `SettingsTabs` with smooth tab-content height animation for reuse across settings surfaces
 - [x] **AI Settings Matching:** Apply inclusive threshold semantics (`>=`) for Skill + KB similarity checks
-- [x] **Skill Matching Guardrail:** Evaluate matched skills in order and reject likely false-positive `requires_human_handover` matches when inbound intent does not indicate handover/escalation; use next valid skill candidate, otherwise continue via KB/fallback
+- [x] **Skill Matching Guardrail:** Evaluate matched skills through a general intent gate, not a skill-specific/handover-only exception: ambiguous matches need strong semantic confidence, a clear candidate margin, or fuzzy non-generic trigger/title anchoring; otherwise continue via KB/fallback
 - [x] **Bot Disclaimer Reliability:** Add regression coverage to enforce default TR/EN disclaimer fallback when localized disclaimer fields are missing at runtime
 - [x] **Inbox Bot Message Readability:** Hide trailing bot disclaimer footer from Inbox bubble rendering for both standard quote (`\n\n> ...`) and Instagram separator (`\n\n------\n> ...`) variants while keeping outbound channel disclaimer payload unchanged
 - [x] **Inbox Skill Attribution:** Persist/show matched `skill_title` for bot skill replies in message footer metadata area (no label when no skill match)

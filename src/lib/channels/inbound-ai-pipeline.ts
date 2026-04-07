@@ -1046,6 +1046,10 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             organization_id: orgId,
             conversation_id: conversation.id,
             source: options.source
+        },
+        intentGate: {
+            message: options.text,
+            threshold: matchThreshold
         }
     })
     const skillCandidates = matchedSkills ?? []

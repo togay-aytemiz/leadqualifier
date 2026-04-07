@@ -170,6 +170,8 @@ export async function simulateChat(
         }
     )
 
+    const activeThreshold = matchThreshold
+
     // 1. Match skills with ZERO threshold to get ANY match for debugging
     console.log(`Simulating chat for: "${message}" in org: ${organizationId} with threshold: ${threshold}`)
     const matches = await matchSkillsSafely({
@@ -177,12 +179,15 @@ export async function simulateChat(
         context: {
             organization_id: organizationId,
             source: 'simulator'
+        },
+        intentGate: {
+            message,
+            threshold: activeThreshold
         }
     })
     console.log('Matches found:', JSON.stringify(matches, null, 2))
     // Only count tokens actually sent to LLM endpoints. Skill-only paths should be zero.
 
-    const activeThreshold = matchThreshold
     const bestMatch = matches?.[0];
 
     // 2. Determine response

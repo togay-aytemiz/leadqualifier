@@ -126,6 +126,18 @@ function isKnownDefaultPrompt(prompt: string) {
     return LEGACY_EN_DEFAULT_PROMPTS.has(prompt) || LEGACY_TR_DEFAULT_PROMPTS.has(prompt)
 }
 
+function isKnownDefaultInstructionFields(fields: AssistantInstructionFields) {
+    const enDefaults = getDefaultAssistantInstructions('en')
+    const trDefaults = getDefaultAssistantInstructions('tr')
+
+    return [enDefaults, trDefaults].some((defaults) => (
+        fields.assistant_role === defaults.assistant_role &&
+        fields.assistant_intake_rule === defaults.assistant_intake_rule &&
+        fields.assistant_never_do === defaults.assistant_never_do &&
+        fields.assistant_other_instructions === defaults.assistant_other_instructions
+    ))
+}
+
 export function resolveStructuredAssistantInstructions(
     settings: Partial<OrganizationAiSettings> | null | undefined,
     locale: string | null | undefined
@@ -136,6 +148,14 @@ export function resolveStructuredAssistantInstructions(
             assistant_intake_rule: normalizeInstructionField(settings?.assistant_intake_rule),
             assistant_never_do: normalizeInstructionField(settings?.assistant_never_do),
             assistant_other_instructions: normalizeInstructionField(settings?.assistant_other_instructions)
+        }
+
+        if (isKnownDefaultInstructionFields(normalizedFields)) {
+            const defaultFields = getDefaultAssistantInstructions(locale)
+            return {
+                ...defaultFields,
+                prompt: compileAssistantInstructions(defaultFields, locale)
+            }
         }
 
         return {

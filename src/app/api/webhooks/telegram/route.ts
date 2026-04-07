@@ -479,6 +479,10 @@ export async function POST(req: NextRequest) {
             organization_id: orgId,
             conversation_id: conversation.id,
             source: 'telegram'
+        },
+        intentGate: {
+            message: text,
+            threshold: matchThreshold
         }
     })
     const skillCandidates = matchedSkills ?? []
