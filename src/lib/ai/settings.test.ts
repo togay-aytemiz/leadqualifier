@@ -30,6 +30,43 @@ function createSupabaseMock(data: Record<string, unknown>, error: unknown = null
 }
 
 describe('getOrgAiSettings handover message localization', () => {
+    it('keeps bot mode locked to off after onboarding completion until an explicit choice has been recorded', async () => {
+        const supabase = createSupabaseMock({
+            bot_mode: 'active',
+            bot_mode_unlock_required: null,
+            bot_mode_unlocked_at: null,
+            match_threshold: 0.6,
+            prompt: DEFAULT_FLEXIBLE_PROMPT,
+            bot_name: 'Bot',
+            allow_lead_extraction_during_operator: false,
+            hot_lead_score_threshold: 7,
+            hot_lead_action: 'notify_only',
+            hot_lead_handover_message_tr: DEFAULT_HANDOVER_MESSAGE_TR,
+            hot_lead_handover_message_en: DEFAULT_HANDOVER_MESSAGE_EN
+        })
+
+        const onboardingState = {
+            organizationId: 'org-1',
+            isComplete: true,
+            completedSteps: 5,
+            totalSteps: 5,
+            showBanner: true,
+            showChecklistCta: false,
+            showNavigationEntry: false,
+            shouldAutoOpen: false,
+            steps: []
+        } satisfies OrganizationOnboardingShellState
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            onboardingState
+        })
+
+        expect(settings.bot_mode).toBe('off')
+        expect(settings.bot_mode_unlock_required).toBe(true)
+        expect(settings.bot_mode_unlocked_at).toBeNull()
+    })
+
     it('forces bot mode to off while onboarding is still incomplete even if legacy lock flag is false', async () => {
         const supabase = createSupabaseMock({
             bot_mode: 'shadow',

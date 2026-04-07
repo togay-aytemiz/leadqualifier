@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 
 import { ChannelCard } from '@/components/channels/ChannelCard'
 import { getChannelCardConfigs, getChannelsListLayoutClasses } from '@/components/channels/channelCards'
+import { getChannelConnectionState } from '@/lib/channels/connection-readiness'
 import type { Channel } from '@/types/database'
 
 interface ChannelsListProps {
@@ -32,6 +33,17 @@ export function ChannelsList({
     const router = useRouter()
 
     const channelCards = useMemo(() => getChannelCardConfigs(channels), [channels])
+    const hasPendingMetaChannel = useMemo(
+        () =>
+            channelCards.some((card) => {
+                if (!card.channel) return false
+                if (card.channel.type !== 'whatsapp' && card.channel.type !== 'instagram') return false
+
+                const connectionState = getChannelConnectionState(card.channel)
+                return connectionState === 'pending'
+            }),
+        [channelCards]
+    )
     const channelPrefetchHrefs = useMemo(
         () =>
             channelCards
@@ -46,6 +58,27 @@ export function ChannelsList({
             router.prefetch(href)
         })
     }, [channelPrefetchHrefs, router])
+
+    useEffect(() => {
+        if (!hasPendingMetaChannel) return
+
+        const refreshPendingChannels = () => {
+            router.refresh()
+        }
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshPendingChannels()
+            }
+        }
+
+        window.addEventListener('focus', refreshPendingChannels)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+
+        return () => {
+            window.removeEventListener('focus', refreshPendingChannels)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+        }
+    }, [hasPendingMetaChannel, router])
 
     return (
         <div>

@@ -13,7 +13,13 @@ describe('DashboardLayout onboarding bot unlock source', () => {
 
     expect(source).toContain('getOrgAiSettings')
     expect(source).toContain('OnboardingCompletionModal')
-    expect(source).toContain('botModeUnlockRequired')
+    expect(source).toContain('requiresExplicitSelection')
     expect(source).toContain('onboardingState?.isComplete')
+  })
+
+  it('passes the modal an explicit post-onboarding choice requirement instead of only the raw lock flag', () => {
+    const source = fs.readFileSync(FILE_PATH, 'utf8')
+
+    expect(source).toContain('requiresExplicitSelection')
   })
 })

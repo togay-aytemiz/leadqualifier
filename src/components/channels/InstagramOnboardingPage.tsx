@@ -93,6 +93,27 @@ export function InstagramOnboardingPage({
         clearPopupResult()
     }, [clearPopupResult, popupResult, router, t])
 
+    useEffect(() => {
+        if (connectionState !== 'pending') return
+
+        const refreshPendingChannel = () => {
+            router.refresh()
+        }
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshPendingChannel()
+            }
+        }
+
+        window.addEventListener('focus', refreshPendingChannel)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+
+        return () => {
+            window.removeEventListener('focus', refreshPendingChannel)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+        }
+    }, [connectionState, router])
+
     const handleConnect = async () => {
         if (isReadOnly) return
 

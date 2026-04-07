@@ -25,4 +25,13 @@ describe('OnboardingCompletionModal source', () => {
     expect(source).not.toContain('onClose={() => setIsOpen(false)}')
     expect(source).not.toContain('dismissText')
   })
+
+  it('keeps the bot-mode options neutral instead of recommending listener mode', () => {
+    const source = fs.readFileSync(FILE_PATH, 'utf8')
+
+    expect(source).not.toContain('recommended')
+    expect(source).not.toContain('Recommended')
+    expect(source).not.toContain('öner')
+    expect(source).not.toContain('badge:')
+  })
 })

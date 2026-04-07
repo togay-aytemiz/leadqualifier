@@ -108,6 +108,10 @@ export function ChannelCard({
     }
 
     const isConnected = !!channel
+    const showPendingVerificationHelp =
+        isConnected
+        && connectionState === 'pending'
+        && (type === 'whatsapp' || type === 'instagram')
     const connectLabel = isComingSoon ? t('actions.learnMore') : t('actions.connect')
     const showComingSoonBadge = !isConnected && (badge === 'comingSoon' || isComingSoon)
     const showFooterBadge = isConnected || showComingSoonBadge
@@ -160,6 +164,16 @@ export function ChannelCard({
                             <p className="mt-3 text-xs font-medium text-slate-700">
                                 {t('gallery.connectedAs', { name: channel.name })}
                             </p>
+                        )}
+                        {showPendingVerificationHelp && (
+                            <div className="mt-3 rounded-2xl border border-amber-200/90 bg-amber-50/90 p-3">
+                                <p className="text-xs font-semibold text-amber-900">
+                                    {t('gallery.pendingVerificationTitle')}
+                                </p>
+                                <p className="mt-1 text-xs leading-5 text-amber-800">
+                                    {t('gallery.pendingVerificationDescription')}
+                                </p>
+                            </div>
                         )}
                     </div>
 

@@ -13,4 +13,13 @@ describe('ChannelsList source guards', () => {
     expect(source).toContain('channelPrefetchHrefs.forEach((href) => {')
     expect(source).not.toContain('}, [channelCards, locale, router])')
   })
+
+  it('refreshes the route when a pending meta channel might have become verified after returning to the app', () => {
+    const source = fs.readFileSync(CHANNELS_LIST_PATH, 'utf8')
+
+    expect(source).toContain("connectionState === 'pending'")
+    expect(source).toContain('router.refresh()')
+    expect(source).toContain("window.addEventListener('focus', refreshPendingChannels)")
+    expect(source).toContain("document.addEventListener('visibilitychange', handleVisibilityChange)")
+  })
 })

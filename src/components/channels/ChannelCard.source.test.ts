@@ -12,4 +12,12 @@ describe('ChannelCard source guards', () => {
     expect(source).toContain('disabled={isReadOnly || isConnectLocked}')
     expect(source).toContain("!isConnectLocked && 'hover:-translate-y-0.5 hover:shadow-md'")
   })
+
+  it('renders explicit pending verification guidance for connected pending channels', () => {
+    const source = fs.readFileSync(CHANNEL_CARD_PATH, 'utf8')
+
+    expect(source).toContain("connectionState === 'pending'")
+    expect(source).toContain("t('gallery.pendingVerificationTitle')")
+    expect(source).toContain("t('gallery.pendingVerificationDescription')")
+  })
 })

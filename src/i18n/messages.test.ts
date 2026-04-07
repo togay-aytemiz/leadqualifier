@@ -87,6 +87,12 @@ describe('pickMessageNamespaces', () => {
     expect(
       trMessages.onboarding.checklist.steps.ai_settings_review.description.toLowerCase()
     ).not.toContain('bot modu')
+    expect(
+      trMessages.onboarding.checklist.steps.connect_whatsapp.description.toLowerCase()
+    ).toContain('test mesajı')
+    expect(
+      trMessages.onboarding.checklist.steps.connect_whatsapp.description.toLowerCase()
+    ).toContain('bot durumunu')
     expect(trMessages.onboarding.checklist.steps.ai_settings_review.visuals.botMode.title).toBe(
       'Bot adını kişiselleştirin'
     )
@@ -118,6 +124,11 @@ describe('pickMessageNamespaces', () => {
     )
     expect(trMessages.Channels.channelConnectionLocked.goToOnboarding).toBe(
       'Başlangıç adımlarına git'
+    )
+    expect(trMessages.Channels.status.pending).toBe('Test mesajı bekleniyor')
+    expect(trMessages.Channels.gallery.pendingVerificationTitle).toBe('Test mesajı bekleniyor')
+    expect(trMessages.Channels.gallery.pendingVerificationDescription.toLowerCase()).toContain(
+      'kendiniz bir test mesajı'
     )
     expect(trMessages.onboarding.completionModal.title.toLowerCase()).toContain('tamamlandı')
     expect(trMessages.onboarding.completionModal.options.active.title).toBe('Aktif')

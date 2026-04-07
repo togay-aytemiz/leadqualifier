@@ -47,6 +47,7 @@ export default async function DashboardLayout({
     const aiSettings = onboardingOrganizationId
         ? await getOrgAiSettings(onboardingOrganizationId, { locale, onboardingState })
         : null
+    const requiresExplicitSelection = aiSettings?.bot_mode_unlock_required ?? false
 
     const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
     const userAvatarUrl = orgContext?.userAvatarUrl ?? null
@@ -83,8 +84,8 @@ export default async function DashboardLayout({
                     {onboardingOrganizationId && onboardingState?.isComplete ? (
                         <OnboardingCompletionModal
                             organizationId={onboardingOrganizationId}
-                            isOpen={Boolean(aiSettings?.bot_mode_unlock_required)}
-                            botModeUnlockRequired={aiSettings?.bot_mode_unlock_required ?? false}
+                            isOpen={requiresExplicitSelection}
+                            requiresExplicitSelection={requiresExplicitSelection}
                         />
                     ) : null}
                     <div className="flex min-h-0 flex-1 overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">

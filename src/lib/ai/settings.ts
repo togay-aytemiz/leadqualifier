@@ -93,6 +93,29 @@ function normalizeBotModeUnlockedAt(value: string | null | undefined) {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function resolveBotModeSelectionRequired(
+    settings: Partial<OrganizationAiSettings> | null,
+    onboardingState?: OrganizationOnboardingShellState | null
+) {
+    if (onboardingState?.isComplete === false) {
+        return true
+    }
+
+    if (settings?.bot_mode_unlock_required === true) {
+        return true
+    }
+
+    if (settings?.bot_mode_unlock_required === false) {
+        return false
+    }
+
+    if (onboardingState?.isComplete === true) {
+        return normalizeBotModeUnlockedAt(settings?.bot_mode_unlocked_at) === null
+    }
+
+    return normalizeBotModeUnlockRequired(settings?.bot_mode_unlock_required)
+}
+
 function normalizeHotLeadAction(action: string | null | undefined): HumanEscalationAction {
     if (action === 'notify_only' || action === 'switch_to_operator') {
         return action
@@ -179,9 +202,7 @@ function applyAiDefaults(
     const localizedHandoverMessages = resolveLocalizedHandoverMessages(settings)
     const localizedBotDisclaimerMessages = resolveLocalizedBotDisclaimerMessages(settings)
     const assistantInstructions = resolveStructuredAssistantInstructions(settings, locale)
-    const onboardingLockRequired =
-        normalizeBotModeUnlockRequired(settings?.bot_mode_unlock_required)
-        || onboardingState?.isComplete === false
+    const onboardingLockRequired = resolveBotModeSelectionRequired(settings, onboardingState)
 
     return {
         mode,

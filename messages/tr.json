@@ -444,7 +444,7 @@
         },
         "connect_whatsapp": {
           "title": "Kanallarınızı bağlayın",
-          "description": "Hazır olduğunuzda kanallarınızı bağlayın ve tüm yeni konuşmaları tek yerden yönetin.",
+          "description": "Kanalınızı bağladıktan sonra bağlı hesaba kendiniz bir test mesajı gönderin. İlk mesaj geldikten sonra Qualy bağlantıyı otomatik olarak doğrular ve ardından bot durumunu sizin seçmenizi ister.",
           "primaryCta": "Kanallara git",
           "channels": {
             "title": "Bağlayabileceğiniz kanallar",
@@ -846,7 +846,7 @@
     },
     "status": {
       "active": "Aktif",
-      "pending": "Kurulum bekleniyor",
+      "pending": "Test mesajı bekleniyor",
       "needsAttention": "Dikkat gerekiyor",
       "notConnected": "Bağlı değil"
     },
@@ -857,6 +857,8 @@
       "category": "İşletme Mesajlaşması",
       "statusLabel": "Durum",
       "connectedAs": "Bağlı hesap: {name}",
+      "pendingVerificationTitle": "Test mesajı bekleniyor",
+      "pendingVerificationDescription": "Bağlantıyı doğrulamak için bağlı hesaba kendiniz bir test mesajı gönderin. İlk mesaj geldikten sonra Qualy bağlantıyı otomatik olarak doğrular ve bot durumunu seçmenizi ister.",
       "badges": {
         "popular": "Popüler",
         "comingSoon": "Yakında"
@@ -1003,8 +1005,8 @@
         "connectedHeading": "Bağlı WhatsApp kanalınızı yönetin",
         "connectedDescription": "WhatsApp kanalınız zaten aktif. Aşağıdaki aksiyonlarla şablonları yönetin, webhook sağlığını kontrol edin veya WhatsApp Business kurulumunu değiştirmeden Qualy bağlantısını kaldırın.",
         "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır.",
-        "pendingDescription": "WhatsApp asset'leriniz bağlandı, ancak webhook doğrulaması hâlâ bekleniyor. Meta callback doğrulamayı tamamlayana kadar gelen konuşmaların akmasını beklemeyin.",
-        "pendingBanner": "{name} bağlandı, ancak webhook doğrulaması hâlâ bekleniyor.",
+        "pendingDescription": "WhatsApp hesabınız bağlandı. Bağlantıyı doğrulamak için bağlı hesaba kendiniz bir test mesajı gönderin. İlk mesaj geldikten sonra Qualy bağlantıyı otomatik olarak doğrular ve bot durumunu seçmenizi ister.",
+        "pendingBanner": "{name} bağlı. Doğrulamak için bir test mesajı gönderin.",
         "errorDescription": "WhatsApp asset'leriniz bağlandı, ancak bu kanalın güvenilir şekilde konuşma alabilmesi için webhook kurulumunda dikkat gerekiyor.",
         "errorBanner": "{name} hazır olmadan önce webhook tarafında dikkat gerektiriyor."
       },
@@ -1032,8 +1034,8 @@
         "connectedHeading": "Bağlı Instagram kanalınızı yönetin",
         "connectedDescription": "Instagram kanalınız zaten aktif. Webhook sağlığını kontrol edebilir veya bu workspace'ten bağlantısını kesebilirsiniz.",
         "connectedBanner": "{name} bağlı ve konuşmaları almaya hazır.",
-        "pendingDescription": "Instagram hesabınız bağlı, ancak Qualy bu kanal için webhook doğrulamasını henüz kaydetmedi. Bu durum OAuth izinlerinden ayrıdır; webhook sağlığı doğrulanana kadar kanalı tam hazır kabul etmeyin.",
-        "pendingBanner": "{name} bağlı, ancak webhook doğrulaması hâlâ bekleniyor.",
+        "pendingDescription": "Instagram hesabınız bağlandı. Bağlantıyı doğrulamak için bağlı hesaba kendiniz bir test mesajı gönderin. İlk mesaj geldikten sonra Qualy bağlantıyı otomatik olarak doğrular ve bot durumunu seçmenizi ister.",
+        "pendingBanner": "{name} bağlı. Doğrulamak için bir test mesajı gönderin.",
         "errorDescription": "Instagram hesabınız bağlı, ancak bu kanalın güvenilir şekilde konuşma alabilmesi için webhook sağlığı tarafında dikkat gerekiyor.",
         "errorBanner": "{name} hazır olmadan önce webhook tarafında dikkat gerektiriyor."
       },

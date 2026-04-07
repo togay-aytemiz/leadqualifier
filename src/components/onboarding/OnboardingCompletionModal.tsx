@@ -12,36 +12,21 @@ import { cn } from '@/lib/utils'
 interface OnboardingCompletionModalProps {
   organizationId: string
   isOpen: boolean
-  botModeUnlockRequired: boolean
+  requiresExplicitSelection: boolean
 }
 
 type BotModeChoice = Extract<AiBotMode, 'active' | 'shadow' | 'off'>
 
-const optionToneClassMap = {
-  active: {
-    badge: 'bg-emerald-100 text-emerald-700',
-    surface: 'border-emerald-200 bg-emerald-50/80 hover:border-emerald-300 hover:bg-emerald-50',
-  },
-  shadow: {
-    badge: 'bg-amber-100 text-amber-700',
-    surface: 'border-amber-200 bg-amber-50/80 hover:border-amber-300 hover:bg-amber-50',
-  },
-  off: {
-    badge: 'bg-slate-100 text-slate-700',
-    surface: 'border-slate-200 bg-slate-50/80 hover:border-slate-300 hover:bg-slate-50',
-  },
-} as const
-
 export function OnboardingCompletionModal({
   organizationId,
   isOpen,
-  botModeUnlockRequired,
+  requiresExplicitSelection,
 }: OnboardingCompletionModalProps) {
   const t = useTranslations('onboarding.completionModal')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  if (!isOpen || !botModeUnlockRequired) {
+  if (!isOpen || !requiresExplicitSelection) {
     return null
   }
 
@@ -110,8 +95,6 @@ export function OnboardingCompletionModal({
 
         <div className="mt-6 grid gap-3 lg:grid-cols-3">
           {options.map((option) => {
-            const toneClasses = optionToneClassMap[option.key]
-
             return (
               <button
                 key={option.key}
@@ -119,14 +102,12 @@ export function OnboardingCompletionModal({
                 disabled={isPending}
                 onClick={() => handleSelect(option.selectedMode)}
                 className={cn(
-                  'rounded-2xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-70',
-                  toneClasses.surface
+                  'rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70'
                 )}
               >
                 <span
                   className={cn(
-                    'inline-flex h-10 w-10 items-center justify-center rounded-2xl',
-                    toneClasses.badge
+                    'inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700'
                   )}
                 >
                   {option.icon}
