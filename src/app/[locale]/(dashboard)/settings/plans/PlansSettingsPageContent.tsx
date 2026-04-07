@@ -299,7 +299,11 @@ export default async function PlansSettingsPageContent({
             .eq('organization_id', organizationId)
             .maybeSingle(),
         getOrganizationBillingSnapshot(organizationId, { supabase }),
-        getOrganizationBillingLedger(organizationId, { supabase, limit: 20 }),
+        getOrganizationBillingLedger(organizationId, {
+            supabase,
+            limit: 50,
+            entryTypes: ['package_grant', 'purchase_credit']
+        }),
         getBillingPricingCatalog({
             supabase
         }),

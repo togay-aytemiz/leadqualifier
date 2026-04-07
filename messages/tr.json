@@ -1505,7 +1505,6 @@
         "effectiveImmediate": "Hemen uygulanır.",
         "effectiveNextPeriod": "Bir sonraki dönem başında uygulanır.",
         "todayChargeLabel": "Bugünkü tahsilat",
-        "chargeFullDelta": "{price} plan farkı",
         "chargeProviderCalculated": "Tutar Iyzico tarafından değişiklik anında hesaplanır ve kayıtlı ödeme yöntemiyle tahsil edilir.",
         "chargeNoCharge": "Bugün yeni tahsilat yapılmaz. Yeni fiyat bir sonraki dönemde devreye girer.",
         "chargeFullPrice": "Bugün {price} tutarında ilk abonelik ödemesi alınır.",

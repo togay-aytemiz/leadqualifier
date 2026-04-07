@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import Iyzipay from 'iyzipay'
 import { getBillingProviderConfig } from '@/lib/billing/providers/config'
 
@@ -154,6 +155,31 @@ function assertSuccessResult(result: unknown): IyzicoResultEnvelope {
     return envelope
 }
 
+function generateIyzicoRandomString() {
+    return `${Date.now()}${crypto.randomBytes(8).toString('hex')}`
+}
+
+function generateIyzicoAuthorizationHeaderV2(input: {
+    apiKey: string
+    secretKey: string
+    path: string
+    randomString: string
+    bodyText: string
+}) {
+    const signature = crypto
+        .createHmac('sha256', input.secretKey)
+        .update(`${input.randomString}${input.path}${input.bodyText}`)
+        .digest('hex')
+
+    const authorizationParams = [
+        `apiKey:${input.apiKey}`,
+        `randomKey:${input.randomString}`,
+        `signature:${signature}`
+    ].join('&')
+
+    return `IYZWSv2 ${Buffer.from(authorizationParams).toString('base64')}`
+}
+
 function invokeIyzicoResource<T>(
     call: (cb: (error: unknown, result: unknown) => void) => void
 ): Promise<T> {
@@ -257,19 +283,57 @@ export async function retryIyzicoSubscriptionPayment(input: {
 }
 
 export async function upgradeIyzicoSubscription(input: {
+    conversationId?: string
+    locale?: IyzicoLocale
     subscriptionReferenceCode: string
     newPricingPlanReferenceCode: string
     upgradePeriod?: IyzicoSubscriptionUpgradePeriod
     resetRecurrenceCount?: boolean
+    useTrial?: boolean
 }) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.upgrade({
-        subscriptionReferenceCode: input.subscriptionReferenceCode,
+    const config = getBillingProviderConfig()
+    if (!config.iyzico.enabled || !config.iyzico.apiKey || !config.iyzico.secretKey || !config.iyzico.baseUrl) {
+        throw new IyzicoClientError('provider_not_configured', 'iyzico provider is not configured')
+    }
+
+    const path = `/v2/subscription/subscriptions/${encodeURIComponent(input.subscriptionReferenceCode)}/upgrade`
+    const body = {
+        locale: input.locale ?? 'tr',
+        conversationId: input.conversationId,
         newPricingPlanReferenceCode: input.newPricingPlanReferenceCode,
         // Iyzico samples document NEXT_PERIOD even though the SDK constant map only exposes NOW.
         upgradePeriod: input.upgradePeriod ?? 'NOW',
-        resetRecurrenceCount: input.resetRecurrenceCount
-    }, cb))
+        useTrial: input.useTrial ?? false,
+        resetRecurrenceCount: input.resetRecurrenceCount ?? false
+    }
+    const bodyText = JSON.stringify(body)
+    const randomString = generateIyzicoRandomString()
+    const baseUrl = config.iyzico.baseUrl.replace(/\/$/, '')
+    const response = await fetch(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+            Authorization: generateIyzicoAuthorizationHeaderV2({
+                apiKey: config.iyzico.apiKey,
+                secretKey: config.iyzico.secretKey,
+                path,
+                randomString,
+                bodyText
+            }),
+            'Content-Type': 'application/json',
+            'x-iyzi-rnd': randomString,
+            'x-iyzi-client-version': 'iyzipay-node-2.0.64'
+        },
+        body: bodyText
+    })
+
+    let result: unknown
+    try {
+        result = await response.json()
+    } catch (error) {
+        throw new IyzicoClientError('invalid_response', toErrorMessage(error))
+    }
+
+    return assertSuccessResult(result) as unknown as IyzicoResultEnvelope
 }
 
 export async function cancelIyzicoSubscription(input: {

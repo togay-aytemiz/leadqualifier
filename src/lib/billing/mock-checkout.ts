@@ -744,9 +744,12 @@ export async function simulateMockSubscriptionCheckout(input: {
             }
         }
 
+        const planChangeConversationId = `subscription_change_${activeSubscription.id}_${planId}`
+
         if (requestedCredits < currentCredits) {
             try {
                 const scheduleResult = await upgradeIyzicoSubscription({
+                    conversationId: planChangeConversationId,
                     subscriptionReferenceCode: activeSubscription.provider_subscription_id,
                     newPricingPlanReferenceCode: pricingPlanReferenceCode,
                     upgradePeriod: 'NEXT_PERIOD'
@@ -769,6 +772,7 @@ export async function simulateMockSubscriptionCheckout(input: {
                             ...metadata,
                             source: 'iyzico_subscription_downgrade',
                             change_type: 'downgrade',
+                            conversation_id: planChangeConversationId,
                             requested_plan_id: planId,
                             requested_monthly_credits: requestedCredits,
                             requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
@@ -807,6 +811,7 @@ export async function simulateMockSubscriptionCheckout(input: {
 
         try {
             const upgradeResult = await upgradeIyzicoSubscription({
+                conversationId: planChangeConversationId,
                 subscriptionReferenceCode: activeSubscription.provider_subscription_id,
                 newPricingPlanReferenceCode: pricingPlanReferenceCode,
                 upgradePeriod: 'NOW',
@@ -821,7 +826,7 @@ export async function simulateMockSubscriptionCheckout(input: {
             const nowIso = new Date().toISOString()
             const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
             const currentMonthlyPriceTry = toNonNegativeNumber(metadata.requested_monthly_price_try)
-            const chargedAmountTry = Math.max(0, toNonNegativeNumber(input.monthlyPriceTry) - currentMonthlyPriceTry)
+            const estimatedChargeAmountTry = Math.max(0, toNonNegativeNumber(input.monthlyPriceTry) - currentMonthlyPriceTry)
             const periodStart = activeSubscription.period_start ?? null
             const periodEnd = activeSubscription.period_end ?? null
 
@@ -847,6 +852,7 @@ export async function simulateMockSubscriptionCheckout(input: {
                         ...metadata,
                         source: 'iyzico_subscription_upgrade',
                         change_type: 'upgrade',
+                        conversation_id: planChangeConversationId,
                         requested_plan_id: planId,
                         requested_monthly_credits: requestedCredits,
                         requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
@@ -868,10 +874,11 @@ export async function simulateMockSubscriptionCheckout(input: {
                         reason: 'Iyzico subscription upgrade success',
                         metadata: {
                             source: 'iyzico_subscription_upgrade',
+                            conversation_id: planChangeConversationId,
                             subscription_id: activeSubscription.id,
                             requested_monthly_credits: requestedCredits,
                             requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
-                            charged_amount_try: chargedAmountTry,
+                            estimated_charge_amount_try: estimatedChargeAmountTry,
                             change_type: 'upgrade'
                         }
                     })

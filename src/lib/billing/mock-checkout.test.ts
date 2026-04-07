@@ -736,6 +736,7 @@ describe('mock checkout simulation wrappers', () => {
             effectiveAt: '2026-04-01T00:00:00.000Z'
         })
         expect(upgradeIyzicoSubscriptionMock).toHaveBeenCalledWith({
+            conversationId: 'subscription_change_sub_row_1_starter',
             subscriptionReferenceCode: 'sub_ref_growth',
             newPricingPlanReferenceCode: 'starter-plan-ref',
             upgradePeriod: 'NEXT_PERIOD'
@@ -951,6 +952,7 @@ describe('mock checkout simulation wrappers', () => {
             effectiveAt: null
         })
         expect(upgradeIyzicoSubscriptionMock).toHaveBeenCalledWith({
+            conversationId: 'subscription_change_sub_row_1_growth',
             subscriptionReferenceCode: 'sub_ref_starter',
             newPricingPlanReferenceCode: 'growth-plan-ref',
             upgradePeriod: 'NOW',
@@ -976,6 +978,7 @@ describe('mock checkout simulation wrappers', () => {
             credits_delta: 1000,
             balance_after: 1870,
             metadata: expect.objectContaining({
+                conversation_id: 'subscription_change_sub_row_1_growth',
                 subscription_id: 'sub_row_1',
                 change_type: 'upgrade',
                 requested_monthly_credits: 2000

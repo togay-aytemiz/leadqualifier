@@ -107,42 +107,9 @@ function readPackageHistoryPrice(
         ?? readNumber(subscriptionMetadata, 'monthly_price_try')
 }
 
-function resolvePreviousPackagePrice(input: {
-    entries: BillingLedgerEntry[]
-    subscriptions: Map<string, BillingHistorySubscriptionRow>
-    entryIndex: number
-    subscriptionId: string | null
-}) {
-    if (!input.subscriptionId) return null
-
-    for (let index = input.entryIndex + 1; index < input.entries.length; index += 1) {
-        const candidate = input.entries[index]
-        if (!candidate) continue
-        if (candidate.entryType !== 'package_grant') continue
-
-        const candidateMetadata = toRecord(candidate.metadata)
-        const candidateSubscriptionId = readString(candidateMetadata, 'subscription_id')
-            ?? readString(candidateMetadata, 'subscription_record_id')
-
-        if (candidateSubscriptionId !== input.subscriptionId) continue
-
-        const candidateSubscriptionMetadata = candidateSubscriptionId
-            ? toRecord(input.subscriptions.get(candidateSubscriptionId)?.metadata ?? null)
-            : null
-        const candidatePrice = readPackageHistoryPrice(candidate, candidateSubscriptionMetadata)
-
-        if (candidatePrice !== null) return candidatePrice
-    }
-
-    return null
-}
-
 function resolvePackageHistoryAmountLabel(input: {
     entry: BillingLedgerEntry
     subscriptionMetadata: Record<string, unknown> | null
-    subscriptions: Map<string, BillingHistorySubscriptionRow>
-    entries: BillingLedgerEntry[]
-    entryIndex: number
     kind: BillingPackageHistoryKind
     formatCurrency: (amount: number, currency: string | null) => string | null
     labels: BillingHistoryLabels
@@ -150,6 +117,11 @@ function resolvePackageHistoryAmountLabel(input: {
     const entryMetadata = toRecord(input.entry.metadata)
     const chargedAmount = readNumber(entryMetadata, 'charged_amount_try')
     if (chargedAmount !== null) {
+        const orderReferenceCode = readString(entryMetadata, 'order_reference_code')
+        if (input.kind === 'upgrade' && !orderReferenceCode) {
+            return input.labels.amountUnavailable
+        }
+
         return input.formatCurrency(chargedAmount, 'TRY') ?? input.labels.amountUnavailable
     }
 
@@ -158,18 +130,7 @@ function resolvePackageHistoryAmountLabel(input: {
     if (requestedPrice === null) return input.labels.amountUnavailable
 
     if (input.kind === 'upgrade') {
-        const subscriptionId = readString(entryMetadata, 'subscription_id')
-            ?? readString(entryMetadata, 'subscription_record_id')
-        const previousPrice = resolvePreviousPackagePrice({
-            entries: input.entries,
-            subscriptions: input.subscriptions,
-            entryIndex: input.entryIndex,
-            subscriptionId
-        })
-
-        if (previousPrice === null) return input.labels.amountUnavailable
-
-        return input.formatCurrency(Math.max(0, requestedPrice - previousPrice), 'TRY') ?? input.labels.amountUnavailable
+        return input.labels.amountUnavailable
     }
 
     return input.formatCurrency(requestedPrice, 'TRY') ?? input.labels.amountUnavailable
@@ -203,9 +164,6 @@ export function buildBillingHistoryRows(input: {
                 amountLabel: resolvePackageHistoryAmountLabel({
                     entry,
                     subscriptionMetadata,
-                    subscriptions: input.subscriptions,
-                    entries: input.entries,
-                    entryIndex,
                     kind,
                     formatCurrency: input.formatCurrency,
                     labels: input.labels

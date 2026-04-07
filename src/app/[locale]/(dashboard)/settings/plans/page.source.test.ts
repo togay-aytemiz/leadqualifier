@@ -75,6 +75,16 @@ describe('plans page source guard', () => {
         expect(source).toContain('buildBillingHistoryRows')
     })
 
+    it('loads purchase history from purchase ledger rows instead of newest usage debits', () => {
+        expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(PLANS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain("entryTypes: ['package_grant', 'purchase_credit']")
+    })
+
     it('defaults billing country to Türkiye only for Turkish locale when no saved country exists', () => {
         expect(fs.existsSync(PLANS_PAGE_CONTENT_PATH)).toBe(true)
 

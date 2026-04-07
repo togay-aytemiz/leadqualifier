@@ -73,6 +73,10 @@ function readNumber(record: Record<string, unknown> | null, key: string): number
     return Number.isFinite(parsed) ? parsed : null
 }
 
+function readLedgerSubscriptionId(metadata: Record<string, unknown> | null) {
+    return readString(metadata, 'subscription_id') ?? readString(metadata, 'subscription_record_id')
+}
+
 function formatLedgerCurrency(locale: string, amount: number, currency: string | null) {
     if (!Number.isFinite(amount)) return null
     const normalizedCurrency = currency && currency.trim().length > 0 ? currency.trim().toUpperCase() : 'TRY'
@@ -97,7 +101,7 @@ function resolveLedgerReasonLabel(
 ) {
     const metadata = toRecord(entry.metadata)
     const source = readString(metadata, 'source')
-    const subscriptionId = readString(metadata, 'subscription_id')
+    const subscriptionId = readLedgerSubscriptionId(metadata)
     const orderId = readString(metadata, 'order_id')
     const reason = entry.reason
     const normalizedReason = reason?.trim().toLowerCase() ?? ''
@@ -216,7 +220,7 @@ export default async function BillingSettingsPageContent({
 
     for (const entry of billingLedger) {
         const metadata = toRecord(entry.metadata)
-        const subscriptionId = readString(metadata, 'subscription_id')
+        const subscriptionId = readLedgerSubscriptionId(metadata)
         const orderId = readString(metadata, 'order_id')
 
         if (subscriptionId && !relatedSubscriptionIds.includes(subscriptionId)) {

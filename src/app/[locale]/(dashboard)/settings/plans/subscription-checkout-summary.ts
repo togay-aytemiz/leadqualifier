@@ -5,7 +5,7 @@ export type SubscriptionCheckoutChangeType =
     | 'same_plan'
 
 export type SubscriptionCheckoutEffectiveTiming = 'immediate' | 'next_period'
-export type SubscriptionCheckoutChargeMode = 'full_price' | 'full_delta' | 'no_charge'
+export type SubscriptionCheckoutChargeMode = 'full_price' | 'provider_calculated' | 'no_charge'
 
 export interface CheckoutPlanSnapshot {
     id: string
@@ -39,7 +39,7 @@ interface SubscriptionCheckoutSummaryDetailLabels {
     effectiveImmediate: string
     effectiveNextPeriod: string
     todayChargeLabel: string
-    chargeFullDelta: (input: { price: string }) => string
+    chargeProviderCalculated: string
     chargeNoCharge: string
     chargeFullPrice: (input: { price: string }) => string
     savedPaymentMethodLabel: string
@@ -80,7 +80,7 @@ export function resolveSubscriptionCheckoutSummary(input: {
         return {
             changeType: 'upgrade',
             effectiveTiming: 'immediate',
-            chargeMode: 'full_delta',
+            chargeMode: 'provider_calculated',
             monthlyPriceDelta,
             creditDelta
         }
@@ -121,16 +121,14 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
     const details: SubscriptionCheckoutSummaryDetail[] = []
     const chargeDetail: SubscriptionCheckoutSummaryDetail = {
         label: input.labels.todayChargeLabel,
-        value: input.summary.chargeMode === 'full_delta'
-            ? input.labels.chargeFullDelta({
-                price: input.formatCurrency(Math.max(0, input.summary.monthlyPriceDelta))
-            })
+        value: input.summary.chargeMode === 'provider_calculated'
+            ? input.labels.chargeProviderCalculated
             : input.summary.chargeMode === 'no_charge'
                 ? input.labels.chargeNoCharge
                 : input.labels.chargeFullPrice({
                     price: input.formatCurrency(input.targetPlan.localizedPrice)
                 }),
-        emphasis: input.summary.chargeMode === 'no_charge' ? undefined : 'strong'
+        emphasis: input.summary.chargeMode === 'full_price' ? 'strong' : undefined
     }
 
     if (input.currentPlan && input.currentPlanName) {
@@ -169,7 +167,7 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
         })
     }
 
-    if (input.summary.chargeMode === 'full_delta' && input.summary.creditDelta > 0) {
+    if (input.summary.changeType === 'upgrade' && input.summary.creditDelta > 0) {
         details.push({
             label: input.labels.todayCreditDeltaLabel,
             value: input.labels.creditDeltaValue({
@@ -193,19 +191,15 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
 }
 
 export function resolveSubscriptionCheckoutContinueLabel(input: SubscriptionCheckoutContinueLabelInput) {
-    if (input.summary.chargeMode === 'no_charge') {
+    if (input.summary.chargeMode !== 'full_price') {
         return input.labels.defaultLabel
     }
 
-    const chargedAmount = input.summary.chargeMode === 'full_delta'
-        ? Math.max(0, input.summary.monthlyPriceDelta)
-        : input.targetPlan.localizedPrice
-
-    if (chargedAmount <= 0) {
+    if (input.targetPlan.localizedPrice <= 0) {
         return input.labels.defaultLabel
     }
 
     return input.labels.chargeLabel({
-        price: input.formatCurrency(chargedAmount)
+        price: input.formatCurrency(input.targetPlan.localizedPrice)
     })
 }

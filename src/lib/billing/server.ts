@@ -74,6 +74,7 @@ async function getOrganizationBillingSnapshotWithSupabase(
 export async function getOrganizationBillingLedger(
     organizationId: string,
     options?: {
+        entryTypes?: BillingCreditLedgerType[]
         limit?: number
         supabase?: SupabaseClient
     }
@@ -81,10 +82,16 @@ export async function getOrganizationBillingLedger(
     const supabase = options?.supabase ?? await createClient()
     const limit = Number.isFinite(options?.limit) ? Math.max(1, Math.min(100, Math.floor(options?.limit as number))) : 15
 
-    const { data, error } = await supabase
+    let query = supabase
         .from('organization_credit_ledger')
         .select('id, entry_type, credit_pool, credits_delta, balance_after, reason, metadata, created_at')
         .eq('organization_id', organizationId)
+
+    if (options?.entryTypes?.length) {
+        query = query.in('entry_type', options.entryTypes)
+    }
+
+    const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(limit)
 

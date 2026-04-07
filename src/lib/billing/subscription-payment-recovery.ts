@@ -47,8 +47,14 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function appendRecordIdToCallbackUrl(callbackUrl: string, recordId: string) {
-    const separator = callbackUrl.includes('?') ? '&' : '?'
-    return `${callbackUrl}${separator}recordId=${encodeURIComponent(recordId)}`
+    try {
+        const url = new URL(callbackUrl)
+        url.searchParams.set('recordId', recordId)
+        return url.toString()
+    } catch {
+        const separator = callbackUrl.includes('?') ? '&' : '?'
+        return `${callbackUrl}${separator}recordId=${encodeURIComponent(recordId)}`
+    }
 }
 
 function createServiceRoleClient() {

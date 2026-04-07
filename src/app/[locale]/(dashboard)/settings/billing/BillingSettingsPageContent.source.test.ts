@@ -19,4 +19,14 @@ describe('billing settings page source guard', () => {
         expect(source).not.toContain('BillingInformationCard')
         expect(source).not.toContain('buildBillingHistoryRows')
     })
+
+    it('resolves package grants written with subscription_record_id metadata', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain("readString(metadata, 'subscription_record_id')")
+    })
 })

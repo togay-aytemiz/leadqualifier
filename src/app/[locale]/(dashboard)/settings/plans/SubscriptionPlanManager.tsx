@@ -166,7 +166,7 @@ export function SubscriptionPlanManager({
                 effectiveImmediate: tPlans('checkoutLegal.details.effectiveImmediate'),
                 effectiveNextPeriod: tPlans('checkoutLegal.details.effectiveNextPeriod'),
                 todayChargeLabel: tPlans('checkoutLegal.details.todayChargeLabel'),
-                chargeFullDelta: ({ price }) => tPlans('checkoutLegal.details.chargeFullDelta', { price }),
+                chargeProviderCalculated: tPlans('checkoutLegal.details.chargeProviderCalculated'),
                 chargeNoCharge: tPlans('checkoutLegal.details.chargeNoCharge'),
                 chargeFullPrice: ({ price }) => tPlans('checkoutLegal.details.chargeFullPrice', { price }),
                 savedPaymentMethodLabel: tPlans('checkoutLegal.details.savedPaymentMethodLabel'),

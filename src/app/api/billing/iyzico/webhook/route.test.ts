@@ -533,19 +533,17 @@ describe('iyzico webhook route', () => {
         retrieveIyzicoSubscriptionMock.mockResolvedValue({
             status: 'success',
             data: {
-                items: [{
-                    referenceCode: 'sub_ref_1',
-                    status: 'UPGRADED',
-                    startDate: Date.UTC(2026, 0, 1, 0, 0, 0),
-                    endDate: Date.UTC(2027, 0, 1, 0, 0, 0),
-                    orders: [{
-                        referenceCode: 'order_ref_upgrade_1',
-                        price: 325,
-                        currencyCode: 'TRY',
-                        orderStatus: 'SUCCESS',
-                        startPeriod: Date.UTC(2026, 3, 2, 19, 44, 0),
-                        endPeriod: Date.UTC(2026, 4, 2, 19, 44, 0)
-                    }]
+                referenceCode: 'sub_ref_1',
+                subscriptionStatus: 'UPGRADED',
+                startDate: Date.UTC(2026, 0, 1, 0, 0, 0),
+                endDate: Date.UTC(2027, 0, 1, 0, 0, 0),
+                orders: [{
+                    referenceCode: 'order_ref_upgrade_1',
+                    price: 325,
+                    currencyCode: 'TRY',
+                    orderStatus: 'SUCCESS',
+                    startPeriod: Date.UTC(2026, 3, 2, 19, 44, 0),
+                    endPeriod: Date.UTC(2026, 4, 2, 19, 44, 0)
                 }]
             }
         })

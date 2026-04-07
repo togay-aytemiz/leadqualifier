@@ -1505,7 +1505,6 @@
         "effectiveImmediate": "Applies immediately.",
         "effectiveNextPeriod": "Applies at the start of the next billing period.",
         "todayChargeLabel": "Today's charge",
-        "chargeFullDelta": "Plan difference: {price}",
         "chargeProviderCalculated": "The amount is calculated by Iyzico at the moment of the change and charged to the saved payment method.",
         "chargeNoCharge": "No new charge is taken today. The new price starts next period.",
         "chargeFullPrice": "The first subscription payment of {price} is charged today.",

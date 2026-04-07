@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-07):** `Settings > Plans > Geçmiş / History` must query purchase ledger rows directly instead of limiting over mixed usage rows, so recent `usage_debit` activity cannot hide successful `package_grant` or `purchase_credit` purchases. Iyzico direct plan changes must call the documented signed REST upgrade endpoint with merchant `conversationId`, `upgradePeriod=NOW`, `useTrial=false`, and `resetRecurrenceCount=false` in the actual body, persist trace metadata locally, and avoid showing local plan deltas as confirmed charges without provider order evidence.
+
 > **Update Note (2026-04-07):** `Settings > Qualy AI` now repairs exact saved EN/TR starter assistant-instruction sets into the active UI locale, so a Turkish interface does not show English default textarea content just because an older row persisted the English starter values. Custom operator-written instruction text remains unchanged.
 
 > **Update Note (2026-04-07):** Skill matching now uses a general sector-independent intent gate before running deterministic skill replies. Embedding similarity remains the primary signal, but ambiguous matches must have either a strong semantic score, a clear score lead over other candidates, or a fuzzy non-generic trigger/title anchor with the customer message; otherwise the flow continues to KB/RAG/fallback instead of firing an unrelated skill.
@@ -44,7 +46,7 @@
 
 > **Update Note (2026-04-03):** `Settings > Plans > Geçmiş / History` now shows purchase timestamps with localized hour/minute precision in addition to the date, so same-day package changes no longer collapse into visually identical date-only rows.
 
-> **Update Note (2026-04-03):** `Settings > Plans > Geçmiş / History` now treats missing upgrade-charge metadata as a history repair case, not a full-price fallback. Older same-cycle upgrades should render the true plan-difference amount derived from the previous package when possible, and repeated pending downgrades before period end should overwrite the prior scheduled target cleanly.
+> **Update Note (2026-04-03):** `Settings > Plans > Geçmiş / History` now treats missing upgrade-charge metadata as unverified, not a full-price or plan-difference fallback. Older same-cycle upgrades should show an unavailable amount unless a provider order reference/amount exists, and repeated pending downgrades before period end should overwrite the prior scheduled target cleanly.
 
 > **Update Note (2026-04-03):** Landing `Pricing` copy is now aligned with Iyzico subscription review language. Public plan cards and metadata must read as `monthly software subscription + included monthly usage allowance`; do not frame landing plans as separate credit/token/coin sales.
 
@@ -74,23 +76,23 @@
 >
 > **Update Note (2026-04-02):** The downgrade helper line under plan-selection CTAs is now shorter and more neutral. Instead of framing the change as a `lower-tier` warning, the helper simply says the plan change applies at period end.
 >
-> **Update Note (2026-04-02):** Existing-subscriber plan-change confirmation is now lighter than first purchase checkout. `Settings > Plans` upgrades/downgrades use a single confirmation step with a concise plan summary, no repeated mandatory re-acceptance sentence for the full legal bundle, and upgrade copy now follows the chosen full true-up model instead of vague provider-calculated wording.
+> **Update Note (2026-04-02):** Existing-subscriber plan-change confirmation is now lighter than first purchase checkout. `Settings > Plans` upgrades/downgrades use a single confirmation step with a concise plan summary, no repeated mandatory re-acceptance sentence for the full legal bundle, and upgrade copy now states that Iyzico calculates/collects the saved-card charge instead of quoting a local plan-difference amount.
 >
-> **Update Note (2026-04-02):** Immediate Iyzico subscription upgrades now explicitly preserve the existing billing anchor. Upgrade calls send `upgradePeriod=NOW` together with `resetRecurrenceCount=false`, so entitlement can expand immediately without intentionally resetting the next renewal date to the day of the upgrade.
+> **Update Note (2026-04-02):** Immediate Iyzico subscription upgrades now explicitly preserve the existing billing anchor. Upgrade calls send `upgradePeriod=NOW` together with `resetRecurrenceCount=false` in the signed provider request body, so entitlement can expand immediately without intentionally resetting the next renewal date to the day of the upgrade.
 >
 > **Update Note (2026-04-02):** Scheduled Iyzico downgrades must keep the effective date anchored to the current period end. If the provider upgrade response echoes a `startDate` equal to `now`, `Settings > Plans` should still show the pending downgrade as starting on the existing renewal date rather than immediately.
 >
 > **Update Note (2026-04-02):** Live Iyzico renewal correctness now depends on provider order periods, not generic subscription item dates. Renewal sync must read the matching `orders[].startPeriod/endPeriod` and exact order price from subscription detail, while same-cycle `subscription.order.success` events (initial activation, immediate upgrade charge, successful retry) must not be treated as a new renewal or double-grant monthly credits.
 >
-> **Update Note (2026-04-02):** Immediate upgrade confirmation now spells out the chosen true-up model inside the popup: today’s full plan-difference charge, today’s full credit-delta unlock, and the preserved next renewal date are all shown explicitly instead of vague provider-calculated wording.
+> **Update Note (2026-04-02):** Immediate upgrade confirmation now spells out the effect without overclaiming the provider charge: the higher entitlement applies immediately, only the credit delta unlocks today, the renewal anchor is preserved, and today’s saved-card charge is described as Iyzico-calculated unless an exact provider order is already reconciled.
 >
 > **Update Note (2026-04-02):** Direct upgrade confirmation now keeps saved-card expectations inside the footer area instead of a separate secondary button. The popup shows a concise `saved card` payment-method row in the summary, then an amber banner below the legal links that says the charge will be taken from the saved card and offers a subtle inline `Update payment method` link before confirmation.
 >
 > **Update Note (2026-04-02):** Direct plan-change confirmation now needs an explicit submit-pending state. Once the operator clicks the apply/pay CTA, the button should immediately switch into a disabled `İşleniyor... / Processing...` state with a spinner so direct saved-card charges do not look like a no-op while the server action is running.
 >
-> **Update Note (2026-04-02):** When a direct plan change charges money today, the confirmation popup now treats that amount as the primary summary outcome: the `today's charge` row moves to the bottom, renders with stronger emphasis, and the primary CTA mirrors the same amount (for example `₺300 ödeme yap`).
+> **Update Note (2026-04-02):** When a direct plan change charges money today, the confirmation popup should only mirror an exact amount if it is provider-confirmed. Saved-card upgrade confirmations keep a neutral apply CTA and do not repeat local estimates such as `₺300 ödeme yap`.
 >
-> **Update Note (2026-04-02):** The direct-upgrade `today's charge` copy should stay compact. Instead of a full sentence like `Bugün ₺300 plan farkı tahsil edilir`, the emphasized summary row now uses a short amount-first label such as `₺300 plan farkı`.
+> **Update Note (2026-04-02):** The direct-upgrade `today's charge` copy should stay provider-evidenced. Instead of local plan-difference labels such as `₺300 plan farkı`, the row should say the amount is calculated and collected by Iyzico unless a provider order reference and amount are available.
 >
 > **Update Note (2026-04-02):** The lightweight renewal/history/billing-profile surface now lives in `Settings > Plans`, not `Settings > Billing`. Operators should see the next renewal date there, open a simple `Geçmiş / History` modal for successful purchases/renewals, and save a minimal billing profile that pre-fills the Iyzico checkout customer/address payload.
 >
@@ -183,7 +185,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-04-07 (Freeform Knowledge Base authoring now includes a persistent `Qualy AI ile doldur` helper card with the filled AI icon, stacked CTA, reusable mobile-friendly drafting modal input, explicit in-modal loading state, repeated draft generation replaces the content body while leaving non-empty titles untouched, the assistant-guidance field now reads `Yapay zeka asistanının dikkat etmesi gerekenler`, billing keeps the new usage inside the existing `İçerik işleme / Content processing` breakdown, offering-profile suggestion generation now uses real Skill/Knowledge content with a stricter second repair pass so pending banners remain reliable after AI-filled saves, the `Knowledge` page now keeps a visible wait-state suggestions banner until it can switch into the ready-state review banner, Instagram bot replies now persist provider ids while new skill images are stored as JPEG, legacy WebP skill images are proxied as JPEG, provider-id/text/image duplicate echo rows are filtered out of Inbox threads, existing Skill image-only edits no longer create Organization Detail AI suggestions, and Skill matching now uses a general semantic-confidence + fuzzy trigger-anchor gate before running deterministic skill replies.)
+> **Last Updated:** 2026-04-07 (Billing history now filters directly to purchase ledger entry types so usage debits cannot hide successful purchases; Iyzico direct upgrades now use the documented signed REST body including `resetRecurrenceCount=false`, and upgrade charge UI/history no longer invent local delta amounts without provider order evidence.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1057,11 +1059,12 @@
   - [x] Add self-serve Iyzico `past_due` recovery actions (`Update payment method` + `Retry payment`) in `Settings > Plans`
   - [x] Redirect missing-auth settings returns to login instead of rendering a blank screen after external Iyzico callbacks
   - [x] Keep localhost Iyzico checkout callbacks on the active local origin instead of forcing production app URL
-  - [x] Preserve the existing renewal anchor on immediate Iyzico upgrades by sending `resetRecurrenceCount=false` together with `upgradePeriod=NOW`
+  - [x] Preserve the existing renewal anchor on immediate Iyzico upgrades by sending `resetRecurrenceCount=false` together with `upgradePeriod=NOW` in the signed REST request body
   - [x] Reconcile Iyzico `subscription.order.success` using exact order periods/prices and ignore same-cycle success events as renewals
-  - [x] Spell immediate upgrade true-up terms in the popup: full delta charge today, full delta credits today, renewal anchor unchanged
+  - [x] Filter `Settings > Plans > Geçmiş / History` to purchase ledger rows and trace direct Iyzico plan changes with merchant `conversationId`
+  - [x] Spell immediate upgrade effects in the popup without inventing the charge: target entitlement today, delta credits today, renewal anchor unchanged, saved-card charge calculated by Iyzico
   - [x] Soften `Settings > Plans` subscription-action hierarchy by moving cancel into the manage modal and rendering payment recovery as text actions
-  - [x] Simplify direct plan-change confirmation to a single explicit approval with concise summary and upgrade true-up wording instead of repeated full legal re-acceptance copy
+  - [x] Simplify direct plan-change confirmation to a single explicit approval with concise summary and provider-calculated upgrade charge wording instead of repeated full legal re-acceptance copy
   - [x] State that displayed subscription and extra-credit prices include VAT/KDV across in-app `Settings > Plans` pricing surfaces and show the conversation-range variability disclaimer directly underneath
 - [ ] **Membership States (Trial / Premium)**
   - [x] Define state model (`trial_active`, `trial_exhausted`, `premium_active`, `past_due`, `canceled`, `admin_locked`)
@@ -1132,7 +1135,7 @@
   - [x] Make iyzico self-serve cancellation provider-backed but keep access active until period end, hide unsupported in-app resume for provider-backed cancellations, and treat failed recurring renewals as `past_due` with locked usage until payment is resolved
   - [x] Persist live Iyzico period-end downgrades on the active subscription record so `Settings > Plans` can keep showing pending package + effective date after revisits
   - [x] Clarify live Iyzico cancellation copy so plans UI no longer implies an in-app auto-renew resume path after provider-backed cancel
-  - [x] Clarify active premium Iyzico confirmation popups so direct plan changes show current vs target monthly price, effect timing, and the chosen true-up model instead of promising a hosted payment screen
+  - [x] Clarify active premium Iyzico confirmation popups so direct plan changes show current vs target monthly price, effect timing, and provider-calculated saved-card charge handling instead of promising a hosted payment screen
   - [x] Add hosted Iyzico card-update callback + embed flow so saved-card changes can be initiated without leaving app context
   - [x] Remove scheduled-cancellation undo CTA from Plans UI so users resubscribe manually after period end if needed
   - [x] Add one-hour post-period grace window plus atomic renewal-success RPC to reduce false lockouts and partial renewal-state drift during webhook retries/delays

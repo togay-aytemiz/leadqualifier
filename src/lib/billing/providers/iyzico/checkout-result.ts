@@ -17,6 +17,33 @@ function readString(value: unknown) {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function getRetrievedSubscriptionItems(value: unknown): Record<string, unknown>[] {
+    const record = asRecord(value)
+    const data = asRecord(record.data)
+    const itemRecords = Array.isArray(data.items)
+        ? data.items
+            .map((item) => asRecord(item))
+            .filter((item) => Boolean(readString(item.referenceCode)))
+        : []
+
+    if (readString(data.referenceCode)) {
+        return [...itemRecords, data]
+    }
+
+    return itemRecords
+}
+
+function findRetrievedSubscriptionItem(
+    value: unknown,
+    subscriptionReferenceCode: string | null
+) {
+    return getRetrievedSubscriptionItems(value).find((itemRecord) => {
+        const itemReferenceCode = readString(itemRecord.referenceCode)
+        if (!subscriptionReferenceCode) return Boolean(itemReferenceCode)
+        return itemReferenceCode === subscriptionReferenceCode
+    }) ?? null
+}
+
 export function extractIyzicoCheckoutPaymentConversationId(value: unknown): string | null {
     const record = asRecord(value)
     const conversationId = record.paymentConversationId
@@ -58,26 +85,16 @@ export function extractIyzicoRetrievedSubscriptionItem(
     startAt: string | null
     endAt: string | null
 } | null {
-    const record = asRecord(value)
-    const data = asRecord(record.data)
-    const items = Array.isArray(data.items) ? data.items : []
-
-    const match = items.find((item) => {
-        const itemRecord = asRecord(item)
-        const itemReferenceCode = readString(itemRecord.referenceCode)
-        if (!subscriptionReferenceCode) return Boolean(itemReferenceCode)
-        return itemReferenceCode === subscriptionReferenceCode
-    })
+    const match = findRetrievedSubscriptionItem(value, subscriptionReferenceCode)
 
     if (!match) return null
 
-    const itemRecord = asRecord(match)
     return {
-        referenceCode: readString(itemRecord.referenceCode),
-        status: readString(itemRecord.status),
-        pricingPlanReferenceCode: readString(itemRecord.pricingPlanReferenceCode),
-        startAt: toIsoFromEpochMs(itemRecord.startDate),
-        endAt: toIsoFromEpochMs(itemRecord.endDate)
+        referenceCode: readString(match.referenceCode),
+        status: readString(match.status) ?? readString(match.subscriptionStatus),
+        pricingPlanReferenceCode: readString(match.pricingPlanReferenceCode),
+        startAt: toIsoFromEpochMs(match.startDate),
+        endAt: toIsoFromEpochMs(match.endDate)
     }
 }
 
@@ -95,21 +112,11 @@ export function extractIyzicoRetrievedSubscriptionOrder(
 } | null {
     if (!orderReferenceCode) return null
 
-    const record = asRecord(value)
-    const data = asRecord(record.data)
-    const items = Array.isArray(data.items) ? data.items : []
-
-    const matchingItem = items.find((item) => {
-        const itemRecord = asRecord(item)
-        const itemReferenceCode = readString(itemRecord.referenceCode)
-        if (!subscriptionReferenceCode) return Boolean(itemReferenceCode)
-        return itemReferenceCode === subscriptionReferenceCode
-    })
+    const matchingItem = findRetrievedSubscriptionItem(value, subscriptionReferenceCode)
 
     if (!matchingItem) return null
 
-    const itemRecord = asRecord(matchingItem)
-    const orders = Array.isArray(itemRecord.orders) ? itemRecord.orders : []
+    const orders = Array.isArray(matchingItem.orders) ? matchingItem.orders : []
     const matchingOrder = orders.find((order) => {
         const orderRecord = asRecord(order)
         return readString(orderRecord.referenceCode) === orderReferenceCode

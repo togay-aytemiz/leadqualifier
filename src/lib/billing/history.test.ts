@@ -15,6 +15,7 @@ describe('buildBillingHistoryRows', () => {
                 metadata: {
                     source: 'iyzico_subscription_upgrade',
                     subscription_id: 'sub_1',
+                    order_reference_code: 'order_ref_upgrade_1',
                     charged_amount_try: 300
                 },
                 createdAt: '2026-04-10T12:00:00.000Z'
@@ -73,7 +74,7 @@ describe('buildBillingHistoryRows', () => {
         ])
     })
 
-    it('derives the paid upgrade delta from the prior package when upgrade charge metadata is missing', () => {
+    it('does not invent an upgrade charge when provider order metadata is missing', () => {
         const entries: BillingLedgerEntry[] = [
             {
                 id: 'ledger_upgrade_missing_charge',
@@ -128,7 +129,7 @@ describe('buildBillingHistoryRows', () => {
             {
                 id: 'ledger_upgrade_missing_charge',
                 dateLabel: '2026-04-10',
-                amountLabel: 'TRY 300',
+                amountLabel: '—',
                 statusLabel: 'Success',
                 detailLabel: 'Package upgrade'
             },
@@ -138,6 +139,56 @@ describe('buildBillingHistoryRows', () => {
                 amountLabel: 'TRY 349',
                 statusLabel: 'Success',
                 detailLabel: 'Package start'
+            }
+        ])
+    })
+
+    it('does not trust stale local upgrade charge metadata without a provider order reference', () => {
+        const entries: BillingLedgerEntry[] = [
+            {
+                id: 'ledger_upgrade_estimated_charge',
+                entryType: 'package_grant',
+                creditPool: 'package_pool',
+                creditsDelta: 2000,
+                balanceAfter: 4000,
+                reason: 'Iyzico subscription upgrade success',
+                metadata: {
+                    source: 'iyzico_subscription_upgrade',
+                    subscription_id: 'sub_1',
+                    change_type: 'upgrade',
+                    charged_amount_try: 300,
+                    requested_monthly_price_try: 949
+                },
+                createdAt: '2026-04-10T12:00:00.000Z'
+            }
+        ]
+
+        const rows = buildBillingHistoryRows({
+            entries,
+            subscriptions: new Map([
+                ['sub_1', { metadata: { change_type: 'upgrade', requested_monthly_price_try: 949 } }]
+            ]),
+            orders: new Map(),
+            formatDate: (value) => value.slice(0, 10),
+            formatCurrency: (amount, currency) => `${currency ?? 'TRY'} ${amount}`,
+            labels: {
+                statusSuccess: 'Success',
+                amountUnavailable: '—',
+                packageStart: 'Package start',
+                packageUpgrade: 'Package upgrade',
+                packageRenewal: 'Package renewal',
+                packageUpdate: 'Package update',
+                topupPurchase: 'Credit purchase'
+            }
+        })
+
+        expect(rows).toEqual([
+            {
+                id: 'ledger_upgrade_estimated_charge',
+                dateLabel: '2026-04-10',
+                amountLabel: '—',
+                statusLabel: 'Success',
+                detailLabel: 'Package upgrade'
             }
         ])
     })

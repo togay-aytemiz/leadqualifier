@@ -21,7 +21,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         expect(summary.chargeMode).toBe('full_price')
     })
 
-    it('treats higher-tier changes as immediate upgrades with full delta charging', () => {
+    it('treats higher-tier changes as immediate upgrades with provider-calculated charging', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -37,7 +37,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
 
         expect(summary.changeType).toBe('upgrade')
         expect(summary.effectiveTiming).toBe('immediate')
-        expect(summary.chargeMode).toBe('full_delta')
+        expect(summary.chargeMode).toBe('provider_calculated')
         expect(summary.monthlyPriceDelta).toBe(300)
         expect(summary.creditDelta).toBe(1000)
     })
@@ -62,7 +62,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         expect(summary.monthlyPriceDelta).toBe(-300)
     })
 
-    it('builds full true-up popup details for immediate upgrades', () => {
+    it('builds provider-calculated popup details for immediate upgrades', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -105,7 +105,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
                 effectiveImmediate: 'Hemen uygulanır.',
                 effectiveNextPeriod: 'Bir sonraki dönem başında uygulanır.',
                 todayChargeLabel: 'Bugünkü tahsilat',
-                chargeFullDelta: ({ price }) => `${price} plan farkı`,
+                chargeProviderCalculated: 'Tutar Iyzico tarafından hesaplanır.',
                 chargeNoCharge: 'Bugün yeni tahsilat yapılmaz.',
                 chargeFullPrice: ({ price }) => `Bugün ${price} tahsil edilir.`,
                 savedPaymentMethodLabel: 'Ödeme yöntemi',
@@ -123,7 +123,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
             { label: 'Ödeme yöntemi', value: 'Tahsilat kayıtlı kartınızdan alınır.' },
             { label: 'Bugün açılacak ek hak', value: '+1000 kredi' },
             { label: 'Bir sonraki yenileme', value: '2026-05-01' },
-            { label: 'Bugünkü tahsilat', value: '₺300 plan farkı', emphasis: 'strong' }
+            { label: 'Bugünkü tahsilat', value: 'Tutar Iyzico tarafından hesaplanır.' }
         ])
     })
 
@@ -170,7 +170,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
                 effectiveImmediate: 'Hemen uygulanır.',
                 effectiveNextPeriod: 'Bir sonraki dönem başında uygulanır.',
                 todayChargeLabel: 'Bugünkü tahsilat',
-                chargeFullDelta: ({ price }) => `${price} plan farkı`,
+                chargeProviderCalculated: 'Tutar Iyzico tarafından hesaplanır.',
                 chargeNoCharge: 'Bugün yeni tahsilat yapılmaz.',
                 chargeFullPrice: ({ price }) => `Bugün ${price} tahsil edilir.`,
                 savedPaymentMethodLabel: 'Ödeme yöntemi',
@@ -187,7 +187,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         })
     })
 
-    it('builds a price-first CTA label when the change charges today', () => {
+    it('keeps provider-calculated upgrade CTAs neutral instead of quoting a local delta', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -215,6 +215,6 @@ describe('resolveSubscriptionCheckoutSummary', () => {
             }
         })
 
-        expect(label).toBe('₺300 ödeme yap')
+        expect(label).toBe('Plan değişikliğini uygula')
     })
 })

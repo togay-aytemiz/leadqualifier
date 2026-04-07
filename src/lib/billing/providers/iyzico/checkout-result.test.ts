@@ -67,6 +67,26 @@ describe('iyzico checkout result helpers', () => {
         })
     })
 
+    it('extracts a direct subscription detail payload from retrieve responses', () => {
+        const result = extractIyzicoRetrievedSubscriptionItem({
+            data: {
+                referenceCode: 'sub_ref_direct',
+                subscriptionStatus: 'ACTIVE',
+                pricingPlanReferenceCode: 'plan_ref_direct',
+                startDate: Date.UTC(2026, 3, 2, 19, 44, 0),
+                endDate: Date.UTC(2026, 4, 2, 19, 44, 0)
+            }
+        }, 'sub_ref_direct')
+
+        expect(result).toEqual({
+            referenceCode: 'sub_ref_direct',
+            status: 'ACTIVE',
+            pricingPlanReferenceCode: 'plan_ref_direct',
+            startAt: '2026-04-02T19:44:00.000Z',
+            endAt: '2026-05-02T19:44:00.000Z'
+        })
+    })
+
     it('extracts a matching subscription order with its exact charge and billing period', () => {
         const result = extractIyzicoRetrievedSubscriptionOrder({
             data: {
@@ -95,6 +115,33 @@ describe('iyzico checkout result helpers', () => {
             orderStatus: 'SUCCESS',
             startAt: '2026-04-02T19:44:00.000Z',
             endAt: '2026-05-02T19:44:00.000Z'
+        })
+    })
+
+    it('extracts a matching order from direct subscription retrieve responses', () => {
+        const result = extractIyzicoRetrievedSubscriptionOrder({
+            data: {
+                referenceCode: 'sub_ref_direct',
+                orders: [
+                    {
+                        referenceCode: 'order_ref_direct',
+                        price: 649,
+                        currencyCode: 'TRY',
+                        orderStatus: 'WAITING',
+                        startPeriod: Date.UTC(2026, 4, 2, 19, 44, 0),
+                        endPeriod: Date.UTC(2026, 5, 2, 19, 44, 0)
+                    }
+                ]
+            }
+        }, 'sub_ref_direct', 'order_ref_direct')
+
+        expect(result).toEqual({
+            referenceCode: 'order_ref_direct',
+            price: 649,
+            currencyCode: 'TRY',
+            orderStatus: 'WAITING',
+            startAt: '2026-05-02T19:44:00.000Z',
+            endAt: '2026-06-02T19:44:00.000Z'
         })
     })
 })
