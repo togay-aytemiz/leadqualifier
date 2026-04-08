@@ -86,6 +86,12 @@ export interface IyzicoTopupCheckoutInitInput {
 
 export type IyzicoSubscriptionUpgradePeriod = 'NOW' | 'NEXT_PERIOD'
 
+export interface IyzicoPaymentRetrieveInput {
+    locale?: IyzicoLocale
+    paymentId: string
+    paymentConversationId?: string | null
+}
+
 export interface IyzicoSubscriptionCardUpdateInitInput {
     locale: IyzicoLocale
     conversationId: string
@@ -279,6 +285,15 @@ export async function retryIyzicoSubscriptionPayment(input: {
         locale: input.locale,
         conversationId: input.conversationId,
         referenceCode: input.referenceCode
+    }, cb))
+}
+
+export async function retrieveIyzicoPayment(input: IyzicoPaymentRetrieveInput) {
+    const client = createIyzicoSdkClient()
+    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.payment.retrieve({
+        locale: input.locale ?? 'tr',
+        paymentId: input.paymentId,
+        ...(input.paymentConversationId ? { paymentConversationId: input.paymentConversationId } : {})
     }, cb))
 }
 

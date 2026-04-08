@@ -7,11 +7,13 @@ const {
     subscriptionCardUpdateWithSubscriptionReferenceCodeMock,
     subscriptionPaymentRetryMock,
     subscriptionUpgradeMock,
+    paymentRetrieveMock,
     iyzipayConstructorMock
 } = vi.hoisted(() => {
     const subscriptionCardUpdateWithSubscriptionReferenceCodeMock = vi.fn()
     const subscriptionPaymentRetryMock = vi.fn()
     const subscriptionUpgradeMock = vi.fn()
+    const paymentRetrieveMock = vi.fn()
     const iyzipayConstructorMock = vi.fn(() => ({
         subscriptionCard: {
             updateWithSubscriptionReferenceCode: subscriptionCardUpdateWithSubscriptionReferenceCodeMock
@@ -21,6 +23,9 @@ const {
         },
         subscription: {
             upgrade: subscriptionUpgradeMock
+        },
+        payment: {
+            retrieve: paymentRetrieveMock
         }
     }))
 
@@ -43,6 +48,7 @@ const {
         subscriptionCardUpdateWithSubscriptionReferenceCodeMock,
         subscriptionPaymentRetryMock,
         subscriptionUpgradeMock,
+        paymentRetrieveMock,
         iyzipayConstructorMock
     }
 })
@@ -140,6 +146,39 @@ describe('iyzico billing client', () => {
             locale: 'tr',
             conversationId: 'conv_retry_1',
             referenceCode: 'order_ref_failed_1'
+        }, expect.any(Function))
+    })
+
+    it('retrieves payment detail by payment id for subscription order settlement amounts', async () => {
+        expect(typeof (iyzicoClient as Record<string, unknown>).retrieveIyzicoPayment).toBe('function')
+
+        paymentRetrieveMock.mockImplementation((payload, cb) => {
+            cb(null, {
+                status: 'success',
+                paymentId: '29512645',
+                paidPrice: 649,
+                paymentStatus: 'SUCCESS'
+            })
+        })
+
+        const result = await (iyzicoClient as typeof iyzicoClient & {
+            retrieveIyzicoPayment: (input: {
+                locale: 'tr' | 'en'
+                paymentId: string
+            }) => Promise<unknown>
+        }).retrieveIyzicoPayment({
+            locale: 'tr',
+            paymentId: '29512645'
+        })
+
+        expect(result).toEqual(expect.objectContaining({
+            status: 'success',
+            paymentId: '29512645',
+            paidPrice: 649
+        }))
+        expect(paymentRetrieveMock).toHaveBeenCalledWith({
+            locale: 'tr',
+            paymentId: '29512645'
         }, expect.any(Function))
     })
 

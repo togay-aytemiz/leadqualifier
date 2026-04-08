@@ -8,7 +8,7 @@ const PLANS_STATUS_BANNER_PATH = path.join(
 )
 
 describe('plans status banner source guard', () => {
-    it('auto-cleans transient billing query params after rendering the banner', () => {
+    it('cleans transient billing query params without starting an App Router navigation', () => {
         expect(fs.existsSync(PLANS_STATUS_BANNER_PATH)).toBe(true)
 
         const source = fs.existsSync(PLANS_STATUS_BANNER_PATH)
@@ -17,6 +17,20 @@ describe('plans status banner source guard', () => {
 
         expect(source).toContain('useEffect')
         expect(source).toContain('hasPlansStatusSearch')
-        expect(source).toContain('router.replace(`${pathname}${nextQuery}`)')
+        expect(source).toContain('window.history.replaceState')
+        expect(source).not.toContain('useRouter')
+        expect(source).not.toContain('router.replace')
+    })
+
+    it('keeps the rendered feedback visible after the URL cleanup until dismissed', () => {
+        expect(fs.existsSync(PLANS_STATUS_BANNER_PATH)).toBe(true)
+
+        const source = fs.existsSync(PLANS_STATUS_BANNER_PATH)
+            ? fs.readFileSync(PLANS_STATUS_BANNER_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('useState(true)')
+        expect(source).toContain('setIsVisible(false)')
+        expect(source).toContain('if (!isVisible) return null')
     })
 })

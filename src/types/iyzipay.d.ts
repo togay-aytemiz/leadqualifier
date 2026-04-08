@@ -21,6 +21,10 @@ declare module 'iyzipay' {
             retrieve: (request: unknown, cb: (error: unknown, result: unknown) => void) => void
         }
 
+        payment: {
+            retrieve: (request: unknown, cb: (error: unknown, result: unknown) => void) => void
+        }
+
         subscriptionCheckoutForm: {
             initialize: (request: unknown, cb: (error: unknown, result: unknown) => void) => void
             retrieve: (request: unknown, cb: (error: unknown, result: unknown) => void) => void

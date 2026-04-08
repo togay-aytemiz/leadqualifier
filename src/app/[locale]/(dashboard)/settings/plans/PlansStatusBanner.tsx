@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { clearPlansStatusSearch, hasPlansStatusSearch } from './status-query'
 
 interface PlansStatusBannerProps {
@@ -19,24 +19,31 @@ export function PlansStatusBanner({
     description
 }: PlansStatusBannerProps) {
     const pathname = usePathname()
-    const router = useRouter()
     const searchParams = useSearchParams()
+    const [isVisible, setIsVisible] = useState(true)
 
     useEffect(() => {
         const currentSearch = new URLSearchParams(searchParams.toString())
         if (!hasPlansStatusSearch(currentSearch)) return
 
         const nextQuery = clearPlansStatusSearch(currentSearch)
-        router.replace(`${pathname}${nextQuery}`)
-    }, [pathname, router, searchParams])
+        window.history.replaceState(window.history.state, '', `${pathname}${nextQuery}${window.location.hash}`)
+    }, [pathname, searchParams])
 
     const handleDismiss = () => {
-        const nextQuery = clearPlansStatusSearch(new URLSearchParams(searchParams.toString()))
-        router.replace(`${pathname}${nextQuery}`)
+        setIsVisible(false)
+
+        const currentSearch = new URLSearchParams(window.location.search)
+        if (!hasPlansStatusSearch(currentSearch)) return
+
+        const nextQuery = clearPlansStatusSearch(currentSearch)
+        window.history.replaceState(window.history.state, '', `${pathname}${nextQuery}${window.location.hash}`)
     }
 
+    if (!isVisible) return null
+
     return (
-        <div className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${className}`}>
+        <div role="status" className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${className}`}>
             <p>
                 {title}
                 {' — '}

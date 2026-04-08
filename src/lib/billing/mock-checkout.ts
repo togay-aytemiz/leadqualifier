@@ -8,9 +8,12 @@ import {
     initializeIyzicoSubscriptionCheckout,
     initializeIyzicoTopupCheckout,
     IyzicoClientError,
+    retrieveIyzicoPayment,
+    retrieveIyzicoSubscription,
     upgradeIyzicoSubscription
 } from '@/lib/billing/providers/iyzico/client'
 import {
+    extractIyzicoLatestSuccessfulSubscriptionOrder,
     extractIyzicoSubscriptionReferenceCode,
     extractIyzicoSubscriptionStartEnd
 } from '@/lib/billing/providers/iyzico/checkout-result'
@@ -217,6 +220,74 @@ function toNonNegativeNumber(value: unknown) {
     const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     if (!Number.isFinite(parsed)) return 0
     return Math.max(0, parsed)
+}
+
+function toNullableNonNegativeNumber(value: unknown) {
+    const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
+    if (!Number.isFinite(parsed)) return null
+    return Math.max(0, parsed)
+}
+
+function readString(record: Record<string, unknown>, key: string) {
+    const value = record[key]
+    return typeof value === 'string' && value.trim().length > 0
+        ? value.trim()
+        : null
+}
+
+async function resolveImmediateIyzicoUpgradeCharge(subscriptionReferenceCode: string) {
+    try {
+        const retrieveResult = await retrieveIyzicoSubscription({
+            subscriptionReferenceCode
+        })
+        const latestOrder = extractIyzicoLatestSuccessfulSubscriptionOrder(
+            retrieveResult,
+            subscriptionReferenceCode
+        )
+
+        if (!latestOrder?.referenceCode) {
+            return {
+                chargedAmountTry: null,
+                orderReferenceCode: null,
+                paymentId: latestOrder?.paymentId ?? null,
+                paymentConversationId: latestOrder?.paymentConversationId ?? null
+            }
+        }
+
+        let chargedAmountTry = latestOrder.price
+
+        if (latestOrder.paymentId) {
+            try {
+                const paymentResult = await retrieveIyzicoPayment({
+                    locale: 'tr',
+                    paymentId: latestOrder.paymentId
+                })
+                const paymentRecord = asRecord(paymentResult)
+                const paymentStatus = readString(paymentRecord, 'paymentStatus')?.toUpperCase() ?? null
+                const paidPrice = toNullableNonNegativeNumber(paymentRecord.paidPrice)
+
+                if ((paymentStatus === null || paymentStatus === 'SUCCESS') && paidPrice !== null) {
+                    chargedAmountTry = paidPrice
+                }
+            } catch {
+                // Keep direct upgrades tolerant; the provider order price remains the fallback.
+            }
+        }
+
+        return {
+            chargedAmountTry,
+            orderReferenceCode: latestOrder.referenceCode,
+            paymentId: latestOrder.paymentId,
+            paymentConversationId: latestOrder.paymentConversationId
+        }
+    } catch {
+        return {
+            chargedAmountTry: null,
+            orderReferenceCode: null,
+            paymentId: null,
+            paymentConversationId: null
+        }
+    }
 }
 
 function withoutPendingPlanChange(metadata: Record<string, unknown>) {
@@ -819,6 +890,7 @@ export async function simulateMockSubscriptionCheckout(input: {
             })
             const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(upgradeResult)
                 ?? activeSubscription.provider_subscription_id
+            const immediateCharge = await resolveImmediateIyzicoUpgradeCharge(subscriptionReferenceCode)
             const currentUsed = Math.round(toNonNegativeNumber(billing.monthly_package_credit_used))
             const topupBalance = toNonNegativeNumber(billing.topup_credit_balance)
             const nextPackageBalance = Math.max(0, requestedCredits - currentUsed)
@@ -879,7 +951,17 @@ export async function simulateMockSubscriptionCheckout(input: {
                             requested_monthly_credits: requestedCredits,
                             requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
                             estimated_charge_amount_try: estimatedChargeAmountTry,
-                            change_type: 'upgrade'
+                            change_type: 'upgrade',
+                            ...(immediateCharge.chargedAmountTry !== null && immediateCharge.orderReferenceCode
+                                ? {
+                                    charged_amount_try: immediateCharge.chargedAmountTry,
+                                    order_reference_code: immediateCharge.orderReferenceCode
+                                }
+                                : {}),
+                            ...(immediateCharge.paymentId ? { payment_id: immediateCharge.paymentId } : {}),
+                            ...(immediateCharge.paymentConversationId
+                                ? { payment_conversation_id: immediateCharge.paymentConversationId }
+                                : {})
                         }
                     })
             }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     extractIyzicoCheckoutPaymentConversationId,
+    extractIyzicoLatestSuccessfulSubscriptionOrder,
     extractIyzicoRetrievedSubscriptionOrder,
     extractIyzicoRetrievedSubscriptionItem,
     extractIyzicoSubscriptionReferenceCode,
@@ -113,8 +114,54 @@ describe('iyzico checkout result helpers', () => {
             price: 300,
             currencyCode: 'TRY',
             orderStatus: 'SUCCESS',
+            paymentId: null,
+            paymentConversationId: null,
             startAt: '2026-04-02T19:44:00.000Z',
             endAt: '2026-05-02T19:44:00.000Z'
+        })
+    })
+
+    it('extracts the successful payment attempt from a matching subscription order', () => {
+        const result = extractIyzicoRetrievedSubscriptionOrder({
+            data: {
+                items: [
+                    {
+                        referenceCode: 'sub_ref_1',
+                        orders: [
+                            {
+                                referenceCode: 'order_ref_1',
+                                price: 349,
+                                currencyCode: 'TRY',
+                                orderStatus: 'SUCCESS',
+                                paymentAttempts: [
+                                    {
+                                        conversationId: 'failed_conv',
+                                        paymentStatus: 'FAILED'
+                                    },
+                                    {
+                                        conversationId: '20c4e63d-1111-db923',
+                                        paymentId: 29512645,
+                                        paymentStatus: 'SUCCESS'
+                                    }
+                                ],
+                                startPeriod: Date.UTC(2026, 3, 8, 13, 27, 0),
+                                endPeriod: Date.UTC(2026, 4, 8, 13, 27, 0)
+                            }
+                        ]
+                    }
+                ]
+            }
+        }, 'sub_ref_1', 'order_ref_1')
+
+        expect(result).toEqual({
+            referenceCode: 'order_ref_1',
+            price: 349,
+            currencyCode: 'TRY',
+            orderStatus: 'SUCCESS',
+            paymentId: '29512645',
+            paymentConversationId: '20c4e63d-1111-db923',
+            startAt: '2026-04-08T13:27:00.000Z',
+            endAt: '2026-05-08T13:27:00.000Z'
         })
     })
 
@@ -140,8 +187,54 @@ describe('iyzico checkout result helpers', () => {
             price: 649,
             currencyCode: 'TRY',
             orderStatus: 'WAITING',
+            paymentId: null,
+            paymentConversationId: null,
             startAt: '2026-05-02T19:44:00.000Z',
             endAt: '2026-06-02T19:44:00.000Z'
+        })
+    })
+
+    it('extracts the latest successful subscription order when the webhook order reference is not known yet', () => {
+        const result = extractIyzicoLatestSuccessfulSubscriptionOrder({
+            data: {
+                referenceCode: 'sub_ref_scale',
+                orders: [
+                    {
+                        referenceCode: 'order_ref_waiting',
+                        price: 949,
+                        currencyCode: 'TRY',
+                        orderStatus: 'WAITING',
+                        startPeriod: Date.UTC(2026, 4, 8, 13, 49, 0),
+                        endPeriod: Date.UTC(2026, 5, 8, 13, 49, 0),
+                        paymentAttempts: []
+                    },
+                    {
+                        referenceCode: 'order_ref_scale_upgrade',
+                        price: 649,
+                        currencyCode: 'TRY',
+                        orderStatus: 'SUCCESS',
+                        startPeriod: Date.UTC(2026, 3, 8, 13, 48, 0),
+                        endPeriod: Date.UTC(2026, 4, 8, 13, 48, 0),
+                        paymentAttempts: [{
+                            conversationId: '7894b37a-e1c60',
+                            createdDate: Date.UTC(2026, 3, 8, 13, 49, 0),
+                            paymentId: 29512963,
+                            paymentStatus: 'SUCCESS'
+                        }]
+                    }
+                ]
+            }
+        }, 'sub_ref_scale')
+
+        expect(result).toEqual({
+            referenceCode: 'order_ref_scale_upgrade',
+            price: 649,
+            currencyCode: 'TRY',
+            orderStatus: 'SUCCESS',
+            paymentId: '29512963',
+            paymentConversationId: '7894b37a-e1c60',
+            startAt: '2026-04-08T13:48:00.000Z',
+            endAt: '2026-05-08T13:48:00.000Z'
         })
     })
 })

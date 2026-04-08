@@ -4,10 +4,12 @@ import { NextRequest } from 'next/server'
 
 const {
     createServiceClientMock,
-    retrieveIyzicoSubscriptionMock
+    retrieveIyzicoSubscriptionMock,
+    retrieveIyzicoPaymentMock
 } = vi.hoisted(() => ({
     createServiceClientMock: vi.fn(),
-    retrieveIyzicoSubscriptionMock: vi.fn()
+    retrieveIyzicoSubscriptionMock: vi.fn(),
+    retrieveIyzicoPaymentMock: vi.fn()
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -15,7 +17,8 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 
 vi.mock('@/lib/billing/providers/iyzico/client', () => ({
-    retrieveIyzicoSubscription: retrieveIyzicoSubscriptionMock
+    retrieveIyzicoSubscription: retrieveIyzicoSubscriptionMock,
+    retrieveIyzicoPayment: retrieveIyzicoPaymentMock
 }))
 
 import { POST } from '@/app/api/billing/iyzico/webhook/route'
@@ -585,6 +588,111 @@ describe('iyzico webhook route', () => {
             })
         }))
         expect(spies.ledgerUpdateEqMock).toHaveBeenCalledWith('id', 'ledger_1')
+    })
+
+    it('prefers payment detail paidPrice when an upgrade order price differs from the collected transaction amount', async () => {
+        const { client: serviceSupabase, spies } = createServiceSupabaseMock({
+            subscriptionRow: {
+                id: 'sub_row_1',
+                organization_id: 'org_1',
+                provider_subscription_id: 'sub_ref_growth',
+                status: 'active',
+                period_end: '2026-05-08T13:27:00.000Z',
+                metadata: {
+                    change_type: 'upgrade',
+                    requested_monthly_credits: 2000,
+                    requested_monthly_price_try: 649,
+                    upgraded_at: '2026-04-08T13:27:00.000Z'
+                }
+            },
+            billingRow: {
+                organization_id: 'org_1',
+                current_period_end: '2026-05-08T13:27:00.000Z',
+                topup_credit_balance: 100,
+                premium_assigned_at: '2026-04-08T13:25:00.000Z'
+            },
+            ledgerRows: [{
+                id: 'ledger_upgrade_1',
+                reason: 'Iyzico subscription upgrade success',
+                metadata: {
+                    subscription_id: 'sub_row_1',
+                    change_type: 'upgrade'
+                }
+            }]
+        })
+        createServiceClientMock.mockReturnValue(serviceSupabase)
+        retrieveIyzicoSubscriptionMock.mockResolvedValue({
+            status: 'success',
+            data: {
+                referenceCode: 'sub_ref_growth',
+                subscriptionStatus: 'UPGRADED',
+                startDate: Date.UTC(2026, 3, 8, 13, 27, 0),
+                endDate: Date.UTC(2026, 4, 8, 13, 27, 0),
+                orders: [{
+                    referenceCode: 'order_ref_upgrade_649',
+                    price: 349,
+                    currencyCode: 'TRY',
+                    orderStatus: 'SUCCESS',
+                    startPeriod: Date.UTC(2026, 3, 8, 13, 27, 0),
+                    endPeriod: Date.UTC(2026, 4, 8, 13, 27, 0),
+                    paymentAttempts: [{
+                        conversationId: '20c4e63d-1111-db923',
+                        paymentId: 29512645,
+                        paymentStatus: 'SUCCESS'
+                    }]
+                }]
+            }
+        })
+        retrieveIyzicoPaymentMock.mockResolvedValue({
+            status: 'success',
+            paymentId: '29512645',
+            price: 649,
+            paidPrice: 649,
+            currency: 'TRY',
+            paymentStatus: 'SUCCESS'
+        })
+        const body = {
+            merchantId: 'merchant_1',
+            iyziEventType: 'subscription.order.success',
+            iyziReferenceCode: 'event_ref_upgrade_649',
+            subscriptionReferenceCode: 'sub_ref_growth',
+            orderReferenceCode: 'order_ref_upgrade_649',
+            customerReferenceCode: 'customer_ref_1'
+        }
+        const signature = buildSignature({
+            secretKey: 'secret-key',
+            merchantId: body.merchantId,
+            eventType: body.iyziEventType,
+            subscriptionReferenceCode: body.subscriptionReferenceCode,
+            orderReferenceCode: body.orderReferenceCode,
+            customerReferenceCode: body.customerReferenceCode
+        })
+
+        const req = new NextRequest('http://localhost/api/billing/iyzico/webhook', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-iyz-signature-v3': signature
+            },
+            body: JSON.stringify(body)
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true, status: 'ignored' })
+        expect(retrieveIyzicoPaymentMock).toHaveBeenCalledWith({
+            locale: 'tr',
+            paymentId: '29512645'
+        })
+        expect(spies.ledgerUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                charged_amount_try: 649,
+                order_reference_code: 'order_ref_upgrade_649',
+                payment_id: '29512645'
+            })
+        }))
+        expect(spies.ledgerUpdateEqMock).toHaveBeenCalledWith('id', 'ledger_upgrade_1')
     })
 
     it('marks subscription as past_due on renewal failure', async () => {

@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-08):** Iyzico same-cycle upgrade history now needs payment-detail reconciliation in both direct upgrade completion and webhook settlement. When the matched subscription order contains a successful `paymentAttempts[].paymentId`, Qualy should query `/payment/detail` and prefer `paidPrice` over subscription-order `price`, because the subscription-operation row can differ from the transaction list’s actually collected amount.
+
+> **Update Note (2026-04-08):** `Settings > Plans` billing feedback banners now need silent URL cleanup. Checkout, direct plan-change, renewal, and payment-recovery success messages should stay visible after the refreshed subscriber Plans UI renders, so clearing transient query params must not start a second App Router navigation that unmounts the banner.
+
 > **Update Note (2026-04-07):** `Settings > Plans > Geçmiş / History` must query purchase ledger rows directly instead of limiting over mixed usage rows, so recent `usage_debit` activity cannot hide successful `package_grant` or `purchase_credit` purchases. Iyzico direct plan changes must call the documented signed REST upgrade endpoint with merchant `conversationId`, `upgradePeriod=NOW`, `useTrial=false`, and `resetRecurrenceCount=false` in the actual body, persist trace metadata locally, and avoid showing local plan deltas as confirmed charges without provider order evidence.
 
 > **Update Note (2026-04-07):** `Settings > Qualy AI` now repairs exact saved EN/TR starter assistant-instruction sets into the active UI locale, so a Turkish interface does not show English default textarea content just because an older row persisted the English starter values. Custom operator-written instruction text remains unchanged.
@@ -185,7 +189,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-04-07 (Billing history now filters directly to purchase ledger entry types so usage debits cannot hide successful purchases; Iyzico direct upgrades now use the documented signed REST body including `resetRecurrenceCount=false`, and upgrade charge UI/history no longer invent local delta amounts without provider order evidence.)
+> **Last Updated:** 2026-04-08 (`Settings > Plans` keeps billing success banners visible during silent callback-param cleanup, and direct/webhook Iyzico same-cycle upgrade history now backfills collected payment-detail `paidPrice` before rendering provider-confirmed upgrade amounts.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1099,6 +1103,7 @@
   - [x] Standardize Turkish billing terminology to use `ücretsiz deneme` instead of `trial` in user-facing copy
   - [x] Refresh sidebar/mobile billing snapshot on checkout query updates so premium activation is reflected without manual page reload
   - [x] Make transient Plans checkout/renewal banners dismissible so stale query-state errors can be cleared without leaving the page
+  - [x] Keep `Settings > Plans` checkout, direct plan-change, renewal, and payment-recovery feedback visible while silently cleaning transient query params without a second App Router navigation
   - [x] Reset stale Iyzico checkout runtime on hosted checkout mount/unmount and switch Plans/callback redirects to locale-aware `as-needed` paths so repeated package attempts do not render a blank checkout surface
   - [x] Add pre-Iyzico legal consent gate for subscription and top-up checkout, using public `Qualy-lp` legal pages in new tabs and a non-final `continue` CTA before provider payment
   - [x] Enforce checkout legal consent server-side and resolve selected plans/top-up packs from server catalog IDs so hidden client fields cannot bypass consent or tamper with credits/pricing
@@ -1140,6 +1145,7 @@
   - [x] Remove scheduled-cancellation undo CTA from Plans UI so users resubscribe manually after period end if needed
   - [x] Add one-hour post-period grace window plus atomic renewal-success RPC to reduce false lockouts and partial renewal-state drift during webhook retries/delays
   - [x] Validate iyzico sandbox success/decline card scenarios and normalize provider failure codes into user-facing checkout errors instead of generic callback failures
+  - [x] Reconcile same-cycle Iyzico upgrade history from payment-detail `paidPrice` during direct upgrade completion and webhook settlement when provider subscription-order price differs from the collected transaction amount
 - [ ] **Trial Abuse Prevention**
   - [x] Enforce one-trial-per-business policy keyed by `whatsapp_business_account_id` + normalized phone + company identity signals (`trial_business_fingerprints` + signup pre-check + billing initialization + WhatsApp connect enforcement)
   - [ ] Add risk controls for disposable email domains, VOIP-heavy signup numbers, and repeated device/IP fingerprints

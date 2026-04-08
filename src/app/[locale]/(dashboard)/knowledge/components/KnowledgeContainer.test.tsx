@@ -56,7 +56,7 @@ vi.mock('./FolderModal', () => ({
 }))
 
 vi.mock('./NewContentButton', () => ({
-  NewContentButton: () => <button>new-content</button>,
+  NewContentButton: () => <button data-testid="new-content" />,
 }))
 
 vi.mock('./FolderActions', () => ({

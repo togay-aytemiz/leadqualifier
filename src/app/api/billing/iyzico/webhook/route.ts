@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { retrieveIyzicoSubscription } from '@/lib/billing/providers/iyzico/client'
+import {
+    retrieveIyzicoPayment,
+    retrieveIyzicoSubscription
+} from '@/lib/billing/providers/iyzico/client'
 import {
     extractIyzicoRetrievedSubscriptionItem,
     extractIyzicoRetrievedSubscriptionOrder
@@ -47,6 +50,12 @@ function asRecord(value: unknown): Record<string, unknown> {
 function toNonNegativeNumber(value: unknown) {
     const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, parsed)
+}
+
+function toNullableNonNegativeNumber(value: unknown) {
+    const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
+    if (!Number.isFinite(parsed)) return null
     return Math.max(0, parsed)
 }
 
@@ -135,6 +144,8 @@ async function syncExactChargeToPackageGrant(input: {
     subscriptionRecord: SubscriptionRecordRow
     orderReferenceCode: string
     chargedAmountTry: number | null
+    paymentId?: string | null
+    paymentConversationId?: string | null
 }) {
     if (input.chargedAmountTry === null) return
 
@@ -171,7 +182,9 @@ async function syncExactChargeToPackageGrant(input: {
     const nextMetadata = {
         ...entryMetadata,
         charged_amount_try: input.chargedAmountTry,
-        order_reference_code: input.orderReferenceCode
+        order_reference_code: input.orderReferenceCode,
+        ...(input.paymentId ? { payment_id: input.paymentId } : {}),
+        ...(input.paymentConversationId ? { payment_conversation_id: input.paymentConversationId } : {})
     }
 
     await input.serviceSupabase
@@ -199,6 +212,8 @@ async function handleSameCycleSuccess(input: {
     orderReferenceCode: string
     eventReferenceCode: string | null
     chargedAmountTry: number | null
+    paymentId: string | null
+    paymentConversationId: string | null
 }) {
     const metadataRecord = asRecord(input.subscriptionRecord.metadata)
     const nowIso = new Date().toISOString()
@@ -209,6 +224,8 @@ async function handleSameCycleSuccess(input: {
         last_paid_event_reference_code: input.eventReferenceCode,
         last_paid_at: nowIso,
         last_paid_order_amount_try: input.chargedAmountTry,
+        last_paid_payment_id: input.paymentId,
+        last_paid_payment_conversation_id: input.paymentConversationId,
         last_failed_order_reference_code: null,
         last_failed_event_reference_code: null
     }
@@ -244,13 +261,59 @@ async function handleSameCycleSuccess(input: {
         serviceSupabase: input.serviceSupabase,
         subscriptionRecord: input.subscriptionRecord,
         orderReferenceCode: input.orderReferenceCode,
-        chargedAmountTry: input.chargedAmountTry
+        chargedAmountTry: input.chargedAmountTry,
+        paymentId: input.paymentId,
+        paymentConversationId: input.paymentConversationId
     })
 
     return NextResponse.json({
         ok: true,
         status: input.subscriptionRecord.status === 'past_due' ? 'recovered' : 'ignored'
     })
+}
+
+async function resolveIyzicoCollectedOrderAmount(input: {
+    subscriptionOrder: ReturnType<typeof extractIyzicoRetrievedSubscriptionOrder>
+}) {
+    const orderAmountTry = input.subscriptionOrder
+        ? toNullableNonNegativeNumber(input.subscriptionOrder.price)
+        : null
+    const paymentId = input.subscriptionOrder?.paymentId ?? null
+    const paymentConversationId = input.subscriptionOrder?.paymentConversationId ?? null
+
+    if (!paymentId) {
+        return {
+            chargedAmountTry: orderAmountTry,
+            paymentId,
+            paymentConversationId
+        }
+    }
+
+    try {
+        const paymentResult = await retrieveIyzicoPayment({
+            locale: 'tr',
+            paymentId
+        })
+        const paymentRecord = asRecord(paymentResult)
+        const paymentStatus = readString(paymentRecord, 'paymentStatus')?.toUpperCase() ?? null
+        const paidPrice = toNullableNonNegativeNumber(paymentRecord.paidPrice)
+
+        if ((paymentStatus === null || paymentStatus === 'SUCCESS') && paidPrice !== null) {
+            return {
+                chargedAmountTry: paidPrice,
+                paymentId,
+                paymentConversationId
+            }
+        }
+    } catch {
+        // Keep webhook settlement tolerant; provider order price remains the legacy fallback.
+    }
+
+    return {
+        chargedAmountTry: orderAmountTry,
+        paymentId,
+        paymentConversationId
+    }
 }
 
 async function handleRenewalSuccess(input: {
@@ -300,9 +363,8 @@ async function handleRenewalSuccess(input: {
         input.orderReferenceCode
     )
     const currentPeriodEnd = billingAccount.current_period_end ?? input.subscriptionRecord.period_end ?? null
-    const chargedAmountTry = subscriptionOrder
-        ? toNonNegativeNumber(subscriptionOrder.price)
-        : null
+    const collectedCharge = await resolveIyzicoCollectedOrderAmount({ subscriptionOrder })
+    const chargedAmountTry = collectedCharge.chargedAmountTry
     const nextPeriodStart = subscriptionOrder?.startAt ?? subscriptionItem?.startAt ?? null
     const nextPeriodEnd = subscriptionOrder?.endAt ?? subscriptionItem?.endAt ?? null
 
@@ -319,7 +381,9 @@ async function handleRenewalSuccess(input: {
             subscriptionRecord: input.subscriptionRecord,
             orderReferenceCode: input.orderReferenceCode,
             eventReferenceCode: input.eventReferenceCode,
-            chargedAmountTry
+            chargedAmountTry,
+            paymentId: collectedCharge.paymentId,
+            paymentConversationId: collectedCharge.paymentConversationId
         })
     }
 
