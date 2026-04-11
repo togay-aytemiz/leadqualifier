@@ -150,11 +150,6 @@ export function SubscriptionPlanManager({
                 : null,
             targetPlanName: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
             renewalPeriodEnd,
-            savedPaymentMethod: checkoutSummary.changeType === 'upgrade'
-                ? {
-                    type: 'saved_subscription_card'
-                }
-                : null,
             formatCurrency: (value) => formatCurrency.format(value),
             formatCredits: (value) => formatNumber.format(value),
             formatRenewalDate: (value) => formatDate.format(new Date(value)),
@@ -166,11 +161,9 @@ export function SubscriptionPlanManager({
                 effectiveImmediate: tPlans('checkoutLegal.details.effectiveImmediate'),
                 effectiveNextPeriod: tPlans('checkoutLegal.details.effectiveNextPeriod'),
                 todayChargeLabel: tPlans('checkoutLegal.details.todayChargeLabel'),
-                chargeProviderCalculated: tPlans('checkoutLegal.details.chargeProviderCalculated'),
+                chargeFixedDifference: ({ price }) => tPlans('checkoutLegal.details.chargeFixedDifference', { price }),
                 chargeNoCharge: tPlans('checkoutLegal.details.chargeNoCharge'),
                 chargeFullPrice: ({ price }) => tPlans('checkoutLegal.details.chargeFullPrice', { price }),
-                savedPaymentMethodLabel: tPlans('checkoutLegal.details.savedPaymentMethodLabel'),
-                savedPaymentMethodGeneric: tPlans('checkoutLegal.details.savedPaymentMethodGeneric'),
                 todayCreditDeltaLabel: tPlans('checkoutLegal.details.todayCreditDeltaLabel'),
                 creditDeltaValue: ({ credits }) => tPlans('checkoutLegal.details.creditDeltaValue', { credits }),
                 nextRenewalLabel: tPlans('checkoutLegal.details.nextRenewalLabel')
@@ -556,15 +549,6 @@ export function SubscriptionPlanManager({
                     summaryDetails={checkoutSummaryDetails}
                     continueLabel={checkoutContinueLabel}
                     immediateStartLabel={tPlans('checkoutLegal.acceptPlanChange')}
-                    secondaryAction={checkoutSummary?.changeType === 'upgrade' && paymentRecoveryState?.canUpdateCard && updatePaymentMethodAction
-                        ? {
-                            label: tPlans('checkoutLegal.updatePaymentMethodInlineAction'),
-                            action: updatePaymentMethodAction,
-                            hiddenFields: [
-                                { name: 'organizationId', value: organizationId }
-                            ]
-                        }
-                        : undefined}
                     action={planAction}
                     hiddenFields={[
                         { name: 'organizationId', value: organizationId },

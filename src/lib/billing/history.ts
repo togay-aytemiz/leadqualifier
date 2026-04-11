@@ -71,6 +71,7 @@ function resolvePackageHistoryKind(input: {
 
     if (
         source === 'iyzico_subscription_upgrade'
+        || source === 'iyzico_subscription_upgrade_checkout'
         || normalizedReason === 'iyzico subscription upgrade success'
         || entryChangeType === 'upgrade'
         || subscriptionChangeType === 'upgrade'
@@ -110,6 +111,7 @@ function readPackageHistoryPrice(
 function resolvePackageHistoryAmountLabel(input: {
     entry: BillingLedgerEntry
     subscriptionMetadata: Record<string, unknown> | null
+    orders: Map<string, BillingHistoryOrderRow>
     kind: BillingPackageHistoryKind
     formatCurrency: (amount: number, currency: string | null) => string | null
     labels: BillingHistoryLabels
@@ -118,11 +120,20 @@ function resolvePackageHistoryAmountLabel(input: {
     const chargedAmount = readNumber(entryMetadata, 'charged_amount_try')
     if (chargedAmount !== null) {
         const orderReferenceCode = readString(entryMetadata, 'order_reference_code')
-        if (input.kind === 'upgrade' && !orderReferenceCode) {
+        const orderId = readString(entryMetadata, 'order_id')
+        if (input.kind === 'upgrade' && !orderReferenceCode && !orderId) {
             return input.labels.amountUnavailable
         }
 
         return input.formatCurrency(chargedAmount, 'TRY') ?? input.labels.amountUnavailable
+    }
+
+    const linkedOrderId = readString(entryMetadata, 'order_id')
+    if (input.kind === 'upgrade' && linkedOrderId) {
+        const linkedOrder = input.orders.get(linkedOrderId)
+        if (linkedOrder) {
+            return input.formatCurrency(linkedOrder.amountTry, linkedOrder.currency) ?? input.labels.amountUnavailable
+        }
     }
 
     const requestedPrice = readPackageHistoryPrice(input.entry, input.subscriptionMetadata)
@@ -164,6 +175,7 @@ export function buildBillingHistoryRows(input: {
                 amountLabel: resolvePackageHistoryAmountLabel({
                     entry,
                     subscriptionMetadata,
+                    orders: input.orders,
                     kind,
                     formatCurrency: input.formatCurrency,
                     labels: input.labels

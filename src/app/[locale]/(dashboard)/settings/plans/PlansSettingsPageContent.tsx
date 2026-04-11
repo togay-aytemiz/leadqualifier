@@ -884,6 +884,9 @@ export default async function PlansSettingsPageContent({
         const selectedPlan = planId
             ? subscriptionPlanOptions.find((plan) => plan.id === planId) ?? null
             : null
+        const currentPlanPriceTry = activePlanId
+            ? subscriptionPlanOptions.find((plan) => plan.id === activePlanId)?.priceTry ?? null
+            : null
 
         if (!selectedPlan) {
             redirectWithCheckoutError(locale, 'subscribe', 'invalid_input')
@@ -895,6 +898,7 @@ export default async function PlansSettingsPageContent({
             monthlyPriceTry: selectedPlan.priceTry,
             monthlyCredits: selectedPlan.credits,
             planId: selectedPlan.id as BillingPlanTierId,
+            currentMonthlyPriceTry: currentPlanPriceTry,
             callbackUrl: subscriptionCallbackUrl,
             locale: checkoutLocale
         })

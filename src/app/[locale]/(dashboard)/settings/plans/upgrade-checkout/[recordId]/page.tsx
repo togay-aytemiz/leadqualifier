@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 import { HostedCheckoutEmbed } from '../../HostedCheckoutEmbed'
 
-interface SubscriptionCheckoutPageProps {
+interface UpgradeCheckoutPageProps {
     params: Promise<{
         locale: string
         recordId: string
@@ -16,7 +16,7 @@ function asRecord(value: unknown): Record<string, unknown> {
     return value as Record<string, unknown>
 }
 
-export default async function SubscriptionCheckoutPage({ params }: SubscriptionCheckoutPageProps) {
+export default async function UpgradeCheckoutPage({ params }: UpgradeCheckoutPageProps) {
     const { locale, recordId } = await params
     if (!recordId) {
         notFound()
@@ -24,18 +24,18 @@ export default async function SubscriptionCheckoutPage({ params }: SubscriptionC
     const tPlans = await getTranslations({ locale, namespace: 'billingPlans' })
 
     const supabase = await createClient()
-    const { data: subscriptionRecord, error } = await supabase
-        .from('organization_subscription_records')
+    const { data: orderRecord, error } = await supabase
+        .from('credit_purchase_orders')
         .select('id, provider, status, metadata')
         .eq('id', recordId)
         .eq('provider', 'iyzico')
         .maybeSingle()
 
-    if (error || !subscriptionRecord) {
+    if (error || !orderRecord) {
         notFound()
     }
 
-    const metadata = asRecord(subscriptionRecord.metadata)
+    const metadata = asRecord(orderRecord.metadata)
     const checkoutFormContent = typeof metadata.checkout_form_content === 'string'
         ? metadata.checkout_form_content
         : null

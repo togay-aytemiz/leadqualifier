@@ -5,7 +5,7 @@ export type SubscriptionCheckoutChangeType =
     | 'same_plan'
 
 export type SubscriptionCheckoutEffectiveTiming = 'immediate' | 'next_period'
-export type SubscriptionCheckoutChargeMode = 'full_price' | 'provider_calculated' | 'no_charge'
+export type SubscriptionCheckoutChargeMode = 'full_price' | 'fixed_difference' | 'no_charge'
 
 export interface CheckoutPlanSnapshot {
     id: string
@@ -27,10 +27,6 @@ export interface SubscriptionCheckoutSummaryDetail {
     emphasis?: 'strong'
 }
 
-export interface SubscriptionCheckoutSavedPaymentMethod {
-    type: 'saved_subscription_card'
-}
-
 interface SubscriptionCheckoutSummaryDetailLabels {
     currentPlan: string
     newPlan: string
@@ -39,11 +35,9 @@ interface SubscriptionCheckoutSummaryDetailLabels {
     effectiveImmediate: string
     effectiveNextPeriod: string
     todayChargeLabel: string
-    chargeProviderCalculated: string
+    chargeFixedDifference: (input: { price: string }) => string
     chargeNoCharge: string
     chargeFullPrice: (input: { price: string }) => string
-    savedPaymentMethodLabel: string
-    savedPaymentMethodGeneric: string
     todayCreditDeltaLabel: string
     creditDeltaValue: (input: { credits: string }) => string
     nextRenewalLabel: string
@@ -80,7 +74,7 @@ export function resolveSubscriptionCheckoutSummary(input: {
         return {
             changeType: 'upgrade',
             effectiveTiming: 'immediate',
-            chargeMode: 'provider_calculated',
+            chargeMode: 'fixed_difference',
             monthlyPriceDelta,
             creditDelta
         }
@@ -112,7 +106,6 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
     currentPlanName?: string | null
     targetPlanName: string
     renewalPeriodEnd?: string | null
-    savedPaymentMethod?: SubscriptionCheckoutSavedPaymentMethod | null
     formatCurrency: (value: number) => string
     formatCredits: (value: number) => string
     formatRenewalDate: (value: string) => string
@@ -121,14 +114,18 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
     const details: SubscriptionCheckoutSummaryDetail[] = []
     const chargeDetail: SubscriptionCheckoutSummaryDetail = {
         label: input.labels.todayChargeLabel,
-        value: input.summary.chargeMode === 'provider_calculated'
-            ? input.labels.chargeProviderCalculated
+        value: input.summary.chargeMode === 'fixed_difference'
+            ? input.labels.chargeFixedDifference({
+                price: input.formatCurrency(Math.max(0, input.summary.monthlyPriceDelta))
+            })
             : input.summary.chargeMode === 'no_charge'
                 ? input.labels.chargeNoCharge
                 : input.labels.chargeFullPrice({
                     price: input.formatCurrency(input.targetPlan.localizedPrice)
                 }),
-        emphasis: input.summary.chargeMode === 'full_price' ? 'strong' : undefined
+        emphasis: input.summary.chargeMode === 'full_price' || input.summary.chargeMode === 'fixed_difference'
+            ? 'strong'
+            : undefined
     }
 
     if (input.currentPlan && input.currentPlanName) {
@@ -160,13 +157,6 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
         details.push(chargeDetail)
     }
 
-    if (input.summary.changeType === 'upgrade' && input.savedPaymentMethod) {
-        details.push({
-            label: input.labels.savedPaymentMethodLabel,
-            value: input.labels.savedPaymentMethodGeneric
-        })
-    }
-
     if (input.summary.changeType === 'upgrade' && input.summary.creditDelta > 0) {
         details.push({
             label: input.labels.todayCreditDeltaLabel,
@@ -191,15 +181,15 @@ export function buildSubscriptionCheckoutSummaryDetails(input: {
 }
 
 export function resolveSubscriptionCheckoutContinueLabel(input: SubscriptionCheckoutContinueLabelInput) {
-    if (input.summary.chargeMode !== 'full_price') {
-        return input.labels.defaultLabel
-    }
-
-    if (input.targetPlan.localizedPrice <= 0) {
+    if (input.summary.chargeMode === 'no_charge') {
         return input.labels.defaultLabel
     }
 
     return input.labels.chargeLabel({
-        price: input.formatCurrency(input.targetPlan.localizedPrice)
+        price: input.formatCurrency(
+            input.summary.chargeMode === 'fixed_difference'
+                ? Math.max(0, input.summary.monthlyPriceDelta)
+                : input.targetPlan.localizedPrice
+        )
     })
 }

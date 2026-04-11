@@ -8,12 +8,9 @@ import {
     initializeIyzicoSubscriptionCheckout,
     initializeIyzicoTopupCheckout,
     IyzicoClientError,
-    retrieveIyzicoPayment,
-    retrieveIyzicoSubscription,
     upgradeIyzicoSubscription
 } from '@/lib/billing/providers/iyzico/client'
 import {
-    extractIyzicoLatestSuccessfulSubscriptionOrder,
     extractIyzicoSubscriptionReferenceCode,
     extractIyzicoSubscriptionStartEnd
 } from '@/lib/billing/providers/iyzico/checkout-result'
@@ -222,72 +219,11 @@ function toNonNegativeNumber(value: unknown) {
     return Math.max(0, parsed)
 }
 
-function toNullableNonNegativeNumber(value: unknown) {
-    const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
-    if (!Number.isFinite(parsed)) return null
-    return Math.max(0, parsed)
-}
-
 function readString(record: Record<string, unknown>, key: string) {
     const value = record[key]
     return typeof value === 'string' && value.trim().length > 0
         ? value.trim()
         : null
-}
-
-async function resolveImmediateIyzicoUpgradeCharge(subscriptionReferenceCode: string) {
-    try {
-        const retrieveResult = await retrieveIyzicoSubscription({
-            subscriptionReferenceCode
-        })
-        const latestOrder = extractIyzicoLatestSuccessfulSubscriptionOrder(
-            retrieveResult,
-            subscriptionReferenceCode
-        )
-
-        if (!latestOrder?.referenceCode) {
-            return {
-                chargedAmountTry: null,
-                orderReferenceCode: null,
-                paymentId: latestOrder?.paymentId ?? null,
-                paymentConversationId: latestOrder?.paymentConversationId ?? null
-            }
-        }
-
-        let chargedAmountTry = latestOrder.price
-
-        if (latestOrder.paymentId) {
-            try {
-                const paymentResult = await retrieveIyzicoPayment({
-                    locale: 'tr',
-                    paymentId: latestOrder.paymentId
-                })
-                const paymentRecord = asRecord(paymentResult)
-                const paymentStatus = readString(paymentRecord, 'paymentStatus')?.toUpperCase() ?? null
-                const paidPrice = toNullableNonNegativeNumber(paymentRecord.paidPrice)
-
-                if ((paymentStatus === null || paymentStatus === 'SUCCESS') && paidPrice !== null) {
-                    chargedAmountTry = paidPrice
-                }
-            } catch {
-                // Keep direct upgrades tolerant; the provider order price remains the fallback.
-            }
-        }
-
-        return {
-            chargedAmountTry,
-            orderReferenceCode: latestOrder.referenceCode,
-            paymentId: latestOrder.paymentId,
-            paymentConversationId: latestOrder.paymentConversationId
-        }
-    } catch {
-        return {
-            chargedAmountTry: null,
-            orderReferenceCode: null,
-            paymentId: null,
-            paymentConversationId: null
-        }
-    }
 }
 
 function withoutPendingPlanChange(metadata: Record<string, unknown>) {
@@ -316,14 +252,26 @@ function resolveRouteLocale(locale: string | null | undefined): 'tr' | 'en' {
 }
 
 function resolveDefaultCallbackBaseUrl() {
-    const value = process.env.NEXT_PUBLIC_APP_URL?.trim()
-    if (!value) return null
+    const candidates = [
+        process.env.NEXT_PUBLIC_APP_URL,
+        process.env.NEXT_PUBLIC_SITE_URL,
+        process.env.SITE_URL,
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+        process.env.URL
+    ]
 
-    try {
-        return new URL(value).origin
-    } catch {
-        return null
+    for (const candidate of candidates) {
+        const value = candidate?.trim()
+        if (!value) continue
+
+        try {
+            return new URL(value).origin
+        } catch {
+            continue
+        }
     }
+
+    return 'http://localhost:3000'
 }
 
 function resolveCheckoutCallbackUrl(input: {
@@ -683,6 +631,193 @@ async function resolveProfileAndOrganization(input: {
     }
 }
 
+async function startHostedIyzicoOneTimeCheckout(input: {
+    tenantSupabase: Awaited<ReturnType<typeof createClient>>
+    serviceSupabase: NonNullable<ReturnType<typeof createServiceRoleClient>>
+    userId: string
+    organizationId: string
+    callbackUrl: string
+    locale?: string | null
+    customerIp?: string | null
+    credits: number
+    amountTry: number
+    metadata: Record<string, unknown>
+    basketIdPrefix: string
+    basketItemId: string
+    basketItemName: string
+    basketCategory2: string
+    redirectPathPrefix: string
+}): Promise<MockCheckoutResult> {
+    const { profile, organization, billingProfile } = await resolveProfileAndOrganization({
+        tenantSupabase: input.tenantSupabase,
+        userId: input.userId,
+        organizationId: input.organizationId
+    })
+    const nameParts = splitNameParts(profile?.full_name)
+    const contactName = billingProfile?.company_name?.trim()
+        || organization?.name?.trim()
+        || `${nameParts.name} ${nameParts.surname}`.trim()
+    const now = new Date()
+    const nowFormatted = formatIyzicoDate(now)
+    const defaultEmail = billingProfile?.billing_email?.trim() || profile?.email?.trim() || 'billing@example.com'
+    const defaultAddress = billingProfile?.address_line_1?.trim()
+        || process.env.IYZICO_DEFAULT_ADDRESS?.trim()
+        || 'Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1'
+    const defaultCity = billingProfile?.city?.trim() || process.env.IYZICO_DEFAULT_CITY?.trim() || 'Istanbul'
+    const defaultCountry = billingProfile?.country?.trim() || process.env.IYZICO_DEFAULT_COUNTRY?.trim() || 'Turkey'
+    const defaultZipCode = billingProfile?.postal_code?.trim() || process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || '34742'
+    const defaultIdentity = billingProfile?.tax_identity_number?.trim()
+        || process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim()
+        || '11111111111'
+    const defaultGsm = billingProfile?.billing_phone?.trim()
+        || process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim()
+        || '+905555555555'
+    const ipAddress = input.customerIp?.trim() || process.env.IYZICO_DEFAULT_IP?.trim() || '127.0.0.1'
+
+    const pendingOrderInsert = await input.serviceSupabase
+        .from('credit_purchase_orders')
+        .insert({
+            organization_id: input.organizationId,
+            provider: 'iyzico',
+            provider_checkout_id: null,
+            provider_payment_id: null,
+            status: 'pending',
+            credits: toNonNegativeNumber(input.credits),
+            amount_try: toNonNegativeNumber(input.amountTry),
+            currency: 'TRY',
+            paid_at: null,
+            metadata: {
+                ...input.metadata,
+                checkout_locale: resolveRouteLocale(input.locale),
+                callback_url: input.callbackUrl,
+                initiated_by: input.userId,
+                initiated_at: now.toISOString()
+            }
+        })
+        .select('id, metadata')
+        .maybeSingle()
+
+    if (pendingOrderInsert.error || !pendingOrderInsert.data?.id) {
+        console.error('Failed to create pending iyzico order:', pendingOrderInsert.error)
+        return errorResult('request_failed')
+    }
+
+    const orderId = pendingOrderInsert.data.id
+
+    try {
+        const checkoutResult = await initializeIyzicoTopupCheckout({
+            locale: resolveIyzicoLocale(input.locale),
+            conversationId: orderId,
+            callbackUrl: input.callbackUrl,
+            price: toNonNegativeNumber(input.amountTry),
+            paidPrice: toNonNegativeNumber(input.amountTry),
+            currency: 'TRY',
+            basketId: `${input.basketIdPrefix}_${orderId}`,
+            buyer: {
+                id: input.userId,
+                name: nameParts.name,
+                surname: nameParts.surname,
+                identityNumber: defaultIdentity,
+                email: defaultEmail,
+                gsmNumber: defaultGsm,
+                registrationDate: nowFormatted,
+                lastLoginDate: nowFormatted,
+                registrationAddress: defaultAddress,
+                ip: ipAddress,
+                city: defaultCity,
+                country: defaultCountry,
+                zipCode: defaultZipCode
+            },
+            shippingAddress: {
+                contactName,
+                city: defaultCity,
+                country: defaultCountry,
+                address: defaultAddress,
+                zipCode: defaultZipCode
+            },
+            billingAddress: {
+                contactName,
+                city: defaultCity,
+                country: defaultCountry,
+                address: defaultAddress,
+                zipCode: defaultZipCode
+            },
+            basketItems: [
+                {
+                    id: input.basketItemId,
+                    name: input.basketItemName,
+                    category1: 'SaaS',
+                    category2: input.basketCategory2,
+                    itemType: 'VIRTUAL',
+                    price: toNonNegativeNumber(input.amountTry)
+                }
+            ]
+        })
+
+        const checkoutToken = typeof checkoutResult.token === 'string'
+            ? checkoutResult.token.trim()
+            : ''
+        const checkoutFormContent = typeof checkoutResult.checkoutFormContent === 'string'
+            ? checkoutResult.checkoutFormContent
+            : ''
+        const paymentPageUrl = typeof checkoutResult.paymentPageUrl === 'string'
+            ? checkoutResult.paymentPageUrl.trim()
+            : ''
+
+        if (!checkoutToken || !checkoutFormContent) {
+            await input.serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    status: 'failed',
+                    metadata: {
+                        ...asRecord(pendingOrderInsert.data.metadata),
+                        checkout_error: 'missing_checkout_page_url_or_token',
+                        checkout_initialize_response: checkoutResult
+                    }
+                })
+                .eq('id', orderId)
+
+            return errorResult('request_failed')
+        }
+
+        await input.serviceSupabase
+            .from('credit_purchase_orders')
+            .update({
+                provider_checkout_id: checkoutToken,
+                metadata: {
+                    ...asRecord(pendingOrderInsert.data.metadata),
+                    checkout_token: checkoutToken,
+                    checkout_form_content: checkoutFormContent,
+                    checkout_page_url: paymentPageUrl,
+                    checkout_initialize_response: checkoutResult
+                }
+            })
+            .eq('id', orderId)
+
+        return {
+            ok: true,
+            status: 'redirect',
+            error: null,
+            changeType: readString(input.metadata, 'change_type'),
+            effectiveAt: null,
+            redirectUrl: buildLocalizedPath(`${input.redirectPathPrefix}/${orderId}`, input.locale)
+        }
+    } catch (error) {
+        await input.serviceSupabase
+            .from('credit_purchase_orders')
+            .update({
+                status: 'failed',
+                metadata: {
+                    ...asRecord(pendingOrderInsert.data.metadata),
+                    checkout_error: toErrorMessage(error)
+                }
+            })
+            .eq('id', orderId)
+
+        return errorResult(mapIyzicoErrorToCheckoutError(error))
+    }
+}
+
 async function resolveActiveIyzicoSubscriptionRecord(input: {
     tenantSupabase: Awaited<ReturnType<typeof createClient>>
     organizationId: string
@@ -721,6 +856,7 @@ export async function simulateMockSubscriptionCheckout(input: {
     monthlyPriceTry: number
     monthlyCredits: number
     planId?: BillingPlanTierId | null
+    currentMonthlyPriceTry?: number | null
     callbackUrl?: string | null
     locale?: string | null
 }): Promise<MockCheckoutResult> {
@@ -880,102 +1016,57 @@ export async function simulateMockSubscriptionCheckout(input: {
             }
         }
 
-        try {
-            const upgradeResult = await upgradeIyzicoSubscription({
-                conversationId: planChangeConversationId,
-                subscriptionReferenceCode: activeSubscription.provider_subscription_id,
-                newPricingPlanReferenceCode: pricingPlanReferenceCode,
-                upgradePeriod: 'NOW',
-                resetRecurrenceCount: false
-            })
-            const subscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(upgradeResult)
-                ?? activeSubscription.provider_subscription_id
-            const immediateCharge = await resolveImmediateIyzicoUpgradeCharge(subscriptionReferenceCode)
-            const currentUsed = Math.round(toNonNegativeNumber(billing.monthly_package_credit_used))
-            const topupBalance = toNonNegativeNumber(billing.topup_credit_balance)
-            const nextPackageBalance = Math.max(0, requestedCredits - currentUsed)
-            const creditDelta = Math.max(0, requestedCredits - currentCredits)
-            const nowIso = new Date().toISOString()
-            const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
-            const currentMonthlyPriceTry = toNonNegativeNumber(metadata.requested_monthly_price_try)
-            const estimatedChargeAmountTry = Math.max(0, toNonNegativeNumber(input.monthlyPriceTry) - currentMonthlyPriceTry)
-            const periodStart = activeSubscription.period_start ?? null
-            const periodEnd = activeSubscription.period_end ?? null
-
-            await serviceSupabase
-                .from('organization_billing_accounts')
-                .update({
-                    membership_state: 'premium_active',
-                    lock_reason: 'none',
-                    monthly_package_credit_limit: requestedCredits,
-                    monthly_package_credit_used: currentUsed,
-                    current_period_start: periodStart,
-                    current_period_end: periodEnd
-                })
-                .eq('organization_id', input.organizationId)
-
-            await serviceSupabase
-                .from('organization_subscription_records')
-                .update({
-                    provider_subscription_id: subscriptionReferenceCode,
-                    period_start: periodStart,
-                    period_end: periodEnd,
-                    metadata: {
-                        ...metadata,
-                        source: 'iyzico_subscription_upgrade',
-                        change_type: 'upgrade',
-                        conversation_id: planChangeConversationId,
-                        requested_plan_id: planId,
-                        requested_monthly_credits: requestedCredits,
-                        requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
-                        upgraded_at: nowIso,
-                        upgrade_response: upgradeResult
-                    }
-                })
-                .eq('id', activeSubscription.id)
-
-            if (creditDelta > 0) {
-                await serviceSupabase
-                    .from('organization_credit_ledger')
-                    .insert({
-                        organization_id: input.organizationId,
-                        entry_type: 'package_grant',
-                        credit_pool: 'package_pool',
-                        credits_delta: creditDelta,
-                        balance_after: nextPackageBalance + topupBalance,
-                        reason: 'Iyzico subscription upgrade success',
-                        metadata: {
-                            source: 'iyzico_subscription_upgrade',
-                            conversation_id: planChangeConversationId,
-                            subscription_id: activeSubscription.id,
-                            requested_monthly_credits: requestedCredits,
-                            requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
-                            estimated_charge_amount_try: estimatedChargeAmountTry,
-                            change_type: 'upgrade',
-                            ...(immediateCharge.chargedAmountTry !== null && immediateCharge.orderReferenceCode
-                                ? {
-                                    charged_amount_try: immediateCharge.chargedAmountTry,
-                                    order_reference_code: immediateCharge.orderReferenceCode
-                                }
-                                : {}),
-                            ...(immediateCharge.paymentId ? { payment_id: immediateCharge.paymentId } : {}),
-                            ...(immediateCharge.paymentConversationId
-                                ? { payment_conversation_id: immediateCharge.paymentConversationId }
-                                : {})
-                        }
-                    })
-            }
-
-            return {
-                ok: true,
-                status: 'success',
-                error: null,
-                changeType: 'upgrade',
-                effectiveAt: null
-            }
-        } catch (error) {
-            return errorResult(mapIyzicoErrorToCheckoutError(error))
+        const callbackUrl = resolveCheckoutCallbackUrl({
+            action: 'subscribe',
+            callbackUrl: input.callbackUrl,
+            locale: input.locale
+        })
+        if (!callbackUrl) {
+            return errorResult('request_failed')
         }
+
+        const metadata = withoutPendingPlanChange(asRecord(activeSubscription.metadata))
+        const currentMonthlyPriceTry = toNonNegativeNumber(input.currentMonthlyPriceTry)
+            || toNonNegativeNumber(metadata.requested_monthly_price_try)
+        const differenceAmountTry = Math.max(0, toNonNegativeNumber(input.monthlyPriceTry) - currentMonthlyPriceTry)
+        const creditDelta = Math.max(0, requestedCredits - currentCredits)
+
+        if (currentMonthlyPriceTry <= 0 || differenceAmountTry <= 0 || creditDelta <= 0) {
+            return errorResult('request_failed')
+        }
+
+        return startHostedIyzicoOneTimeCheckout({
+            tenantSupabase: supabase,
+            serviceSupabase,
+            userId: user.id,
+            organizationId: input.organizationId,
+            callbackUrl,
+            locale: input.locale,
+            credits: creditDelta,
+            amountTry: differenceAmountTry,
+            metadata: {
+                source: 'iyzico_subscription_upgrade_checkout',
+                checkout_action: 'subscribe',
+                change_type: 'upgrade',
+                conversation_id: planChangeConversationId,
+                subscription_id: activeSubscription.id,
+                subscription_reference_code: activeSubscription.provider_subscription_id,
+                subscription_metadata_snapshot: metadata,
+                target_pricing_plan_reference_code: pricingPlanReferenceCode,
+                requested_plan_id: planId,
+                requested_monthly_credits: requestedCredits,
+                requested_monthly_price_try: toNonNegativeNumber(input.monthlyPriceTry),
+                current_monthly_price_try: currentMonthlyPriceTry,
+                current_period_start: activeSubscription.period_start,
+                current_period_end: activeSubscription.period_end,
+                credit_delta: creditDelta
+            },
+            basketIdPrefix: 'upgrade_difference',
+            basketItemId: `subscription_upgrade_${planId}`,
+            basketItemName: 'Qualy Plan Upgrade Difference',
+            basketCategory2: 'Plan Upgrade',
+            redirectPathPrefix: '/settings/plans/upgrade-checkout'
+        })
     }
 
     const planId = resolvePlanIdFromCredits({
@@ -1094,6 +1185,9 @@ export async function simulateMockSubscriptionCheckout(input: {
         const checkoutFormContent = typeof checkoutResult.checkoutFormContent === 'string'
             ? checkoutResult.checkoutFormContent
             : ''
+        const paymentPageUrl = typeof checkoutResult.paymentPageUrl === 'string'
+            ? checkoutResult.paymentPageUrl.trim()
+            : ''
 
         if (!token || !checkoutFormContent) {
             await serviceSupabase
@@ -1119,6 +1213,7 @@ export async function simulateMockSubscriptionCheckout(input: {
                     organization_name: organization?.name ?? null,
                     checkout_token: token,
                     checkout_form_content: checkoutFormContent,
+                    checkout_page_url: paymentPageUrl,
                     checkout_initialize_response: checkoutResult
                 }
             })

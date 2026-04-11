@@ -7,8 +7,10 @@ import { CheckoutLegalConsentModal } from './CheckoutLegalConsentModal'
 const checkoutLegalMessages = messages.billingPlans.checkoutLegal
 
 describe('CheckoutLegalConsentModal', () => {
-    it('uses provider-calculated copy for direct-upgrade charges', () => {
-        expect(checkoutLegalMessages.details.chargeProviderCalculated).toBe('Tutar Iyzico tarafından değişiklik anında hesaplanır ve kayıtlı ödeme yöntemiyle tahsil edilir.')
+    it('uses hosted-checkout copy for direct-upgrade payment step messaging', () => {
+        expect(checkoutLegalMessages.providerNoticeDirectAction).toBe('Onaydan sonra güvenli Iyzico ödeme ekranına geçersiniz. Kart bilgisi istenirse işlemi orada tamamlarsınız.')
+        expect(checkoutLegalMessages.continueDirectAction).toBe('Ödeme ekranına devam et')
+        expect(checkoutLegalMessages.continueDirectActionWithCharge).toBe('{price} ödeme için devam et')
     })
 
     it('defines a localized pending submit label for direct plan changes', () => {
@@ -64,22 +66,11 @@ describe('CheckoutLegalConsentModal', () => {
                         },
                         {
                             label: 'Bugünkü tahsilat',
-                            value: checkoutLegalMessages.details.chargeProviderCalculated
+                            value: 'Bugün ₺300 plan farkı tahsil edilir.'
                         },
-                        {
-                            label: checkoutLegalMessages.details.savedPaymentMethodLabel,
-                            value: checkoutLegalMessages.details.savedPaymentMethodGeneric
-                        }
                     ]}
                     immediateStartLabel={checkoutLegalMessages.acceptPlanChange}
                     continueLabel={checkoutLegalMessages.continueDirectAction}
-                    secondaryAction={{
-                        label: checkoutLegalMessages.updatePaymentMethodInlineAction,
-                        action: () => {},
-                        hiddenFields: [
-                            { name: 'organizationId', value: 'org_1' }
-                        ]
-                    }}
                     action={() => {}}
                     hiddenFields={[
                         { name: 'organizationId', value: 'org_1' },
@@ -93,15 +84,11 @@ describe('CheckoutLegalConsentModal', () => {
         expect(html).toContain(checkoutLegalMessages.titleDirectAction)
         expect(html).toContain(checkoutLegalMessages.acceptPlanChange)
         expect(html).toContain(checkoutLegalMessages.continueDirectAction)
-        expect(html).toContain(checkoutLegalMessages.details.chargeProviderCalculated)
-        expect(html).toContain(checkoutLegalMessages.savedPaymentMethodBannerNotice)
-        expect(html).toContain(checkoutLegalMessages.savedPaymentMethodBannerHint)
-        expect(html).toContain(checkoutLegalMessages.updatePaymentMethodInlineAction)
-        expect(html).toContain('bg-amber-50')
+        expect(html).toContain(checkoutLegalMessages.providerNoticeDirectAction)
         expect(html).toContain('type="hidden" name="acceptedRequiredDocs" value="accepted"')
         expect(html).not.toContain('₺300 ödeme yap')
-        expect(html).not.toContain('₺300 plan farkı')
         expect(html).not.toContain('okudum ve kabul ediyorum')
-        expect(html).not.toContain('Ödeme bu adımdan sonra Iyzico ekranında tamamlanır.')
+        expect(html).not.toContain('ayrı bir ödeme ekranı açılmaz')
+        expect(html).not.toContain('kayıtlı kartınızdan')
     })
 })

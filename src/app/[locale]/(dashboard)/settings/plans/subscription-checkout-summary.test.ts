@@ -21,7 +21,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         expect(summary.chargeMode).toBe('full_price')
     })
 
-    it('treats higher-tier changes as immediate upgrades with provider-calculated charging', () => {
+    it('treats higher-tier changes as immediate upgrades with a fixed-difference checkout', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -37,7 +37,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
 
         expect(summary.changeType).toBe('upgrade')
         expect(summary.effectiveTiming).toBe('immediate')
-        expect(summary.chargeMode).toBe('provider_calculated')
+        expect(summary.chargeMode).toBe('fixed_difference')
         expect(summary.monthlyPriceDelta).toBe(300)
         expect(summary.creditDelta).toBe(1000)
     })
@@ -62,7 +62,7 @@ describe('resolveSubscriptionCheckoutSummary', () => {
         expect(summary.monthlyPriceDelta).toBe(-300)
     })
 
-    it('builds provider-calculated popup details for immediate upgrades', () => {
+    it('builds fixed-difference popup details for immediate upgrades', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -94,9 +94,6 @@ describe('resolveSubscriptionCheckoutSummary', () => {
             formatCurrency: (value) => `₺${value}`,
             formatCredits: (value) => String(value),
             formatRenewalDate: (value) => value.slice(0, 10),
-            savedPaymentMethod: {
-                type: 'saved_subscription_card'
-            },
             labels: {
                 currentPlan: 'Mevcut plan',
                 newPlan: 'Yeni plan',
@@ -105,11 +102,9 @@ describe('resolveSubscriptionCheckoutSummary', () => {
                 effectiveImmediate: 'Hemen uygulanır.',
                 effectiveNextPeriod: 'Bir sonraki dönem başında uygulanır.',
                 todayChargeLabel: 'Bugünkü tahsilat',
-                chargeProviderCalculated: 'Tutar Iyzico tarafından hesaplanır.',
+                chargeFixedDifference: ({ price }) => `Bugün ${price} tahsil edilir.`,
                 chargeNoCharge: 'Bugün yeni tahsilat yapılmaz.',
                 chargeFullPrice: ({ price }) => `Bugün ${price} tahsil edilir.`,
-                savedPaymentMethodLabel: 'Ödeme yöntemi',
-                savedPaymentMethodGeneric: 'Tahsilat kayıtlı kartınızdan alınır.',
                 todayCreditDeltaLabel: 'Bugün açılacak ek hak',
                 creditDeltaValue: ({ credits }) => `+${credits} kredi`,
                 nextRenewalLabel: 'Bir sonraki yenileme'
@@ -120,14 +115,13 @@ describe('resolveSubscriptionCheckoutSummary', () => {
             { label: 'Mevcut plan', value: 'Temel • ₺349 / ay' },
             { label: 'Yeni plan', value: 'Gelişmiş • ₺649 / ay' },
             { label: 'Geçiş zamanı', value: 'Hemen uygulanır.' },
-            { label: 'Ödeme yöntemi', value: 'Tahsilat kayıtlı kartınızdan alınır.' },
             { label: 'Bugün açılacak ek hak', value: '+1000 kredi' },
             { label: 'Bir sonraki yenileme', value: '2026-05-01' },
-            { label: 'Bugünkü tahsilat', value: 'Tutar Iyzico tarafından hesaplanır.' }
+            { label: 'Bugünkü tahsilat', value: 'Bugün ₺300 tahsil edilir.', emphasis: 'strong' }
         ])
     })
 
-    it('keeps saved-card messaging generic even if masked digits are available later', () => {
+    it('does not render a saved-card summary row for hosted fixed-difference upgrades', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -159,9 +153,6 @@ describe('resolveSubscriptionCheckoutSummary', () => {
             formatCurrency: (value) => `₺${value}`,
             formatCredits: (value) => String(value),
             formatRenewalDate: (value) => value.slice(0, 10),
-            savedPaymentMethod: {
-                type: 'saved_subscription_card'
-            },
             labels: {
                 currentPlan: 'Mevcut plan',
                 newPlan: 'Yeni plan',
@@ -170,24 +161,21 @@ describe('resolveSubscriptionCheckoutSummary', () => {
                 effectiveImmediate: 'Hemen uygulanır.',
                 effectiveNextPeriod: 'Bir sonraki dönem başında uygulanır.',
                 todayChargeLabel: 'Bugünkü tahsilat',
-                chargeProviderCalculated: 'Tutar Iyzico tarafından hesaplanır.',
+                chargeFixedDifference: ({ price }) => `Bugün ${price} tahsil edilir.`,
                 chargeNoCharge: 'Bugün yeni tahsilat yapılmaz.',
                 chargeFullPrice: ({ price }) => `Bugün ${price} tahsil edilir.`,
-                savedPaymentMethodLabel: 'Ödeme yöntemi',
-                savedPaymentMethodGeneric: 'Tahsilat kayıtlı kartınızdan alınır.',
                 todayCreditDeltaLabel: 'Bugün açılacak ek hak',
                 creditDeltaValue: ({ credits }) => `+${credits} kredi`,
                 nextRenewalLabel: 'Bir sonraki yenileme'
             }
         })
 
-        expect(details).toContainEqual({
-            label: 'Ödeme yöntemi',
-            value: 'Tahsilat kayıtlı kartınızdan alınır.'
-        })
+        expect(details).not.toContainEqual(expect.objectContaining({
+            label: 'Ödeme yöntemi'
+        }))
     })
 
-    it('keeps provider-calculated upgrade CTAs neutral instead of quoting a local delta', () => {
+    it('quotes the fixed-difference amount in the upgrade CTA', () => {
         const summary = resolveSubscriptionCheckoutSummary({
             currentPlan: {
                 id: 'starter',
@@ -210,11 +198,11 @@ describe('resolveSubscriptionCheckoutSummary', () => {
             },
             formatCurrency: (value) => `₺${value}`,
             labels: {
-                defaultLabel: 'Plan değişikliğini uygula',
-                chargeLabel: ({ price }) => `${price} ödeme yap`
+                defaultLabel: 'Ödeme ekranına devam et',
+                chargeLabel: ({ price }) => `${price} ödeme için devam et`
             }
         })
 
-        expect(label).toBe('Plan değişikliğini uygula')
+        expect(label).toBe('₺300 ödeme için devam et')
     })
 })

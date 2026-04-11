@@ -19,18 +19,18 @@ describe('subscription plan manager source guard', () => {
         expect(source).toContain("text-[11px] text-amber-700")
     })
 
-    it('wires saved-payment-method copy and update action into the direct upgrade modal', () => {
+    it('does not wire saved-card-only copy into hosted fixed-difference upgrades', () => {
         expect(fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)).toBe(true)
 
         const source = fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)
             ? fs.readFileSync(SUBSCRIPTION_PLAN_MANAGER_PATH, 'utf8')
             : ''
 
-        expect(source).toContain("savedPaymentMethodLabel: tPlans('checkoutLegal.details.savedPaymentMethodLabel')")
-        expect(source).toContain("label: tPlans('checkoutLegal.updatePaymentMethodInlineAction')")
+        expect(source).not.toContain("savedPaymentMethodLabel: tPlans('checkoutLegal.details.savedPaymentMethodLabel')")
+        expect(source).not.toContain("label: tPlans('checkoutLegal.updatePaymentMethodInlineAction')")
     })
 
-    it('uses a dynamic charge-aware CTA label for direct plan changes', () => {
+    it('uses a dynamic charge-aware CTA label for hosted upgrade payments', () => {
         expect(fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)).toBe(true)
 
         const source = fs.existsSync(SUBSCRIPTION_PLAN_MANAGER_PATH)

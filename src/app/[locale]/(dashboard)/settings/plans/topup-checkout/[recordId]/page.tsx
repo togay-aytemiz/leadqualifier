@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
@@ -20,6 +21,7 @@ export default async function TopupCheckoutPage({ params }: TopupCheckoutPagePro
     if (!recordId) {
         notFound()
     }
+    const tPlans = await getTranslations({ locale, namespace: 'billingPlans' })
 
     const supabase = await createClient()
     const { data: orderRecord, error } = await supabase
@@ -37,6 +39,9 @@ export default async function TopupCheckoutPage({ params }: TopupCheckoutPagePro
     const checkoutFormContent = typeof metadata.checkout_form_content === 'string'
         ? metadata.checkout_form_content
         : null
+    const checkoutPageUrl = typeof metadata.checkout_page_url === 'string'
+        ? metadata.checkout_page_url.trim()
+        : null
 
     if (!checkoutFormContent || !checkoutFormContent.trim()) {
         redirect(`${buildLocalizedPath('/settings/plans', locale)}?checkout_action=topup&checkout_status=error&checkout_error=request_failed`)
@@ -44,7 +49,15 @@ export default async function TopupCheckoutPage({ params }: TopupCheckoutPagePro
 
     return (
         <div className="flex min-h-[75vh] items-center justify-center p-4">
-            <HostedCheckoutEmbed checkoutFormContent={checkoutFormContent} />
+            <HostedCheckoutEmbed
+                checkoutFormContent={checkoutFormContent}
+                checkoutPageUrl={checkoutPageUrl}
+                loadingTitle={tPlans('hostedCheckout.loadingTitle')}
+                loadingDescription={tPlans('hostedCheckout.loadingDescription')}
+                fallbackTitle={tPlans('hostedCheckout.fallbackTitle')}
+                fallbackDescription={tPlans('hostedCheckout.fallbackDescription')}
+                fallbackActionLabel={tPlans('hostedCheckout.fallbackAction')}
+            />
         </div>
     )
 }

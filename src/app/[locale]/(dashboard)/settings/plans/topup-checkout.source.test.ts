@@ -19,4 +19,15 @@ describe('top-up checkout page source guard', () => {
         expect(source).toContain('checkout_form_content')
         expect(source).toContain('HostedCheckoutEmbed')
     })
+
+    it('passes the saved iyzico checkout page url into the shared embed fallback', () => {
+        expect(fs.existsSync(TOPUP_CHECKOUT_PAGE_PATH)).toBe(true)
+
+        const source = fs.existsSync(TOPUP_CHECKOUT_PAGE_PATH)
+            ? fs.readFileSync(TOPUP_CHECKOUT_PAGE_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('checkout_page_url')
+        expect(source).toContain('checkoutPageUrl={checkoutPageUrl}')
+    })
 })

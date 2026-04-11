@@ -143,7 +143,7 @@ export function CheckoutLegalConsentModal({
             : tPlans('checkoutLegal.description')
     )
     const resolvedProviderNotice = isPlanChangeConsent
-        ? providerNotice
+        ? (providerNotice ?? tPlans('checkoutLegal.providerNoticeDirectAction'))
         : (providerNotice ?? tPlans('checkoutLegal.providerNotice'))
     const resolvedImmediateStartLabel = immediateStartLabel ?? (
         isPlanChangeConsent

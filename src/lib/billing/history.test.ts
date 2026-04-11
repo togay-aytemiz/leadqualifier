@@ -143,6 +143,59 @@ describe('buildBillingHistoryRows', () => {
         ])
     })
 
+    it('shows a fixed-difference upgrade charge when the hosted checkout order is linked', () => {
+        const entries: BillingLedgerEntry[] = [
+            {
+                id: 'ledger_upgrade_difference',
+                entryType: 'package_grant',
+                creditPool: 'package_pool',
+                creditsDelta: 1000,
+                balanceAfter: 2000,
+                reason: 'Iyzico subscription upgrade success',
+                metadata: {
+                    source: 'iyzico_subscription_upgrade_checkout',
+                    subscription_id: 'sub_1',
+                    change_type: 'upgrade',
+                    charged_amount_try: 300,
+                    order_id: 'order_upgrade_1',
+                    requested_monthly_price_try: 649
+                },
+                createdAt: '2026-04-10T12:00:00.000Z'
+            }
+        ]
+
+        const rows = buildBillingHistoryRows({
+            entries,
+            subscriptions: new Map([
+                ['sub_1', { metadata: { change_type: 'upgrade', requested_monthly_price_try: 649 } }]
+            ]),
+            orders: new Map([
+                ['order_upgrade_1', { credits: 1000, amountTry: 300, currency: 'TRY' }]
+            ]),
+            formatDate: (value) => value.slice(0, 10),
+            formatCurrency: (amount, currency) => `${currency ?? 'TRY'} ${amount}`,
+            labels: {
+                statusSuccess: 'Success',
+                amountUnavailable: '—',
+                packageStart: 'Package start',
+                packageUpgrade: 'Package upgrade',
+                packageRenewal: 'Package renewal',
+                packageUpdate: 'Package update',
+                topupPurchase: 'Credit purchase'
+            }
+        })
+
+        expect(rows).toEqual([
+            {
+                id: 'ledger_upgrade_difference',
+                dateLabel: '2026-04-10',
+                amountLabel: 'TRY 300',
+                statusLabel: 'Success',
+                detailLabel: 'Package upgrade'
+            }
+        ])
+    })
+
     it('does not trust stale local upgrade charge metadata without a provider order reference', () => {
         const entries: BillingLedgerEntry[] = [
             {

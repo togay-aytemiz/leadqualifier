@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import {
     retrieveIyzicoSubscriptionCheckoutResult,
-    retrieveIyzicoTopupCheckoutResult
+    retrieveIyzicoTopupCheckoutResult,
+    upgradeIyzicoSubscription
 } from '@/lib/billing/providers/iyzico/client'
 import {
     extractIyzicoCheckoutPaymentConversationId,
@@ -51,6 +52,19 @@ function toNonNegativeNumber(value: unknown) {
     const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     if (!Number.isFinite(parsed)) return 0
     return Math.max(0, parsed)
+}
+
+function readString(record: Record<string, unknown>, key: string) {
+    const value = record[key]
+    return typeof value === 'string' && value.trim().length > 0
+        ? value.trim()
+        : null
+}
+
+function readRecord(record: Record<string, unknown>, key: string) {
+    const value = record[key]
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
 }
 
 function resolveLocale(value: unknown): 'tr' | 'en' {
@@ -160,6 +174,18 @@ async function findSubscriptionRecordByToken(serviceSupabase: ReturnType<typeof 
     return data as SubscriptionRecordRow
 }
 
+function resolveOrderCheckoutRedirectContext(order: CreditPurchaseOrderRow) {
+    const metadata = asRecord(order.metadata)
+    const action: 'subscribe' | 'topup' = readString(metadata, 'checkout_action') === 'subscribe'
+        ? 'subscribe'
+        : 'topup'
+
+    return {
+        action,
+        changeType: readString(metadata, 'change_type')
+    }
+}
+
 async function processTopupCallback(input: {
     req: NextRequest
     serviceSupabase: ReturnType<typeof createServiceRoleClient>
@@ -167,75 +193,303 @@ async function processTopupCallback(input: {
     order: CreditPurchaseOrderRow
     locale: 'tr' | 'en'
 }) {
+    const redirectContext = resolveOrderCheckoutRedirectContext(input.order)
+    const orderMetadata = asRecord(input.order.metadata)
+    const isUpgradeCheckout = readString(orderMetadata, 'source') === 'iyzico_subscription_upgrade_checkout'
+
     if (!input.serviceSupabase) {
         return NextResponse.redirect(buildPlansRedirectUrl({
             req: input.req,
             locale: input.locale,
-            action: 'topup',
+            action: redirectContext.action,
             status: 'error',
             error: 'request_failed'
         }))
     }
 
     if (input.order.status === 'paid') {
+        if (isUpgradeCheckout && readString(orderMetadata, 'upgrade_apply_status') !== 'success') {
+            return NextResponse.redirect(buildPlansRedirectUrl({
+                req: input.req,
+                locale: input.locale,
+                action: redirectContext.action,
+                status: 'error',
+                changeType: redirectContext.changeType,
+                error: 'request_failed'
+            }))
+        }
+
         return NextResponse.redirect(buildPlansRedirectUrl({
             req: input.req,
             locale: input.locale,
-            action: 'topup',
-            status: 'success'
+            action: redirectContext.action,
+            status: 'success',
+            changeType: redirectContext.changeType
         }))
     }
 
-    const conversationId = input.order.id
-    let checkoutResult: Awaited<ReturnType<typeof retrieveIyzicoTopupCheckoutResult>>
-    try {
-        checkoutResult = await retrieveIyzicoTopupCheckoutResult(input.token, conversationId)
-    } catch (error) {
-        await input.serviceSupabase
-            .from('credit_purchase_orders')
-            .update({
-                status: 'failed',
-                metadata: {
-                    ...asRecord(input.order.metadata),
-                    callback_token: input.token,
-                    callback_processed_at: new Date().toISOString(),
-                    callback_error: error instanceof Error ? error.message : 'Unknown iyzico callback error'
-                }
-            })
-            .eq('id', input.order.id)
+    const persistedScheduleResponse = readRecord(orderMetadata, 'upgrade_schedule_response')
+    const persistedPaymentStatus = readString(orderMetadata, 'payment_status')?.toUpperCase() ?? ''
+    const persistedPaymentId = readString(orderMetadata, 'payment_id')
+    const persistedPaymentConversationId = readString(orderMetadata, 'payment_conversation_id')
+    const persistedCallbackResponse = readRecord(orderMetadata, 'callback_retrieve_response')
+    const canReusePersistedUpgradePayment = Boolean(
+        isUpgradeCheckout
+        && persistedScheduleResponse
+        && persistedPaymentStatus === 'SUCCESS'
+        && persistedPaymentId
+    )
 
-        return NextResponse.redirect(buildPlansRedirectUrl({
-            req: input.req,
-            locale: input.locale,
-            action: 'topup',
-            status: 'failed',
-            error: mapIyzicoProviderFailureToCheckoutError(error) ?? 'request_failed'
-        }))
+    let checkoutResult: unknown = persistedCallbackResponse
+        ?? {
+            paymentStatus: persistedPaymentStatus,
+            paymentId: persistedPaymentId,
+            paymentConversationId: persistedPaymentConversationId
+        }
+    let paymentStatus = persistedPaymentStatus
+    let paymentId = persistedPaymentId ?? input.token
+    let paymentConversationId = persistedPaymentConversationId
+
+    if (!canReusePersistedUpgradePayment) {
+        const conversationId = input.order.id
+        try {
+            checkoutResult = await retrieveIyzicoTopupCheckoutResult(input.token, conversationId)
+        } catch (error) {
+            await input.serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    status: 'failed',
+                    metadata: {
+                        ...orderMetadata,
+                        callback_token: input.token,
+                        callback_processed_at: new Date().toISOString(),
+                        callback_error: error instanceof Error ? error.message : 'Unknown iyzico callback error'
+                    }
+                })
+                .eq('id', input.order.id)
+
+            return NextResponse.redirect(buildPlansRedirectUrl({
+                req: input.req,
+                locale: input.locale,
+                action: redirectContext.action,
+                status: 'failed',
+                changeType: redirectContext.changeType,
+                error: mapIyzicoProviderFailureToCheckoutError(error) ?? 'request_failed'
+            }))
+        }
+
+        paymentStatus = typeof asRecord(checkoutResult).paymentStatus === 'string'
+            ? String(asRecord(checkoutResult).paymentStatus).toUpperCase()
+            : ''
+
+        if (paymentStatus !== 'SUCCESS') {
+            await input.serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    status: 'failed',
+                    metadata: {
+                        ...orderMetadata,
+                        callback_token: input.token,
+                        callback_processed_at: new Date().toISOString(),
+                        callback_retrieve_response: checkoutResult
+                    }
+                })
+                .eq('id', input.order.id)
+
+            return NextResponse.redirect(buildPlansRedirectUrl({
+                req: input.req,
+                locale: input.locale,
+                action: redirectContext.action,
+                status: 'failed',
+                changeType: redirectContext.changeType,
+                error: mapIyzicoProviderFailureToCheckoutError(checkoutResult) ?? null
+            }))
+        }
+
+        paymentId = typeof asRecord(checkoutResult).paymentId === 'string' && String(asRecord(checkoutResult).paymentId).trim()
+            ? String(asRecord(checkoutResult).paymentId).trim()
+            : typeof asRecord(checkoutResult).iyziReferenceCode === 'string' && String(asRecord(checkoutResult).iyziReferenceCode).trim()
+                ? String(asRecord(checkoutResult).iyziReferenceCode).trim()
+                : input.token
+        paymentConversationId = extractIyzicoCheckoutPaymentConversationId(checkoutResult)
     }
-    const paymentStatus = typeof checkoutResult.paymentStatus === 'string'
-        ? checkoutResult.paymentStatus.toUpperCase()
-        : ''
 
-    if (paymentStatus !== 'SUCCESS') {
-        await input.serviceSupabase
-            .from('credit_purchase_orders')
-            .update({
-                status: 'failed',
-                metadata: {
-                    ...asRecord(input.order.metadata),
-                    callback_token: input.token,
-                    callback_processed_at: new Date().toISOString(),
-                    callback_retrieve_response: checkoutResult
-                }
-            })
-            .eq('id', input.order.id)
+    const nowIso = new Date().toISOString()
+
+    if (isUpgradeCheckout) {
+        const subscriptionId = readString(orderMetadata, 'subscription_id')
+        const subscriptionReferenceCode = readString(orderMetadata, 'subscription_reference_code')
+        const targetPricingPlanReferenceCode = readString(orderMetadata, 'target_pricing_plan_reference_code')
+        const requestedPlanId = readString(orderMetadata, 'requested_plan_id')
+        const requestedCredits = Math.round(toNonNegativeNumber(orderMetadata.requested_monthly_credits))
+        const requestedPriceTry = toNonNegativeNumber(orderMetadata.requested_monthly_price_try)
+        const creditDelta = Math.max(
+            0,
+            Math.round(toNonNegativeNumber(orderMetadata.credit_delta) || toNonNegativeNumber(input.order.credits))
+        )
+        const currentPeriodStart = readString(orderMetadata, 'current_period_start')
+        const currentPeriodEnd = readString(orderMetadata, 'current_period_end')
+        const conversationId = readString(orderMetadata, 'conversation_id')
+            ?? (subscriptionId && requestedPlanId ? `subscription_change_${subscriptionId}_${requestedPlanId}` : null)
+        const subscriptionMetadataSnapshot = asRecord(orderMetadata.subscription_metadata_snapshot)
+
+        if (
+            !subscriptionId
+            || !subscriptionReferenceCode
+            || !targetPricingPlanReferenceCode
+            || !requestedPlanId
+            || !conversationId
+            || requestedCredits <= 0
+            || requestedPriceTry <= 0
+            || creditDelta <= 0
+        ) {
+            await input.serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    provider_payment_id: paymentId,
+                    paid_at: nowIso,
+                    metadata: {
+                        ...orderMetadata,
+                        callback_token: input.token,
+                        callback_processed_at: nowIso,
+                        payment_status: paymentStatus,
+                        payment_id: paymentId,
+                        payment_conversation_id: paymentConversationId,
+                        callback_retrieve_response: checkoutResult,
+                        upgrade_apply_status: 'failed',
+                        upgrade_apply_error: 'missing_upgrade_metadata'
+                    }
+                })
+                .eq('id', input.order.id)
+
+            return NextResponse.redirect(buildPlansRedirectUrl({
+                req: input.req,
+                locale: input.locale,
+                action: redirectContext.action,
+                status: 'error',
+                changeType: redirectContext.changeType,
+                error: 'request_failed'
+            }))
+        }
+
+        let latestOrderMetadata = orderMetadata
+        let scheduleResult = persistedScheduleResponse
+
+        if (!scheduleResult) {
+            let providerScheduleResult: Awaited<ReturnType<typeof upgradeIyzicoSubscription>>
+            try {
+                providerScheduleResult = await upgradeIyzicoSubscription({
+                    conversationId,
+                    subscriptionReferenceCode,
+                    newPricingPlanReferenceCode: targetPricingPlanReferenceCode,
+                    upgradePeriod: 'NEXT_PERIOD',
+                    resetRecurrenceCount: false
+                })
+            } catch (error) {
+                await input.serviceSupabase
+                    .from('credit_purchase_orders')
+                    .update({
+                        provider_payment_id: paymentId,
+                        paid_at: nowIso,
+                        metadata: {
+                            ...orderMetadata,
+                            callback_token: input.token,
+                            callback_processed_at: nowIso,
+                            payment_status: paymentStatus,
+                            payment_id: paymentId,
+                            payment_conversation_id: paymentConversationId,
+                            callback_retrieve_response: checkoutResult,
+                            upgrade_apply_status: 'failed',
+                            upgrade_apply_error: error instanceof Error ? error.message : 'upgrade scheduling failed'
+                        }
+                    })
+                    .eq('id', input.order.id)
+
+                return NextResponse.redirect(buildPlansRedirectUrl({
+                    req: input.req,
+                    locale: input.locale,
+                    action: redirectContext.action,
+                    status: 'error',
+                    changeType: redirectContext.changeType,
+                    error: 'request_failed'
+                }))
+            }
+
+            scheduleResult = asRecord(providerScheduleResult)
+            latestOrderMetadata = {
+                ...orderMetadata,
+                callback_token: input.token,
+                callback_processed_at: nowIso,
+                payment_status: paymentStatus,
+                payment_id: paymentId,
+                payment_conversation_id: paymentConversationId,
+                callback_retrieve_response: checkoutResult,
+                upgrade_apply_status: 'scheduled',
+                upgrade_schedule_response: providerScheduleResult
+            }
+
+            const schedulePersistResult = await input.serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    provider_payment_id: paymentId,
+                    paid_at: nowIso,
+                    metadata: latestOrderMetadata
+                })
+                .eq('id', input.order.id)
+
+            if (schedulePersistResult.error) {
+                return NextResponse.redirect(buildPlansRedirectUrl({
+                    req: input.req,
+                    locale: input.locale,
+                    action: redirectContext.action,
+                    status: 'error',
+                    changeType: redirectContext.changeType,
+                    error: 'request_failed'
+                }))
+            }
+        }
+
+        const nextSubscriptionReferenceCode = extractIyzicoSubscriptionReferenceCode(scheduleResult) ?? subscriptionReferenceCode
+        const applyResult = await input.serviceSupabase.rpc('apply_iyzico_subscription_upgrade_checkout_success', {
+            target_order_id: input.order.id,
+            next_subscription_reference_code: nextSubscriptionReferenceCode,
+            payment_conversation_id: paymentConversationId,
+            upgrade_schedule_response: scheduleResult,
+            callback_retrieve_response: checkoutResult,
+            applied_at: nowIso
+        })
+
+        const applyResultRecord = asRecord(applyResult.data)
+        if (applyResult.error || applyResultRecord.ok !== true) {
+            await input.serviceSupabase
+                .from('credit_purchase_orders')
+                .update({
+                    provider_payment_id: paymentId,
+                    paid_at: nowIso,
+                    metadata: {
+                        ...latestOrderMetadata,
+                        upgrade_apply_status: 'failed',
+                        upgrade_apply_error: applyResult.error?.message ?? 'upgrade apply failed'
+                    }
+                })
+                .eq('id', input.order.id)
+
+            return NextResponse.redirect(buildPlansRedirectUrl({
+                req: input.req,
+                locale: input.locale,
+                action: redirectContext.action,
+                status: 'error',
+                changeType: redirectContext.changeType,
+                error: 'request_failed'
+            }))
+        }
 
         return NextResponse.redirect(buildPlansRedirectUrl({
             req: input.req,
             locale: input.locale,
-            action: 'topup',
-            status: 'failed',
-            error: mapIyzicoProviderFailureToCheckoutError(checkoutResult) ?? null
+            action: redirectContext.action,
+            status: 'success',
+            changeType: redirectContext.changeType
         }))
     }
 
@@ -249,7 +503,7 @@ async function processTopupCallback(input: {
         return NextResponse.redirect(buildPlansRedirectUrl({
             req: input.req,
             locale: input.locale,
-            action: 'topup',
+            action: redirectContext.action,
             status: 'error',
             error: 'request_failed'
         }))
@@ -263,12 +517,6 @@ async function processTopupCallback(input: {
         0,
         toNonNegativeNumber(billing.monthly_package_credit_limit) - toNonNegativeNumber(billing.monthly_package_credit_used)
     )
-    const paymentId = typeof checkoutResult.paymentId === 'string' && checkoutResult.paymentId.trim()
-        ? checkoutResult.paymentId.trim()
-        : typeof checkoutResult.iyziReferenceCode === 'string' && checkoutResult.iyziReferenceCode.trim()
-            ? checkoutResult.iyziReferenceCode.trim()
-            : input.token
-    const paymentConversationId = extractIyzicoCheckoutPaymentConversationId(checkoutResult)
 
     await input.serviceSupabase
         .from('organization_billing_accounts')
@@ -283,12 +531,13 @@ async function processTopupCallback(input: {
         .update({
             status: 'paid',
             provider_payment_id: paymentId,
-            paid_at: new Date().toISOString(),
+            paid_at: nowIso,
             metadata: {
-                ...asRecord(input.order.metadata),
+                ...orderMetadata,
                 callback_token: input.token,
-                callback_processed_at: new Date().toISOString(),
+                callback_processed_at: nowIso,
                 payment_status: paymentStatus,
+                payment_id: paymentId,
                 payment_conversation_id: paymentConversationId,
                 callback_retrieve_response: checkoutResult
             }
@@ -314,8 +563,9 @@ async function processTopupCallback(input: {
     return NextResponse.redirect(buildPlansRedirectUrl({
         req: input.req,
         locale: input.locale,
-        action: 'topup',
-        status: 'success'
+        action: redirectContext.action,
+        status: 'success',
+        changeType: redirectContext.changeType
     }))
 }
 
