@@ -4,6 +4,7 @@ import {
     buildAvailabilitySlots,
     findAlternativeAvailabilitySlots,
     isSlotAvailable,
+    isSlotWithinAvailabilityRules,
     type BookingBusyRange,
     type WeeklyAvailabilityRule
 } from '@/lib/calendar/availability'
@@ -54,6 +55,48 @@ describe('buildAvailabilitySlots', () => {
             '2026-03-18T08:00:00.000Z'
         ])
     })
+
+    it('anchors generated starts to the weekly window slot grid instead of the lookup start minute', () => {
+        const slots = buildAvailabilitySlots({
+            rangeEndIso: '2026-03-18T12:00:00.000Z',
+            rangeStartIso: '2026-03-18T10:07:00.000Z',
+            rules: [
+                {
+                    active: true,
+                    dayOfWeek: 3,
+                    endMinute: 11 * 60 + 45,
+                    startMinute: 9 * 60 + 15
+                }
+            ],
+            serviceDurationMinutes: 30,
+            slotIntervalMinutes: 30,
+            timezone: 'UTC'
+        })
+
+        expect(slots).toEqual([
+            '2026-03-18T10:15:00.000Z',
+            '2026-03-18T10:45:00.000Z',
+            '2026-03-18T11:15:00.000Z'
+        ])
+    })
+})
+
+describe('isSlotWithinAvailabilityRules', () => {
+    it('treats a booking ending exactly at local midnight as inside the starting day rule', () => {
+        expect(isSlotWithinAvailabilityRules({
+            bookingEndIso: '2026-03-19T00:00:00.000Z',
+            bookingStartIso: '2026-03-18T23:00:00.000Z',
+            rules: [
+                {
+                    active: true,
+                    dayOfWeek: 3,
+                    endMinute: 1440,
+                    startMinute: 23 * 60
+                }
+            ],
+            timezone: 'UTC'
+        })).toBe(true)
+    })
 })
 
 describe('isSlotAvailable', () => {
@@ -83,6 +126,85 @@ describe('isSlotAvailable', () => {
         })).toBe(true)
     })
 
+    it('allows an internal overlap while peak existing occupancy stays below capacity', () => {
+        const blockedRanges: BookingBusyRange[] = [
+            {
+                endIso: '2026-04-15T10:00:00.000Z',
+                source: 'internal_booking',
+                startIso: '2026-04-15T09:00:00.000Z'
+            }
+        ]
+
+        expect(isSlotAvailable({
+            blockedRanges,
+            bookingEndIso: '2026-04-15T10:30:00.000Z',
+            bookingStartIso: '2026-04-15T09:30:00.000Z',
+            maxConcurrentBookings: 2
+        })).toBe(true)
+    })
+
+    it('allows sequential existing bookings inside a candidate range when they never exceed capacity together', () => {
+        const blockedRanges: BookingBusyRange[] = [
+            {
+                endIso: '2026-04-15T10:00:00.000Z',
+                source: 'internal_booking',
+                startIso: '2026-04-15T09:00:00.000Z'
+            },
+            {
+                endIso: '2026-04-15T11:00:00.000Z',
+                source: 'internal_booking',
+                startIso: '2026-04-15T10:00:00.000Z'
+            }
+        ]
+
+        expect(isSlotAvailable({
+            blockedRanges,
+            bookingEndIso: '2026-04-15T11:30:00.000Z',
+            bookingStartIso: '2026-04-15T09:30:00.000Z',
+            maxConcurrentBookings: 2
+        })).toBe(true)
+    })
+
+    it('blocks when peak existing internal occupancy reaches the capacity limit', () => {
+        const blockedRanges: BookingBusyRange[] = [
+            {
+                endIso: '2026-04-15T10:30:00.000Z',
+                source: 'internal_booking',
+                startIso: '2026-04-15T09:00:00.000Z'
+            },
+            {
+                endIso: '2026-04-15T10:30:00.000Z',
+                source: 'internal_booking',
+                startIso: '2026-04-15T09:15:00.000Z'
+            }
+        ]
+
+        expect(isSlotAvailable({
+            blockedRanges,
+            bookingEndIso: '2026-04-15T10:30:00.000Z',
+            bookingStartIso: '2026-04-15T09:30:00.000Z',
+            maxConcurrentBookings: 2
+        })).toBe(false)
+    })
+
+    it('blocks a later existing booking that falls inside the candidate after-buffer', () => {
+        const blockedRanges: BookingBusyRange[] = [
+            {
+                endIso: '2026-04-15T12:00:00.000Z',
+                source: 'internal_booking',
+                startIso: '2026-04-15T11:05:00.000Z'
+            }
+        ]
+
+        expect(isSlotAvailable({
+            blockedRanges,
+            bufferAfterMinutes: 15,
+            bookingEndIso: '2026-04-15T11:00:00.000Z',
+            bookingStartIso: '2026-04-15T10:00:00.000Z',
+            maxConcurrentBookings: 1
+        })).toBe(false)
+    })
+
     it('blocks ranges returned by Google freebusy overlays', () => {
         const blockedRanges: BookingBusyRange[] = [
             {
@@ -95,7 +217,8 @@ describe('isSlotAvailable', () => {
         expect(isSlotAvailable({
             blockedRanges,
             bookingEndIso: '2026-03-18T07:30:00.000Z',
-            bookingStartIso: '2026-03-18T06:30:00.000Z'
+            bookingStartIso: '2026-03-18T06:30:00.000Z',
+            maxConcurrentBookings: 3
         })).toBe(false)
     })
 })

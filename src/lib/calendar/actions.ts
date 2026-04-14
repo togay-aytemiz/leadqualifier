@@ -17,6 +17,7 @@ import type {
   CreateCalendarBookingInput,
   UpdateCalendarBookingInput,
 } from '@/lib/calendar/types'
+import { withDevTiming } from '@/lib/performance/timing'
 
 function buildDefaultCalendarRange() {
   const now = new Date()
@@ -33,9 +34,11 @@ function buildDefaultCalendarRange() {
   }
 }
 
-async function requireOrganizationContext() {
+async function requireOrganizationContext(timingLabel?: string) {
   const supabase = await createClient()
-  const context = await resolveActiveOrganizationContext(supabase)
+  const context = timingLabel
+    ? await withDevTiming(timingLabel, () => resolveActiveOrganizationContext(supabase))
+    : await resolveActiveOrganizationContext(supabase)
   const organizationId = context?.activeOrganizationId ?? null
 
   if (!organizationId) {
@@ -52,13 +55,18 @@ export async function getCalendarPageData(input?: {
   rangeStartIso?: string
   rangeEndIso?: string
 }) {
-  const { supabase, organizationId } = await requireOrganizationContext()
+  const { supabase, organizationId } = await requireOrganizationContext(
+    'calendar.action.getPageData.requireOrg'
+  )
   const fallbackRange = buildDefaultCalendarRange()
 
-  return getCalendarPageDataByOrganizationId(supabase, organizationId, {
-    rangeStartIso: input?.rangeStartIso ?? fallbackRange.rangeStartIso,
-    rangeEndIso: input?.rangeEndIso ?? fallbackRange.rangeEndIso,
-  })
+  return withDevTiming(
+    'calendar.action.getPageData.data',
+    () => getCalendarPageDataByOrganizationId(supabase, organizationId, {
+      rangeStartIso: input?.rangeStartIso ?? fallbackRange.rangeStartIso,
+      rangeEndIso: input?.rangeEndIso ?? fallbackRange.rangeEndIso,
+    })
+  )
 }
 
 export async function getCalendarAvailability(input: BookingAvailabilityLookupInput) {

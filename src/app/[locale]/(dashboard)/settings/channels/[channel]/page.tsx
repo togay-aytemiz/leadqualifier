@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 
@@ -15,11 +16,20 @@ import {
     getOrganizationOnboardingState,
     isChannelConnectionPrerequisitesComplete
 } from '@/lib/onboarding/state'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import Link from 'next/link'
 
 function getLocalizedHref(locale: string, href: string) {
     if (locale === 'tr') return href
     return `/${locale}${href}`
+}
+
+function ChannelsPageIntlProvider({ children }: { children: ReactNode }) {
+    return (
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['Channels']}>
+            {children}
+        </DashboardRouteIntlProvider>
+    )
 }
 
 interface ChannelSetupPageProps {
@@ -72,71 +82,81 @@ export default async function ChannelSetupPage({ params }: ChannelSetupPageProps
         const channelTitle = tChannels(`types.${catalogEntry.type}`)
 
         return (
-            <ChannelOnboardingShell
-                channelType={catalogEntry.type}
-                pageTitle={tChannels('onboarding.pageTitle', { channel: channelTitle })}
-                backHref={getLocalizedHref(locale, '/settings/channels')}
-                backLabel={tChannels('onboarding.back')}
-                banner={
-                    <ChannelsOnboardingLockBanner
-                        message={tChannels('channelConnectionLocked.message')}
-                        description={tChannels('channelConnectionLocked.description')}
-                        ctaLabel={tChannels('channelConnectionLocked.goToOnboarding')}
-                        ctaHref={getLocalizedHref(locale, '/onboarding')}
-                    />
-                }
-            >
-                <div className="rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-                    <p className="text-sm leading-7 text-slate-600">
-                        {tChannels('channelConnectionLocked.pageDescription', { channel: channelTitle })}
-                    </p>
-                    <div className="mt-4">
-                        <Link
-                            href={getLocalizedHref(locale, '/onboarding')}
-                            className="inline-flex h-10 items-center justify-center rounded-lg border border-violet-600 bg-violet-600 px-4 text-sm font-medium text-white transition-colors hover:bg-violet-700"
-                        >
-                            {tChannels('channelConnectionLocked.goToOnboarding')}
-                        </Link>
+            <ChannelsPageIntlProvider>
+                <ChannelOnboardingShell
+                    channelType={catalogEntry.type}
+                    pageTitle={tChannels('onboarding.pageTitle', { channel: channelTitle })}
+                    backHref={getLocalizedHref(locale, '/settings/channels')}
+                    backLabel={tChannels('onboarding.back')}
+                    banner={
+                        <ChannelsOnboardingLockBanner
+                            message={tChannels('channelConnectionLocked.message')}
+                            description={tChannels('channelConnectionLocked.description')}
+                            ctaLabel={tChannels('channelConnectionLocked.goToOnboarding')}
+                            ctaHref={getLocalizedHref(locale, '/onboarding')}
+                        />
+                    }
+                >
+                    <div className="rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+                        <p className="text-sm leading-7 text-slate-600">
+                            {tChannels('channelConnectionLocked.pageDescription', { channel: channelTitle })}
+                        </p>
+                        <div className="mt-4">
+                            <Link
+                                href={getLocalizedHref(locale, '/onboarding')}
+                                className="inline-flex h-10 items-center justify-center rounded-lg border border-violet-600 bg-violet-600 px-4 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+                            >
+                                {tChannels('channelConnectionLocked.goToOnboarding')}
+                            </Link>
+                        </div>
                     </div>
-                </div>
-            </ChannelOnboardingShell>
+                </ChannelOnboardingShell>
+            </ChannelsPageIntlProvider>
         )
     }
 
     if (catalogEntry.type === 'whatsapp') {
         return (
-            <WhatsAppOnboardingPage
-                organizationId={organizationId}
-                channel={selectedChannel}
-                isReadOnly={isReadOnly}
-            />
+            <ChannelsPageIntlProvider>
+                <WhatsAppOnboardingPage
+                    organizationId={organizationId}
+                    channel={selectedChannel}
+                    isReadOnly={isReadOnly}
+                />
+            </ChannelsPageIntlProvider>
         )
     }
 
     if (catalogEntry.type === 'telegram') {
         return (
-            <TelegramOnboardingPage
-                organizationId={organizationId}
-                channel={selectedChannel}
-                isReadOnly={isReadOnly}
-            />
+            <ChannelsPageIntlProvider>
+                <TelegramOnboardingPage
+                    organizationId={organizationId}
+                    channel={selectedChannel}
+                    isReadOnly={isReadOnly}
+                />
+            </ChannelsPageIntlProvider>
         )
     }
 
     if (catalogEntry.type === 'instagram') {
         return (
-            <InstagramOnboardingPage
-                organizationId={organizationId}
-                channel={selectedChannel}
-                isReadOnly={isReadOnly}
-            />
+            <ChannelsPageIntlProvider>
+                <InstagramOnboardingPage
+                    organizationId={organizationId}
+                    channel={selectedChannel}
+                    isReadOnly={isReadOnly}
+                />
+            </ChannelsPageIntlProvider>
         )
     }
 
     return (
-        <ChannelPlaceholderOnboardingPage
-            type={catalogEntry.type}
-            channel={selectedChannel}
-        />
+        <ChannelsPageIntlProvider>
+            <ChannelPlaceholderOnboardingPage
+                type={catalogEntry.type}
+                channel={selectedChannel}
+            />
+        </ChannelsPageIntlProvider>
     )
 }

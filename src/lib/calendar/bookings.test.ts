@@ -130,6 +130,7 @@ function createBlockedRangesBuilder(result: unknown, error: { message?: string }
     builder: {
       select: selectMock,
     },
+    ltMock,
     gtMock,
   }
 }
@@ -225,6 +226,7 @@ describe('calendar bookings hardening', () => {
       expect.objectContaining({
         organization_id: 'org-1',
         booking_enabled: false,
+        max_concurrent_bookings: 1,
         timezone: 'Europe/Istanbul',
       })
     )
@@ -344,6 +346,175 @@ describe('calendar bookings hardening', () => {
 
     expect(result.exactMatchAvailable).toBe(false)
     expect(result.availableSlots[0]).toBe('2026-03-17T11:00:00.000Z')
+  })
+
+  it('allows availability slots that overlap one internal booking when org capacity is two', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-17T09:00:00.000Z'))
+
+    const settingsLookup = createMaybeSingleBuilder({
+      organization_id: 'org-1',
+      booking_enabled: true,
+      timezone: 'UTC',
+      default_booking_duration_minutes: 60,
+      slot_interval_minutes: 30,
+      minimum_notice_minutes: 0,
+      buffer_before_minutes: 0,
+      buffer_after_minutes: 0,
+      max_concurrent_bookings: 2,
+      google_busy_overlay_enabled: false,
+      google_write_through_enabled: false,
+      created_at: '2026-03-17T10:00:00.000Z',
+      updated_at: '2026-03-17T10:00:00.000Z',
+    })
+    const rulesLookup = createOrderedListBuilder([
+      {
+        id: 'rule-1',
+        organization_id: 'org-1',
+        day_of_week: 3,
+        start_minute: 0,
+        end_minute: 1440,
+        label: 'Wednesday',
+        active: true,
+        created_at: '2026-03-17T10:00:00.000Z',
+        updated_at: '2026-03-17T10:00:00.000Z',
+      },
+    ])
+    const connectionLookup = createMaybeSingleBuilder(null)
+    const blockedRangesLookup = createBlockedRangesBuilder([
+      {
+        id: 'booking-1',
+        starts_at: '2026-03-18T10:00:00.000Z',
+        ends_at: '2026-03-18T11:00:00.000Z',
+      },
+    ])
+
+    const supabase = createSupabaseMock({
+      booking_settings: [settingsLookup.builder],
+      booking_availability_rules: [rulesLookup.builder],
+      calendar_connections: [connectionLookup.builder],
+      calendar_bookings: [blockedRangesLookup.builder],
+    })
+
+    const result = await lookupBookingAvailability(supabase as never, 'org-1', {
+      rangeStartIso: '2026-03-18T10:00:00.000Z',
+      rangeEndIso: '2026-03-18T12:00:00.000Z',
+      serviceCatalogId: null,
+    })
+
+    expect(result.availableSlots).toContain('2026-03-18T10:00:00.000Z')
+    expect(result.availableSlots).toContain('2026-03-18T10:30:00.000Z')
+  })
+
+  it('loads blocking bookings from a buffer-padded range so buffer-only conflicts are checked', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-17T09:00:00.000Z'))
+
+    const settingsLookup = createMaybeSingleBuilder({
+      organization_id: 'org-1',
+      booking_enabled: true,
+      timezone: 'UTC',
+      default_booking_duration_minutes: 60,
+      slot_interval_minutes: 30,
+      minimum_notice_minutes: 0,
+      buffer_before_minutes: 15,
+      buffer_after_minutes: 30,
+      max_concurrent_bookings: 1,
+      google_busy_overlay_enabled: false,
+      google_write_through_enabled: false,
+      created_at: '2026-03-17T10:00:00.000Z',
+      updated_at: '2026-03-17T10:00:00.000Z',
+    })
+    const rulesLookup = createOrderedListBuilder([
+      {
+        id: 'rule-1',
+        organization_id: 'org-1',
+        day_of_week: 3,
+        start_minute: 0,
+        end_minute: 1440,
+        label: 'Wednesday',
+        active: true,
+        created_at: '2026-03-17T10:00:00.000Z',
+        updated_at: '2026-03-17T10:00:00.000Z',
+      },
+    ])
+    const connectionLookup = createMaybeSingleBuilder(null)
+    const blockedRangesLookup = createBlockedRangesBuilder([])
+
+    const supabase = createSupabaseMock({
+      booking_settings: [settingsLookup.builder],
+      booking_availability_rules: [rulesLookup.builder],
+      calendar_connections: [connectionLookup.builder],
+      calendar_bookings: [blockedRangesLookup.builder],
+    })
+
+    await lookupBookingAvailability(supabase as never, 'org-1', {
+      rangeStartIso: '2026-03-18T10:15:00.000Z',
+      rangeEndIso: '2026-03-18T11:15:00.000Z',
+      serviceCatalogId: null,
+    })
+
+    expect(blockedRangesLookup.ltMock).toHaveBeenCalledWith(
+      'starts_at',
+      '2026-03-18T12:00:00.000Z'
+    )
+    expect(blockedRangesLookup.gtMock).toHaveBeenCalledWith(
+      'ends_at',
+      '2026-03-18T09:30:00.000Z'
+    )
+  })
+
+  it('does not mark an exact requested slot as available when it is off the configured slot grid', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-17T09:00:00.000Z'))
+
+    const settingsLookup = createMaybeSingleBuilder({
+      organization_id: 'org-1',
+      booking_enabled: true,
+      timezone: 'UTC',
+      default_booking_duration_minutes: 60,
+      slot_interval_minutes: 30,
+      minimum_notice_minutes: 0,
+      buffer_before_minutes: 0,
+      buffer_after_minutes: 0,
+      max_concurrent_bookings: 1,
+      google_busy_overlay_enabled: false,
+      google_write_through_enabled: false,
+      created_at: '2026-03-17T10:00:00.000Z',
+      updated_at: '2026-03-17T10:00:00.000Z',
+    })
+    const rulesLookup = createOrderedListBuilder([
+      {
+        id: 'rule-1',
+        organization_id: 'org-1',
+        day_of_week: 3,
+        start_minute: 0,
+        end_minute: 1440,
+        label: 'Wednesday',
+        active: true,
+        created_at: '2026-03-17T10:00:00.000Z',
+        updated_at: '2026-03-17T10:00:00.000Z',
+      },
+    ])
+    const connectionLookup = createMaybeSingleBuilder(null)
+    const blockedRangesLookup = createBlockedRangesBuilder([])
+
+    const supabase = createSupabaseMock({
+      booking_settings: [settingsLookup.builder],
+      booking_availability_rules: [rulesLookup.builder],
+      calendar_connections: [connectionLookup.builder],
+      calendar_bookings: [blockedRangesLookup.builder],
+    })
+
+    const result = await lookupBookingAvailability(supabase as never, 'org-1', {
+      rangeStartIso: '2026-03-18T10:00:00.000Z',
+      rangeEndIso: '2026-03-18T12:00:00.000Z',
+      requestedStartIso: '2026-03-18T10:07:00.000Z',
+      serviceCatalogId: null,
+    })
+
+    expect(result.exactMatchAvailable).toBe(false)
+    expect(result.alternativeSlots[0]).toBe('2026-03-18T10:30:00.000Z')
   })
 
   it('rejects booking creation inside minimum notice instead of bypassing the rule on direct writes', async () => {

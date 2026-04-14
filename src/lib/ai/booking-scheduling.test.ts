@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
     createCalendarBookingRecordMock,
@@ -111,6 +111,10 @@ describe('maybeHandleSchedulingRequest', () => {
         })
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
     it('asks to clarify the service when booking intent exists but the service is unresolved', async () => {
         getBookableServiceCatalogItemsByOrganizationIdMock.mockResolvedValue([
             {
@@ -203,6 +207,78 @@ describe('maybeHandleSchedulingRequest', () => {
                 booking_suggestion_slots: [
                     '2026-03-18T13:00:00.000Z',
                     '2026-03-18T14:00:00.000Z'
+                ],
+                is_booking_response: true
+            })
+        )
+    })
+
+    it('suggests the nearest two service slots across the next 30 local days when no date is requested', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-03-18T07:07:00.000Z'))
+
+        lookupBookingAvailabilityMock.mockResolvedValue({
+            requestedStartIso: null,
+            exactMatchAvailable: false,
+            slotDurationMinutes: 60,
+            durationSource: 'default',
+            availableSlots: [
+                '2026-03-18T14:00:00.000Z',
+                '2026-03-19T08:00:00.000Z'
+            ],
+            alternativeSlots: [
+                '2026-03-18T14:00:00.000Z',
+                '2026-03-19T08:00:00.000Z'
+            ]
+        })
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const persistBotMessage = vi.fn(async () => undefined)
+        const supabase = createSupabaseMock({
+            messages: [createMessagesHistoryBuilder([]).builder],
+            leads: [createLeadSnapshotBuilder(null).builder]
+        })
+
+        const handled = await maybeHandleSchedulingRequest({
+            supabase: supabase as never,
+            organizationId: 'org-1',
+            conversationId: 'conv-1',
+            message: 'En yakın lazer randevusu ne zaman?',
+            platform: 'whatsapp',
+            customerName: 'Ayse',
+            customerPhone: '+905551112233',
+            responseLanguage: 'tr',
+            formatOutboundBotMessage: (content) => content,
+            sendOutbound,
+            persistBotMessage
+        })
+
+        expect(handled).toBe(true)
+        expect(lookupBookingAvailabilityMock).toHaveBeenCalledWith(
+            expect.anything(),
+            'org-1',
+            expect.objectContaining({
+                rangeStartIso: '2026-03-17T21:00:00.000Z',
+                rangeEndIso: '2026-04-16T21:00:00.000Z',
+                requestedStartIso: null,
+                serviceCatalogId: 'svc-laser',
+                suggestionLimit: 2
+            })
+        )
+        expect(sendOutbound).toHaveBeenCalledWith(
+            expect.stringContaining('En yakın uygun seçenekler')
+        )
+        expect(sendOutbound).toHaveBeenCalledWith(
+            expect.stringContaining('başka saat ve seçeneklere de bakabiliriz')
+        )
+        expect(persistBotMessage).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+                booking_action: 'suggest_alternatives',
+                booking_service_catalog_id: 'svc-laser',
+                booking_suggestion_slots: [
+                    '2026-03-18T14:00:00.000Z',
+                    '2026-03-19T08:00:00.000Z'
                 ],
                 is_booking_response: true
             })

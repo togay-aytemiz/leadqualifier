@@ -77,7 +77,7 @@ interface MaybeHandleSchedulingRequestInput {
 }
 
 const DIRECT_BOOKING_INTENT_PATTERNS = [
-    /\brandevu\b/i,
+    /\brandevu\p{L}*\b/iu,
     /\bbook(?:ing)?\b/i,
     /\bschedule\b/i,
     /\bavailability\b/i,
@@ -156,6 +156,7 @@ const AVAILABILITY_CONTINUATION_PATTERNS = [
 ]
 
 const TIME_TOKEN_PATTERN = /\b([01]?\d|2[0-3]):([0-5]\d)\b/
+const NEAREST_LOOKUP_DAYS = 30
 const TURKISH_DAY_PATTERN_LOOKUP: Array<{ pattern: RegExp, dayOfWeek: number }> = [
     { pattern: /\bpazar\w*\b/i, dayOfWeek: 0 },
     { pattern: /\bpazartesi\w*\b/i, dayOfWeek: 1 },
@@ -189,7 +190,7 @@ function createDatePartsFormatter(timezone: string) {
     return new Intl.DateTimeFormat('en-CA', {
         day: '2-digit',
         hour: '2-digit',
-        hour12: false,
+        hourCycle: 'h23',
         minute: '2-digit',
         month: '2-digit',
         timeZone: timezone,
@@ -218,7 +219,7 @@ function getZonedDateParts(date: Date, timezone: string) {
         year: Number(lookup.year ?? '0'),
         month: Number(lookup.month ?? '1'),
         day: Number(lookup.day ?? '1'),
-        hour: Number(lookup.hour ?? '0'),
+        hour: Number(lookup.hour ?? '0') % 24,
         minute: Number(lookup.minute ?? '0'),
         dayOfWeek: weekdayLookup[(lookup.weekday as keyof typeof weekdayLookup) ?? 'Sun'] ?? 0
     }
@@ -266,8 +267,9 @@ function detectBookingManagementIntent(message: string) {
 }
 
 function resolveRequestedDayOffset(message: string) {
-    if (/\byarin\b/i.test(normalizeLooseText(message)) || /\btomorrow\b/i.test(message)) return 1
-    if (/\bbugun\b/i.test(normalizeLooseText(message)) || /\btoday\b/i.test(message)) return 0
+    const normalizedMessage = normalizeLooseText(message)
+    if (/\byar[ıi]n\b/i.test(normalizedMessage) || /\btomorrow\b/i.test(message)) return 1
+    if (/\bbug[uü]n\b/i.test(normalizedMessage) || /\btoday\b/i.test(message)) return 0
     return null
 }
 
@@ -344,6 +346,41 @@ function buildDayLookupWindow(input: {
     }
 }
 
+function buildLocalRangeLookupWindow(input: {
+    timezone: string
+    year: number
+    month: number
+    day: number
+    dayCount: number
+}) {
+    const startLocalDate = {
+        year: input.year,
+        month: input.month,
+        day: input.day
+    }
+    const endLocalDate = addDaysToLocalDate(startLocalDate, input.dayCount)
+
+    return {
+        rangeStartIso: buildZonedDateTimeIso({
+            timezone: input.timezone,
+            year: startLocalDate.year,
+            month: startLocalDate.month,
+            day: startLocalDate.day,
+            hour: 0,
+            minute: 0
+        }),
+        rangeEndIso: buildZonedDateTimeIso({
+            timezone: input.timezone,
+            year: endLocalDate.year,
+            month: endLocalDate.month,
+            day: endLocalDate.day,
+            hour: 0,
+            minute: 0
+        }),
+        requestedStartIso: null
+    }
+}
+
 function resolveLookupWindow(message: string, timezone: string, contextRequestedSlot?: string | null) {
     const now = new Date()
     const today = getZonedDateParts(now, timezone)
@@ -389,14 +426,13 @@ function resolveLookupWindow(message: string, timezone: string, contextRequested
         })
     }
 
-    const startIso = now.toISOString()
-    const endIso = new Date(now.getTime() + 7 * 24 * 60 * 60_000).toISOString()
-
-    return {
-        rangeStartIso: startIso,
-        rangeEndIso: endIso,
-        requestedStartIso: requestedTime ? null : null
-    }
+    return buildLocalRangeLookupWindow({
+        timezone,
+        year: today.year,
+        month: today.month,
+        day: today.day,
+        dayCount: NEAREST_LOOKUP_DAYS
+    })
 }
 
 function formatBookingSlot(iso: string, timezone: string, responseLanguage: 'tr' | 'en') {
@@ -785,12 +821,21 @@ export async function maybeHandleSchedulingRequest(
         settings.timezone,
         bookingContext?.requestedSlot ?? bookingContext?.suggestionSlots[0] ?? null
     )
+    const normalizedSchedulingMessage = normalizeLooseText(input.message)
+    const hasRequestedDayReference = resolveRequestedDayOffset(input.message) !== null
+        || resolveRequestedWeekday(input.message) !== null
+        || Boolean(
+            bookingContext
+            && SAME_DAY_REFERENCE_PATTERNS.some((pattern) => pattern.test(normalizedSchedulingMessage))
+        )
+    const isNearestLookupWindow = !lookupWindow.requestedStartIso && !hasRequestedDayReference
+    const suggestionLimit = 2
     const availability = await lookupBookingAvailability(input.supabase, input.organizationId, {
         rangeStartIso: lookupWindow.rangeStartIso,
         rangeEndIso: lookupWindow.rangeEndIso,
         requestedStartIso: lookupWindow.requestedStartIso,
         serviceCatalogId: matchedService.id,
-        suggestionLimit: 3
+        suggestionLimit
     })
 
     const action = resolveBookingAssistantAction({
@@ -810,19 +855,23 @@ export async function maybeHandleSchedulingRequest(
 
     if (action === 'suggest_alternatives') {
         const suggestions = availability.alternativeSlots.length > 0
-            ? availability.alternativeSlots
-            : availability.availableSlots.slice(0, 3)
+            ? availability.alternativeSlots.slice(0, suggestionLimit)
+            : availability.availableSlots.slice(0, suggestionLimit)
         const suggestionText = suggestions
             .map((slot) => formatBookingSlot(slot, settings.timezone, input.responseLanguage))
             .join(', ')
 
         const alternativesReply = buildLocalizedText(input.responseLanguage, {
             tr: lookupWindow.requestedStartIso
-                ? `İstediğiniz saat dolu görünüyor. Şu seçenekler uygun: ${suggestionText}. Uygun olanı seçerseniz sizin için oluşturabilirim.`
-                : `Şu an uygun görünen seçenekler: ${suggestionText}. Uygun olanı seçerseniz sizin için oluşturabilirim.`,
+                ? `İstediğiniz saat dolu görünüyor. Şu uygun görünen seçenekler var: ${suggestionText}. Uygun olanı seçerseniz sizin için oluşturabilirim.`
+                : isNearestLookupWindow
+                    ? `En yakın uygun seçenekler: ${suggestionText}. Hangisi uygun? Dilerseniz başka saat ve seçeneklere de bakabiliriz.`
+                    : `Şu an uygun görünen seçenekler: ${suggestionText}. Uygun olanı seçerseniz sizin için oluşturabilirim.`,
             en: lookupWindow.requestedStartIso
                 ? `That time looks busy. These options are available: ${suggestionText}. If one works for you, I can create it for you.`
-                : `These options are currently available: ${suggestionText}. If one works for you, I can create it for you.`
+                : isNearestLookupWindow
+                    ? `The closest available options are: ${suggestionText}. Which one works for you? If you want, we can also check other times and options.`
+                    : `These options are currently available: ${suggestionText}. If one works for you, I can create it for you.`
         })
 
         const formattedReply = input.formatOutboundBotMessage(alternativesReply)

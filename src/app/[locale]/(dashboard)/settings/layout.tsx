@@ -5,6 +5,9 @@ import { SettingsResponsiveShell } from '@/components/settings/SettingsResponsiv
 import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
+import { withDevTiming } from '@/lib/performance/timing'
+
+const SETTINGS_ROUTE_MESSAGES_TIMING_LABEL = 'settings.layout.routeMessages'
 
 export async function generateMetadata(): Promise<Metadata> {
   const tNav = await getTranslations('nav')
@@ -22,24 +25,19 @@ export default async function SettingsLayout({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
-  const orgContext = await resolveActiveOrganizationContext()
+  const orgContext = await withDevTiming(
+    'settings.layout.orgContext',
+    () => resolveActiveOrganizationContext()
+  )
   if (!orgContext) {
     redirect(buildLocalizedPath('/login', locale))
   }
 
   return (
     <DashboardRouteIntlProvider
-      namespaces={[
-        'Sidebar',
-        'organizationSettings',
-        'unsavedChanges',
-        'profileSettings',
-        'calendar',
-        'billingUsage',
-        'billingPlans',
-        'aiQaLab',
-        'Channels',
-      ]}
+      includeDashboardShell={false}
+      timingLabel={SETTINGS_ROUTE_MESSAGES_TIMING_LABEL}
+      namespaces={['Sidebar']}
     >
       <SettingsResponsiveShell
         activeOrganizationId={orgContext?.activeOrganizationId ?? null}

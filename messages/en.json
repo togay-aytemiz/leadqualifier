@@ -2925,11 +2925,13 @@
       "bookingEnabledHelp": "When disabled, the system stops suggesting and creating new bookings.",
       "timezone": "Time zone",
       "defaultDuration": "Default service duration",
+      "maxConcurrentBookings": "Maximum bookings at the same time",
       "slotInterval": "Booking interval",
       "minimumNotice": "Minimum notice (minutes)",
       "bufferBefore": "Gap before appointment",
       "bufferAfter": "Gap after appointment",
       "fieldHints": {
+        "maxConcurrentBookings": "Set how many appointments can run at the same time in this workspace. Leave this at 1 when one person or one resource handles bookings.",
         "slotInterval": "Available times are offered to customers in these minute increments.",
         "minimumNotice": "Sets how far in advance a booking must be from the current moment.",
         "bufferBefore": "Automatically reserves prep time before each booking.",

@@ -429,6 +429,7 @@ export interface BookingSettings {
     minimum_notice_minutes: number
     buffer_before_minutes: number
     buffer_after_minutes: number
+    max_concurrent_bookings: number
     google_busy_overlay_enabled: boolean
     google_write_through_enabled: boolean
     created_at: string

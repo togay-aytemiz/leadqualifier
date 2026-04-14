@@ -9,6 +9,7 @@ import {
     listQaLabRuns
 } from '@/lib/qa-lab/runs'
 import { canAccessQaLab } from '@/lib/qa-lab/access'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import QaLabSettingsClient from './QaLabSettingsClient'
 
 export default async function QaLabSettingsPage() {
@@ -53,13 +54,15 @@ export default async function QaLabSettingsPage() {
     const canStartRuns = userRole === 'admin'
 
     return (
-        <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
-            <QaLabSettingsClient
-                initialRuns={runs}
-                presets={QA_LAB_PRESETS}
-                canStartRuns={canStartRuns}
-                isReadOnlyTenantMode={orgContext.readOnlyTenantMode}
-            />
-        </div>
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['aiQaLab', 'Sidebar', 'common']}>
+            <div className="flex-1 bg-white flex flex-col min-w-0 overflow-hidden">
+                <QaLabSettingsClient
+                    initialRuns={runs}
+                    presets={QA_LAB_PRESETS}
+                    canStartRuns={canStartRuns}
+                    isReadOnlyTenantMode={orgContext.readOnlyTenantMode}
+                />
+            </div>
+        </DashboardRouteIntlProvider>
     )
 }

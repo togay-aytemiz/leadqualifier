@@ -12,6 +12,7 @@ describe('CalendarSettingsClient source', () => {
         const source = fs.readFileSync(CALENDAR_SETTINGS_CLIENT_PATH, 'utf8')
 
         expect(source).toContain('function InfoTooltip')
+        expect(source).toContain("t('settings.fieldHints.maxConcurrentBookings')")
         expect(source).toContain("t('settings.fieldHints.slotInterval')")
         expect(source).toContain("t('settings.fieldHints.minimumNotice')")
         expect(source).toContain("t('settings.fieldHints.bufferBefore')")
@@ -30,5 +31,19 @@ describe('CalendarSettingsClient source', () => {
 
         expect(source).toContain('const isActiveTabDirty = activeTab === \'availability\'')
         expect(source).toContain('disabled={isPending || isReadOnly || !isActiveTabDirty}')
+    })
+
+    it('exposes the simple maximum concurrent bookings field in general settings', () => {
+        const source = fs.readFileSync(CALENDAR_SETTINGS_CLIENT_PATH, 'utf8')
+
+        expect(source).toContain("t('settings.maxConcurrentBookings')")
+        expect(source).toContain('value={settingsDraft.maxConcurrentBookings}')
+        expect(source).toContain('max_concurrent_bookings: maxConcurrentBookings')
+    })
+
+    it('opens organization details from the empty service durations state', () => {
+        const source = fs.readFileSync(CALENDAR_SETTINGS_CLIENT_PATH, 'utf8')
+
+        expect(source).toContain('href="/settings/organization?focus=organization-details"')
     })
 })

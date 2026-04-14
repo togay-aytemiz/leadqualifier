@@ -3,6 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const DASHBOARD_LAYOUT_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/layout.tsx')
+const DASHBOARD_SHELL_DATA_PATH = path.resolve(process.cwd(), 'src/lib/dashboard/shell-data.ts')
 const DASHBOARD_LOADING_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/loading.tsx')
 const PROVIDER_PATH = path.resolve(process.cwd(), 'src/components/i18n/DashboardRouteIntlProvider.tsx')
 const SETTINGS_LAYOUT_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/settings/layout.tsx')
@@ -17,16 +18,20 @@ const ADMIN_LAYOUT_PATH = path.resolve(process.cwd(), 'src/app/[locale]/(dashboa
 describe('dashboard message scoping', () => {
     it('keeps the root dashboard provider on shell-only namespaces', () => {
         const source = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
+        const shellDataSource = fs.readFileSync(DASHBOARD_SHELL_DATA_PATH, 'utf8')
 
-        expect(source).toContain('DASHBOARD_SHELL_MESSAGE_NAMESPACES')
-        expect(source).toContain('getScopedMessages(locale, DASHBOARD_SHELL_MESSAGE_NAMESPACES)')
+        expect(source).toContain('shellData.messages')
+        expect(shellDataSource).toContain('DASHBOARD_SHELL_MESSAGE_NAMESPACES')
+        expect(shellDataSource).toContain('getScopedMessages(locale, DASHBOARD_SHELL_MESSAGE_NAMESPACES)')
     })
 
-    it('avoids a second admin-only active-organization refetch in the root dashboard layout', () => {
+    it('keeps active organization resolution inside the shared shell loader', () => {
         const source = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
+        const shellDataSource = fs.readFileSync(DASHBOARD_SHELL_DATA_PATH, 'utf8')
 
         expect(source).not.toContain('includeAccessibleOrganizations: true')
-        expect(source.match(/resolveActiveOrganizationContext\(/g) ?? []).toHaveLength(1)
+        expect(source).not.toContain('resolveActiveOrganizationContext(')
+        expect(shellDataSource.match(/resolveActiveOrganizationContext\(/g) ?? []).toHaveLength(1)
     })
 
     it('provides a root dashboard loading boundary for auth-to-app entry', () => {
@@ -44,6 +49,7 @@ describe('dashboard message scoping', () => {
         const source = fs.readFileSync(PROVIDER_PATH, 'utf8')
 
         expect(source).toContain('mergeMessageNamespaceLists')
+        expect(source).toContain('includeDashboardShell')
         expect(source).toContain('DASHBOARD_SHELL_MESSAGE_NAMESPACES')
         expect(source).toContain('NextIntlClientProvider')
     })

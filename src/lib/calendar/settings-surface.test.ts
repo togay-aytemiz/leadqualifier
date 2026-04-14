@@ -30,6 +30,10 @@ describe('calendar settings dirty helpers', () => {
         expect(buildCalendarSettingsDraft(null).bookingEnabled).toBe(false)
     })
 
+    it('defaults the maximum concurrent bookings setting to one', () => {
+        expect(buildCalendarSettingsDraft(null).maxConcurrentBookings).toBe('1')
+    })
+
     it('treats unchanged general settings as clean but ignores Google-only differences', () => {
         const baseline = buildCalendarSettingsDraft({
             booking_enabled: true,
@@ -39,6 +43,7 @@ describe('calendar settings dirty helpers', () => {
             minimum_notice_minutes: 120,
             buffer_before_minutes: 15,
             buffer_after_minutes: 10,
+            max_concurrent_bookings: 1,
             google_busy_overlay_enabled: true,
             google_write_through_enabled: false
         } as never)
@@ -53,6 +58,11 @@ describe('calendar settings dirty helpers', () => {
             ...baseline,
             timezone: 'UTC'
         })).toBe(true)
+
+        expect(isCalendarGeneralSettingsDirty(baseline, {
+            ...baseline,
+            maxConcurrentBookings: '2'
+        })).toBe(true)
     })
 
     it('tracks Google app-surface setting changes independently from general calendar settings', () => {
@@ -64,6 +74,7 @@ describe('calendar settings dirty helpers', () => {
             minimum_notice_minutes: 120,
             buffer_before_minutes: 15,
             buffer_after_minutes: 10,
+            max_concurrent_bookings: 1,
             google_busy_overlay_enabled: true,
             google_write_through_enabled: false
         } as never)

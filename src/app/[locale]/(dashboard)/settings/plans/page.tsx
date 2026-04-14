@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader, Skeleton } from '@/design'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import PlansSettingsPageContent, { type PlansSettingsSearchParams } from './PlansSettingsPageContent'
 
 interface PlansSettingsPageProps {
@@ -46,7 +47,7 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
     }
 
     return (
-        <>
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['billingPlans']}>
             <PageHeader title={tPlans('pageTitle')} />
 
             <Suspense fallback={<PlansSettingsPageSkeleton />}>
@@ -56,6 +57,6 @@ export default async function PlansSettingsPage({ searchParams }: PlansSettingsP
                     search={search}
                 />
             </Suspense>
-        </>
+        </DashboardRouteIntlProvider>
     )
 }

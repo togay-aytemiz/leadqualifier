@@ -5,20 +5,28 @@ import {
     getScopedMessages,
     mergeMessageNamespaceLists
 } from '@/i18n/messages'
+import { withDevTiming } from '@/lib/performance/timing'
 
 interface DashboardRouteIntlProviderProps {
     children: React.ReactNode
     namespaces: readonly string[]
+    includeDashboardShell?: boolean
+    timingLabel?: string
 }
 
 export async function DashboardRouteIntlProvider({
     children,
-    namespaces
+    includeDashboardShell = true,
+    namespaces,
+    timingLabel = 'dashboard.routeIntl.messages'
 }: DashboardRouteIntlProviderProps) {
     const locale = await getLocale()
-    const messages = await getScopedMessages(
-        locale,
-        mergeMessageNamespaceLists(DASHBOARD_SHELL_MESSAGE_NAMESPACES, namespaces)
+    const scopedNamespaces = includeDashboardShell
+        ? mergeMessageNamespaceLists(DASHBOARD_SHELL_MESSAGE_NAMESPACES, namespaces)
+        : namespaces
+    const messages = await withDevTiming(
+        timingLabel,
+        () => getScopedMessages(locale, scopedNamespaces)
     )
 
     return (

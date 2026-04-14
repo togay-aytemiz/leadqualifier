@@ -51,7 +51,9 @@ interface FieldInputProps {
     value: string
     disabled?: boolean
     suffix?: string
-    type?: 'text' | 'time'
+    type?: 'number' | 'text' | 'time'
+    min?: number
+    max?: number
     onChange: (value: string) => void
 }
 
@@ -88,6 +90,8 @@ function FieldInput({
     disabled = false,
     suffix,
     type = 'text',
+    min,
+    max,
     onChange
 }: FieldInputProps) {
     return (
@@ -97,6 +101,8 @@ function FieldInput({
                 <input
                     type={type}
                     value={value}
+                    min={min}
+                    max={max}
                     disabled={disabled}
                     onChange={(event) => onChange(event.target.value)}
                     className={cn(
@@ -318,6 +324,13 @@ export function CalendarSettingsClient({
         </>
     )
 
+    const maxConcurrentBookingsLabel = (
+        <>
+            <span>{t('settings.maxConcurrentBookings')}</span>
+            <InfoTooltip label={t('settings.fieldHints.maxConcurrentBookings')} />
+        </>
+    )
+
     const minimumNoticeLabel = (
         <>
             <span>{t('settings.minimumNotice')}</span>
@@ -359,13 +372,17 @@ export function CalendarSettingsClient({
         const minimumNotice = Number.parseInt(settingsDraft.minimumNotice, 10)
         const bufferBefore = Number.parseInt(settingsDraft.bufferBefore, 10)
         const bufferAfter = Number.parseInt(settingsDraft.bufferAfter, 10)
+        const maxConcurrentBookings = Number.parseInt(settingsDraft.maxConcurrentBookings, 10)
 
         if (
             !Number.isFinite(defaultDuration) || defaultDuration <= 0 ||
             !Number.isFinite(slotInterval) || slotInterval <= 0 ||
             !Number.isFinite(minimumNotice) || minimumNotice < 0 ||
             !Number.isFinite(bufferBefore) || bufferBefore < 0 ||
-            !Number.isFinite(bufferAfter) || bufferAfter < 0
+            !Number.isFinite(bufferAfter) || bufferAfter < 0 ||
+            !Number.isFinite(maxConcurrentBookings) ||
+            maxConcurrentBookings < 1 ||
+            maxConcurrentBookings > 50
         ) {
             setFeedback({ type: 'error', message: t('messages.invalidNumericSettings') })
             return
@@ -381,7 +398,8 @@ export function CalendarSettingsClient({
                         slot_interval_minutes: slotInterval,
                         minimum_notice_minutes: minimumNotice,
                         buffer_before_minutes: bufferBefore,
-                        buffer_after_minutes: bufferAfter
+                        buffer_after_minutes: bufferAfter,
+                        max_concurrent_bookings: maxConcurrentBookings
                     })
 
                     setFeedback({ type: 'success', message: t('messages.settingsSaved') })
@@ -566,6 +584,15 @@ export function CalendarSettingsClient({
                                                         onChange={(value) => setSettingsDraft((current) => ({ ...current, defaultDuration: value }))}
                                                     />
                                                     <FieldInput
+                                                        label={maxConcurrentBookingsLabel}
+                                                        value={settingsDraft.maxConcurrentBookings}
+                                                        type="number"
+                                                        min={1}
+                                                        max={50}
+                                                        disabled={isPending || isReadOnly}
+                                                        onChange={(value) => setSettingsDraft((current) => ({ ...current, maxConcurrentBookings: value }))}
+                                                    />
+                                                    <FieldInput
                                                         label={slotIntervalLabel}
                                                         value={settingsDraft.slotInterval}
                                                         suffix={t('minutesShort')}
@@ -708,7 +735,7 @@ export function CalendarSettingsClient({
                                             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-5 py-6">
                                                 <p className="text-sm text-gray-600">{t('services.empty')}</p>
                                                 <Link
-                                                    href="/settings/organization"
+                                                    href="/settings/organization?focus=organization-details"
                                                     className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
                                                 >
                                                     {t('services.openOrganizationSettings')}

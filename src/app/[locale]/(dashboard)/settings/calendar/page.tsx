@@ -9,6 +9,7 @@ import {
 } from '@/lib/calendar/bookings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 
 export default async function CalendarSettingsPage() {
     const supabase = await createClient()
@@ -50,12 +51,14 @@ export default async function CalendarSettingsPage() {
     ])
 
     return (
-        <CalendarSettingsClient
-            initialSettings={bookingSettings}
-            initialAvailabilityRules={availabilityRules}
-            initialServices={services}
-            initialConnection={calendarConnection}
-            isReadOnly={orgContext?.readOnlyTenantMode ?? false}
-        />
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['calendar', 'Sidebar']}>
+            <CalendarSettingsClient
+                initialSettings={bookingSettings}
+                initialAvailabilityRules={availabilityRules}
+                initialServices={services}
+                initialConnection={calendarConnection}
+                isReadOnly={orgContext?.readOnlyTenantMode ?? false}
+            />
+        </DashboardRouteIntlProvider>
     )
 }

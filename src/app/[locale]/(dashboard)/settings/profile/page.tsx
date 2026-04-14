@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getLocale } from 'next-intl/server'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import ProfileSettingsClient from './ProfileSettingsClient'
 
 export default async function ProfileSettingsPage() {
@@ -26,5 +27,9 @@ export default async function ProfileSettingsPage() {
     const initialName = profile?.full_name ?? ''
     const email = profile?.email ?? ''
     const initialAvatarUrl = profile?.avatar_url ?? null
-    return <ProfileSettingsClient initialName={initialName} email={email} initialAvatarUrl={initialAvatarUrl} />
+    return (
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['profileSettings', 'unsavedChanges']}>
+            <ProfileSettingsClient initialName={initialName} email={email} initialAvatarUrl={initialAvatarUrl} />
+        </DashboardRouteIntlProvider>
+    )
 }

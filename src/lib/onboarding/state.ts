@@ -41,6 +41,11 @@ export interface OrganizationOnboardingShellState {
   steps: OrganizationOnboardingStepState[]
 }
 
+export interface OrganizationOnboardingShellData {
+  onboardingState: OrganizationOnboardingShellState
+  billingSnapshot: OrganizationBillingSnapshot | null
+}
+
 export type OrganizationOnboardingStateRow = OrganizationOnboardingState
 
 interface ResolveOnboardingStateInput {
@@ -220,19 +225,27 @@ export async function getOrganizationOnboardingState(
   organizationId: string,
   options?: { supabase?: SupabaseClient }
 ): Promise<OrganizationOnboardingShellState> {
-  if (!options?.supabase) {
-    return getOrganizationOnboardingStateCached(organizationId)
-  }
-
-  return getOrganizationOnboardingStateWithSupabase(options.supabase, organizationId)
+  const shellData = await getOrganizationOnboardingShellData(organizationId, options)
+  return shellData.onboardingState
 }
 
-const getOrganizationOnboardingStateCached = cache(async (organizationId: string) => {
+export async function getOrganizationOnboardingShellData(
+  organizationId: string,
+  options?: { supabase?: SupabaseClient }
+): Promise<OrganizationOnboardingShellData> {
+  if (!options?.supabase) {
+    return getOrganizationOnboardingShellDataCached(organizationId)
+  }
+
+  return getOrganizationOnboardingShellDataWithSupabase(options.supabase, organizationId)
+}
+
+const getOrganizationOnboardingShellDataCached = cache(async (organizationId: string) => {
   const supabase = await createClient()
-  return getOrganizationOnboardingStateWithSupabase(supabase, organizationId)
+  return getOrganizationOnboardingShellDataWithSupabase(supabase, organizationId)
 })
 
-async function getOrganizationOnboardingStateWithSupabase(
+async function getOrganizationOnboardingShellDataWithSupabase(
   supabase: SupabaseClient,
   organizationId: string
 ) {
@@ -256,7 +269,7 @@ async function getOrganizationOnboardingStateWithSupabase(
     readConnectedChannels(supabase, organizationId),
   ])
 
-  return resolveOnboardingState({
+  const onboardingState = resolveOnboardingState({
     organizationId,
     onboardingRow,
     billingSnapshot,
@@ -267,6 +280,11 @@ async function getOrganizationOnboardingStateWithSupabase(
     serviceCatalogCount,
     connectedChannels,
   })
+
+  return {
+    onboardingState,
+    billingSnapshot,
+  }
 }
 
 async function readAiSettingsReviewCookie(organizationId: string) {

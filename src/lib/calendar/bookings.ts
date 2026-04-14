@@ -62,6 +62,7 @@ function buildDefaultBookingSettings(organizationId: string): BookingSettings {
     minimum_notice_minutes: 60,
     buffer_before_minutes: 0,
     buffer_after_minutes: 0,
+    max_concurrent_bookings: 1,
     google_busy_overlay_enabled: true,
     google_write_through_enabled: false,
     created_at: now,
@@ -424,13 +425,18 @@ async function getBlockedRangesForLookup(
     excludeBookingId?: string | null
   }
 ) {
+  const bufferPaddingMinutes =
+    normalizePositiveMinuteValue(input.settings.buffer_before_minutes) +
+    normalizePositiveMinuteValue(input.settings.buffer_after_minutes)
+  const blockingRangeStartIso = addMinutesToIso(input.rangeStartIso, -bufferPaddingMinutes)
+  const blockingRangeEndIso = addMinutesToIso(input.rangeEndIso, bufferPaddingMinutes)
   let query = supabase
     .from('calendar_bookings')
     .select('id, starts_at, ends_at')
     .eq('organization_id', organizationId)
     .in('status', ['pending', 'confirmed'])
-    .lt('starts_at', input.rangeEndIso)
-    .gt('ends_at', input.rangeStartIso)
+    .lt('starts_at', blockingRangeEndIso)
+    .gt('ends_at', blockingRangeStartIso)
 
   if (input.excludeBookingId) {
     query = query.neq('id', input.excludeBookingId)
@@ -459,8 +465,8 @@ async function getBlockedRangesForLookup(
     const busyRanges = await queryGoogleFreeBusy({
       accessToken: token.accessToken,
       calendarId: googleCalendarId,
-      timeMin: input.rangeStartIso,
-      timeMax: input.rangeEndIso,
+      timeMin: blockingRangeStartIso,
+      timeMax: blockingRangeEndIso,
       timeZone: input.settings.timezone,
     })
 
@@ -520,12 +526,15 @@ export async function lookupBookingAvailability(
       bookingStartIso: slot,
       bufferAfterMinutes: settings.buffer_after_minutes,
       bufferBeforeMinutes: settings.buffer_before_minutes,
+      maxConcurrentBookings: settings.max_concurrent_bookings ?? 1,
     })
   })
 
   const requestedStartIso = input.requestedStartIso?.trim() || null
+  const candidateSlotSet = new Set(availableSlots)
   const exactMatchAvailable = requestedStartIso
-    ? satisfiesMinimumNotice(settings, requestedStartIso) &&
+    ? candidateSlotSet.has(requestedStartIso) &&
+      satisfiesMinimumNotice(settings, requestedStartIso) &&
       isSlotWithinAvailabilityRules({
         bookingEndIso: addMinutesToIso(requestedStartIso, durationMinutes),
         bookingStartIso: requestedStartIso,
@@ -538,6 +547,7 @@ export async function lookupBookingAvailability(
         bookingStartIso: requestedStartIso,
         bufferAfterMinutes: settings.buffer_after_minutes,
         bufferBeforeMinutes: settings.buffer_before_minutes,
+        maxConcurrentBookings: settings.max_concurrent_bookings ?? 1,
       })
     : false
 
@@ -741,6 +751,7 @@ async function assertRequestedBookingSlotAvailable(
     bookingStartIso: input.startsAt,
     bufferAfterMinutes: input.settings.buffer_after_minutes,
     bufferBeforeMinutes: input.settings.buffer_before_minutes,
+    maxConcurrentBookings: input.settings.max_concurrent_bookings ?? 1,
   })
 
   if (!withinRules || !available) {

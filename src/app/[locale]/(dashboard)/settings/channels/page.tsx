@@ -5,6 +5,7 @@ import { ChannelsList } from '@/components/channels/ChannelsList'
 import { ChannelsOnboardingLockBanner } from '@/components/channels/ChannelsOnboardingLockBanner'
 import { PageHeader } from '@/design'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import {
     getOrganizationOnboardingState,
     isChannelConnectionPrerequisitesComplete
@@ -46,7 +47,7 @@ export default async function ChannelsPage() {
     const isChannelConnectionLocked = !isChannelConnectionPrerequisitesComplete(onboardingState.steps)
 
     return (
-        <>
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['Channels']}>
             <PageHeader title={tChannels('title')} />
 
             <div className="flex-1 overflow-auto p-8">
@@ -79,6 +80,6 @@ export default async function ChannelsPage() {
                     />
                 </div>
             </div>
-        </>
+        </DashboardRouteIntlProvider>
     )
 }

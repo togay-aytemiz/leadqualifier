@@ -177,6 +177,18 @@ describe('pickMessageNamespaces', () => {
     expect(trMessages.calendar.introModal.items.workingHours.body).toBe(
       'Açık günleri, saat aralıklarını ve hizmet sürelerini tanımla.'
     )
+    expect(enMessages.calendar.settings.maxConcurrentBookings).toBe(
+      'Maximum bookings at the same time'
+    )
+    expect(enMessages.calendar.settings.fieldHints.maxConcurrentBookings.toLowerCase()).toContain(
+      'one person'
+    )
+    expect(trMessages.calendar.settings.maxConcurrentBookings).toBe(
+      'Aynı anda en fazla randevu'
+    )
+    expect(
+      trMessages.calendar.settings.fieldHints.maxConcurrentBookings.toLowerCase()
+    ).toContain('tek kişi')
     expect(trMessages.simulator.introModal.description.toLowerCase()).toContain('kaydedilmez')
     expect(trMessages.simulator.introModal.description.toLowerCase()).toContain('denemen için')
     expect(trMessages.simulator.introModal.items.realMessage.title).toBe('Gerçek müşteri gibi yaz')

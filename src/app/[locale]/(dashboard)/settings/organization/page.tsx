@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server'
 import { Skeleton } from '@/design'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import OrganizationSettingsPageContent from './OrganizationSettingsPageContent'
 
 function OrganizationSettingsPageSkeleton() {
@@ -53,12 +54,14 @@ export default async function OrganizationSettingsPage() {
     })
 
     return (
-        <Suspense fallback={<OrganizationSettingsPageSkeleton />}>
-            <OrganizationSettingsPageContent
-                organizationId={organizationId}
-                locale={locale as 'en' | 'tr'}
-                isReadOnly={orgContext?.readOnlyTenantMode ?? false}
-            />
-        </Suspense>
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['organizationSettings', 'unsavedChanges']}>
+            <Suspense fallback={<OrganizationSettingsPageSkeleton />}>
+                <OrganizationSettingsPageContent
+                    organizationId={organizationId}
+                    locale={locale as 'en' | 'tr'}
+                    isReadOnly={orgContext?.readOnlyTenantMode ?? false}
+                />
+            </Suspense>
+        </DashboardRouteIntlProvider>
     )
 }

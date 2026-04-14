@@ -4,6 +4,7 @@ import { ApplicationsSettingsClient } from '@/components/settings/ApplicationsSe
 import { getBookingSettingsByOrganizationId } from '@/lib/calendar/bookings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 
 export default async function SettingsApplicationsPage() {
     const supabase = await createClient()
@@ -35,9 +36,11 @@ export default async function SettingsApplicationsPage() {
     const bookingSettings = await getBookingSettingsByOrganizationId(supabase, organizationId)
 
     return (
-        <ApplicationsSettingsClient
-            initialSettings={bookingSettings}
-            isReadOnly={orgContext?.readOnlyTenantMode ?? false}
-        />
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['calendar', 'Sidebar']}>
+            <ApplicationsSettingsClient
+                initialSettings={bookingSettings}
+                isReadOnly={orgContext?.readOnlyTenantMode ?? false}
+            />
+        </DashboardRouteIntlProvider>
     )
 }

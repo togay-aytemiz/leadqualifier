@@ -15,6 +15,7 @@ export interface CalendarSettingsDraft {
     minimumNotice: string
     bufferBefore: string
     bufferAfter: string
+    maxConcurrentBookings: string
     googleBusyOverlayEnabled: boolean
     googleWriteThroughEnabled: boolean
 }
@@ -64,6 +65,7 @@ export function buildCalendarSettingsDraft(settings: BookingSettings | null): Ca
         minimumNotice: String(settings?.minimum_notice_minutes ?? 60),
         bufferBefore: String(settings?.buffer_before_minutes ?? 0),
         bufferAfter: String(settings?.buffer_after_minutes ?? 0),
+        maxConcurrentBookings: String(settings?.max_concurrent_bookings ?? 1),
         googleBusyOverlayEnabled: settings?.google_busy_overlay_enabled ?? true,
         googleWriteThroughEnabled: settings?.google_write_through_enabled ?? false
     }
@@ -109,7 +111,8 @@ export function isCalendarGeneralSettingsDirty(
         draft.slotInterval !== baseline.slotInterval ||
         draft.minimumNotice !== baseline.minimumNotice ||
         draft.bufferBefore !== baseline.bufferBefore ||
-        draft.bufferAfter !== baseline.bufferAfter
+        draft.bufferAfter !== baseline.bufferAfter ||
+        draft.maxConcurrentBookings !== baseline.maxConcurrentBookings
     )
 }
 

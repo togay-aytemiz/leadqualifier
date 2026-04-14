@@ -1,31 +1,22 @@
 import type { CSSProperties } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
-import { getLocale } from 'next-intl/server'
 import { MainSidebar } from '@/design'
 import { MobileBottomNav } from '@/design/MobileBottomNav'
 import { DashboardRouteTransitionViewport } from '@/components/common/DashboardRouteTransitionViewport'
-import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { canAccessQaLab } from '@/lib/qa-lab/access'
 import { TabTitleSync } from '@/components/common/TabTitleSync'
-import { DASHBOARD_SHELL_MESSAGE_NAMESPACES, getScopedMessages } from '@/i18n/messages'
 import { resolveDashboardTypographyVariables } from '@/design/dashboard-typography'
-import { getOrganizationBillingSnapshot } from '@/lib/billing/server'
-import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import { OnboardingTrialBanner } from '@/components/onboarding/OnboardingTrialBanner'
-import { getOrgAiSettings } from '@/lib/ai/settings'
 import { OnboardingCompletionModal } from '@/components/onboarding/OnboardingCompletionModal'
+import { getDashboardShellData } from '@/lib/dashboard/shell-data'
 
 export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    const [locale, orgContext] = await Promise.all([
-        getLocale(),
-        resolveActiveOrganizationContext()
-    ])
-    const messagesPromise = getScopedMessages(locale, DASHBOARD_SHELL_MESSAGE_NAMESPACES)
-    const messages = await messagesPromise
+    const shellData = await getDashboardShellData()
+    const orgContext = shellData.orgContext
     const hasExplicitAdminOrganizationSelection = !(orgContext?.isSystemAdmin ?? false)
         || orgContext?.source === 'cookie'
     const sidebarOrganizationId = hasExplicitAdminOrganizationSelection
@@ -38,15 +29,8 @@ export default async function DashboardLayout({
     const onboardingOrganizationId = orgContext?.readOnlyTenantMode
         ? null
         : (orgContext?.activeOrganizationId ?? null)
-    const [billingSnapshot, onboardingState] = onboardingOrganizationId
-        ? await Promise.all([
-            getOrganizationBillingSnapshot(onboardingOrganizationId),
-            getOrganizationOnboardingState(onboardingOrganizationId)
-        ])
-        : [null, null]
-    const aiSettings = onboardingOrganizationId
-        ? await getOrgAiSettings(onboardingOrganizationId, { locale, onboardingState })
-        : null
+    const billingSnapshot = shellData.billingSnapshot
+    const aiSettings = shellData.aiSettings
     const requiresExplicitSelection = aiSettings?.bot_mode_unlock_required ?? false
 
     const userName = orgContext?.userFullName || orgContext?.userEmail || 'User'
@@ -54,7 +38,7 @@ export default async function DashboardLayout({
     const dashboardContentTypographyStyle = resolveDashboardTypographyVariables('content') as CSSProperties
 
     return (
-        <NextIntlClientProvider locale={locale} messages={messages}>
+        <NextIntlClientProvider locale={shellData.locale} messages={shellData.messages}>
             <div className="flex h-screen w-full overflow-hidden bg-gray-50">
                 <TabTitleSync organizationId={orgContext?.activeOrganizationId ?? null} />
                 <div className="hidden lg:flex">
@@ -66,7 +50,7 @@ export default async function DashboardLayout({
                         activeOrganizationId={sidebarOrganizationId}
                         readOnlyTenantMode={orgContext?.readOnlyTenantMode ?? false}
                         canAccessQaLabAdmin={canAccessQaLabAdmin}
-                        onboardingState={onboardingState}
+                        onboardingState={shellData.onboardingState}
                         initialBotMode={aiSettings?.bot_mode ?? null}
                         initialBotModeUnlockRequired={aiSettings?.bot_mode_unlock_required ?? false}
                     />
@@ -75,13 +59,13 @@ export default async function DashboardLayout({
                     className="dashboard-content-type-scale relative flex min-w-0 flex-1 flex-col overflow-hidden"
                     style={dashboardContentTypographyStyle}
                 >
-                    {onboardingState?.showBanner && billingSnapshot ? (
+                    {shellData.onboardingState?.showBanner && billingSnapshot ? (
                         <OnboardingTrialBanner
                             billingSnapshot={billingSnapshot}
-                            showChecklistCta={onboardingState.showChecklistCta}
+                            showChecklistCta={shellData.onboardingState.showChecklistCta}
                         />
                     ) : null}
-                    {onboardingOrganizationId && onboardingState?.isComplete ? (
+                    {onboardingOrganizationId && shellData.onboardingState?.isComplete ? (
                         <OnboardingCompletionModal
                             organizationId={onboardingOrganizationId}
                             isOpen={requiresExplicitSelection}
@@ -95,7 +79,7 @@ export default async function DashboardLayout({
                     </div>
                     <MobileBottomNav
                         activeOrganizationId={orgContext?.activeOrganizationId ?? null}
-                        onboardingState={onboardingState}
+                        onboardingState={shellData.onboardingState}
                     />
                 </div>
             </div>

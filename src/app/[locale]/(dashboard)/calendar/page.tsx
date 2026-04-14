@@ -15,6 +15,7 @@ import {
   getTodayDateKey,
   normalizeCalendarView,
 } from '@/lib/calendar/presentation'
+import { withDevTiming } from '@/lib/performance/timing'
 
 const CalendarClient = dynamic(
   () => import('@/components/calendar/CalendarClient').then((mod) => mod.CalendarClient),
@@ -35,7 +36,10 @@ export default async function CalendarWorkspacePage({ searchParams }: PageProps)
   const supabase = await createClient()
   const locale = await getLocale()
   const t = await getTranslations('calendar')
-  const orgContext = await resolveActiveOrganizationContext()
+  const orgContext = await withDevTiming(
+    'calendar.page.orgContext',
+    () => resolveActiveOrganizationContext()
+  )
 
   if (!orgContext) {
     redirect(`/${locale}/login`)
@@ -57,16 +61,22 @@ export default async function CalendarWorkspacePage({ searchParams }: PageProps)
     )
   }
 
-  await enforceWorkspaceAccessOrRedirect({
-    organizationId,
-    locale,
-    currentPath: '/calendar',
-    supabase,
-    bypassLock: orgContext.isSystemAdmin ?? false,
-  })
+  await withDevTiming(
+    'calendar.page.billing',
+    () => enforceWorkspaceAccessOrRedirect({
+      organizationId,
+      locale,
+      currentPath: '/calendar',
+      supabase,
+      bypassLock: orgContext.isSystemAdmin ?? false,
+    })
+  )
 
   const params = await searchParams
-  const settings = await getBookingSettingsByOrganizationId(supabase, organizationId)
+  const settings = await withDevTiming(
+    'calendar.page.settings',
+    () => getBookingSettingsByOrganizationId(supabase, organizationId)
+  )
   const initialView = normalizeCalendarView(params.view)
   const anchorDate = isValidDateKey(params.date)
     ? String(params.date)
@@ -75,11 +85,14 @@ export default async function CalendarWorkspacePage({ searchParams }: PageProps)
     anchorDate,
     timeZone: settings.timezone,
   })
-  const data = await getCalendarPageDataByOrganizationId(supabase, organizationId, {
-    rangeStartIso: dataWindow.rangeStartIso,
-    rangeEndIso: dataWindow.rangeEndIso,
-    settings,
-  })
+  const data = await withDevTiming(
+    'calendar.page.data',
+    () => getCalendarPageDataByOrganizationId(supabase, organizationId, {
+      rangeStartIso: dataWindow.rangeStartIso,
+      rangeEndIso: dataWindow.rangeEndIso,
+      settings,
+    })
+  )
 
   return (
     <CalendarClient

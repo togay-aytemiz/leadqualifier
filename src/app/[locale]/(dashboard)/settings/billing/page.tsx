@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { PageHeader, Skeleton } from '@/design'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 import BillingSettingsPageContent from './BillingSettingsPageContent'
 
 function BillingSettingsPageSkeleton() {
@@ -40,12 +41,12 @@ export default async function BillingSettingsPage() {
     }
 
     return (
-        <>
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['billingUsage']}>
             <PageHeader title={tBilling('pageTitle')} />
 
             <Suspense fallback={<BillingSettingsPageSkeleton />}>
                 <BillingSettingsPageContent organizationId={organizationId} locale={locale} />
             </Suspense>
-        </>
+        </DashboardRouteIntlProvider>
     )
 }

@@ -1,5 +1,11 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-14):** Dashboard-wide performance hardening is now planned before broader pilot expansion. The first pass must measure route/action timings, then reduce dashboard shell critical-path reads, narrow settings message loading, optimize calendar page data, add calendar window cache/prefetch, verify DB/RLS query timing, and add a performance regression guard.
+
+> **Update Note (2026-04-14):** Calendar capacity-aware booking now ships the simple org-level capacity control. Each workspace has `max_concurrent_bookings`, new/missing settings default to `1`, and overlapping internal appointments are allowed only while peak simultaneous pending/confirmed occupied ranges stay below that value. The implementation also uses symmetric before/after buffer occupancy, slot-grid-aligned nearest AI suggestions, and keeps staff/resource groups deferred.
+
+> **Update Note (2026-04-12):** Launch/social asset generation now has a reusable marketing context and social-post skill guardrails. Future Qualy social visuals should lead with `Qualy AI` as the AI-powered unified inbox actor, require visible Qualy branding, avoid generic `Assistant/asistan` labels for the AI, and limit channel logos to WhatsApp, Instagram, Telegram, and Messenger when channel coverage is shown.
+
 > **Update Note (2026-04-10):** In-app Iyzico hosted checkout must fail soft if the embedded provider script never mounts. `Settings > Plans` subscription, top-up, and fixed-difference upgrade checkout routes now need a visible loading state plus a fallback CTA that opens the stored secure `checkout_page_url`, so operators are never left on a blank screen with a still-pending order.
 
 > **Update Note (2026-04-10):** Immediate package upgrades no longer rely on Iyzico `upgradePeriod=NOW` for same-cycle charging. Because provider-side `NOW` collects the full target-plan amount, Qualy must charge only the fixed plan-price difference through a hosted one-time checkout, unlock just the credit delta immediately after that payment succeeds, and then schedule the subscription’s target pricing plan with `upgradePeriod=NEXT_PERIOD` so the next renewal collects the full new package amount. Upgrade callback finalization must also be recoverable: a paid difference checkout may not show success unless local entitlement apply succeeded, and the local billing/subscription/ledger apply now runs through one atomic RPC so retries can recover safely after transient failures. The upgrade confirmation popup must describe this as a secure Iyzico payment step, not as a saved-card direct charge.
@@ -193,7 +199,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-04-10 (`Settings > Plans` upgrades now charge only the fixed plan-price difference through hosted checkout, and hosted Iyzico checkout surfaces now fail soft to the stored secure payment page instead of leaving blank in-app screens when the embed does not mount.)
+> **Last Updated:** 2026-04-14 (dashboard performance refactor planning now targets route/action timing, shell critical-path slimming, settings message-scope reduction, calendar data optimization, cache/prefetch, DB/RLS timing verification, and regression coverage; calendar capacity-aware booking also ships the simple org-level model.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1287,9 +1293,36 @@
 
 ---
 
+## Phase 9.6: Capacity-Aware Booking 📝
+
+- [x] Decide the simple org-level capacity model: `max_concurrent_bookings` controls how many appointments may overlap, defaults to `1`, and avoids staff/resource-group scheduling in this iteration
+- [x] Add the implementation plan for capacity-aware booking (`docs/plans/2026-04-13-capacity-aware-booking-plan.md`)
+- [x] Add `booking_settings.max_concurrent_bookings` with migration defaults and type updates
+- [x] Replace the hard `calendar_bookings_no_overlap` exclusion constraint with an atomic point-in-time capacity guard over buffered occupied ranges
+- [x] Update availability lookup so internal booking occupancy counts against capacity while Google busy overlay remains a hard block
+- [x] Add `Settings > Calendar` copy and input for `Aynı anda en fazla randevu / Maximum bookings at the same time`
+- [x] Update slot generation and AI scheduling so nearest-availability questions return the closest two real slot-grid-aligned options when available
+- [x] Align `24:00` end-of-day availability validation so generated suggestions and direct booking writes agree
+- [x] Route the empty service-duration `Organizasyon ayarlarını aç` CTA directly to `Settings > Organization > Organization Details`
+- [x] Track follow-up UX issues separately: next-valid default time in manual booking, past booking status-only edits, split working-hour windows, booking-disabled customer replies, and resource-specific scheduling
+- [x] Verify with targeted calendar/AI/i18n tests plus `npm run build`
+
+---
+
 ## Phase 10: Pilot Launch
 
 - [x] Prepare AI copywriter-ready static launch asset brief grounded in repo + PRD + roadmap + release notes, with Turkish-first terminology and non-team positioning guardrails
+- [x] Standardize reusable product-marketing context and social-post prompt guardrails for Qualy AI-first launch visuals, visible brand presence, and the approved WhatsApp/Instagram/Telegram/Messenger channel set
+- [x] Add dashboard-wide performance refactor plan for Calendar, Settings, and workspace navigation (`docs/plans/2026-04-14-dashboard-performance-refactor-plan.md`)
+- [ ] Execute dashboard performance hardening before expanding pilot usage
+  - [x] Add route/action timing harness across the dashboard shell, Settings layout, Calendar page, and Calendar page action
+  - [ ] Capture baseline Calendar/Settings measurements with `DASHBOARD_PERF_DEBUG=1`
+  - [x] Dedupe/slim dashboard shell org, billing, onboarding, and AI settings critical path through a request-scoped shell-data loader
+  - [x] Narrow Settings layout message loading so the shared shell only carries settings navigation copy while each settings page provides its own client namespace
+  - [ ] Optimize Calendar page data payload/read model and server action path
+  - [ ] Add Calendar client stale-window cache and adjacent-window prefetch
+  - [ ] Verify DB/RLS query timing and add only proven indexes
+  - [ ] Add dashboard performance regression guard
 - [ ] Finish GTM readiness hardening before expanding beyond the first 5 pilots
   - [x] Keep inbound AI reply path fast by deferring lead extraction + hot-lead escalation side work until after reply delivery, with regression coverage for deferred execution and failure isolation
   - [x] Make operator outbound delivery durable by queueing pending Inbox rows before provider dispatch and finalizing them to `sent` / `failed` across text, template, and media send paths

@@ -2925,11 +2925,13 @@
       "bookingEnabledHelp": "Kapalıyken sistem yeni randevu önermeyi ve oluşturmayı durdurur.",
       "timezone": "Saat dilimi",
       "defaultDuration": "Varsayılan hizmet süresi",
+      "maxConcurrentBookings": "Aynı anda en fazla randevu",
       "slotInterval": "Randevu aralığı",
       "minimumNotice": "En erken randevu süresi",
       "bufferBefore": "Randevu öncesi boşluk",
       "bufferAfter": "Randevu sonrası boşluk",
       "fieldHints": {
+        "maxConcurrentBookings": "Bu çalışma alanında aynı anda kaç randevu yürütülebileceğini belirler. Randevuları tek kişi veya tek kaynak yönetiyorsa 1 olarak bırakın.",
         "slotInterval": "Müsait saatler müşteriye bu dakika adımlarıyla gösterilir.",
         "minimumNotice": "Şu andan itibaren en az ne kadar sonrasına randevu verilebileceğini belirler.",
         "bufferBefore": "Her randevudan önce hazırlık için otomatik boş bırakılan süredir.",

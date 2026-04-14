@@ -26,4 +26,18 @@ describe('settings layout source', () => {
         expect(source).not.toContain('getOrganizationOnboardingState')
         expect(source).not.toContain('OnboardingTrialBanner')
     })
+
+    it('keeps route-specific settings namespaces out of the shared settings shell provider', () => {
+        const source = fs.readFileSync(SETTINGS_LAYOUT_PATH, 'utf8')
+
+        expect(source).toContain('includeDashboardShell={false}')
+        expect(source).toContain("namespaces={['Sidebar']}")
+        expect(source).not.toContain("'organizationSettings'")
+        expect(source).not.toContain("'profileSettings'")
+        expect(source).not.toContain("'calendar'")
+        expect(source).not.toContain("'billingUsage'")
+        expect(source).not.toContain("'billingPlans'")
+        expect(source).not.toContain("'aiQaLab'")
+        expect(source).not.toContain("'Channels'")
+    })
 })

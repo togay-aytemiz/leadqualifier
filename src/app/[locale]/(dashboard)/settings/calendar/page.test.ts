@@ -10,4 +10,12 @@ describe('settings calendar page source', () => {
 
         expect(source).toContain("currentPath: '/settings/calendar'")
     })
+
+    it('loads only calendar settings client namespaces at the page boundary', () => {
+        const source = fs.readFileSync(SETTINGS_CALENDAR_PAGE_PATH, 'utf8')
+
+        expect(source).toContain('DashboardRouteIntlProvider')
+        expect(source).toContain('includeDashboardShell={false}')
+        expect(source).toContain("namespaces={['calendar', 'Sidebar']}")
+    })
 })

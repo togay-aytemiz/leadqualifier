@@ -5,6 +5,7 @@ import { getOrgAiSettings } from '@/lib/ai/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
 import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
+import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
 
 export default async function AiSettingsPage() {
     const supabase = await createClient()
@@ -37,9 +38,11 @@ export default async function AiSettingsPage() {
     const aiSettings = await getOrgAiSettings(organizationId, { supabase, locale, onboardingState })
 
     return (
-        <AiSettingsClient
-            initialSettings={aiSettings}
-            onboardingState={onboardingState}
-        />
+        <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['aiSettings', 'Sidebar', 'unsavedChanges']}>
+            <AiSettingsClient
+                initialSettings={aiSettings}
+                onboardingState={onboardingState}
+            />
+        </DashboardRouteIntlProvider>
     )
 }
