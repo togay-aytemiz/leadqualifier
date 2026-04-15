@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -70,6 +72,11 @@ vi.mock('@/lib/knowledge-base/actions', () => ({
 
 import { KnowledgeContainer } from '@/app/[locale]/(dashboard)/knowledge/components/KnowledgeContainer'
 
+const KNOWLEDGE_CONTAINER_PATH = path.resolve(
+  process.cwd(),
+  'src/app/[locale]/(dashboard)/knowledge/components/KnowledgeContainer.tsx'
+)
+
 function buildEntry(status: 'ready' | 'processing' | 'error' = 'ready'): KnowledgeBaseEntry {
   return {
     id: 'doc-1',
@@ -118,5 +125,16 @@ describe('KnowledgeContainer', () => {
     expect(markup).toContain('aiSuggestionsBannerTitle')
     expect(markup).toContain('aiSuggestionsBannerDescription')
     expect(markup).toContain('aiSuggestionsBannerCta')
+  })
+
+  it('does not refetch pending suggestions on mount when the server provided the initial count', () => {
+    const source = fs.readFileSync(KNOWLEDGE_CONTAINER_PATH, 'utf8')
+
+    expect(source).toContain('initialPendingSuggestions')
+    expect(source).toContain(".on('postgres_changes'")
+    expect(source).toContain("window.addEventListener('pending-suggestions-updated'")
+    expect(source).not.toMatch(
+      /useEffect\(\(\) => \{\s*if \(!organizationId \|\| !aiSuggestionsEnabled\) return\s*refreshPendingSuggestions\(\)\s*\}, \[aiSuggestionsEnabled, organizationId, refreshPendingSuggestions\]\)/
+    )
   })
 })

@@ -22,6 +22,7 @@ import {
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
+import { resolveDashboardPrefetchTargets } from '@/design/dashboard-route-transition'
 
 interface GlobalRailProps {
     userName?: string
@@ -79,18 +80,24 @@ export function GlobalRail({ userName }: GlobalRailProps) {
         if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
         const timeoutId = window.setTimeout(() => {
-            router.prefetch('/inbox')
-            router.prefetch('/leads')
-            router.prefetch('/simulator')
-            router.prefetch('/skills')
-            router.prefetch('/knowledge')
-            router.prefetch('/settings/channels')
+            const routesToPrefetch = [
+                '/inbox',
+                '/leads',
+                '/simulator',
+                '/skills',
+                '/knowledge',
+                '/settings/channels'
+            ]
+
+            resolveDashboardPrefetchTargets(routesToPrefetch, pathname).forEach((href) => {
+                router.prefetch(href)
+            })
         }, 120)
 
         return () => {
             window.clearTimeout(timeoutId)
         }
-    }, [router])
+    }, [pathname, router])
 
     return (
         <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 gap-6 shrink-0 h-screen">

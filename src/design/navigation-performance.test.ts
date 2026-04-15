@@ -74,6 +74,23 @@ describe('navigation performance source guards', () => {
     expect(mobileBottomNavSource).toContain('className={cn(')
   })
 
+  it('does not prefetch the route that is already loading or being clicked', () => {
+    const mainSidebarSource = fs.readFileSync(MAIN_SIDEBAR_PATH, 'utf8')
+    const mobileBottomNavSource = fs.readFileSync(MOBILE_BOTTOM_NAV_PATH, 'utf8')
+    const settingsShellSource = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
+    const globalRailSource = fs.readFileSync(path.join(process.cwd(), 'src/design/GlobalRail.tsx'), 'utf8')
+
+    expect(mainSidebarSource).toContain('resolveDashboardPrefetchTargets(uniqueRoutes, pathname)')
+    expect(mobileBottomNavSource).toContain('resolveDashboardPrefetchTargets(hotRoutes, pathname)')
+    expect(settingsShellSource).toContain('resolveDashboardPrefetchTargets(prefetchRoutes, pathname)')
+    expect(globalRailSource).toContain('resolveDashboardPrefetchTargets(routesToPrefetch, pathname)')
+    expect(mainSidebarSource).not.toMatch(/warmDashboardHotRoute\(href\)\s+dispatchDashboardRouteTransitionStart\(href\)/)
+    expect(mobileBottomNavSource).not.toMatch(/warmDashboardHotRoute\(href\)\s+dispatchDashboardRouteTransitionStart\(href\)/)
+    expect(settingsShellSource).not.toMatch(/warmDashboardRoute\(href\)\s+dispatchDashboardRouteTransitionStart\(href\)/)
+    expect(mainSidebarSource).not.toContain('onTouchStart={() => warmDashboardHotRoute')
+    expect(mobileBottomNavSource).not.toContain('onTouchStart={() => warmDashboardHotRoute')
+  })
+
   it('defers non-critical main sidebar hydration work', () => {
     const mainSidebarSource = fs.readFileSync(MAIN_SIDEBAR_PATH, 'utf8')
 
@@ -191,7 +208,7 @@ describe('navigation performance source guards', () => {
     expect(planCatalogSource).toContain("dynamic(() => import('./CheckoutLegalConsentModal')")
 
     expect(topupCardSource).toContain("from 'next/dynamic'")
-    expect(topupCardSource).toContain("dynamic(() => import('./CheckoutLegalConsentModal')")
+    expect(topupCardSource).toContain("() => import('./CheckoutLegalConsentModal').then")
   })
 
   it('keeps dashboard layout on the slim org-context path during initial render', () => {

@@ -5,6 +5,12 @@ import { LeadSearch } from '@/components/leads/LeadSearch'
 import { LeadsEmptyState } from '@/components/leads/LeadsEmptyState'
 import { LeadsTable } from '@/components/leads/LeadsTable'
 import { getLeadsPageData, type LeadsPageData } from '@/lib/leads/page-data'
+import {
+  buildLeadsPageDataCacheKey,
+  getCachedLeadsPageData,
+  leadsPageDataCache,
+  primeLeadsPageDataCache,
+} from '@/lib/leads/page-data-cache'
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
@@ -23,8 +29,11 @@ interface LeadsClientProps {
   organizationId: string
 }
 
-function buildLeadsCacheKey(queryState: LeadsQueryState) {
-  return JSON.stringify(queryState)
+function buildLeadsCacheKey(queryState: LeadsQueryState, organizationId: string) {
+  return buildLeadsPageDataCacheKey({
+    organizationId,
+    queryState,
+  })
 }
 
 function readLeadsQueryStateFromSearchParams(searchParams: URLSearchParams): LeadsQueryState {
@@ -86,27 +95,30 @@ function syncLeadsUrl(queryState: LeadsQueryState, mode: LeadsUrlSyncMode) {
   window.history.replaceState(window.history.state, '', nextUrl)
 }
 
-export function LeadsClient({
-  initialData,
-  initialQueryState,
-  organizationId,
-}: LeadsClientProps) {
+export function LeadsClient({ initialData, initialQueryState, organizationId }: LeadsClientProps) {
   const t = useTranslations('leads')
-  const cacheRef = useRef<Map<string, LeadsPageData>>(
-    new Map([[buildLeadsCacheKey(initialQueryState), initialData]])
-  )
   const historyModeRef = useRef<LeadsUrlSyncMode>('replace')
   const requestIdRef = useRef(0)
   const [queryState, setQueryState] = useState(initialQueryState)
   const [searchValue, setSearchValue] = useState(initialQueryState.search)
   const [pageData, setPageData] = useState(initialData)
   const [isLoading, setIsLoading] = useState(false)
-  const cacheKey = useMemo(() => buildLeadsCacheKey(queryState), [queryState])
+  const cacheKey = useMemo(
+    () => buildLeadsCacheKey(queryState, organizationId),
+    [organizationId, queryState]
+  )
+
+  useEffect(() => {
+    primeLeadsPageDataCache(buildLeadsCacheKey(initialQueryState, organizationId), initialData)
+  }, [initialData, initialQueryState, organizationId])
 
   const loadPageData = useCallback(
-    async (nextQueryState: LeadsQueryState, options?: { background?: boolean; requestId?: number }) => {
-      const nextCacheKey = buildLeadsCacheKey(nextQueryState)
-      const cached = cacheRef.current.get(nextCacheKey)
+    async (
+      nextQueryState: LeadsQueryState,
+      options?: { background?: boolean; requestId?: number }
+    ) => {
+      const nextCacheKey = buildLeadsCacheKey(nextQueryState, organizationId)
+      const cached = getCachedLeadsPageData(nextCacheKey)
       if (cached) {
         setPageData(cached)
         setIsLoading(false)
@@ -114,8 +126,9 @@ export function LeadsClient({
       }
 
       if (options?.background) {
-        const result = await getLeadsPageData(nextQueryState, organizationId)
-        cacheRef.current.set(nextCacheKey, result)
+        const result = await leadsPageDataCache.getOrLoad(nextCacheKey, () =>
+          getLeadsPageData(nextQueryState, organizationId)
+        )
         return result
       }
 
@@ -125,8 +138,18 @@ export function LeadsClient({
       setIsLoading(true)
 
       try {
-        const result = await getLeadsPageData(nextQueryState, organizationId)
-        cacheRef.current.set(nextCacheKey, result)
+        const result = await leadsPageDataCache.getOrLoad(
+          nextCacheKey,
+          () => getLeadsPageData(nextQueryState, organizationId),
+          {
+            allowStale: true,
+            onUpdate: (updatedData) => {
+              if (requestIdRef.current === requestId) {
+                setPageData(updatedData)
+              }
+            },
+          }
+        )
 
         if (requestIdRef.current !== requestId) {
           return result
@@ -155,7 +178,7 @@ export function LeadsClient({
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId
 
-    const cached = cacheRef.current.get(cacheKey)
+    const cached = getCachedLeadsPageData(cacheKey)
     if (cached) {
       setPageData(cached)
       setIsLoading(false)
@@ -210,8 +233,8 @@ export function LeadsClient({
       ...queryState,
       page: page + 1,
     }
-    const nextCacheKey = buildLeadsCacheKey(nextQueryState)
-    if (cacheRef.current.get(nextCacheKey)) {
+    const nextCacheKey = buildLeadsCacheKey(nextQueryState, organizationId)
+    if (getCachedLeadsPageData(nextCacheKey)) {
       return
     }
 
@@ -220,7 +243,7 @@ export function LeadsClient({
     }, 150)
 
     return () => clearTimeout(timeoutId)
-  }, [loadPageData, pageData.leadsResult, queryState])
+  }, [loadPageData, organizationId, pageData.leadsResult, queryState])
 
   const handleSortChange = useCallback((sortBy: string, sortOrder: 'asc' | 'desc') => {
     historyModeRef.current = 'push'

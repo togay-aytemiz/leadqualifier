@@ -29,6 +29,7 @@ import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
   dispatchDashboardRouteTransitionStart,
   primeDashboardRoute,
+  resolveDashboardPrefetchTargets,
   shouldStartDashboardRouteTransition,
 } from '@/design/dashboard-route-transition'
 import { useDashboardRouteState } from '@/design/dashboard-route-state'
@@ -208,12 +209,12 @@ export function MobileBottomNav({
     ]
 
     const prefetchRoutes = () => {
-      hotRoutes.forEach((href) => router.prefetch(href))
+      resolveDashboardPrefetchTargets(hotRoutes, pathname).forEach((href) => router.prefetch(href))
     }
 
     const timeoutId = setTimeout(prefetchRoutes, 250)
     return () => clearTimeout(timeoutId)
-  }, [router])
+  }, [pathname, router])
 
   const warmDashboardHotRoute = useCallback(
     (href: string) => {
@@ -225,10 +226,9 @@ export function MobileBottomNav({
   const handleDashboardNavClick = useCallback(
     (event: ReactMouseEvent<HTMLAnchorElement>, href: string) => {
       if (!shouldStartDashboardRouteTransition(event)) return
-      warmDashboardHotRoute(href)
       dispatchDashboardRouteTransitionStart(href)
     },
-    [warmDashboardHotRoute]
+    []
   )
 
   const refreshBillingSnapshot = useCallback(async () => {
@@ -423,7 +423,6 @@ export function MobileBottomNav({
                 prefetch={false}
                 onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
                 onFocus={() => warmDashboardHotRoute('/settings/plans')}
-                onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
                 onClick={(event) => {
                   handleDashboardNavClick(event, '/settings/plans')
                   setOtherMenuPath(null)
@@ -487,7 +486,6 @@ export function MobileBottomNav({
                   prefetch={false}
                   onMouseEnter={() => warmDashboardHotRoute(skillsMenuNavState.href ?? '/skills')}
                   onFocus={() => warmDashboardHotRoute(skillsMenuNavState.href ?? '/skills')}
-                  onTouchStart={() => warmDashboardHotRoute(skillsMenuNavState.href ?? '/skills')}
                   onClick={(event) => {
                     handleDashboardNavClick(event, skillsMenuNavState.href ?? '/skills')
                     setOtherMenuPath(null)
@@ -525,9 +523,6 @@ export function MobileBottomNav({
                     warmDashboardHotRoute(knowledgeMenuNavState.href ?? '/knowledge')
                   }
                   onFocus={() => warmDashboardHotRoute(knowledgeMenuNavState.href ?? '/knowledge')}
-                  onTouchStart={() =>
-                    warmDashboardHotRoute(knowledgeMenuNavState.href ?? '/knowledge')
-                  }
                   onClick={(event) => {
                     handleDashboardNavClick(event, knowledgeMenuNavState.href ?? '/knowledge')
                     setOtherMenuPath(null)
@@ -551,7 +546,6 @@ export function MobileBottomNav({
                   prefetch={false}
                   onMouseEnter={() => warmDashboardHotRoute('/onboarding')}
                   onFocus={() => warmDashboardHotRoute('/onboarding')}
-                  onTouchStart={() => warmDashboardHotRoute('/onboarding')}
                   onClick={(event) => {
                     handleDashboardNavClick(event, '/onboarding')
                     setOtherMenuPath(null)
@@ -588,9 +582,6 @@ export function MobileBottomNav({
                     warmDashboardHotRoute(simulatorMenuNavState.href ?? '/simulator')
                   }
                   onFocus={() => warmDashboardHotRoute(simulatorMenuNavState.href ?? '/simulator')}
-                  onTouchStart={() =>
-                    warmDashboardHotRoute(simulatorMenuNavState.href ?? '/simulator')
-                  }
                   onClick={(event) => {
                     handleDashboardNavClick(event, simulatorMenuNavState.href ?? '/simulator')
                     setOtherMenuPath(null)
@@ -605,7 +596,6 @@ export function MobileBottomNav({
                 href={settingsMenuNavState.href ?? '/settings'}
                 onMouseEnter={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
                 onFocus={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
-                onTouchStart={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
                 onClick={(event) => {
                   handleDashboardNavClick(event, settingsMenuNavState.href ?? '/settings')
                   setOtherMenuPath(null)
@@ -671,7 +661,6 @@ export function MobileBottomNav({
                 )}
                 onMouseEnter={() => warmDashboardHotRoute(item.href)}
                 onFocus={() => warmDashboardHotRoute(item.href)}
-                onTouchStart={() => warmDashboardHotRoute(item.href)}
                 onClick={(event) => handleDashboardNavClick(event, item.href)}
               >
                 <span

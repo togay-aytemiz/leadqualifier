@@ -61,7 +61,8 @@ describe('SettingsResponsiveShell source', () => {
 
     expect(source).toContain('const prefetchRoutes = useMemo(() => {')
     expect(source).toContain('}, [billingOnlyMode, locale])')
-    expect(source).toContain('}, [prefetchRoutes, router])')
+    expect(source).toContain('resolveDashboardPrefetchTargets(prefetchRoutes, pathname)')
+    expect(source).toContain('}, [pathname, prefetchRoutes, router])')
   })
 
   it('warms dashboard routes on navigation intent before click transitions', () => {

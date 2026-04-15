@@ -17,6 +17,7 @@ import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
   dispatchDashboardRouteTransitionStart,
   primeDashboardRoute,
+  resolveDashboardPrefetchTargets,
   shouldStartDashboardRouteTransition,
 } from '@/design/dashboard-route-transition'
 import { useDashboardRouteState } from '@/design/dashboard-route-state'
@@ -407,14 +408,14 @@ export function SettingsResponsiveShell({
     if (!shouldEnableManualRoutePrefetch('app-shell')) return
 
     const prefetchVisibleRoutes = () => {
-      prefetchRoutes.forEach((href) => {
+      resolveDashboardPrefetchTargets(prefetchRoutes, pathname).forEach((href) => {
         router.prefetch(href)
       })
     }
 
     const timeoutId = setTimeout(prefetchVisibleRoutes, 250)
     return () => clearTimeout(timeoutId)
-  }, [prefetchRoutes, router])
+  }, [pathname, prefetchRoutes, router])
 
   const warmDashboardRoute = useCallback(
     (href: string | undefined) => {
@@ -427,10 +428,9 @@ export function SettingsResponsiveShell({
   const handleDashboardNavClick = useCallback(
     (event: ReactMouseEvent<HTMLAnchorElement>, href: string | undefined) => {
       if (!href || !shouldStartDashboardRouteTransition(event)) return
-      warmDashboardRoute(href)
       dispatchDashboardRouteTransitionStart(href)
     },
-    [warmDashboardRoute]
+    []
   )
 
   const mobileListPaneClasses = getSettingsMobileListPaneClasses(isMobileDetailOpen)

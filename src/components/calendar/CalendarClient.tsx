@@ -53,6 +53,14 @@ import {
   getCalendarPageData,
   updateCalendarBookingAction,
 } from '@/lib/calendar/actions'
+import {
+  buildCalendarPageDataCacheKey,
+  clearCalendarPageDataCache,
+  getCachedCalendarPageData,
+  loadCalendarPageDataWithCache,
+  prefetchCalendarPageData,
+  primeCalendarPageDataCache,
+} from '@/lib/calendar/page-data-cache'
 
 interface CalendarClientProps {
   data: CalendarPageData
@@ -127,8 +135,22 @@ function createBookingDraftFromRecord(
   }
 }
 
-function buildRangeCacheKey(rangeStartIso: string, rangeEndIso: string) {
-  return `${rangeStartIso}:${rangeEndIso}`
+function resolveCalendarCacheTimeZone(data: CalendarPageData) {
+  return data.settings?.timezone ?? 'Europe/Istanbul'
+}
+
+function buildRangeCacheKey(options: {
+  data: Pick<CalendarPageData, 'organizationId'>
+  rangeEndIso: string
+  rangeStartIso: string
+  timeZone: string
+}) {
+  return buildCalendarPageDataCacheKey({
+    organizationId: options.data.organizationId,
+    rangeEndIso: options.rangeEndIso,
+    rangeStartIso: options.rangeStartIso,
+    timeZone: options.timeZone,
+  })
 }
 
 export function CalendarClient({
@@ -171,14 +193,16 @@ export function CalendarClient({
   } | null>(null)
   const [isCalendarLoading, setIsCalendarLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const rangeCacheRef = useRef(
-    new Map<string, CalendarPageData>([
-      [buildRangeCacheKey(data.rangeStartIso, data.rangeEndIso), data],
-    ])
-  )
   const isCalendarCacheDirtyRef = useRef(false)
   const latestCalendarLoadIdRef = useRef(0)
-  const desiredRangeCacheKeyRef = useRef(buildRangeCacheKey(data.rangeStartIso, data.rangeEndIso))
+  const desiredRangeCacheKeyRef = useRef(
+    buildRangeCacheKey({
+      data,
+      rangeEndIso: data.rangeEndIso,
+      rangeStartIso: data.rangeStartIso,
+      timeZone: resolveCalendarCacheTimeZone(data),
+    })
+  )
 
   const settings = calendarData.settings
   const isBookingEnabled = Boolean(settings?.booking_enabled)
@@ -200,8 +224,13 @@ export function CalendarClient({
 
   useEffect(() => {
     setCalendarData(data)
-    const cacheKey = buildRangeCacheKey(data.rangeStartIso, data.rangeEndIso)
-    rangeCacheRef.current.set(cacheKey, data)
+    const cacheKey = buildRangeCacheKey({
+      data,
+      rangeEndIso: data.rangeEndIso,
+      rangeStartIso: data.rangeStartIso,
+      timeZone: resolveCalendarCacheTimeZone(data),
+    })
+    primeCalendarPageDataCache(cacheKey, data)
     desiredRangeCacheKeyRef.current = cacheKey
     isCalendarCacheDirtyRef.current = false
   }, [data])
@@ -303,8 +332,61 @@ export function CalendarClient({
   const invalidateCalendarWindowCache = useCallback(() => {
     isCalendarCacheDirtyRef.current = true
     latestCalendarLoadIdRef.current += 1
-    rangeCacheRef.current.clear()
+    clearCalendarPageDataCache()
   }, [])
+
+  const prefetchAdjacentCalendarWindows = useCallback(
+    (sourceAnchorDate: string, sourceView: CalendarView, timeZone: string) => {
+      if (process.env.NEXT_PUBLIC_DISABLE_MANUAL_PREFETCH === '1') return
+      if (!calendarData.organizationId) return
+
+      const runPrefetch = () => {
+        for (const direction of ['prev', 'next'] as const) {
+          const adjacentAnchorDate = shiftCalendarAnchor({
+            anchorDate: sourceAnchorDate,
+            direction,
+            view: sourceView,
+          })
+          const adjacentWindow = buildCalendarDataWindow({
+            anchorDate: adjacentAnchorDate,
+            timeZone,
+          })
+          const cacheKey = buildRangeCacheKey({
+            data: calendarData,
+            rangeEndIso: adjacentWindow.rangeEndIso,
+            rangeStartIso: adjacentWindow.rangeStartIso,
+            timeZone,
+          })
+
+          void prefetchCalendarPageData(cacheKey, () =>
+            getCalendarPageData({
+              rangeEndIso: adjacentWindow.rangeEndIso,
+              rangeStartIso: adjacentWindow.rangeStartIso,
+            })
+          )
+        }
+      }
+
+      if (typeof window === 'undefined') {
+        return
+      }
+
+      const prefetchWindow = window as Window & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions
+        ) => number
+      }
+
+      if (typeof prefetchWindow.requestIdleCallback === 'function') {
+        prefetchWindow.requestIdleCallback(runPrefetch, { timeout: 1_000 })
+        return
+      }
+
+      prefetchWindow.setTimeout(runPrefetch, 150)
+    },
+    [calendarData]
+  )
 
   const ensureCalendarWindow = useCallback(
     async (nextAnchorDate: string, nextView: CalendarView, timeZone: string) => {
@@ -313,10 +395,12 @@ export function CalendarClient({
         view: nextView,
         timeZone,
       })
-      const currentCacheKey = buildRangeCacheKey(
-        calendarData.rangeStartIso,
-        calendarData.rangeEndIso
-      )
+      const currentCacheKey = buildRangeCacheKey({
+        data: calendarData,
+        rangeEndIso: calendarData.rangeEndIso,
+        rangeStartIso: calendarData.rangeStartIso,
+        timeZone,
+      })
 
       if (
         !isCalendarCacheDirtyRef.current &&
@@ -329,6 +413,7 @@ export function CalendarClient({
       ) {
         desiredRangeCacheKeyRef.current = currentCacheKey
         setIsCalendarLoading(false)
+        prefetchAdjacentCalendarWindows(nextAnchorDate, nextView, timeZone)
         return
       }
 
@@ -336,13 +421,19 @@ export function CalendarClient({
         anchorDate: nextAnchorDate,
         timeZone,
       })
-      const cacheKey = buildRangeCacheKey(nextWindow.rangeStartIso, nextWindow.rangeEndIso)
+      const cacheKey = buildRangeCacheKey({
+        data: calendarData,
+        rangeEndIso: nextWindow.rangeEndIso,
+        rangeStartIso: nextWindow.rangeStartIso,
+        timeZone,
+      })
       desiredRangeCacheKeyRef.current = cacheKey
-      const cachedWindow = rangeCacheRef.current.get(cacheKey)
+      const cachedWindow = getCachedCalendarPageData(cacheKey)
 
       if (cachedWindow) {
         setCalendarData(cachedWindow)
         setIsCalendarLoading(false)
+        prefetchAdjacentCalendarWindows(nextAnchorDate, nextView, timeZone)
         return
       }
 
@@ -351,10 +442,27 @@ export function CalendarClient({
       setIsCalendarLoading(true)
 
       try {
-        const nextData = await getCalendarPageData({
-          rangeStartIso: nextWindow.rangeStartIso,
-          rangeEndIso: nextWindow.rangeEndIso,
-        })
+        const nextData = await loadCalendarPageDataWithCache(
+          cacheKey,
+          () =>
+            getCalendarPageData({
+              rangeStartIso: nextWindow.rangeStartIso,
+              rangeEndIso: nextWindow.rangeEndIso,
+            }),
+          {
+            onUpdate: (updatedData) => {
+              if (
+                latestCalendarLoadIdRef.current !== requestId ||
+                desiredRangeCacheKeyRef.current !== cacheKey
+              ) {
+                return
+              }
+
+              setCalendarData(updatedData)
+              prefetchAdjacentCalendarWindows(nextAnchorDate, nextView, timeZone)
+            },
+          }
+        )
 
         if (
           latestCalendarLoadIdRef.current !== requestId ||
@@ -363,8 +471,8 @@ export function CalendarClient({
           return
         }
 
-        rangeCacheRef.current.set(cacheKey, nextData)
         setCalendarData(nextData)
+        prefetchAdjacentCalendarWindows(nextAnchorDate, nextView, timeZone)
       } catch (error) {
         if (
           latestCalendarLoadIdRef.current !== requestId ||
@@ -386,7 +494,7 @@ export function CalendarClient({
         }
       }
     },
-    [calendarData.rangeEndIso, calendarData.rangeStartIso, t]
+    [calendarData, prefetchAdjacentCalendarWindows, t]
   )
 
   useEffect(() => {

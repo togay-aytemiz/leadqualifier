@@ -43,4 +43,15 @@ describe('InboxContainer thread bootstrap source guards', () => {
     expect(containerSource).toContain('initialSelectedConversationId?: string | null')
     expect(containerSource).toContain('initialSelectedConversationId ??')
   })
+
+  it('dedupes profile hydration across current user, assignee, and message sender paths', () => {
+    const containerSource = fs.readFileSync(INBOX_CONTAINER_PATH, 'utf8')
+
+    expect(containerSource).toContain("from '@/lib/profile/client-cache'")
+    expect(containerSource).toContain('loadCurrentUserWithCache')
+    expect(containerSource).toContain('loadProfileWithCache(user.id')
+    expect(containerSource).toContain('loadProfileWithCache(assigneeId')
+    expect(containerSource).toContain('primeProfileCache(profile)')
+    expect(containerSource).toContain('getCachedProfile(id)')
+  })
 })

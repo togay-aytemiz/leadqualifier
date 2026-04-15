@@ -141,7 +141,6 @@ export function SidebarItem({
                 aria-label={resolvedLabel}
                 onMouseEnter={onNavigateIntent}
                 onFocus={onNavigateIntent}
-                onTouchStart={onNavigateIntent}
                 onClick={onNavigateClick}
             >
                 {content}

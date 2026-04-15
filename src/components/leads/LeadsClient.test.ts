@@ -12,7 +12,9 @@ describe('Leads client cache source guards', () => {
 
     expect(pageSource).toContain('<LeadsClient')
     expect(clientSource).toContain('getLeadsPageData(')
-    expect(clientSource).toContain('cacheRef.current.get(cacheKey)')
+    expect(clientSource).toContain('leadsPageDataCache')
+    expect(clientSource).toContain('primeLeadsPageDataCache')
+    expect(clientSource).toContain('getCachedLeadsPageData(cacheKey)')
     expect(clientSource).toContain('window.history.replaceState')
     expect(clientSource).toContain('const [queryState, setQueryState] = useState')
     expect(clientSource).toContain('if (options?.background) {')

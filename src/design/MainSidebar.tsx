@@ -22,6 +22,7 @@ import { shouldEnableManualRoutePrefetch } from '@/design/manual-prefetch'
 import {
   dispatchDashboardRouteTransitionStart,
   primeDashboardRoute,
+  resolveDashboardPrefetchTargets,
   shouldStartDashboardRouteTransition,
 } from '@/design/dashboard-route-transition'
 import { useDashboardRouteState } from '@/design/dashboard-route-state'
@@ -800,14 +801,14 @@ export function MainSidebar({
 
     const uniqueRoutes = Array.from(new Set(routesToPrefetch))
     const prefetchRoutes = () => {
-      uniqueRoutes.forEach((route) => {
+      resolveDashboardPrefetchTargets(uniqueRoutes, pathname).forEach((route) => {
         router.prefetch(`${localePrefix}${route}`)
       })
     }
 
     const timeoutId = setTimeout(prefetchRoutes, 250)
     return () => clearTimeout(timeoutId)
-  }, [canAccessQaLabAdmin, isSystemAdmin, localePrefix, router])
+  }, [canAccessQaLabAdmin, isSystemAdmin, localePrefix, pathname, router])
 
   const warmDashboardHotRoute = useCallback(
     (href: string) => {
@@ -819,10 +820,9 @@ export function MainSidebar({
   const handleDashboardNavClick = useCallback(
     (event: ReactMouseEvent<HTMLAnchorElement>, href: string) => {
       if (!shouldStartDashboardRouteTransition(event)) return
-      warmDashboardHotRoute(href)
       dispatchDashboardRouteTransitionStart(href)
     },
-    [warmDashboardHotRoute]
+    []
   )
 
   const sections = useMemo(
@@ -1782,9 +1782,6 @@ export function MainSidebar({
                         warmDashboardHotRoute(settingsNavState.href ?? '/settings/ai')
                       }
                       onFocus={() => warmDashboardHotRoute(settingsNavState.href ?? '/settings/ai')}
-                      onTouchStart={() =>
-                        warmDashboardHotRoute(settingsNavState.href ?? '/settings/ai')
-                      }
                       onClick={(event) =>
                         handleDashboardNavClick(event, settingsNavState.href ?? '/settings/ai')
                       }
@@ -1825,7 +1822,6 @@ export function MainSidebar({
                   )}
                   onMouseEnter={() => warmDashboardHotRoute('/onboarding')}
                   onFocus={() => warmDashboardHotRoute('/onboarding')}
-                  onTouchStart={() => warmDashboardHotRoute('/onboarding')}
                   onClick={(event) => handleDashboardNavClick(event, '/onboarding')}
                 >
                   <HiOutlineRocketLaunch size={19} />
@@ -1843,7 +1839,6 @@ export function MainSidebar({
                 )}
                 onMouseEnter={() => warmDashboardHotRoute('/onboarding')}
                 onFocus={() => warmDashboardHotRoute('/onboarding')}
-                onTouchStart={() => warmDashboardHotRoute('/onboarding')}
                 onClick={(event) => handleDashboardNavClick(event, '/onboarding')}
               >
                 <HiMiniRocketLaunch
@@ -2053,7 +2048,6 @@ export function MainSidebar({
                             className={navItemClassName}
                             onMouseEnter={() => warmDashboardHotRoute(itemHref)}
                             onFocus={() => warmDashboardHotRoute(itemHref)}
-                            onTouchStart={() => warmDashboardHotRoute(itemHref)}
                             onClick={(event) => handleDashboardNavClick(event, itemHref)}
                           >
                             {navItemContent}
@@ -2094,7 +2088,6 @@ export function MainSidebar({
               className="block px-3 pt-3"
               onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
               onFocus={() => warmDashboardHotRoute('/settings/plans')}
-              onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
               onClick={(event) => handleDashboardNavClick(event, '/settings/plans')}
             >
               <div className="flex items-center justify-between gap-2">
@@ -2207,7 +2200,6 @@ export function MainSidebar({
               title={`${tSidebar('billingStatusLabel')}: ${formatSidebarBillingCredits(locale, billingDisplayCredits)} ${tSidebar('billingCreditsUnit')}`}
               onMouseEnter={() => warmDashboardHotRoute('/settings/plans')}
               onFocus={() => warmDashboardHotRoute('/settings/plans')}
-              onTouchStart={() => warmDashboardHotRoute('/settings/plans')}
               onClick={(event) => handleDashboardNavClick(event, '/settings/plans')}
               className={cn(
                 'mx-auto flex h-11 w-11 items-center justify-center rounded-xl border transition',

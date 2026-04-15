@@ -93,11 +93,6 @@ export function KnowledgeContainer({
 
     useEffect(() => {
         if (!organizationId || !aiSuggestionsEnabled) return
-        refreshPendingSuggestions()
-    }, [aiSuggestionsEnabled, organizationId, refreshPendingSuggestions])
-
-    useEffect(() => {
-        if (!organizationId || !aiSuggestionsEnabled) return
         let suggestionChannel: ReturnType<typeof supabase.channel> | null = null
         let isMounted = true
 

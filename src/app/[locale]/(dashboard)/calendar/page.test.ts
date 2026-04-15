@@ -41,10 +41,11 @@ describe('calendar page source', () => {
   it('guards cached-window reuse and stale async loads inside the client workspace', () => {
     const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
 
-    expect(source).toContain('rangeCacheRef')
+    expect(source).toContain('loadCalendarPageDataWithCache')
+    expect(source).toContain('primeCalendarPageDataCache')
     expect(source).toContain('desiredRangeCacheKeyRef')
     expect(source).toContain('latestCalendarLoadIdRef')
-    expect(source).toContain('const cachedWindow = rangeCacheRef.current.get(cacheKey)')
+    expect(source).toContain('getCachedCalendarPageData(cacheKey)')
     expect(source).toContain('latestCalendarLoadIdRef.current !== requestId')
     expect(source).toContain('desiredRangeCacheKeyRef.current !== cacheKey')
   })
@@ -56,7 +57,16 @@ describe('calendar page source', () => {
     expect(source).toContain('isCalendarCacheDirtyRef')
     expect(source).toContain('latestCalendarLoadIdRef.current += 1')
     expect(source.match(/invalidateCalendarWindowCache\(\)/g)).toHaveLength(2)
-    expect(source.match(/rangeCacheRef\.current\.clear\(\)/g)).toHaveLength(1)
+    expect(source.match(/clearCalendarPageDataCache\(\)/g)).toHaveLength(1)
+  })
+
+  it('prefetches adjacent calendar data windows without replacing visible data', () => {
+    const source = fs.readFileSync(CALENDAR_CLIENT_PATH, 'utf8')
+
+    expect(source).toContain('prefetchAdjacentCalendarWindows')
+    expect(source).toContain('void prefetchCalendarPageData(')
+    expect(source).toContain('NEXT_PUBLIC_DISABLE_MANUAL_PREFETCH')
+    expect(source).not.toContain('setCalendarData(prefetchedData)')
   })
 
   it('keeps booking duration editable, captures customer email, and uses the shared select primitive in the modal', () => {

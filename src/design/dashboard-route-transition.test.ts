@@ -4,6 +4,7 @@ import {
     normalizeDashboardRoutePath,
     resolveOptimisticDashboardPath,
     resolveDashboardRouteSkeleton,
+    resolveDashboardPrefetchTargets,
     shouldRenderGlobalDashboardPendingOverlay,
     shouldPrimeDashboardRoute
 } from '@/design/dashboard-route-transition'
@@ -28,6 +29,18 @@ describe('shouldPrimeDashboardRoute', () => {
         expect(shouldPrimeDashboardRoute('/knowledge')).toBe(true)
         expect(shouldPrimeDashboardRoute('/admin/users')).toBe(true)
         expect(shouldPrimeDashboardRoute('/login')).toBe(false)
+    })
+})
+
+describe('resolveDashboardPrefetchTargets', () => {
+    it('dedupes manual prefetch routes and excludes the active route', () => {
+        expect(resolveDashboardPrefetchTargets([
+            '/inbox',
+            '/calendar',
+            '/tr/calendar?view=week',
+            '/leads',
+            '/leads/'
+        ], '/tr/calendar')).toEqual(['/inbox', '/leads'])
     })
 })
 

@@ -71,6 +71,21 @@ export function shouldPrimeDashboardRoute(value: string) {
     return Boolean(resolveDashboardRouteFamily(value))
 }
 
+export function resolveDashboardPrefetchTargets(routes: string[], currentPath: string) {
+    const normalizedCurrentPath = normalizeDashboardRoutePath(currentPath)
+    const seenRoutes = new Set<string>()
+
+    return routes.filter((route) => {
+        const normalizedRoute = normalizeDashboardRoutePath(route)
+        if (!shouldPrimeDashboardRoute(normalizedRoute)) return false
+        if (normalizedRoute === normalizedCurrentPath) return false
+        if (seenRoutes.has(normalizedRoute)) return false
+
+        seenRoutes.add(normalizedRoute)
+        return true
+    })
+}
+
 export function resolveDashboardRouteSkeleton(value: string | null | undefined) {
     if (!value) return null
 

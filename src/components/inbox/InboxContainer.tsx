@@ -169,6 +169,13 @@ import {
   resolveMessageSenderIdentity,
   type InboxSenderProfile,
 } from '@/components/inbox/message-sender'
+import {
+  getCachedProfile,
+  loadCurrentUserWithCache,
+  loadProfileWithCache,
+  primeProfileCache,
+  type ClientProfile,
+} from '@/lib/profile/client-cache'
 import { ImportantInfoEditor } from '@/components/inbox/ImportantInfoEditor'
 import { ConversationTagsEditor } from '@/components/inbox/ConversationTagsEditor'
 import {
@@ -211,7 +218,7 @@ interface InboxContainerProps {
   isReadOnly?: boolean
 }
 
-type ProfileLite = Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'>
+type ProfileLite = ClientProfile
 type Assignee = Pick<Profile, 'full_name' | 'email'>
 type SenderProfile = InboxSenderProfile
 const SUMMARY_PANEL_ID = 'conversation-summary-panel'
@@ -653,7 +660,7 @@ export function InboxContainer({
 
   const hydrateSenderProfiles = useCallback(
     async (messageList: Message[]) => {
-      const missingIds = Array.from(
+      const candidateIds = Array.from(
         new Set(
           messageList
             .filter((message) => message.sender_type === 'user')
@@ -661,8 +668,16 @@ export function InboxContainer({
               typeof message.created_by === 'string' ? message.created_by.trim() : ''
             )
             .filter((id) => id.length > 0)
-            .filter((id) => !senderProfilesRef.current[id])
         )
+      )
+      const cachedProfiles = candidateIds
+        .map((id) => getCachedProfile(id))
+        .filter((profile): profile is ProfileLite => Boolean(profile))
+
+      mergeSenderProfiles(cachedProfiles)
+
+      const missingIds = candidateIds.filter(
+        (id) => !senderProfilesRef.current[id] && !getCachedProfile(id)
       )
 
       if (missingIds.length === 0) return
@@ -677,7 +692,11 @@ export function InboxContainer({
         return
       }
 
-      mergeSenderProfiles((data ?? []) as SenderProfile[])
+      const profiles = (data ?? []) as ProfileLite[]
+      profiles.forEach((profile) => {
+        primeProfileCache(profile)
+      })
+      mergeSenderProfiles(profiles)
     },
     [mergeSenderProfiles, supabase]
   )
@@ -1293,25 +1312,49 @@ export function InboxContainer({
       const cached = assigneeCacheRef.current[assigneeId]
       if (cached) return cached
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('id', assigneeId)
-        .single()
+      const cachedProfile = getCachedProfile(assigneeId)
+      if (cachedProfile) {
+        const assignee: Assignee = {
+          full_name: cachedProfile.full_name,
+          email: cachedProfile.email,
+        }
+        assigneeCacheRef.current[assigneeId] = assignee
+        return assignee
+      }
 
-      if (error || !data) {
+      try {
+        const profile = await loadProfileWithCache(assigneeId, async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .eq('id', assigneeId)
+            .single()
+
+          if (error || !data) {
+            throw error ?? new Error('Assignee profile not found')
+          }
+
+          return {
+            avatar_url: data.avatar_url,
+            email: data.email,
+            full_name: data.full_name,
+            id: data.id,
+          }
+        })
+
+        const assignee: Assignee = {
+          full_name: profile.full_name,
+          email: profile.email,
+        }
+        assigneeCacheRef.current[assigneeId] = assignee
+        mergeSenderProfiles([profile])
+        return assignee
+      } catch (error) {
         console.error('Failed to load assignee profile', error)
         return null
       }
-
-      const assignee: Assignee = {
-        full_name: data.full_name,
-        email: data.email,
-      }
-      assigneeCacheRef.current[assigneeId] = assignee
-      return assignee
     },
-    [supabase]
+    [mergeSenderProfiles, supabase]
   )
 
   useEffect(() => {
@@ -1344,32 +1387,48 @@ export function InboxContainer({
     let isMounted = true
 
     const loadProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await loadCurrentUserWithCache(async () => {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        return user ? { id: user.id } : null
+      })
       if (!user) return
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url')
-        .eq('id', user.id)
-        .single()
+      try {
+        const profile = await loadProfileWithCache(user.id, async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .eq('id', user.id)
+            .single()
 
-      if (!isMounted || error || !data) return
+          if (error || !data) {
+            throw error ?? new Error('Current user profile not found')
+          }
 
-      const profile: ProfileLite = {
-        id: data.id,
-        full_name: data.full_name,
-        email: data.email,
-        avatar_url: data.avatar_url,
+          return {
+            avatar_url: data.avatar_url,
+            email: data.email,
+            full_name: data.full_name,
+            id: data.id,
+          }
+        })
+
+        if (!isMounted) return
+
+        assigneeCacheRef.current[profile.id] = {
+          full_name: profile.full_name,
+          email: profile.email,
+        }
+        mergeSenderProfiles([profile])
+        setCurrentUserProfile(profile)
+      } catch (error) {
+        if (isMounted) {
+          console.error('Failed to load current user profile', error)
+        }
       }
-
-      assigneeCacheRef.current[data.id] = {
-        full_name: data.full_name,
-        email: data.email,
-      }
-      mergeSenderProfiles([profile])
-      setCurrentUserProfile(profile)
     }
 
     loadProfile()
