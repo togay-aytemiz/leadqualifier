@@ -1721,13 +1721,41 @@
       "reasonFallback": "No reason",
       "showMore": "Show more",
       "showLess": "Show less",
+      "loadMore": "Load more",
+      "loading": "Loading...",
+      "periodLabel": "Period",
+      "viewLabel": "View",
+      "movementLabel": "Movement",
+      "period": {
+        "currentMonth": "This month",
+        "previousMonth": "Previous month",
+        "all": "All"
+      },
+      "movement": {
+        "all": "All",
+        "usage": "Usage",
+        "loads": "Loads"
+      },
+      "view": {
+        "entries": "Records",
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly"
+      },
       "columns": {
         "date": "Date",
         "type": "Type",
         "pool": "Pool",
+        "movement": "Movement",
         "delta": "Delta",
         "balance": "Balance",
-        "reason": "Reason"
+        "reason": "Reason",
+        "detail": "Detail",
+        "period": "Period",
+        "usage": "Usage",
+        "added": "Added",
+        "net": "Net",
+        "movements": "Movements"
       },
       "reasonMap": {
         "aiUsageDebit": "AI usage debit",
@@ -1739,6 +1767,14 @@
         "packageAssignedDetailed": "Monthly package assigned: {credits} credits/month • {price}",
         "topupAddedDetailed": "Top-up credits added: {credits} credits • {amount}"
       },
+      "reasonCompact": {
+        "ai": "AI",
+        "package": "Package",
+        "topup": "Top-up",
+        "adjustment": "Adjust",
+        "refund": "Refund",
+        "reversal": "Reverse"
+      },
       "entryType": {
         "trialGrant": "Trial grant",
         "packageGrant": "Package grant",
@@ -1747,6 +1783,27 @@
         "adjustment": "Adjustment",
         "refund": "Refund",
         "reversal": "Reversal"
+      },
+      "entryTypeCompact": {
+        "trialGrant": "Trial",
+        "packageGrant": "Package",
+        "usageDebit": "Usage",
+        "purchaseCredit": "Top-up",
+        "adjustment": "Adjust",
+        "refund": "Refund",
+        "reversal": "Reverse"
+      },
+      "poolCompact": {
+        "trial": "Trial",
+        "package": "Package",
+        "topup": "Extra",
+        "mixed": "Mixed"
+      },
+      "aggregate": {
+        "summaryType": "Summary",
+        "mixedPool": "Mixed",
+        "recordsCount": "{count, plural, one {# record} other {# records}}",
+        "movementsCount": "{count, plural, one {# movement} other {# movements}}"
       }
     },
     "monthLabel": "This month",

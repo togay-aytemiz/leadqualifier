@@ -1721,13 +1721,41 @@
       "reasonFallback": "Neden yok",
       "showMore": "Daha fazla göster",
       "showLess": "Daha az göster",
+      "loadMore": "Daha fazla yükle",
+      "loading": "Yükleniyor...",
+      "periodLabel": "Dönem",
+      "viewLabel": "Görünüm",
+      "movementLabel": "Hareket",
+      "period": {
+        "currentMonth": "Bu ay",
+        "previousMonth": "Geçen ay",
+        "all": "Tümü"
+      },
+      "movement": {
+        "all": "Tümü",
+        "usage": "Kullanım",
+        "loads": "Yüklemeler"
+      },
+      "view": {
+        "entries": "Kayıtlar",
+        "day": "Günlük",
+        "week": "Haftalık",
+        "month": "Aylık"
+      },
       "columns": {
         "date": "Tarih",
         "type": "Tür",
         "pool": "Havuz",
+        "movement": "Hareket",
         "delta": "Değişim",
         "balance": "Bakiye",
-        "reason": "Neden"
+        "reason": "Neden",
+        "detail": "Detay",
+        "period": "Dönem",
+        "usage": "Kullanım",
+        "added": "Yükleme",
+        "net": "Net",
+        "movements": "Hareket"
       },
       "reasonMap": {
         "aiUsageDebit": "Yapay zeka kullanım düşümü",
@@ -1739,6 +1767,14 @@
         "packageAssignedDetailed": "Aylık paket tanımlandı: {credits} kredi/ay • {price}",
         "topupAddedDetailed": "Ek kredi eklendi: {credits} kredi • {amount}"
       },
+      "reasonCompact": {
+        "ai": "AI",
+        "package": "Paket",
+        "topup": "Yükleme",
+        "adjustment": "Ayar",
+        "refund": "İade",
+        "reversal": "Ters"
+      },
       "entryType": {
         "trialGrant": "Ücretsiz deneme tanımı",
         "packageGrant": "Paket tanımı",
@@ -1747,6 +1783,27 @@
         "adjustment": "Düzeltme",
         "refund": "İade",
         "reversal": "Ters kayıt"
+      },
+      "entryTypeCompact": {
+        "trialGrant": "Deneme",
+        "packageGrant": "Paket",
+        "usageDebit": "Kullanım",
+        "purchaseCredit": "Yükleme",
+        "adjustment": "Ayar",
+        "refund": "İade",
+        "reversal": "Ters"
+      },
+      "poolCompact": {
+        "trial": "Deneme",
+        "package": "Paket",
+        "topup": "Ek",
+        "mixed": "Karma"
+      },
+      "aggregate": {
+        "summaryType": "Özet",
+        "mixedPool": "Karma",
+        "recordsCount": "{count} kayıt",
+        "movementsCount": "{count} hareket"
       }
     },
     "monthLabel": "Bu ay",

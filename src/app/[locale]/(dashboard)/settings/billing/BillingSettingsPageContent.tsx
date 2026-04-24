@@ -7,41 +7,50 @@ import {
     getOrgCreditUsageSummary,
     getOrgStorageUsageSummary,
 } from '@/lib/billing/usage'
-import { getOrganizationBillingLedger, type BillingLedgerEntry } from '@/lib/billing/server'
+import {
+    getOrganizationBillingLedgerWindow,
+    getOrganizationBillingLedgerPage,
+    type BillingLedgerEntry,
+    type BillingLedgerAggregateView,
+    type BillingLedgerMovementFilter,
+    type BillingLedgerPeriodFilter
+} from '@/lib/billing/server'
 import { BillingLedgerTable } from './BillingLedgerTable'
 import { UsageBreakdownDetails } from './UsageBreakdownDetails'
 
-function resolveLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
+const BILLING_LEDGER_PAGE_SIZE = 25
+
+function resolveCompactLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
     switch (value) {
     case 'trial_grant':
-        return tBilling('ledger.entryType.trialGrant')
+        return tBilling('ledger.entryTypeCompact.trialGrant')
     case 'package_grant':
-        return tBilling('ledger.entryType.packageGrant')
+        return tBilling('ledger.entryTypeCompact.packageGrant')
     case 'usage_debit':
-        return tBilling('ledger.entryType.usageDebit')
+        return tBilling('ledger.entryTypeCompact.usageDebit')
     case 'purchase_credit':
-        return tBilling('ledger.entryType.purchaseCredit')
+        return tBilling('ledger.entryTypeCompact.purchaseCredit')
     case 'adjustment':
-        return tBilling('ledger.entryType.adjustment')
+        return tBilling('ledger.entryTypeCompact.adjustment')
     case 'refund':
-        return tBilling('ledger.entryType.refund')
+        return tBilling('ledger.entryTypeCompact.refund')
     case 'reversal':
-        return tBilling('ledger.entryType.reversal')
+        return tBilling('ledger.entryTypeCompact.reversal')
     default:
         return value
     }
 }
 
-function resolveLedgerPoolLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
+function resolveCompactLedgerPoolLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
     switch (value) {
     case 'trial_pool':
-        return tBilling('pool.trial')
+        return tBilling('ledger.poolCompact.trial')
     case 'package_pool':
-        return tBilling('pool.package')
+        return tBilling('ledger.poolCompact.package')
     case 'topup_pool':
-        return tBilling('pool.topup')
+        return tBilling('ledger.poolCompact.topup')
     case 'mixed':
-        return tBilling('pool.mixed')
+        return tBilling('ledger.poolCompact.mixed')
     default:
         return value
     }
@@ -183,42 +192,51 @@ function resolveLedgerReasonLabel(
     return tBilling('ledger.reasonFallback')
 }
 
-interface BillingSettingsPageContentProps {
-    organizationId: string
-    locale: string
+function resolveCompactLedgerReasonLabel(
+    tBilling: Awaited<ReturnType<typeof getTranslations>>,
+    entry: BillingLedgerEntry
+) {
+    const normalizedReason = entry.reason?.trim().toLowerCase() ?? ''
+
+    if (entry.entryType === 'usage_debit' || normalizedReason === 'ai usage debit') {
+        return tBilling('ledger.reasonCompact.ai')
+    }
+
+    if (entry.entryType === 'package_grant') {
+        return tBilling('ledger.reasonCompact.package')
+    }
+
+    if (entry.entryType === 'purchase_credit') {
+        return tBilling('ledger.reasonCompact.topup')
+    }
+
+    if (entry.entryType === 'adjustment') {
+        return tBilling('ledger.reasonCompact.adjustment')
+    }
+
+    if (entry.entryType === 'refund') {
+        return tBilling('ledger.reasonCompact.refund')
+    }
+
+    if (entry.entryType === 'reversal') {
+        return tBilling('ledger.reasonCompact.reversal')
+    }
+
+    if (entry.reason) return entry.reason
+    return tBilling('ledger.reasonFallback')
 }
 
-export default async function BillingSettingsPageContent({
-    organizationId,
-    locale
-}: BillingSettingsPageContentProps) {
-    const supabase = await createClient()
-    const tBilling = await getTranslations('billingUsage')
-    const [usage, storageUsage, billingLedger] = await Promise.all([
-        getOrgCreditUsageSummary(organizationId, { supabase }),
-        getOrgStorageUsageSummary(organizationId, { supabase }),
-        getOrganizationBillingLedger(organizationId, { supabase, limit: 20 })
-    ])
-    const formatDateTime = new Intl.DateTimeFormat(locale, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    })
-    const [year, month] = usage.month.split('-').map(Number)
-    const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getFullYear()
-    const safeMonth = Number.isFinite(month ?? Number.NaN) ? (month as number) : new Date().getMonth() + 1
-    const monthDate = new Date(Date.UTC(safeYear, safeMonth - 1, 1))
-    const monthLabel = new Intl.DateTimeFormat(locale, {
-        month: 'long',
-        year: 'numeric',
-        timeZone: usage.timezone
-    }).format(monthDate)
+async function buildLedgerTableRows(input: {
+    supabase: Awaited<ReturnType<typeof createClient>>
+    organizationId: string
+    locale: string
+    entries: BillingLedgerEntry[]
+    tBilling: Awaited<ReturnType<typeof getTranslations>>
+}) {
     const relatedSubscriptionIds: string[] = []
     const relatedOrderIds: string[] = []
 
-    for (const entry of billingLedger) {
+    for (const entry of input.entries) {
         const metadata = toRecord(entry.metadata)
         const subscriptionId = readLedgerSubscriptionId(metadata)
         const orderId = readString(metadata, 'order_id')
@@ -235,10 +253,10 @@ export default async function BillingSettingsPageContent({
     const ordersById = new Map<string, LedgerOrderLookupRow>()
 
     if (relatedSubscriptionIds.length > 0) {
-        const { data, error } = await supabase
+        const { data, error } = await input.supabase
             .from('organization_subscription_records')
             .select('id, metadata')
-            .eq('organization_id', organizationId)
+            .eq('organization_id', input.organizationId)
             .in('id', relatedSubscriptionIds)
 
         if (error) {
@@ -253,10 +271,10 @@ export default async function BillingSettingsPageContent({
     }
 
     if (relatedOrderIds.length > 0) {
-        const { data, error } = await supabase
+        const { data, error } = await input.supabase
             .from('credit_purchase_orders')
             .select('id, credits, amount_try, currency')
-            .eq('organization_id', organizationId)
+            .eq('organization_id', input.organizationId)
             .in('id', relatedOrderIds)
 
         if (error) {
@@ -272,6 +290,71 @@ export default async function BillingSettingsPageContent({
         }
     }
 
+    const formatDateTime = new Intl.DateTimeFormat(input.locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+
+    return input.entries.map((entry) => {
+        const isDebit = entry.creditsDelta < 0
+        const reasonDetailLabel = resolveLedgerReasonLabel(
+            input.tBilling,
+            input.locale,
+            entry,
+            subscriptionsById,
+            ordersById
+        )
+
+        return {
+            id: entry.id,
+            createdAt: entry.createdAt,
+            dateLabel: formatDateTime.format(new Date(entry.createdAt)),
+            typeLabel: resolveCompactLedgerEntryLabel(input.tBilling, entry.entryType),
+            poolLabel: resolveCompactLedgerPoolLabel(input.tBilling, entry.creditPool),
+            deltaLabel: `${isDebit ? '-' : '+'}${formatCreditAmount(Math.abs(entry.creditsDelta), input.locale)}`,
+            balanceLabel: formatCreditAmount(entry.balanceAfter, input.locale),
+            reasonLabel: resolveCompactLedgerReasonLabel(input.tBilling, entry),
+            reasonDetailLabel,
+            creditsDelta: entry.creditsDelta,
+            balanceAfter: entry.balanceAfter,
+            isDebit
+        }
+    })
+}
+
+interface BillingSettingsPageContentProps {
+    organizationId: string
+    locale: string
+}
+
+export default async function BillingSettingsPageContent({
+    organizationId,
+    locale
+}: BillingSettingsPageContentProps) {
+    const supabase = await createClient()
+    const tBilling = await getTranslations('billingUsage')
+    const [usage, storageUsage, billingLedger] = await Promise.all([
+        getOrgCreditUsageSummary(organizationId, { supabase }),
+        getOrgStorageUsageSummary(organizationId, { supabase }),
+        getOrganizationBillingLedgerPage(organizationId, {
+            supabase,
+            limit: BILLING_LEDGER_PAGE_SIZE,
+            offset: 0,
+            period: 'current_month'
+        })
+    ])
+    const [year, month] = usage.month.split('-').map(Number)
+    const safeYear = Number.isFinite(year ?? Number.NaN) ? (year as number) : new Date().getFullYear()
+    const safeMonth = Number.isFinite(month ?? Number.NaN) ? (month as number) : new Date().getMonth() + 1
+    const monthDate = new Date(Date.UTC(safeYear, safeMonth - 1, 1))
+    const monthLabel = new Intl.DateTimeFormat(locale, {
+        month: 'long',
+        year: 'numeric',
+        timeZone: usage.timezone
+    }).format(monthDate)
     const monthlyCredits = usage.monthly.credits
     const totalCredits = usage.total.credits
     const formatStorageLabel = (bytes: number) => {
@@ -282,25 +365,76 @@ export default async function BillingSettingsPageContent({
     const storageSkillsLabel = formatStorageLabel(storageUsage.skillsBytes)
     const storageKnowledgeLabel = formatStorageLabel(storageUsage.knowledgeBytes)
     const storageWhatsAppMediaLabel = formatStorageLabel(storageUsage.whatsappMediaBytes)
-    const ledgerRows = billingLedger.map((entry) => {
-        const isDebit = entry.creditsDelta < 0
-        return {
-            id: entry.id,
-            dateLabel: formatDateTime.format(new Date(entry.createdAt)),
-            typeLabel: resolveLedgerEntryLabel(tBilling, entry.entryType),
-            poolLabel: resolveLedgerPoolLabel(tBilling, entry.creditPool),
-            deltaLabel: `${isDebit ? '-' : '+'}${formatCreditAmount(Math.abs(entry.creditsDelta), locale)}`,
-            balanceLabel: formatCreditAmount(entry.balanceAfter, locale),
-            reasonLabel: resolveLedgerReasonLabel(
-                tBilling,
-                locale,
-                entry,
-                subscriptionsById,
-                ordersById
-            ),
-            isDebit
-        }
+    const ledgerRows = await buildLedgerTableRows({
+        supabase,
+        organizationId,
+        locale,
+        entries: billingLedger.entries,
+        tBilling
     })
+
+    async function loadLedgerRows(input: {
+        period: BillingLedgerPeriodFilter
+        movement: BillingLedgerMovementFilter
+        offset: number
+    }) {
+        'use server'
+
+        const nextSupabase = await createClient()
+        const nextTBilling = await getTranslations('billingUsage')
+        const page = await getOrganizationBillingLedgerPage(organizationId, {
+            supabase: nextSupabase,
+            limit: BILLING_LEDGER_PAGE_SIZE,
+            offset: input.offset,
+            period: input.period,
+            movement: input.movement
+        })
+        const rows = await buildLedgerTableRows({
+            supabase: nextSupabase,
+            organizationId,
+            locale,
+            entries: page.entries,
+            tBilling: nextTBilling
+        })
+
+        return {
+            rows,
+            hasMore: page.hasMore,
+            nextOffset: page.nextOffset
+        }
+    }
+
+    async function loadAggregateLedgerRows(input: {
+        period: BillingLedgerPeriodFilter
+        movement: BillingLedgerMovementFilter
+        view: BillingLedgerAggregateView
+        offset: number
+    }) {
+        'use server'
+
+        const nextSupabase = await createClient()
+        const nextTBilling = await getTranslations('billingUsage')
+        const page = await getOrganizationBillingLedgerWindow(organizationId, {
+            supabase: nextSupabase,
+            period: input.period,
+            movement: input.movement,
+            view: input.view,
+            offset: input.offset
+        })
+        const rows = await buildLedgerTableRows({
+            supabase: nextSupabase,
+            organizationId,
+            locale,
+            entries: page.entries,
+            tBilling: nextTBilling
+        })
+
+        return {
+            rows,
+            hasMore: page.hasMore,
+            nextOffset: page.nextOffset
+        }
+    }
 
     return (
         <div className="flex-1 overflow-auto p-8">
@@ -384,15 +518,48 @@ export default async function BillingSettingsPageContent({
                         rows={ledgerRows}
                         columns={{
                             date: tBilling('ledger.columns.date'),
-                            type: tBilling('ledger.columns.type'),
-                            pool: tBilling('ledger.columns.pool'),
+                            movement: tBilling('ledger.columns.movement'),
                             delta: tBilling('ledger.columns.delta'),
                             balance: tBilling('ledger.columns.balance'),
-                            reason: tBilling('ledger.columns.reason')
+                            detail: tBilling('ledger.columns.detail'),
+                            period: tBilling('ledger.columns.period'),
+                            usage: tBilling('ledger.columns.usage'),
+                            added: tBilling('ledger.columns.added'),
+                            net: tBilling('ledger.columns.net'),
+                            movements: tBilling('ledger.columns.movements')
                         }}
                         emptyText={tBilling('ledger.empty')}
                         showMoreLabel={tBilling('ledger.showMore')}
                         showLessLabel={tBilling('ledger.showLess')}
+                        loadMoreLabel={tBilling('ledger.loadMore')}
+                        loadingLabel={tBilling('ledger.loading')}
+                        filterLabel={tBilling('ledger.periodLabel')}
+                        viewLabel={tBilling('ledger.viewLabel')}
+                        movementLabel={tBilling('ledger.movementLabel')}
+                        selectedPeriod="current_month"
+                        selectedView="entries"
+                        selectedMovement="all"
+                        periodOptions={[
+                            { value: 'current_month', label: tBilling('ledger.period.currentMonth') },
+                            { value: 'previous_month', label: tBilling('ledger.period.previousMonth') },
+                            { value: 'all', label: tBilling('ledger.period.all') }
+                        ]}
+                        viewOptions={[
+                            { value: 'entries', label: tBilling('ledger.view.entries') },
+                            { value: 'day', label: tBilling('ledger.view.day') },
+                            { value: 'week', label: tBilling('ledger.view.week') },
+                            { value: 'month', label: tBilling('ledger.view.month') }
+                        ]}
+                        movementOptions={[
+                            { value: 'all', label: tBilling('ledger.movement.all') },
+                            { value: 'usage', label: tBilling('ledger.movement.usage') },
+                            { value: 'loads', label: tBilling('ledger.movement.loads') }
+                        ]}
+                        hasMoreRows={billingLedger.hasMore}
+                        nextOffset={billingLedger.nextOffset}
+                        locale={locale}
+                        loadRows={loadLedgerRows}
+                        loadAggregateRows={loadAggregateLedgerRows}
                     />
                 </SettingsSection>
             </div>

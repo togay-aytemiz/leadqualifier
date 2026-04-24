@@ -29,4 +29,28 @@ describe('billing settings page source guard', () => {
 
         expect(source).toContain("readString(metadata, 'subscription_record_id')")
     })
+
+    it('does not pass callback props inside aggregate labels to the client ledger table', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).not.toContain('recordsCount: ({ count })')
+        expect(source).not.toContain('recordsCountLabel:')
+        expect(source).toContain("loadAggregateRows={loadAggregateLedgerRows}")
+    })
+
+    it('keeps aggregate loading period-based instead of raw-row based', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('getOrganizationBillingLedgerWindow')
+        expect(source).toContain('movement: input.movement')
+        expect(source).toContain('view: input.view')
+    })
 })
