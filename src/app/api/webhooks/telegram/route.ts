@@ -252,7 +252,10 @@ export async function POST(req: NextRequest) {
     const responseLanguageName = resolveMvpResponseLanguageName(text, {
         historyMessages: languageHistoryMessages
     })
-    const aiSettings = await getOrgAiSettings(orgId, { supabase })
+    const aiSettings = await getOrgAiSettings(orgId, {
+        supabase,
+        failClosedBotMode: true
+    })
     const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
         message: content,
         platform: 'telegram',

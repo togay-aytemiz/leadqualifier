@@ -511,7 +511,10 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const responseLanguageName = resolveMvpResponseLanguageName(options.text, {
         historyMessages: languageHistoryMessages
     })
-    const aiSettings = await getOrgAiSettings(orgId, { supabase: options.supabase })
+    const aiSettings = await getOrgAiSettings(orgId, {
+        supabase: options.supabase,
+        failClosedBotMode: true
+    })
     const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
         message: content,
         platform: options.platform,

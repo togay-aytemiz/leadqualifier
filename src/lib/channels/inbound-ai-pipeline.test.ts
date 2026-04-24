@@ -475,6 +475,10 @@ describe('processInboundAiPipeline guardrails', () => {
         await processInboundAiPipeline(buildInput(supabase, sendOutbound))
         await flushAfterCallbacks()
 
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase,
+            failClosedBotMode: true
+        })
         expect(resolveLeadExtractionAllowanceMock).toHaveBeenCalledWith({
             botMode: 'shadow',
             operatorActive: false,

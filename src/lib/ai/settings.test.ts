@@ -30,6 +30,19 @@ function createSupabaseMock(data: Record<string, unknown>, error: unknown = null
 }
 
 describe('getOrgAiSettings handover message localization', () => {
+    it('can fail closed for runtime reads when AI settings cannot be loaded', async () => {
+        const supabase = createSupabaseMock({}, { message: 'temporary database error' })
+
+        const settings = await getOrgAiSettings('org-1', {
+            supabase: supabase as unknown as GetOrgAiSettingsSupabase,
+            failClosedBotMode: true
+        })
+
+        expect(settings.bot_mode).toBe('off')
+        expect(settings.bot_mode_unlock_required).toBe(true)
+        expect(settings.bot_mode_unlocked_at).toBeNull()
+    })
+
     it('keeps bot mode locked to off after onboarding completion until an explicit choice has been recorded', async () => {
         const supabase = createSupabaseMock({
             bot_mode: 'active',

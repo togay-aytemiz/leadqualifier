@@ -433,6 +433,10 @@ describe('Telegram webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase,
+            failClosedBotMode: true
+        })
         expect(resolveLeadExtractionAllowanceMock).toHaveBeenCalledWith({
             botMode: 'shadow',
             operatorActive: false,

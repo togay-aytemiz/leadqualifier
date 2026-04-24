@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-24):** Runtime bot-mode reads now fail closed on customer-facing webhook paths. If organization AI settings cannot be loaded or are unexpectedly missing during WhatsApp/Instagram shared inbound processing or Telegram processing, effective bot mode resolves to `Kapalı`, preventing transient settings-read failures from bypassing the `Dinleyici` no-reply guarantee.
+
 > **Update Note (2026-04-15):** Dashboard route prefetching must not race the active navigation. App-shell manual prefetch now excludes the route already being rendered, click handlers only start the optimistic transition instead of also prefetching the same destination, and touch-start prefetch is removed so Calendar/Leads page chunks do not appear twice during route entry.
 
 > **Update Note (2026-04-14):** Duplicate dashboard entry reads are now part of performance hardening. Inbox current-user and profile hydration must share client caches across auth, assignee, and sender paths so Strict Mode/equivalent user ids do not duplicate `/user` or `profiles` reads, and Knowledge must trust the server-provided pending-suggestion count on initial render instead of immediately refetching the same count.
@@ -205,7 +207,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-04-15 (dashboard performance hardening now prevents current-route/click-time manual prefetch races that duplicated Calendar/Leads page chunks, includes shared client caches for hot route data plus Inbox current-user/profile hydration, removes duplicate Knowledge pending-suggestion entry reads, applies Calendar stale-window cache/prefetch and Leads cache/in-flight dedupe reuse, and keeps the existing Next App Router architecture; calendar capacity-aware booking also ships the simple org-level model.)
+> **Last Updated:** 2026-04-24 (customer-facing webhook runtimes now fail closed to `Kapalı` when AI settings cannot be loaded, preserving the `Dinleyici` no-reply guarantee; dashboard performance hardening and simple org-level capacity-aware booking remain current.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -741,6 +743,7 @@
   - [x] Active mode copy mentions background lead extraction
   - [x] Sidebar status dot uses green/amber/red for Active/Dinleyici/Kapalı
   - [x] Regression tests enforce `Shadow` guarantee in shared inbound + Telegram paths: no outbound bot reply while lead extraction still runs
+  - [x] Runtime AI settings reads fail closed to `Kapalı` on shared WhatsApp/Instagram and Telegram webhook paths when settings cannot be loaded
 - [x] **AI Settings:** Always-on flexible mode with a single threshold and structured AI assistant instructions for customer-facing replies
 - [x] **AI Settings Copy:** Localized TR labels and sensitivity helper text
 - [x] **AI Settings Copy:** TR locale now localizes `Skill Based Handover` section title, and skill button empty-state copy is channel-agnostic

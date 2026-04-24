@@ -65,6 +65,7 @@ interface GetOrgAiSettingsOptions {
     supabase?: SupabaseClientLike
     locale?: string | null
     onboardingState?: OrganizationOnboardingShellState | null
+    failClosedBotMode?: boolean
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -252,7 +253,22 @@ export async function getOrgAiSettings(
         if (process.env.AI_SETTINGS_DEBUG === '1') {
             console.error('Failed to load AI settings:', error)
         }
+        if (options?.failClosedBotMode) {
+            return applyAiDefaults({
+                bot_mode: 'off',
+                bot_mode_unlock_required: true,
+                bot_mode_unlocked_at: null
+            }, options?.locale, options?.onboardingState)
+        }
         return applyAiDefaults(null, options?.locale, options?.onboardingState)
+    }
+
+    if (!data && options?.failClosedBotMode) {
+        return applyAiDefaults({
+            bot_mode: 'off',
+            bot_mode_unlock_required: true,
+            bot_mode_unlocked_at: null
+        }, options?.locale, options?.onboardingState)
     }
 
     return applyAiDefaults(data as Partial<OrganizationAiSettings>, options?.locale, options?.onboardingState)
