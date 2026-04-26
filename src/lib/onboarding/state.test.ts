@@ -7,6 +7,7 @@ import { getDefaultSystemSkillTemplates } from '@/lib/skills/default-system-skil
 import {
   countCustomSkillsForOnboarding,
   isChannelConnectionPrerequisitesComplete,
+  resolveCustomSkillCountFromLoadedSkills,
   resolveOnboardingState,
   type OrganizationOnboardingStateRow,
 } from '@/lib/onboarding/state'
@@ -170,6 +171,22 @@ describe('resolveOnboardingState', () => {
     ]
 
     expect(countCustomSkillsForOnboarding(skills)).toBe(1)
+  })
+
+  it('treats skill totals above the default signature ceiling as custom without loading every skill body', () => {
+    const defaultTemplates = getDefaultSystemSkillTemplates('tr')
+    const loadedDefaultSkills = defaultTemplates.map((template, index) =>
+      createSkill({
+        id: `skill-${index + 1}`,
+        title: template.title,
+        trigger_examples: template.trigger_examples,
+        response_text: template.response_text,
+        requires_human_handover: true,
+      })
+    )
+
+    expect(resolveCustomSkillCountFromLoadedSkills(999, loadedDefaultSkills)).toBe(1)
+    expect(resolveCustomSkillCountFromLoadedSkills(defaultTemplates.length, loadedDefaultSkills)).toBe(0)
   })
 
   it('auto-opens onboarding once for trial orgs that have never seen it', () => {

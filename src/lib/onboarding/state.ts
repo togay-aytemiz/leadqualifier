@@ -147,6 +147,17 @@ export function countCustomSkillsForOnboarding(skills: OnboardingSkillCandidate[
   }, 0)
 }
 
+export function resolveCustomSkillCountFromLoadedSkills(
+  totalSkillCount: number,
+  loadedSkills: OnboardingSkillCandidate[]
+) {
+  if (totalSkillCount > DEFAULT_SYSTEM_SKILL_SIGNATURES.size) {
+    return 1
+  }
+
+  return countCustomSkillsForOnboarding(loadedSkills)
+}
+
 export function isChannelConnectionPrerequisitesComplete(
   steps: Pick<OrganizationOnboardingStepState, 'id' | 'isComplete'>[]
 ) {
@@ -329,10 +340,32 @@ async function readKnowledgeDocumentCount(supabase: SupabaseClient, organization
 }
 
 async function readCustomSkillCount(supabase: SupabaseClient, organizationId: string) {
+  const { count, error: countError } = (await supabase
+    .from('skills')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)) as OnboardingCountQueryResult
+
+  if (countError) {
+    if (!isMissingRelationError(countError, 'skills')) {
+      console.error('Failed to count skills for onboarding:', countError)
+    }
+    return 0
+  }
+
+  const totalSkillCount = normalizeCount(count)
+  if (totalSkillCount === 0) {
+    return 0
+  }
+
+  if (totalSkillCount > DEFAULT_SYSTEM_SKILL_SIGNATURES.size) {
+    return 1
+  }
+
   const { data, error } = await supabase
     .from('skills')
     .select('title, trigger_examples, response_text')
     .eq('organization_id', organizationId)
+    .limit(DEFAULT_SYSTEM_SKILL_SIGNATURES.size)
 
   if (error) {
     if (!isMissingRelationError(error, 'skills')) {
@@ -341,7 +374,10 @@ async function readCustomSkillCount(supabase: SupabaseClient, organizationId: st
     return 0
   }
 
-  return countCustomSkillsForOnboarding((data as OnboardingSkillCandidate[] | null) ?? [])
+  return resolveCustomSkillCountFromLoadedSkills(
+    totalSkillCount,
+    (data as OnboardingSkillCandidate[] | null) ?? []
+  )
 }
 
 async function readOfferingProfile(supabase: SupabaseClient, organizationId: string) {

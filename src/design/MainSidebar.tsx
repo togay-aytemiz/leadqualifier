@@ -200,6 +200,7 @@ interface MainSidebarProps {
   onboardingState?: OrganizationOnboardingShellState | null
   initialBotMode?: AiBotMode | null
   initialBotModeUnlockRequired?: boolean
+  initialBillingSnapshot?: OrganizationBillingSnapshot | null
 }
 
 export function MainSidebar({
@@ -213,6 +214,7 @@ export function MainSidebar({
   onboardingState = null,
   initialBotMode = null,
   initialBotModeUnlockRequired = false,
+  initialBillingSnapshot = null,
 }: MainSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -246,7 +248,9 @@ export function MainSidebar({
   const [isBotModeDropdownOpen, setIsBotModeDropdownOpen] = useState(false)
   const [isUpdatingBotMode, setIsUpdatingBotMode] = useState(false)
   const [botModeUpdateError, setBotModeUpdateError] = useState<string | null>(null)
-  const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(null)
+  const [billingSnapshot, setBillingSnapshot] = useState<OrganizationBillingSnapshot | null>(
+    initialBillingSnapshot
+  )
   const [isBillingDetailsExpanded, setIsBillingDetailsExpanded] = useState(false)
   const [orgSearch, setOrgSearch] = useState('')
   const [isSwitchingOrg, setIsSwitchingOrg] = useState(false)
@@ -359,19 +363,20 @@ export function MainSidebar({
 
   const refreshPendingSuggestions = useCallback(
     async (orgId: string) => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('offering_profile_suggestions')
-        .select('id', { count: 'exact', head: true })
+        .select('id')
         .eq('organization_id', orgId)
         .is('archived_at', null)
         .or('status.eq.pending,status.is.null')
+        .limit(1)
 
       if (error) {
         console.error('Failed to load pending suggestion indicator', error)
         return
       }
 
-      setHasPendingSuggestions((count ?? 0) > 0)
+      setHasPendingSuggestions((data ?? []).length > 0)
     },
     [supabase]
   )
@@ -554,21 +559,26 @@ export function MainSidebar({
     setBotMode(initialBotModeState.botMode)
     setBotModeUnlockRequired(Boolean(initialBotModeUnlockRequired))
     setIsBotModeLoading(initialBotModeState.isLoading)
+    setBillingSnapshot(initialBillingSnapshot)
 
     refreshUnread(organizationId)
     deferredLoadTimer = window.setTimeout(() => {
       void refreshPendingSuggestions(organizationId)
-      void refreshBillingSnapshot(organizationId)
-
-      const loadBotMode = async () => {
-        const nextBotModeState = await fetchBotMode(organizationId)
-        if (!isMounted) return
-        setBotMode(nextBotModeState.botMode)
-        setBotModeUnlockRequired(nextBotModeState.botModeUnlockRequired)
-        setIsBotModeLoading(false)
-        setBotModeUpdateError(null)
+      if (!initialBillingSnapshot) {
+        void refreshBillingSnapshot(organizationId)
       }
-      void loadBotMode()
+
+      if (initialBotModeState.isLoading) {
+        const loadBotMode = async () => {
+          const nextBotModeState = await fetchBotMode(organizationId)
+          if (!isMounted) return
+          setBotMode(nextBotModeState.botMode)
+          setBotModeUnlockRequired(nextBotModeState.botModeUnlockRequired)
+          setIsBotModeLoading(false)
+          setBotModeUpdateError(null)
+        }
+        void loadBotMode()
+      }
     }, 150)
 
     return () => {
@@ -579,6 +589,7 @@ export function MainSidebar({
     }
   }, [
     fetchBotMode,
+    initialBillingSnapshot,
     initialBotMode,
     initialBotModeUnlockRequired,
     isDesktopViewport,
@@ -769,6 +780,7 @@ export function MainSidebar({
 
   useEffect(() => {
     if (!shouldEnableManualRoutePrefetch('app-shell')) return
+    if (isDesktopViewport !== true) return
 
     const routesToPrefetch = [
       '/inbox',
@@ -808,7 +820,7 @@ export function MainSidebar({
 
     const timeoutId = setTimeout(prefetchRoutes, 250)
     return () => clearTimeout(timeoutId)
-  }, [canAccessQaLabAdmin, isSystemAdmin, localePrefix, pathname, router])
+  }, [canAccessQaLabAdmin, isDesktopViewport, isSystemAdmin, localePrefix, pathname, router])
 
   const warmDashboardHotRoute = useCallback(
     (href: string) => {
@@ -1812,6 +1824,7 @@ export function MainSidebar({
               >
                 <Link
                   href="/onboarding"
+                  prefetch={false}
                   title={tNav('onboarding')}
                   aria-label={tNav('onboarding')}
                   className={cn(
@@ -1830,6 +1843,7 @@ export function MainSidebar({
             ) : (
                 <Link
                   href="/onboarding"
+                  prefetch={false}
                   aria-label={tNav('onboarding')}
                   className={cn(
                     'group flex items-center gap-3 rounded-2xl border px-3 py-3 transition-all duration-150 motion-reduce:transition-none',
@@ -2043,6 +2057,7 @@ export function MainSidebar({
                         const navLink = (
                           <Link
                             href={itemHref}
+                            prefetch={false}
                             title={collapsed ? undefined : item.label}
                             aria-label={item.label}
                             className={navItemClassName}

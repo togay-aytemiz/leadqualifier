@@ -62,11 +62,13 @@ interface NavItem {
 interface MobileBottomNavProps {
   activeOrganizationId?: string | null
   onboardingState?: OrganizationOnboardingShellState | null
+  initialBillingSnapshot?: OrganizationBillingSnapshot | null
 }
 
 export function MobileBottomNav({
   activeOrganizationId = null,
   onboardingState = null,
+  initialBillingSnapshot = null,
 }: MobileBottomNavProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -79,7 +81,14 @@ export function MobileBottomNav({
   const [loadedBillingSnapshot, setLoadedBillingSnapshot] = useState<{
     organizationId: string
     snapshot: OrganizationBillingSnapshot | null
-  } | null>(null)
+  } | null>(
+    activeOrganizationId
+      ? {
+          organizationId: activeOrganizationId,
+          snapshot: initialBillingSnapshot,
+        }
+      : null
+  )
 
   const { activePath } = useDashboardRouteState(pathname)
   const activeItem = resolveMobileNavActiveItem(activePath)
@@ -194,6 +203,7 @@ export function MobileBottomNav({
 
   useEffect(() => {
     if (!shouldEnableManualRoutePrefetch('app-shell')) return
+    if (isDesktopViewport !== false) return
 
     const hotRoutes = [
       '/inbox',
@@ -209,12 +219,14 @@ export function MobileBottomNav({
     ]
 
     const prefetchRoutes = () => {
-      resolveDashboardPrefetchTargets(hotRoutes, pathname).forEach((href) => router.prefetch(href))
+      resolveDashboardPrefetchTargets(hotRoutes, pathname).forEach((href) => (
+        router.prefetch(`${localePrefix}${href}`)
+      ))
     }
 
     const timeoutId = setTimeout(prefetchRoutes, 250)
     return () => clearTimeout(timeoutId)
-  }, [pathname, router])
+  }, [isDesktopViewport, localePrefix, pathname, router])
 
   const warmDashboardHotRoute = useCallback(
     (href: string) => {
@@ -260,13 +272,39 @@ export function MobileBottomNav({
   }, [activeOrganizationId, isDesktopViewport, supabase])
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (!activeOrganizationId) {
+        setLoadedBillingSnapshot(null)
+        return
+      }
+
+      setLoadedBillingSnapshot({
+        organizationId: activeOrganizationId,
+        snapshot: initialBillingSnapshot,
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeOrganizationId, initialBillingSnapshot])
+
+  useEffect(() => {
     if (!activeOrganizationId || isDesktopViewport !== false) return
+    if (loadedBillingSnapshot?.organizationId === activeOrganizationId && !billingRefreshSignal) {
+      return
+    }
+
     const frame = window.requestAnimationFrame(() => {
       void refreshBillingSnapshot()
     })
 
     return () => window.cancelAnimationFrame(frame)
-  }, [activeOrganizationId, billingRefreshSignal, isDesktopViewport, refreshBillingSnapshot])
+  }, [
+    activeOrganizationId,
+    billingRefreshSignal,
+    isDesktopViewport,
+    loadedBillingSnapshot?.organizationId,
+    refreshBillingSnapshot,
+  ])
 
   useEffect(() => {
     if (!activeOrganizationId || isDesktopViewport !== false) return
@@ -594,6 +632,7 @@ export function MobileBottomNav({
               )}
               <Link
                 href={settingsMenuNavState.href ?? '/settings'}
+                prefetch={false}
                 onMouseEnter={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
                 onFocus={() => warmDashboardHotRoute(settingsMenuNavState.href ?? '/settings')}
                 onClick={(event) => {
@@ -655,6 +694,7 @@ export function MobileBottomNav({
               <Link
                 key={item.id}
                 href={item.href}
+                prefetch={false}
                 className={cn(
                   'flex flex-col items-center justify-center rounded-xl py-1.5 text-[11px] font-medium transition-colors',
                   isActive ? 'text-[#242A40]' : 'text-slate-500 hover:text-slate-900'

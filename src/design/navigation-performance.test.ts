@@ -93,10 +93,16 @@ describe('navigation performance source guards', () => {
 
   it('defers non-critical main sidebar hydration work', () => {
     const mainSidebarSource = fs.readFileSync(MAIN_SIDEBAR_PATH, 'utf8')
+    const dashboardLayoutSource = fs.readFileSync(DASHBOARD_LAYOUT_PATH, 'utf8')
 
     expect(mainSidebarSource).toContain('deferredLoadTimer = window.setTimeout(() => {')
     expect(mainSidebarSource).toContain('void refreshPendingSuggestions(organizationId)')
-    expect(mainSidebarSource).toContain('void refreshBillingSnapshot(organizationId)')
+    expect(mainSidebarSource).toContain('initialBillingSnapshot')
+    expect(dashboardLayoutSource).toContain('initialBillingSnapshot={billingSnapshot}')
+    expect(mainSidebarSource).toContain('if (!initialBillingSnapshot) {')
+    expect(mainSidebarSource).toContain('if (initialBotModeState.isLoading) {')
+    expect(mainSidebarSource).toContain(".from('offering_profile_suggestions')")
+    expect(mainSidebarSource).toContain('.limit(1)')
   })
 
   it('skips mobile billing hydration on desktop viewports', () => {
@@ -159,9 +165,12 @@ describe('navigation performance source guards', () => {
       path.join(process.cwd(), 'src/components/common/DashboardRouteTransitionViewport.tsx'),
       'utf8'
     )
+    const settingsShellSource = fs.readFileSync(SETTINGS_SHELL_PATH, 'utf8')
     const settingsLoadingSource = fs.readFileSync(SETTINGS_LOADING_PATH, 'utf8')
 
     expect(transitionViewportSource).toContain('shouldRenderGlobalDashboardPendingOverlay')
+    expect(settingsShellSource).toContain('isShowingPendingRouteLoading')
+    expect(settingsShellSource).toContain('<SettingsDetailLoadingSkeleton />')
     expect(settingsLoadingSource).toContain('SettingsDetailLoadingSkeleton')
     expect(settingsLoadingSource).not.toContain('DashboardRouteSkeleton route="page"')
   })

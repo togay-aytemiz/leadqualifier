@@ -1,18 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
-import { getLocale, getTranslations } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import AiSettingsClient from './AiSettingsClient'
-import { getOrgAiSettings } from '@/lib/ai/settings'
-import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { enforceWorkspaceAccessOrRedirect } from '@/lib/billing/workspace-access'
-import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import { DashboardRouteIntlProvider } from '@/components/i18n/DashboardRouteIntlProvider'
+import { getDashboardShellData } from '@/lib/dashboard/shell-data'
+import { getOrgAiSettings } from '@/lib/ai/settings'
+import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 
 export default async function AiSettingsPage() {
-    const supabase = await createClient()
-    const locale = await getLocale()
+    const shellData = await getDashboardShellData()
+    const locale = shellData.locale
     const tAi = await getTranslations('aiSettings')
 
-    const orgContext = await resolveActiveOrganizationContext()
+    const orgContext = shellData.orgContext
     if (!orgContext) return null
     const organizationId = orgContext?.activeOrganizationId ?? null
 
@@ -34,8 +33,10 @@ export default async function AiSettingsPage() {
         bypassLock: orgContext?.isSystemAdmin ?? false
     })
 
-    const onboardingState = await getOrganizationOnboardingState(organizationId, { supabase })
-    const aiSettings = await getOrgAiSettings(organizationId, { supabase, locale, onboardingState })
+    const onboardingState = shellData.onboardingState
+        ?? await getOrganizationOnboardingState(organizationId)
+    const aiSettings = shellData.aiSettings
+        ?? await getOrgAiSettings(organizationId, { locale, onboardingState })
 
     return (
         <DashboardRouteIntlProvider includeDashboardShell={false} namespaces={['aiSettings', 'Sidebar', 'unsavedChanges']}>

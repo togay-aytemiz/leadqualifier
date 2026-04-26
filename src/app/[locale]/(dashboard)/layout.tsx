@@ -53,6 +53,7 @@ export default async function DashboardLayout({
                         onboardingState={shellData.onboardingState}
                         initialBotMode={aiSettings?.bot_mode ?? null}
                         initialBotModeUnlockRequired={aiSettings?.bot_mode_unlock_required ?? false}
+                        initialBillingSnapshot={billingSnapshot}
                     />
                 </div>
                 <div
@@ -80,6 +81,7 @@ export default async function DashboardLayout({
                     <MobileBottomNav
                         activeOrganizationId={orgContext?.activeOrganizationId ?? null}
                         onboardingState={shellData.onboardingState}
+                        initialBillingSnapshot={billingSnapshot}
                     />
                 </div>
             </div>
