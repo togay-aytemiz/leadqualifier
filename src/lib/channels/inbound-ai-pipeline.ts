@@ -24,7 +24,7 @@ import {
 import { decideHumanEscalation } from '@/lib/ai/escalation'
 import { runLeadExtraction } from '@/lib/leads/extraction'
 import { isOperatorActive } from '@/lib/inbox/operator-state'
-import { matchSkillsSafely } from '@/lib/skills/match-safe'
+import { matchSkillsWithStatus } from '@/lib/skills/match-safe'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import type { OutboundMessageInput, OutboundReplyButton, OutboundSendResult } from '@/lib/channels/outbound-message'
 import {
@@ -36,8 +36,32 @@ import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/skill-actions'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { maybeHandleSchedulingRequest } from '@/lib/ai/booking'
+import { withAiTimeout } from '@/lib/ai/deadline'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
+
+function payloadContainsNoAnswer(value: unknown): boolean {
+    if (typeof value === 'string') {
+        return /^no_answer[.!?]*$/i.test(value.trim())
+    }
+    if (Array.isArray(value)) return value.some(payloadContainsNoAnswer)
+    if (value && typeof value === 'object') {
+        return Object.values(value).some(payloadContainsNoAnswer)
+    }
+    return false
+}
+
+function isRagNoAnswerResponse(response: string | null | undefined) {
+    const trimmed = response?.trim()
+    if (!trimmed) return false
+    if (payloadContainsNoAnswer(trimmed)) return true
+
+    try {
+        return payloadContainsNoAnswer(JSON.parse(trimmed))
+    } catch {
+        return false
+    }
+}
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
 
 export interface InboundAiPipelineInput {
@@ -234,7 +258,7 @@ function schedulePostResponseTask(logPrefix: string, label: string, task: () => 
 }
 
 async function handleInstagramDeletedEvent(params: {
-    conversation: Record<string, any>
+    conversation: Record<string, unknown>
     contactAvatarUrl: string | null
     markInstagramRequest: boolean
     options: InboundAiPipelineInput
@@ -1043,7 +1067,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         return
     }
 
-    const matchedSkills = await matchSkillsSafely({
+    const skillMatchResult = await matchSkillsWithStatus({
         matcher: () => matchSkills(options.text, orgId, matchThreshold, 5, options.supabase),
         context: {
             organization_id: orgId,
@@ -1055,7 +1079,25 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             threshold: matchThreshold
         }
     })
-    const skillCandidates = matchedSkills ?? []
+    if (skillMatchResult.status === 'error') {
+        console.warn(`${options.logPrefix}: Skill matching failed; routing to human attention without fallback`, {
+            organization_id: orgId,
+            conversation_id: conversation.id,
+            error: skillMatchResult.error
+        })
+
+        await options.supabase
+            .from('conversations')
+            .update({
+                human_attention_required: true,
+                human_attention_reason: 'skill_match_error',
+                human_attention_resolved_at: null,
+                human_attention_requested_at: conversation.human_attention_requested_at ?? new Date().toISOString()
+            })
+            .eq('id', conversation.id)
+        return
+    }
+    const skillCandidates = skillMatchResult.matches ?? []
     for (const candidateMatch of skillCandidates) {
         const { data: matchedSkillDetails, error: matchedSkillError } = await options.supabase
             .from('skills')
@@ -1220,7 +1262,7 @@ Context:
 ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${continuityGuidance ? `\n\n${continuityGuidance}` : ''}`
                 const historyMessages = toOpenAiConversationMessages(history, options.text, 10)
 
-                const completion = await openai.chat.completions.create({
+                const completion = await withAiTimeout(openai.chat.completions.create({
                     model: 'gpt-4o-mini',
                     messages: [
                         { role: 'system', content: systemPrompt },
@@ -1229,7 +1271,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     ],
                     temperature: 0.3,
                     max_tokens: RAG_MAX_OUTPUT_TOKENS
-                })
+                }), { stage: 'rag_completion' })
 
                 const ragResponse = completion.choices[0]?.message?.content?.trim()
                 const polishedRagResponse = stripRepeatedGreeting(ragResponse ?? '', assistantHistoryForFollowup)
@@ -1271,7 +1313,11 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     supabase: options.supabase
                 })
 
-                if (guardedRagResponse && !guardedRagResponse.includes(noAnswerToken)) {
+                if (
+                    guardedRagResponse
+                    && !isRagNoAnswerResponse(ragResponse)
+                    && !isRagNoAnswerResponse(guardedRagResponse)
+                ) {
                     const formattedRagReply = formatOutboundBotMessage(guardedRagResponse)
                     const outboundMetadata = await sendOutboundAndCollectMetadata(formattedRagReply)
                     await persistBotMessage(formattedRagReply, {

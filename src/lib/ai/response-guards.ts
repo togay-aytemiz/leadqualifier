@@ -393,6 +393,7 @@ function enforceNoProgressLoopBreak(input: {
     userMessage: string
     responseLanguage: MvpResponseLanguage
     noProgressLoopBreak?: boolean
+    suppressIntakeQuestions?: boolean
 }) {
     const response = input.response.trim()
     if (!response) return response
@@ -418,9 +419,17 @@ function enforceNoProgressLoopBreak(input: {
         return summary.replace(/\s+/g, ' ').trim()
     }
 
-    const softNextStep = input.responseLanguage === 'tr'
-        ? 'Hazır olduğunuzda tek bir detay paylaşarak devam edebiliriz.'
-        : 'When you are ready, we can continue with one detail at a time.'
+    const softNextStep = input.suppressIntakeQuestions
+        ? (
+            input.responseLanguage === 'tr'
+                ? 'Hazır olduğunuzda buradan devam edebiliriz.'
+                : 'When you are ready, we can continue here.'
+        )
+        : (
+            input.responseLanguage === 'tr'
+                ? 'Hazır olduğunuzda tek bir detay paylaşarak devam edebiliriz.'
+                : 'When you are ready, we can continue with one detail at a time.'
+        )
     return `${summary} ${softNextStep}`.replace(/\s+/g, ' ').trim()
 }
 
@@ -474,7 +483,8 @@ export function applyLiveAssistantResponseGuards(input: {
         response: answerFirst,
         userMessage: input.userMessage,
         responseLanguage: input.responseLanguage,
-        noProgressLoopBreak: input.noProgressLoopBreak
+        noProgressLoopBreak: input.noProgressLoopBreak,
+        suppressIntakeQuestions: input.suppressIntakeQuestions
     })
     const languageConsistent = enforceResponseLanguageConsistency({
         response: noProgressLoopBreakEnforced,

@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-04-29):** Runtime hardening now closes critical fail-open paths: production billing entitlement lookup failures lock usage, Iyzico success RPC execute grants are limited away from normal authenticated users, Instagram/WhatsApp POST signatures are verified before channel state mutation or no-event success, skill matcher technical failures route to human attention, and RAG/fallback guards block `NO_ANSWER` or ungrounded fallback replies.
+
+> **Update Note (2026-04-29):** Frontend accessibility/polish now covers shared modal dialog/focus behavior, shared clickable table rows, Inbox conversation-row naming/selected state, Leads search/table labels and sortable headers, disabled coming-soon Knowledge content sources, localized WhatsApp setup SDK/timeout errors, and production-safe debug logging for Inbox realtime and Telegram connection/webhook paths.
+
 > **Update Note (2026-04-29):** Customer-facing AI disclaimer language now follows the actual outgoing bot message when that message has a clear TR/EN signal, so Turkish fallback replies cannot carry the English AI-generated footer even if the earlier response-language hint drifted. Regression coverage also locks Turkish no-progress/refusal-style turns to Turkish disclaimer handling.
 
 > **Update Note (2026-04-25):** Dashboard and Settings navigation hardening now removes several redundant first-load and transition costs: server shell billing snapshots seed desktop/mobile nav, known bot-mode state skips a duplicate sidebar read, hidden desktop/mobile shells no longer run route prefetch batches, manually warmed nav links opt out of Next automatic prefetch, sidebar pending-suggestion badges use existence reads, `Settings > Qualy AI` reuses cached dashboard shell data, onboarding skill checks avoid loading every skill body when totals already prove custom skills exist, and cold Settings-to-Settings transitions show the detail-pane skeleton immediately.
@@ -213,7 +217,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-04-25 (Dashboard/Settings navigation now reduces hidden-shell prefetch work, duplicate nav billing/bot reads, boolean badge count overhead, Settings AI shell-data duplication, and cold Settings pane lag.)
+> **Last Updated:** 2026-04-29 (Runtime fail-closed hardening completed for billing, Iyzico RPC grants, Meta webhook signatures, AI no-answer/fallback paths, skill matcher errors, and bounded AI deadlines; frontend accessibility/polish guards also completed.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -588,6 +592,7 @@
   - [x] Inbox list header no longer shows the dropdown chevron next to the title
   - [x] Inbox list header surface now matches the list column background for consistent sidebar visuals
   - [x] Inbox list header now exposes a single right-aligned filter icon menu for `All / Unread` plus `All / Hot / Warm / Cold`, includes inline `Sıfırla / Reset`, uses colored customer-score chips with stronger selected states, keeps unread rows visible until the operator manually switches away, and backfills additional pages before showing the filtered empty state
+  - [x] Inbox conversation rows now expose accessible names, selected state, and production-safe gated realtime debug logging
   - [x] Chat view now shows an animated "scroll to latest" button only when not at bottom, positioned on the composer divider
   - [x] Scroll-to-latest now keeps the thread pinned to the true bottom even after dynamic composer height changes and lazy-loaded message media reflow
   - [x] Conversation message history now lazy-loads older pages on upward scroll while preserving viewport position after prepend
@@ -975,6 +980,7 @@
   - [x] Required-intake values shown in Inbox "Important info" are now rendered consistently in Leads table/mobile rows via shared resolver logic
   - [x] Leads service column/cards now render AI-extracted `services[]` values from `extracted_fields.services` (fallback to `service_type` for legacy rows)
   - [x] Leads sort/search/pagination now stays inside a client-side page-data cache seeded from the initial server payload instead of re-running the full route on every interaction
+  - [x] Leads search/table controls now expose accessible labels, scoped sortable headers, and named clickable rows/cards
 - [x] **Operator Takeover Control**
   - [x] Toggle to keep lead extraction running during operator takeover (AI Settings)
   - [x] Inbox `Hizmet` row now supports compact inline editing from the active service catalog and preserves manual service overrides across extraction reruns
@@ -1202,6 +1208,8 @@
 - [x] Stabilize test + lint + build quality gates after troubleshooting sweep
 - [x] Remove `no-explicit-any` debt in critical modules (AI, Inbox, Knowledge Base, Leads, Channels, shared types)
 - [x] Document executable Phase 9 closure plan (`docs/plans/2026-02-10-phase-9-testing-qa-implementation-plan.md`)
+- [x] Harden runtime fail-closed behavior for billing entitlement errors, Iyzico success RPC grants, Meta webhook signature ordering, AI RAG/fallback no-answer handling, and skill matcher technical errors
+- [x] Add frontend accessibility/polish source guards for shared modal dialog/focus behavior, shared primitives, Inbox rows, Leads controls, Knowledge coming-soon sources, WhatsApp setup error localization, and Telegram production logging
 - [x] Add non-photography Knowledge Base extraction QA fixture for dental-clinic domain validation (`docs/kb-fixtures/2026-02-dis-klinigi-kb-cikartim-test-fixture.md`)
 - [x] Publish manual simulator-only AI QA Lab design for LLM-generated, multi-turn closed-loop evaluation (`docs/plans/2026-02-19-ai-qa-lab-llm-closed-loop-design.md`)
 - [x] Implement admin `AI QA Lab` manual run queue + immutable run snapshot persistence (`qa_runs` migration, `Settings > QA Lab` page, server actions)

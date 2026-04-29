@@ -19,6 +19,7 @@ import {
 } from '@/lib/ai/followup'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
 import { applyLiveAssistantResponseGuards } from '@/lib/ai/response-guards'
+import { withAiTimeout } from '@/lib/ai/deadline'
 import {
     buildConversationContinuityGuidance,
     type ConversationHistoryTurn,
@@ -185,7 +186,7 @@ If the request is still outside this context, state that clearly and offer one c
     const historyMessages = toOpenAiConversationMessages(options.conversationHistory ?? [], message, 10)
 
     try {
-        const completion = await openai.chat.completions.create({
+        const completion = await withAiTimeout(openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.3,
             max_tokens: FALLBACK_MAX_OUTPUT_TOKENS,
@@ -194,7 +195,7 @@ If the request is still outside this context, state that clearly and offer one c
                 ...historyMessages,
                 { role: 'user', content: message }
             ]
-        })
+        }), { stage: 'fallback' })
 
         const response = completion.choices[0]?.message?.content?.trim()
         const polishedResponse = response
@@ -311,6 +312,17 @@ export async function buildFallbackResponse(options: {
             console.warn('Fallback knowledge hint lookup failed:', error)
         }
     }
+
+    if (!groundedKnowledgeContext) {
+        return renderStrictFallback(
+            '',
+            topics,
+            language,
+            options.message,
+            requiredIntakeAnalysis
+        )
+    }
+
     const followupGuidance = buildRequiredIntakeFollowupGuidance(
         options.requiredIntakeFields ?? [],
         options.recentCustomerMessages ?? [],

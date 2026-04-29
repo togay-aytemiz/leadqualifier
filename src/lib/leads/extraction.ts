@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
+import { withAiTimeout } from '@/lib/ai/deadline'
 import { resolveOrganizationUsageEntitlement } from '@/lib/billing/entitlements'
 import { normalizeIntakeFields, normalizeServiceCatalogNames } from '@/lib/leads/offering-profile-utils'
 import { repairRequiredIntakeFromConversation } from '@/lib/leads/required-intake-repair'
@@ -1459,7 +1460,7 @@ export async function runLeadExtraction(options: {
     ]
         .join('\n\n')
 
-    const completion = await openai.chat.completions.create({
+    const completion = await withAiTimeout(openai.chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0.2,
         max_tokens: LEAD_EXTRACTION_MAX_OUTPUT_TOKENS,
@@ -1468,7 +1469,7 @@ export async function runLeadExtraction(options: {
             { role: 'system', content: extractionSystemPrompt },
             { role: 'user', content: userPrompt }
         ]
-    })
+    }), { stage: 'lead_extraction' })
 
     let response = completion.choices[0]?.message?.content?.trim() ?? '{}'
     let usageTotals = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
@@ -1506,7 +1507,7 @@ export async function runLeadExtraction(options: {
         }
 
         const strictPrompt = `${userPrompt}\n\nReturn JSON with all required keys including summary, score, and status.`
-        const retry = await openai.chat.completions.create({
+        const retry = await withAiTimeout(openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.2,
             max_tokens: LEAD_EXTRACTION_MAX_OUTPUT_TOKENS,
@@ -1515,7 +1516,7 @@ export async function runLeadExtraction(options: {
                 { role: 'system', content: extractionSystemPrompt },
                 { role: 'user', content: strictPrompt }
             ]
-        })
+        }), { stage: 'lead_extraction_retry' })
         response = retry.choices[0]?.message?.content?.trim() ?? response
         addUsage(retry, strictPrompt, response)
     }
@@ -1558,7 +1559,7 @@ export async function runLeadExtraction(options: {
                 : 'none'}`,
             `Recent conversation turns (oldest to newest):\n${conversationTurns.join('\n')}`
         ].join('\n\n')
-        const repairCompletion = await openai.chat.completions.create({
+        const repairCompletion = await withAiTimeout(openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.1,
             max_tokens: REQUIRED_INTAKE_REPAIR_MAX_OUTPUT_TOKENS,
@@ -1567,7 +1568,7 @@ export async function runLeadExtraction(options: {
                 { role: 'system', content: repairSystemPrompt },
                 { role: 'user', content: repairUserPrompt }
             ]
-        })
+        }), { stage: 'required_intake_repair' })
         const repairResponse = repairCompletion.choices[0]?.message?.content?.trim() ?? '{}'
         addUsage(repairCompletion, repairUserPrompt, repairResponse)
         const repairedCollected = parseRequiredIntakeRepairPayload(

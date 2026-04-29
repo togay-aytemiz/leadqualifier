@@ -34,8 +34,15 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
+import { withAiTimeout } from '@/lib/ai/deadline'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
+
+function telegramDebug(...args: unknown[]) {
+    if (process.env.NODE_ENV !== 'production') {
+        console.debug(...args)
+    }
+}
 
 function readTrimmedString(value: unknown): string | null {
     if (typeof value !== 'string') return null
@@ -93,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     const update = await req.json()
 
-    console.log('Telegram Webhook: Received update', {
+    telegramDebug('Telegram Webhook: Received update', {
         updateId: update.update_id,
         hasMessage: !!update.message,
         hasSecret: !!secretToken
@@ -101,14 +108,14 @@ export async function POST(req: NextRequest) {
 
     // 1. Basic Validation
     if (!update.message || !update.message.text) {
-        console.log('Telegram Webhook: Skipping non-text update')
+        telegramDebug('Telegram Webhook: Skipping non-text update')
         return NextResponse.json({ ok: true }) // Ignore non-text updates
     }
 
     const { chat, text, from } = update.message
     const chatId = chat.id.toString()
 
-    console.log('Telegram Webhook: Processing message', {
+    telegramDebug('Telegram Webhook: Processing message', {
         chatId,
         text,
         fromId: from.id
@@ -133,7 +140,7 @@ export async function POST(req: NextRequest) {
             .single()
 
         channel = data
-        console.log('Telegram Webhook: Channel lookup by secret', { found: !!data, channelId: data?.id })
+        telegramDebug('Telegram Webhook: Channel lookup by secret', { found: !!data, channelId: data?.id })
     } else {
         console.warn('Telegram Webhook: Missing secret token')
     }
@@ -165,7 +172,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (!conversation) {
-        console.log('Telegram Webhook: Creating new conversation (not found)')
+        telegramDebug('Telegram Webhook: Creating new conversation (not found)')
         const { data: newConv, error } = await supabase
             .from('conversations')
             .insert({
@@ -186,7 +193,7 @@ export async function POST(req: NextRequest) {
             // This happens if a conversation was created by another request in the split second between our select and insert
             // or if the unique index prevents our insert.
             if (error.code === '23505') {
-                console.log('Telegram Webhook: Unique violation (race condition), refetching existing conversation')
+                telegramDebug('Telegram Webhook: Unique violation (race condition), refetching existing conversation')
                 const { data: existingRetry } = await supabase
                     .from('conversations')
                     .select('*')
@@ -209,7 +216,7 @@ export async function POST(req: NextRequest) {
             conversation = newConv
         }
     } else {
-        console.log('Telegram Webhook: Found existing conversation', conversation.id)
+        telegramDebug('Telegram Webhook: Found existing conversation', conversation.id)
     }
 
     const telegramMessageId = String(update.message.message_id)
@@ -222,7 +229,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
     if ((existingInboundData as { id?: string } | null)?.id) {
-        console.log('Telegram Webhook: Duplicate inbound detected, skipping')
+        telegramDebug('Telegram Webhook: Duplicate inbound detected, skipping')
         return NextResponse.json({ ok: true })
     }
 
@@ -282,7 +289,7 @@ export async function POST(req: NextRequest) {
     if (msgError) {
         console.error('Telegram Webhook: Failed to save message', msgError)
     } else {
-        console.log('Telegram Webhook: Message saved successfully')
+        telegramDebug('Telegram Webhook: Message saved successfully')
 
         // Update conversation: Bump timestamp + increment unread count for user messages
         await supabase.from('conversations')
@@ -297,7 +304,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (conversation.ai_processing_paused) {
-        console.log('Telegram Webhook: Conversation AI processing paused. SKIPPING AI PROCESSING.', {
+        telegramDebug('Telegram Webhook: Conversation AI processing paused. SKIPPING AI PROCESSING.', {
             conversationId: conversation.id
         })
         return NextResponse.json({ ok: true })
@@ -310,7 +317,7 @@ export async function POST(req: NextRequest) {
     // Note: We need to ensure 'active_agent' is selected in step 3.
     // Since we selected '*', it should be there.
 
-    console.log('Telegram Webhook: Checking Active Agent', {
+    telegramDebug('Telegram Webhook: Checking Active Agent', {
         conversationId: conversation.id,
         activeAgent: conversation.active_agent,
         assigneeId: conversation.assignee_id
@@ -374,7 +381,7 @@ export async function POST(req: NextRequest) {
 
     if (operatorActive || !allowReplies) {
         if (operatorActive) {
-            console.log('Telegram Webhook: Operator active or Assigned. SKIPPING AI REPLY.')
+            telegramDebug('Telegram Webhook: Operator active or Assigned. SKIPPING AI REPLY.')
         }
         return NextResponse.json({ ok: true })
     }
@@ -491,7 +498,7 @@ export async function POST(req: NextRequest) {
     const skillCandidates = matchedSkills ?? []
     const bestMatch = skillCandidates[0]
 
-    console.log('Telegram Webhook: Skill match result', {
+    telegramDebug('Telegram Webhook: Skill match result', {
         found: !!bestMatch,
         skillId: bestMatch?.skill_id,
         similarity: bestMatch?.similarity
@@ -581,7 +588,7 @@ export async function POST(req: NextRequest) {
                 })
             }
         }
-        console.log('Telegram Webhook: Sent matched response')
+        telegramDebug('Telegram Webhook: Sent matched response')
 
         await applyEscalationAfterReply({
             skillRequiresHumanHandover
@@ -591,7 +598,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Fallback: Check Knowledge Base (RAG)
-    console.log('Telegram Webhook: No eligible skill match, searching Knowledge Base...')
+    telegramDebug('Telegram Webhook: No eligible skill match, searching Knowledge Base...')
     const llmResponseStartedAt = Date.now()
 
     try {
@@ -693,7 +700,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 if (kbResults && kbResults.length > 0) {
-                    console.log('Telegram Webhook: Knowledge Base match found', { count: kbResults.length })
+                    telegramDebug('Telegram Webhook: Knowledge Base match found', { count: kbResults.length })
 
                     const { context, chunks } = buildRagContext(kbResults)
                     if (!context) {
@@ -727,7 +734,7 @@ Context:
 ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${continuityGuidance ? `\n\n${continuityGuidance}` : ''}`
                     const historyMessages = toOpenAiConversationMessages(history, text, 10)
 
-                    const completion = await openai.chat.completions.create({
+                    const completion = await withAiTimeout(openai.chat.completions.create({
                         model: 'gpt-4o-mini',
                         max_tokens: RAG_MAX_OUTPUT_TOKENS,
                         messages: [
@@ -736,7 +743,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                             { role: 'user', content: text }
                         ],
                         temperature: 0.3
-                    })
+                    }), { stage: 'telegram_rag_completion' })
 
                     const ragResponse = completion.choices[0]?.message?.content?.trim()
                     const polishedRagResponse = stripRepeatedGreeting(ragResponse ?? '', assistantHistoryForFollowup)
@@ -807,7 +814,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     }
                 }
             } else {
-                console.log('Telegram Webhook: KB routing declined', { reason: decision.reason })
+                telegramDebug('Telegram Webhook: KB routing declined', { reason: decision.reason })
             }
     } catch (error) {
         if (error instanceof Error && error.message.includes('Failed to record AI usage')) {
@@ -821,7 +828,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     if (!await ensureUsageAllowed('before_fallback')) {
         return NextResponse.json({ ok: true })
     }
-    console.log('Telegram Webhook: No knowledge match, sending fallback')
+    telegramDebug('Telegram Webhook: No knowledge match, sending fallback')
     const fallbackText = await buildFallbackResponse({
         organizationId: orgId,
         message: text,

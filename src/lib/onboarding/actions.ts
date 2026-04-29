@@ -102,7 +102,11 @@ async function upsertOnboardingStateWithLegacyFallback(
     initialError
   )
 
-  const { ai_settings_reviewed_at, ...legacyPayload } = payload
+  const legacyPayload: Omit<typeof payload, 'ai_settings_reviewed_at'> = {
+    organization_id: payload.organization_id,
+    first_seen_at: payload.first_seen_at,
+    intro_acknowledged_at: payload.intro_acknowledged_at,
+  }
   return executeUpsert(legacyPayload)
 }
 

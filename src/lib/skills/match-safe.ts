@@ -244,25 +244,43 @@ export function filterSkillMatchesByIntentGate(options: SkillMatchIntentGateOpti
     })
 }
 
-export async function matchSkillsSafely(options: {
+export type SafeSkillMatchResult =
+    | { status: 'matched', matches: SkillMatch[] }
+    | { status: 'no_match', matches: SkillMatch[] }
+    | { status: 'error', matches: SkillMatch[], error: unknown }
+
+export async function matchSkillsWithStatus(options: {
     matcher: () => Promise<SkillMatch[]>
     context?: Record<string, unknown>
     intentGate?: SkillMatchIntentGateOptions
-}) {
+}): Promise<SafeSkillMatchResult> {
     try {
         const matches = await options.matcher()
         const safeMatches = Array.isArray(matches) ? matches : []
-        if (!options.intentGate) return safeMatches
+        const gatedMatches = options.intentGate
+            ? filterSkillMatchesByIntentGate({
+                ...options.intentGate,
+                matches: safeMatches
+            })
+            : safeMatches
 
-        return filterSkillMatchesByIntentGate({
-            ...options.intentGate,
-            matches: safeMatches
-        })
+        return gatedMatches.length > 0
+            ? { status: 'matched', matches: gatedMatches }
+            : { status: 'no_match', matches: [] }
     } catch (error) {
         console.warn('Skill matching failed; continuing with KB/fallback path.', {
             ...options.context,
             error
         })
-        return [] as SkillMatch[]
+        return { status: 'error', matches: [], error }
     }
+}
+
+export async function matchSkillsSafely(options: {
+    matcher: () => Promise<SkillMatch[]>
+    context?: Record<string, unknown>
+    intentGate?: SkillMatchIntentGateOptions
+}) {
+    const result = await matchSkillsWithStatus(options)
+    return result.matches
 }

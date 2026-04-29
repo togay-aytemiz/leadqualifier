@@ -6,7 +6,6 @@ const {
     getBillingProviderConfigMock,
     subscriptionCardUpdateWithSubscriptionReferenceCodeMock,
     subscriptionPaymentRetryMock,
-    subscriptionUpgradeMock,
     paymentRetrieveMock,
     iyzipayConstructorMock
 } = vi.hoisted(() => {

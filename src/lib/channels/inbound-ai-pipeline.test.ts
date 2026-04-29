@@ -102,7 +102,15 @@ vi.mock('@/lib/inbox/operator-state', () => ({
 }))
 
 vi.mock('@/lib/skills/match-safe', () => ({
-    matchSkillsSafely: matchSkillsSafelyMock
+    matchSkillsSafely: matchSkillsSafelyMock,
+    matchSkillsWithStatus: async (...args: unknown[]) => {
+        const result = await matchSkillsSafelyMock(...args)
+        if (!Array.isArray(result)) return result
+        return {
+            status: result.length > 0 ? 'matched' : 'no_match',
+            matches: result
+        }
+    }
 }))
 
 vi.mock('@/lib/ai/escalation', () => ({
@@ -1883,6 +1891,169 @@ describe('processInboundAiPipeline guardrails', () => {
 
         expect(sendOutbound).toHaveBeenCalledWith('Elbette, cilt bakımı ve lazer epilasyon hizmetlerimiz mevcut.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('routes lowercase RAG no_answer responses to fallback instead of sending them', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Paket fiyatı nedir?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Paket fiyatı',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Paketler kişiye göre hazırlanır.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Paketler kişiye göre hazırlanır.',
+            chunks: [{ document_id: 'doc-1', content: 'Paketler kişiye göre hazırlanır.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'no_answer' } }]
+        })
+        buildFallbackResponseMock.mockResolvedValueOnce('Fallback response')
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Paket fiyatı nedir?' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Fallback response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('no_answer'))
+        expect(buildFallbackResponseMock).toHaveBeenCalled()
+    })
+
+    it('routes structured RAG NO_ANSWER payloads to fallback instead of sending them', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Garanti veriyor musunuz?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Garanti',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Hizmet kapsamı görüşmede netleşir.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Hizmet kapsamı görüşmede netleşir.',
+            chunks: [{ document_id: 'doc-1', content: 'Hizmet kapsamı görüşmede netleşir.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: '{"answer":"NO_ANSWER"}' } }]
+        })
+        buildFallbackResponseMock.mockResolvedValueOnce('Fallback response')
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Garanti veriyor musunuz?' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Fallback response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('NO_ANSWER'))
+        expect(buildFallbackResponseMock).toHaveBeenCalled()
+    })
+
+    it('routes skill matcher technical errors to human attention without KB or fallback', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterSkillError = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce({
+            status: 'error',
+            matches: [],
+            error: new Error('match RPC unavailable')
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder],
+            conversations: [
+                lookup.builder,
+                conversationUpdateAfterInbound.builder,
+                conversationUpdateAfterSkillError.builder
+            ],
+            leads: [leadSnapshot.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Hizmet fiyatı nedir?' })
+        )
+
+        expect(sendOutbound).not.toHaveBeenCalled()
+        expect(decideKnowledgeBaseRouteMock).not.toHaveBeenCalled()
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+        expect(conversationUpdateAfterSkillError.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            human_attention_required: true,
+            human_attention_reason: 'skill_match_error',
+            human_attention_resolved_at: null,
+            human_attention_requested_at: expect.any(String)
+        }))
     })
 
     it('sets a max_tokens cap for inbound RAG completion', async () => {

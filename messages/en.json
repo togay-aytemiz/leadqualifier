@@ -1149,6 +1149,8 @@
       "embeddedSignupCancelled": "WhatsApp setup was cancelled before completion.",
       "embeddedSignupCancelledStep": "WhatsApp setup was cancelled at step: {step}.",
       "embeddedSignupFailedReason": "WhatsApp setup failed: {reason}",
+      "metaSdkLoadFailed": "Meta setup could not be opened. Please check your browser connection and try again.",
+      "embeddedSignupTimedOut": "Meta setup took too long to respond. Please close the Meta window and try again.",
       "embeddedSignupSuccess": "WhatsApp connected successfully.",
       "confirmDisconnectTitle": "Remove this WhatsApp channel from Qualy?",
       "confirmDisconnectDesc": "This only removes this channel from Qualy. It does not disconnect your WhatsApp Business app, phone number, or Meta/WABA setup. The bot will stop responding to new messages here.",

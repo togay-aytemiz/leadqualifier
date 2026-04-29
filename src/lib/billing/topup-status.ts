@@ -12,6 +12,20 @@ export interface OrganizationTopupStatusSummary {
     hasTrialCreditCarryover: boolean
 }
 
+interface TopupStatusQueryBuilder {
+    select: (columns: string) => TopupStatusQueryBuilder
+    eq: (column: string, value: string) => TopupStatusQueryBuilder
+    in: (column: string, values: string[]) => TopupStatusQueryBuilder
+    then: Promise<{
+        data: TopupUsageLedgerRow[] | null
+        error: unknown
+    }>['then']
+}
+
+interface TopupStatusSupabaseLike {
+    from: (table: string) => TopupStatusQueryBuilder
+}
+
 function readNumericValue(input: unknown): number {
     if (typeof input === 'number' && Number.isFinite(input)) return input
     if (typeof input === 'string') {
@@ -74,9 +88,10 @@ function hasTrialCreditCarryover(rows: TopupUsageLedgerRow[]) {
 
 export async function getOrganizationTopupStatusSummary(
     organizationId: string,
-    supabase: { from: (table: string) => any }
+    supabase: unknown
 ) : Promise<OrganizationTopupStatusSummary> {
-    const { data, error } = await supabase
+    const client = supabase as TopupStatusSupabaseLike
+    const { data, error } = await client
         .from('organization_credit_ledger')
         .select('entry_type, credit_pool, credits_delta, metadata')
         .eq('organization_id', organizationId)

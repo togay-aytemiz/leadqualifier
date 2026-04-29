@@ -543,6 +543,15 @@ export async function POST(req: NextRequest) {
   const debugEnabled = isInstagramWebhookDebugEnabled()
   const signatureHeader = req.headers.get('x-hub-signature-256')
   const rawBody = await req.text()
+  const globalAppSecret = process.env.META_INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET
+  const signatureVerifiedByGlobalSecret = globalAppSecret
+    ? isValidMetaSignature(signatureHeader, rawBody, globalAppSecret)
+    : false
+
+  if (globalAppSecret && !signatureVerifiedByGlobalSecret) {
+    console.warn('Instagram Webhook: Invalid signature')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   let payload: unknown
   try {
@@ -593,6 +602,11 @@ export async function POST(req: NextRequest) {
         supabase,
         event.instagramBusinessAccountId
       )
+      if (!directChannel && !signatureVerifiedByGlobalSecret) {
+        console.warn('Instagram Webhook: Signature could not be verified before channel reconciliation')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
       const resolvedChannel =
         directChannel ||
         (await reconcileChannelByInstagramAccountId(supabase, event.instagramBusinessAccountId))
@@ -605,16 +619,17 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      channel = await markInstagramChannelWebhookVerified(supabase, resolvedChannel)
       const appSecret =
         process.env.META_INSTAGRAM_APP_SECRET ||
         process.env.META_APP_SECRET ||
-        readConfigString(channel.config, 'app_secret')
-      const isValid = isValidMetaSignature(signatureHeader, rawBody, appSecret)
+        readConfigString(resolvedChannel.config, 'app_secret')
+      const isValid = signatureVerifiedByGlobalSecret || isValidMetaSignature(signatureHeader, rawBody, appSecret)
       if (!isValid) {
         console.warn('Instagram Webhook: Invalid signature')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
+
+      channel = await markInstagramChannelWebhookVerified(supabase, resolvedChannel)
 
       const pageAccessToken = readConfigString(channel.config, 'page_access_token')
       if (!pageAccessToken) {

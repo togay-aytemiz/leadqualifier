@@ -10,7 +10,6 @@ import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 import {
     type BillingPlanTierId,
     getBillingPricingCatalog,
-    resolveBillingCurrencyByRegion,
     resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
 import { getBillingProviderConfig } from '@/lib/billing/providers/config'
@@ -360,15 +359,8 @@ export default async function PlansSettingsPageContent({
         })
     }
 
-    const billingCurrency = resolveBillingCurrencyByRegion(organizationBillingRegion)
     const formatNumber = new Intl.NumberFormat(locale, {
         maximumFractionDigits: 1
-    })
-    const formatCurrency = new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency: billingCurrency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2
     })
     const formatDateTime = new Intl.DateTimeFormat(locale, {
         year: 'numeric',

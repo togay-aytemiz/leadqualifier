@@ -327,11 +327,8 @@ async function processTopupCallback(input: {
             0,
             Math.round(toNonNegativeNumber(orderMetadata.credit_delta) || toNonNegativeNumber(input.order.credits))
         )
-        const currentPeriodStart = readString(orderMetadata, 'current_period_start')
-        const currentPeriodEnd = readString(orderMetadata, 'current_period_end')
         const conversationId = readString(orderMetadata, 'conversation_id')
             ?? (subscriptionId && requestedPlanId ? `subscription_change_${subscriptionId}_${requestedPlanId}` : null)
-        const subscriptionMetadataSnapshot = asRecord(orderMetadata.subscription_metadata_snapshot)
 
         if (
             !subscriptionId

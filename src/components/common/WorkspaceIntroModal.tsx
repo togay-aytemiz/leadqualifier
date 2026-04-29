@@ -54,7 +54,7 @@ export function WorkspaceIntroModal({
 
     const hasSeenIntro = window.localStorage.getItem(storageKey)
     if (!hasSeenIntro) {
-      setIsOpen(true)
+      queueMicrotask(() => setIsOpen(true))
     }
   }, [storageKey])
 

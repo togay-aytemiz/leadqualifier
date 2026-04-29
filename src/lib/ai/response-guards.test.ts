@@ -161,6 +161,21 @@ describe('response guards', () => {
         expect(response).not.toContain('Bütçe aralığınızı paylaşabilir misiniz')
     })
 
+    it('avoids soft intake pressure when no-progress suppression is active', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Anladım. Bütçe aralığınızı paylaşabilir misiniz?',
+            userMessage: 'Şimdilik bilmiyorum.',
+            responseLanguage: 'tr',
+            recentAssistantMessages: [],
+            suppressIntakeQuestions: true,
+            noProgressLoopBreak: true
+        })
+
+        expect(response).toContain('Anladım.')
+        expect(response).not.toContain('tek bir detay')
+        expect(response).not.toContain('Bütçe aralığınızı paylaşabilir misiniz')
+    })
+
     it('does not force no-progress loop break when user asks a direct question', () => {
         const response = applyLiveAssistantResponseGuards({
             response: 'Fiyat proje kapsamına göre değişir. Yaklaşık bütçenizi paylaşır mısınız?',

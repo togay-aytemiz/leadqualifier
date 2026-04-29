@@ -176,12 +176,12 @@ export function OnboardingPageClient({
 
     const expandedStep = steps.find((step) => step.id === expandedStepId)
     if (!expandedStep) {
-      setExpandedStepId(
+      const nextExpandedStepId =
         steps.find((step) => step.isExpandedByDefault && !step.isComplete)?.id ??
-          steps.find((step) => !step.isComplete)?.id ??
-          steps.find((step) => step.isExpandedByDefault)?.id ??
-          null
-      )
+        steps.find((step) => !step.isComplete)?.id ??
+        steps.find((step) => step.isExpandedByDefault)?.id ??
+        null
+      queueMicrotask(() => setExpandedStepId(nextExpandedStepId))
     }
   }, [expandedStepId, steps])
 

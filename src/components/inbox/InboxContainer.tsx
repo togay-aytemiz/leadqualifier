@@ -248,6 +248,12 @@ const INSTAGRAM_UPLOAD_ACCEPT = [
 ].join(',')
 const EMPTY_VISIBLE_MESSAGES: Message[] = []
 
+function debugInbox(...args: unknown[]) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug(...args)
+  }
+}
+
 type PendingAttachment = {
   id: string
   file: File
@@ -1235,7 +1241,7 @@ export function InboxContainer({
   const recoverInboxRealtime = useCallback(
     (reason: string, options?: { restartSubscriptions?: boolean }) => {
       const restartSubscriptions = options?.restartSubscriptions === true
-      console.log('Recovering inbox realtime state:', {
+      debugInbox('Recovering inbox realtime state:', {
         reason,
         restartSubscriptions,
       })
@@ -1711,13 +1717,13 @@ export function InboxContainer({
         return
       }
 
-      console.log('Setting up Realtime subscription...', {
+      debugInbox('Setting up Realtime subscription...', {
         generation: realtimeSubscriptionGeneration,
       })
       const channelKey = `${organizationId}:${realtimeSubscriptionGeneration}`
 
       const logChannelStatus = (channelName: string, status: string, err?: Error) => {
-        console.log(`${channelName} Channel Status:`, status, err ? { error: err } : '')
+        debugInbox(`${channelName} Channel Status:`, status, err ? { error: err } : '')
         if (!isMounted) return
         if (shouldRecoverInboxRealtime(status)) {
           recoverInboxRealtime(`channel:${channelName}:${status}`, { restartSubscriptions: true })
@@ -1737,7 +1743,7 @@ export function InboxContainer({
           },
           (payload) => {
             const newMsg = payload.new as Message
-            console.log('Realtime Message received:', newMsg)
+            debugInbox('Realtime Message received:', newMsg)
             let shouldPublishUnreadState = false
             const isInstagramSeenRealtimeEvent = isInstagramSeenEventMessage({
               platform: 'instagram',
@@ -1870,7 +1876,7 @@ export function InboxContainer({
           },
           (payload) => {
             const newOrUpdatedConv = payload.new as Conversation
-            console.log('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
+            debugInbox('Realtime Conversation event:', payload.eventType, newOrUpdatedConv)
             let shouldHydrateConversationPreview = false
             let shouldRefreshSelectedThread = false
 
@@ -1965,7 +1971,7 @@ export function InboxContainer({
             const leadRow = (
               payload.eventType === 'DELETE' ? payload.old : payload.new
             ) as Lead | null
-            console.log('Realtime Lead event:', payload.eventType, leadRow)
+            debugInbox('Realtime Lead event:', payload.eventType, leadRow)
             if (!leadRow?.conversation_id) return
 
             setConversations((prev) =>
@@ -1998,15 +2004,15 @@ export function InboxContainer({
         cleanupRealtimeAuth()
       }
       if (messagesChannel) {
-        console.log('Cleaning up Messages channel...')
+        debugInbox('Cleaning up Messages channel...')
         supabase.removeChannel(messagesChannel)
       }
       if (conversationsChannel) {
-        console.log('Cleaning up Conversations channel...')
+        debugInbox('Cleaning up Conversations channel...')
         supabase.removeChannel(conversationsChannel)
       }
       if (leadsChannel) {
-        console.log('Cleaning up Leads channel...')
+        debugInbox('Cleaning up Leads channel...')
         supabase.removeChannel(leadsChannel)
       }
     }
@@ -3078,12 +3084,24 @@ export function InboxContainer({
               },
             })
           const isInstagramRequestPreview = isInstagramRequestConversation(c)
+          const resolveConversationRowLabel = (conversation: ConversationListItem) =>
+            [
+              contactDisplayName,
+              conversation.unread_count > 0 ? t('conversationFiltersUnreadUnread') : null,
+              leadStatusLabel,
+              previewContent,
+            ]
+              .filter(Boolean)
+              .join(' · ')
 
           return (
-            <div
+            <button
               key={c.id}
+              type="button"
               onClick={() => handleSelectConversation(c.id)}
-              className={`relative cursor-pointer border-b border-gray-100 px-4 py-4 transition-colors group ${selectedId === c.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+              aria-label={resolveConversationRowLabel(c)}
+              aria-current={selectedId === c.id ? 'true' : undefined}
+              className={`group relative w-full cursor-pointer border-b border-gray-100 px-4 py-4 text-left transition-colors ${selectedId === c.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
             >
               <div className="flex items-start gap-3">
                 <div className="relative shrink-0">
@@ -3177,7 +3195,7 @@ export function InboxContainer({
               {selectedId === c.id && (
                 <div className="absolute bottom-0 left-0 top-0 w-0.5 bg-blue-500"></div>
               )}
-            </div>
+            </button>
           )
         })
       )}

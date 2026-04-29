@@ -49,6 +49,9 @@ type MetaWindow = Window & typeof globalThis & {
     __metaSdkAppId?: string
 }
 
+const META_SDK_LOAD_FAILED = 'META_SDK_LOAD_FAILED'
+const META_EMBEDDED_SIGNUP_TIMEOUT = 'META_EMBEDDED_SIGNUP_TIMEOUT'
+
 function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message) return error.message
     return fallback
@@ -59,6 +62,14 @@ function getEmbeddedSignupErrorMessage(t: ReturnType<typeof useTranslations<'Cha
 
     if (message === 'WHATSAPP_EMBEDDED_SIGNUP_ASSETS_MISSING') {
         return t('oauthStatus.missingWhatsAppAssets')
+    }
+
+    if (message === META_SDK_LOAD_FAILED) {
+        return t('whatsappConnect.metaSdkLoadFailed')
+    }
+
+    if (message === META_EMBEDDED_SIGNUP_TIMEOUT) {
+        return t('whatsappConnect.embeddedSignupTimedOut')
     }
 
     return message
@@ -75,7 +86,7 @@ async function loadMetaSdk(appId: string): Promise<MetaSdk> {
 
     const initializeSdk = () => {
         if (!metaWindow.FB) {
-            throw new Error('Meta SDK failed to load.')
+            throw new Error(META_SDK_LOAD_FAILED)
         }
 
         if (metaWindow.__metaSdkAppId !== appId) {
@@ -109,7 +120,7 @@ async function loadMetaSdk(appId: string): Promise<MetaSdk> {
 
         if (existingScript) {
             existingScript.addEventListener('load', onReady, { once: true })
-            existingScript.addEventListener('error', () => reject(new Error('Meta SDK failed to load.')), { once: true })
+            existingScript.addEventListener('error', () => reject(new Error(META_SDK_LOAD_FAILED)), { once: true })
             return
         }
 
@@ -118,7 +129,7 @@ async function loadMetaSdk(appId: string): Promise<MetaSdk> {
         script.src = 'https://connect.facebook.net/en_US/sdk.js'
         script.async = true
         script.defer = true
-        script.onerror = () => reject(new Error('Meta SDK failed to load.'))
+        script.onerror = () => reject(new Error(META_SDK_LOAD_FAILED))
         document.body.appendChild(script)
     })
 }
@@ -152,7 +163,7 @@ function subscribeToEmbeddedSignupEvents(timeoutMs = 180000) {
     window.addEventListener('message', onMessage)
     timer = window.setTimeout(() => {
         cleanup()
-        rejectPromise(new Error('Timed out waiting for Meta embedded signup status.'))
+        rejectPromise(new Error(META_EMBEDDED_SIGNUP_TIMEOUT))
     }, timeoutMs)
 
     return {

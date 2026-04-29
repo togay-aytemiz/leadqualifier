@@ -47,7 +47,7 @@ export function LeadSearch({ value, onValueChange }: LeadSearchProps = {}) {
 
     return (
         <div className="relative w-44 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search aria-hidden={true} className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
                 value={resolvedValue}
                 onChange={(e) => {
@@ -59,6 +59,7 @@ export function LeadSearch({ value, onValueChange }: LeadSearchProps = {}) {
                     setUncontrolledValue(nextValue)
                 }}
                 placeholder={t('searchPlaceholder')}
+                aria-label={t('searchAction')}
                 className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm transition-colors hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
         </div>

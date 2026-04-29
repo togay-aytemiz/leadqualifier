@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { SkillMatch } from '@/types/database'
-import { filterSkillMatchesByIntentGate, matchSkillsSafely } from '@/lib/skills/match-safe'
+import { filterSkillMatchesByIntentGate, matchSkillsSafely, matchSkillsWithStatus } from '@/lib/skills/match-safe'
 
 describe('matchSkillsSafely', () => {
     it('returns matcher results as-is', async () => {
@@ -28,6 +28,32 @@ describe('matchSkillsSafely', () => {
         const result = await matchSkillsSafely({ matcher })
 
         expect(result).toEqual([])
+    })
+
+    it('keeps technical matcher errors distinguishable from no-match results', async () => {
+        const matcherError = new Error('embedding service down')
+        const matcher = vi.fn(async () => {
+            throw matcherError
+        })
+
+        const result = await matchSkillsWithStatus({ matcher })
+
+        expect(result).toEqual({
+            status: 'error',
+            matches: [],
+            error: matcherError
+        })
+    })
+
+    it('reports an empty successful matcher response as no_match', async () => {
+        const matcher = vi.fn(async () => [])
+
+        const result = await matchSkillsWithStatus({ matcher })
+
+        expect(result).toEqual({
+            status: 'no_match',
+            matches: []
+        })
     })
 })
 

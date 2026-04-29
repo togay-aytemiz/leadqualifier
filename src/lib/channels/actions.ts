@@ -28,6 +28,12 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 import type { Channel, Json } from '@/types/database'
 
+function telegramDebug(...args: unknown[]) {
+    if (process.env.NODE_ENV !== 'production') {
+        console.debug(...args)
+    }
+}
+
 export async function getChannels(organizationId: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -191,7 +197,12 @@ async function persistOnboardingChannelConnectionCompletion(
             error
         )
 
-        const { ai_settings_reviewed_at, ...legacyPayload } = payload
+        const legacyPayload: Omit<typeof payload, 'ai_settings_reviewed_at'> = {
+            organization_id: payload.organization_id,
+            first_seen_at: payload.first_seen_at,
+            intro_acknowledged_at: payload.intro_acknowledged_at,
+            channel_connection_completed_at: payload.channel_connection_completed_at
+        }
         const retryResult = await upsert(legacyPayload)
         error = retryResult.error
     }
@@ -301,7 +312,7 @@ export async function connectTelegramChannel(organizationId: string, botToken: s
         const appUrl = resolveConfiguredAppUrl()
 
         if (appUrl) {
-            console.log('Setting Telegram Webhook to:', `${appUrl}/api/webhooks/telegram`)
+            telegramDebug('Setting Telegram Webhook to:', `${appUrl}/api/webhooks/telegram`)
             // Pass secret in URL as query param to avoid header stripping issues
             await client.setWebhook(`${appUrl}/api/webhooks/telegram?secret=${webhookSecret}`, webhookSecret)
         } else {

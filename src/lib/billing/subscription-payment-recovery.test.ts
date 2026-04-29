@@ -121,15 +121,15 @@ describe('subscription payment recovery', () => {
     })
 
     it('exports helpers for loading recovery state and starting provider actions', async () => {
-        const module = await import('./subscription-payment-recovery')
+        const recoveryModule = await import('./subscription-payment-recovery')
 
-        expect(typeof module.getSubscriptionPaymentRecoveryState).toBe('function')
-        expect(typeof module.beginSubscriptionPaymentMethodUpdate).toBe('function')
-        expect(typeof module.retryFailedSubscriptionPayment).toBe('function')
+        expect(typeof recoveryModule.getSubscriptionPaymentRecoveryState).toBe('function')
+        expect(typeof recoveryModule.beginSubscriptionPaymentMethodUpdate).toBe('function')
+        expect(typeof recoveryModule.retryFailedSubscriptionPayment).toBe('function')
     })
 
     it('loads retry and card-update affordances for a past-due iyzico subscription', async () => {
-        const module = await import('./subscription-payment-recovery')
+        const recoveryModule = await import('./subscription-payment-recovery')
         const supabase = {
             from: () => ({
                 select: () => ({
@@ -156,7 +156,7 @@ describe('subscription payment recovery', () => {
             })
         }
 
-        const result = await module.getSubscriptionPaymentRecoveryState({
+        const result = await recoveryModule.getSubscriptionPaymentRecoveryState({
             organizationId: 'org_1',
             supabase: supabase as never
         })
@@ -171,7 +171,7 @@ describe('subscription payment recovery', () => {
     })
 
     it('starts a payment-method update and persists hosted checkout HTML on the subscription row', async () => {
-        const module = await import('./subscription-payment-recovery')
+        const recoveryModule = await import('./subscription-payment-recovery')
         const { supabase } = createSupabaseMock({
             subscriptionRow: {
                 id: 'sub_row_1',
@@ -193,7 +193,7 @@ describe('subscription payment recovery', () => {
             checkoutFormContent: '<div id=\"iyzipay-checkout-form\"></div>'
         })
 
-        const result = await module.beginSubscriptionPaymentMethodUpdate({
+        const result = await recoveryModule.beginSubscriptionPaymentMethodUpdate({
             organizationId: 'org_1',
             locale: 'tr',
             callbackUrl: 'https://app.test/api/billing/iyzico/card-update/callback?locale=tr'

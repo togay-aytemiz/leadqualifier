@@ -34,33 +34,41 @@ export function NewContentButton({ collectionId, className }: NewContentButtonPr
         {
             icon: <FileText size={16} className="text-blue-500" />,
             label: tBtn('freeform'),
-            onClick: () => router.push(collectionId ? `/knowledge/create?collectionId=${collectionId}` : '/knowledge/create')
+            onClick: () => router.push(collectionId ? `/knowledge/create?collectionId=${collectionId}` : '/knowledge/create'),
+            disabled: false
         },
         {
             icon: <Upload size={16} className="text-red-500" />,
             label: tBtn('pdf'),
             onClick: () => { }, // TODO: Implement
-            badge: tBtn('comingSoon')
+            badge: tBtn('comingSoon'),
+            disabled: true
         },
         {
             icon: <Github size={16} className="text-gray-700" />,
             label: tBtn('github'),
             onClick: () => { }, // TODO: Implement
-            badge: tBtn('comingSoon')
+            badge: tBtn('comingSoon'),
+            disabled: true
         },
         {
             icon: <FileCode size={16} className="text-gray-500" />, // Using FileCode for Notion as placeholder
             label: tBtn('notion'),
             onClick: () => { }, // TODO: Implement
-            badge: tBtn('comingSoon')
+            badge: tBtn('comingSoon'),
+            disabled: true
         },
         {
             icon: <Globe size={16} className="text-gray-400" />,
             label: tBtn('website'),
             onClick: () => { }, // TODO: Implement
-            badge: tBtn('comingSoon')
+            badge: tBtn('comingSoon'),
+            disabled: true
         }
-    ]
+    ].map((opt) => ({
+        ...opt,
+        disabled: Boolean(opt.badge) || opt.disabled
+    }))
 
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
@@ -85,10 +93,13 @@ export function NewContentButton({ collectionId, className }: NewContentButtonPr
                             <button
                                 key={i}
                                 onClick={() => {
+                                    if (opt.disabled) return
                                     opt.onClick()
                                     setOpen(false)
                                 }}
-                                className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors text-left"
+                                disabled={opt.disabled}
+                                aria-disabled={opt.disabled}
+                                className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors text-left disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white"
                             >
                                 <div className="flex items-center gap-3">
                                     {opt.icon}

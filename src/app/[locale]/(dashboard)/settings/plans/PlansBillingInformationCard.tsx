@@ -50,7 +50,7 @@ export function PlansBillingInformationCard({
 
     useEffect(() => {
         if (saveState.status === 'success') {
-            setIsFormOpen(false)
+            queueMicrotask(() => setIsFormOpen(false))
         }
     }, [saveState.status])
 

@@ -460,6 +460,8 @@ describe('Instagram webhook route', () => {
 
     afterEach(() => {
         delete process.env.META_WEBHOOK_VERIFY_TOKEN
+        delete process.env.META_INSTAGRAM_APP_SECRET
+        delete process.env.META_APP_SECRET
     })
 
     it('marks matching instagram channels verified when global verify token matches on GET', async () => {
@@ -492,6 +494,60 @@ describe('Instagram webhook route', () => {
             })
         }))
         expect(updateEqMock).toHaveBeenCalledWith('id', 'channel-ig-1')
+    })
+
+    it('does not mark instagram channel verified when POST signature is invalid', async () => {
+        const event = {
+            instagramBusinessAccountId: 'page-1',
+            contactId: 'ig-user-1',
+            contactName: 'Ayse',
+            messageId: 'ig-mid-1',
+            text: 'Merhaba',
+            timestamp: '1738000000',
+            eventSource: 'messaging',
+            eventType: 'message',
+            direction: 'inbound',
+            skipAutomation: false
+        }
+        const { supabase, updateMock } = createInstagramSupabaseMock({
+            directLookupMatcher: (query) => query.includes('config->>page_id.eq.page-1')
+                ? {
+                    id: 'channel-ig-1',
+                    organization_id: 'org-1',
+                    config: {
+                        page_id: 'page-1',
+                        instagram_business_account_id: 'ig-biz-1',
+                        instagram_app_scoped_id: 'ig-app-1',
+                        app_secret: 'app-secret',
+                        page_access_token: 'token-ig-1',
+                        webhook_status: 'pending',
+                        webhook_verified_at: null
+                    }
+                }
+                : null,
+            listData: []
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractInstagramInboundEventsMock.mockReturnValue([event])
+        isValidMetaSignatureMock.mockReturnValue(false)
+
+        const req = new NextRequest('http://localhost/api/webhooks/instagram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=invalid'
+            },
+            body: JSON.stringify({ entry: [{}] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(401)
+        await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' })
+        expect(updateMock).not.toHaveBeenCalled()
+        expect(instagramCtorMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
     it('routes page-id based instagram webhook events into the shared inbound pipeline', async () => {

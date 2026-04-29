@@ -1149,6 +1149,8 @@
       "embeddedSignupCancelled": "WhatsApp kurulumu tamamlanmadan iptal edildi.",
       "embeddedSignupCancelledStep": "WhatsApp kurulumu şu adımda iptal edildi: {step}.",
       "embeddedSignupFailedReason": "WhatsApp kurulumu başarısız: {reason}",
+      "metaSdkLoadFailed": "Meta kurulumu açılamadı. Lütfen tarayıcı bağlantınızı kontrol edip tekrar deneyin.",
+      "embeddedSignupTimedOut": "Meta kurulumu çok uzun süre yanıt vermedi. Lütfen Meta penceresini kapatıp tekrar deneyin.",
       "embeddedSignupSuccess": "WhatsApp başarıyla bağlandı.",
       "confirmDisconnectTitle": "Bu WhatsApp kanalı Qualy'den kaldırılsın mı?",
       "confirmDisconnectDesc": "Bu işlem yalnızca bu kanalı Qualy'den kaldırır. WhatsApp Business uygulamanızı, telefon numaranızı veya Meta/WABA kurulumunuzu ayırmaz. Bot burada yeni mesajlara yanıt vermeyi durdurur.",

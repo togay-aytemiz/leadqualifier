@@ -46,6 +46,7 @@ function createSupabaseMock(result: { data: unknown; error: unknown }) {
 describe('billing entitlements', () => {
     beforeEach(() => {
         createClientMock.mockReset()
+        vi.unstubAllEnvs()
     })
 
     it('falls back to allowed entitlement when billing row does not exist', async () => {
@@ -57,6 +58,33 @@ describe('billing entitlements', () => {
         expect(entitlement.isUsageAllowed).toBe(true)
         expect(entitlement.lockReason).toBeNull()
         expect(entitlement.membershipState).toBeNull()
+    })
+
+    it('fails closed in production when billing row is unexpectedly missing', async () => {
+        vi.stubEnv('NODE_ENV', 'production')
+        const supabase = createSupabaseMock({ data: null, error: null })
+        createClientMock.mockResolvedValue(supabase)
+
+        const entitlement = await resolveOrganizationUsageEntitlement('org_1')
+
+        expect(entitlement.isUsageAllowed).toBe(false)
+        expect(entitlement.lockReason).toBe('admin_locked')
+        expect(entitlement.membershipState).toBe('admin_locked')
+    })
+
+    it('fails closed in production when billing lookup errors', async () => {
+        vi.stubEnv('NODE_ENV', 'production')
+        const supabase = createSupabaseMock({
+            data: null,
+            error: { code: 'PGRST500', message: 'database unavailable' }
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const entitlement = await resolveOrganizationUsageEntitlement('org_1')
+
+        expect(entitlement.isUsageAllowed).toBe(false)
+        expect(entitlement.lockReason).toBe('admin_locked')
+        expect(entitlement.membershipState).toBe('admin_locked')
     })
 
     it('returns locked entitlement when trial is exhausted', async () => {

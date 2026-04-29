@@ -269,6 +269,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     const signatureHeader = req.headers.get('x-hub-signature-256')
     const rawBody = await req.text()
+    const globalAppSecret = process.env.META_WHATSAPP_APP_SECRET || process.env.META_APP_SECRET
+    const signatureVerifiedByGlobalSecret = globalAppSecret
+        ? isValidMetaSignature(signatureHeader, rawBody, globalAppSecret)
+        : false
+
+    if (globalAppSecret && !signatureVerifiedByGlobalSecret) {
+        console.warn('WhatsApp Webhook: Invalid signature')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     let payload: unknown
     try {
@@ -312,7 +321,7 @@ export async function POST(req: NextRequest) {
             const appSecret = process.env.META_WHATSAPP_APP_SECRET
                 || process.env.META_APP_SECRET
                 || readConfigString(channel.config, 'app_secret')
-            const isValid = isValidMetaSignature(signatureHeader, rawBody, appSecret)
+            const isValid = signatureVerifiedByGlobalSecret || isValidMetaSignature(signatureHeader, rawBody, appSecret)
             if (!isValid) {
                 console.warn('WhatsApp Webhook: Invalid signature')
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

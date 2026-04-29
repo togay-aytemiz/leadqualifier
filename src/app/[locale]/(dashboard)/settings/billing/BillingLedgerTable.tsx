@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useTranslations } from 'next-intl'
 import type { BillingLedgerMovementFilter, BillingLedgerPeriodFilter } from '@/lib/billing/server'
 
@@ -287,15 +287,20 @@ export function BillingLedgerTable({
         }),
         [t]
     )
-    const formatSignedCredit = (value: number) => `${value < 0 ? '-' : '+'}${formatCredits.format(Math.abs(value))}`
+    const formatSignedCredit = useCallback(
+        (value: number) => `${value < 0 ? '-' : '+'}${formatCredits.format(Math.abs(value))}`,
+        [formatCredits]
+    )
 
     useEffect(() => {
-        setPeriod(selectedPeriod)
-        setView(selectedView)
-        setMovement(selectedMovement)
-        setLedgerRows(rows)
-        setHasMore(hasMoreRows)
-        setLoadOffset(nextOffset ?? rows.length)
+        queueMicrotask(() => {
+            setPeriod(selectedPeriod)
+            setView(selectedView)
+            setMovement(selectedMovement)
+            setLedgerRows(rows)
+            setHasMore(hasMoreRows)
+            setLoadOffset(nextOffset ?? rows.length)
+        })
     }, [hasMoreRows, nextOffset, rows, selectedMovement, selectedPeriod, selectedView])
 
     const aggregateRows = useMemo(
@@ -307,7 +312,7 @@ export function BillingLedgerTable({
             formatCredit: formatSignedCredit,
             formatBalance: (value) => formatCredits.format(value)
         }),
-        [aggregateLabels, formatCredits, ledgerRows, locale, view]
+        [aggregateLabels, formatCredits, formatSignedCredit, ledgerRows, locale, view]
     )
 
     const loadEntryPage = (

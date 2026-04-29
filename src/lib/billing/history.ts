@@ -155,7 +155,7 @@ export function buildBillingHistoryRows(input: {
     formatCurrency: (amount: number, currency: string | null) => string | null
     labels: BillingHistoryLabels
 }): BillingHistoryRow[] {
-    return input.entries.flatMap((entry, entryIndex) => {
+    return input.entries.flatMap((entry) => {
         const entryMetadata = toRecord(entry.metadata)
 
         if (entry.entryType === 'package_grant') {

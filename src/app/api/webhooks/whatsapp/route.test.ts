@@ -127,6 +127,8 @@ describe('WhatsApp webhook route', () => {
 
     afterEach(() => {
         delete process.env.META_WEBHOOK_VERIFY_TOKEN
+        delete process.env.META_WHATSAPP_APP_SECRET
+        delete process.env.META_APP_SECRET
     })
 
     it('returns challenge when global verify token matches on GET', async () => {
@@ -197,6 +199,33 @@ describe('WhatsApp webhook route', () => {
         expect(res.status).toBe(401)
         await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' })
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects no-event POST request with invalid signature', async () => {
+        process.env.META_WHATSAPP_APP_SECRET = 'app-secret'
+        extractWhatsAppInboundMessagesMock.mockReturnValue([])
+        isValidMetaSignatureMock.mockReturnValue(false)
+
+        const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=invalid'
+            },
+            body: JSON.stringify({ entry: [] })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(401)
+        await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' })
+        expect(createClientMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(isValidMetaSignatureMock).toHaveBeenCalledWith(
+            'sha256=invalid',
+            JSON.stringify({ entry: [] }),
+            'app-secret'
+        )
     })
 
     it('forwards valid text event into shared inbound pipeline', async () => {

@@ -6,7 +6,7 @@ import { Search, X, ArrowUpRight, TriangleAlert, ArrowLeft, ChevronDown } from '
 import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { isSettingsDetailPath, SETTINGS_MOBILE_BACK_EVENT } from '@/components/settings/mobilePaneState'
 
 // --- Button ---
@@ -195,16 +195,28 @@ export function TableBody({ children }: TableBodyProps) {
     return <tbody className="divide-y divide-gray-100">{children}</tbody>
 }
 
-interface TableRowProps {
+interface TableRowProps extends Omit<React.HTMLAttributes<HTMLTableRowElement>, 'onClick'> {
     children: React.ReactNode
     onClick?: () => void
     className?: string
 }
 
-export function TableRow({ children, onClick, className }: TableRowProps) {
+export function TableRow({ children, onClick, className, onKeyDown, ...props }: TableRowProps) {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+        onKeyDown?.(event)
+        if (event.defaultPrevented || !onClick) return
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onClick()
+    }
+
     return (
         <tr
+            {...props}
             onClick={onClick}
+            onKeyDown={handleKeyDown}
+            tabIndex={onClick ? 0 : undefined}
+            role={onClick ? 'button' : undefined}
             className={cn("hover:bg-gray-50 transition-colors", onClick && "cursor-pointer", className)}
         >
             {children}
@@ -241,19 +253,21 @@ export function TableToolbar({ left, right }: TableToolbarProps) {
 // --- SearchInput ---
 interface SearchInputProps {
     placeholder?: string
+    ariaLabel?: string
     value?: string
     onChange?: (value: string) => void
     className?: string
 }
 
-export function SearchInput({ placeholder = "Search...", value, onChange, className }: SearchInputProps) {
+export function SearchInput({ placeholder = "Search...", ariaLabel, value, onChange, className }: SearchInputProps) {
     return (
         <div className={cn("relative w-full", className)}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <Search aria-hidden={true} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
                 type="text"
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
+                aria-label={ariaLabel ?? placeholder}
                 className="w-full h-10 pl-10 pr-4 bg-gray-100 text-gray-900 border-none rounded-lg text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 shadow-none placeholder-gray-500 transition-all"
                 placeholder={placeholder}
             />
@@ -438,6 +452,58 @@ interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, headerActions, children, panelClassName, bodyClassName }: ModalProps) {
     const tCommon = useTranslations('common')
+    const titleId = useId()
+    const panelRef = useRef<HTMLDivElement | null>(null)
+    const previouslyFocusedElementRef = useRef<HTMLElement | null>(null)
+
+    useEffect(() => {
+        if (!isOpen || typeof document === 'undefined') return
+
+        previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+        queueMicrotask(() => panelRef.current?.focus())
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault()
+                onClose()
+                return
+            }
+
+            if (event.key !== 'Tab') return
+            const panel = panelRef.current
+            if (!panel) return
+            const focusable = Array.from(
+                panel.querySelectorAll<HTMLElement>(
+                    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                )
+            ).filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null)
+            if (focusable.length === 0) {
+                event.preventDefault()
+                panel.focus()
+                return
+            }
+
+            const first = focusable[0]
+            const last = focusable.at(-1)
+            if (!first || !last) return
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault()
+                last.focus()
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault()
+                first.focus()
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown)
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown)
+            previouslyFocusedElementRef.current?.focus()
+            previouslyFocusedElementRef.current = null
+        }
+    }, [isOpen, onClose])
 
     if (!isOpen) return null
 
@@ -450,6 +516,11 @@ export function Modal({ isOpen, onClose, title, headerActions, children, panelCl
             onClick={(e) => e.stopPropagation()}
         >
             <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal={true}
+                aria-labelledby={titleId}
+                tabIndex={-1}
                 className={cn(
                     "bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden pointer-events-auto transition-all duration-200",
                     "opacity-100 translate-y-0 scale-100",
@@ -458,7 +529,7 @@ export function Modal({ isOpen, onClose, title, headerActions, children, panelCl
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white">
-                    <h3 className="font-bold text-gray-900">{title}</h3>
+                    <h3 id={titleId} className="font-bold text-gray-900">{title}</h3>
                     <div className="flex items-center gap-1">
                         {headerActions}
                         <button

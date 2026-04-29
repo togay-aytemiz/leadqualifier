@@ -45,8 +45,10 @@ export function HostedCheckoutEmbed({
         const container = containerRef.current
         if (!container) return
 
-        setIsCheckoutVisible(false)
-        setIsFallbackVisible(false)
+        queueMicrotask(() => {
+            setIsCheckoutVisible(false)
+            setIsFallbackVisible(false)
+        })
         resetIyzicoCheckoutRuntime(document, window)
         container.innerHTML = ''
 

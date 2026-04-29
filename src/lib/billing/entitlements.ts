@@ -46,6 +46,19 @@ function buildFallbackEntitlement(): OrganizationUsageEntitlement {
     }
 }
 
+function buildFailClosedEntitlement(): OrganizationUsageEntitlement {
+    return {
+        isUsageAllowed: false,
+        lockReason: 'admin_locked',
+        membershipState: 'admin_locked',
+        snapshot: null
+    }
+}
+
+function isProductionRuntime() {
+    return process.env.NODE_ENV === 'production'
+}
+
 export async function resolveOrganizationUsageEntitlement(
     organizationId: string,
     options?: {
@@ -64,10 +77,16 @@ export async function resolveOrganizationUsageEntitlement(
         if (!isMissingBillingTableError(error)) {
             console.error('Failed to resolve billing entitlement:', error)
         }
+        if (isProductionRuntime()) {
+            return buildFailClosedEntitlement()
+        }
         return buildFallbackEntitlement()
     }
 
     if (!data) {
+        if (isProductionRuntime()) {
+            return buildFailClosedEntitlement()
+        }
         return buildFallbackEntitlement()
     }
 

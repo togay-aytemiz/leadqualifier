@@ -166,6 +166,18 @@ export function LeadsTable({
         router.push(`/inbox?conversation=${conversationId}`)
     }
 
+    const resolveLeadRowLabel = (lead: LeadWithConversation) => {
+        const serviceNames = getLeadServiceNames(lead)
+        return [
+            lead.conversation.contact_name,
+            statusLabels[lead.status] || lead.status,
+            `${t('columns.score')}: ${lead.total_score}`,
+            serviceNames.length > 0 ? serviceNames.join(', ') : null
+        ].filter(Boolean).join(' · ')
+    }
+
+    const resolveSortLabel = (col: ColumnDef) => col.label
+
     const getSortIcon = (columnKey: string, isSortable: boolean) => {
         if (!isSortable) return null
         if (sortBy === columnKey) {
@@ -213,6 +225,7 @@ export function LeadsTable({
                         <button
                             key={lead.id}
                             type="button"
+                            aria-label={resolveLeadRowLabel(lead)}
                             onClick={() => handleRowClick(lead.conversation_id)}
                             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:border-gray-300 active:scale-[0.99]"
                         >
@@ -287,13 +300,24 @@ export function LeadsTable({
                         {allColumns.map(col => (
                             <th
                                 key={col.key}
+                                scope="col"
+                                aria-sort={
+                                    col.sortable !== false && sortBy === col.key
+                                        ? sortOrder === 'asc' ? 'ascending' : 'descending'
+                                        : undefined
+                                }
                                 className={`px-6 py-2.5 ${col.width || ''} ${col.sortable !== false ? 'cursor-pointer select-none hover:bg-gray-100' : ''}`}
-                                onClick={() => col.sortable !== false && handleSort(col.key)}
                             >
-                                <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    aria-label={resolveSortLabel(col)}
+                                    onClick={() => col.sortable !== false && handleSort(col.key)}
+                                    disabled={col.sortable === false}
+                                    className="flex w-full items-center gap-1.5 text-left disabled:cursor-default"
+                                >
                                     <span>{col.label}</span>
                                     {getSortIcon(col.key, col.sortable !== false)}
-                                </div>
+                                </button>
                             </th>
                         ))}
                     </tr>
@@ -305,6 +329,7 @@ export function LeadsTable({
                         return (
                             <TableRow
                                 key={lead.id}
+                                aria-label={resolveLeadRowLabel(lead)}
                                 onClick={() => handleRowClick(lead.conversation_id)}
                             >
                                 {/* Name & Platform merged */}
