@@ -32,6 +32,12 @@ describe('ai language helpers', () => {
         expect(resolveMvpResponseLanguageName('Sikayetim var')).toBe('Turkish')
     })
 
+    it('treats Turkish no-progress and refusal phrases as Turkish', () => {
+        expect(resolveMvpResponseLanguage('bilmiyorum')).toBe('tr')
+        expect(resolveMvpResponseLanguage('paylasmak istemiyorum')).toBe('tr')
+        expect(resolveMvpResponseLanguageName('yardimci olabilir misiniz')).toBe('Turkish')
+    })
+
     it('uses history when current message language is ambiguous', () => {
         expect(isMvpResponseLanguageAmbiguous('ok')).toBe(true)
         expect(resolveMvpResponseLanguage('ok', {

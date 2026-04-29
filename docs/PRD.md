@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-04-29):** AI-generated disclaimer footers must match the language of the final customer-facing bot text when that text is clearly Turkish or English. This prevents Turkish fallback/recovery replies from shipping with an English disclaimer if the earlier per-turn language hint was ambiguous or stale.
+
 > **Update Note (2026-04-25):** Dashboard and Settings navigation must avoid redundant client-side work after the server shell payload is available. The desktop sidebar and mobile bottom nav should hydrate from the server billing snapshot, skip duplicate first-mount billing and bot-mode reads when those values are already known, gate route prefetch work to the actually visible viewport shell, disable automatic `Link` prefetch on manually warmed dashboard nav links, and use existence reads instead of exact counts for boolean sidebar badges. Cold Settings-to-Settings transitions should show a local detail-pane skeleton immediately instead of leaving old content under the newly selected nav item.
 
 > **Update Note (2026-04-24):** `Settings > Usage > Credit history` must support operator exploration beyond the most recent mixed ledger slice. The table should default to the current month, allow previous-month and all-time filters, include package grants and extra-credit purchases alongside usage debits, use compact one-word labels for type/pool/reason columns, support record-level plus daily/weekly/monthly aggregate views over loaded rows, and lazy-load additional pages for large all-time histories.
