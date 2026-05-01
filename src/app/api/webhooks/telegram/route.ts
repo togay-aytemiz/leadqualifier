@@ -50,6 +50,59 @@ function readTrimmedString(value: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function readTelegramUpdate(req: NextRequest) {
+    try {
+        const payload = await req.json()
+        return isRecord(payload) ? payload : null
+    } catch {
+        return null
+    }
+}
+
+function resolveTelegramWebhookSecret(req: NextRequest) {
+    const headerSecret = readTrimmedString(req.headers.get('x-telegram-bot-api-secret-token'))
+    if (headerSecret) return headerSecret
+    if (process.env.NODE_ENV === 'production') return null
+    return readTrimmedString(req.nextUrl.searchParams.get('secret'))
+}
+
+function readTelegramTextMessage(update: Record<string, unknown>) {
+    if (!isRecord(update.message)) return { status: 'ignored' as const }
+
+    const message = update.message
+    const text = readTrimmedString(message.text)
+    if (!text) return { status: 'ignored' as const }
+
+    if (!isRecord(message.chat) || !isRecord(message.from)) {
+        return { status: 'invalid' as const }
+    }
+
+    const chatId = message.chat.id
+    const fromId = message.from.id
+    const messageId = message.message_id
+    if (
+        (typeof chatId !== 'string' && typeof chatId !== 'number')
+        || (typeof fromId !== 'string' && typeof fromId !== 'number')
+        || (typeof messageId !== 'string' && typeof messageId !== 'number')
+    ) {
+        return { status: 'invalid' as const }
+    }
+
+    return {
+        status: 'valid' as const,
+        message,
+        text,
+        from: message.from as { id: string | number, first_name?: string, last_name?: string },
+        chatId: String(chatId),
+        fromId,
+        messageId: String(messageId)
+    }
+}
+
 function buildTelegramSkillImagePlaceholder(responseLanguage: 'tr' | 'en') {
     return responseLanguage === 'tr' ? '[Yetenek görseli]' : '[Skill image]'
 }
@@ -94,32 +147,42 @@ async function resolveTelegramContactAvatarUrl(args: {
 }
 
 export async function POST(req: NextRequest) {
-    const headerSecret = req.headers.get('x-telegram-bot-api-secret-token')
-    const querySecret = req.nextUrl.searchParams.get('secret')
-    const secretToken = headerSecret || querySecret
+    const secretToken = resolveTelegramWebhookSecret(req)
 
-    const update = await req.json()
+    const update = await readTelegramUpdate(req)
+    if (!update) {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    const telegramMessage = readTelegramTextMessage(update)
 
     telegramDebug('Telegram Webhook: Received update', {
         updateId: update.update_id,
-        hasMessage: !!update.message,
+        hasMessage: telegramMessage.status === 'valid',
         hasSecret: !!secretToken
     })
 
     // 1. Basic Validation
-    if (!update.message || !update.message.text) {
+    if (telegramMessage.status === 'ignored') {
         telegramDebug('Telegram Webhook: Skipping non-text update')
         return NextResponse.json({ ok: true }) // Ignore non-text updates
     }
+    if (telegramMessage.status === 'invalid') {
+        return NextResponse.json({ error: 'Invalid Telegram message payload' }, { status: 400 })
+    }
 
-    const { chat, text, from } = update.message
-    const chatId = chat.id.toString()
+    const { text, from, chatId } = telegramMessage
 
     telegramDebug('Telegram Webhook: Processing message', {
         chatId,
         text,
-        fromId: from.id
+        fromId: telegramMessage.fromId
     })
+
+    if (!secretToken) {
+        console.warn('Telegram Webhook: Missing secret token')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     // Use Service Role Key (Admin) to bypass RLS
     const supabase = createClient(
@@ -128,22 +191,15 @@ export async function POST(req: NextRequest) {
     )
 
     // 2. Find Channel by Bot Token (We need to verify which bot this is)
-    let channel;
+    const { data: channel } = await supabase
+        .from('channels')
+        .select('id, organization_id, config')
+        .eq('type', 'telegram')
+        .eq('status', 'active')
+        .eq('config->>webhook_secret', secretToken)
+        .single()
 
-    if (secretToken) {
-        const { data } = await supabase
-            .from('channels')
-            .select('id, organization_id, config')
-            .eq('type', 'telegram')
-            .eq('status', 'active')
-            .eq('config->>webhook_secret', secretToken)
-            .single()
-
-        channel = data
-        telegramDebug('Telegram Webhook: Channel lookup by secret', { found: !!data, channelId: data?.id })
-    } else {
-        console.warn('Telegram Webhook: Missing secret token')
-    }
+    telegramDebug('Telegram Webhook: Channel lookup by secret', { found: !!channel, channelId: channel?.id })
 
     if (!channel) {
         console.warn('Telegram Webhook: No matching channel found for secret')
@@ -219,7 +275,7 @@ export async function POST(req: NextRequest) {
         telegramDebug('Telegram Webhook: Found existing conversation', conversation.id)
     }
 
-    const telegramMessageId = String(update.message.message_id)
+    const telegramMessageId = telegramMessage.messageId
     const dedupeFilter = 'metadata->>telegram_message_id'
     const { data: existingInboundData } = await supabase
         .from('messages')

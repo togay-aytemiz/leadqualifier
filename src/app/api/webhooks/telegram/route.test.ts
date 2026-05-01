@@ -246,6 +246,7 @@ function createLeadScoreBuilder(totalScore: number | null = null) {
 describe('Telegram webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        vi.unstubAllEnvs()
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
 
@@ -278,6 +279,98 @@ describe('Telegram webhook route', () => {
             file_id: 'file-1',
             file_path: 'photos/avatar.jpg'
         })
+    })
+
+    it('returns 400 for malformed JSON without creating a service client', async () => {
+        const req = new NextRequest('http://localhost/api/webhooks/telegram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-telegram-bot-api-secret-token': 'secret-1'
+            },
+            body: '{bad-json'
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(400)
+        await expect(res.json()).resolves.toEqual({ error: 'Invalid JSON body' })
+        expect(createClientMock).not.toHaveBeenCalled()
+    })
+
+    it('ignores non-message updates without creating a service client', async () => {
+        const req = new NextRequest('http://localhost/api/webhooks/telegram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-telegram-bot-api-secret-token': 'secret-1'
+            },
+            body: JSON.stringify({
+                update_id: 1000,
+                edited_message: {
+                    message_id: 11,
+                    text: 'Düzenlendi',
+                    chat: { id: 123 },
+                    from: { id: 456, first_name: 'Ayse' }
+                }
+            })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({ ok: true })
+        expect(createClientMock).not.toHaveBeenCalled()
+    })
+
+    it('returns 400 for text messages missing required chat or sender data', async () => {
+        const req = new NextRequest('http://localhost/api/webhooks/telegram', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-telegram-bot-api-secret-token': 'secret-1'
+            },
+            body: JSON.stringify({
+                update_id: 1000,
+                message: {
+                    message_id: 11,
+                    text: 'Merhaba',
+                    from: { id: 456, first_name: 'Ayse' }
+                }
+            })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(400)
+        await expect(res.json()).resolves.toEqual({ error: 'Invalid Telegram message payload' })
+        expect(createClientMock).not.toHaveBeenCalled()
+    })
+
+    it('does not accept query-string webhook secrets in production', async () => {
+        vi.stubEnv('NODE_ENV', 'production')
+
+        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                update_id: 1001,
+                message: {
+                    message_id: 12,
+                    text: 'Merhaba',
+                    chat: { id: 123 },
+                    from: { id: 456, first_name: 'Ayse' }
+                }
+            })
+        })
+
+        const res = await POST(req)
+
+        expect(res.status).toBe(401)
+        await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' })
+        expect(createClientMock).not.toHaveBeenCalled()
     })
 
     it('stores inbound message and skips AI flow when conversation processing is paused', async () => {
