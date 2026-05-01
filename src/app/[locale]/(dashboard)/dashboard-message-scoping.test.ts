@@ -41,6 +41,7 @@ describe('dashboard message scoping', () => {
 
         expect(source).toContain('DashboardRouteSkeleton')
         expect(source).toContain('route="inbox"')
+        expect(source).toContain('variant="branded"')
     })
 
     it('uses a reusable dashboard route intl provider', () => {

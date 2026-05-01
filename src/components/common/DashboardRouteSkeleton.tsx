@@ -1,6 +1,37 @@
+import Image from 'next/image'
 import { PageSkeleton, Skeleton } from '@/design'
 import { AdminRouteLoading } from '@/components/common/AdminRouteLoading'
 import type { DashboardRouteSkeletonKey } from '@/design/dashboard-route-transition'
+
+interface BrandedRouteLoadingProps {
+    title: string
+    description: string
+}
+
+function BrandedRouteLoading({ title, description }: BrandedRouteLoadingProps) {
+    return (
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white px-6">
+            <div className="flex w-full max-w-sm animate-[qualy-loading-fade_420ms_ease-in-out_both] flex-col items-center text-center">
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <Image
+                        src="/icon-black.svg"
+                        alt=""
+                        width={30}
+                        height={30}
+                        aria-hidden
+                        priority
+                        className="animate-[qualy-loading-mark_1.4s_ease-in-out_infinite] motion-reduce:animate-none"
+                    />
+                </div>
+                <p className="text-sm font-semibold text-gray-950">{title}</p>
+                <p className="mt-2 max-w-xs text-sm leading-6 text-gray-500">{description}</p>
+                <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-full w-2/5 rounded-full bg-gray-950 animate-[qualy-loading-progress_1.35s_ease-in-out_infinite] motion-reduce:animate-none" />
+                </div>
+            </div>
+        </div>
+    )
+}
 
 function InboxRouteSkeleton() {
     return (
@@ -132,9 +163,21 @@ function KnowledgeRouteSkeleton() {
 
 interface DashboardRouteSkeletonProps {
     route: DashboardRouteSkeletonKey
+    variant?: 'shell' | 'branded'
+    title?: string
+    description?: string
 }
 
-export function DashboardRouteSkeleton({ route }: DashboardRouteSkeletonProps) {
+export function DashboardRouteSkeleton({
+    route,
+    variant = 'shell',
+    title = 'Qualy',
+    description = ''
+}: DashboardRouteSkeletonProps) {
+    if (variant === 'branded') {
+        return <BrandedRouteLoading title={title} description={description} />
+    }
+
     if (route === 'inbox') {
         return <InboxRouteSkeleton />
     }

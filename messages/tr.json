@@ -150,7 +150,11 @@
   },
   "dashboard": {
     "title": "Panel",
-    "welcome": "Hoşgeldin, {name}!"
+    "welcome": "Hoşgeldin, {name}!",
+    "loading": {
+      "title": "Qualy açılıyor",
+      "description": "Çalışma alanınız hazırlanıyor. Birazdan hazırsınız."
+    }
   },
   "skills": {
     "title": "Yetenekler",

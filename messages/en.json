@@ -150,7 +150,11 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "welcome": "Welcome, {name}!"
+    "welcome": "Welcome, {name}!",
+    "loading": {
+      "title": "Opening Qualy",
+      "description": "Preparing your workspace. This should only take a moment."
+    }
   },
   "skills": {
     "title": "Skills",
