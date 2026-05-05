@@ -3,6 +3,7 @@ import type {
     BillingAdminAuditLog,
     BillingLockReason,
     BillingMembershipState,
+    BillingPurchaseRequest,
     Json,
     OrganizationBillingAccount
 } from '@/types/database'
@@ -106,7 +107,23 @@ export interface AdminOrganizationProfileSnapshot {
 export interface AdminOrganizationDetail {
     organization: AdminOrganizationSummary
     profiles: AdminOrganizationProfileSnapshot[]
+    purchaseRequests: AdminBillingPurchaseRequestEntry[]
     billingAuditEntries: AdminBillingAuditEntry[]
+}
+
+export interface AdminBillingPurchaseRequestEntry {
+    id: string
+    requestType: BillingPurchaseRequest['request_type']
+    status: BillingPurchaseRequest['status']
+    emailStatus: BillingPurchaseRequest['email_status']
+    requesterName: string | null
+    requesterEmail: string | null
+    requestedPlanId: string | null
+    requestedTopupPackId: string | null
+    requestedCredits: number | null
+    requestedAmount: number | null
+    requestedCurrency: string | null
+    createdAt: string
 }
 
 export interface AdminBillingAuditEntry {
@@ -1006,6 +1023,49 @@ async function getBillingAdminAuditEntriesByOrganizationId(
     })
 }
 
+async function getBillingPurchaseRequestsByOrganizationId(
+    supabase: SupabaseClient,
+    organizationId: string,
+    limit = 10
+): Promise<AdminBillingPurchaseRequestEntry[]> {
+    const { data, error } = await supabase
+        .from('billing_purchase_requests')
+        .select('id, request_type, status, email_status, requested_by, requested_plan_id, requested_topup_pack_id, requested_credits, requested_amount, requested_currency, created_at')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+    if (error) {
+        console.error('Failed to load billing purchase requests for organization detail:', error)
+        return []
+    }
+
+    const rows = (data ?? []) as BillingPurchaseRequest[]
+    if (rows.length === 0) return []
+
+    const requesterIds = Array.from(new Set(rows.map((row) => row.requested_by)))
+    const requesterProfiles = await getProfilesByIds(supabase, requesterIds)
+    const requesterById = new Map(requesterProfiles.map((profile) => [profile.id, profile]))
+
+    return rows.map((row) => {
+        const requester = requesterById.get(row.requested_by)
+        return {
+            id: row.id,
+            requestType: row.request_type,
+            status: row.status,
+            emailStatus: row.email_status,
+            requesterName: requester?.full_name ?? null,
+            requesterEmail: requester?.email ?? null,
+            requestedPlanId: row.requested_plan_id,
+            requestedTopupPackId: row.requested_topup_pack_id,
+            requestedCredits: row.requested_credits,
+            requestedAmount: row.requested_amount,
+            requestedCurrency: row.requested_currency,
+            createdAt: row.created_at
+        } satisfies AdminBillingPurchaseRequestEntry
+    })
+}
+
 function buildLikeSearchInput(value: string) {
     return value.replace(/[%_]/g, '').replace(/,/g, ' ').trim()
 }
@@ -1533,10 +1593,11 @@ export async function getAdminOrganizationDetail(
     const organizations = await getOrganizationsByIds(supabase, [organizationId])
     if (organizations.length === 0) return null
 
-    const [organizationSummaryList, organizationMemberships, billingAuditEntries] = await Promise.all([
+    const [organizationSummaryList, organizationMemberships, billingAuditEntries, purchaseRequests] = await Promise.all([
         buildOrganizationSummariesFromRows(supabase, organizations),
         getMembershipsByOrganizationId(supabase, organizationId),
-        getBillingAdminAuditEntriesByOrganizationId(supabase, organizationId)
+        getBillingAdminAuditEntriesByOrganizationId(supabase, organizationId),
+        getBillingPurchaseRequestsByOrganizationId(supabase, organizationId)
     ])
 
     const organization = organizationSummaryList[0]
@@ -1607,6 +1668,7 @@ export async function getAdminOrganizationDetail(
     return {
         organization,
         profiles: profilesSnapshot,
+        purchaseRequests,
         billingAuditEntries
     }
 }

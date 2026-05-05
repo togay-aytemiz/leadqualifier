@@ -1,17 +1,9 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-
-const CheckoutLegalConsentModal = dynamic(
-  () => import('./CheckoutLegalConsentModal').then((module) => module.CheckoutLegalConsentModal),
-  {
-    loading: () => null,
-  }
-)
 
 interface TopupConversationRange {
   min: number
@@ -44,7 +36,6 @@ export function TopupCheckoutCard({
 }: TopupCheckoutCardProps) {
   const [isClient, setIsClient] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false)
   const locale = useLocale()
   const tPlans = useTranslations('billingPlans')
 
@@ -102,11 +93,6 @@ export function TopupCheckoutCard({
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [isModalOpen])
-
-  useEffect(() => {
-    if (isModalOpen) return
-    setIsLegalModalOpen(false)
   }, [isModalOpen])
 
   const modal = (
@@ -199,14 +185,20 @@ export function TopupCheckoutCard({
             {tPlans('topups.modal.cancel')}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsLegalModalOpen(true)}
-            className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
-            disabled={!selectedPack || !topupAllowed}
-          >
-            {tPlans('topups.modal.continue')}
-          </button>
+          {selectedPack ? (
+            <form action={topupAction}>
+              <input type="hidden" name="organizationId" value={organizationId} />
+              <input type="hidden" name="requestType" value="topup" />
+              <input type="hidden" name="packId" value={selectedPack.id} />
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+                disabled={!topupAllowed}
+              >
+                {tPlans('purchaseRequest.modal.submit')}
+              </button>
+            </form>
+          ) : null}
         </div>
       </div>
     </div>
@@ -236,25 +228,6 @@ export function TopupCheckoutCard({
       </div>
 
       {isClient && isModalOpen && createPortal(modal, document.body)}
-      {isClient &&
-        isLegalModalOpen &&
-        selectedPack &&
-        createPortal(
-          <CheckoutLegalConsentModal
-            flowType="topup"
-            summary={tPlans('checkoutLegal.topupSummary', {
-              credits: formatNumber.format(selectedPack.credits),
-              amount: formatCurrency.format(selectedPack.localizedAmount),
-            })}
-            action={topupAction}
-            hiddenFields={[
-              { name: 'organizationId', value: organizationId },
-              { name: 'packId', value: selectedPack.id },
-            ]}
-            onClose={() => setIsLegalModalOpen(false)}
-          />,
-          document.body
-        )}
     </>
   )
 }

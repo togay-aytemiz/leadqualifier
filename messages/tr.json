@@ -1361,6 +1361,27 @@
     "statusBanner": {
       "dismiss": "Durum mesajini kapat"
     },
+    "purchaseRequest": {
+      "status": {
+        "successTitle": "Talep iletildi",
+        "errorTitle": "Talep iletilemedi",
+        "successDescription": "Satın alma talebiniz ekibimize iletildi. En kısa sürede sizinle iletişime geçeceğiz.",
+        "errors": {
+          "unauthorized": "Oturum doğrulanamadı.",
+          "invalidInput": "Geçerli bir plan veya kredi paketi seçip tekrar deneyin.",
+          "requestFailed": "Talep kaydedilemedi. Lütfen tekrar deneyin."
+        }
+      },
+      "modal": {
+        "title": "Satın alma talebi gönder",
+        "description": "Talebiniz ekibimize iletilecek. Ödeme ve paket aktivasyonu için sizinle iletişime geçeceğiz.",
+        "planSummary": "{plan} • {price} / ay • {credits} kredi",
+        "topupSummary": "{credits} kredi • {amount}",
+        "cancel": "İptal",
+        "submit": "Talep gönder",
+        "close": "Kapat"
+      }
+    },
     "packageCatalog": {
       "title": "Aylık paketler",
       "description": "İşletmene en uygun aylık paketi seç.",
@@ -2727,6 +2748,25 @@
         "topupAllowed": "Ek kredi açık",
         "topupBlocked": "Ek kredi kapalı"
       },
+      "purchaseRequests": {
+        "title": "Satın Alma Talepleri",
+        "description": "Müşteri planlar sayfasından gelen son plan, yükseltme ve kredi talepleri.",
+        "empty": "Henüz satın alma talebi yok.",
+        "requesterFallback": "Bilinmeyen talep sahibi",
+        "credits": "{value} kredi",
+        "type": {
+          "plan": "Yeni plan talebi",
+          "planChange": "Plan değişikliği talebi",
+          "topup": "Ek kredi talebi",
+          "custom": "Özel paket talebi"
+        },
+        "status": {
+          "new": "Yeni",
+          "seen": "Görüldü",
+          "handled": "Tamamlandı",
+          "dismissed": "Yok sayıldı"
+        }
+      },
       "manualActions": {
         "banner": "Manuel faturalandırma aksiyonları sistem yöneticileri için aktiftir. Her aksiyon neden ister ve audit log’a yazılır.",
         "title": "Manuel Faturalandırma Aksiyonları",
@@ -2783,6 +2823,17 @@
           "creditsLabel": "Aylık dahil kredi",
           "reasonLabel": "Neden",
           "submit": "Premium’u aktifleştir"
+        },
+        "assignNamedPremium": {
+          "title": "Katalog Paketi Tanımla",
+          "planLabel": "Paket",
+          "creditsSuffix": "kredi",
+          "submit": "Seçili paketi aktifleştir",
+          "planNames": {
+            "starter": "Temel",
+            "growth": "Gelişmiş",
+            "scale": "Profesyonel"
+          }
         },
         "cancelPremium": {
           "title": "Premium İptal Et",

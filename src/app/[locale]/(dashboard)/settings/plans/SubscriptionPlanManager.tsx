@@ -1,19 +1,9 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import {
-    buildSubscriptionCheckoutSummaryDetails,
-    resolveSubscriptionCheckoutContinueLabel,
-    resolveSubscriptionCheckoutSummary
-} from './subscription-checkout-summary'
-
-const CheckoutLegalConsentModal = dynamic(() => import('./CheckoutLegalConsentModal').then((module) => module.CheckoutLegalConsentModal), {
-    loading: () => null
-})
 
 interface PlanConversationRange {
     min: number
@@ -72,7 +62,6 @@ export function SubscriptionPlanManager({
 }: SubscriptionPlanManagerProps) {
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
-    const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
     const locale = useLocale()
     const tPlans = useTranslations('billingPlans')
 
@@ -100,91 +89,11 @@ export function SubscriptionPlanManager({
         }),
         [locale]
     )
-    const formatDate = useMemo(
-        () => new Intl.DateTimeFormat(locale, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        }),
-        [locale]
-    )
     const hasHigherPlan = plans.some((plan) => plan.credits > activePlanCredits)
     const activePlan = plans.find((plan) => plan.id === activePlanId) ?? null
     const activePlanName = activePlan
         ? tPlans(`packageCatalog.planNames.${activePlan.id}`)
         : tPlans('status.currentPackageUnknown')
-    const checkoutPlan = plans.find((plan) => plan.id === checkoutPlanId) ?? null
-    const checkoutSummary = checkoutPlan
-        ? resolveSubscriptionCheckoutSummary({
-            currentPlan: activePlan
-                ? {
-                    id: activePlan.id,
-                    credits: activePlan.credits,
-                    localizedPrice: activePlan.localizedPrice
-                }
-                : null,
-            targetPlan: {
-                id: checkoutPlan.id,
-                credits: checkoutPlan.credits,
-                localizedPrice: checkoutPlan.localizedPrice
-            }
-        })
-        : null
-    const checkoutSummaryDetails = checkoutPlan && checkoutSummary
-        ? buildSubscriptionCheckoutSummaryDetails({
-            currentPlan: activePlan
-                ? {
-                    id: activePlan.id,
-                    credits: activePlan.credits,
-                    localizedPrice: activePlan.localizedPrice
-                }
-                : null,
-            targetPlan: {
-                id: checkoutPlan.id,
-                credits: checkoutPlan.credits,
-                localizedPrice: checkoutPlan.localizedPrice
-            },
-            summary: checkoutSummary,
-            currentPlanName: activePlan
-                ? tPlans(`packageCatalog.planNames.${activePlan.id}`)
-                : null,
-            targetPlanName: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
-            renewalPeriodEnd,
-            formatCurrency: (value) => formatCurrency.format(value),
-            formatCredits: (value) => formatNumber.format(value),
-            formatRenewalDate: (value) => formatDate.format(new Date(value)),
-            labels: {
-                currentPlan: tPlans('checkoutLegal.details.currentPlan'),
-                newPlan: tPlans('checkoutLegal.details.newPlan'),
-                planValue: ({ plan, price }) => tPlans('checkoutLegal.details.planValue', { plan, price }),
-                effectiveLabel: tPlans('checkoutLegal.details.effectiveLabel'),
-                effectiveImmediate: tPlans('checkoutLegal.details.effectiveImmediate'),
-                effectiveNextPeriod: tPlans('checkoutLegal.details.effectiveNextPeriod'),
-                todayChargeLabel: tPlans('checkoutLegal.details.todayChargeLabel'),
-                chargeFixedDifference: ({ price }) => tPlans('checkoutLegal.details.chargeFixedDifference', { price }),
-                chargeNoCharge: tPlans('checkoutLegal.details.chargeNoCharge'),
-                chargeFullPrice: ({ price }) => tPlans('checkoutLegal.details.chargeFullPrice', { price }),
-                todayCreditDeltaLabel: tPlans('checkoutLegal.details.todayCreditDeltaLabel'),
-                creditDeltaValue: ({ credits }) => tPlans('checkoutLegal.details.creditDeltaValue', { credits }),
-                nextRenewalLabel: tPlans('checkoutLegal.details.nextRenewalLabel')
-            }
-        })
-        : []
-    const checkoutContinueLabel = checkoutPlan && checkoutSummary
-        ? resolveSubscriptionCheckoutContinueLabel({
-            summary: checkoutSummary,
-            targetPlan: {
-                id: checkoutPlan.id,
-                credits: checkoutPlan.credits,
-                localizedPrice: checkoutPlan.localizedPrice
-            },
-            formatCurrency: (value) => formatCurrency.format(value),
-            labels: {
-                defaultLabel: tPlans('checkoutLegal.continueDirectAction'),
-                chargeLabel: ({ price }) => tPlans('checkoutLegal.continueDirectActionWithCharge', { price })
-            }
-        })
-        : tPlans('checkoutLegal.continueDirectAction')
     const canRenderPortal = typeof document !== 'undefined'
     const openCancelFromPlanModal = () => {
         setIsPlanModalOpen(false)
@@ -305,14 +214,18 @@ export function SubscriptionPlanManager({
                                 </p>
 
                                 <div className="mt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setCheckoutPlanId(plan.id)}
-                                        className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
-                                        disabled={!canManage || isCurrent}
-                                    >
-                                        {buttonLabel}
-                                    </button>
+                                    <form action={planAction}>
+                                        <input type="hidden" name="organizationId" value={organizationId} />
+                                        <input type="hidden" name="requestType" value="plan_change" />
+                                        <input type="hidden" name="planId" value={plan.id} />
+                                        <button
+                                            type="submit"
+                                            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                            disabled={!canManage || isCurrent}
+                                        >
+                                            {buttonLabel}
+                                        </button>
+                                    </form>
                                 </div>
                                 {isDowngrade && (
                                     <p className="mt-2 text-[11px] text-amber-700">
@@ -535,29 +448,6 @@ export function SubscriptionPlanManager({
 
             {canRenderPortal && isPlanModalOpen && createPortal(planModal, document.body)}
             {canRenderPortal && isCancelModalOpen && createPortal(cancelModal, document.body)}
-            {canRenderPortal && checkoutPlan && createPortal(
-                <CheckoutLegalConsentModal
-                    flowType="subscription"
-                    consentVariant="plan_change"
-                    title={tPlans('checkoutLegal.titleDirectAction')}
-                    description={tPlans('checkoutLegal.descriptionDirectAction')}
-                    summary={tPlans('checkoutLegal.subscriptionSummary', {
-                        plan: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
-                        price: formatCurrency.format(checkoutPlan.localizedPrice),
-                        credits: formatNumber.format(checkoutPlan.credits)
-                    })}
-                    summaryDetails={checkoutSummaryDetails}
-                    continueLabel={checkoutContinueLabel}
-                    immediateStartLabel={tPlans('checkoutLegal.acceptPlanChange')}
-                    action={planAction}
-                    hiddenFields={[
-                        { name: 'organizationId', value: organizationId },
-                        { name: 'planId', value: checkoutPlan.id }
-                    ]}
-                    onClose={() => setCheckoutPlanId(null)}
-                />,
-                document.body
-            )}
         </>
     )
 }

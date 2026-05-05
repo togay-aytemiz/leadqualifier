@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getBillingPricingCatalog, type BillingPlanTierId } from '@/lib/billing/pricing-catalog'
 import type { BillingLockReason, BillingMembershipState } from '@/types/database'
 
 export type AdminBillingActionError =
@@ -199,6 +200,35 @@ export async function adminAssignPremium(input: {
     }
 
     return success()
+}
+
+export async function adminAssignNamedPremiumPlan(input: {
+    organizationId: string
+    planId: BillingPlanTierId
+    periodStartIso: string
+    periodEndIso: string
+    reason: string
+}): Promise<AdminBillingActionResult> {
+    if (
+        input.planId !== 'starter'
+        && input.planId !== 'growth'
+        && input.planId !== 'scale'
+    ) {
+        return failure('invalid_input')
+    }
+
+    const catalog = await getBillingPricingCatalog()
+    const plan = catalog.plans.find((candidate) => candidate.id === input.planId)
+    if (!plan) return failure('invalid_input')
+
+    return adminAssignPremium({
+        organizationId: input.organizationId,
+        periodStartIso: input.periodStartIso,
+        periodEndIso: input.periodEndIso,
+        monthlyPriceTry: plan.priceTry,
+        monthlyCredits: plan.credits,
+        reason: input.reason
+    })
 }
 
 export async function adminCancelPremium(input: {

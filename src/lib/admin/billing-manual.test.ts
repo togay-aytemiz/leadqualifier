@@ -3,18 +3,24 @@ import {
     adminAdjustTopupCredits,
     adminAdjustPackageCredits,
     adminAdjustTrialCredits,
+    adminAssignNamedPremiumPlan,
     adminAssignPremium,
     adminCancelPremium,
     adminExtendTrial,
     adminSetMembershipOverride
 } from '@/lib/admin/billing-manual'
 
-const { createClientMock } = vi.hoisted(() => ({
-    createClientMock: vi.fn()
+const { createClientMock, getBillingPricingCatalogMock } = vi.hoisted(() => ({
+    createClientMock: vi.fn(),
+    getBillingPricingCatalogMock: vi.fn()
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
     createClient: createClientMock
+}))
+
+vi.mock('@/lib/billing/pricing-catalog', () => ({
+    getBillingPricingCatalog: getBillingPricingCatalogMock
 }))
 
 interface RpcResult {
@@ -73,6 +79,33 @@ function createSupabaseMock(options: SupabaseMockOptions = {}) {
 describe('admin billing manual actions', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        getBillingPricingCatalogMock.mockResolvedValue({
+            trialCredits: 200,
+            plans: [
+                {
+                    id: 'starter',
+                    credits: 1000,
+                    priceTry: 349,
+                    priceUsd: 9.99,
+                    conversationRange: { min: 90, max: 120 }
+                },
+                {
+                    id: 'growth',
+                    credits: 2000,
+                    priceTry: 649,
+                    priceUsd: 17.99,
+                    conversationRange: { min: 180, max: 240 }
+                },
+                {
+                    id: 'scale',
+                    credits: 4000,
+                    priceTry: 949,
+                    priceUsd: 26.99,
+                    conversationRange: { min: 360, max: 480 }
+                }
+            ],
+            topups: []
+        })
     })
 
     it('returns invalid_input when extend trial payload is incomplete', async () => {
@@ -170,6 +203,32 @@ describe('admin billing manual actions', () => {
             monthly_price_try: 49,
             monthly_credits: 1200,
             action_reason: 'activate premium manually'
+        })
+    })
+
+    it('assigns a named premium plan from the pricing catalog', async () => {
+        const { supabase, rpcMock } = createSupabaseMock()
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await adminAssignNamedPremiumPlan({
+            organizationId: 'org-1',
+            planId: 'growth',
+            periodStartIso: '2026-02-01T00:00:00.000Z',
+            periodEndIso: '2026-03-01T00:00:00.000Z',
+            reason: 'activate growth manually'
+        })
+
+        expect(result).toEqual({
+            ok: true,
+            error: null
+        })
+        expect(rpcMock).toHaveBeenCalledWith('admin_assign_premium', {
+            target_organization_id: 'org-1',
+            period_start: '2026-02-01T00:00:00.000Z',
+            period_end: '2026-03-01T00:00:00.000Z',
+            monthly_price_try: 649,
+            monthly_credits: 2000,
+            action_reason: 'activate growth manually'
         })
     })
 

@@ -8,13 +8,16 @@ import { requireSystemAdmin } from '@/lib/admin/access'
 import {
     getAdminOrganizationDetail,
     type AdminBillingAuditEntry,
+    type AdminBillingPurchaseRequestEntry,
     type AdminBillingSnapshot
 } from '@/lib/admin/read-models'
+import { getBillingPricingCatalog, type BillingPlanTierId } from '@/lib/billing/pricing-catalog'
 import { formatStorageSize } from '@/lib/billing/usage'
 import {
     adminAdjustPackageCredits,
     adminAdjustTrialCredits,
     adminAdjustTopupCredits,
+    adminAssignNamedPremiumPlan,
     adminAssignPremium,
     adminCancelPremium,
     adminExtendTrial,
@@ -147,6 +150,42 @@ function resolveBillingAuditActionLabel(
     }
 }
 
+function resolvePurchaseRequestTypeLabel(
+    tAdmin: Awaited<ReturnType<typeof getTranslations>>,
+    requestType: AdminBillingPurchaseRequestEntry['requestType']
+) {
+    switch (requestType) {
+    case 'plan':
+        return tAdmin('organizationDetail.purchaseRequests.type.plan')
+    case 'plan_change':
+        return tAdmin('organizationDetail.purchaseRequests.type.planChange')
+    case 'topup':
+        return tAdmin('organizationDetail.purchaseRequests.type.topup')
+    case 'custom':
+        return tAdmin('organizationDetail.purchaseRequests.type.custom')
+    default:
+        return requestType
+    }
+}
+
+function resolvePurchaseRequestStatusLabel(
+    tAdmin: Awaited<ReturnType<typeof getTranslations>>,
+    status: AdminBillingPurchaseRequestEntry['status']
+) {
+    switch (status) {
+    case 'new':
+        return tAdmin('organizationDetail.purchaseRequests.status.new')
+    case 'seen':
+        return tAdmin('organizationDetail.purchaseRequests.status.seen')
+    case 'handled':
+        return tAdmin('organizationDetail.purchaseRequests.status.handled')
+    case 'dismissed':
+        return tAdmin('organizationDetail.purchaseRequests.status.dismissed')
+    default:
+        return status
+    }
+}
+
 function buildBillingActionRedirect(
     locale: string,
     organizationId: string,
@@ -170,7 +209,10 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
     const tAdmin = await getTranslations('admin')
     const tCommon = await getTranslations('common')
 
-    const details = await getAdminOrganizationDetail(id, supabase)
+    const [details, pricingCatalog] = await Promise.all([
+        getAdminOrganizationDetail(id, supabase),
+        getBillingPricingCatalog({ supabase })
+    ])
     if (!details) {
         notFound()
     }
@@ -226,6 +268,7 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
         'past_due',
         'admin_locked'
     ]
+    const planOptions = pricingCatalog.plans
 
     const getActionStatusTitle = () => {
         if (billingActionStatus === 'success') {
@@ -340,6 +383,32 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
             periodEndIso,
             monthlyPriceTry,
             monthlyCredits,
+            reason
+        })
+
+        revalidatePath(`/${locale}/admin/organizations/${id}`)
+        redirect(buildBillingActionRedirect(locale, id, 'assign_premium', result))
+    }
+
+    const handleAssignNamedPremiumPlan = async (formData: FormData) => {
+        'use server'
+
+        const planId = String(formData.get('premiumPlanId') ?? '') as BillingPlanTierId
+        const periodStartInput = String(formData.get('namedPeriodStart') ?? '').trim()
+        const periodEndInput = String(formData.get('namedPeriodEnd') ?? '').trim()
+        const reason = String(formData.get('namedPremiumAssignReason') ?? '')
+        const periodStartIso = periodStartInput
+            ? new Date(`${periodStartInput}T00:00:00.000Z`).toISOString()
+            : ''
+        const periodEndIso = periodEndInput
+            ? new Date(`${periodEndInput}T23:59:59.000Z`).toISOString()
+            : ''
+
+        const result = await adminAssignNamedPremiumPlan({
+            organizationId: id,
+            planId,
+            periodStartIso,
+            periodEndIso,
             reason
         })
 
@@ -546,6 +615,58 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                         </div>
                     </div>
 
+                    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5">
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-900">
+                                {tAdmin('organizationDetail.purchaseRequests.title')}
+                            </h2>
+                            <p className="mt-1 text-sm text-gray-500">
+                                {tAdmin('organizationDetail.purchaseRequests.description')}
+                            </p>
+                        </div>
+                        {details.purchaseRequests.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">
+                                {tAdmin('organizationDetail.purchaseRequests.empty')}
+                            </p>
+                        ) : (
+                            <div className="grid gap-3">
+                                {details.purchaseRequests.map((request) => (
+                                    <div key={request.id} className="rounded-lg border border-gray-200 p-4">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">
+                                                    {resolvePurchaseRequestTypeLabel(tAdmin, request.requestType)}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {formatDateTime.format(new Date(request.createdAt))}
+                                                    {' · '}
+                                                    {request.requesterName ?? request.requesterEmail ?? tAdmin('organizationDetail.purchaseRequests.requesterFallback')}
+                                                </p>
+                                            </div>
+                                            <Badge variant={request.status === 'new' ? 'warning' : request.status === 'handled' ? 'info' : 'neutral'}>
+                                                {resolvePurchaseRequestStatusLabel(tAdmin, request.status)}
+                                            </Badge>
+                                        </div>
+                                        <p className="mt-3 text-sm text-gray-700">
+                                            {[
+                                                request.requestedPlanId,
+                                                request.requestedTopupPackId,
+                                                request.requestedCredits
+                                                    ? tAdmin('organizationDetail.purchaseRequests.credits', {
+                                                        value: formatNumber.format(request.requestedCredits)
+                                                    })
+                                                    : null,
+                                                request.requestedAmount && request.requestedCurrency
+                                                    ? `${formatNumber.format(request.requestedAmount)} ${request.requestedCurrency}`
+                                                    : null
+                                            ].filter(Boolean).join(' · ')}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
                         <div>
                             <h2 className="text-base font-semibold text-gray-900">
@@ -682,6 +803,70 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
                                 >
                                     {tAdmin('organizationDetail.manualActions.adjustPackageCredits.submit')}
+                                </button>
+                            </form>
+
+                            <form action={handleAssignNamedPremiumPlan} className="space-y-3 rounded-lg border border-gray-200 p-4">
+                                <h3 className="text-sm font-semibold text-gray-900">
+                                    {tAdmin('organizationDetail.manualActions.assignNamedPremium.title')}
+                                </h3>
+                                <label className="block text-xs font-medium text-gray-600">
+                                    {tAdmin('organizationDetail.manualActions.assignNamedPremium.planLabel')}
+                                </label>
+                                <select
+                                    name="premiumPlanId"
+                                    defaultValue={planOptions[0]?.id ?? 'starter'}
+                                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2"
+                                    required
+                                >
+                                    {planOptions.map((plan) => (
+                                        <option key={plan.id} value={plan.id}>
+                                            {tAdmin(`organizationDetail.manualActions.assignNamedPremium.planNames.${plan.id}`)}
+                                            {' · '}
+                                            {formatNumber.format(plan.credits)}
+                                            {' '}
+                                            {tAdmin('organizationDetail.manualActions.assignNamedPremium.creditsSuffix')}
+                                            {' · '}
+                                            {formatNumber.format(plan.priceTry)}
+                                            {' TRY'}
+                                        </option>
+                                    ))}
+                                </select>
+                                <label className="block text-xs font-medium text-gray-600">
+                                    {tAdmin('organizationDetail.manualActions.assignPremium.periodStartLabel')}
+                                </label>
+                                <input
+                                    type="date"
+                                    name="namedPeriodStart"
+                                    defaultValue={defaultPeriodStartDate}
+                                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2"
+                                    required
+                                />
+                                <label className="block text-xs font-medium text-gray-600">
+                                    {tAdmin('organizationDetail.manualActions.assignPremium.periodEndLabel')}
+                                </label>
+                                <input
+                                    type="date"
+                                    name="namedPeriodEnd"
+                                    defaultValue={defaultPeriodEndDate}
+                                    className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2"
+                                    required
+                                />
+                                <label className="block text-xs font-medium text-gray-600">
+                                    {tAdmin('organizationDetail.manualActions.assignPremium.reasonLabel')}
+                                </label>
+                                <textarea
+                                    name="namedPremiumAssignReason"
+                                    rows={2}
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none ring-blue-200 focus:ring-2"
+                                    placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
+                                    required
+                                />
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
+                                >
+                                    {tAdmin('organizationDetail.manualActions.assignNamedPremium.submit')}
                                 </button>
                             </form>
 

@@ -1361,6 +1361,27 @@
     "statusBanner": {
       "dismiss": "Dismiss status message"
     },
+    "purchaseRequest": {
+      "status": {
+        "successTitle": "Request sent",
+        "errorTitle": "Request could not be sent",
+        "successDescription": "Your purchase request was sent to our team. We will contact you shortly.",
+        "errors": {
+          "unauthorized": "Your session is not authenticated.",
+          "invalidInput": "Select a valid plan or credit package and try again.",
+          "requestFailed": "The request could not be saved. Please try again."
+        }
+      },
+      "modal": {
+        "title": "Send purchase request",
+        "description": "Your request will be sent to our team. We will contact you to complete payment and activate the package manually.",
+        "planSummary": "{plan} • {price} / month • {credits} credits",
+        "topupSummary": "{credits} credits • {amount}",
+        "cancel": "Cancel",
+        "submit": "Send request",
+        "close": "Close"
+      }
+    },
     "packageCatalog": {
       "title": "Monthly packages",
       "description": "Pick the monthly package that fits your business.",
@@ -2727,6 +2748,25 @@
         "topupAllowed": "Extra credits available",
         "topupBlocked": "Extra credits blocked"
       },
+      "purchaseRequests": {
+        "title": "Purchase Requests",
+        "description": "Recent plan, upgrade, and credit requests sent from the customer plans page.",
+        "empty": "No purchase requests yet.",
+        "requesterFallback": "Unknown requester",
+        "credits": "{value} credits",
+        "type": {
+          "plan": "New plan request",
+          "planChange": "Plan change request",
+          "topup": "Credit top-up request",
+          "custom": "Custom package request"
+        },
+        "status": {
+          "new": "New",
+          "seen": "Seen",
+          "handled": "Handled",
+          "dismissed": "Dismissed"
+        }
+      },
       "manualActions": {
         "banner": "Manual billing actions are active for system admins. Every action requires a reason and is audit logged.",
         "title": "Manual Billing Actions",
@@ -2783,6 +2823,17 @@
           "creditsLabel": "Monthly included credits",
           "reasonLabel": "Reason",
           "submit": "Activate premium"
+        },
+        "assignNamedPremium": {
+          "title": "Assign Catalog Package",
+          "planLabel": "Package",
+          "creditsSuffix": "credits",
+          "submit": "Activate selected package",
+          "planNames": {
+            "starter": "Starter",
+            "growth": "Growth",
+            "scale": "Scale"
+          }
         },
         "cancelPremium": {
           "title": "Cancel Premium",

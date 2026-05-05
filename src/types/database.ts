@@ -127,6 +127,9 @@ export type BillingCreditLedgerType =
     | 'reversal'
 
 export type BillingCreditPoolType = 'trial_pool' | 'package_pool' | 'topup_pool' | 'mixed'
+export type BillingPurchaseRequestType = 'plan' | 'plan_change' | 'topup' | 'custom'
+export type BillingPurchaseRequestStatus = 'new' | 'seen' | 'handled' | 'dismissed'
+export type BillingPurchaseRequestEmailStatus = 'not_configured' | 'sent' | 'failed'
 
 export interface PlatformBillingSettings {
     key: 'default'
@@ -252,6 +255,24 @@ export interface BillingAdminAuditLog {
     after_state: Json
     metadata: Json
     created_at: string
+}
+
+export interface BillingPurchaseRequest {
+    id: string
+    organization_id: string
+    requested_by: string
+    request_type: BillingPurchaseRequestType
+    requested_plan_id: string | null
+    requested_topup_pack_id: string | null
+    requested_credits: number | null
+    requested_amount: number | null
+    requested_currency: 'TRY' | 'USD' | null
+    status: BillingPurchaseRequestStatus
+    email_status: BillingPurchaseRequestEmailStatus
+    email_error: string | null
+    metadata: Json
+    created_at: string
+    updated_at: string
 }
 
 export interface OrganizationMember {
@@ -714,6 +735,11 @@ export interface Database {
                 Row: BillingAdminAuditLog
                 Insert: Omit<BillingAdminAuditLog, 'id' | 'created_at'>
                 Update: Partial<Omit<BillingAdminAuditLog, 'id' | 'organization_id' | 'created_at'>>
+            }
+            billing_purchase_requests: {
+                Row: BillingPurchaseRequest
+                Insert: Omit<BillingPurchaseRequest, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<BillingPurchaseRequest, 'id' | 'organization_id' | 'requested_by' | 'created_at' | 'updated_at'>>
             }
             offering_profiles: {
                 Row: OfferingProfile

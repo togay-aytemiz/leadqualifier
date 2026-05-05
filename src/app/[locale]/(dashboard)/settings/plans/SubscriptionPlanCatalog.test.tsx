@@ -82,4 +82,15 @@ describe('SubscriptionPlanCatalog', () => {
     expect(source).not.toContain('setIsClient(true)')
     expect(source).not.toContain('useEffect(() => {')
   })
+
+  it('uses the sales-led purchase request flow instead of checkout consent', () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/app/[locale]/(dashboard)/settings/plans/SubscriptionPlanCatalog.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("tPlans('purchaseRequest.modal.title')")
+    expect(source).toContain("name=\"requestType\"")
+    expect(source).not.toContain('CheckoutLegalConsentModal')
+  })
 })

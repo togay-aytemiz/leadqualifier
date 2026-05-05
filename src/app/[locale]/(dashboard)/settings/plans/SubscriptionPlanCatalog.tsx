@@ -1,14 +1,10 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import type { SubscriptionPlanOption } from './SubscriptionPlanManager'
-
-const CheckoutLegalConsentModal = dynamic(() => import('./CheckoutLegalConsentModal').then((module) => module.CheckoutLegalConsentModal), {
-    loading: () => null
-})
 
 interface SubscriptionPlanCatalogProps {
     organizationId: string
@@ -42,6 +38,64 @@ export function SubscriptionPlanCatalog({
     const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
     const checkoutPlan = plans.find((plan) => plan.id === checkoutPlanId) ?? null
     const isClient = typeof document !== 'undefined'
+    const requestModal = checkoutPlan ? (
+        <div
+            className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setCheckoutPlanId(null)}
+        >
+            <div
+                className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 className="text-xl font-semibold text-gray-900">
+                            {tPlans('purchaseRequest.modal.title')}
+                        </h3>
+                        <p className="mt-2 text-sm text-gray-600">
+                            {tPlans('purchaseRequest.modal.description')}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCheckoutPlanId(null)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                        aria-label={tPlans('purchaseRequest.modal.close')}
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                    {tPlans('purchaseRequest.modal.planSummary', {
+                        plan: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
+                        price: formatCurrency.format(checkoutPlan.localizedPrice),
+                        credits: formatNumber.format(checkoutPlan.credits)
+                    })}
+                </div>
+
+                <form action={planAction} className="mt-6 flex justify-end gap-3">
+                    <input type="hidden" name="organizationId" value={organizationId} />
+                    <input type="hidden" name="requestType" value="plan" />
+                    <input type="hidden" name="planId" value={checkoutPlan.id} />
+                    <button
+                        type="button"
+                        onClick={() => setCheckoutPlanId(null)}
+                        className="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+                    >
+                        {tPlans('purchaseRequest.modal.cancel')}
+                    </button>
+                    <button
+                        type="submit"
+                        className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+                        disabled={!canSubmit}
+                    >
+                        {tPlans('purchaseRequest.modal.submit')}
+                    </button>
+                </form>
+            </div>
+        </div>
+    ) : null
 
     return (
         <>
@@ -110,23 +164,7 @@ export function SubscriptionPlanCatalog({
                 {tPlans('packageCatalog.conversationRangeDisclaimer')}
             </p>
 
-            {isClient && checkoutPlan && createPortal(
-                <CheckoutLegalConsentModal
-                    flowType="subscription"
-                    summary={tPlans('checkoutLegal.subscriptionSummary', {
-                        plan: tPlans(`packageCatalog.planNames.${checkoutPlan.id}`),
-                        price: formatCurrency.format(checkoutPlan.localizedPrice),
-                        credits: formatNumber.format(checkoutPlan.credits)
-                    })}
-                    action={planAction}
-                    hiddenFields={[
-                        { name: 'organizationId', value: organizationId },
-                        { name: 'planId', value: checkoutPlan.id }
-                    ]}
-                    onClose={() => setCheckoutPlanId(null)}
-                />,
-                document.body
-            )}
+            {isClient && requestModal && createPortal(requestModal, document.body)}
         </>
     )
 }

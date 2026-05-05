@@ -8,7 +8,6 @@ import { SettingsSection } from '@/components/settings/SettingsSection'
 import { Link } from '@/i18n/navigation'
 import type { OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 import {
-    type BillingPlanTierId,
     getBillingPricingCatalog,
     resolveLocalizedMoneyForRegion
 } from '@/lib/billing/pricing-catalog'
@@ -19,12 +18,14 @@ import {
     resolveBillingRegionFromRequestHeaders
 } from '@/lib/billing/request-region'
 import {
-    simulateMockSubscriptionCheckout,
-    simulateMockTopupCheckout,
     type MockCheckoutError,
-    type MockCheckoutResult,
     type MockCheckoutStatus
 } from '@/lib/billing/mock-checkout'
+import {
+    createBillingPurchaseRequest,
+    type BillingPurchaseRequestActionError,
+    type CreateBillingPurchaseRequestResult
+} from '@/lib/billing/purchase-request.actions'
 import {
     cancelSubscriptionRenewal,
     getSubscriptionRenewalState,
@@ -46,7 +47,6 @@ import {
 import { getOrganizationBillingLedger, getOrganizationBillingSnapshot } from '@/lib/billing/server'
 import { buildBillingHistoryRows } from '@/lib/billing/history'
 import { getOrganizationTopupStatusSummary } from '@/lib/billing/topup-status'
-import { readCheckoutLegalConsent } from '@/lib/billing/checkout-legal'
 import { resolveMetaOrigin } from '@/lib/channels/meta-origin'
 import { buildLocalizedPath } from '@/lib/i18n/locale-path'
 import { AlertCircle } from 'lucide-react'
@@ -69,6 +69,8 @@ export interface PlansSettingsSearchParams {
     payment_recovery_action?: string
     payment_recovery_status?: string
     payment_recovery_error?: string
+    purchase_request_status?: string
+    purchase_request_error?: string
 }
 
 interface PlansSettingsPageContentProps {
@@ -167,26 +169,6 @@ function resolveRequestOriginFromHeaders(requestHeaders: Awaited<ReturnType<type
     return `${proto}://${host}`
 }
 
-function buildCheckoutRedirect(
-    locale: string,
-    action: 'subscribe' | 'topup',
-    result: MockCheckoutResult
-) {
-    const query = new URLSearchParams()
-    query.set('checkout_action', action)
-    query.set('checkout_status', result.status)
-    if (result.error) {
-        query.set('checkout_error', result.error)
-    }
-    if (result.changeType) {
-        query.set('checkout_change_type', result.changeType)
-    }
-    if (result.effectiveAt) {
-        query.set('checkout_effective_at', result.effectiveAt)
-    }
-    return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
-}
-
 function buildRenewalRedirect(
     locale: string,
     action: 'cancel' | 'resume',
@@ -197,6 +179,18 @@ function buildRenewalRedirect(
     query.set('renewal_status', result.status)
     if (result.error) {
         query.set('renewal_error', result.error)
+    }
+    return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
+}
+
+function buildPurchaseRequestRedirect(
+    locale: string,
+    result: CreateBillingPurchaseRequestResult
+) {
+    const query = new URLSearchParams()
+    query.set('purchase_request_status', result.status)
+    if (result.error) {
+        query.set('purchase_request_error', result.error)
     }
     return `${buildLocalizedPath('/settings/plans', locale)}?${query.toString()}`
 }
@@ -251,20 +245,6 @@ function resolveTopupActionState(snapshot: OrganizationBillingSnapshot | null): 
         allowed: true,
         reasonKey: null
     }
-}
-
-function redirectWithCheckoutError(
-    locale: string,
-    action: 'subscribe' | 'topup',
-    error: MockCheckoutError
-): never {
-    redirect(buildCheckoutRedirect(locale, action, {
-        ok: false,
-        status: 'error',
-        error,
-        changeType: null,
-        effectiveAt: null
-    }))
 }
 
 export default async function PlansSettingsPageContent({
@@ -334,9 +314,6 @@ export default async function PlansSettingsPageContent({
         requestOrigin: resolveRequestOriginFromHeaders(requestHeaders)
     })
     const checkoutLocale = normalizeCheckoutLocale(locale)
-    const customerIp = readHeaderValue(requestHeaders.get('x-forwarded-for')) ?? '127.0.0.1'
-    const subscriptionCallbackUrl = `${appOrigin}/api/billing/iyzico/callback?action=subscribe&locale=${checkoutLocale}`
-    const topupCallbackUrl = `${appOrigin}/api/billing/iyzico/callback?action=topup&locale=${checkoutLocale}`
     const paymentMethodUpdateCallbackUrl = `${appOrigin}/api/billing/iyzico/card-update/callback?locale=${checkoutLocale}`
     const organizationBillingRegion = resolveBillingRegionForOrganization({
         organizationBillingRegion: organizationRecord?.billing_region,
@@ -603,6 +580,24 @@ export default async function PlansSettingsPageContent({
         }
         return null
     })()
+    const purchaseRequestStatus = (() => {
+        const value = search.purchase_request_status
+        if (value === 'success' || value === 'error') {
+            return value as 'success' | 'error'
+        }
+        return null
+    })()
+    const purchaseRequestError = (() => {
+        const value = search.purchase_request_error
+        if (
+            value === 'unauthorized'
+            || value === 'invalid_input'
+            || value === 'request_failed'
+        ) {
+            return value as BillingPurchaseRequestActionError
+        }
+        return null
+    })()
     const topupState = resolveTopupActionState(snapshot)
     const isTrialMembership = snapshot?.membershipState === 'trial_active' || snapshot?.membershipState === 'trial_exhausted'
     const isPremiumMembership = snapshot?.membershipState === 'premium_active'
@@ -860,83 +855,53 @@ export default async function PlansSettingsPageContent({
         }
     }
 
-    const handleMockSubscribe = async (formData: FormData) => {
-        'use server'
-
-        const consent = readCheckoutLegalConsent(formData)
-        if (!consent.isComplete) {
-            redirectWithCheckoutError(locale, 'subscribe', 'legal_consent_required')
-        }
-
-        const orgId = String(formData.get('organizationId') ?? '')
-        const planIdValue = String(formData.get('planId') ?? '').trim()
-        const planId = planIdValue === 'starter' || planIdValue === 'growth' || planIdValue === 'scale'
-            ? planIdValue as BillingPlanTierId
-            : null
-        const selectedPlan = planId
-            ? subscriptionPlanOptions.find((plan) => plan.id === planId) ?? null
-            : null
-        const currentPlanPriceTry = activePlanId
-            ? subscriptionPlanOptions.find((plan) => plan.id === activePlanId)?.priceTry ?? null
-            : null
-
-        if (!selectedPlan) {
-            redirectWithCheckoutError(locale, 'subscribe', 'invalid_input')
-        }
-
-        const result = await simulateMockSubscriptionCheckout({
-            organizationId: orgId,
-            simulatedOutcome: 'success',
-            monthlyPriceTry: selectedPlan.priceTry,
-            monthlyCredits: selectedPlan.credits,
-            planId: selectedPlan.id as BillingPlanTierId,
-            currentMonthlyPriceTry: currentPlanPriceTry,
-            callbackUrl: subscriptionCallbackUrl,
-            locale: checkoutLocale
-        })
-
-        if (result.redirectUrl) {
-            redirect(result.redirectUrl)
-        }
-
-        revalidatePath(`/${locale}/settings/plans`)
-        revalidatePath(`/${locale}/settings/billing`)
-        redirect(buildCheckoutRedirect(locale, 'subscribe', result))
+    const getPurchaseRequestTitle = () => {
+        if (!purchaseRequestStatus) return ''
+        return purchaseRequestStatus === 'success'
+            ? tPlans('purchaseRequest.status.successTitle')
+            : tPlans('purchaseRequest.status.errorTitle')
     }
 
-    const handleMockTopup = async (formData: FormData) => {
+    const getPurchaseRequestDescription = () => {
+        if (!purchaseRequestStatus) return ''
+
+        if (purchaseRequestStatus === 'success') {
+            return tPlans('purchaseRequest.status.successDescription')
+        }
+
+        switch (purchaseRequestError) {
+        case 'unauthorized':
+            return tPlans('purchaseRequest.status.errors.unauthorized')
+        case 'invalid_input':
+            return tPlans('purchaseRequest.status.errors.invalidInput')
+        default:
+            return tPlans('purchaseRequest.status.errors.requestFailed')
+        }
+    }
+
+    const handlePurchaseRequest = async (formData: FormData) => {
         'use server'
 
-        const consent = readCheckoutLegalConsent(formData)
-        if (!consent.isComplete) {
-            redirectWithCheckoutError(locale, 'topup', 'legal_consent_required')
-        }
-
         const orgId = String(formData.get('organizationId') ?? '')
-        const packId = String(formData.get('packId') ?? '').trim()
-        const selectedPack = topupPacks.find((pack) => pack.id === packId) ?? null
+        const requestTypeValue = String(formData.get('requestType') ?? '').trim()
+        const requestType = requestTypeValue === 'plan'
+            || requestTypeValue === 'plan_change'
+            || requestTypeValue === 'topup'
+            || requestTypeValue === 'custom'
+            ? requestTypeValue
+            : 'custom'
 
-        if (!selectedPack) {
-            redirectWithCheckoutError(locale, 'topup', 'invalid_input')
-        }
-
-        const result = await simulateMockTopupCheckout({
+        const result = await createBillingPurchaseRequest({
             organizationId: orgId,
-            simulatedOutcome: 'success',
-            credits: selectedPack.credits,
-            amountTry: selectedPack.amountTry,
-            callbackUrl: topupCallbackUrl,
             locale: checkoutLocale,
-            customerIp
+            requestType,
+            planId: String(formData.get('planId') ?? '').trim() || null,
+            topupPackId: String(formData.get('packId') ?? '').trim() || null
         })
-
-        if (result.redirectUrl) {
-            redirect(result.redirectUrl)
-        }
 
         revalidatePath(`/${locale}/settings/plans`)
         revalidatePath(`/${locale}/settings/billing`)
-        redirect(buildCheckoutRedirect(locale, 'topup', result))
+        redirect(buildPurchaseRequestRedirect(locale, result))
     }
 
     const handleCancelRenewal = async (formData: FormData) => {
@@ -1040,6 +1005,19 @@ export default async function PlansSettingsPageContent({
                     />
                 )}
 
+                {purchaseRequestStatus && (
+                    <PlansStatusBanner
+                        className={
+                            purchaseRequestStatus === 'success'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                : 'border-rose-200 bg-rose-50 text-rose-900'
+                        }
+                        dismissLabel={tPlans('statusBanner.dismiss')}
+                        title={getPurchaseRequestTitle()}
+                        description={getPurchaseRequestDescription()}
+                    />
+                )}
+
                 {snapshot?.membershipState === 'past_due' && (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                         {tPlans('renewalFailureNotice.title')}
@@ -1136,7 +1114,7 @@ export default async function PlansSettingsPageContent({
                                             pendingPlanEffectiveAt={hasPendingDowngrade ? pendingPlanChange?.effectiveAt ?? null : null}
                                             supportsAutoRenewResume={supportsAutoRenewResume}
                                             paymentRecoveryState={paymentRecoveryState}
-                                            planAction={handleMockSubscribe}
+                                            planAction={handlePurchaseRequest}
                                             cancelAction={handleCancelRenewal}
                                             retryPaymentAction={handleRetryFailedPayment}
                                             updatePaymentMethodAction={handleUpdatePaymentMethod}
@@ -1241,7 +1219,7 @@ export default async function PlansSettingsPageContent({
                                 organizationId={organizationId}
                                 plans={localizedPlanTiers}
                                 canSubmit={canSubmitPlanSelection}
-                                planAction={handleMockSubscribe}
+                                planAction={handlePurchaseRequest}
                             />
 
                             {!canSubmitPlanSelection && (
@@ -1263,7 +1241,7 @@ export default async function PlansSettingsPageContent({
                             packs={topupPacks}
                             topupAllowed={topupState.allowed}
                             blockedReason={topupBlockedReason}
-                            topupAction={handleMockTopup}
+                            topupAction={handlePurchaseRequest}
                         />
 
                         <article className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
