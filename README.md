@@ -1,6 +1,6 @@
 # Qualy
 
-WhatsApp AI Qualy for Turkish SMBs.
+WhatsApp AI Qualy for Turkish SMBs..
 
 ## Tech Stack
 
