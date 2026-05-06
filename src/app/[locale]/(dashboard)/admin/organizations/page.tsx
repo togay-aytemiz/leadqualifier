@@ -110,8 +110,8 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
             <div className="flex-1 overflow-auto p-8">
                 <div className="w-full space-y-8">
                     <p className="text-gray-500">{tAdmin('organizations.description')}</p>
-                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-                        {tAdmin('readOnlyBanner')}
+                    <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900">
+                        {tAdmin('organizations.billingActionsHint')}
                     </p>
 
                     <form method="get" className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -146,7 +146,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                         {organizations.length === 0 ? (
                             <tbody>
                                 <tr>
-                                    <td colSpan={14} className="px-6 py-12 text-center">
+                                    <td colSpan={15} className="px-6 py-12 text-center">
                                         <div className="mx-auto flex max-w-md flex-col items-center">
                                             <Building2 className="mb-3 text-gray-300" size={40} />
                                             <p className="text-lg font-medium text-gray-900">
@@ -171,6 +171,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                     tAdmin('organizations.columns.knowledge'),
                                     tAdmin('organizations.columns.storage'),
                                     tAdmin('organizations.columns.premium'),
+                                    tAdmin('organizations.columns.requests'),
                                     tAdmin('organizations.columns.paidFee'),
                                     tAdmin('organizations.columns.plan'),
                                     tAdmin('organizations.columns.trial'),
@@ -219,6 +220,27 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
+                                                <div className="space-y-1">
+                                                    <p className="text-sm font-medium text-gray-700">
+                                                        {tAdmin('organizations.requestsTotal', {
+                                                            count: formatNumber.format(org.purchaseRequestCount)
+                                                        })}
+                                                    </p>
+                                                    {org.newPurchaseRequestCount > 0 ? (
+                                                        <Link
+                                                            href={`/admin/organizations/${org.id}`}
+                                                            className="text-xs font-semibold text-amber-700 underline decoration-amber-300 underline-offset-4 hover:text-amber-900"
+                                                        >
+                                                            {tAdmin('organizations.requestsNew', {
+                                                                count: formatNumber.format(org.newPurchaseRequestCount)
+                                                            })}
+                                                        </Link>
+                                                    ) : (
+                                                        <p className="text-xs text-gray-400">{tAdmin('organizations.requestsNone')}</p>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
                                                 {org.paidFee.amount !== null && org.paidFee.currency ? (
                                                     <span className="text-sm font-medium text-gray-700">
                                                         {formatPaidFee(org.paidFee.amount, org.paidFee.currency)}
@@ -259,7 +281,7 @@ export default async function AdminOrganizationsPage({ searchParams }: AdminOrga
                                             <TableCell align="right">
                                                 <Link
                                                     href={`/admin/organizations/${org.id}`}
-                                                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                                    className="inline-flex h-8 items-center whitespace-nowrap rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white transition hover:bg-[#1f2437]"
                                                 >
                                                     {tAdmin('organizations.viewDetails')}
                                                 </Link>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -25,6 +26,23 @@ interface TopupCheckoutCardProps {
   topupAllowed: boolean
   blockedReason: string | null
   topupAction: (formData: FormData) => void | Promise<void>
+}
+
+function TopupRequestSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus()
+  const tPlans = useTranslations('billingPlans')
+
+  return (
+    <button
+      type="submit"
+      className="inline-flex h-10 min-w-[120px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+      disabled={disabled || pending}
+    >
+      {pending
+        ? tPlans('purchaseRequest.modal.submitting')
+        : tPlans('purchaseRequest.modal.submit')}
+    </button>
+  )
 }
 
 export function TopupCheckoutCard({
@@ -190,13 +208,7 @@ export function TopupCheckoutCard({
               <input type="hidden" name="organizationId" value={organizationId} />
               <input type="hidden" name="requestType" value="topup" />
               <input type="hidden" name="packId" value={selectedPack.id} />
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
-                disabled={!topupAllowed}
-              >
-                {tPlans('purchaseRequest.modal.submit')}
-              </button>
+              <TopupRequestSubmitButton disabled={!topupAllowed} />
             </form>
           ) : null}
         </div>

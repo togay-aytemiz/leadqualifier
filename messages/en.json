@@ -1379,6 +1379,7 @@
         "topupSummary": "{credits} credits • {amount}",
         "cancel": "Cancel",
         "submit": "Send request",
+        "submitting": "Sending...",
         "close": "Close"
       }
     },
@@ -1407,7 +1408,7 @@
       "vatIncluded": "Prices include VAT.",
       "conversationRangeDisclaimer": "Conversation range can vary based on message length, language, and response complexity.",
       "planCta": {
-        "start": "Select plan and continue",
+        "start": "Select and continue",
         "upgrade": "Upgrade",
         "downgrade": "Downgrade",
         "switch": "Switch package",
@@ -2534,6 +2535,8 @@
       "users": "Total Users",
       "skills": "Total Skills",
       "knowledge": "Total Knowledge Docs",
+      "purchaseRequests": "Purchase Requests",
+      "purchaseRequestsNew": "{count} new",
       "messages": "Total Messages",
       "tokens": "Total Tokens",
       "credits": "Total Credits Used",
@@ -2633,7 +2636,8 @@
     },
     "organizations": {
       "title": "Organizations",
-      "description": "Read-only organization summary for system admins.",
+      "description": "Organization summary for system admins. Open an organization to review purchase requests and assign packages.",
+      "billingActionsHint": "Billing requests and manual package assignment are active. Open an organization detail page to handle requests, assign a catalog package, or adjust credits.",
       "emptyTitle": "No organizations found",
       "emptyDesc": "There are no organizations in the system yet.",
       "emptySearchTitle": "No organizations match your search",
@@ -2658,12 +2662,16 @@
         "knowledge": "Knowledge Base",
         "storage": "Storage",
         "premium": "Membership",
+        "requests": "Requests",
         "paidFee": "Paid Fee",
         "plan": "Package Credits",
         "trial": "Trial Credits",
         "created": "Created",
         "details": "Details"
       },
+      "requestsTotal": "{count} total",
+      "requestsNew": "{count} new - open",
+      "requestsNone": "No new requests",
       "storageMediaLabel": "WA media: {value}"
     },
     "users": {

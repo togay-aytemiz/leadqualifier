@@ -1,5 +1,4 @@
 import { resolvePostAuthRoute } from '@/lib/auth/post-auth-route'
-import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
 
 interface PostAuthSupabaseQueryResult<T> {
   data: T | null
@@ -96,11 +95,8 @@ export async function resolvePostAuthRedirectPath({
   })
 
   if (homeRoute === '/inbox' && onboarding?.shouldAutoOpen) {
-    return buildLocalizedPath('/onboarding', normalizeAppLocale(locale))
+    return '/onboarding'
   }
 
-  return buildLocalizedPath(
-    homeRoute,
-    normalizeAppLocale(locale)
-  )
+  return homeRoute
 }

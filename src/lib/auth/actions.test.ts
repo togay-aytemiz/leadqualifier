@@ -122,7 +122,7 @@ describe('auth login action', () => {
         })
     })
 
-    it('redirects directly to the localized home route after successful login', async () => {
+    it('returns the internal home route after successful login for the localized client router', async () => {
         const signInWithPasswordMock = vi.fn(async () => ({
             data: {
                 user: { id: 'user-1' },
@@ -140,7 +140,7 @@ describe('auth login action', () => {
         })
 
         await expect(login(createLoginFormData({ locale: 'en' }))).resolves.toEqual({
-            redirectPath: '/en/inbox'
+            redirectPath: '/inbox'
         })
         expect(resolveActiveOrganizationContextMock).not.toHaveBeenCalled()
     })
@@ -382,7 +382,7 @@ describe('auth register action', () => {
         })
 
         await expect(register(createRegisterFormData({ locale: 'en' }))).resolves.toEqual({
-            redirectPath: '/en/register/check-email?email=jane%40example.com',
+            redirectPath: '/register/check-email?email=jane%40example.com',
         })
 
         expect(signUpMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -450,7 +450,7 @@ describe('auth register action', () => {
         })
 
         await expect(register(createRegisterFormData({ locale: 'en' }))).resolves.toEqual({
-            redirectPath: '/en/inbox'
+            redirectPath: '/inbox'
         })
         expect(resolveActiveOrganizationContextMock).not.toHaveBeenCalled()
     })

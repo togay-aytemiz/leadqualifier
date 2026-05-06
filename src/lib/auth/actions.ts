@@ -6,7 +6,7 @@ import { normalizeRegisterFormData } from '@/lib/auth/register-data'
 import { ACTIVE_ORG_COOKIE } from '@/lib/organizations/active-context'
 import { resolvePostAuthRedirectPath } from '@/lib/auth/post-auth-redirect'
 import type { PostAuthSupabase } from '@/lib/auth/post-auth-redirect'
-import { buildLocalizedPath, normalizeAppLocale } from '@/lib/i18n/locale-path'
+import { normalizeAppLocale } from '@/lib/i18n/locale-path'
 import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import {
     checkTrialBusinessIdentity,
@@ -61,7 +61,7 @@ async function buildPostAuthRedirectPath(
     userId: string | null | undefined
 ) {
     if (!userId) {
-        return buildLocalizedPath('/inbox', normalizeAppLocale(locale))
+        return '/inbox'
     }
 
     const cookieStore = await cookies()
@@ -236,7 +236,7 @@ export async function register(formData: FormData) {
     }
 
     return {
-        redirectPath: `${buildLocalizedPath('/register/check-email', normalizeAppLocale(locale))}?email=${encodeURIComponent(email)}`,
+        redirectPath: `/register/check-email?email=${encodeURIComponent(email)}`,
     } satisfies RegisterActionState
 }
 

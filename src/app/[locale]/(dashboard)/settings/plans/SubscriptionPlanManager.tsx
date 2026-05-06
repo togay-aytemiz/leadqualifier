@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { useLocale, useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -40,6 +41,27 @@ interface SubscriptionPlanManagerProps {
     cancelAction: (formData: FormData) => void | Promise<void>
     retryPaymentAction?: (formData: FormData) => void | Promise<void>
     updatePaymentMethodAction?: (formData: FormData) => void | Promise<void>
+}
+
+function PlanChangeSubmitButton({
+    disabled,
+    label
+}: {
+    disabled: boolean
+    label: string
+}) {
+    const { pending } = useFormStatus()
+    const tPlans = useTranslations('billingPlans')
+
+    return (
+        <button
+            type="submit"
+            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+            disabled={disabled || pending}
+        >
+            {pending ? tPlans('purchaseRequest.modal.submitting') : label}
+        </button>
+    )
 }
 
 export function SubscriptionPlanManager({
@@ -218,13 +240,10 @@ export function SubscriptionPlanManager({
                                         <input type="hidden" name="organizationId" value={organizationId} />
                                         <input type="hidden" name="requestType" value="plan_change" />
                                         <input type="hidden" name="planId" value={plan.id} />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                        <PlanChangeSubmitButton
                                             disabled={!canManage || isCurrent}
-                                        >
-                                            {buttonLabel}
-                                        </button>
+                                            label={buttonLabel}
+                                        />
                                     </form>
                                 </div>
                                 {isDowngrade && (

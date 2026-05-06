@@ -1,7 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Badge, DataTable, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
 import { Link } from '@/i18n/navigation'
-import { Activity, Building2, Clock3, Database, Sparkles, Users, Wallet } from 'lucide-react'
+import { Activity, Building2, Clock3, Database, Inbox, Sparkles, Users, Wallet } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import {
     getAdminAiLatencySummary,
@@ -205,6 +205,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             title: dashboardOrgContext.hasExplicitSelection ? t('stats.creditsActiveOrganization') : t('stats.credits'),
             value: formatter.format(usageMetrics.totalCreditUsage),
             periodLabel: selectedPeriodLabel
+        },
+        {
+            key: 'purchaseRequests',
+            icon: Inbox,
+            iconBgClass: 'bg-amber-50',
+            iconClass: 'text-amber-600',
+            title: t('stats.purchaseRequests'),
+            value: formatter.format(summary.purchaseRequestCount),
+            periodLabel: t('stats.purchaseRequestsNew', {
+                count: formatter.format(summary.newPurchaseRequestCount)
+            })
         }
     ]
     const billingDetailCards = [
@@ -304,7 +315,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         </div>
                     </form>
 
-                    <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
+                    <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-4">
                         {statCards.map((stat) => {
                             const Icon = stat.icon
 

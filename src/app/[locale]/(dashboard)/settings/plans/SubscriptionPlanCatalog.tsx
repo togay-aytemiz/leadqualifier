@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { useLocale, useTranslations } from 'next-intl'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -11,6 +12,23 @@ interface SubscriptionPlanCatalogProps {
     plans: SubscriptionPlanOption[]
     canSubmit: boolean
     planAction: (formData: FormData) => void | Promise<void>
+}
+
+function PurchaseRequestSubmitButton({ disabled }: { disabled: boolean }) {
+    const { pending } = useFormStatus()
+    const tPlans = useTranslations('billingPlans')
+
+    return (
+        <button
+            type="submit"
+            className="inline-flex h-10 min-w-[120px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
+            disabled={disabled || pending}
+        >
+            {pending
+                ? tPlans('purchaseRequest.modal.submitting')
+                : tPlans('purchaseRequest.modal.submit')}
+        </button>
+    )
 }
 
 export function SubscriptionPlanCatalog({
@@ -85,13 +103,7 @@ export function SubscriptionPlanCatalog({
                     >
                         {tPlans('purchaseRequest.modal.cancel')}
                     </button>
-                    <button
-                        type="submit"
-                        className="inline-flex h-10 items-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition hover:bg-[#1f2437] disabled:cursor-not-allowed disabled:bg-gray-300"
-                        disabled={!canSubmit}
-                    >
-                        {tPlans('purchaseRequest.modal.submit')}
-                    </button>
+                    <PurchaseRequestSubmitButton disabled={!canSubmit} />
                 </form>
             </div>
         </div>
@@ -147,7 +159,7 @@ export function SubscriptionPlanCatalog({
                                 <button
                                     type="button"
                                     onClick={() => setCheckoutPlanId(plan.id)}
-                                    className="inline-flex h-10 min-w-[132px] items-center justify-center rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
+                                    className="inline-flex h-10 min-w-[132px] items-center justify-center whitespace-nowrap rounded-lg bg-[#242A40] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3b4768] disabled:cursor-not-allowed disabled:bg-gray-300"
                                     disabled={!canSubmit}
                                 >
                                     {tPlans('packageCatalog.planCta.start')}

@@ -72,4 +72,42 @@ describe('resolvePostAuthHomeRoute', () => {
 
         expect(path).toBe('/onboarding')
     })
+
+    it('returns internal admin route for next-intl client router instead of pre-localizing English redirects', async () => {
+        const path = await resolvePostAuthRedirectPath({
+            cookieOrganizationId: null,
+            locale: 'en',
+            userId: 'admin-1',
+            supabase: {
+                from: (table: string) => ({
+                    select: () => ({
+                        eq: () => ({
+                            maybeSingle: async () => {
+                                if (table === 'profiles') {
+                                    return {
+                                        data: { is_system_admin: true },
+                                        error: null
+                                    }
+                                }
+
+                                if (table === 'organizations') {
+                                    return {
+                                        data: null,
+                                        error: null
+                                    }
+                                }
+
+                                return {
+                                    data: null,
+                                    error: null
+                                }
+                            }
+                        })
+                    })
+                })
+            }
+        })
+
+        expect(path).toBe('/admin')
+    })
 })

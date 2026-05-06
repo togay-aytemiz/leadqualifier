@@ -53,6 +53,8 @@ export interface AdminOrganizationSummary {
     storageWhatsAppMediaObjectCount: number
     billing: AdminBillingSnapshot
     paidFee: AdminOrganizationPaidFee
+    purchaseRequestCount: number
+    newPurchaseRequestCount: number
 }
 
 export interface AdminBillingSnapshot {
@@ -165,6 +167,8 @@ export interface AdminDashboardSummary {
     messageCount: number
     totalTokenCount: number
     totalCreditUsage: number
+    purchaseRequestCount: number
+    newPurchaseRequestCount: number
 }
 
 export interface AdminUsageMetricsSummary {
@@ -336,6 +340,57 @@ async function getCountByOrganization(
 ): Promise<Map<string, number>> {
     if (organizationIds.length === 0) return EMPTY_COUNT_MAP
     return loadCountByOrganization(supabase, organizationIds, tableName)
+}
+
+async function getPurchaseRequestCountsByOrganization(
+    supabase: SupabaseClient,
+    organizationIds: string[],
+    status?: BillingPurchaseRequest['status']
+): Promise<Map<string, number>> {
+    const counts = new Map<string, number>()
+    if (organizationIds.length === 0) return counts
+
+    for (const organizationId of organizationIds) {
+        let query = supabase
+            .from('billing_purchase_requests')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', organizationId)
+
+        if (status) {
+            query = query.eq('status', status)
+        }
+
+        const { count, error } = await query
+        if (error) {
+            console.error(`Failed to count billing purchase requests for organization ${organizationId}:`, error)
+            continue
+        }
+
+        counts.set(organizationId, toNonNegativeInteger(count))
+    }
+
+    return counts
+}
+
+async function getPurchaseRequestCount(
+    supabase: SupabaseClient,
+    status?: BillingPurchaseRequest['status']
+): Promise<number> {
+    let query = supabase
+        .from('billing_purchase_requests')
+        .select('id', { count: 'exact', head: true })
+
+    if (status) {
+        query = query.eq('status', status)
+    }
+
+    const { count, error } = await query
+    if (error) {
+        console.error('Failed to count billing purchase requests for admin dashboard:', error)
+        return 0
+    }
+
+    return toNonNegativeInteger(count)
 }
 
 async function getTokenTotalsByOrganization(
@@ -1102,7 +1157,9 @@ async function buildOrganizationSummariesFromRows(
         tokenTotals,
         storageUsageTotals,
         billingByOrganization,
-        subscriptionMetadataByOrganization
+        subscriptionMetadataByOrganization,
+        purchaseRequestCounts,
+        newPurchaseRequestCounts
     ] = await Promise.all([
         getCountByOrganization(supabase, organizationIds, 'organization_members'),
         getCountByOrganization(supabase, organizationIds, 'skills'),
@@ -1111,7 +1168,9 @@ async function buildOrganizationSummariesFromRows(
         getTokenTotalsByOrganization(supabase, organizationIds),
         getStorageUsageByOrganization(supabase, organizationIds),
         getBillingByOrganization(supabase, organizationIds),
-        getLatestSubscriptionMetadataByOrganization(supabase, organizationIds)
+        getLatestSubscriptionMetadataByOrganization(supabase, organizationIds),
+        getPurchaseRequestCountsByOrganization(supabase, organizationIds),
+        getPurchaseRequestCountsByOrganization(supabase, organizationIds, 'new')
     ])
 
     return organizations.map((organization) => {
@@ -1139,7 +1198,9 @@ async function buildOrganizationSummariesFromRows(
             paidFee: resolveAdminOrganizationPaidFee({
                 metadata: subscriptionMetadataByOrganization.get(organization.id) ?? null,
                 organizationBillingRegion: organization.billing_region
-            })
+            }),
+            purchaseRequestCount: getCount(purchaseRequestCounts, organization.id),
+            newPurchaseRequestCount: getCount(newPurchaseRequestCounts, organization.id)
         }
     })
 }
@@ -1329,7 +1390,9 @@ async function getAdminDashboardSummaryFallback(
         userCount,
         skillCountRaw,
         knowledgeDocumentCountRaw,
-        usageSummary
+        usageSummary,
+        purchaseRequestCount,
+        newPurchaseRequestCount
     ] = await Promise.all([
         getTableCount(supabase, 'organizations'),
         getTableCount(supabase, 'profiles'),
@@ -1338,7 +1401,9 @@ async function getAdminDashboardSummaryFallback(
         getAdminUsageMetricsSummary({
             organizationId: null,
             periodKey: ADMIN_METRIC_PERIOD_ALL
-        }, supabase)
+        }, supabase),
+        getPurchaseRequestCount(supabase),
+        getPurchaseRequestCount(supabase, 'new')
     ])
 
     let organizationCount = organizationCountRaw
@@ -1366,7 +1431,9 @@ async function getAdminDashboardSummaryFallback(
         knowledgeDocumentCount,
         messageCount: usageSummary.messageCount,
         totalTokenCount: usageSummary.totalTokenCount,
-        totalCreditUsage: usageSummary.totalCreditUsage
+        totalCreditUsage: usageSummary.totalCreditUsage,
+        purchaseRequestCount,
+        newPurchaseRequestCount
     }
 }
 
@@ -1375,7 +1442,7 @@ export async function getAdminDashboardSummary(
 ): Promise<AdminDashboardSummary> {
     const supabase = supabaseOverride ?? await createClient()
 
-    const [{ data, error }, usageSummary, excludedOrganizationIds] = await Promise.all([
+    const [{ data, error }, usageSummary, excludedOrganizationIds, purchaseRequestCount, newPurchaseRequestCount] = await Promise.all([
         supabase
             .rpc('get_admin_dashboard_totals')
             .maybeSingle(),
@@ -1383,7 +1450,9 @@ export async function getAdminDashboardSummary(
             organizationId: null,
             periodKey: ADMIN_METRIC_PERIOD_ALL
         }, supabase),
-        getExcludedAdminOrganizationIds(supabase)
+        getExcludedAdminOrganizationIds(supabase),
+        getPurchaseRequestCount(supabase),
+        getPurchaseRequestCount(supabase, 'new')
     ])
 
     if (error || !data) {
@@ -1431,7 +1500,9 @@ export async function getAdminDashboardSummary(
         knowledgeDocumentCount,
         messageCount: usageSummary.messageCount,
         totalTokenCount: usageSummary.totalTokenCount,
-        totalCreditUsage: usageSummary.totalCreditUsage
+        totalCreditUsage: usageSummary.totalCreditUsage,
+        purchaseRequestCount,
+        newPurchaseRequestCount
     }
 }
 
