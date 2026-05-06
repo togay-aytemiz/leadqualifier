@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
 import type { BillingLockReason, BillingMembershipState, OrganizationBillingAccount } from '@/types/database'
+import { renewDueManualAdminSubscription } from '@/lib/billing/manual-renewal'
 
 type SupabaseClientLike = SupabaseClient<Database>
 
@@ -66,6 +67,11 @@ export async function resolveOrganizationUsageEntitlement(
     }
 ): Promise<OrganizationUsageEntitlement> {
     const supabase = options?.supabase ?? await createClient()
+
+    await renewDueManualAdminSubscription({
+        organizationId,
+        supabase
+    })
 
     const { data, error } = await supabase
         .from('organization_billing_accounts')

@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-06):** Manual admin-assigned premium packages now renew like recurring subscriptions until the admin changes or cancels them. Before billing snapshots and usage entitlements are read, Qualy runs an idempotent manual-admin renewal RPC that advances due monthly periods, resets monthly package usage, and writes a package-grant ledger entry.
+
 > **Update Note (2026-05-05):** `Settings > Plans` now uses a sales-led billing request flow for plan selection, plan changes, and one-time top-ups while keeping the existing Iyzico/self-service checkout surfaces available for future reuse. Requests persist in `billing_purchase_requests`, can notify the admin via Resend, and Admin organization detail now shows recent purchase requests plus a catalog-package premium assignment shortcut for manual activation.
 
 > **Update Note (2026-05-01):** Release hardening now covers Telegram webhook malformed-payload handling, production header-only Telegram webhook secrets, regression tests for negative webhook inputs, and removal of raw Simulator message/match debug logs from server actions.
@@ -223,7 +225,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-05 (Sales-led billing request flow, Resend admin notification, and manual admin package assignment.)
+> **Last Updated:** 2026-05-06 (Manual admin package assignment now renews monthly until an admin changes or cancels it.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1098,6 +1100,7 @@
   - [x] Implement top-up checkout flow (available for active premium subscriptions)
   - [x] Prevent implicit mock auto-activation when live env vars are missing; explicit mock now requires `BILLING_MOCK_ENABLED=1` in every environment
   - [x] Implement payment webhook sync + failed-payment handling
+  - [x] Add manual-admin recurring renewal for sales-led packages so admin-assigned premium plans renew monthly until admin cancellation/change
   - [x] Add self-serve Iyzico `past_due` recovery actions (`Update payment method` + `Retry payment`) in `Settings > Plans`
   - [x] Redirect missing-auth settings returns to login instead of rendering a blank screen after external Iyzico callbacks
   - [x] Keep localhost Iyzico checkout callbacks on the active local origin instead of forcing production app URL

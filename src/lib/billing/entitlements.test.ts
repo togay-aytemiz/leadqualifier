@@ -33,13 +33,18 @@ function createBillingAccount(overrides?: Partial<OrganizationBillingAccount>): 
 }
 
 function createSupabaseMock(result: { data: unknown; error: unknown }) {
+    const rpcMock = vi.fn(async () => ({
+        data: { status: 'not_due', renewed_periods: 0 },
+        error: null
+    }))
     const maybeSingleMock = vi.fn(async () => result)
     const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
     const selectMock = vi.fn(() => ({ eq: eqMock }))
     const fromMock = vi.fn(() => ({ select: selectMock }))
 
     return {
-        from: fromMock
+        from: fromMock,
+        rpc: rpcMock
     }
 }
 
@@ -103,6 +108,42 @@ describe('billing entitlements', () => {
         expect(entitlement.isUsageAllowed).toBe(false)
         expect(entitlement.lockReason).toBe('subscription_required')
         expect(entitlement.membershipState).toBe('trial_exhausted')
+    })
+
+    it('renews due manual-admin subscriptions before resolving usage entitlement', async () => {
+        const calls: string[] = []
+        const supabase = createSupabaseMock({
+            data: createBillingAccount({
+                membership_state: 'premium_active',
+                trial_credit_used: 120,
+                current_period_start: '2026-05-01T10:00:00.000Z',
+                current_period_end: '2026-06-01T10:00:00.000Z',
+                monthly_package_credit_limit: 1000,
+                monthly_package_credit_used: 0
+            }),
+            error: null
+        })
+        supabase.rpc.mockImplementation(async () => {
+            calls.push('rpc')
+            return {
+                data: { status: 'renewed', renewed_periods: 1 },
+                error: null
+            }
+        })
+        const originalFrom = supabase.from
+        supabase.from = vi.fn((table: string) => {
+            calls.push('select')
+            return originalFrom(table)
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const entitlement = await resolveOrganizationUsageEntitlement('org_1')
+
+        expect(entitlement.isUsageAllowed).toBe(true)
+        expect(supabase.rpc).toHaveBeenCalledWith('renew_due_manual_admin_subscription', {
+            target_organization_id: 'org_1'
+        })
+        expect(calls).toEqual(['rpc', 'select'])
     })
 
     it('throws BillingUsageLockedError when usage is not allowed', async () => {

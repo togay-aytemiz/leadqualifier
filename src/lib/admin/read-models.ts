@@ -8,6 +8,7 @@ import type {
     OrganizationBillingAccount
 } from '@/types/database'
 import { buildOrganizationBillingSnapshot } from '@/lib/billing/snapshot'
+import { renewDueManualAdminSubscription } from '@/lib/billing/manual-renewal'
 import {
     resolveMonthlySubscriptionAmountTry,
     resolveTopupUsageDebit
@@ -446,6 +447,11 @@ async function getBillingByOrganization(
     const billingByOrganization = new Map<string, AdminBillingSnapshot>()
 
     for (const organizationIdBatch of chunkValues(organizationIds, 100)) {
+        await Promise.all(organizationIdBatch.map((organizationId) => renewDueManualAdminSubscription({
+            organizationId,
+            supabase
+        })))
+
         const { data, error } = await supabase
             .from('organization_billing_accounts')
             .select('*')

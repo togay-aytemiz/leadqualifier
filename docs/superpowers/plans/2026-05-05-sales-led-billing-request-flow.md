@@ -94,11 +94,11 @@
 - Modify: `src/lib/billing/snapshot.ts` or `src/lib/billing/policy.ts` only if needed.
 - Test: `src/lib/billing/manual-renewal.test.ts`, `src/lib/billing/snapshot.test.ts`, `src/lib/billing/entitlements.test.ts`
 
-- [ ] Write failing tests showing a manual premium subscription past period end renews once and remains usable.
-- [ ] Add an idempotent RPC to renew active `manual_admin` subscriptions monthly.
-- [ ] Call the renewal helper before billing snapshot and entitlement reads.
-- [ ] Ensure non-manual/Iyzico expired premium behavior stays unchanged.
-- [ ] Run targeted billing tests.
+- [x] Write failing tests showing a manual premium subscription past period end renews once and remains usable.
+- [x] Add an idempotent RPC to renew active `manual_admin` subscriptions monthly.
+- [x] Call the renewal helper before billing snapshot and entitlement reads.
+- [x] Ensure non-manual/Iyzico expired premium behavior stays unchanged.
+- [x] Run targeted billing tests.
 
 ### Task 7: Docs, Release Notes, And Verification
 
@@ -114,4 +114,3 @@
 - [ ] Run `npm test -- --run` for touched targeted tests.
 - [ ] Run `npm run build`.
 - [ ] Provide commit message: `feat(phase-7): add sales-led billing request flow`.
-

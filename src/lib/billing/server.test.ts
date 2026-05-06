@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+    getOrganizationBillingSnapshot,
     getOrganizationBillingLedger,
     getOrganizationBillingLedgerPage,
     getOrganizationBillingLedgerWindow
@@ -8,6 +9,59 @@ import {
 vi.mock('@/lib/supabase/server', () => ({
     createClient: vi.fn()
 }))
+
+describe('getOrganizationBillingSnapshot', () => {
+    it('renews due manual-admin subscriptions before reading the billing snapshot', async () => {
+        const calls: string[] = []
+        const rpcMock = vi.fn(async () => {
+            calls.push('rpc')
+            return {
+                data: { status: 'renewed', renewed_periods: 1 },
+                error: null
+            }
+        })
+        const maybeSingleMock = vi.fn(async () => {
+            calls.push('select')
+            return {
+                data: {
+                    organization_id: 'org_1',
+                    membership_state: 'premium_active',
+                    lock_reason: 'none',
+                    trial_started_at: '2026-02-01T00:00:00.000Z',
+                    trial_ends_at: '2026-02-15T00:00:00.000Z',
+                    trial_credit_limit: 120,
+                    trial_credit_used: 120,
+                    current_period_start: '2026-05-01T10:00:00.000Z',
+                    current_period_end: '2026-06-01T10:00:00.000Z',
+                    monthly_package_credit_limit: 1000,
+                    monthly_package_credit_used: 0,
+                    topup_credit_balance: 0,
+                    premium_assigned_at: '2026-05-01T10:00:00.000Z',
+                    last_manual_action_at: '2026-05-01T10:00:00.000Z',
+                    created_at: '2026-02-01T00:00:00.000Z',
+                    updated_at: '2026-06-01T10:00:00.000Z'
+                },
+                error: null
+            }
+        })
+        const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
+        const selectMock = vi.fn(() => ({ eq: eqMock }))
+        const fromMock = vi.fn(() => ({ select: selectMock }))
+
+        const snapshot = await getOrganizationBillingSnapshot('org_1', {
+            supabase: {
+                rpc: rpcMock,
+                from: fromMock
+            } as never
+        })
+
+        expect(snapshot?.membershipState).toBe('premium_active')
+        expect(rpcMock).toHaveBeenCalledWith('renew_due_manual_admin_subscription', {
+            target_organization_id: 'org_1'
+        })
+        expect(calls).toEqual(['rpc', 'select'])
+    })
+})
 
 describe('getOrganizationBillingLedger', () => {
     it('can restrict ledger history to purchase entry types before applying the limit', async () => {

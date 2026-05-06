@@ -8,6 +8,7 @@ import type {
     OrganizationBillingAccount
 } from '@/types/database'
 import { buildOrganizationBillingSnapshot, type OrganizationBillingSnapshot } from '@/lib/billing/snapshot'
+import { renewDueManualAdminSubscription } from '@/lib/billing/manual-renewal'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -211,6 +212,11 @@ async function getOrganizationBillingSnapshotWithSupabase(
     supabase: SupabaseClient,
     organizationId: string
 ): Promise<OrganizationBillingSnapshot | null> {
+    await renewDueManualAdminSubscription({
+        organizationId,
+        supabase
+    })
+
     const { data, error } = await supabase
         .from('organization_billing_accounts')
         .select('*')
