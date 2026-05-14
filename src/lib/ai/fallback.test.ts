@@ -108,7 +108,7 @@ describe('buildFallbackResponse', () => {
             trackUsage: false
         })
 
-        expect(response).toBe('Şu konularda yardımcı olabilirim: fiyatlar, randevu, iptal/iade, hizmetler. Hangisiyle ilgileniyorsunuz?')
+        expect(response).toBe('Bu konuda elimde net bilgi yok. Şu konularda yardımcı olabilirim: fiyatlar, randevu, iptal/iade, hizmetler. Hangisiyle ilgileniyorsunuz?')
         expect(openAiCreateMock).not.toHaveBeenCalled()
     })
 })

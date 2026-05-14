@@ -42,7 +42,7 @@ const RAG_MAX_OUTPUT_TOKENS = 320
 
 function payloadContainsNoAnswer(value: unknown): boolean {
     if (typeof value === 'string') {
-        return /^no_answer[.!?]*$/i.test(value.trim())
+        return /\bno_answer\b/i.test(value.trim())
     }
     if (Array.isArray(value)) return value.some(payloadContainsNoAnswer)
     if (value && typeof value === 'object') {
@@ -62,6 +62,16 @@ function isRagNoAnswerResponse(response: string | null | undefined) {
         return false
     }
 }
+
+function normalizeMarkdownLinksForPlainChat(content: string) {
+    return content.replace(/\[([^\]\n]+)]\((https?:\/\/[^)\s]+)\)/gi, (_match, rawLabel: string, rawUrl: string) => {
+        const label = rawLabel.trim()
+        const url = rawUrl.trim()
+        if (!label || label === url) return url
+        return `${label}: ${url}`
+    })
+}
+
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
 
 export interface InboundAiPipelineInput {
@@ -540,7 +550,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         failClosedBotMode: true
     })
     const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
-        message: content,
+        message: normalizeMarkdownLinksForPlainChat(content),
         platform: options.platform,
         responseLanguage,
         settings: aiSettings
@@ -1253,6 +1263,11 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 const systemPrompt = `${basePrompt}
 
 Answer the user's question based strictly on the provided context below.
+Treat document titles, section labels, and source URLs in the context as valid evidence.
+If a relevant context chunk partially answers the question, answer the known part and say only the missing detail is not in the knowledge base.
+For find, view, where, or link requests, a matching source URL is enough to answer.
+Do not use Markdown links like [label](url). When sharing a link, write the full raw URL.
+When several chunks are similar, prefer the one that matches the user wording most closely, such as student vs staff or a specific department name.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
 Keep the answer concise and friendly.

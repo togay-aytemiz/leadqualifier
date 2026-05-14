@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding, generateEmbeddings, formatEmbeddingForPgvector } from '@/lib/ai/embeddings'
-import { chunkText } from '@/lib/knowledge-base/chunking'
+import { chunkText, estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import {
     generateKnowledgeBaseDraftFromBrief,
     type KnowledgeBaseDraftBrief,
@@ -298,7 +298,7 @@ export async function processKnowledgeDocument(
 
     try {
         await supabase.from('knowledge_chunks').delete().eq('document_id', data.id)
-        await buildAndStoreChunks(supabase, data.organization_id, data.id, data.content ?? '')
+        await buildAndStoreChunks(supabase, data.organization_id, data.id, data.title ?? '', data.content ?? '')
         const { data: readyDoc } = await supabase
             .from('knowledge_documents')
             .update({ status: 'ready' })
@@ -457,6 +457,7 @@ export async function searchKnowledgeBase(
 ) {
     const supabase = options?.supabase || await createClient()
     let data: KnowledgeSearchResult[] | null = null
+    const vectorLimit = Math.max(limit, Math.min(12, limit * 2))
 
     try {
         const embedding = await generateEmbedding(query, {
@@ -469,7 +470,7 @@ export async function searchKnowledgeBase(
         const { data: result, error } = await supabase.rpc('match_knowledge_chunks', {
             query_embedding: formatEmbeddingForPgvector(embedding),
             match_threshold: threshold,
-            match_count: limit,
+            match_count: vectorLimit,
             filter_org_id: organizationId,
             filter_collection_id: options?.collectionId ?? null,
             filter_type: options?.type ?? null,
@@ -485,21 +486,20 @@ export async function searchKnowledgeBase(
         console.error('Embedding generation failed:', error)
     }
 
-    if (!data || data.length === 0) {
-        const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, limit, {
-            collectionId: options?.collectionId ?? null,
-            type: options?.type ?? null,
-            language: options?.language ?? null,
-            supabase
-        })
-        if (fallbackResults.length > 0) {
-            return fallbackResults
-        }
+    const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, Math.max(limit * 8, 40), {
+        collectionId: options?.collectionId ?? null,
+        type: options?.type ?? null,
+        language: options?.language ?? null,
+        supabase
+    })
+
+    if ((!data || data.length === 0) && fallbackResults.length > 0) {
+        return mergeSearchResults(query, [], fallbackResults, limit)
     }
 
     if (!data) return []
 
-    return data
+    return mergeSearchResults(query, data, fallbackResults, limit)
 }
 export interface SidebarCollection extends KnowledgeCollection {
     files: Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>[]
@@ -584,8 +584,35 @@ const KEYWORD_STOPWORDS = new Set([
     'kaç',
     'zaman',
     'kim',
+    'kimlerden',
     'nereye',
     'nerede',
+    'nereden',
+    'bulabilir',
+    'göster',
+    'goster',
+    'gösterir',
+    'gosterir',
+    'okuyabilirim',
+    'sayfa',
+    'sayfasi',
+    'sayfası',
+    'bilgi',
+    'bilgileri',
+    'bilgilerini',
+    'var',
+    'vardır',
+    'vardir',
+    'hakkında',
+    'hakkinda',
+    'hakkındaki',
+    'hakkindaki',
+    'üniversite',
+    'universite',
+    'üniversitenin',
+    'universitenin',
+    'oluşuyor',
+    'olusuyor',
     'ücret',
     'fiyat',
     'randevu',
@@ -608,16 +635,83 @@ const KEYWORD_STOPWORDS = new Set([
     'which'
 ])
 
+const TURKISH_SEARCH_CHAR_MAP: Record<string, string> = {
+    'ı': 'i',
+    'İ': 'i',
+    'ğ': 'g',
+    'Ğ': 'g',
+    'ü': 'u',
+    'Ü': 'u',
+    'ş': 's',
+    'Ş': 's',
+    'ö': 'o',
+    'Ö': 'o',
+    'ç': 'c',
+    'Ç': 'c'
+}
+
+function normalizeSearchText(value: string): string {
+    return value
+        .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => TURKISH_SEARCH_CHAR_MAP[char] ?? char)
+        .normalize('NFKD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+}
+
+function stemSearchToken(token: string): string {
+    const normalized = normalizeSearchText(token)
+    const suffixes = [
+        'lerinin',
+        'larinin',
+        'lerini',
+        'larini',
+        'sinin',
+        'sini',
+        'sina',
+        'sine',
+        'ini',
+        'ina',
+        'ine',
+        'nin',
+        'imiz',
+        'imizle',
+        'miz',
+        'leri',
+        'lari',
+        'ler',
+        'lar',
+        'si',
+        'su'
+    ]
+
+    for (const suffix of suffixes) {
+        if (normalized.endsWith(suffix) && normalized.length - suffix.length >= 4) {
+            return normalized.slice(0, -suffix.length)
+        }
+    }
+
+    return normalized
+}
+
+function isKeywordStopword(token: string) {
+    const normalized = normalizeSearchText(token)
+    const stemmed = stemSearchToken(normalized)
+
+    return KEYWORD_STOPWORDS.has(token)
+        || KEYWORD_STOPWORDS.has(normalized)
+        || KEYWORD_STOPWORDS.has(stemmed)
+}
+
 function extractKeywordTokens(query: string): string[] {
     const normalized = query
-        .toLowerCase()
+        .toLocaleLowerCase('tr-TR')
         .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
         .trim()
 
     if (!normalized) return []
 
     const tokens = normalized.split(/\s+/).filter(Boolean)
-    const keywords = tokens.filter(token => token.length >= 3 && !KEYWORD_STOPWORDS.has(token))
+    const keywords = tokens.filter(token => token.length >= 3 && !isKeywordStopword(token))
     const unique = Array.from(new Set(keywords))
 
     if (unique.length > 0) {
@@ -629,6 +723,218 @@ function extractKeywordTokens(query: string): string[] {
 
 function sanitizeKeyword(keyword: string): string {
     return keyword.replace(/[%_]/g, '')
+}
+
+function expandKeywordToken(token: string): string[] {
+    const normalized = normalizeSearchText(token)
+    const stemmed = stemSearchToken(normalized)
+    const variants = new Set([token, normalized, stemmed])
+
+    if (normalized.endsWith('lari') || normalized.endsWith('leri')) {
+        variants.add(normalized.slice(0, -1))
+    }
+    if (normalized.endsWith('si') || normalized.endsWith('su')) {
+        variants.add(normalized.slice(0, -2))
+    }
+
+    return [...variants]
+        .map(sanitizeKeyword)
+        .filter((value) => value.length >= 3)
+}
+
+function keywordGroups(query: string): string[][] {
+    return extractKeywordTokens(query)
+        .map(expandKeywordToken)
+        .filter((group) => group.length > 0)
+}
+
+function lexicalMatchScore(query: string, value: string) {
+    const groups = keywordGroups(query)
+    if (groups.length === 0) return 0
+
+    const haystack = normalizeSearchText(value)
+    const hits = groups.filter((group) => {
+        return group.some((keyword) => haystack.includes(normalizeSearchText(keyword)))
+    }).length
+
+    return hits / groups.length
+}
+
+function extractSourceUrlFromContent(content: string) {
+    return content.match(/^Source URL:\s*(.+)$/im)?.[1]?.trim() ?? ''
+}
+
+function sourcePath(sourceUrl: string) {
+    try {
+        return new URL(sourceUrl).pathname
+    } catch {
+        return sourceUrl
+    }
+}
+
+function hasQuerySignal(query: string, signals: string[]) {
+    const normalized = normalizeSearchText(query)
+    return signals.some((signal) => normalized.includes(normalizeSearchText(signal)))
+}
+
+function isTimeSensitiveQuery(query: string) {
+    return hasQuerySignal(query, [
+        'duyuru',
+        'sonuc',
+        'sonuç',
+        'basladi',
+        'başladı',
+        'guncel',
+        'güncel',
+        'ilan',
+        'sinav',
+        'sınav',
+        'yerlestirme',
+        'yerleştirme',
+        '2024',
+        '2025',
+        '2026'
+    ])
+}
+
+function isEvergreenPath(pathname: string) {
+    return pathname.startsWith('/sayfa/')
+        || pathname === '/iletisim'
+        || pathname === '/aday-ogrenci'
+        || pathname === '/obs'
+        || pathname === '/akademik-takvim'
+}
+
+function isTransientPath(pathname: string) {
+    return pathname.startsWith('/duyuru/')
+        || pathname.startsWith('/haber/')
+        || pathname.startsWith('/etkinlik/')
+}
+
+function pageTypeScore(query: string, sourceUrl: string) {
+    const pathname = sourcePath(sourceUrl)
+    const timeSensitive = isTimeSensitiveQuery(query)
+    let score = 0
+
+    if (isEvergreenPath(pathname)) {
+        score += timeSensitive ? 0.02 : 0.1
+    }
+
+    if (isTransientPath(pathname) && !timeSensitive) {
+        score -= 0.14
+    }
+
+    return score
+}
+
+function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    const pathname = normalizeSearchText(sourcePath(sourceUrl))
+    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    let score = 0
+    const hasSpecificContactSubject = hasQuerySignal(query, [
+        'koordinatorluk',
+        'koordinatörlük',
+        'koordinatorlugu',
+        'koordinatörlüğü',
+        'fakulte',
+        'fakülte',
+        'fakultesi',
+        'fakültesi',
+        'yuksekokul',
+        'yüksekokul',
+        'yuksekokulu',
+        'yüksekokulu',
+        'enstitu',
+        'enstitü',
+        'ogrenci isleri',
+        'öğrenci işleri',
+        'erasmus'
+    ])
+
+    if (hasQuerySignal(query, ['iletisim', 'iletişim', 'ulasim', 'ulaşım', 'adres', 'telefon'])
+        && (pathname.includes('iletisim') || pathname.includes('ulasim'))
+        && (!hasSpecificContactSubject || lexicalMatchScore(query, `${result.document_title}\n${sourceUrl}`) >= 0.5)) {
+        score += 0.18
+    }
+
+    if (hasQuerySignal(query, ['aday ogrenci', 'aday öğrenci'])
+        && pathname === '/aday-ogrenci') {
+        score += 0.22
+    }
+
+    if (hasQuerySignal(query, ['tarihce', 'tarihçe'])
+        && searchable.includes('tarihce')) {
+        score += 0.18
+    }
+
+    if (hasQuerySignal(query, ['akademik takvim'])) {
+        const hasSpecificCalendarSubject = hasQuerySignal(query, [
+            'tip fakultesi',
+            'tıp fakültesi',
+            'saglik bilimleri',
+            'sağlık bilimleri',
+            'spor bilimleri',
+            'lisansustu',
+            'lisansüstü',
+            'enstitu',
+            'enstitü',
+            '2024',
+            '2025',
+            '2026'
+        ])
+        if (pathname === '/akademik-takvim' && !hasSpecificCalendarSubject) {
+            score += 0.32
+        } else if (pathname.endsWith('/akademik-takvim')) {
+            score += hasSpecificCalendarSubject ? 0.16 : 0.06
+        }
+    }
+
+    if (hasQuerySignal(query, ['yurt', 'yurtlar', 'yurtlari', 'yurtları'])
+        && pathname.includes('/yurtlar/')) {
+        score += 0.24
+    }
+
+    if (hasQuerySignal(query, ['akademik kadro'])
+        && pathname.includes('akademik-kadro')) {
+        score += 0.22
+    }
+
+    return score
+}
+
+function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
+    const similarity = Number.isFinite(result.similarity) ? Number(result.similarity) : 0
+    const sourceUrl = extractSourceUrlFromContent(result.content)
+    const contentScore = lexicalMatchScore(query, `${result.document_title}\n${result.content}`)
+    const titleScore = lexicalMatchScore(query, result.document_title ?? '')
+    const sourceUrlScore = lexicalMatchScore(query, sourceUrl)
+
+    return similarity * 0.6
+        + contentScore * 0.4
+        + titleScore * 0.15
+        + sourceUrlScore * 0.18
+        + pageTypeScore(query, sourceUrl)
+        + directIntentScore(query, sourceUrl, result)
+}
+
+function mergeSearchResults(
+    query: string,
+    vectorResults: KnowledgeSearchResult[],
+    keywordResults: KnowledgeSearchResult[],
+    limit: number
+) {
+    const byChunk = new Map<string, KnowledgeSearchResult>()
+
+    for (const result of [...vectorResults, ...keywordResults]) {
+        const existing = byChunk.get(result.chunk_id)
+        if (!existing || scoreKnowledgeResult(query, result) > scoreKnowledgeResult(query, existing)) {
+            byChunk.set(result.chunk_id, result)
+        }
+    }
+
+    return [...byChunk.values()]
+        .sort((left, right) => scoreKnowledgeResult(query, right) - scoreKnowledgeResult(query, left))
+        .slice(0, limit)
 }
 
 async function searchKnowledgeBaseByKeyword(
@@ -643,7 +949,7 @@ async function searchKnowledgeBaseByKeyword(
     }
 ) {
     const supabase = options?.supabase || await createClient()
-    const keywords = extractKeywordTokens(query)
+    const keywords = Array.from(new Set(extractKeywordTokens(query).flatMap(expandKeywordToken)))
     if (keywords.length === 0) return []
 
     const filters = keywords
@@ -681,21 +987,45 @@ async function searchKnowledgeBaseByKeyword(
             document_title: row.knowledge_documents?.title ?? 'Untitled',
             document_type: row.knowledge_documents?.type ?? 'article',
             content: row.content as string,
-            similarity: 0.2
+            similarity: Math.max(
+                0.2,
+                0.45 + lexicalMatchScore(query, `${row.knowledge_documents?.title ?? ''}\n${row.content}`) * 0.25
+            )
         }))
+}
+
+function chunkContentHasMetadata(content: string) {
+    return /^Page Title:\s+/im.test(content) || /^Document Title:\s+/im.test(content)
+}
+
+function buildIndexedChunkContent(title: string, content: string) {
+    const normalizedTitle = title.trim()
+    const normalizedContent = content.trim()
+    if (!normalizedTitle || chunkContentHasMetadata(normalizedContent)) return normalizedContent
+
+    return `Document Title: ${normalizedTitle}\n\n${normalizedContent}`
 }
 
 async function buildAndStoreChunks(
     supabase: SupabaseClientLike,
     organizationId: string,
     documentId: string,
+    title: string,
     content: string
 ) {
     const chunks = chunkText(content)
     if (chunks.length === 0) return
+    const indexedChunks = chunks.map((chunk) => {
+        const indexedContent = buildIndexedChunkContent(title, chunk.content)
+        return {
+            ...chunk,
+            content: indexedContent,
+            tokenCount: estimateTokenCount(indexedContent)
+        }
+    })
 
     const embeddings = await generateEmbeddings(
-        chunks.map((chunk) => chunk.content),
+        indexedChunks.map((chunk) => chunk.content),
         {
             organizationId,
             supabase,
@@ -706,7 +1036,7 @@ async function buildAndStoreChunks(
         }
     )
 
-    const rows = chunks.map((chunk, index) => ({
+    const rows = indexedChunks.map((chunk, index) => ({
         document_id: documentId,
         organization_id: organizationId,
         chunk_index: index,

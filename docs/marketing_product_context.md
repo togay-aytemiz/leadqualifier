@@ -54,11 +54,22 @@ Qualy AI, Türkiye'deki KOBİ'ler (güzellik merkezleri, fotoğrafçılar, klini
 
 ## 6. Sosyal Görsel Üretim Kuralları
 
+* İlk GTM görsellerinde dil Türkçe öncelikli olmalı. İngilizce varyantlar Product Hunt ve seçili LinkedIn paylaşımları için ayrıca üretilebilir.
 * İlk launch postlarında ana mesaj "tek gelen kutusu"ndan daha net olmalı: **Qualy AI destekli tek gelen kutusu**.
-* Görselde Qualy logosu veya "Qualy" wordmark mutlaka görünmeli.
+* Instagram feed görselleri varsayılan olarak **dikey 4:5** hazırlanmalı.
+* Görselde Qualy logosu veya "Qualy" wordmark varsayılan olarak kullanılmamalı; logo üretimi tutarlı olmadığı için erken sosyal görseller hesap kimliği, caption ve görsel dil üzerinden markalanmalı. Logo ancak kullanıcı açıkça isterse eklenmeli.
+* Görseller broşür gibi çok yazılı olmamalı. Tek vurucu slogan ana metin olmalı; en fazla bir kısa destek cümlesi kullanılmalı. Kalabalık UI metni ve açıklama paragrafları başarısız çıktı sayılmalı.
+* Kreatif keşif sırasında AI bütün kompozisyonu, kanal ikonlarını, UI crop'unu ve ışık/atmosfer dilini tek parça üretmeli. Kanal ikonu/UI/slogan zayıfsa çıktı post-process ile kurtarılmaya çalışılmamalı; başarısız sayılıp yeniden üretilmeli.
+* Doğru logo/ikon asset'lerini sonradan bindirme yaklaşımı yalnızca kullanıcı özellikle "yayına hazır final cleanup" isterse kullanılmalı; normal görsel keşfinde default yöntem olmamalı.
+* Ürün/admin UI parçaları hayali glassmorphism dashboard gibi değil, gerçek Qualy arayüzünden türetilmiş düz, önden görünen, beyaz/light panel hissinde olmalı. Glow ve cam efektleri arka plan/çerçeve/callout alanlarında kalmalı.
+* Final sosyal görsellerde ana UI paneli elle primitive shape'lerle çizilmemeli; image generator bütün UI moment'ini profesyonel bir marketing screenshot gibi üretmeli. Inbox, chat ekranı, AI özet kartı veya admin paneli SVG/HTML/canvas/`sharp` ile elde kurulmuş gibi görünmemeli. Deterministik bindirme yalnızca doğru Qualy logosu, kanal ikonları, kırpma, küçük cleanup ve gerekirse ana başlık netliği için kullanılmalı.
+* Respond.io referans dilinden alınacak soft lavender/icy-blue hissi arka planı komple açık renge çevirmemeli; Qualy arka planı koyu siyah/lacivert kalmalı. Lavender/icy-blue treatment UI elementleri, chat balonları, callout'lar ve glow path'lerde kullanılmalı. UI içindeki sert mor/mavi gradientler, komple açık lavender arka planlar ve aynı kadın/erkek avatarların tekrar etmesi başarısız çıktı sayılmalı.
+* Placeholder'lı base görsel final çıktı gibi paylaşılmamalı; kullanıcıya gösterilecek aday görselde AI tarafından üretilmiş kanal ikonları/UI/typography/slogan zaten iyi olmalı. UI tam dashboard screenshot olarak küçültülmemeli; büyük crop, az satır, büyük bubble ve tek güçlü AI özet kartı tercih edilmeli.
 * Yapay zeka aktörü "asistan" veya "Assistant" diye tek başına etiketlenmemeli; **Qualy AI** veya **AI talep özeti** gibi ifadeler kullanılmalı.
 * AI aktörü insan avatarıyla temsil edilmemeli; Qualy logosu, AI rozeti veya nötr bir AI işareti kullanılmalı.
+* AI ile üretilmiş insan görselleri yalnızca genel müşteri, operatör veya işletme sahibi personası olarak kullanılabilir. Gerçek müşteri, çalışan, testimonial veya Qualy AI temsili gibi sunulmamalı.
 * Kanal kapsamı anlatılacaksa yalnızca **WhatsApp, Instagram, Telegram ve Messenger** gösterilmeli. Threads, X/Twitter, e-posta veya rastgele chat ikonları eklenmemeli.
+* Görsel serisinde konuşma yüzeyi değişebilir: bazı postlarda WhatsApp chat ekranı, bazı postlarda Instagram DM ekranı kullanılabilir. Kanal kapsamı anlatılıyorsa dört kanal logosu yine görünür kalmalı.
 * Kanal logoları ana mesajı domine etmemeli; dört kanaldan gelen taleplerin Qualy AI gelen kutusunda birleştiği anlatılmalı.
 
 ## 7. Ajans İçin Blog Yazısı Konu ve Tema Önerileri

@@ -1,5 +1,27 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-14):** Customer-channel RAG answers must share links as full raw URLs, not Markdown hyperlinks, because WhatsApp and Instagram render plain text. The internal `NO_ANSWER` sentinel remains a routing/control signal only and must never be exposed as customer copy; unknown answers should say there is no clear information before redirecting to supported topics.
+
+> **Update Note (2026-05-14):** Website-crawl RAG retrieval QA now includes a 20-question university corpus audit. The search layer should ignore Turkish filler words such as `hakkında`, prefer the root academic-calendar page for generic calendar requests, boost direct dormitory and academic-staff pages, and prevent generic contact pages from outranking named coordinator/faculty pages.
+
+> **Update Note (2026-05-14):** Website-scale Knowledge Base/RAG imports now need hybrid retrieval quality, not pure vector ranking. Runtime search should combine vector matches with normalized Turkish keyword, document-title, and source-URL signals; newly indexed chunks should carry document titles; and RAG prompts should treat matching titles/source URLs as valid evidence for link/find/view questions while still refusing unsupported claims.
+
+> **Update Note (2026-05-14):** University crawl RAG quality now specifically requires evergreen page preference over old news/announcement pages for generic questions, Turkish suffix/slug matching for page names, larger keyword candidate pools before reranking, and fallback routing for any model response that contains the internal `NO_ANSWER` sentinel.
+
+> **Update Note (2026-05-12):** University GTM now has a dedicated admissions-season sales plan. The motion positions Qualy as a WhatsApp/Instagram candidate-message operations layer for preference periods, not as a generic university web chatbot replacement, and frames internal IT as the content/control partner.
+
+> **Update Note (2026-05-06):** Qualy social visual generation should use an image-generation-first pipeline for the main UI moment. Manually assembled primitive dashboard panels are no longer acceptable as final social assets; deterministic post-processing is limited to exact Qualy logo/channel icon compositing, cropping, resizing, and small cleanup.
+
+> **Update Note (2026-05-06):** Qualy social visual rules now separate atmospheric marketing treatment from product UI fidelity. Dark glow, gradients, and decorative glass effects can frame assets, but actual admin/inbox UI fragments should be realistic, front-facing, white/light product panels derived from current Qualy UI code or screenshots rather than imaginary glassmorphism dashboards.
+
+> **Update Note (2026-05-06):** Qualy social visual rules now require exact brand and channel assets for final outputs. AI-generated lookalike Qualy logos, malformed social icons, hollow Instagram marks, or generic channel badges are treated as draft failures and must be replaced by the source logo/icon assets before delivery.
+
+> **Update Note (2026-05-06):** The Qualy social visual skill now includes a named template system (`QV-01` through `QV-06`), Instagram grid rotation, first-six-post launch sequence, and demo-business guidance. Empty-channel launch should start general-to-specific before moving into a canonical sector demo business.
+
+> **Update Note (2026-05-06):** The reusable `qualy-social-visuals` Codex skill is now installed locally under `/Users/togay/.codex/skills/qualy-social-visuals`. It uses the Qualy logo assets from `/Users/togay/Desktop/marketingSuite/Logo`, requires PRD/Roadmap/Release grounding before every visual prompt, and codifies the dark navy/violet-glow SaaS social style for Instagram, LinkedIn, and Product Hunt assets.
+
+> **Update Note (2026-05-06):** GTM preparation now has a dedicated checklist roadmap in `docs/GTM_ROADMAP.md`. Launch positioning is explicitly multi-channel across WhatsApp, Instagram, Telegram, and Facebook Messenger, with Turkish-first social assets, English variants reserved for Product Hunt/selected LinkedIn use, and a planned reusable social-visual skill once reference imagery is provided.
+
 > **Update Note (2026-05-06):** Manual admin-assigned premium packages now renew like recurring subscriptions until the admin changes or cancels them. Before billing snapshots and usage entitlements are read, Qualy runs an idempotent manual-admin renewal RPC that advances due monthly periods, resets monthly package usage, and writes a package-grant ledger entry.
 
 > **Update Note (2026-05-05):** `Settings > Plans` now uses a sales-led billing request flow for plan selection, plan changes, and one-time top-ups while keeping the existing Iyzico/self-service checkout surfaces available for future reuse. Requests persist in `billing_purchase_requests`, can notify the admin via Resend, and Admin organization detail now shows recent purchase requests plus a catalog-package premium assignment shortcut for manual activation.
@@ -225,7 +247,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-06 (Manual admin package assignment now renews monthly until an admin changes or cancels it.)
+> **Last Updated:** 2026-05-14 (Customer-channel RAG links now use full raw URLs instead of Markdown hyperlinks.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1347,6 +1369,7 @@
 - [x] Prepare AI copywriter-ready static launch asset brief grounded in repo + PRD + roadmap + release notes, with Turkish-first terminology and non-team positioning guardrails
 - [x] Standardize reusable product-marketing context and social-post prompt guardrails for Qualy AI-first launch visuals, visible brand presence, and the approved WhatsApp/Instagram/Telegram/Messenger channel set
 - [x] Add dashboard-wide performance refactor plan for Calendar, Settings, and workspace navigation (`docs/plans/2026-04-14-dashboard-performance-refactor-plan.md`)
+- [x] Add university admissions-season GTM sales plan with competitor scan, build-vs-buy objection handling, pilot package, demo strategy, and rector/IT/admissions stakeholder talk tracks (`docs/plans/2026-05-12-university-gtm-sales-plan.md`)
 - [ ] Execute dashboard performance hardening before expanding pilot usage
   - [x] Add route/action timing harness across the dashboard shell, Settings layout, Calendar page, and Calendar page action
   - [ ] Capture baseline Calendar/Settings measurements with `DASHBOARD_PERF_DEBUG=1`

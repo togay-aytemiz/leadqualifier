@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-*Last updated: 2026-04-12*
+*Last updated: 2026-05-06*
 
 ## Product Overview
 
@@ -105,11 +105,27 @@
 
 **Launch asset positioning:** First-launch visuals should lead with Qualy AI and the AI-powered unified inbox. The message should not read like a normal shared inbox with a generic assistant. Use a headline such as `Qualy AI yayında` or a similarly clear AI-led launch line.
 
-**Logo and brand presence:** Visual prompts must require a visible `Qualy` wordmark or logo, ideally in the UI panel top-left and/or near the headline. If exact logo assets are not available to the image model, leave room for manual logo replacement and ask for clean text rendering.
+**Language policy:** Use Turkish-first copy for Instagram and Turkish SMB outreach. English variants are appropriate for Product Hunt and selected LinkedIn posts, but the default visual language for early GTM should be Turkish unless the brief explicitly asks for an international audience.
+
+**Format:** Instagram feed visuals should be generated as vertical 4:5 assets by default unless another format is explicitly requested.
+
+**Logo and brand presence:** Do not include the Qualy logo or wordmark in normal social visual concepts. The logo has been unreliable in image generation, so early feed visuals should rely on the account identity, caption, and campaign visual language instead. Add the logo only if the user explicitly asks for a logo-bearing final or publish-ready variant.
+
+**Copy density:** Social visuals must be stop-the-scroll, not brochure-like. Use one short, punchy slogan as the main text and at most one short support line. Avoid crowded layouts, explanatory paragraphs, and dense UI text.
+
+**Logo/icon fidelity:** During creative exploration, the AI image model should generate the full composition including supported-channel icons when channel coverage is depicted, but should omit the Qualy logo unless explicitly requested. Hollow/malformed Instagram marks, generic chat icons, or off-brand social badges are draft failures and should be regenerated, not patched, unless the user explicitly asks for publish-finalization cleanup.
+
+**UI realism:** Product/admin UI fragments in marketing visuals should look like real front-facing app UI, not imaginary glassmorphism dashboards. Use white/light screenshot-like panels, crisp rows, labels, message bubbles, and controls inspired by current Qualy code or screenshots. Keep dark glow and glass effects mostly in the background, framing, and decorative callouts. For final social visuals, the image generator must produce the main UI moment as a cohesive premium marketing screenshot. Do not manually build the inbox/chat/summary UI with SVG, HTML, canvas, `sharp`, or primitive shapes unless the user explicitly asks for a deterministic mockup. Weak generations should be rejected and regenerated instead of manually rescued.
+
+**Reference fidelity:** For Respond.io-inspired assets, keep Qualy's overall background dark navy/near-black while borrowing soft lavender/icy-blue treatment for UI elements, reply bubbles, callouts, glow paths, oversized white UI crops, subtle dot textures, and gentle glow. Reject full-canvas light lavender backgrounds unless explicitly requested, harsh internal UI gradients, generic dark-blue dashboards, and repeated identical avatar faces.
+
+**Final preview rule:** Placeholder-only logo/channel areas should not be shown as output candidates. Share only AI-generated candidates where channel icons, UI crop, slogan, typography, and overall art direction are already strong enough. Reject full dashboard UI scaled down into the frame; prefer large cropped UI moments.
 
 **AI actor representation:** If a visual includes the bot/agent, label it as `Qualy AI` and represent it with the Qualy logo, an AI badge, or a neutral assistant mark. Do not use a human avatar or the bare labels `asistan` / `Assistant`, because those can read as a human support rep.
 
-**Channel logo policy:** When the visual communicates channel coverage, show exactly the supported channels unless the brief says otherwise: WhatsApp, Instagram, Telegram, Messenger. Do not add Threads, X/Twitter, email, generic chat icons, or extra social logos. Channel logos are secondary proof points; the main concept is Qualy AI managing the unified inbox.
+**Human imagery:** AI-generated human imagery may be used for generic customers, operators, or SMB owners when it helps communicate relief, trust, or the operator workflow. Do not present generated people as real customers, employees, testimonials, or the Qualy AI actor.
+
+**Channel logo policy:** When the visual communicates channel coverage, show exactly the supported channels unless the brief says otherwise: WhatsApp, Instagram, Telegram, Messenger. Do not add Threads, X/Twitter, email, generic chat icons, or extra social logos. Channel logos are secondary proof points; the main concept is Qualy AI managing the unified inbox. It is acceptable to vary the depicted conversation surface by asset: use WhatsApp-style chats in some visuals and Instagram DM-style chats in others, while keeping the four channel logos visible when coverage is part of the message.
 
 **Preferred first-post composition:** A light, premium SaaS launch visual with a large `Qualy AI yayında` headline, a central unified inbox UI, four channel logo badges feeding into the inbox, a visible `Qualy` brand mark, and a compact `AI talep özeti` card.
 

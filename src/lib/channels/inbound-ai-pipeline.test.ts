@@ -1953,6 +1953,66 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).toHaveBeenCalled()
     })
 
+    it('routes mixed RAG explanations containing NO_ANSWER to fallback instead of sending them', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Bugün yemekhane menüsünde ne var?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Yemekhane menüsü',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Yemekhane menüsü bilgisi bulunmuyor.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Yemekhane menüsü bilgisi bulunmuyor.',
+            chunks: [{ document_id: 'doc-1', content: 'Yemekhane menüsü bilgisi bulunmuyor.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Üzgünüm, bu bilgi context içinde yok. NO_ANSWER' } }]
+        })
+        buildFallbackResponseMock.mockResolvedValueOnce('Fallback response')
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Bugün yemekhane menüsünde ne var?' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Fallback response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('NO_ANSWER'))
+        expect(buildFallbackResponseMock).toHaveBeenCalled()
+    })
+
     it('routes structured RAG NO_ANSWER payloads to fallback instead of sending them', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 
@@ -2132,7 +2192,82 @@ describe('processInboundAiPipeline guardrails', () => {
         const ragRequest = openAiCreateMock.mock.calls[0]?.[0] as { messages?: Array<{ role: string; content: string }> } | undefined
         const systemPrompt = ragRequest?.messages?.find((item) => item.role === 'system')?.content ?? ''
         expect(systemPrompt).toContain('Reply language policy (MVP): use Turkish only.')
+        expect(systemPrompt).toContain('Treat document titles, section labels, and source URLs in the context as valid evidence.')
+        expect(systemPrompt).toContain('If a relevant context chunk partially answers the question, answer the known part')
+        expect(systemPrompt).toContain('For find, view, where, or link requests, a matching source URL is enough to answer.')
+        expect(systemPrompt).toContain('Do not use Markdown links like [label](url).')
+        expect(systemPrompt).toContain('write the full raw URL')
+        expect(systemPrompt).toContain('When several chunks are similar, prefer the one that matches the user wording most closely')
         expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('converts RAG Markdown links into raw URLs for chat channels', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const languageHistory = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Akademik takvim nerede?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Akademik takvim nerede?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Akademik takvim',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Akademik takvim sayfası: https://example.edu.tr/akademik-takvim'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Akademik takvim sayfası: https://example.edu.tr/akademik-takvim',
+            chunks: [{
+                document_id: 'doc-1',
+                content: 'Akademik takvim sayfası: https://example.edu.tr/akademik-takvim'
+            }],
+            tokenCount: 7
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Akademik takvime [buradan](https://example.edu.tr/akademik-takvim) ulaşabilirsiniz.' } }]
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, languageHistory.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Akademik takvim nerede?' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith('Akademik takvime buradan: https://example.edu.tr/akademik-takvim ulaşabilirsiniz.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('[buradan]('))
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 

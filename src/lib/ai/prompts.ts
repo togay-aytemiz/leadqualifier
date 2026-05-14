@@ -1,7 +1,7 @@
 export const DEFAULT_STRICT_FALLBACK_TEXT =
-    'Şu konularda yardımcı olabilirim: {topics}. Hangisiyle ilgileniyorsunuz?'
+    'Bu konuda elimde net bilgi yok. Şu konularda yardımcı olabilirim: {topics}. Hangisiyle ilgileniyorsunuz?'
 export const DEFAULT_STRICT_FALLBACK_TEXT_EN =
-    'I can help with these topics: {topics}. Which one are you interested in?'
+    'I do not have a clear answer for that. I can help with these topics: {topics}. Which one are you interested in?'
 
 export const DEFAULT_FLEXIBLE_PROMPT = `You are the AI assistant for a business.
 Be concise, friendly, and respond in the user's language.

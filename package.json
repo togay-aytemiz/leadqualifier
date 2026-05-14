@@ -15,6 +15,7 @@
     "test:e2e:settings": "playwright test tests/e2e/settings-navigation.spec.ts",
     "test:load:messages": "node scripts/load/whatsapp-webhook.autocannon.mjs",
     "test:load:users": "node scripts/load/whatsapp-webhook.scenario.mjs",
+    "knowledge:import-crawl": "node scripts/knowledge/import-crawl-corpus.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {
