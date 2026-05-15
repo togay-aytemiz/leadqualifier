@@ -828,7 +828,8 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                             {tAdmin('organizationDetail.manualActions.assignNamedPremium.creditsSuffix')}
                                             {' · '}
                                             {formatNumber.format(plan.priceTry)}
-                                            {' TRY'}
+                                            {' '}
+                                            {tAdmin('organizationDetail.manualActions.assignNamedPremium.currencyTry')}
                                         </option>
                                     ))}
                                 </select>

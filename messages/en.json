@@ -144,6 +144,7 @@
       "passwordMismatch": "Passwords do not match",
       "weakPassword": "Password must be at least 6 characters",
       "emailInUse": "Email is already in use",
+      "confirmationFailed": "We could not complete email verification from this link. Please sign in to continue.",
       "generic": "Something went wrong. Please try again."
     },
     "trialAlreadyUsedBusiness": "This business has already used its free trial. Please sign in or contact support."
@@ -2836,6 +2837,7 @@
           "title": "Assign Catalog Package",
           "planLabel": "Package",
           "creditsSuffix": "credits",
+          "currencyTry": "TRY",
           "submit": "Activate selected package",
           "planNames": {
             "starter": "Starter",

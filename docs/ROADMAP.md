@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-15):** Signup email-confirmation routing is hardened: `/login?code=...` now hands off to a server-side Supabase auth callback, exchanges the code into a session, and redirects through the standard post-auth onboarding/workspace resolver. Supabase Data API table grants are now explicit for authenticated/service-role access to avoid relying on public-schema default grants after the 2026 rollout, while anon table access remains closed.
+
 > **Update Note (2026-05-14):** Customer-channel RAG answers must share links as full raw URLs, not Markdown hyperlinks, because WhatsApp and Instagram render plain text. The internal `NO_ANSWER` sentinel remains a routing/control signal only and must never be exposed as customer copy; unknown answers should say there is no clear information before redirecting to supported topics.
 
 > **Update Note (2026-05-14):** Website-crawl RAG retrieval QA now includes a 20-question university corpus audit. The search layer should ignore Turkish filler words such as `hakkında`, prefer the root academic-calendar page for generic calendar requests, boost direct dormitory and academic-staff pages, and prevent generic contact pages from outranking named coordinator/faculty pages.
@@ -247,7 +249,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-14 (Customer-channel RAG links now use full raw URLs instead of Markdown hyperlinks.)
+> **Last Updated:** 2026-05-15 (Signup confirmation callback and explicit Supabase Data API grants.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1386,6 +1388,7 @@
   - [ ] Verify DB/RLS query timing and add only proven indexes
   - [ ] Add dashboard performance regression guard
 - [ ] Finish GTM readiness hardening before expanding beyond the first 5 pilots
+  - [x] Harden signup confirmation/login handoff and Supabase Data API grant posture: `/login?code=...` exchanges through a server callback, stale auth codes are cleared on failure, and public-schema grants are explicit for authenticated/service-role Data API access
   - [x] Keep inbound AI reply path fast by deferring lead extraction + hot-lead escalation side work until after reply delivery, with regression coverage for deferred execution and failure isolation
   - [x] Make operator outbound delivery durable by queueing pending Inbox rows before provider dispatch and finalizing them to `sent` / `failed` across text, template, and media send paths
   - [x] Improve `Settings > Usage` credit-history auditability with period filters, usage/load movement filters, package/top-up visibility, simplified record/aggregate tables, labeled inline filter controls, complete-period aggregate lazy loading, and lazy-loaded all-time pages

@@ -3,11 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { buildPasswordResetRedirectUrl } from '@/lib/auth/reset'
 import { normalizeRegisterFormData } from '@/lib/auth/register-data'
-import { ACTIVE_ORG_COOKIE } from '@/lib/organizations/active-context'
-import { resolvePostAuthRedirectPath } from '@/lib/auth/post-auth-redirect'
-import type { PostAuthSupabase } from '@/lib/auth/post-auth-redirect'
+import { buildPostAuthRedirectPath } from '@/lib/auth/post-auth'
 import { normalizeAppLocale } from '@/lib/i18n/locale-path'
-import { getOrganizationOnboardingState } from '@/lib/onboarding/state'
 import {
     checkTrialBusinessIdentity,
     checkSignupVelocityGuard,
@@ -17,7 +14,7 @@ import {
     verifyTurnstileCaptcha,
 } from '@/lib/auth/signup-guard'
 import { redirect } from 'next/navigation'
-import { cookies, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import { resolveBillingRegionFromRequestHeaders } from '@/lib/billing/request-region'
 
 export type LoginActionState = {
@@ -53,59 +50,6 @@ function resolveLoginErrorCode(error: unknown): LoginActionState['errorCode'] | 
     }
 
     return null
-}
-
-async function buildPostAuthRedirectPath(
-    locale: string | null | undefined,
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    userId: string | null | undefined
-) {
-    if (!userId) {
-        return '/inbox'
-    }
-
-    const cookieStore = await cookies()
-    const organizationId = await resolvePostAuthOrganizationId(
-        supabase,
-        userId
-    )
-    const onboardingState = organizationId
-        ? await getOrganizationOnboardingState(organizationId, {
-            supabase
-        })
-        : null
-
-    return resolvePostAuthRedirectPath({
-        cookieOrganizationId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null,
-        locale,
-        onboarding: {
-            shouldAutoOpen: onboardingState?.shouldAutoOpen ?? false,
-            resolveOrganizationId: async () => organizationId
-        },
-        supabase: supabase as unknown as PostAuthSupabase,
-        userId
-    })
-}
-
-async function resolvePostAuthOrganizationId(
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    userId: string
-) {
-    const { data, error } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle()
-
-    if (error) {
-        console.warn('Failed to resolve post-auth organization for onboarding:', error)
-        return null
-    }
-
-    return typeof data?.organization_id === 'string'
-        ? data.organization_id
-        : null
 }
 
 export async function login(formData: FormData) {

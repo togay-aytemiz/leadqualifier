@@ -144,6 +144,7 @@
       "passwordMismatch": "Şifreler eşleşmiyor",
       "weakPassword": "Şifre en az 6 karakter olmalıdır",
       "emailInUse": "E-posta zaten kullanımda",
+      "confirmationFailed": "Bu bağlantıyla e-posta doğrulaması tamamlanamadı. Devam etmek için lütfen giriş yapın.",
       "generic": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
     },
     "trialAlreadyUsedBusiness": "Bu işletme ücretsiz deneme hakkını daha önce kullandı. Lütfen giriş yapın veya destek ile iletişime geçin."
@@ -2836,6 +2837,7 @@
           "title": "Katalog Paketi Tanımla",
           "planLabel": "Paket",
           "creditsSuffix": "kredi",
+          "currencyTry": "TRY",
           "submit": "Seçili paketi aktifleştir",
           "planNames": {
             "starter": "Temel",

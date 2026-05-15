@@ -13,18 +13,33 @@ import {
 } from '@/design/manual-prefetch'
 
 type TranslateFn = (key: string, values?: Record<string, string | number>) => string
+type LoginInitialErrorCode = 'confirmation_failed'
 
-function resolveLoginErrorMessage(state: LoginActionState | null, t: TranslateFn) {
-    if (!state) return null
-
-    if (state.errorCode === 'invalid_credentials') {
+function resolveLoginErrorMessage(
+    state: LoginActionState | null,
+    initialErrorCode: LoginInitialErrorCode | null | undefined,
+    t: TranslateFn
+) {
+    if (state?.errorCode === 'invalid_credentials') {
         return t('errors.invalidCredentials')
     }
 
-    return state.error ?? null
+    if (state?.error) {
+        return state.error
+    }
+
+    if (initialErrorCode === 'confirmation_failed') {
+        return t('errors.confirmationFailed')
+    }
+
+    return null
 }
 
-export function LoginForm() {
+export function LoginForm({
+    initialErrorCode = null,
+}: {
+    initialErrorCode?: LoginInitialErrorCode | null
+}) {
     const t = useTranslations('auth')
     const tc = useTranslations('common')
     const locale = useLocale()
@@ -36,7 +51,7 @@ export function LoginForm() {
         },
         null
     )
-    const errorMessage = resolveLoginErrorMessage(state, t)
+    const errorMessage = resolveLoginErrorMessage(state, initialErrorCode, t)
     const isRedirecting = Boolean(state?.redirectPath)
 
     useEffect(() => {
