@@ -1265,7 +1265,7 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(escalationUpdate.updateMock).toHaveBeenCalled()
     })
 
-    it('uses plain-text instagram disclaimer formatting for instagram bot replies', async () => {
+    it('uses quoted instagram disclaimer footer formatting for instagram bot replies', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
         const lookup = createConversationLookupBuilder(createConversation({ platform: 'instagram' }))
@@ -1298,11 +1298,11 @@ describe('processInboundAiPipeline guardrails', () => {
             }
         }))
 
-        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(botInsert.insertMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 sender_type: 'bot',
-                content: 'Skill response\n\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+                content: 'Skill response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
             })
         )
     })

@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Update Note (2026-05-15):** Outbound bot text is now normalized for messenger channels before it is sent and persisted. WhatsApp converts `**bold**` to single-star emphasis, Instagram strips Markdown markers, Telegram defaults to plain text when no parse mode is configured, full raw URLs are preserved, and inline dash-separated RAG lists are broken into readable message bullets. Inbox message bubbles preserve those line breaks with `whitespace-pre-wrap`.
+> **Update Note (2026-05-15):** Outbound bot text is now normalized for messenger channels before it is sent and persisted. WhatsApp converts `**bold**` to single-star emphasis, Instagram strips unsupported Markdown markers while preserving the standardized quoted AI-disclaimer footer, Telegram defaults to plain text when no parse mode is configured, full raw URLs are preserved, and inline dash-separated RAG lists are broken into readable message bullets. Inbox message bubbles preserve those line breaks with `whitespace-pre-wrap`.
 
 > **Update Note (2026-05-15):** Bot disclaimer formatting now treats the footer as app-owned only. Outbound formatting strips any trailing LLM/Skill/KB-generated AI-disclaimer artifact before appending the configured footer, preventing duplicated WhatsApp/Telegram/Instagram disclaimer text and removing model-supplied footers even when the org-level disclaimer toggle is off.
 
