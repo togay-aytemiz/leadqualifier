@@ -2754,6 +2754,7 @@
         "trialCredits": "Trial Credits",
         "trialEndsAt": "Trial ends: {date}",
         "topup": "Extra Credits",
+        "usedVsLimit": "Used: {used} / {limit}",
         "topupAllowed": "Extra credits available",
         "topupBlocked": "Extra credits blocked"
       },
@@ -2781,6 +2782,7 @@
         "title": "Manual Billing Actions",
         "description": "Use these tools for trial/premium overrides at organization level.",
         "reasonPlaceholder": "Describe why this action is required...",
+        "submitting": "Processing...",
         "successTitle": "Billing action completed",
         "errorTitle": "Billing action failed",
         "successDescription": "The requested organization billing change was applied.",

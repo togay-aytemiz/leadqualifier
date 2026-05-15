@@ -2754,6 +2754,7 @@
         "trialCredits": "Ücretsiz Deneme Kredileri",
         "trialEndsAt": "Ücretsiz deneme bitişi: {date}",
         "topup": "Ek Kredi",
+        "usedVsLimit": "Kullanım: {used} / {limit}",
         "topupAllowed": "Ek kredi açık",
         "topupBlocked": "Ek kredi kapalı"
       },
@@ -2781,6 +2782,7 @@
         "title": "Manuel Faturalandırma Aksiyonları",
         "description": "Organizasyon seviyesinde ücretsiz deneme/premium override işlemlerini bu alandan yapın.",
         "reasonPlaceholder": "Bu aksiyonun nedenini yazın...",
+        "submitting": "İşleniyor...",
         "successTitle": "Faturalandırma aksiyonu tamamlandı",
         "errorTitle": "Faturalandırma aksiyonu başarısız oldu",
         "successDescription": "İstenen organizasyon faturalandırma değişikliği uygulandı.",

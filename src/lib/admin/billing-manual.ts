@@ -175,6 +175,7 @@ export async function adminAssignPremium(input: {
         || !input.periodEndIso
         || !Number.isFinite(input.monthlyPriceTry)
         || !Number.isFinite(input.monthlyCredits)
+        || input.monthlyCredits <= 0
         || !reason
     ) {
         return failure('invalid_input')

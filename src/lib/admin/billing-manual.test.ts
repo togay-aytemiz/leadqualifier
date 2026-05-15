@@ -206,6 +206,26 @@ describe('admin billing manual actions', () => {
         })
     })
 
+    it('rejects premium assignment without positive monthly credits before calling Supabase', async () => {
+        const { supabase } = createSupabaseMock()
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await adminAssignPremium({
+            organizationId: 'org-1',
+            periodStartIso: '2026-02-01T00:00:00.000Z',
+            periodEndIso: '2026-03-01T00:00:00.000Z',
+            monthlyPriceTry: 49,
+            monthlyCredits: 0,
+            reason: 'activate premium manually'
+        })
+
+        expect(result).toEqual({
+            ok: false,
+            error: 'invalid_input'
+        })
+        expect(createClientMock).not.toHaveBeenCalled()
+    })
+
     it('assigns a named premium plan from the pricing catalog', async () => {
         const { supabase, rpcMock } = createSupabaseMock()
         createClientMock.mockResolvedValue(supabase)

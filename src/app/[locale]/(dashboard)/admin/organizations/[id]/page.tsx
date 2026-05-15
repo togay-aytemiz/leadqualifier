@@ -26,6 +26,7 @@ import {
     type AdminBillingActionResult
 } from '@/lib/admin/billing-manual'
 import type { BillingLockReason, BillingMembershipState } from '@/types/database'
+import { AdminBillingSubmitButton } from './AdminBillingSubmitButton'
 
 interface AdminOrganizationDetailsPageProps {
     params: Promise<{ id: string }>
@@ -576,22 +577,24 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                         <div className="rounded-xl border border-gray-200 bg-white p-4">
                             <p className="text-xs uppercase tracking-wider text-gray-400">{tAdmin('organizationDetail.billing.packageCredits')}</p>
                             <p className="mt-2 text-sm font-semibold text-gray-900">
-                                {formatNumber.format(details.organization.billing.packageCreditsUsed)} / {formatNumber.format(details.organization.billing.packageCreditsLimit)}
+                                {formatNumber.format(details.organization.billing.packageCreditsRemaining)}
                             </p>
                             <p className="mt-1 text-xs text-gray-500">
-                                {tAdmin('status.remainingLabel', {
-                                    value: formatNumber.format(details.organization.billing.packageCreditsRemaining)
+                                {tAdmin('organizationDetail.billing.usedVsLimit', {
+                                    used: formatNumber.format(details.organization.billing.packageCreditsUsed),
+                                    limit: formatNumber.format(details.organization.billing.packageCreditsLimit)
                                 })}
                             </p>
                         </div>
                         <div className="rounded-xl border border-gray-200 bg-white p-4">
                             <p className="text-xs uppercase tracking-wider text-gray-400">{tAdmin('organizationDetail.billing.trialCredits')}</p>
                             <p className="mt-2 text-sm font-semibold text-gray-900">
-                                {formatNumber.format(details.organization.billing.trialCreditsUsed)} / {formatNumber.format(details.organization.billing.trialCreditsLimit)}
+                                {formatNumber.format(details.organization.billing.trialCreditsRemaining)}
                             </p>
                             <p className="mt-1 text-xs text-gray-500">
-                                {tAdmin('status.remainingLabel', {
-                                    value: formatNumber.format(details.organization.billing.trialCreditsRemaining)
+                                {tAdmin('organizationDetail.billing.usedVsLimit', {
+                                    used: formatNumber.format(details.organization.billing.trialCreditsUsed),
+                                    limit: formatNumber.format(details.organization.billing.trialCreditsLimit)
                                 })}
                             </p>
                             {details.organization.billing.trialEndsAt && (
@@ -702,12 +705,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.extendTrial.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleAdjustTopup} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -734,12 +734,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.adjustCredits.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleAdjustTrialCredits} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -766,12 +763,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.adjustTrialCredits.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleAdjustPackageCredits} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -798,12 +792,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.adjustPackageCredits.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleAssignNamedPremiumPlan} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -863,12 +854,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.assignNamedPremium.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleAssignPremium} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -934,12 +922,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.assignPremium.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleCancelPremium} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -956,12 +941,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700"
-                                >
+                                <AdminBillingSubmitButton variant="danger">
                                     {tAdmin('organizationDetail.manualActions.cancelPremium.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
 
                             <form action={handleSetMembershipOverride} className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -1008,12 +990,9 @@ export default async function AdminOrganizationDetailsPage({ params, searchParam
                                     placeholder={tAdmin('organizationDetail.manualActions.reasonPlaceholder')}
                                     required
                                 />
-                                <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center rounded-lg bg-[#242A40] px-3 text-xs font-semibold text-white hover:bg-[#1f2437]"
-                                >
+                                <AdminBillingSubmitButton>
                                     {tAdmin('organizationDetail.manualActions.membershipOverride.submit')}
-                                </button>
+                                </AdminBillingSubmitButton>
                             </form>
                         </div>
                     </div>

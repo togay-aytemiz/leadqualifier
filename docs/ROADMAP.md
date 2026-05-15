@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-15):** Admin manual billing now aligns the control panel with tenant credit visibility. Organization detail shows remaining package/trial credits first, used/limit only as helper context, manual premium assignment refuses zero-credit grants before the RPC, the `admin_assign_premium` migration reasserts package grant/renewal metadata, and billing action buttons show a disabled processing state to prevent repeated clicks.
+
 > **Update Note (2026-05-15):** Chat-channel link formatting now defensively repairs model output before send/persist. Markdown links whose URLs contain accidental spaces are converted into visible raw URLs, raw URL domains such as `example. edu. tr` are compacted back to clickable form, and shared WhatsApp/Instagram plus Telegram RAG prompts explicitly tell the model to copy source URLs without inserted spaces.
 
 > **Update Note (2026-05-15):** Default Skills now seed five active templates: the existing four guardrail handover skills plus a configurable greeting skill. The greeting skill is localized, editable from `Yetenekler / Skills`, covers `/start`, `Merhaba/Selam` and `Hello/Hi`, does not trigger human handover, and exact trigger matching runs before embedding search so Telegram `/start` is handled by configured skill content rather than a hardcoded webhook response.
@@ -263,7 +265,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-15 (Messenger-channel bot replies now normalize Markdown, inline bullets, and malformed/raw URLs before send/persist.)
+> **Last Updated:** 2026-05-15 (Admin manual billing credit display, premium grant validation, and action loading states are now aligned with tenant credit snapshots.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1091,8 +1093,9 @@
   - [x] Admin-only org details page (`/admin/organizations/[id]`)
   - [x] Read org-level snapshots: usage, token usage, skills, knowledge stats (read-only table)
   - [x] Include profile-level details via user details view (multi-profile-ready membership listing)
-  - [ ] Audit trail for admin-driven plan/quota updates
+  - [x] Audit trail for admin-driven plan/quota updates
   - [x] Manual billing actions (system-admin): extend trial, adjust credits, assign/cancel premium with required reason
+  - [x] Admin manual billing detail now shows remaining package/trial credits first, guards zero-credit premium grants, and disables billing submit buttons while actions are processing
 - [ ] Usage analytics per org
   - [x] Admin organization table columns: total usage, total token usage, total skill count, knowledge base count
   - [x] Admin organization list/detail now shows total storage usage per org with WhatsApp media breakdown
