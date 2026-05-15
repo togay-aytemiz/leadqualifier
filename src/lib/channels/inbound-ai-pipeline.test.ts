@@ -2267,8 +2267,9 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(systemPrompt).toContain('If a relevant context chunk partially answers the question, answer the known part')
         expect(systemPrompt).toContain('For find, view, where, or link requests, a matching source URL is enough to answer.')
         expect(systemPrompt).toContain('Do not use Markdown links like [label](url).')
-        expect(systemPrompt).toContain('write the full raw URL')
+        expect(systemPrompt).toContain('put the full raw URL on its own final line')
         expect(systemPrompt).toContain('Copy source URLs exactly and never insert spaces inside a URL')
+        expect(systemPrompt).toContain('Do not add punctuation or words after the URL')
         expect(systemPrompt).toContain('When several chunks are similar, prefer the one that matches the user wording most closely')
         expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
@@ -2338,8 +2339,92 @@ describe('processInboundAiPipeline guardrails', () => {
             buildInput(supabase, sendOutbound, { text: 'Akademik takvim nerede?' })
         )
 
-        expect(sendOutbound).toHaveBeenCalledWith('Akademik takvime buradan: https://example.edu.tr/akademik-takvim ulaşabilirsiniz.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).toHaveBeenCalledWith('Akademik takvime buradan:\nhttps://example.edu.tr/akademik-takvim\nulaşabilirsiniz.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('[buradan]('))
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('pins malformed RAG source links to a final raw URL line before sending and persisting', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Tıp fak finalleri ne zaman?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Tıp Fakültesi final tarihleri akademik takvim',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                document_title: 'Akademik Takvimler',
+                content: 'Final tarihleri akademik takvimde belirtilmektedir.',
+                source_url: 'https://yuksekihtisasuniversitesi.edu.tr/tr/akademik/akademik-takvimler'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: [
+                'Document Title: Akademik Takvimler',
+                'Source URL: https://yuksekihtisasuniversitesi.edu.tr/tr/akademik/akademik-takvimler',
+                '',
+                'Final tarihleri akademik takvimde belirtilmektedir.'
+            ].join('\n'),
+            chunks: [{
+                document_id: 'doc-1',
+                document_title: 'Akademik Takvimler',
+                content: 'Final tarihleri akademik takvimde belirtilmektedir.',
+                source_url: 'https://yuksekihtisasuniversitesi.edu.tr/tr/akademik/akademik-takvimler'
+            }],
+            tokenCount: 12
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{
+                message: {
+                    content: "Güncel akademik takvimi incelemek için şu linke göz atabilirsiniz: https://\nyuksekihtisasuniversitesi.Tıp Fakültesi'nin final tarihleri akademik takvimde belirtilmektedir. edu. tr/tr/akademik/akademik-takvimler Başka bir konuda yardımcı olabilir miyim?"
+                }
+            }]
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Tıp fak finalleri ne zaman?' })
+        )
+
+        const expectedReply = [
+            'Güncel akademik takvimi incelemek için şu linke göz atabilirsiniz:',
+            'https://yuksekihtisasuniversitesi.edu.tr/tr/akademik/akademik-takvimler',
+            '',
+            '> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+        ].join('\n')
+        expect(sendOutbound).toHaveBeenCalledWith(expectedReply)
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: expectedReply
+        }))
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 

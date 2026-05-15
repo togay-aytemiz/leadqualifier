@@ -64,6 +64,70 @@ function isRagNoAnswerResponse(response: string | null | undefined) {
     }
 }
 
+function normalizeSourceUrl(value: unknown) {
+    const raw = readTrimmedString(value)
+    if (!raw) return null
+    const compacted = raw.replace(/\s+/g, '')
+    try {
+        const parsed = new URL(compacted)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+        return parsed.toString()
+    } catch {
+        return null
+    }
+}
+
+function collectRagSourceUrls(chunks: unknown[]) {
+    const urls: string[] = []
+    const seen = new Set<string>()
+
+    for (const chunk of chunks) {
+        if (!isRecord(chunk)) continue
+        const sourceUrl = normalizeSourceUrl(chunk.source_url ?? chunk.sourceUrl)
+        if (!sourceUrl || seen.has(sourceUrl)) continue
+
+        seen.add(sourceUrl)
+        urls.push(sourceUrl)
+        if (urls.length >= 2) break
+    }
+
+    return urls
+}
+
+function stripRagUrlArtifacts(response: string) {
+    let stripped = response
+        .replace(/\[([^\]\n]+)]\(\s*https?:\/\/[\s\S]*?\)/gi, '$1')
+
+    if (/https?:\/\/\s/i.test(stripped)) {
+        stripped = stripped.replace(/https?:\/\/[\s\S]*$/i, '')
+    } else {
+        stripped = stripped.replace(/https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi, '')
+    }
+
+    return stripped
+        .replace(/\s+([,.;!?])/g, '$1')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim()
+}
+
+function appendCanonicalRagSourceLinks(response: string, chunks: unknown[]) {
+    if (!/https?:\/\//i.test(response)) return response
+
+    const sourceUrls = collectRagSourceUrls(chunks)
+    if (sourceUrls.length === 0) return response
+
+    const responseWithoutUrlArtifacts = stripRagUrlArtifacts(response)
+    return [
+        responseWithoutUrlArtifacts,
+        ...sourceUrls
+    ]
+        .filter(Boolean)
+        .join('\n')
+        .trim()
+}
+
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
 
 export interface InboundAiPipelineInput {
@@ -1261,8 +1325,8 @@ Answer the user's question based strictly on the provided context below.
 Treat document titles, section labels, and source URLs in the context as valid evidence.
 If a relevant context chunk partially answers the question, answer the known part and say only the missing detail is not in the knowledge base.
 For find, view, where, or link requests, a matching source URL is enough to answer.
-Do not use Markdown links like [label](url). When sharing a link, write the full raw URL.
-Copy source URLs exactly and never insert spaces inside a URL.
+Do not use Markdown links like [label](url). When sharing a link, put the full raw URL on its own final line.
+Copy source URLs exactly and never insert spaces inside a URL. Do not add punctuation or words after the URL.
 When several chunks are similar, prefer the one that matches the user wording most closely, such as student vs staff or a specific department name.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
@@ -1297,6 +1361,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
                     })
                     : ''
+                const finalRagResponse = appendCanonicalRagSourceLinks(guardedRagResponse, chunks)
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                 const ragUsage = completion.usage
                     ? {
@@ -1306,8 +1371,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     }
                     : {
                         inputTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(options.text),
-                        outputTokens: estimateTokenCount(guardedRagResponse ?? ''),
-                        totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(options.text) + estimateTokenCount(guardedRagResponse ?? '')
+                        outputTokens: estimateTokenCount(finalRagResponse ?? ''),
+                        totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(options.text) + estimateTokenCount(finalRagResponse ?? '')
                     }
 
                 await recordAiUsage({
@@ -1325,11 +1390,11 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 })
 
                 if (
-                    guardedRagResponse
+                    finalRagResponse
                     && !isRagNoAnswerResponse(ragResponse)
-                    && !isRagNoAnswerResponse(guardedRagResponse)
+                    && !isRagNoAnswerResponse(finalRagResponse)
                 ) {
-                    const formattedRagReply = formatOutboundBotMessage(guardedRagResponse)
+                    const formattedRagReply = formatOutboundBotMessage(finalRagResponse)
                     const outboundMetadata = await sendOutboundAndCollectMetadata(formattedRagReply)
                     await persistBotMessage(formattedRagReply, {
                         ...outboundMetadata,

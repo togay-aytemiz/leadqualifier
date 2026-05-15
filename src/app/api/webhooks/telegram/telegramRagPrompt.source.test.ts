@@ -7,6 +7,8 @@ describe('Telegram RAG prompt source guard', () => {
 
         expect(source).toContain('Treat document titles, section labels, and source URLs in the context as valid evidence.')
         expect(source).toContain('Do not use Markdown links like [label](url).')
+        expect(source).toContain('put the full raw URL on its own final line')
         expect(source).toContain('Copy source URLs exactly and never insert spaces inside a URL.')
+        expect(source).toContain('Do not add punctuation or words after the URL.')
     })
 })

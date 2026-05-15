@@ -14,20 +14,54 @@ function normalizeUrlWhitespace(rawUrl: string) {
     return rawUrl.replace(/\s+/g, '').trim()
 }
 
+function splitTrailingUrlPunctuation(url: string) {
+    const trailingPunctuation = url.match(/[.,;:!?]+$/)?.[0] ?? ''
+    if (!trailingPunctuation) {
+        return { url, trailingPunctuation: '' }
+    }
+
+    return {
+        url: url.slice(0, -trailingPunctuation.length),
+        trailingPunctuation
+    }
+}
+
+function formatRawUrlForPlainChat(rawUrl: string) {
+    const compacted = normalizeUrlWhitespace(rawUrl)
+    const { url, trailingPunctuation } = splitTrailingUrlPunctuation(compacted)
+    const repairedUrl = url || compacted
+    const hadWhitespace = /\s/.test(rawUrl)
+
+    if (!hadWhitespace && !trailingPunctuation) {
+        return repairedUrl
+    }
+
+    return `\n${repairedUrl}\n`
+}
+
 export function normalizeMarkdownLinksForPlainChat(content: string) {
-    return content.replace(/\[([^\]\n]+)]\(\s*(https?:\/\/[^)\n]+?)\s*\)/gi, (_match, rawLabel: string, rawUrl: string) => {
+    return content.replace(/\[([^\]\n]+)]\(\s*(https?:\/\/[\s\S]*?)\s*\)/gi, (_match, rawLabel: string, rawUrl: string) => {
         const label = rawLabel.trim()
         const url = normalizeUrlWhitespace(rawUrl)
         if (!label || label === url) return url
+        if (/\s/.test(rawUrl)) return `${label}:\n${url}\n`
         return `${label}: ${url}`
     })
 }
 
 function normalizeRawUrlsForPlainChat(content: string) {
     return content.replace(
-        /https?:\/\/[A-Za-z0-9-]+(?:\s*\.\s*[A-Za-z0-9-]+)+(?:[/?#][^\s<>()\]]*)?/gi,
-        (rawUrl: string) => normalizeUrlWhitespace(rawUrl)
+        /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi,
+        (rawUrl: string) => formatRawUrlForPlainChat(rawUrl)
     )
+}
+
+function normalizeUrlLineBreaks(content: string) {
+    return content
+        .replace(/[ \t]*\n[ \t]*/g, '\n')
+        .replace(/\n[.,;:!?]+(?=\n|$)/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
 }
 
 function convertDoubleStarToSingleStar(content: string) {
@@ -86,7 +120,9 @@ export function formatOutboundTextForChannel(content: string, options: OutboundT
         return content
     }
 
-    const withPlainLinks = normalizeInlineBullets(normalizeRawUrlsForPlainChat(normalizeMarkdownLinksForPlainChat(content)))
+    const withPlainLinks = normalizeUrlLineBreaks(
+        normalizeInlineBullets(normalizeRawUrlsForPlainChat(normalizeMarkdownLinksForPlainChat(content)))
+    )
 
     if (options.platform === 'whatsapp') {
         return normalizeBotDisclaimerFooter(convertDoubleStarToSingleStar(withPlainLinks), {

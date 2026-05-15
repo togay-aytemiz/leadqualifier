@@ -301,6 +301,10 @@ export async function simulateChat(
             const systemPrompt = `${basePrompt}
 
 Answer the user's question based strictly on the provided context below.
+Treat document titles, section labels, and source URLs in the context as valid evidence.
+For find, view, where, or link requests, a matching source URL is enough to answer.
+Do not use Markdown links like [label](url). When sharing a link, put the full raw URL on its own final line.
+Copy source URLs exactly and never insert spaces inside a URL. Do not add punctuation or words after the URL.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
 Keep the answer concise and friendly.

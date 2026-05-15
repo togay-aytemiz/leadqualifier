@@ -8,7 +8,7 @@ describe('formatOutboundTextForChannel', () => {
             { platform: 'whatsapp' }
         )
 
-        expect(formatted).toBe('*Tıp Fakültesi:* Detaylar için sayfayı aç: https://example.com/tip.')
+        expect(formatted).toBe('*Tıp Fakültesi:* Detaylar için sayfayı aç:\nhttps://example.com/tip')
     })
 
     it('converts spaced Markdown URLs into raw clickable WhatsApp links', () => {
@@ -18,7 +18,18 @@ describe('formatOutboundTextForChannel', () => {
         )
 
         expect(formatted).toBe(
-            '2025-2026 Eğitim Öğretim Yılı Akademik Takvimine şu linkten ulaşabilirsiniz: 2025-2026 Eğitim Öğretim Yılı Akademik Takvimi: https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2025-2026-egitim-ogretim-yili-akademik-takvimi.'
+            '2025-2026 Eğitim Öğretim Yılı Akademik Takvimine şu linkten ulaşabilirsiniz: 2025-2026 Eğitim Öğretim Yılı Akademik Takvimi:\nhttps://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2025-2026-egitim-ogretim-yili-akademik-takvimi'
+        )
+    })
+
+    it('converts newline-wrapped Markdown URLs into isolated raw WhatsApp links', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Güncel akademik takvim için [akademik takvim](https://yuksekihtisasuniversitesi.edu.tr/tr/akademik/\nakademik-takvim) bağlantısını inceleyebilirsiniz.',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'Güncel akademik takvim için akademik takvim:\nhttps://yuksekihtisasuniversitesi.edu.tr/tr/akademik/akademik-takvim\nbağlantısını inceleyebilirsiniz.'
         )
     })
 
@@ -29,8 +40,39 @@ describe('formatOutboundTextForChannel', () => {
         )
 
         expect(formatted).toBe(
-            'Akademik takvim: https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim üzerinden açabilirsiniz.'
+            'Akademik takvim:\nhttps://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim\nüzerinden açabilirsiniz.'
         )
+    })
+
+    it('repairs whitespace inside raw URL paths without swallowing Turkish prose', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Final tarihleri için https://yuksekihtisasuniversitesi.edu.tr/tr/akademik/\nakademik-takvim üzerinden bilgi alabilirsiniz.',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'Final tarihleri için\nhttps://yuksekihtisasuniversitesi.edu.tr/tr/akademik/akademik-takvim\nüzerinden bilgi alabilirsiniz.'
+        )
+    })
+
+    it('repairs whitespace before a raw URL path slash', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Takvim: https://example.edu.tr /akademik-takvim üzerinden açılır.',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'Takvim:\nhttps://example.edu.tr/akademik-takvim\nüzerinden açılır.'
+        )
+    })
+
+    it('keeps trailing punctuation outside raw WhatsApp URL tokens', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Akademik takvim: https://example.edu.tr/akademik-takvim.',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe('Akademik takvim:\nhttps://example.edu.tr/akademik-takvim')
     })
 
     it('keeps WhatsApp bot disclaimers on a separate quoted footer line', () => {
@@ -61,7 +103,7 @@ describe('formatOutboundTextForChannel', () => {
             { platform: 'instagram' }
         )
 
-        expect(formatted).toBe('Tıp Fakültesi:\nDetaylar için sayfayı aç: https://example.com/tip.')
+        expect(formatted).toBe('Tıp Fakültesi:\nDetaylar için sayfayı aç:\nhttps://example.com/tip')
     })
 
     it('keeps Instagram bot disclaimers on a separate quoted footer line', () => {
