@@ -37,6 +37,7 @@ import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/sk
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { maybeHandleSchedulingRequest } from '@/lib/ai/booking'
 import { withAiTimeout } from '@/lib/ai/deadline'
+import { formatOutboundTextForChannel } from '@/lib/channels/outbound-text-format'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -61,15 +62,6 @@ function isRagNoAnswerResponse(response: string | null | undefined) {
     } catch {
         return false
     }
-}
-
-function normalizeMarkdownLinksForPlainChat(content: string) {
-    return content.replace(/\[([^\]\n]+)]\((https?:\/\/[^)\s]+)\)/gi, (_match, rawLabel: string, rawUrl: string) => {
-        const label = rawLabel.trim()
-        const url = rawUrl.trim()
-        if (!label || label === url) return url
-        return `${label}: ${url}`
-    })
 }
 
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
@@ -549,12 +541,15 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         supabase: options.supabase,
         failClosedBotMode: true
     })
-    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
-        message: normalizeMarkdownLinksForPlainChat(content),
-        platform: options.platform,
-        responseLanguage,
-        settings: aiSettings
-    })
+    const formatOutboundBotMessage = (content: string) => {
+        const withDisclaimer = applyBotMessageDisclaimer({
+            message: content,
+            platform: options.platform,
+            responseLanguage,
+            settings: aiSettings
+        })
+        return formatOutboundTextForChannel(withDisclaimer, { platform: options.platform })
+    }
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
     const requiredIntakeFields = await getRequiredIntakeFields({

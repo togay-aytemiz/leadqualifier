@@ -35,6 +35,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { withAiTimeout } from '@/lib/ai/deadline'
+import { formatOutboundTextForChannel } from '@/lib/channels/outbound-text-format'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -319,12 +320,15 @@ export async function POST(req: NextRequest) {
         supabase,
         failClosedBotMode: true
     })
-    const formatOutboundBotMessage = (content: string) => applyBotMessageDisclaimer({
-        message: content,
-        platform: 'telegram',
-        responseLanguage,
-        settings: aiSettings
-    })
+    const formatOutboundBotMessage = (content: string) => {
+        const withDisclaimer = applyBotMessageDisclaimer({
+            message: content,
+            platform: 'telegram',
+            responseLanguage,
+            settings: aiSettings
+        })
+        return formatOutboundTextForChannel(withDisclaimer, { platform: 'telegram' })
+    }
     const matchThreshold = aiSettings.match_threshold
     const kbThreshold = matchThreshold
     const requiredIntakeFields = await getRequiredIntakeFields({ organizationId: orgId, supabase })

@@ -4589,7 +4589,7 @@ export function InboxContainer({
                                     </div>
                                   )}
                                   {renderMessageText && (
-                                    <div className={media ? 'mt-2' : undefined}>
+                                    <div className={cn('whitespace-pre-wrap text-left', media && 'mt-2')}>
                                       {renderMessageText}
                                     </div>
                                   )}
@@ -4736,7 +4736,7 @@ export function InboxContainer({
                                   </div>
                                 )}
                                 {renderMessageText && (
-                                  <div className={media ? 'mt-2 text-right' : undefined}>
+                                  <div className={cn('whitespace-pre-wrap text-left', media && 'mt-2')}>
                                     {renderMessageText}
                                   </div>
                                 )}

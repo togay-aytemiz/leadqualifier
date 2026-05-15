@@ -1,5 +1,11 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-15):** Outbound bot text is now normalized for messenger channels before it is sent and persisted. WhatsApp converts `**bold**` to single-star emphasis, Instagram strips Markdown markers, Telegram defaults to plain text when no parse mode is configured, full raw URLs are preserved, and inline dash-separated RAG lists are broken into readable message bullets. Inbox message bubbles preserve those line breaks with `whitespace-pre-wrap`.
+
+> **Update Note (2026-05-15):** Bot disclaimer formatting now treats the footer as app-owned only. Outbound formatting strips any trailing LLM/Skill/KB-generated AI-disclaimer artifact before appending the configured footer, preventing duplicated WhatsApp/Telegram/Instagram disclaimer text and removing model-supplied footers even when the org-level disclaimer toggle is off.
+
+> **Update Note (2026-05-15):** The post-onboarding bot-mode choice modal now presents the explicit choices in the same order as the sidebar quick switch: `Aktif` first, `Dinleyici` second, and `Şimdilik kapalı kalsın` last. The cards use the matching sidebar status tones (`emerald`, `amber`, `rose`) so operators can understand the impact of each choice at a glance.
+
 > **Update Note (2026-05-15):** Onboarding progress shown in dashboard chrome must stay synchronized with the dedicated `/onboarding` page even when the Next.js dashboard layout remains mounted across route transitions. The onboarding page now publishes its fresh checklist snapshot to desktop sidebar and mobile `Other` navigation so shell progress cannot lag behind page progress such as `4/5` vs `3/5`.
 
 > **Update Note (2026-05-15):** Website-crawl Knowledge imports now support real Supabase ingestion, not only dry-run chunk reports. The importer can create/reuse a crawl-specific Knowledge folder, prevent accidental duplicate imports unless `--replace` is explicit, write documents as `processing`, embed and insert chunks, mark documents `ready`, and verify imported page/chunk counts for a target organization.
@@ -253,7 +259,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-15 (Onboarding shell progress now syncs with fresh `/onboarding` page state.)
+> **Last Updated:** 2026-05-15 (Messenger-channel bot replies now normalize Markdown, inline bullets, and raw URLs before send/persist.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -798,6 +804,8 @@
 - [x] **AI Settings:** Configurable bot name (org-level)
 - [x] **AI Settings:** Channel-wide bot disclaimer toggle + localized TR/EN disclaimer text (default enabled)
 - [x] **Bot Reply Formatting:** Outbound bot replies append disclaimer footer text when enabled; WhatsApp/Telegram keep blockquote format (`\n\n> ...`), while Instagram uses a separated footer (`\n\n------\n> ...`) because native quote styling is unavailable there
+- [x] **Bot Disclaimer De-duplication:** Strip trailing model-supplied disclaimer artifacts before applying the app-owned footer so customer-facing messages contain the AI disclaimer at most once
+- [x] **Channel-Aware Text Formatting:** Normalize outgoing bot text for WhatsApp, Instagram, and Telegram by preserving raw URLs, cleaning unsupported Markdown, and converting inline dash-separated RAG lists into readable message bullets before send/persist
 - [x] **Escalation Controls**
   - [x] AI Settings Escalation tab: two primary sections (`Automatic Escalation` + `Skill Based Handover`), hot lead score slider, action cards, and locale-aware handover message
   - [x] Skill-level `Requires Human Handover` toggle with read-only message preview

@@ -34,4 +34,22 @@ describe('OnboardingCompletionModal source', () => {
     expect(source).not.toContain('öner')
     expect(source).not.toContain('badge:')
   })
+
+  it('puts active first and colors each choice with the sidebar bot-mode tones', () => {
+    const source = fs.readFileSync(FILE_PATH, 'utf8')
+
+    const activeIndex = source.indexOf("key: 'active'")
+    const shadowIndex = source.indexOf("key: 'shadow'")
+    const offIndex = source.indexOf("key: 'off'")
+
+    expect(activeIndex).toBeGreaterThan(-1)
+    expect(shadowIndex).toBeGreaterThan(activeIndex)
+    expect(offIndex).toBeGreaterThan(shadowIndex)
+    expect(source).toContain("tone: 'emerald'")
+    expect(source).toContain("tone: 'amber'")
+    expect(source).toContain("tone: 'rose'")
+    expect(source).toContain('border-emerald-200 bg-emerald-50')
+    expect(source).toContain('border-amber-200 bg-amber-50')
+    expect(source).toContain('border-rose-200 bg-rose-50')
+  })
 })

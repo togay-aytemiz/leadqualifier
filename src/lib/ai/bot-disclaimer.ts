@@ -39,6 +39,46 @@ function formatDisclaimerBlock(platform: BotDisclaimerPlatform | undefined, disc
     return `> ${disclaimerMessage}`
 }
 
+function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function resolveKnownDisclaimerMessages(settings: BotDisclaimerSettings) {
+    return Array.from(new Set([
+        DEFAULT_BOT_DISCLAIMER_MESSAGE_TR,
+        DEFAULT_BOT_DISCLAIMER_MESSAGE_EN,
+        (settings.bot_disclaimer_message_tr ?? '').toString().trim(),
+        (settings.bot_disclaimer_message_en ?? '').toString().trim()
+    ].filter(Boolean)))
+}
+
+function stripModelSuppliedDisclaimerArtifacts(
+    message: string,
+    settings: BotDisclaimerSettings
+) {
+    let stripped = message.replace(/\r\n/g, '\n').trim()
+    if (!stripped) return stripped
+
+    const disclaimerMessages = resolveKnownDisclaimerMessages(settings)
+    let previous = ''
+
+    while (stripped && stripped !== previous) {
+        previous = stripped
+
+        for (const disclaimerMessage of disclaimerMessages) {
+            const escapedMessage = escapeRegExp(disclaimerMessage)
+            const trailingDisclaimerPattern = new RegExp(
+                `(?:\\s*(?:-{4,}\\s*)?\\n?\\s*>?\\s*${escapedMessage}\\s*[.!?]*)+$`,
+                'i'
+            )
+
+            stripped = stripped.replace(trailingDisclaimerPattern, '').trim()
+        }
+    }
+
+    return stripped
+}
+
 function resolveDisclaimerLanguage(message: string, responseLanguage: MvpResponseLanguage): MvpResponseLanguage {
     if (isMvpResponseLanguageAmbiguous(message)) return responseLanguage
     return resolveMvpResponseLanguage(message)
@@ -50,7 +90,7 @@ export function applyBotMessageDisclaimer(options: {
     platform?: BotDisclaimerPlatform
     settings: BotDisclaimerSettings
 }) {
-    const baseMessage = options.message.trim()
+    const baseMessage = stripModelSuppliedDisclaimerArtifacts(options.message, options.settings)
     if (!baseMessage) return ''
 
     if (options.settings.bot_disclaimer_enabled === false) {

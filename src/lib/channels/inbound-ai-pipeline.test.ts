@@ -1265,7 +1265,7 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(escalationUpdate.updateMock).toHaveBeenCalled()
     })
 
-    it('uses instagram disclaimer formatting for instagram bot replies', async () => {
+    it('uses plain-text instagram disclaimer formatting for instagram bot replies', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
         const lookup = createConversationLookupBuilder(createConversation({ platform: 'instagram' }))
@@ -1298,11 +1298,11 @@ describe('processInboundAiPipeline guardrails', () => {
             }
         }))
 
-        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\n------\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).toHaveBeenCalledWith('Skill response\n\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(botInsert.insertMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 sender_type: 'bot',
-                content: 'Skill response\n\n------\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+                content: 'Skill response\n\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
             })
         )
     })
@@ -1891,6 +1891,77 @@ describe('processInboundAiPipeline guardrails', () => {
 
         expect(sendOutbound).toHaveBeenCalledWith('Elbette, cilt bakımı ve lazer epilasyon hizmetlerimiz mevcut.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('formats RAG inline bullets before sending and persisting the bot reply', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'Tıp Fakültesi eğitimi nasıl?',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Tıp Fakültesi eğitimi',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'Tıp Fakültesi eğitiminde dersler, klinik beceri eğitimi ve staj uygulamaları bulunur.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'Tıp Fakültesi eğitiminde dersler, klinik beceri eğitimi ve staj uygulamaları bulunur.',
+            chunks: [{
+                document_id: 'doc-1',
+                content: 'Tıp Fakültesi eğitiminde dersler, klinik beceri eğitimi ve staj uygulamaları bulunur.'
+            }],
+            tokenCount: 10
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{
+                message: {
+                    content: 'Eğitim süreci şu şekildedir: - **Dersler:** Temel tıp bilimleri verilir. - **Klinik Beceri Eğitimi:** Birinci sınıftan itibaren başlar. - **Staj ve Klinik Uygulamalar:** Sağlık kuruluşlarında yapılır.'
+                }
+            }]
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Tıp Fakültesi eğitimi nasıl?' })
+        )
+
+        const expectedReply = 'Eğitim süreci şu şekildedir:\n- *Dersler:* Temel tıp bilimleri verilir.\n- *Klinik Beceri Eğitimi:* Birinci sınıftan itibaren başlar.\n- *Staj ve Klinik Uygulamalar:* Sağlık kuruluşlarında yapılır.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+        expect(sendOutbound).toHaveBeenCalledWith(expectedReply)
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: expectedReply
+        }))
     })
 
     it('routes lowercase RAG no_answer responses to fallback instead of sending them', async () => {

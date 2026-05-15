@@ -88,7 +88,7 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
 
                             <div className={`flex flex-col space-y-1 max-w-xl ${isMe || isBot ? 'items-end' : ''}`}>
                                 <div className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${getInboxMessageBubbleClasses(msg.sender_type)}`}>
-                                    <p>{msg.content}</p>
+                                    <p className="whitespace-pre-wrap text-left">{msg.content}</p>
                                 </div>
                                 <span className="text-[10px] text-gray-400">
                                     {format(new Date(msg.created_at), 'HH:mm')}

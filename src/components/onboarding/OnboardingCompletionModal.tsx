@@ -16,6 +16,40 @@ interface OnboardingCompletionModalProps {
 }
 
 type BotModeChoice = Extract<AiBotMode, 'active' | 'shadow' | 'off'>
+type BotModeChoiceTone = 'emerald' | 'amber' | 'rose'
+
+const botModeChoiceToneClassMap: Record<
+  BotModeChoiceTone,
+  {
+    card: string
+    icon: string
+    dot: string
+    title: string
+    body: string
+  }
+> = {
+  emerald: {
+    card: 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100/70',
+    icon: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/70',
+    dot: 'bg-emerald-500',
+    title: 'text-emerald-950',
+    body: 'text-emerald-800',
+  },
+  amber: {
+    card: 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70',
+    icon: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200/70',
+    dot: 'bg-amber-500',
+    title: 'text-amber-950',
+    body: 'text-amber-800',
+  },
+  rose: {
+    card: 'border-rose-200 bg-rose-50 hover:border-rose-300 hover:bg-rose-100/70',
+    icon: 'bg-rose-100 text-rose-700 ring-1 ring-rose-200/70',
+    dot: 'bg-rose-500',
+    title: 'text-rose-950',
+    body: 'text-rose-800',
+  },
+}
 
 export function OnboardingCompletionModal({
   organizationId,
@@ -55,20 +89,23 @@ export function OnboardingCompletionModal({
     icon: ReactNode
     title: string
     body: string
+    tone: BotModeChoiceTone
   }> = [
-    {
-      key: 'shadow',
-      selectedMode: 'shadow',
-      icon: <Ear size={18} />,
-      title: t('options.shadow.title'),
-      body: t('options.shadow.body'),
-    },
     {
       key: 'active',
       selectedMode: 'active',
       icon: <Sparkles size={18} />,
       title: t('options.active.title'),
       body: t('options.active.body'),
+      tone: 'emerald',
+    },
+    {
+      key: 'shadow',
+      selectedMode: 'shadow',
+      icon: <Ear size={18} />,
+      title: t('options.shadow.title'),
+      body: t('options.shadow.body'),
+      tone: 'amber',
     },
     {
       key: 'off',
@@ -76,6 +113,7 @@ export function OnboardingCompletionModal({
       icon: <Power size={18} />,
       title: t('options.off.title'),
       body: t('options.off.body'),
+      tone: 'rose',
     },
   ]
 
@@ -95,6 +133,8 @@ export function OnboardingCompletionModal({
 
         <div className="mt-6 grid gap-3 lg:grid-cols-3">
           {options.map((option) => {
+            const toneClasses = botModeChoiceToneClassMap[option.tone]
+
             return (
               <button
                 key={option.key}
@@ -102,18 +142,25 @@ export function OnboardingCompletionModal({
                 disabled={isPending}
                 onClick={() => handleSelect(option.selectedMode)}
                 className={cn(
-                  'rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70'
+                  'rounded-2xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-70',
+                  toneClasses.card
                 )}
               >
-                <span
-                  className={cn(
-                    'inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700'
-                  )}
-                >
-                  {option.icon}
-                </span>
-                <p className="mt-4 text-base font-semibold text-slate-900">{option.title}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{option.body}</p>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      'inline-flex h-10 w-10 items-center justify-center rounded-2xl',
+                      toneClasses.icon
+                    )}
+                  >
+                    {option.icon}
+                  </span>
+                  <span className={cn('h-2.5 w-2.5 rounded-full', toneClasses.dot)} />
+                </div>
+                <p className={cn('mt-4 text-base font-semibold', toneClasses.title)}>
+                  {option.title}
+                </p>
+                <p className={cn('mt-2 text-sm leading-6', toneClasses.body)}>{option.body}</p>
               </button>
             )
           })}
