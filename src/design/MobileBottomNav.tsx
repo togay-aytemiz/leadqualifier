@@ -49,6 +49,10 @@ import { formatSidebarBillingCredits, formatSidebarBillingDate } from '@/lib/bil
 import { resolveWorkspaceAccessState } from '@/lib/billing/workspace-access'
 import { resolveBillingLockedNavItem } from '@/lib/billing/navigation-lock'
 import type { OrganizationOnboardingShellState } from '@/lib/onboarding/state'
+import {
+  listenForOnboardingStateUpdates,
+  shouldApplyOnboardingStateUpdate,
+} from '@/lib/onboarding/events'
 
 interface NavItem {
   id: Exclude<MobileNavItemId, 'other'>
@@ -89,6 +93,9 @@ export function MobileBottomNav({
         }
       : null
   )
+  const [syncedOnboardingState, setSyncedOnboardingState] =
+    useState<OrganizationOnboardingShellState | null>(onboardingState)
+  const effectiveOnboardingState = syncedOnboardingState ?? onboardingState
 
   const { activePath } = useDashboardRouteState(pathname)
   const activeItem = resolveMobileNavActiveItem(activePath)
@@ -200,6 +207,19 @@ export function MobileBottomNav({
     mediaQuery.addListener(syncViewport)
     return () => mediaQuery.removeListener(syncViewport)
   }, [])
+
+  useEffect(() => {
+    setSyncedOnboardingState(onboardingState)
+  }, [onboardingState])
+
+  useEffect(() => {
+    if (isDesktopViewport !== false) return
+
+    return listenForOnboardingStateUpdates((detail) => {
+      if (!shouldApplyOnboardingStateUpdate(activeOrganizationId, detail)) return
+      setSyncedOnboardingState(detail.onboardingState ?? null)
+    })
+  }, [activeOrganizationId, isDesktopViewport])
 
   useEffect(() => {
     if (!shouldEnableManualRoutePrefetch('app-shell')) return
@@ -578,7 +598,7 @@ export function MobileBottomNav({
               )}
             </div>
             <div className="mt-3 space-y-1">
-              {onboardingState?.showNavigationEntry && (
+              {effectiveOnboardingState?.showNavigationEntry && (
                 <Link
                   href="/onboarding"
                   prefetch={false}

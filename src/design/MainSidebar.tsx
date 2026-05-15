@@ -94,6 +94,10 @@ import {
   shouldRefreshInboxUnreadIndicator,
 } from '@/lib/inbox/unread-events'
 import {
+  listenForOnboardingStateUpdates,
+  shouldApplyOnboardingStateUpdate,
+} from '@/lib/onboarding/events'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -257,6 +261,9 @@ export function MainSidebar({
   const [isOrgPickerOpen, setIsOrgPickerOpen] = useState(false)
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean | null>(null)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
+  const [syncedOnboardingState, setSyncedOnboardingState] =
+    useState<OrganizationOnboardingShellState | null>(onboardingState)
+  const effectiveOnboardingState = syncedOnboardingState ?? onboardingState
   const localePrefixMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
   const localePrefix =
     localePrefixMatch && localePrefixMatch[1] !== 'tr' ? `/${localePrefixMatch[1]}` : ''
@@ -511,6 +518,19 @@ export function MainSidebar({
   useEffect(() => {
     setOrganizationId(activeOrganizationId)
   }, [activeOrganizationId])
+
+  useEffect(() => {
+    setSyncedOnboardingState(onboardingState)
+  }, [onboardingState])
+
+  useEffect(() => {
+    if (isDesktopViewport !== true) return
+
+    return listenForOnboardingStateUpdates((detail) => {
+      if (!shouldApplyOnboardingStateUpdate(organizationId, detail)) return
+      setSyncedOnboardingState(detail.onboardingState ?? null)
+    })
+  }, [isDesktopViewport, organizationId])
 
   useEffect(() => {
     const normalizedOrganizations = sortOrganizations(organizations)
@@ -976,7 +996,7 @@ export function MainSidebar({
   )
   const shouldRestrictToBilling = workspaceAccess.isLocked && !isSystemAdmin
   const isBotModeLockedByOnboarding =
-    botModeUnlockRequired || onboardingState?.isComplete === false
+    botModeUnlockRequired || effectiveOnboardingState?.isComplete === false
   const effectiveBotMode = resolveMainSidebarBotMode({
     botMode,
     isWorkspaceLocked: shouldRestrictToBilling || isBotModeLockedByOnboarding,
@@ -1092,13 +1112,15 @@ export function MainSidebar({
     if (isBotModeLoading) return tSidebar('botStatusQuickSwitchSaving')
     if (readOnlyTenantMode) return tSidebar('botStatusQuickSwitchReadOnly')
     if (shouldRestrictToBilling) return tSidebar('botStatusQuickSwitchLocked')
-    if (onboardingState?.isComplete === false) return tSidebar('botStatusQuickSwitchOnboardingLocked')
+    if (effectiveOnboardingState?.isComplete === false) {
+      return tSidebar('botStatusQuickSwitchOnboardingLocked')
+    }
     if (isBotModeLockedByOnboarding) return tSidebar('botStatusQuickSwitchOnboardingLocked')
     return tSidebar('botStatusQuickSwitchHelp')
   }, [
     isBotModeLoading,
     isBotModeLockedByOnboarding,
-    onboardingState?.isComplete,
+    effectiveOnboardingState?.isComplete,
     readOnlyTenantMode,
     shouldRestrictToBilling,
     tSidebar
@@ -1343,10 +1365,10 @@ export function MainSidebar({
     []
   )
   const isOnboardingActive = activePath.startsWith('/onboarding')
-  const onboardingHighlightProgressLabel = onboardingState
+  const onboardingHighlightProgressLabel = effectiveOnboardingState
     ? tSidebar('onboardingProgress', {
-        completed: String(onboardingState.completedSteps),
-        total: String(onboardingState.totalSteps),
+        completed: String(effectiveOnboardingState.completedSteps),
+        total: String(effectiveOnboardingState.totalSteps),
       })
     : ''
 
@@ -1810,7 +1832,7 @@ export function MainSidebar({
 
       <nav className="flex-1 px-3 pt-3">
         <div className={cn('space-y-4', !collapsed && 'space-y-5')}>
-          {onboardingState?.showNavigationEntry &&
+          {effectiveOnboardingState?.showNavigationEntry &&
             (collapsed ? (
               <SidebarHoverTooltip
                 className="flex justify-center"

@@ -4,6 +4,8 @@ import path from 'node:path'
 const DEFAULT_MAX_TOKENS = 650
 const DEFAULT_OVERLAP_TOKENS = 100
 const DEFAULT_SAMPLE_LIMIT = 5
+const DEFAULT_IMPORT_BATCH_SIZE = 50
+const DEFAULT_EMBEDDING_BATCH_SIZE = 64
 const DEFAULT_BOILERPLATE_LINES = new Set([
     'Kapat',
     'Web Asistan Menü',
@@ -353,7 +355,65 @@ function numberSummary(values) {
     }
 }
 
-export async function buildDryRunReport(options = {}) {
+function chunkArray(values, size) {
+    const safeSize = Number.isFinite(size) && size > 0 ? Math.floor(size) : DEFAULT_IMPORT_BATCH_SIZE
+    const chunks = []
+
+    for (let index = 0; index < values.length; index += safeSize) {
+        chunks.push(values.slice(index, index + safeSize))
+    }
+
+    return chunks
+}
+
+function formatEmbeddingForPgvector(embedding) {
+    return `[${embedding.join(',')}]`
+}
+
+function normalizeEmbeddingResult(result) {
+    if (Array.isArray(result)) {
+        return {
+            embeddings: result,
+            promptTokens: null
+        }
+    }
+
+    return {
+        embeddings: result?.embeddings ?? [],
+        promptTokens: Number.isFinite(result?.promptTokens) ? result.promptTokens : null
+    }
+}
+
+function buildDocumentContent(page) {
+    const header = [
+        `Page Title: ${page.title}`,
+        page.sourceUrl ? `Source URL: ${page.sourceUrl}` : null,
+        page.crawledAt ? `Crawled At: ${page.crawledAt}` : null,
+        page.corpusPath ? `Corpus Path: ${page.corpusPath}` : null
+    ].filter(Boolean).join('\n')
+
+    return `${header}\n\n${normalizeWhitespace(page.content)}`.trim()
+}
+
+function hostnameFromSourceUrl(sourceUrl) {
+    try {
+        return new URL(sourceUrl).hostname.replace(/^www\./, '')
+    } catch {
+        return ''
+    }
+}
+
+function defaultCollectionName(pageChunks, crawlOutputDir) {
+    const firstHost = pageChunks
+        .map((entry) => hostnameFromSourceUrl(entry.page.sourceUrl))
+        .find(Boolean)
+
+    if (firstHost) return `Website Crawl - ${firstHost}`
+
+    return `Website Crawl - ${path.basename(crawlOutputDir)}`
+}
+
+export async function buildCrawlCorpus(options = {}) {
     const crawlOutputDir = options.crawlOutputDir
     if (!crawlOutputDir) {
         throw new Error('crawlOutputDir is required')
@@ -369,18 +429,19 @@ export async function buildDryRunReport(options = {}) {
     }))
     const pageReports = []
     const sampleChunks = []
+    const pageChunks = []
     let totalChunks = 0
-    let databaseWrites = 0
     const tokenCounts = []
 
     for (const page of pages) {
         const chunks = createWebsiteChunks(page, options)
-        if (chunks.length > 0) {
-            databaseWrites += 0
-        }
 
         totalChunks += chunks.length
         tokenCounts.push(...chunks.map((chunk) => chunk.tokenCount))
+        pageChunks.push({
+            page,
+            chunks
+        })
         pageReports.push({
             title: page.title,
             sourceUrl: page.sourceUrl,
@@ -415,7 +476,6 @@ export async function buildDryRunReport(options = {}) {
         pagesWithChunks,
         emptyPages: emptyPages.length,
         totalChunks,
-        databaseWrites,
         tokenSummary: numberSummary(tokenCounts),
         avgChunksPerPage: pageReports.length > 0 ? Number((totalChunks / pageReports.length).toFixed(2)) : 0,
         commonBoilerplateLines: commonBoilerplate.map((entry) => entry.line),
@@ -423,7 +483,319 @@ export async function buildDryRunReport(options = {}) {
         largestPages,
         sampleChunks,
         warnings: emptyPages.slice(0, 20).map((page) => `No chunks created for ${page.sourceUrl || page.corpusPath}`),
-        pages: pageReports
+        pages: pageReports,
+        pageChunks
+    }
+}
+
+export async function buildDryRunReport(options = {}) {
+    const corpus = await buildCrawlCorpus(options)
+
+    return {
+        ...corpus,
+        dryRun: true,
+        databaseWrites: 0
+    }
+}
+
+function assertRepository(repository) {
+    const requiredMethods = [
+        'getOrganization',
+        'findCollection',
+        'createCollection',
+        'deleteDocumentsByCollection',
+        'insertDocuments',
+        'insertChunks',
+        'updateDocumentsStatus'
+    ]
+
+    for (const method of requiredMethods) {
+        if (typeof repository?.[method] !== 'function') {
+            throw new Error(`Import repository is missing ${method}`)
+        }
+    }
+}
+
+async function resolveImportCollection({ repository, organizationId, collectionName, replace }) {
+    const existingCollection = await repository.findCollection({
+        organizationId,
+        name: collectionName
+    })
+
+    if (existingCollection && !replace) {
+        throw new Error(`Collection "${collectionName}" already exists. Re-run with --replace to delete its previous documents first.`)
+    }
+
+    if (existingCollection) {
+        await repository.deleteDocumentsByCollection({
+            organizationId,
+            collectionId: existingCollection.id
+        })
+        return existingCollection
+    }
+
+    return repository.createCollection({
+        organization_id: organizationId,
+        name: collectionName,
+        description: 'Imported website crawl corpus for RAG answers.',
+        icon: 'file-text'
+    })
+}
+
+async function importPageBatch({
+    batch,
+    batchIndex,
+    repository,
+    organizationId,
+    collectionId,
+    language,
+    embedTexts,
+    embeddingBatchSize,
+    crawlOutputDir,
+    skipUsage
+}) {
+    const documentRows = batch.map(({ page }) => ({
+        organization_id: organizationId,
+        collection_id: collectionId,
+        title: page.title || 'Untitled page',
+        type: 'article',
+        source: 'website_crawl',
+        content: buildDocumentContent(page),
+        language: language || null,
+        status: 'processing'
+    }))
+
+    const insertedDocuments = await repository.insertDocuments(documentRows)
+    if (!Array.isArray(insertedDocuments) || insertedDocuments.length !== batch.length) {
+        throw new Error(`Inserted document count mismatch for import batch ${batchIndex + 1}`)
+    }
+
+    const documentIds = insertedDocuments.map((document) => document.id)
+    let chunksImported = 0
+    let usageRows = 0
+
+    try {
+        const pendingChunks = []
+        batch.forEach((entry, pageIndex) => {
+            const document = insertedDocuments[pageIndex]
+            entry.chunks.forEach((chunk, chunkIndex) => {
+                pendingChunks.push({
+                    document_id: document.id,
+                    organization_id: organizationId,
+                    chunk_index: chunkIndex,
+                    content: chunk.content,
+                    token_count: chunk.tokenCount
+                })
+            })
+        })
+
+        for (const [embeddingBatchIndex, chunkBatch] of chunkArray(pendingChunks, embeddingBatchSize).entries()) {
+            const embeddingResult = normalizeEmbeddingResult(await embedTexts(chunkBatch.map((chunk) => chunk.content), {
+                batchIndex,
+                embeddingBatchIndex
+            }))
+            if (embeddingResult.embeddings.length !== chunkBatch.length) {
+                throw new Error(`Embedding count mismatch for import batch ${batchIndex + 1}.${embeddingBatchIndex + 1}`)
+            }
+
+            const rows = chunkBatch.map((chunk, index) => ({
+                ...chunk,
+                embedding: formatEmbeddingForPgvector(embeddingResult.embeddings[index] ?? [])
+            }))
+            await repository.insertChunks(rows)
+            chunksImported += rows.length
+
+            if (!skipUsage && embeddingResult.promptTokens && typeof repository.recordEmbeddingUsage === 'function') {
+                await repository.recordEmbeddingUsage({
+                    organization_id: organizationId,
+                    category: 'embedding',
+                    model: 'text-embedding-3-small',
+                    input_tokens: embeddingResult.promptTokens,
+                    output_tokens: 0,
+                    total_tokens: embeddingResult.promptTokens,
+                    metadata: {
+                        source: 'crawl_corpus_import',
+                        crawl_output_dir: crawlOutputDir,
+                        page_batch_index: batchIndex,
+                        embedding_batch_index: embeddingBatchIndex,
+                        chunk_count: rows.length
+                    }
+                })
+                usageRows += 1
+            }
+        }
+
+        await repository.updateDocumentsStatus(documentIds, 'ready')
+
+        return {
+            pagesImported: batch.length,
+            chunksImported,
+            usageRows
+        }
+    } catch (error) {
+        try {
+            await repository.updateDocumentsStatus(documentIds, 'error')
+        } catch {
+            // Keep the original import error.
+        }
+        throw error
+    }
+}
+
+export async function importCrawlCorpus(options = {}) {
+    const organizationId = String(options.organizationId ?? '').trim()
+    if (!organizationId) {
+        throw new Error('organizationId is required for real import')
+    }
+    if (typeof options.embedTexts !== 'function') {
+        throw new Error('embedTexts is required for real import')
+    }
+
+    const repository = options.repository
+    assertRepository(repository)
+
+    const organization = await repository.getOrganization(organizationId)
+    if (!organization) {
+        throw new Error(`Organization not found: ${organizationId}`)
+    }
+
+    const corpus = await buildCrawlCorpus(options)
+    const importablePageChunks = corpus.pageChunks.filter((entry) => entry.chunks.length > 0)
+    const collectionName = options.collectionName || defaultCollectionName(importablePageChunks, corpus.crawlOutputDir)
+    const collection = await resolveImportCollection({
+        repository,
+        organizationId,
+        collectionName,
+        replace: Boolean(options.replace)
+    })
+    const batchSize = Number(options.batchSize ?? DEFAULT_IMPORT_BATCH_SIZE)
+    const embeddingBatchSize = Number(options.embeddingBatchSize ?? DEFAULT_EMBEDDING_BATCH_SIZE)
+    let pagesImported = 0
+    let chunksImported = 0
+    let usageRows = 0
+
+    for (const [batchIndex, batch] of chunkArray(importablePageChunks, batchSize).entries()) {
+        const batchResult = await importPageBatch({
+            batch,
+            batchIndex,
+            repository,
+            organizationId,
+            collectionId: collection.id,
+            language: options.language,
+            embedTexts: options.embedTexts,
+            embeddingBatchSize,
+            crawlOutputDir: corpus.crawlOutputDir,
+            skipUsage: Boolean(options.skipUsage)
+        })
+        pagesImported += batchResult.pagesImported
+        chunksImported += batchResult.chunksImported
+        usageRows += batchResult.usageRows
+
+        if (typeof options.onProgress === 'function') {
+            options.onProgress({
+                pagesImported,
+                chunksImported,
+                totalPages: importablePageChunks.length,
+                totalChunks: corpus.totalChunks,
+                collectionId: collection.id,
+                collectionName
+            })
+        }
+    }
+
+    return {
+        ...corpus,
+        dryRun: false,
+        organizationId,
+        organizationName: organization.name ?? null,
+        collectionId: collection.id,
+        collectionName,
+        replace: Boolean(options.replace),
+        pagesImported,
+        chunksImported,
+        databaseWrites: pagesImported + chunksImported + usageRows
+    }
+}
+
+function assertNoSupabaseError(result, action) {
+    if (result?.error) {
+        throw new Error(`${action}: ${result.error.message}`)
+    }
+
+    return result?.data ?? null
+}
+
+export function createSupabaseImportRepository(supabase) {
+    return {
+        async getOrganization(organizationId) {
+            const result = await supabase
+                .from('organizations')
+                .select('id, name')
+                .eq('id', organizationId)
+                .maybeSingle()
+
+            return assertNoSupabaseError(result, 'Failed to load organization')
+        },
+        async findCollection({ organizationId, name }) {
+            const result = await supabase
+                .from('knowledge_collections')
+                .select('id, name')
+                .eq('organization_id', organizationId)
+                .eq('name', name)
+                .maybeSingle()
+
+            return assertNoSupabaseError(result, 'Failed to find collection')
+        },
+        async createCollection(row) {
+            const result = await supabase
+                .from('knowledge_collections')
+                .insert(row)
+                .select('id, name')
+                .single()
+
+            return assertNoSupabaseError(result, 'Failed to create collection')
+        },
+        async deleteDocumentsByCollection({ organizationId, collectionId }) {
+            const result = await supabase
+                .from('knowledge_documents')
+                .delete()
+                .eq('organization_id', organizationId)
+                .eq('collection_id', collectionId)
+
+            assertNoSupabaseError(result, 'Failed to delete previous collection documents')
+        },
+        async insertDocuments(rows) {
+            const result = await supabase
+                .from('knowledge_documents')
+                .insert(rows)
+                .select('id, title')
+
+            return assertNoSupabaseError(result, 'Failed to insert knowledge documents')
+        },
+        async insertChunks(rows) {
+            const result = await supabase
+                .from('knowledge_chunks')
+                .insert(rows)
+
+            assertNoSupabaseError(result, 'Failed to insert knowledge chunks')
+        },
+        async updateDocumentsStatus(documentIds, status) {
+            if (documentIds.length === 0) return
+
+            const result = await supabase
+                .from('knowledge_documents')
+                .update({ status })
+                .in('id', documentIds)
+
+            assertNoSupabaseError(result, `Failed to mark knowledge documents ${status}`)
+        },
+        async recordEmbeddingUsage(row) {
+            const result = await supabase
+                .from('organization_ai_usage')
+                .insert(row)
+
+            assertNoSupabaseError(result, 'Failed to record embedding usage')
+        }
     }
 }
 

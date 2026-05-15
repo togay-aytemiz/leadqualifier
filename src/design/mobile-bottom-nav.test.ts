@@ -27,7 +27,8 @@ describe('MobileBottomNav source', () => {
   it('adds onboarding to the other menu without a dedicated bottom-tab slot', () => {
     const source = fs.readFileSync(MOBILE_BOTTOM_NAV_PATH, 'utf8')
 
-    expect(source).toContain('onboardingState?.showNavigationEntry')
+    expect(source).toContain('listenForOnboardingStateUpdates')
+    expect(source).toContain('effectiveOnboardingState?.showNavigationEntry')
     expect(source).toContain("href=\"/onboarding\"")
   })
 })

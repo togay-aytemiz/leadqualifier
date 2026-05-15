@@ -18,6 +18,8 @@ describe('OnboardingPageClient source', () => {
     expect(source).toContain('if (!expandedStepId) return')
     expect(source).toContain('completedSteps')
     expect(source).toContain('totalSteps')
+    expect(source).toContain('dispatchOnboardingStateUpdated')
+    expect(source).toContain('effectiveOnboardingState')
   })
 
   it('greets the user directly instead of rendering a redundant page header block', () => {

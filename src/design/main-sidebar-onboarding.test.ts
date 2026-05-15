@@ -8,10 +8,13 @@ describe('MainSidebar onboarding source', () => {
   it('adds onboarding as a highlighted top card ahead of the workspace links', () => {
     const source = fs.readFileSync(MAIN_SIDEBAR_PATH, 'utf8')
 
-    expect(source).toContain('onboardingState?.showNavigationEntry')
+    expect(source).toContain('effectiveOnboardingState?.showNavigationEntry')
+    expect(source).toContain('listenForOnboardingStateUpdates')
+    expect(source).toContain('shouldApplyOnboardingStateUpdate')
+    expect(source).toContain('effectiveOnboardingState')
     expect(source).toContain('onboardingHighlightProgressLabel')
-    expect(source).toContain('onboardingState.completedSteps')
-    expect(source).toContain('onboardingState.totalSteps')
+    expect(source).toContain('effectiveOnboardingState.completedSteps')
+    expect(source).toContain('effectiveOnboardingState.totalSteps')
     expect(source).toContain('href="/onboarding"')
     expect(source).toContain('from-violet-50')
     expect(source).not.toContain('{onboardingState.completedSteps}/{onboardingState.totalSteps}')

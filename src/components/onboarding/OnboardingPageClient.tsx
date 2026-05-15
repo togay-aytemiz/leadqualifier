@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   CalendarDays,
   CircleAlert,
@@ -26,6 +26,7 @@ import type {
   OrganizationOnboardingShellState,
   OrganizationOnboardingStepId,
 } from '@/lib/onboarding/state'
+import { dispatchOnboardingStateUpdated } from '@/lib/onboarding/events'
 import { cn } from '@/lib/utils'
 
 import { OnboardingStepCard } from './OnboardingStepCard'
@@ -149,11 +150,29 @@ export function OnboardingPageClient({
   const [optimisticCompletedStepIds, setOptimisticCompletedStepIds] = useState<
     Set<OrganizationOnboardingStepId>
   >(new Set())
-  const steps = onboardingState.steps.map((step) =>
-    optimisticCompletedStepIds.has(step.id) ? { ...step, isComplete: true } : step
+  const steps = useMemo(
+    () =>
+      onboardingState.steps.map((step) =>
+        optimisticCompletedStepIds.has(step.id) ? { ...step, isComplete: true } : step
+      ),
+    [onboardingState.steps, optimisticCompletedStepIds]
   )
   const completedSteps = steps.filter((step) => step.isComplete).length
   const totalSteps = steps.length
+  const isComplete = completedSteps === totalSteps
+  const effectiveOnboardingState = useMemo<OrganizationOnboardingShellState>(
+    () => ({
+      ...onboardingState,
+      isComplete,
+      completedSteps,
+      totalSteps,
+      showChecklistCta: onboardingState.showBanner && !isComplete,
+      showNavigationEntry: !isComplete,
+      shouldAutoOpen: onboardingState.shouldAutoOpen && !isComplete,
+      steps,
+    }),
+    [completedSteps, isComplete, onboardingState, steps, totalSteps]
+  )
   const [expandedStepId, setExpandedStepId] = useState(
     steps.find((step) => step.isExpandedByDefault && !step.isComplete)?.id ??
       steps.find((step) => !step.isComplete)?.id ??
@@ -161,6 +180,13 @@ export function OnboardingPageClient({
       null
   )
   const hasMarkedSeenRef = useRef(false)
+
+  useEffect(() => {
+    dispatchOnboardingStateUpdated({
+      organizationId,
+      onboardingState: effectiveOnboardingState,
+    })
+  }, [effectiveOnboardingState, organizationId])
 
   useEffect(() => {
     if (!shouldMarkSeenOnMount || hasMarkedSeenRef.current) return
