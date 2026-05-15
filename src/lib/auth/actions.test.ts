@@ -145,6 +145,31 @@ describe('auth login action', () => {
         expect(resolveActiveOrganizationContextMock).not.toHaveBeenCalled()
     })
 
+    it('keeps successful login from crashing when post-auth onboarding resolution fails', async () => {
+        const signInWithPasswordMock = vi.fn(async () => ({
+            data: {
+                user: { id: 'user-1' },
+                session: { access_token: 'token-1' },
+            },
+            error: null,
+        }))
+
+        createClientMock.mockResolvedValue({
+            auth: {
+                signInWithPassword: signInWithPasswordMock,
+                getUser: vi.fn(),
+            },
+            from: createPostAuthLookupFromMock(),
+        })
+        getOrganizationOnboardingStateMock.mockRejectedValueOnce(
+            new Error('onboarding read failed')
+        )
+
+        await expect(login(createLoginFormData({ locale: 'en' }))).resolves.toEqual({
+            redirectPath: '/inbox'
+        })
+    })
+
     it('maps invalid login credentials into a localized error code instead of returning raw provider text', async () => {
         const signInWithPasswordMock = vi.fn(async () => ({
             data: {

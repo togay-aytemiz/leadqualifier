@@ -63,7 +63,7 @@ export async function renewDueManualAdminSubscription(input: {
         return { status: 'skipped', renewedPeriods: 0 }
     }
 
-    const rpc = input.supabase.rpc as ManualRenewalRpc
+    const rpc = input.supabase.rpc.bind(input.supabase) as ManualRenewalRpc
     const { data, error } = await rpc('renew_due_manual_admin_subscription', {
         target_organization_id: input.organizationId
     })

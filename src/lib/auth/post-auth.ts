@@ -40,25 +40,30 @@ export async function buildPostAuthRedirectPath(
         return '/inbox'
     }
 
-    const cookieStore = await cookies()
-    const organizationId = await resolvePostAuthOrganizationId(
-        supabase,
-        userId
-    )
-    const onboardingState = organizationId
-        ? await getOrganizationOnboardingState(organizationId, {
-            supabase
-        })
-        : null
+    try {
+        const cookieStore = await cookies()
+        const organizationId = await resolvePostAuthOrganizationId(
+            supabase,
+            userId
+        )
+        const onboardingState = organizationId
+            ? await getOrganizationOnboardingState(organizationId, {
+                supabase
+            })
+            : null
 
-    return resolvePostAuthRedirectPath({
-        cookieOrganizationId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null,
-        locale,
-        onboarding: {
-            shouldAutoOpen: onboardingState?.shouldAutoOpen ?? false,
-            resolveOrganizationId: async () => organizationId
-        },
-        supabase: supabase as unknown as PostAuthSupabase,
-        userId
-    })
+        return resolvePostAuthRedirectPath({
+            cookieOrganizationId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null,
+            locale,
+            onboarding: {
+                shouldAutoOpen: onboardingState?.shouldAutoOpen ?? false,
+                resolveOrganizationId: async () => organizationId
+            },
+            supabase: supabase as unknown as PostAuthSupabase,
+            userId
+        })
+    } catch (error) {
+        console.error('Failed to resolve post-auth redirect path:', error)
+        return '/inbox'
+    }
 }
