@@ -2268,6 +2268,7 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(systemPrompt).toContain('For find, view, where, or link requests, a matching source URL is enough to answer.')
         expect(systemPrompt).toContain('Do not use Markdown links like [label](url).')
         expect(systemPrompt).toContain('write the full raw URL')
+        expect(systemPrompt).toContain('Copy source URLs exactly and never insert spaces inside a URL')
         expect(systemPrompt).toContain('When several chunks are similar, prefer the one that matches the user wording most closely')
         expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
@@ -2323,7 +2324,7 @@ describe('processInboundAiPipeline guardrails', () => {
             tokenCount: 7
         })
         openAiCreateMock.mockResolvedValue({
-            choices: [{ message: { content: 'Akademik takvime [buradan](https://example.edu.tr/akademik-takvim) ulaşabilirsiniz.' } }]
+            choices: [{ message: { content: 'Akademik takvime [buradan](https://example. edu. tr/akademik-takvim) ulaşabilirsiniz.' } }]
         })
 
         const supabase = createSupabaseMock({

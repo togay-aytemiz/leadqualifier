@@ -2,10 +2,25 @@ import type { SkillInsert } from '@/types/database'
 
 type SupportedLocale = 'tr' | 'en'
 
-type DefaultSkillTemplate = Pick<SkillInsert, 'title' | 'trigger_examples' | 'response_text'>
+type DefaultSkillTemplate = Pick<
+    SkillInsert,
+    'title' | 'trigger_examples' | 'response_text'
+> & Partial<Pick<SkillInsert, 'requires_human_handover'>>
 
 const DEFAULT_SYSTEM_SKILL_TEMPLATES: Record<SupportedLocale, DefaultSkillTemplate[]> = {
     tr: [
+        {
+            title: 'Karşılama ve İlk Mesaj',
+            trigger_examples: [
+                '/start',
+                'Merhaba',
+                'Selam',
+                'İyi günler',
+                'Bilgi almak istiyorum'
+            ],
+            response_text: 'Merhaba, yardımcı olayım. Hangi konuda bilgi almak istersiniz?',
+            requires_human_handover: false
+        },
         {
             title: 'İnsan Desteği Talebi',
             trigger_examples: [
@@ -44,6 +59,18 @@ const DEFAULT_SYSTEM_SKILL_TEMPLATES: Record<SupportedLocale, DefaultSkillTempla
         }
     ],
     en: [
+        {
+            title: 'Greeting and First Message',
+            trigger_examples: [
+                '/start',
+                'Hello',
+                'Hi',
+                'Good day',
+                'I would like to get information'
+            ],
+            response_text: 'Hello, I can help. What would you like to know?',
+            requires_human_handover: false
+        },
         {
             title: 'Request Human Support',
             trigger_examples: [
@@ -104,6 +131,6 @@ export function buildDefaultSystemSkills(organizationId: string, locale?: string
         trigger_examples: template.trigger_examples,
         response_text: template.response_text,
         enabled: true,
-        requires_human_handover: true
+        requires_human_handover: template.requires_human_handover ?? true
     }))
 }

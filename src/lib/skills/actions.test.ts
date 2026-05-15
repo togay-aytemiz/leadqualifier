@@ -55,7 +55,7 @@ vi.mock('@/lib/leads/offering-profile', () => ({
     appendRequiredIntakeFields: appendRequiredIntakeFieldsMock
 }))
 
-import { getSkills } from '@/lib/skills/actions'
+import { getSkills, matchSkills } from '@/lib/skills/actions'
 
 type SkillRow = {
     id: string
@@ -115,6 +115,35 @@ function createSkillsReadSupabase(skills: SkillRow[]) {
     }
 }
 
+function createSkillExactMatchSupabase(skills: Array<Pick<SkillRow, 'id' | 'title' | 'response_text' | 'trigger_examples'>>) {
+    const limitMock = vi.fn(async () => ({
+        data: skills,
+        error: null
+    }))
+    const eqEnabledMock = vi.fn(() => ({ limit: limitMock }))
+    const eqOrgMock = vi.fn(() => ({ eq: eqEnabledMock }))
+    const selectMock = vi.fn(() => ({ eq: eqOrgMock }))
+    const rpcMock = vi.fn()
+    const fromMock = vi.fn((table: string) => {
+        if (table !== 'skills') {
+            throw new Error(`Unexpected table ${table}`)
+        }
+
+        return {
+            select: selectMock
+        }
+    })
+
+    return {
+        supabase: {
+            from: fromMock,
+            rpc: rpcMock
+        },
+        fromMock,
+        rpcMock
+    }
+}
+
 describe('getSkills', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -158,5 +187,36 @@ describe('getSkills', () => {
         shouldRunSkillsMaintenanceForOrganizationMock.mockReturnValue(true)
 
         await expect(getSkills('org-1', '', 'tr')).resolves.toEqual(existingSkills)
+    })
+})
+
+describe('matchSkills', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('matches exact configurable trigger examples before embedding search for Telegram start commands', async () => {
+        const { supabase, rpcMock } = createSkillExactMatchSupabase([
+            {
+                id: 'skill-greeting',
+                title: 'Karşılama ve İlk Mesaj',
+                response_text: 'Merhaba, yardımcı olayım. Hangi konuda bilgi almak istersiniz?',
+                trigger_examples: ['/start', 'Merhaba', 'Selam']
+            }
+        ])
+
+        const result = await matchSkills('/start payload', 'org-1', 0.7, 5, supabase as never)
+
+        expect(result).toEqual([
+            {
+                skill_id: 'skill-greeting',
+                title: 'Karşılama ve İlk Mesaj',
+                response_text: 'Merhaba, yardımcı olayım. Hangi konuda bilgi almak istersiniz?',
+                trigger_text: '/start',
+                similarity: 1
+            }
+        ])
+        expect(generateEmbeddingsMock).not.toHaveBeenCalled()
+        expect(rpcMock).not.toHaveBeenCalled()
     })
 })

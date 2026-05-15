@@ -11,6 +11,28 @@ describe('formatOutboundTextForChannel', () => {
         expect(formatted).toBe('*Tıp Fakültesi:* Detaylar için sayfayı aç: https://example.com/tip.')
     })
 
+    it('converts spaced Markdown URLs into raw clickable WhatsApp links', () => {
+        const formatted = formatOutboundTextForChannel(
+            '2025-2026 Eğitim Öğretim Yılı Akademik Takvimine şu linkten ulaşabilirsiniz: [2025-2026 Eğitim Öğretim Yılı Akademik Takvimi](https://yuksekihtisasuniversitesi. edu. tr/sayfa/ogrenci/akademik-takvim/2025-2026-egitim-ogretim-yili-akademik-takvimi).',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            '2025-2026 Eğitim Öğretim Yılı Akademik Takvimine şu linkten ulaşabilirsiniz: 2025-2026 Eğitim Öğretim Yılı Akademik Takvimi: https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim/2025-2026-egitim-ogretim-yili-akademik-takvimi.'
+        )
+    })
+
+    it('repairs spaces inside raw URLs without swallowing following text', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Akademik takvim: https://yuksekihtisasuniversitesi. edu. tr/sayfa/ogrenci/akademik-takvim üzerinden açabilirsiniz.',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'Akademik takvim: https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/akademik-takvim üzerinden açabilirsiniz.'
+        )
+    })
+
     it('keeps WhatsApp bot disclaimers on a separate quoted footer line', () => {
         const formatted = formatOutboundTextForChannel(
             "Evet, Tıp Fakültesi'nde İngilizce eğitim verilmektedir.\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.",

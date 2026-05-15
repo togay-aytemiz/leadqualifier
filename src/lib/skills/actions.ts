@@ -83,6 +83,66 @@ function areSkillTriggersEqual(
     return previousTriggers.every((trigger, index) => trigger === nextTriggers[index])
 }
 
+function normalizeExactSkillTrigger(value: string | null | undefined) {
+    const trimmed = normalizeSkillText(value)
+    if (!trimmed) return ''
+
+    const commandMatch = trimmed.match(/^\/([a-z0-9_]+)(?:@[a-z0-9_]+)?(?:\s+.*)?$/i)
+    if (commandMatch?.[1]) {
+        return `/${commandMatch[1].toLowerCase()}`
+    }
+
+    return trimmed
+        .toLocaleLowerCase('tr-TR')
+        .replace(/\s+/g, ' ')
+}
+
+async function matchExactSkillTriggers(
+    query: string,
+    organizationId: string,
+    limit: number,
+    supabase: SupabaseClientLike
+): Promise<SkillMatch[]> {
+    const normalizedQuery = normalizeExactSkillTrigger(query)
+    if (!normalizedQuery) return []
+
+    const { data, error } = await supabase
+        .from('skills')
+        .select('id, title, response_text, trigger_examples')
+        .eq('organization_id', organizationId)
+        .eq('enabled', true)
+        .limit(100)
+
+    if (error) {
+        console.warn('Failed to read skills for exact trigger matching:', error)
+        return []
+    }
+
+    const matches: SkillMatch[] = []
+    for (const skill of data ?? []) {
+        const triggerExamples = Array.isArray(skill.trigger_examples)
+            ? skill.trigger_examples
+            : []
+
+        const matchedTrigger = triggerExamples.find((trigger) => (
+            normalizeExactSkillTrigger(trigger) === normalizedQuery
+        ))
+        if (!matchedTrigger) continue
+
+        matches.push({
+            skill_id: skill.id,
+            title: skill.title,
+            response_text: skill.response_text,
+            trigger_text: matchedTrigger,
+            similarity: 1
+        })
+
+        if (matches.length >= limit) break
+    }
+
+    return matches
+}
+
 async function requireActiveSkillImageOrganizationId(
     supabase: SupabaseClientLike,
     requestedOrganizationId: string
@@ -534,6 +594,10 @@ export async function matchSkills(
     customSupabase?: SupabaseClientLike
 ): Promise<SkillMatch[]> {
     const supabase = customSupabase || await createClient()
+    const exactMatches = await matchExactSkillTriggers(query, organizationId, limit, supabase)
+    if (exactMatches.length > 0) {
+        return exactMatches
+    }
 
     // Generate embedding for the query
     const [queryEmbedding] = await generateEmbeddings([query], {
