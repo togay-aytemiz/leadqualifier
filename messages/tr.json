@@ -1788,6 +1788,11 @@
       },
       "reasonMap": {
         "aiUsageDebit": "Yapay zeka kullanım düşümü",
+        "knowledgeBaseIndexing": "Bilgi Bankası indeksleme",
+        "knowledgeBaseSearch": "Bilgi Bankası araması",
+        "skillIndexing": "Yetenek indeksleme",
+        "skillMatching": "Yetenek eşleştirme",
+        "contentIndexing": "İçerik indeksleme",
         "mockSubscriptionSuccess": "Mock premium ödeme başarılı",
         "mockTopupSuccess": "Mock ek kredi ödeme başarılı",
         "packageStartDetailed": "Aylık paket başlatıldı: {credits} kredi/ay • {price}",
@@ -2540,6 +2545,8 @@
       "purchaseRequestsNew": "{count} yeni",
       "messages": "Toplam Mesaj",
       "tokens": "Toplam Token",
+      "tokenBreakdownLabel": "Token kullanım detayı",
+      "tokenBreakdownTooltip": "Giriş tokenları: {input}\nÇıkış tokenları: {output}\nText embedding tokenları: {embedding}\nChat ağırlıklı token: {weighted}\nToplam token: {total}\nKredi: {credits}",
       "credits": "Toplam Kullanılan Kredi",
       "creditsActiveOrganization": "Aktif Org Kullanılan Kredi",
       "period": {

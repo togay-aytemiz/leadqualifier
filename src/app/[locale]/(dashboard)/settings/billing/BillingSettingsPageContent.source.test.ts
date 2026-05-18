@@ -53,4 +53,18 @@ describe('billing settings page source guard', () => {
         expect(source).toContain('movement: input.movement')
         expect(source).toContain('view: input.view')
     })
+
+    it('labels knowledge base embedding debits from the linked AI usage metadata', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain(".from('organization_ai_usage')")
+        expect(source).toContain(".select('id, category, metadata')")
+        expect(source).toContain('knowledgeBaseIndexing')
+        expect(source).toContain('crawl_corpus_import')
+        expect(source).toContain('knowledge_chunk_index_embedding')
+    })
 })

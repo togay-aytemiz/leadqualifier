@@ -1788,6 +1788,11 @@
       },
       "reasonMap": {
         "aiUsageDebit": "AI usage debit",
+        "knowledgeBaseIndexing": "Knowledge Base indexing",
+        "knowledgeBaseSearch": "Knowledge Base search",
+        "skillIndexing": "Skill indexing",
+        "skillMatching": "Skill matching",
+        "contentIndexing": "Content indexing",
         "mockSubscriptionSuccess": "Mock premium checkout success",
         "mockTopupSuccess": "Mock extra credit checkout success",
         "packageStartDetailed": "Monthly package started: {credits} credits/month • {price}",
@@ -2540,6 +2545,8 @@
       "purchaseRequestsNew": "{count} new",
       "messages": "Total Messages",
       "tokens": "Total Tokens",
+      "tokenBreakdownLabel": "Token usage details",
+      "tokenBreakdownTooltip": "Input tokens: {input}\nOutput tokens: {output}\nText embedding tokens: {embedding}\nChat weighted tokens: {weighted}\nTotal tokens: {total}\nCredits: {credits}",
       "credits": "Total Credits Used",
       "creditsActiveOrganization": "Credits Used (Active Org)",
       "period": {

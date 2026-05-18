@@ -177,6 +177,10 @@ export interface AdminUsageMetricsSummary {
     isAllTime: boolean
     messageCount: number
     totalTokenCount: number
+    inputTokenCount: number
+    outputTokenCount: number
+    embeddingTokenCount: number
+    weightedChatTokenCount: number
     totalCreditUsage: number
 }
 
@@ -627,6 +631,10 @@ async function getUsageTotalsForRange(
     if (options.organizationIds && options.organizationIds.length === 0) {
         return {
             totalTokenCount: 0,
+            inputTokenCount: 0,
+            outputTokenCount: 0,
+            embeddingTokenCount: 0,
+            weightedChatTokenCount: 0,
             totalCreditUsage: 0
         }
     }
@@ -634,12 +642,16 @@ async function getUsageTotalsForRange(
     const pageSize = 1000
     let offset = 0
     let totalTokenCount = 0
+    let inputTokenCount = 0
+    let outputTokenCount = 0
+    let embeddingTokenCount = 0
+    let weightedChatTokenCount = 0
     let totalCreditUsageTenths = 0
 
     while (true) {
         let query = supabase
             .from('organization_ai_usage')
-            .select('total_tokens, input_tokens, output_tokens')
+            .select('category, model, total_tokens, input_tokens, output_tokens')
             .order('created_at', { ascending: true })
             .range(offset, offset + pageSize - 1)
 
@@ -660,22 +672,34 @@ async function getUsageTotalsForRange(
             console.error('Failed to load AI usage totals for admin dashboard usage metrics:', error)
             return {
                 totalTokenCount,
+                inputTokenCount,
+                outputTokenCount,
+                embeddingTokenCount,
+                weightedChatTokenCount,
                 totalCreditUsage: totalCreditUsageTenths / 10
             }
         }
 
         const rows = (data ?? []) as Array<{
+            category: string | null
+            model: string | null
             total_tokens: number | null
             input_tokens: number | null
             output_tokens: number | null
         }>
 
         const chunkSummary = summarizeUsageMetricRows(rows.map((row) => ({
+            category: row.category,
+            model: row.model,
             totalTokens: toNonNegativeNumber(row.total_tokens),
             inputTokens: toNonNegativeNumber(row.input_tokens),
             outputTokens: toNonNegativeNumber(row.output_tokens)
         })))
         totalTokenCount += chunkSummary.totalTokenCount
+        inputTokenCount += chunkSummary.inputTokenCount
+        outputTokenCount += chunkSummary.outputTokenCount
+        embeddingTokenCount += chunkSummary.embeddingTokenCount
+        weightedChatTokenCount += chunkSummary.weightedChatTokenCount
         totalCreditUsageTenths += Math.round(chunkSummary.totalCreditUsage * 10)
 
         if (rows.length < pageSize) break
@@ -684,6 +708,10 @@ async function getUsageTotalsForRange(
 
     return {
         totalTokenCount: Math.floor(totalTokenCount),
+        inputTokenCount: Math.floor(inputTokenCount),
+        outputTokenCount: Math.floor(outputTokenCount),
+        embeddingTokenCount: Math.floor(embeddingTokenCount),
+        weightedChatTokenCount: Math.floor(weightedChatTokenCount),
         totalCreditUsage: totalCreditUsageTenths / 10
     }
 }
@@ -769,6 +797,22 @@ export async function getAdminUsageMetricsSummary(
                     allUsageTotals.totalTokenCount,
                     excludedUsageTotals.totalTokenCount
                 ),
+                inputTokenCount: subtractNonNegativeInt(
+                    allUsageTotals.inputTokenCount,
+                    excludedUsageTotals.inputTokenCount
+                ),
+                outputTokenCount: subtractNonNegativeInt(
+                    allUsageTotals.outputTokenCount,
+                    excludedUsageTotals.outputTokenCount
+                ),
+                embeddingTokenCount: subtractNonNegativeInt(
+                    allUsageTotals.embeddingTokenCount,
+                    excludedUsageTotals.embeddingTokenCount
+                ),
+                weightedChatTokenCount: subtractNonNegativeInt(
+                    allUsageTotals.weightedChatTokenCount,
+                    excludedUsageTotals.weightedChatTokenCount
+                ),
                 totalCreditUsage: subtractNonNegativeTenths(
                     allUsageTotals.totalCreditUsage,
                     excludedUsageTotals.totalCreditUsage
@@ -793,6 +837,10 @@ export async function getAdminUsageMetricsSummary(
         isAllTime: periodKey === ADMIN_METRIC_PERIOD_ALL,
         messageCount,
         totalTokenCount: usageTotals.totalTokenCount,
+        inputTokenCount: usageTotals.inputTokenCount,
+        outputTokenCount: usageTotals.outputTokenCount,
+        embeddingTokenCount: usageTotals.embeddingTokenCount,
+        weightedChatTokenCount: usageTotals.weightedChatTokenCount,
         totalCreditUsage: usageTotals.totalCreditUsage
     }
 }

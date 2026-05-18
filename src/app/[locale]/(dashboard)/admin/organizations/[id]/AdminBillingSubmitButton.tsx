@@ -27,7 +27,7 @@ export function AdminBillingSubmitButton({
             disabled={pending}
             aria-busy={pending}
         >
-            {pending && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+            {pending && <Loader2 size={14} className="animate-spin" aria-hidden={true} />}
             {pending ? tAdmin('organizationDetail.manualActions.submitting') : children}
         </button>
     )

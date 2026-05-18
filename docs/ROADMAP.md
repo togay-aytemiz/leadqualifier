@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-18):** Text embedding usage now has category/model-aware credit costing instead of chat-token weighting. `text-embedding-3-small` Knowledge Base indexing is priced from the embedding token rate, admin token cards expose input/output/text-embedding breakdown on hover, and Usage ledger rows label KB import debits as `Bilgi Bankası indeksleme`.
+
 > **Update Note (2026-05-15):** Admin manual billing now aligns the control panel with tenant credit visibility. Organization detail shows remaining package/trial credits first, used/limit only as helper context, manual premium assignment refuses zero-credit grants before the RPC, the `admin_assign_premium` migration reasserts package grant/renewal metadata, and billing action buttons show a disabled processing state to prevent repeated clicks.
 
 > **Update Note (2026-05-15):** Chat-channel link formatting now defensively repairs model output before send/persist. Markdown links whose URLs contain accidental spaces or newlines are converted into visible raw URLs, raw URL domains/paths such as `example. edu. tr/akademik- takvim` are compacted back to clickable form, URLs that need repair are isolated on their own lines, and shared WhatsApp/Instagram plus Telegram/Simulator RAG prompts explicitly tell the model to put copied source URLs on their own final line without inserted spaces or trailing prose. Shared inbound RAG also appends canonical chunk source URLs when the model emits a malformed URL.
@@ -265,7 +267,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-15 (RAG source links now recover to canonical isolated URL lines when model output inserts spaces, newlines, or prose into the URL.)
+> **Last Updated:** 2026-05-18 (Text embedding credit costing, admin token breakdown, and KB indexing ledger labels aligned.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -848,6 +850,8 @@
 - [x] **Usage & Billing Reliability:** Prevent silent AI usage-reporting drift by making `recordAiUsage` fail fast on persistence errors (no swallowed insert failures)
 - [x] **Usage & Billing Reliability:** Fix WhatsApp media storage totals showing `0 B` by making storage RPC media-bucket aware (`target_media_bucket_ids`) and reconciling empty media totals from storage object listings in server fallback path
 - [x] **Usage & Billing Reliability:** Start tracking embedding token usage in `organization_ai_usage` for skill matching and knowledge retrieval/indexing flows
+- [x] **Usage & Billing Reliability:** Price text embeddings with category/model-aware credit costs so KB indexing does not consume chat-completion-rate credits
+- [x] **Usage & Billing UI:** Label KB import embedding debits as `Bilgi Bankası indeksleme` in credit history instead of generic AI usage
 - [x] **Billing Lock Enforcement:** Add runtime entitlement re-check stages in shared inbound pipeline + Telegram webhook to stop follow-up AI calls after lock transition
 - [x] **Billing Lock Enforcement:** Block offering-profile suggestion/service-catalog/required-intake AI generation when organization usage is locked
 - [x] **Webhook Reliability:** Add Telegram inbound duplicate dedupe (`metadata.telegram_message_id`) to avoid duplicate processing and duplicate AI spend
@@ -1109,6 +1113,7 @@
   - [x] Add admin dashboard monthly plan metrics block (monthly plan payment amount/count, monthly top-up payment amount, monthly top-up credits purchased/used) and remove redundant overview/read-only/active-org summary cards
   - [x] Add admin dashboard period selector (`Tüm Zamanlar` + month) for message/token/used-credit cards
   - [x] Align admin used-credit totals with `organization_ai_usage`-based credit cost aggregation to fix dashboard vs organization-detail mismatches
+  - [x] Add admin token breakdown hover detail for input, output, text embedding, weighted chat tokens, and credits
   - [x] Move organization list search/pagination to DB-level count + range queries (no in-memory full-list slicing)
   - [x] Batch organization metric aggregation to avoid per-organization N+1 read fan-out
   - [x] Load organization detail profile layer with targeted org/member/profile queries (no full-table scans)

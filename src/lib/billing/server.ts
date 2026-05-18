@@ -30,6 +30,7 @@ export interface BillingLedgerEntry {
     creditPool: BillingCreditPoolType
     creditsDelta: number
     balanceAfter: number
+    usageId: string | null
     reason: string | null
     metadata: unknown
     createdAt: string
@@ -176,6 +177,7 @@ function mapBillingLedgerEntries(data: Array<{
     credit_pool: BillingCreditPoolType
     credits_delta: number | string | null
     balance_after: number | string | null
+    usage_id?: string | null
     reason: string | null
     metadata: unknown
     created_at: string
@@ -186,6 +188,7 @@ function mapBillingLedgerEntries(data: Array<{
         creditPool: entry.credit_pool,
         creditsDelta: Number(entry.credits_delta ?? 0),
         balanceAfter: Number(entry.balance_after ?? 0),
+        usageId: entry.usage_id ?? null,
         reason: entry.reason,
         metadata: entry.metadata,
         createdAt: entry.created_at
@@ -247,7 +250,7 @@ export async function getOrganizationBillingLedger(
 
     let query = supabase
         .from('organization_credit_ledger')
-        .select('id, entry_type, credit_pool, credits_delta, balance_after, reason, metadata, created_at')
+        .select('id, entry_type, credit_pool, credits_delta, balance_after, usage_id, reason, metadata, created_at')
         .eq('organization_id', organizationId)
 
     if (options?.entryTypes?.length) {
@@ -287,7 +290,7 @@ export async function getOrganizationBillingLedgerPage(
 
     let query = supabase
         .from('organization_credit_ledger')
-        .select('id, entry_type, credit_pool, credits_delta, balance_after, reason, metadata, created_at')
+        .select('id, entry_type, credit_pool, credits_delta, balance_after, usage_id, reason, metadata, created_at')
         .eq('organization_id', organizationId)
 
     if (options?.entryTypes?.length) {
@@ -348,7 +351,7 @@ export async function getOrganizationBillingLedgerWindow(
     })
     let query = supabase
         .from('organization_credit_ledger')
-        .select('id, entry_type, credit_pool, credits_delta, balance_after, reason, metadata, created_at')
+        .select('id, entry_type, credit_pool, credits_delta, balance_after, usage_id, reason, metadata, created_at')
         .eq('organization_id', organizationId)
 
     query = applyBillingLedgerMovementFilter(query, options.movement)

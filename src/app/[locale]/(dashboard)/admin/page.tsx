@@ -1,7 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server'
 import { Badge, DataTable, PageHeader, TableBody, TableCell, TableHead, TableRow } from '@/design'
 import { Link } from '@/i18n/navigation'
-import { Activity, Building2, Clock3, Database, Inbox, Sparkles, Users, Wallet } from 'lucide-react'
+import { Activity, Building2, Clock3, Database, Inbox, Info, Sparkles, Users, Wallet } from 'lucide-react'
 import { requireSystemAdmin } from '@/lib/admin/access'
 import {
     getAdminAiLatencySummary,
@@ -145,6 +145,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             label: formatPeriodLabel(periodKey)
         }))
     ]
+    const tokenBreakdownTooltip = t('stats.tokenBreakdownTooltip', {
+        input: formatter.format(usageMetrics.inputTokenCount),
+        output: formatter.format(usageMetrics.outputTokenCount),
+        embedding: formatter.format(usageMetrics.embeddingTokenCount),
+        weighted: formatter.format(usageMetrics.weightedChatTokenCount),
+        total: formatter.format(usageMetrics.totalTokenCount),
+        credits: creditFormatter.format(usageMetrics.totalCreditUsage)
+    })
 
     const statCards = [
         {
@@ -195,7 +203,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             iconClass: 'text-purple-500',
             title: t('stats.tokens'),
             value: formatter.format(usageMetrics.totalTokenCount),
-            periodLabel: selectedPeriodLabel
+            periodLabel: selectedPeriodLabel,
+            infoLabel: t('stats.tokenBreakdownLabel'),
+            infoTooltip: tokenBreakdownTooltip
         },
         {
             key: 'credits',
@@ -326,7 +336,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                                             <Icon className={stat.iconClass} size={20} />
                                         </div>
                                     </div>
-                                    <h3 className="text-sm font-medium text-gray-500 mb-1">{stat.title}</h3>
+                                    <div className="mb-1 flex items-center gap-1.5">
+                                        <h3 className="text-sm font-medium text-gray-500">{stat.title}</h3>
+                                        {'infoTooltip' in stat && stat.infoTooltip ? (
+                                            <span className="group relative inline-flex">
+                                                <span
+                                                    tabIndex={0}
+                                                    role="img"
+                                                    aria-label={stat.infoLabel}
+                                                    title={stat.infoTooltip}
+                                                    className="inline-flex h-4 w-4 items-center justify-center rounded-full text-gray-400 ring-1 ring-gray-200 transition hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                                >
+                                                    <Info size={12} aria-hidden={true} />
+                                                </span>
+                                                <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-72 -translate-x-1/2 whitespace-pre-line rounded-lg border border-gray-200 bg-white p-3 text-left text-xs font-normal leading-5 text-gray-600 shadow-lg group-hover:block group-focus-within:block">
+                                                    {stat.infoTooltip}
+                                                </span>
+                                            </span>
+                                        ) : null}
+                                    </div>
                                     <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
                                     {stat.periodLabel ? (
                                         <p className="mt-1 text-xs text-gray-400">

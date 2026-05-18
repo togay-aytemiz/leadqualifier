@@ -66,6 +66,11 @@ interface LedgerOrderLookupRow {
     currency: string | null
 }
 
+interface LedgerUsageLookupRow {
+    category: string | null
+    metadata: unknown
+}
+
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null
     return value as Record<string, unknown>
@@ -73,7 +78,7 @@ function toRecord(value: unknown): Record<string, unknown> | null {
 
 function readString(record: Record<string, unknown> | null, key: string): string | null {
     const value = record?.[key]
-    return typeof value === 'string' && value.trim().length > 0 ? value : null
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
 }
 
 function readNumber(record: Record<string, unknown> | null, key: string): number | null {
@@ -101,12 +106,44 @@ function formatLedgerCurrency(locale: string, amount: number, currency: string |
     }
 }
 
+function resolveUsageDebitLabel(
+    tBilling: Awaited<ReturnType<typeof getTranslations>>,
+    entry: BillingLedgerEntry,
+    usage: LedgerUsageLookupRow | null
+) {
+    const ledgerMetadata = toRecord(entry.metadata)
+    const usageMetadata = toRecord(usage?.metadata ?? null)
+    const category = (usage?.category ?? readString(ledgerMetadata, 'category') ?? '')
+        .trim()
+        .toLowerCase()
+    const source = readString(usageMetadata, 'source') ?? readString(ledgerMetadata, 'source')
+
+    if (category !== 'embedding') {
+        return tBilling('ledger.reasonMap.aiUsageDebit')
+    }
+
+    switch (source) {
+    case 'crawl_corpus_import':
+    case 'knowledge_chunk_index_embedding':
+        return tBilling('ledger.reasonMap.knowledgeBaseIndexing')
+    case 'knowledge_search_query_embedding':
+        return tBilling('ledger.reasonMap.knowledgeBaseSearch')
+    case 'skill_index_embedding':
+        return tBilling('ledger.reasonMap.skillIndexing')
+    case 'skill_query_embedding':
+        return tBilling('ledger.reasonMap.skillMatching')
+    default:
+        return tBilling('ledger.reasonMap.contentIndexing')
+    }
+}
+
 function resolveLedgerReasonLabel(
     tBilling: Awaited<ReturnType<typeof getTranslations>>,
     locale: string,
     entry: BillingLedgerEntry,
     subscriptions: Map<string, LedgerSubscriptionLookupRow>,
-    orders: Map<string, LedgerOrderLookupRow>
+    orders: Map<string, LedgerOrderLookupRow>,
+    usageRows: Map<string, LedgerUsageLookupRow>
 ) {
     const metadata = toRecord(entry.metadata)
     const source = readString(metadata, 'source')
@@ -116,7 +153,8 @@ function resolveLedgerReasonLabel(
     const normalizedReason = reason?.trim().toLowerCase() ?? ''
 
     if (normalizedReason === 'ai usage debit') {
-        return tBilling('ledger.reasonMap.aiUsageDebit')
+        const usage = entry.usageId ? usageRows.get(entry.usageId) ?? null : null
+        return resolveUsageDebitLabel(tBilling, entry, usage)
     }
 
     if (entry.entryType === 'package_grant') {
@@ -235,6 +273,7 @@ async function buildLedgerTableRows(input: {
 }) {
     const relatedSubscriptionIds: string[] = []
     const relatedOrderIds: string[] = []
+    const relatedUsageIds: string[] = []
 
     for (const entry of input.entries) {
         const metadata = toRecord(entry.metadata)
@@ -247,10 +286,14 @@ async function buildLedgerTableRows(input: {
         if (orderId && !relatedOrderIds.includes(orderId)) {
             relatedOrderIds.push(orderId)
         }
+        if (entry.usageId && !relatedUsageIds.includes(entry.usageId)) {
+            relatedUsageIds.push(entry.usageId)
+        }
     }
 
     const subscriptionsById = new Map<string, LedgerSubscriptionLookupRow>()
     const ordersById = new Map<string, LedgerOrderLookupRow>()
+    const usageRowsById = new Map<string, LedgerUsageLookupRow>()
 
     if (relatedSubscriptionIds.length > 0) {
         const { data, error } = await input.supabase
@@ -290,6 +333,25 @@ async function buildLedgerTableRows(input: {
         }
     }
 
+    if (relatedUsageIds.length > 0) {
+        const { data, error } = await input.supabase
+            .from('organization_ai_usage')
+            .select('id, category, metadata')
+            .eq('organization_id', input.organizationId)
+            .in('id', relatedUsageIds)
+
+        if (error) {
+            console.error('Failed to load billing AI usage lookup rows:', error)
+        } else {
+            for (const row of data ?? []) {
+                usageRowsById.set(row.id, {
+                    category: row.category,
+                    metadata: row.metadata
+                })
+            }
+        }
+    }
+
     const formatDateTime = new Intl.DateTimeFormat(input.locale, {
         year: 'numeric',
         month: 'short',
@@ -305,7 +367,8 @@ async function buildLedgerTableRows(input: {
             input.locale,
             entry,
             subscriptionsById,
-            ordersById
+            ordersById,
+            usageRowsById
         )
 
         return {
