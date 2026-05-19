@@ -1793,6 +1793,7 @@
         "skillIndexing": "Skill indexing",
         "skillMatching": "Skill matching",
         "contentIndexing": "Content indexing",
+        "embeddingCreditCorrection": "Knowledge Base indexing credit correction",
         "mockSubscriptionSuccess": "Mock premium checkout success",
         "mockTopupSuccess": "Mock extra credit checkout success",
         "packageStartDetailed": "Monthly package started: {credits} credits/month • {price}",

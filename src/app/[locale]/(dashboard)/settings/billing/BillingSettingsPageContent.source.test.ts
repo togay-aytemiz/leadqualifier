@@ -79,4 +79,28 @@ describe('billing settings page source guard', () => {
         expect(source).toContain(".select('id, category, model, input_tokens, output_tokens, metadata')")
         expect(source).toContain('resolveDisplayCreditsDelta')
     })
+
+    it('marks same-day knowledge base indexing debit rows as compactable for the customer ledger', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('resolveIstanbulDateKey')
+        expect(source).toContain("reasonDetailLabel === input.tBilling('ledger.reasonMap.knowledgeBaseIndexing')")
+        expect(source).toContain('compactGroupKey')
+        expect(source).toContain('knowledge-base-indexing:')
+    })
+
+    it('localizes automatic text embedding credit correction ledger adjustments', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain("normalizedReason === 'text embedding credit correction'")
+        expect(source).toContain('ledger.reasonMap.embeddingCreditCorrection')
+    })
 })

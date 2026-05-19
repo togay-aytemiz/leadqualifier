@@ -20,6 +20,7 @@ import { BillingLedgerTable } from './BillingLedgerTable'
 import { UsageBreakdownDetails } from './UsageBreakdownDetails'
 
 const BILLING_LEDGER_PAGE_SIZE = 25
+const ISTANBUL_UTC_OFFSET_MS = 3 * 60 * 60 * 1000
 
 function resolveCompactLedgerEntryLabel(tBilling: Awaited<ReturnType<typeof getTranslations>>, value: string) {
     switch (value) {
@@ -160,6 +161,18 @@ function resolveDisplayCreditsDelta(entry: BillingLedgerEntry, usage: LedgerUsag
     return credits > 0 ? -credits : entry.creditsDelta
 }
 
+function resolveIstanbulDateKey(value: string) {
+    const date = new Date(value)
+    if (!Number.isFinite(date.getTime())) return null
+
+    const localDate = new Date(date.getTime() + ISTANBUL_UTC_OFFSET_MS)
+    return [
+        localDate.getUTCFullYear(),
+        String(localDate.getUTCMonth() + 1).padStart(2, '0'),
+        String(localDate.getUTCDate()).padStart(2, '0')
+    ].join('-')
+}
+
 function resolveLedgerReasonLabel(
     tBilling: Awaited<ReturnType<typeof getTranslations>>,
     locale: string,
@@ -247,6 +260,10 @@ function resolveLedgerReasonLabel(
 
     if (normalizedReason === 'mock top-up checkout success' || normalizedReason === 'mock topup checkout success') {
         return tBilling('ledger.reasonMap.mockTopupSuccess')
+    }
+
+    if (normalizedReason === 'text embedding credit correction') {
+        return tBilling('ledger.reasonMap.embeddingCreditCorrection')
     }
 
     if (reason) return reason
@@ -398,6 +415,11 @@ async function buildLedgerTableRows(input: {
             ordersById,
             usageRowsById
         )
+        const compactDateKey = entry.entryType === 'usage_debit'
+            && isDebit
+            && reasonDetailLabel === input.tBilling('ledger.reasonMap.knowledgeBaseIndexing')
+            ? resolveIstanbulDateKey(entry.createdAt)
+            : null
 
         return {
             id: entry.id,
@@ -411,7 +433,8 @@ async function buildLedgerTableRows(input: {
             reasonDetailLabel,
             creditsDelta: displayCreditsDelta,
             balanceAfter: entry.balanceAfter,
-            isDebit
+            isDebit,
+            compactGroupKey: compactDateKey ? `knowledge-base-indexing:${compactDateKey}` : null
         }
     })
 }

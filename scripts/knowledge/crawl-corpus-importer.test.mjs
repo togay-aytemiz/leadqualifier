@@ -300,6 +300,104 @@ Kayit tarihleri ve ders baslangic bilgileri.
         }
     })
 
+    it('records one compact embedding usage row per completed crawl import', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
+        const calls = {
+            insertedDocuments: [],
+            insertedChunks: [],
+            usageRows: []
+        }
+        const repository = {
+            getOrganization: async (organizationId) => ({ id: organizationId, name: 'Test Org' }),
+            findCollection: async () => null,
+            createCollection: async (row) => ({ id: 'collection-1', name: row.name }),
+            deleteDocumentsByCollection: async () => {},
+            insertDocuments: async (rows) => {
+                calls.insertedDocuments.push(...rows)
+                return rows.map((row, index) => ({
+                    id: `doc-${index + 1}`,
+                    title: row.title
+                }))
+            },
+            insertChunks: async (rows) => {
+                calls.insertedChunks.push(...rows)
+            },
+            updateDocumentsStatus: async () => {},
+            recordEmbeddingUsage: async (row) => {
+                calls.usageRows.push(row)
+            }
+        }
+
+        try {
+            await mkdir(path.join(tempDir, 'corpus'), { recursive: true })
+            await writeFile(path.join(tempDir, 'corpus-report.json'), JSON.stringify({
+                corpusPages: [
+                    {
+                        url: 'https://example.edu.tr/a',
+                        title: 'Page A',
+                        corpusPath: 'corpus/a.md'
+                    },
+                    {
+                        url: 'https://example.edu.tr/b',
+                        title: 'Page B',
+                        corpusPath: 'corpus/b.md'
+                    }
+                ]
+            }), 'utf8')
+            await writeFile(path.join(tempDir, 'corpus', 'a.md'), `# Page A
+
+Source URL: https://example.edu.tr/a
+
+## Content
+
+Admissions detail for page A.
+`, 'utf8')
+            await writeFile(path.join(tempDir, 'corpus', 'b.md'), `# Page B
+
+Source URL: https://example.edu.tr/b
+
+## Content
+
+Scholarship detail for page B.
+`, 'utf8')
+
+            const report = await importCrawlCorpus({
+                crawlOutputDir: tempDir,
+                organizationId: 'org-1',
+                repository,
+                embedTexts: async (texts) => ({
+                    embeddings: texts.map(() => [0.1, 0.2, 0.3]),
+                    promptTokens: texts.length * 10
+                }),
+                maxTokens: 45,
+                overlapTokens: 6,
+                batchSize: 2,
+                embeddingBatchSize: 1
+            })
+
+            expect(calls.insertedDocuments).toHaveLength(2)
+            expect(calls.insertedChunks).toHaveLength(2)
+            expect(calls.usageRows).toHaveLength(1)
+            expect(calls.usageRows[0]).toMatchObject({
+                organization_id: 'org-1',
+                category: 'embedding',
+                model: 'text-embedding-3-small',
+                input_tokens: 20,
+                total_tokens: 20,
+                metadata: {
+                    source: 'crawl_corpus_import',
+                    page_count: 2,
+                    chunk_count: 2,
+                    embedding_batch_count: 2,
+                    usage_compaction: 'crawl_import_total'
+                }
+            })
+            expect(report.databaseWrites).toBe(5)
+        } finally {
+            await rm(tempDir, { recursive: true, force: true })
+        }
+    })
+
     it('refuses to import into an existing collection unless replace is explicit', async () => {
         const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
         const repository = {

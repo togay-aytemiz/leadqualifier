@@ -1793,6 +1793,7 @@
         "skillIndexing": "Yetenek indeksleme",
         "skillMatching": "Yetenek eşleştirme",
         "contentIndexing": "İçerik indeksleme",
+        "embeddingCreditCorrection": "Bilgi Bankası indeksleme kredi düzeltmesi",
         "mockSubscriptionSuccess": "Mock premium ödeme başarılı",
         "mockTopupSuccess": "Mock ek kredi ödeme başarılı",
         "packageStartDetailed": "Aylık paket başlatıldı: {credits} kredi/ay • {price}",

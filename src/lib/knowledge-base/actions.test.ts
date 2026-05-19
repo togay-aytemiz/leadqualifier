@@ -267,6 +267,27 @@ function createHybridSearchSupabase(options?: {
             title: string
             type: string
             status: string
+            collection_id?: string | null
+            language?: string | null
+        }
+    }>
+    titleRows?: Array<{
+        id: string
+        title: string
+        type: string
+        status: string
+    }>
+    titleChunkRows?: Array<{
+        id: string
+        document_id: string
+        chunk_index: number
+        content: string
+        knowledge_documents: {
+            title: string
+            type: string
+            status: string
+            collection_id?: string | null
+            language?: string | null
         }
     }>
 }) {
@@ -305,27 +326,80 @@ function createHybridSearchSupabase(options?: {
         }
     ]
 
+    const titleRows = options?.titleRows ?? []
+    const titleChunkRows = options?.titleChunkRows ?? []
+
     const limitMock = vi.fn(async () => ({
         data: fallbackRows,
         error: null
     }))
-    const orMock = vi.fn(() => ({
-        limit: limitMock
+    const keywordChain: {
+        eq: ReturnType<typeof vi.fn>
+        or: ReturnType<typeof vi.fn>
+    } = {
+        eq: vi.fn(),
+        or: vi.fn(() => ({
+            limit: limitMock
+        }))
+    }
+    keywordChain.eq.mockReturnValue(keywordChain)
+
+    const titleDocumentLimitMock = vi.fn(async () => ({
+        data: titleRows,
+        error: null
     }))
-    const eqMock = vi.fn(() => ({
-        or: orMock
+    const titleDocumentChain: {
+        eq: ReturnType<typeof vi.fn>
+        or: ReturnType<typeof vi.fn>
+    } = {
+        eq: vi.fn(),
+        or: vi.fn(() => ({
+            limit: titleDocumentLimitMock
+        }))
+    }
+    titleDocumentChain.eq.mockReturnValue(titleDocumentChain)
+
+    const titleChunkLimitMock = vi.fn(async () => ({
+        data: titleChunkRows,
+        error: null
     }))
-    const selectMock = vi.fn(() => ({
-        eq: eqMock
+    const titleChunkOrderMock = vi.fn(() => ({
+        limit: titleChunkLimitMock
     }))
-    const fromMock = vi.fn((table: string) => {
-        if (table !== 'knowledge_chunks') {
-            throw new Error(`Unexpected table ${table}`)
+    const titleChunkChain: {
+        eq: ReturnType<typeof vi.fn>
+        in: ReturnType<typeof vi.fn>
+        order: ReturnType<typeof vi.fn>
+    } = {
+        eq: vi.fn(),
+        in: vi.fn(),
+        order: titleChunkOrderMock
+    }
+    titleChunkChain.eq.mockReturnValue(titleChunkChain)
+    titleChunkChain.in.mockReturnValue(titleChunkChain)
+
+    const knowledgeChunksSelectMock = vi.fn((selection: string) => {
+        if (selection.includes('chunk_index')) {
+            return titleChunkChain
         }
 
-        return {
-            select: selectMock
+        return keywordChain
+    })
+    const knowledgeDocumentsSelectMock = vi.fn(() => titleDocumentChain)
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'knowledge_chunks') {
+            return {
+                select: knowledgeChunksSelectMock
+            }
         }
+
+        if (table === 'knowledge_documents') {
+            return {
+                select: knowledgeDocumentsSelectMock
+            }
+        }
+
+        throw new Error(`Unexpected table ${table}`)
     })
 
     return {
@@ -334,8 +408,11 @@ function createHybridSearchSupabase(options?: {
             from: fromMock
         },
         rpcMock,
-        orMock,
-        limitMock
+        orMock: keywordChain.or,
+        limitMock,
+        titleDocumentOrMock: titleDocumentChain.or,
+        titleDocumentLimitMock,
+        titleChunkLimitMock
     }
 }
 
@@ -836,6 +913,162 @@ describe('searchKnowledgeBase', () => {
         )
 
         expect(results[0]?.chunk_id).toBe('academic-staff-1')
+    })
+
+    it('adds title-matched early chunks for exact regulation metadata questions', async () => {
+        const { supabase, titleDocumentOrMock, titleDocumentLimitMock, titleChunkLimitMock } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-regulation-1',
+                    document_id: 'doc-generic-regulation-1',
+                    document_title: 'Tıp Fakültesi Mevzuatlar',
+                    document_type: 'article',
+                    content: 'Page Title: Tıp Fakültesi Mevzuatlar\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/mevzuatlar\n\nMevzuat listesi.',
+                    similarity: 0.64
+                }
+            ],
+            fallbackRows: [],
+            titleRows: [
+                {
+                    id: 'doc-title-1',
+                    title: 'Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi',
+                    type: 'article',
+                    status: 'ready'
+                }
+            ],
+            titleChunkRows: [
+                {
+                    id: 'title-chunk-1',
+                    document_id: 'doc-title-1',
+                    chunk_index: 0,
+                    content: 'Document Title: Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi\n\nKabul: 05.11.2025 tarihli ve 22 sayılı Senato’da 2025/122 sayılı karar ile kabul edilmiştir.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }
+            ]
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi hangi Senato kararıyla kabul edildi?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(titleDocumentOrMock).toHaveBeenCalled()
+        expect(titleDocumentLimitMock).toHaveBeenCalledWith(128)
+        expect(titleChunkLimitMock).toHaveBeenCalled()
+        expect(results[0]).toMatchObject({
+            chunk_id: 'title-chunk-1',
+            document_id: 'doc-title-1'
+        })
+        expect(results[0]?.content).toContain('2025/122')
+    })
+
+    it('prefers the canonical candidate student page when the user asks for the candidate student page', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'fees-1',
+                    document_id: 'doc-fees-1',
+                    document_title: 'Kayıt İşlemleri ve Ücretler',
+                    document_type: 'article',
+                    content: 'Page Title: Kayıt İşlemleri ve Ücretler\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/ogrenci/genel/kayit-islemleri-ve-ucretler\n\nKayıtlı öğrencilerin eğitim ücretleri.',
+                    similarity: 0.64
+                },
+                {
+                    chunk_id: 'candidate-1',
+                    document_id: 'doc-candidate-1',
+                    document_title: 'Tıp Puanları. Ankara Tıp Fakültesi ve Ankara\'da Tıp Bölümleri',
+                    document_type: 'article',
+                    content: 'Page Title: Tıp Puanları. Ankara Tıp Fakültesi ve Ankara\'da Tıp Bölümleri\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/aday-ogrenci\n\nÜCRETLER & BURSLAR\nKONTENJANLAR',
+                    similarity: 0.5
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Aday öğrenci sayfasında ücretler, burslar ve kontenjanlar için ne var?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('candidate-1')
+    })
+
+    it('prefers evergreen department pages over old hiring notices for department page questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'notice-1',
+                    document_id: 'doc-notice-1',
+                    document_title: 'Beslenme ve Diyetetik Bölümü Öğretim Görevlisi Alımı Sınav Sonucu',
+                    document_type: 'article',
+                    content: 'Page Title: Beslenme ve Diyetetik Bölümü Öğretim Görevlisi Alımı Sınav Sonucu\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/duyuru/beslenme-ve-diyetetik-bolumu-ogretim-gorevlisi-alimi-sinav-sonucu\n\nBeslenme ve Diyetetik Bölümü öğretim görevlisi alımı sınav sonucu.',
+                    similarity: 0.62
+                },
+                {
+                    chunk_id: 'department-1',
+                    document_id: 'doc-department-1',
+                    document_title: 'DEPARTMENT OF NUTRITION AND DIETETICS',
+                    document_type: 'article',
+                    content: 'Page Title: DEPARTMENT OF NUTRITION AND DIETETICS\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/beslenme-ve-diyetetik-bolumu\n\nAbout the Department of Nutrition and Dietetics\nCourse Schedules',
+                    similarity: 0.5
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Beslenme ve Diyetetik Bölümü sayfasında bölüm hakkında ve ders programı bilgileri var mı?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('department-1')
+    })
+
+    it('uses exact department slug phrase matches so similar health program pages do not outrank the named department', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'tele-health-1',
+                    document_id: 'doc-tele-health-1',
+                    document_title: 'VERİ TABANI, AĞ TASARIMI VE YÖNETİMİ BÖLÜMÜ<br>TELE-SAĞLIK TEKNİKERLİĞİ',
+                    document_type: 'article',
+                    content: 'Page Title: VERİ TABANI, AĞ TASARIMI VE YÖNETİMİ BÖLÜMÜ<br>TELE-SAĞLIK TEKNİKERLİĞİ\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/bolum/veri-tabani-ag-tasarimi-ve-yonetimi-bolumu-br-tele-saglik-teknikerligi\n\nTele-sağlık teknikerliği.',
+                    similarity: 0.62
+                },
+                {
+                    chunk_id: 'health-management-1',
+                    document_id: 'doc-health-management-1',
+                    document_title: 'HEALTH MANAGEMENT DEPARTMENT',
+                    document_type: 'article',
+                    content: 'Page Title: HEALTH MANAGEMENT DEPARTMENT\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/saglik-bilimleri-fakultesi/bolum/saglik-yonetimi-bolumu\n\nprofessional healthcare managers\ncritical thinking',
+                    similarity: 0.5
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Sağlık Yönetimi Bölümü sayfası hangi profesyonel sağlık yöneticilerini yetiştirmeyi hedefliyor?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('health-management-1')
     })
 })
 

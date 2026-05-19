@@ -550,9 +550,7 @@ async function importPageBatch({
     collectionId,
     language,
     embedTexts,
-    embeddingBatchSize,
-    crawlOutputDir,
-    skipUsage
+    embeddingBatchSize
 }) {
     const documentRows = batch.map(({ page }) => ({
         organization_id: organizationId,
@@ -572,7 +570,8 @@ async function importPageBatch({
 
     const documentIds = insertedDocuments.map((document) => document.id)
     let chunksImported = 0
-    let usageRows = 0
+    let embeddingPromptTokens = 0
+    let embeddingBatchCount = 0
 
     try {
         const pendingChunks = []
@@ -604,25 +603,8 @@ async function importPageBatch({
             }))
             await repository.insertChunks(rows)
             chunksImported += rows.length
-
-            if (!skipUsage && embeddingResult.promptTokens && typeof repository.recordEmbeddingUsage === 'function') {
-                await repository.recordEmbeddingUsage({
-                    organization_id: organizationId,
-                    category: 'embedding',
-                    model: 'text-embedding-3-small',
-                    input_tokens: embeddingResult.promptTokens,
-                    output_tokens: 0,
-                    total_tokens: embeddingResult.promptTokens,
-                    metadata: {
-                        source: 'crawl_corpus_import',
-                        crawl_output_dir: crawlOutputDir,
-                        page_batch_index: batchIndex,
-                        embedding_batch_index: embeddingBatchIndex,
-                        chunk_count: rows.length
-                    }
-                })
-                usageRows += 1
-            }
+            embeddingPromptTokens += embeddingResult.promptTokens
+            embeddingBatchCount += 1
         }
 
         await repository.updateDocumentsStatus(documentIds, 'ready')
@@ -630,7 +612,8 @@ async function importPageBatch({
         return {
             pagesImported: batch.length,
             chunksImported,
-            usageRows
+            embeddingPromptTokens,
+            embeddingBatchCount
         }
     } catch (error) {
         try {
@@ -673,6 +656,8 @@ export async function importCrawlCorpus(options = {}) {
     let pagesImported = 0
     let chunksImported = 0
     let usageRows = 0
+    let embeddingPromptTokens = 0
+    let embeddingBatchCount = 0
 
     for (const [batchIndex, batch] of chunkArray(importablePageChunks, batchSize).entries()) {
         const batchResult = await importPageBatch({
@@ -683,13 +668,12 @@ export async function importCrawlCorpus(options = {}) {
             collectionId: collection.id,
             language: options.language,
             embedTexts: options.embedTexts,
-            embeddingBatchSize,
-            crawlOutputDir: corpus.crawlOutputDir,
-            skipUsage: Boolean(options.skipUsage)
+            embeddingBatchSize
         })
         pagesImported += batchResult.pagesImported
         chunksImported += batchResult.chunksImported
-        usageRows += batchResult.usageRows
+        embeddingPromptTokens += batchResult.embeddingPromptTokens
+        embeddingBatchCount += batchResult.embeddingBatchCount
 
         if (typeof options.onProgress === 'function') {
             options.onProgress({
@@ -701,6 +685,30 @@ export async function importCrawlCorpus(options = {}) {
                 collectionName
             })
         }
+    }
+
+    if (
+        !options.skipUsage
+        && embeddingPromptTokens > 0
+        && typeof repository.recordEmbeddingUsage === 'function'
+    ) {
+        await repository.recordEmbeddingUsage({
+            organization_id: organizationId,
+            category: 'embedding',
+            model: 'text-embedding-3-small',
+            input_tokens: embeddingPromptTokens,
+            output_tokens: 0,
+            total_tokens: embeddingPromptTokens,
+            metadata: {
+                source: 'crawl_corpus_import',
+                crawl_output_dir: corpus.crawlOutputDir,
+                page_count: pagesImported,
+                chunk_count: chunksImported,
+                embedding_batch_count: embeddingBatchCount,
+                usage_compaction: 'crawl_import_total'
+            }
+        })
+        usageRows = 1
     }
 
     return {

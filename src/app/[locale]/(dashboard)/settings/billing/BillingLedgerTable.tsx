@@ -20,6 +20,7 @@ export interface BillingLedgerTableRow {
     creditsDelta: number
     balanceAfter: number
     isDebit: boolean
+    compactGroupKey?: string | null
 }
 
 export interface BillingLedgerAggregateTableRow {
@@ -243,6 +244,44 @@ export function buildBillingLedgerAggregateRows(input: {
         })
 }
 
+export function buildBillingLedgerEntryRows(input: {
+    rows: BillingLedgerTableRow[]
+    formatCredit: (value: number) => string
+}): BillingLedgerTableRow[] {
+    const groups = new Map<string, BillingLedgerTableRow & { compactedCount: number }>()
+    const output: BillingLedgerTableRow[] = []
+
+    for (const row of input.rows) {
+        const compactGroupKey = row.compactGroupKey?.trim()
+        if (!compactGroupKey) {
+            output.push(row)
+            continue
+        }
+
+        const existing = groups.get(compactGroupKey)
+        if (!existing) {
+            const groupedRow = { ...row, id: `compact-${compactGroupKey}`, compactedCount: 1 }
+            groups.set(compactGroupKey, groupedRow)
+            output.push(groupedRow)
+            continue
+        }
+
+        existing.compactedCount += 1
+        existing.creditsDelta += toFiniteNumber(row.creditsDelta)
+        existing.isDebit = existing.creditsDelta < 0
+        existing.deltaLabel = input.formatCredit(existing.creditsDelta)
+
+        if (new Date(row.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+            existing.createdAt = row.createdAt
+            existing.dateLabel = row.dateLabel
+            existing.balanceAfter = row.balanceAfter
+            existing.balanceLabel = row.balanceLabel
+        }
+    }
+
+    return output
+}
+
 export function BillingLedgerTable({
     rows,
     columns,
@@ -314,6 +353,13 @@ export function BillingLedgerTable({
         }),
         [aggregateLabels, formatCredits, formatSignedCredit, ledgerRows, locale, view]
     )
+    const entryRows = useMemo(
+        () => buildBillingLedgerEntryRows({
+            rows: ledgerRows,
+            formatCredit: formatSignedCredit
+        }),
+        [formatSignedCredit, ledgerRows]
+    )
 
     const loadEntryPage = (
         nextPeriod: BillingLedgerPeriodFilter,
@@ -377,7 +423,7 @@ export function BillingLedgerTable({
         loadAggregatePage(period, movement, view, loadOffset, 'append')
     }
 
-    const hasVisibleRows = view === 'entries' ? ledgerRows.length > 0 : aggregateRows.length > 0
+    const hasVisibleRows = view === 'entries' ? entryRows.length > 0 : aggregateRows.length > 0
 
     return (
         <div className="space-y-4">
@@ -467,7 +513,7 @@ export function BillingLedgerTable({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {ledgerRows.map((entry) => (
+                                {entryRows.map((entry) => (
                                     <tr key={entry.id}>
                                         <td className="px-4 py-3 align-top text-gray-600" title={entry.dateLabel}>{entry.dateLabel}</td>
                                         <td className="px-4 py-3 align-top text-gray-700" title={entry.typeLabel}>{entry.typeLabel}</td>

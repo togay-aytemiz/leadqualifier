@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import type { ReactNode } from 'react'
 import {
     BillingLedgerTable,
+    buildBillingLedgerEntryRows,
     buildBillingLedgerAggregateRows,
     type BillingLedgerTableRow
 } from './BillingLedgerTable'
@@ -281,6 +282,51 @@ describe('BillingLedgerTable', () => {
                 isNetDebit: false
             })
         ])
+    })
+
+    it('compacts same-day knowledge base indexing records into one visible entry', () => {
+        const compactRows = buildBillingLedgerEntryRows({
+            rows: [
+                {
+                    ...rows[3],
+                    id: 'kb-1',
+                    reasonDetailLabel: 'Knowledge Base indexing',
+                    creditsDelta: -2.8,
+                    deltaLabel: '-2.8',
+                    compactGroupKey: 'knowledge-base-indexing:2026-05-19'
+                },
+                {
+                    ...rows[3],
+                    id: 'kb-2',
+                    reasonDetailLabel: 'Knowledge Base indexing',
+                    creditsDelta: -4.8,
+                    deltaLabel: '-4.8',
+                    compactGroupKey: 'knowledge-base-indexing:2026-05-19'
+                },
+                {
+                    ...rows[3],
+                    id: 'ai-1',
+                    reasonDetailLabel: 'AI usage debit',
+                    creditsDelta: -0.2,
+                    deltaLabel: '-0.2'
+                }
+            ],
+            formatCredit: (value) => `${value < 0 ? '-' : '+'}${Math.abs(value).toFixed(1)}`
+        })
+
+        expect(compactRows).toHaveLength(2)
+        expect(compactRows[0]).toMatchObject({
+            id: 'compact-knowledge-base-indexing:2026-05-19',
+            reasonDetailLabel: 'Knowledge Base indexing',
+            creditsDelta: -7.6,
+            deltaLabel: '-7.6',
+            isDebit: true
+        })
+        expect(compactRows[1]).toMatchObject({
+            id: 'ai-1',
+            reasonDetailLabel: 'AI usage debit',
+            creditsDelta: -0.2
+        })
     })
 
     it('renders aggregate views without ledger implementation columns or truncated summary labels', () => {

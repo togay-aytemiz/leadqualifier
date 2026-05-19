@@ -65,12 +65,23 @@ interface KnowledgeSearchResult {
 interface KeywordSearchRow {
     id: string
     document_id: string
+    chunk_index?: number | null
     content: string
     knowledge_documents?: {
+        id?: string | null
         title?: string | null
         type?: string | null
         status?: string | null
+        collection_id?: string | null
+        language?: string | null
     } | null
+}
+
+interface TitleSearchDocumentRow {
+    id: string
+    title: string | null
+    type: string | null
+    status: string | null
 }
 
 /**
@@ -486,20 +497,27 @@ export async function searchKnowledgeBase(
         console.error('Embedding generation failed:', error)
     }
 
-    const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, Math.max(limit * 8, 40), {
+    const fallbackLimit = Math.max(limit * 8, 40)
+    const fallbackOptions = {
         collectionId: options?.collectionId ?? null,
         type: options?.type ?? null,
         language: options?.language ?? null,
         supabase
-    })
+    }
+    const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions)
+    const titleResults = await searchKnowledgeBaseByTitle(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
+    const sourceResults = shouldUseSourcePathFallback(query)
+        ? await searchKnowledgeBaseBySourcePath(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
+        : []
+    const lexicalResults = [...fallbackResults, ...titleResults, ...sourceResults]
 
-    if ((!data || data.length === 0) && fallbackResults.length > 0) {
-        return mergeSearchResults(query, [], fallbackResults, limit)
+    if ((!data || data.length === 0) && lexicalResults.length > 0) {
+        return mergeSearchResults(query, [], lexicalResults, limit)
     }
 
     if (!data) return []
 
-    return mergeSearchResults(query, data, fallbackResults, limit)
+    return mergeSearchResults(query, data, lexicalResults, limit)
 }
 export interface SidebarCollection extends KnowledgeCollection {
     files: Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>[]
@@ -760,6 +778,129 @@ function lexicalMatchScore(query: string, value: string) {
     return hits / groups.length
 }
 
+const SOURCE_SLUG_CONNECTORS = new Set(['ve', 'and', 'ile'])
+const SOURCE_SLUG_STOPWORDS = new Set([
+    'sayfasinda',
+    'sayfada',
+    'sayfanin',
+    'sayfaya',
+    'icin',
+    'midir',
+    'mi',
+    'mı',
+    'hedefliyor',
+    'yetistirmeyi'
+])
+
+function sourceSlugTokenSequence(query: string) {
+    const normalized = normalizeSearchText(query)
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    if (!normalized) return []
+
+    return normalized
+        .split(/\s+/)
+        .filter((token) => {
+            if (SOURCE_SLUG_CONNECTORS.has(token)) return true
+            return token.length >= 3 && !SOURCE_SLUG_STOPWORDS.has(token) && !isKeywordStopword(token)
+        })
+        .map((token) => SOURCE_SLUG_CONNECTORS.has(token) ? token : stemSearchToken(token))
+}
+
+function sourceSlugCandidates(query: string) {
+    const tokens = sourceSlugTokenSequence(query)
+    const priorityCandidates = new Set<string>()
+    const candidates = new Set<string>()
+
+    if (hasQuerySignal(query, ['aday ogrenci', 'aday öğrenci'])) {
+        priorityCandidates.add('aday-ogrenci')
+    }
+
+    tokens.forEach((token, index) => {
+        if (token !== 'bolum' && token !== 'bolumu') return
+
+        for (let start = Math.max(0, index - 4); start < index; start += 1) {
+            const slice = tokens.slice(start, index + 1)
+            const meaningfulTokenCount = slice.filter((item) => !SOURCE_SLUG_CONNECTORS.has(item)).length
+            if (meaningfulTokenCount >= 2) {
+                priorityCandidates.add(slice.join('-'))
+            }
+        }
+    })
+
+    for (let index = 1; index < tokens.length; index += 1) {
+        if (tokens[index - 1] === 'aday' && tokens[index] === 'ogrenci') {
+            priorityCandidates.add('aday-ogrenci')
+        }
+    }
+
+    for (let size = Math.min(5, tokens.length); size >= 2; size -= 1) {
+        for (let start = 0; start <= tokens.length - size; start += 1) {
+            const slice = tokens.slice(start, start + size)
+            const meaningfulTokenCount = slice.filter((token) => !SOURCE_SLUG_CONNECTORS.has(token)).length
+            if (meaningfulTokenCount < 2) continue
+
+            candidates.add(slice.join('-'))
+        }
+    }
+
+    return [...candidates]
+        .filter((candidate) => candidate.length >= 5)
+        .sort((left, right) => right.length - left.length)
+        .reduce<string[]>((items, candidate) => {
+            if (!priorityCandidates.has(candidate)) items.push(candidate)
+            return items
+        }, [...priorityCandidates])
+        .filter((candidate) => candidate.length >= 5)
+        .slice(0, 6)
+}
+
+function shouldUseSourcePathFallback(query: string) {
+    return hasQuerySignal(query, [
+        'sayfa',
+        'sayfasi',
+        'sayfası',
+        'link',
+        'nerede',
+        'aday ogrenci',
+        'aday öğrenci',
+        'bolum',
+        'bölüm',
+        'bolumu',
+        'bölümü',
+        'akademik takvim',
+        'iletisim',
+        'iletişim',
+        'koordinatorluk',
+        'koordinatörlük',
+        'yurt',
+        'yurtlar'
+    ])
+}
+
+function normalizedSourcePathSlug(sourceUrl: string) {
+    return normalizeSearchText(sourcePath(sourceUrl))
+        .replace(/[^\p{L}\p{N}]+/gu, '-')
+        .replace(/^-+|-+$/g, '')
+}
+
+function sourceSlugMatchScore(query: string, sourceUrl: string) {
+    const pathSlug = normalizedSourcePathSlug(sourceUrl)
+    if (!pathSlug) return 0
+
+    return sourceSlugCandidates(query).reduce((bestScore, candidate) => {
+        if (!pathSlug.includes(candidate)) return bestScore
+
+        const meaningfulTokenCount = candidate
+            .split('-')
+            .filter((token) => !SOURCE_SLUG_CONNECTORS.has(token)).length
+
+        return Math.max(bestScore, Math.min(1, meaningfulTokenCount / 3))
+    }, 0)
+}
+
 function extractSourceUrlFromContent(content: string) {
     return content.match(/^Source URL:\s*(.+)$/im)?.[1]?.trim() ?? ''
 }
@@ -814,6 +955,8 @@ function isTransientPath(pathname: string) {
 function pageTypeScore(query: string, sourceUrl: string) {
     const pathname = sourcePath(sourceUrl)
     const timeSensitive = isTimeSensitiveQuery(query)
+    const departmentPageQuery = hasQuerySignal(query, ['bolum', 'bölüm', 'bolumu', 'bölümü'])
+        && hasQuerySignal(query, ['sayfa', 'sayfasi', 'sayfası', 'hakkinda', 'hakkında', 'ders program'])
     let score = 0
 
     if (isEvergreenPath(pathname)) {
@@ -821,7 +964,7 @@ function pageTypeScore(query: string, sourceUrl: string) {
     }
 
     if (isTransientPath(pathname) && !timeSensitive) {
-        score -= 0.14
+        score -= departmentPageQuery ? 0.3 : 0.14
     }
 
     return score
@@ -830,6 +973,8 @@ function pageTypeScore(query: string, sourceUrl: string) {
 function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
     const pathname = normalizeSearchText(sourcePath(sourceUrl))
     const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    const title = normalizeSearchText(result.document_title ?? '')
+    const sourceSlugScore = sourceSlugMatchScore(query, sourceUrl)
     let score = 0
     const hasSpecificContactSubject = hasQuerySignal(query, [
         'koordinatorluk',
@@ -859,7 +1004,7 @@ function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSe
 
     if (hasQuerySignal(query, ['aday ogrenci', 'aday öğrenci'])
         && pathname === '/aday-ogrenci') {
-        score += 0.22
+        score += 0.36
     }
 
     if (hasQuerySignal(query, ['tarihce', 'tarihçe'])
@@ -899,6 +1044,45 @@ function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSe
         score += 0.22
     }
 
+    if (hasQuerySignal(query, ['bolum', 'bölüm', 'bolumu', 'bölümü'])
+        && pathname.includes('/bolum/')) {
+        score += 0.08
+    }
+
+    if (sourceSlugScore >= 0.8) {
+        score += pathname.includes('/bolum/') ? 0.18 : 0.1
+    }
+
+    if (hasQuerySignal(query, ['yonerge', 'yönerge'])
+        && title.includes('yonerge')) {
+        score += 0.14
+    }
+
+    if (hasQuerySignal(query, ['yonetmelik', 'yönetmelik'])
+        && title.includes('yonetmelik')) {
+        score += 0.14
+    }
+
+    if (hasQuerySignal(query, ['on lisans', 'ön lisans'])
+        && (title.includes('on lisans') || searchable.includes('on lisans'))) {
+        score += 0.16
+    }
+
+    if (hasQuerySignal(query, ['senato karari', 'senato kararı'])
+        && searchable.includes('senato')) {
+        score += 0.12
+    }
+
+    if (hasQuerySignal(query, ['akts'])
+        && searchable.includes('akts')) {
+        score += 0.16
+    }
+
+    if (hasQuerySignal(query, ['kapsam'])
+        && searchable.includes('kapsam')) {
+        score += 0.08
+    }
+
     return score
 }
 
@@ -908,11 +1092,13 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
     const contentScore = lexicalMatchScore(query, `${result.document_title}\n${result.content}`)
     const titleScore = lexicalMatchScore(query, result.document_title ?? '')
     const sourceUrlScore = lexicalMatchScore(query, sourceUrl)
+    const sourceSlugScore = sourceSlugMatchScore(query, sourceUrl)
 
     return similarity * 0.6
         + contentScore * 0.4
         + titleScore * 0.15
         + sourceUrlScore * 0.18
+        + sourceSlugScore * 0.3
         + pageTypeScore(query, sourceUrl)
         + directIntentScore(query, sourceUrl, result)
 }
@@ -992,6 +1178,162 @@ async function searchKnowledgeBaseByKeyword(
                 0.45 + lexicalMatchScore(query, `${row.knowledge_documents?.title ?? ''}\n${row.content}`) * 0.25
             )
         }))
+}
+
+async function searchKnowledgeBaseByTitle(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const supabase = options?.supabase || await createClient()
+    const keywords = Array.from(new Set(extractKeywordTokens(query).flatMap(expandKeywordToken)))
+    if (keywords.length === 0) return []
+
+    const filters = keywords
+        .map((keyword) => `title.ilike.%${sanitizeKeyword(keyword)}%`)
+        .join(',')
+
+    let documentQuery = supabase
+        .from('knowledge_documents')
+        .select('id, title, type, status')
+        .eq('organization_id', organizationId)
+        .eq('status', 'ready')
+
+    if (options?.collectionId) {
+        documentQuery = documentQuery.eq('collection_id', options.collectionId)
+    }
+    if (options?.type) {
+        documentQuery = documentQuery.eq('type', options.type)
+    }
+    if (options?.language) {
+        documentQuery = documentQuery.eq('language', options.language)
+    }
+
+    const documentCandidateLimit = Math.max(limit * 8, 120)
+    const { data: documents, error: documentError } = await documentQuery
+        .or(filters)
+        .limit(documentCandidateLimit)
+    if (documentError || !documents) {
+        console.error('Title fallback document search failed:', documentError)
+        return []
+    }
+
+    const rankedDocuments = (documents as TitleSearchDocumentRow[])
+        .filter((row) => row.status === 'ready')
+        .map((row) => ({
+            ...row,
+            score: lexicalMatchScore(query, row.title ?? '')
+        }))
+        .filter((row) => row.score >= 0.35)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, Math.max(4, Math.min(12, limit)))
+
+    const documentIds = rankedDocuments.map((row) => row.id)
+    if (documentIds.length === 0) return []
+
+    const documentById = new Map(rankedDocuments.map((row) => [row.id, row]))
+    const { data: chunks, error: chunkError } = await supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, chunk_index, content, knowledge_documents(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .in('document_id', documentIds)
+        .order('chunk_index')
+        .limit(Math.max(limit * 3, 24))
+
+    if (chunkError || !chunks) {
+        console.error('Title fallback chunk search failed:', chunkError)
+        return []
+    }
+
+    return (chunks as KeywordSearchRow[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => {
+            const documentScore = documentById.get(row.document_id)?.score ?? 0
+            const chunkScore = lexicalMatchScore(query, `${row.knowledge_documents?.title ?? ''}\n${row.content}`)
+            const earlyChunkBoost = Math.max(0, 0.08 - Number(row.chunk_index ?? 0) * 0.015)
+
+            return {
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: row.knowledge_documents?.title ?? 'Untitled',
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content: row.content as string,
+                similarity: Math.max(
+                    0.2,
+                    0.5 + documentScore * 0.18 + chunkScore * 0.2 + earlyChunkBoost
+                )
+            }
+        })
+}
+
+async function searchKnowledgeBaseBySourcePath(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const supabase = options?.supabase || await createClient()
+    const candidates = sourceSlugCandidates(query)
+    if (candidates.length === 0) return []
+
+    const filters = candidates
+        .map((candidate) => `content.ilike.%${sanitizeKeyword(candidate)}%`)
+        .join(',')
+
+    let sourceQuery = supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, content, knowledge_documents!inner(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .or(filters)
+        .limit(Math.max(limit * 4, 24))
+
+    if (options?.collectionId) {
+        sourceQuery = sourceQuery.eq('knowledge_documents.collection_id', options.collectionId)
+    }
+    if (options?.type) {
+        sourceQuery = sourceQuery.eq('knowledge_documents.type', options.type)
+    }
+    if (options?.language) {
+        sourceQuery = sourceQuery.eq('knowledge_documents.language', options.language)
+    }
+
+    const { data, error } = await sourceQuery
+    if (error || !data) {
+        console.error('Source URL fallback search failed:', error)
+        return []
+    }
+
+    return (data as KeywordSearchRow[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => {
+            const documentTitle = row.knowledge_documents?.title ?? 'Untitled'
+            const sourceUrl = extractSourceUrlFromContent(row.content)
+            const sourceScore = sourceSlugMatchScore(query, sourceUrl)
+            const chunkScore = lexicalMatchScore(query, `${documentTitle}\n${row.content}\n${sourceUrl}`)
+
+            return {
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: documentTitle,
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content: row.content as string,
+                similarity: Math.max(
+                    0.2,
+                    0.52 + sourceScore * 0.24 + chunkScore * 0.16
+                )
+            }
+        })
 }
 
 function chunkContentHasMetadata(content: string) {
