@@ -118,11 +118,13 @@ export function UsageBreakdownDetails({ usage }: UsageBreakdownDetailsProps) {
     const monthlyAiReplies = toSafeCredit(usage.monthly.breakdown.aiReplies)
     const monthlySummary = toSafeCredit(usage.monthly.breakdown.conversationSummary)
     const monthlyLeadExtraction = toSafeCredit(usage.monthly.breakdown.leadExtraction)
-    const monthlyDocumentProcessing = toSafeCredit(usage.monthly.breakdown.documentProcessing)
+    const monthlyKnowledgeBaseIndexing = toSafeCredit(usage.monthly.breakdown.knowledgeBaseIndexing)
+    const monthlyContentProcessing = toSafeCredit(usage.monthly.breakdown.contentProcessing)
     const totalAiReplies = toSafeCredit(usage.total.breakdown.aiReplies)
     const totalSummary = toSafeCredit(usage.total.breakdown.conversationSummary)
     const totalLeadExtraction = toSafeCredit(usage.total.breakdown.leadExtraction)
-    const totalDocumentProcessing = toSafeCredit(usage.total.breakdown.documentProcessing)
+    const totalKnowledgeBaseIndexing = toSafeCredit(usage.total.breakdown.knowledgeBaseIndexing)
+    const totalContentProcessing = toSafeCredit(usage.total.breakdown.contentProcessing)
     const rows: UsageBreakdownTableRow[] = [
         {
             label: t('creditsLabel'),
@@ -146,9 +148,14 @@ export function UsageBreakdownDetails({ usage }: UsageBreakdownDetailsProps) {
             total: totalLeadExtraction
         },
         {
-            label: t('documentProcessingLabel'),
-            monthly: monthlyDocumentProcessing,
-            total: totalDocumentProcessing
+            label: t('knowledgeBaseIndexingLabel'),
+            monthly: monthlyKnowledgeBaseIndexing,
+            total: totalKnowledgeBaseIndexing
+        },
+        {
+            label: t('contentProcessingLabel'),
+            monthly: monthlyContentProcessing,
+            total: totalContentProcessing
         }
     ]
 

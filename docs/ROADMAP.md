@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Update Note (2026-05-18):** Text embedding usage now has category/model-aware credit costing instead of chat-token weighting. `text-embedding-3-small` Knowledge Base indexing is priced from the embedding token rate, admin token cards expose input/output/text-embedding breakdown on hover, and Usage ledger rows label KB import debits as `Bilgi Bankası indeksleme`.
+> **Update Note (2026-05-18):** Text embedding usage now has category/model-aware credit costing instead of chat-token weighting. `text-embedding-3-small` Knowledge Base indexing is priced from the embedding token rate, admin token cards expose input/output/text-embedding breakdown on hover, Usage ledger rows and the usage-details modal label KB import debits as `Bilgi Bankası indeksleme`, customer Usage summaries/history recalculate linked usage debits from token rows, and storage fallback reads paginate Knowledge documents beyond Supabase's default 1000-row page.
 
 > **Update Note (2026-05-15):** Admin manual billing now aligns the control panel with tenant credit visibility. Organization detail shows remaining package/trial credits first, used/limit only as helper context, manual premium assignment refuses zero-credit grants before the RPC, the `admin_assign_premium` migration reasserts package grant/renewal metadata, and billing action buttons show a disabled processing state to prevent repeated clicks.
 
@@ -267,7 +267,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-18 (Text embedding credit costing, admin token breakdown, and KB indexing ledger labels aligned.)
+> **Last Updated:** 2026-05-18 (Text embedding credit costing, customer/admin usage visibility, and 1000+ Knowledge document storage counts aligned.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -852,6 +852,9 @@
 - [x] **Usage & Billing Reliability:** Start tracking embedding token usage in `organization_ai_usage` for skill matching and knowledge retrieval/indexing flows
 - [x] **Usage & Billing Reliability:** Price text embeddings with category/model-aware credit costs so KB indexing does not consume chat-completion-rate credits
 - [x] **Usage & Billing UI:** Label KB import embedding debits as `Bilgi Bankası indeksleme` in credit history instead of generic AI usage
+- [x] **Usage & Billing UI:** Split `Bilgi Bankası indeksleme` from generic content processing in the Usage breakdown modal so KB embedding/import costs have their own user-facing row
+- [x] **Usage & Billing Reliability:** Recalculate customer Usage summary and credit-history debit display from linked `organization_ai_usage` token rows when available, so legacy embedding ledger rows use the corrected cost formula
+- [x] **Usage & Billing Reliability:** Paginate storage fallback reads for Skills and Knowledge documents so `Settings > Usage` can show Knowledge document counts above 1000
 - [x] **Billing Lock Enforcement:** Add runtime entitlement re-check stages in shared inbound pipeline + Telegram webhook to stop follow-up AI calls after lock transition
 - [x] **Billing Lock Enforcement:** Block offering-profile suggestion/service-catalog/required-intake AI generation when organization usage is locked
 - [x] **Webhook Reliability:** Add Telegram inbound duplicate dedupe (`metadata.telegram_message_id`) to avoid duplicate processing and duplicate AI spend

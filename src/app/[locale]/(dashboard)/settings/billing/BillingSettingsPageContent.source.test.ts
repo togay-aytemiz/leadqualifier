@@ -62,9 +62,21 @@ describe('billing settings page source guard', () => {
             : ''
 
         expect(source).toContain(".from('organization_ai_usage')")
-        expect(source).toContain(".select('id, category, metadata')")
+        expect(source).toContain(".select('id, category, model, input_tokens, output_tokens, metadata')")
         expect(source).toContain('knowledgeBaseIndexing')
         expect(source).toContain('crawl_corpus_import')
         expect(source).toContain('knowledge_chunk_index_embedding')
+    })
+
+    it('recalculates displayed usage debit deltas from linked AI usage token rows', () => {
+        expect(fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)).toBe(true)
+
+        const source = fs.existsSync(BILLING_SETTINGS_PAGE_CONTENT_PATH)
+            ? fs.readFileSync(BILLING_SETTINGS_PAGE_CONTENT_PATH, 'utf8')
+            : ''
+
+        expect(source).toContain('calculateAiUsageCreditCost')
+        expect(source).toContain(".select('id, category, model, input_tokens, output_tokens, metadata')")
+        expect(source).toContain('resolveDisplayCreditsDelta')
     })
 })

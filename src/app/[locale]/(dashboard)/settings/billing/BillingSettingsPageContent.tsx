@@ -7,6 +7,7 @@ import {
     getOrgCreditUsageSummary,
     getOrgStorageUsageSummary,
 } from '@/lib/billing/usage'
+import { calculateAiUsageCreditCost } from '@/lib/billing/credit-cost'
 import {
     getOrganizationBillingLedgerWindow,
     getOrganizationBillingLedgerPage,
@@ -68,6 +69,9 @@ interface LedgerOrderLookupRow {
 
 interface LedgerUsageLookupRow {
     category: string | null
+    model: string | null
+    inputTokens: number | null
+    outputTokens: number | null
     metadata: unknown
 }
 
@@ -84,6 +88,12 @@ function readString(record: Record<string, unknown> | null, key: string): string
 function readNumber(record: Record<string, unknown> | null, key: string): number | null {
     const value = record?.[key]
     const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function toNullableFiniteNumber(value: unknown) {
+    if (value === null || value === undefined || value === '') return null
+    const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
     return Number.isFinite(parsed) ? parsed : null
 }
 
@@ -135,6 +145,19 @@ function resolveUsageDebitLabel(
     default:
         return tBilling('ledger.reasonMap.contentIndexing')
     }
+}
+
+function resolveDisplayCreditsDelta(entry: BillingLedgerEntry, usage: LedgerUsageLookupRow | null) {
+    if (!usage || usage.inputTokens === null || usage.outputTokens === null) return entry.creditsDelta
+
+    const credits = calculateAiUsageCreditCost({
+        category: usage.category,
+        model: usage.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens
+    })
+
+    return credits > 0 ? -credits : entry.creditsDelta
 }
 
 function resolveLedgerReasonLabel(
@@ -336,7 +359,7 @@ async function buildLedgerTableRows(input: {
     if (relatedUsageIds.length > 0) {
         const { data, error } = await input.supabase
             .from('organization_ai_usage')
-            .select('id, category, metadata')
+            .select('id, category, model, input_tokens, output_tokens, metadata')
             .eq('organization_id', input.organizationId)
             .in('id', relatedUsageIds)
 
@@ -346,6 +369,9 @@ async function buildLedgerTableRows(input: {
             for (const row of data ?? []) {
                 usageRowsById.set(row.id, {
                     category: row.category,
+                    model: row.model,
+                    inputTokens: toNullableFiniteNumber(row.input_tokens),
+                    outputTokens: toNullableFiniteNumber(row.output_tokens),
                     metadata: row.metadata
                 })
             }
@@ -361,7 +387,9 @@ async function buildLedgerTableRows(input: {
     })
 
     return input.entries.map((entry) => {
-        const isDebit = entry.creditsDelta < 0
+        const usage = entry.usageId ? usageRowsById.get(entry.usageId) ?? null : null
+        const displayCreditsDelta = resolveDisplayCreditsDelta(entry, usage)
+        const isDebit = displayCreditsDelta < 0
         const reasonDetailLabel = resolveLedgerReasonLabel(
             input.tBilling,
             input.locale,
@@ -377,11 +405,11 @@ async function buildLedgerTableRows(input: {
             dateLabel: formatDateTime.format(new Date(entry.createdAt)),
             typeLabel: resolveCompactLedgerEntryLabel(input.tBilling, entry.entryType),
             poolLabel: resolveCompactLedgerPoolLabel(input.tBilling, entry.creditPool),
-            deltaLabel: `${isDebit ? '-' : '+'}${formatCreditAmount(Math.abs(entry.creditsDelta), input.locale)}`,
+            deltaLabel: `${isDebit ? '-' : '+'}${formatCreditAmount(Math.abs(displayCreditsDelta), input.locale)}`,
             balanceLabel: formatCreditAmount(entry.balanceAfter, input.locale),
             reasonLabel: resolveCompactLedgerReasonLabel(input.tBilling, entry),
             reasonDetailLabel,
-            creditsDelta: entry.creditsDelta,
+            creditsDelta: displayCreditsDelta,
             balanceAfter: entry.balanceAfter,
             isDebit
         }

@@ -140,7 +140,7 @@ describe('billing usage helpers', () => {
         expect(summary.total.count).toBe(2)
     })
 
-    it('builds user-friendly breakdown buckets including document processing sources', () => {
+    it('builds user-friendly breakdown buckets including content processing sources', () => {
         const summary = buildCreditUsageSummary(
             [
                 {
@@ -188,7 +188,8 @@ describe('billing usage helpers', () => {
         expect(summary.monthly.breakdown.aiReplies).toBeCloseTo(1.0, 5)
         expect(summary.monthly.breakdown.conversationSummary).toBeCloseTo(0.2, 5)
         expect(summary.monthly.breakdown.leadExtraction).toBeCloseTo(0.3, 5)
-        expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(1.1, 5)
+        expect(summary.monthly.breakdown.contentProcessing).toBeCloseTo(1.1, 5)
+        expect(summary.monthly.breakdown.knowledgeBaseIndexing).toBeCloseTo(0, 5)
     })
 
     it('routes embedding and follow-up costs into visible billing buckets', () => {
@@ -260,7 +261,61 @@ describe('billing usage helpers', () => {
         expect(summary.monthly.breakdown.aiReplies).toBeCloseTo(0.7, 5)
         expect(summary.monthly.breakdown.conversationSummary).toBeCloseTo(0.2, 5)
         expect(summary.monthly.breakdown.leadExtraction).toBeCloseTo(0.6, 5)
-        expect(summary.monthly.breakdown.documentProcessing).toBeCloseTo(1.1, 5)
+        expect(summary.monthly.breakdown.contentProcessing).toBeCloseTo(0.7, 5)
+        expect(summary.monthly.breakdown.knowledgeBaseIndexing).toBeCloseTo(0.4, 5)
+    })
+
+    it('routes crawl corpus import embedding costs into knowledge base indexing', () => {
+        const summary = buildCreditUsageSummary(
+            [
+                {
+                    created_at: '2026-05-15T20:10:48.000Z',
+                    credits_delta: -4.3,
+                    metadata: { category: 'embedding', source: 'crawl_corpus_import' }
+                }
+            ],
+            {
+                now: new Date('2026-05-15T21:00:00.000Z'),
+                timeZone: 'Europe/Istanbul'
+            }
+        )
+
+        expect(summary.monthly.breakdown.knowledgeBaseIndexing).toBeCloseTo(4.3, 5)
+        expect(summary.total.breakdown.knowledgeBaseIndexing).toBeCloseTo(4.3, 5)
+        expect(summary.monthly.breakdown.contentProcessing).toBeCloseTo(0, 5)
+    })
+
+    it('recalculates linked text embedding usage credits for customer usage summaries', async () => {
+        const organizationId = 'org_1'
+        const supabase = createUsageSummarySupabaseMock({
+            ledgerRows: [{
+                organization_id: organizationId,
+                entry_type: 'usage_debit',
+                created_at: '2026-05-15T20:10:48.000Z',
+                credits_delta: -7.5,
+                usage_id: 'usage_embedding_1',
+                metadata: { category: 'embedding', model: 'text-embedding-3-small' }
+            }],
+            usageRows: [{
+                id: 'usage_embedding_1',
+                organization_id: organizationId,
+                category: 'embedding',
+                model: 'text-embedding-3-small',
+                input_tokens: 22_500,
+                output_tokens: 0,
+                metadata: { source: 'crawl_corpus_import' }
+            }]
+        })
+
+        const summary = await getOrgCreditUsageSummary(organizationId, {
+            supabase: supabase as never,
+            now: new Date('2026-05-15T21:00:00.000Z'),
+            timeZone: 'Europe/Istanbul'
+        })
+
+        expect(summary.monthly.credits).toBeCloseTo(1, 5)
+        expect(summary.total.credits).toBeCloseTo(1, 5)
+        expect(summary.monthly.breakdown.knowledgeBaseIndexing).toBeCloseTo(1, 5)
     })
 
     it('loads all usage debit ledger rows beyond Supabase default 1000-row page', async () => {
@@ -305,6 +360,10 @@ interface UsageSummarySupabaseRow {
     usage_id?: string
     metadata?: unknown
     id?: string
+    category?: string
+    model?: string
+    input_tokens?: number
+    output_tokens?: number
 }
 
 interface StorageUsageListItem {
@@ -326,6 +385,10 @@ function createUsageSummarySupabaseMock(options: {
                 .filter((row) => typeof row.id === 'string' && idSet.has(row.id))
                 .map((row) => ({
                     id: row.id,
+                    category: row.category ?? null,
+                    model: row.model ?? null,
+                    input_tokens: row.input_tokens ?? null,
+                    output_tokens: row.output_tokens ?? null,
                     metadata: row.metadata ?? {}
                 })),
             error: null
@@ -457,25 +520,11 @@ function createStorageUsageSupabaseMock(options: {
     }))
     const fromMock = vi.fn((table: string) => {
         if (table === 'skills') {
-            return {
-                select: vi.fn(() => ({
-                    eq: vi.fn(async () => ({
-                        data: options.skillsRows ?? [],
-                        error: null
-                    }))
-                }))
-            }
+            return createStorageTableQueryMock(options.skillsRows ?? [])
         }
 
         if (table === 'knowledge_documents') {
-            return {
-                select: vi.fn(() => ({
-                    eq: vi.fn(async () => ({
-                        data: options.knowledgeRows ?? [],
-                        error: null
-                    }))
-                }))
-            }
+            return createStorageTableQueryMock(options.knowledgeRows ?? [])
         }
 
         throw new Error(`Unexpected table for storage summary mock: ${table}`)
@@ -488,6 +537,25 @@ function createStorageUsageSupabaseMock(options: {
             from: storageFromMock
         }
     }
+}
+
+function createStorageTableQueryMock<T>(rows: T[]) {
+    const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        range: vi.fn(async (from: number, to: number) => ({
+            data: rows.slice(from, to + 1),
+            error: null
+        })),
+        then: (
+            resolve: (value: { data: T[]; error: null }) => unknown
+        ) => resolve({
+            data: rows.slice(0, 1000),
+            error: null
+        })
+    }
+
+    return query
 }
 
 describe('getOrgStorageUsageSummary', () => {
@@ -553,6 +621,25 @@ describe('getOrgStorageUsageSummary', () => {
             knowledgeDocumentCount: 1
         })
         expect(supabase.from).toHaveBeenCalledTimes(2)
+    })
+
+    it('paginates storage fallback knowledge rows beyond Supabase default 1000-row page', async () => {
+        const knowledgeRows = Array.from({ length: 1005 }, () => ({
+            title: 'D',
+            content: 'abc'
+        }))
+        const supabase = createStorageUsageSupabaseMock({
+            rpcError: { message: 'function missing' },
+            skillsRows: [],
+            knowledgeRows
+        })
+
+        const summary = await getOrgStorageUsageSummary('org-1', {
+            supabase: supabase as never
+        })
+
+        expect(summary.knowledgeDocumentCount).toBe(1005)
+        expect(summary.knowledgeBytes).toBe(4020)
     })
 
     it('reconciles WhatsApp media usage from storage listing when RPC media values are zero', async () => {

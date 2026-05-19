@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { calculateAiUsageCreditCost } from '@/lib/billing/credit-cost'
 
 export interface MessageUsageCounts {
     aiGenerated: number
@@ -71,7 +72,8 @@ export interface CreditUsageBreakdown {
     aiReplies: number
     conversationSummary: number
     leadExtraction: number
-    documentProcessing: number
+    knowledgeBaseIndexing: number
+    contentProcessing: number
 }
 
 export interface CreditUsageTotals {
@@ -131,6 +133,7 @@ const WHATSAPP_MEDIA_BUCKET = process.env.WHATSAPP_MEDIA_BUCKET?.trim() || DEFAU
 const CREDIT_USAGE_LEDGER_PAGE_SIZE = 1000
 const USAGE_METADATA_BATCH_SIZE = 200
 const STORAGE_LIST_PAGE_SIZE = 1000
+const STORAGE_USAGE_ROW_PAGE_SIZE = 1000
 const DOCUMENT_PROCESSING_SOURCES = new Set([
     'offering_profile_suggestion',
     'required_intake_fields',
@@ -142,6 +145,7 @@ const AI_REPLY_EMBEDDING_SOURCES = new Set([
     'skill_query_embedding'
 ])
 const DOCUMENT_PROCESSING_EMBEDDING_SOURCES = new Set([
+    'crawl_corpus_import',
     'knowledge_chunk_index_embedding',
     'skill_index_embedding'
 ])
@@ -237,7 +241,8 @@ function buildBreakdownTotals(): CreditUsageBreakdown {
         aiReplies: 0,
         conversationSummary: 0,
         leadExtraction: 0,
-        documentProcessing: 0
+        knowledgeBaseIndexing: 0,
+        contentProcessing: 0
     }
 }
 
@@ -246,7 +251,8 @@ function withRoundedBreakdown(totals: CreditUsageBreakdown): CreditUsageBreakdow
         aiReplies: roundToSingleDecimal(totals.aiReplies),
         conversationSummary: roundToSingleDecimal(totals.conversationSummary),
         leadExtraction: roundToSingleDecimal(totals.leadExtraction),
-        documentProcessing: roundToSingleDecimal(totals.documentProcessing)
+        knowledgeBaseIndexing: roundToSingleDecimal(totals.knowledgeBaseIndexing),
+        contentProcessing: roundToSingleDecimal(totals.contentProcessing)
     }
 }
 
@@ -270,7 +276,7 @@ function addToBreakdown(options: {
 
     if (category === 'lead_extraction') {
         if (source && DOCUMENT_PROCESSING_SOURCES.has(source)) {
-            totals.documentProcessing += credits
+            totals.contentProcessing += credits
             return
         }
 
@@ -290,7 +296,7 @@ function addToBreakdown(options: {
         }
 
         if (source && DOCUMENT_PROCESSING_EMBEDDING_SOURCES.has(source)) {
-            totals.documentProcessing += credits
+            totals.knowledgeBaseIndexing += credits
         }
     }
 }
@@ -439,7 +445,25 @@ async function loadAllUsageDebitLedgerRows(
 
 interface UsageMetadataLookupRow {
     id: string
+    category: string | null
+    model: string | null
+    input_tokens: number | string | null
+    output_tokens: number | string | null
     metadata: unknown
+}
+
+interface UsageMetadataLookupValue {
+    category: string | null
+    model: string | null
+    inputTokens: number | null
+    outputTokens: number | null
+    metadata: unknown
+}
+
+function toNullableFiniteNumber(value: unknown) {
+    if (value === null || value === undefined || value === '') return null
+    const parsed = typeof value === 'string' ? Number.parseFloat(value) : Number(value)
+    return Number.isFinite(parsed) ? parsed : null
 }
 
 async function loadUsageMetadataByIds(options: {
@@ -447,12 +471,12 @@ async function loadUsageMetadataByIds(options: {
     organizationId: string
     usageIds: string[]
 }) {
-    const usageMetadataById = new Map<string, unknown>()
+    const usageMetadataById = new Map<string, UsageMetadataLookupValue>()
 
     for (const usageIdChunk of splitIntoChunks(options.usageIds, USAGE_METADATA_BATCH_SIZE)) {
         const { data, error } = await options.supabase
             .from('organization_ai_usage')
-            .select('id, metadata')
+            .select('id, category, model, input_tokens, output_tokens, metadata')
             .eq('organization_id', options.organizationId)
             .in('id', usageIdChunk)
 
@@ -462,11 +486,33 @@ async function loadUsageMetadataByIds(options: {
         }
 
         for (const row of (data ?? []) as UsageMetadataLookupRow[]) {
-            usageMetadataById.set(row.id, row.metadata)
+            usageMetadataById.set(row.id, {
+                category: row.category,
+                model: row.model,
+                inputTokens: toNullableFiniteNumber(row.input_tokens),
+                outputTokens: toNullableFiniteNumber(row.output_tokens),
+                metadata: row.metadata
+            })
         }
     }
 
     return usageMetadataById
+}
+
+function resolveCreditDeltaFromUsage(
+    row: CreditUsageLedgerRow,
+    usage: UsageMetadataLookupValue | null
+) {
+    if (!usage || usage.inputTokens === null || usage.outputTokens === null) return row.credits_delta
+
+    const credits = calculateAiUsageCreditCost({
+        category: usage.category,
+        model: usage.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens
+    })
+
+    return credits > 0 ? -credits : row.credits_delta
 }
 
 export function buildCreditUsageSummary(
@@ -575,17 +621,20 @@ export async function getOrgCreditUsageSummary(
             organizationId,
             usageIds
         })
-        : new Map<string, unknown>()
+        : new Map<string, UsageMetadataLookupValue>()
 
     const normalizedRows = ledgerRows.map((row) => {
         const ledgerMetadata = toRecord(row.metadata) ?? {}
-        const usageMetadata = row.usage_id ? toRecord(usageMetadataById.get(row.usage_id) ?? null) : null
+        const usage = row.usage_id ? usageMetadataById.get(row.usage_id) ?? null : null
+        const usageMetadata = toRecord(usage?.metadata ?? null)
 
         return {
             created_at: row.created_at,
-            credits_delta: row.credits_delta,
+            credits_delta: resolveCreditDeltaFromUsage(row, usage),
             metadata: {
                 ...ledgerMetadata,
+                ...(usage?.category ? { category: usage.category } : {}),
+                ...(usage?.model ? { model: usage.model } : {}),
                 ...(usageMetadata ? { source: readString(usageMetadata, 'source') } : {})
             }
         } satisfies CreditUsageLedgerRow
@@ -855,27 +904,10 @@ export async function getOrgStorageUsageSummary(
         console.warn('Failed to load storage summary via RPC, using table fallback:', storageRpcError)
     }
 
-    const [skillsResult, knowledgeResult] = await Promise.all([
-        supabase
-            .from('skills')
-            .select('title, response_text, trigger_examples')
-            .eq('organization_id', organizationId),
-        supabase
-            .from('knowledge_documents')
-            .select('title, content')
-            .eq('organization_id', organizationId)
+    const [skillsRows, knowledgeRows] = await Promise.all([
+        loadAllSkillStorageRows(supabase, organizationId),
+        loadAllKnowledgeStorageRows(supabase, organizationId)
     ])
-
-    if (skillsResult.error) {
-        console.error('Failed to load skill storage usage:', skillsResult.error)
-    }
-
-    if (knowledgeResult.error) {
-        console.error('Failed to load knowledge storage usage:', knowledgeResult.error)
-    }
-
-    const skillsRows = (skillsResult.data ?? []) as SkillStorageRow[]
-    const knowledgeRows = (knowledgeResult.data ?? []) as KnowledgeStorageRow[]
 
     const skillsBytes = calculateSkillStorageBytes(skillsRows)
     const knowledgeBytes = calculateKnowledgeStorageBytes(knowledgeRows)
@@ -894,4 +926,62 @@ export async function getOrgStorageUsageSummary(
         skillCount: skillsRows.length,
         knowledgeDocumentCount: knowledgeRows.length
     }
+}
+
+async function loadAllSkillStorageRows(
+    supabase: SupabaseClient,
+    organizationId: string
+): Promise<SkillStorageRow[]> {
+    const rows: SkillStorageRow[] = []
+    let offset = 0
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('skills')
+            .select('title, response_text, trigger_examples')
+            .eq('organization_id', organizationId)
+            .range(offset, offset + STORAGE_USAGE_ROW_PAGE_SIZE - 1)
+
+        if (error) {
+            console.error('Failed to load skill storage usage:', error)
+            break
+        }
+
+        const pageRows = (data ?? []) as SkillStorageRow[]
+        rows.push(...pageRows)
+
+        if (pageRows.length < STORAGE_USAGE_ROW_PAGE_SIZE) break
+        offset += STORAGE_USAGE_ROW_PAGE_SIZE
+    }
+
+    return rows
+}
+
+async function loadAllKnowledgeStorageRows(
+    supabase: SupabaseClient,
+    organizationId: string
+): Promise<KnowledgeStorageRow[]> {
+    const rows: KnowledgeStorageRow[] = []
+    let offset = 0
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('knowledge_documents')
+            .select('title, content')
+            .eq('organization_id', organizationId)
+            .range(offset, offset + STORAGE_USAGE_ROW_PAGE_SIZE - 1)
+
+        if (error) {
+            console.error('Failed to load knowledge storage usage:', error)
+            break
+        }
+
+        const pageRows = (data ?? []) as KnowledgeStorageRow[]
+        rows.push(...pageRows)
+
+        if (pageRows.length < STORAGE_USAGE_ROW_PAGE_SIZE) break
+        offset += STORAGE_USAGE_ROW_PAGE_SIZE
+    }
+
+    return rows
 }
