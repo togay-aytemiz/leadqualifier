@@ -1,4 +1,4 @@
-export type OutboundTextPlatform = 'whatsapp' | 'telegram' | 'instagram'
+export type OutboundTextPlatform = 'whatsapp' | 'telegram' | 'instagram' | 'demo_chat'
 
 export interface OutboundTextFormatOptions {
     platform: OutboundTextPlatform

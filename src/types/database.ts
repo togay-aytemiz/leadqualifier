@@ -369,7 +369,7 @@ export interface SkillMatch {
 }
 
 // Inbox Types
-export type ConversationPlatform = 'whatsapp' | 'telegram' | 'instagram' | 'simulator'
+export type ConversationPlatform = 'whatsapp' | 'telegram' | 'instagram' | 'simulator' | 'demo_chat'
 export type ConversationStatus = 'open' | 'closed' | 'snoozed'
 export type MessageSenderType = 'user' | 'contact' | 'system' | 'bot'
 export type HumanAttentionReason = 'skill_handover' | 'hot_lead'

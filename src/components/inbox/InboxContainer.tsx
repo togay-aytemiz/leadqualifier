@@ -89,7 +89,7 @@ import {
   shouldShowScrollToLatestButton,
 } from '@/components/inbox/scrollToLatest'
 import { applyLeadStatusToConversationList } from '@/components/inbox/conversationLeadStatus'
-import { getChannelPlatformIconSrc } from '@/lib/channels/platform-icons'
+import { getConversationPlatformIconSrc } from '@/lib/channels/platform-icons'
 import {
   getLatestContactMessageAt,
   resolveWhatsAppReplyWindowState,
@@ -2533,7 +2533,7 @@ export function InboxContainer({
 
   const handleSendMessage = async () => {
     if (isReadOnly) return
-    if (!selectedId || isSending || isWhatsAppReplyBlocked) return
+    if (!selectedId || isSending || isWhatsAppReplyBlocked || demoChatComposerDisabled) return
 
     const normalizedInput = input.trim()
     const selectedAttachments = [...pendingAttachments]
@@ -3085,6 +3085,7 @@ export function InboxContainer({
               },
             })
           const isInstagramRequestPreview = isInstagramRequestConversation(c)
+          const platformIconSrc = getConversationPlatformIconSrc(c.platform)
           const resolveConversationRowLabel = (conversation: ConversationListItem) =>
             [
               contactDisplayName,
@@ -3109,12 +3110,12 @@ export function InboxContainer({
                   <Avatar name={contactDisplayName} src={c.contact_avatar_url} size="sm" />
                   <div className="absolute left-1/2 top-full -mt-2 -translate-x-1/2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border-[0.5px] border-white/50 bg-white shadow-sm">
-                      {c.platform !== 'simulator' ? (
+                      {platformIconSrc ? (
                         <NextImage
                           alt=""
                           aria-hidden
                           className="h-[18px] w-[18px]"
-                          src={getChannelPlatformIconSrc(c.platform)}
+                          src={platformIconSrc}
                           width={18}
                           height={18}
                         />
@@ -3383,6 +3384,7 @@ export function InboxContainer({
   }, [selectedConversation?.platform, visibleMessages])
   const isWhatsAppConversation = selectedConversation?.platform === 'whatsapp'
   const isInstagramConversation = selectedConversation?.platform === 'instagram'
+  const isDemoChatConversation = selectedConversation?.platform === 'demo_chat'
   const supportsImageAttachments = isWhatsAppConversation || isInstagramConversation
   const maxAttachmentCount = isInstagramConversation
     ? MAX_INSTAGRAM_OUTBOUND_ATTACHMENTS
@@ -3410,6 +3412,11 @@ export function InboxContainer({
     whatsappReplyWindowState?.reason === 'window_expired'
       ? t('whatsappReplyWindow.composerLockedExpired')
       : t('whatsappReplyWindow.composerLockedNoInbound')
+  const resolveConversationPlatformLabel = useCallback((platform: Conversation['platform']) => {
+    if (platform === 'demo_chat') return t('platformDemoChat')
+    if (platform === 'simulator') return t('platformSimulator')
+    return platform
+  }, [t])
   const canOpenWhatsAppPhone = Boolean(
     (selectedConversation?.contact_phone ?? '').replace(/\D/g, '')
   )
@@ -3531,12 +3538,21 @@ export function InboxContainer({
     activeAgent,
     botMode: resolvedBotMode,
   })
-  const inputPlaceholder = activeAgent === 'ai' ? t('takeOverPlaceholder') : t('replyPlaceholder')
-  const isComposerDisabled = isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked
+  const demoChatComposerDisabled = isDemoChatConversation
+  const inputPlaceholder = demoChatComposerDisabled
+    ? t('demoChatReplyDisabledShort')
+    : activeAgent === 'ai'
+      ? t('takeOverPlaceholder')
+      : t('replyPlaceholder')
+  const isComposerDisabled =
+    isReadOnly || showConversationSkeleton || isWhatsAppReplyBlocked || demoChatComposerDisabled
   const isAttachmentPickerDisabled = isComposerDisabled || !supportsImageAttachments
   const isDocumentAttachmentPickerDisabled = isComposerDisabled || !isWhatsAppConversation
   const isTemplatePickerDisabled =
-    isReadOnly || showConversationSkeleton || (isWhatsAppConversation && isWhatsAppReplyBlocked)
+    isReadOnly
+    || showConversationSkeleton
+    || demoChatComposerDisabled
+    || (isWhatsAppConversation && isWhatsAppReplyBlocked)
   const hasMessageInput = Boolean(input.trim())
   const hasPendingAttachments = pendingAttachments.length > 0
   const canSend = (hasMessageInput || hasPendingAttachments) && !isSending && !isComposerDisabled
@@ -3652,12 +3668,12 @@ export function InboxContainer({
           <span className={labelClassName}>{t('platform')}</span>
           <div className="flex items-center gap-2">
             <span className="inline-flex h-4 w-4 items-center justify-center">
-              {selectedConversation.platform !== 'simulator' ? (
+              {getConversationPlatformIconSrc(selectedConversation.platform) ? (
                 <NextImage
                   alt=""
                   aria-hidden
                   className="h-4 w-4"
-                  src={getChannelPlatformIconSrc(selectedConversation.platform)}
+                  src={getConversationPlatformIconSrc(selectedConversation.platform) ?? '/demo-chat.svg'}
                   width={16}
                   height={16}
                 />
@@ -3667,8 +3683,8 @@ export function InboxContainer({
                 </span>
               )}
             </span>
-            <span className={cn(valueTextClassName, 'capitalize')}>
-              {selectedConversation.platform}
+            <span className={valueTextClassName}>
+              {resolveConversationPlatformLabel(selectedConversation.platform)}
             </span>
           </div>
         </div>
@@ -3858,19 +3874,19 @@ export function InboxContainer({
                   >
                     <ArrowLeft size={18} />
                   </button>
-                  {selectedConversation.platform !== 'simulator' ? (
+                  {getConversationPlatformIconSrc(selectedConversation.platform) ? (
                     <NextImage
                       alt=""
                       aria-hidden
-                      title={`${t('platform')}: ${selectedConversation.platform}`}
+                      title={`${t('platform')}: ${resolveConversationPlatformLabel(selectedConversation.platform)}`}
                       className="h-5 w-5 shrink-0 lg:hidden"
-                      src={getChannelPlatformIconSrc(selectedConversation.platform)}
+                      src={getConversationPlatformIconSrc(selectedConversation.platform) ?? '/demo-chat.svg'}
                       width={20}
                       height={20}
                     />
                   ) : (
                     <span
-                      title={`${t('platform')}: ${selectedConversation.platform}`}
+                      title={`${t('platform')}: ${resolveConversationPlatformLabel(selectedConversation.platform)}`}
                       className="shrink-0 text-[10px] font-semibold uppercase text-gray-400 lg:hidden"
                     >
                       {t('platformSimulatorShort')}
@@ -5140,11 +5156,22 @@ export function InboxContainer({
                       onTemplateClick={() => setIsTemplatePickerModalOpen(true)}
                       onSendClick={handleSendMessage}
                       sendAriaLabel={isSending ? t('composerAttachments.sending') : t('sendButton')}
-                      sendTitle={isWhatsAppReplyBlocked ? whatsappReplyBlockedTooltip : undefined}
+                      sendTitle={
+                        demoChatComposerDisabled
+                          ? t('demoChatReplyDisabled')
+                          : isWhatsAppReplyBlocked
+                            ? whatsappReplyBlockedTooltip
+                            : undefined
+                      }
                     />
                   </div>
                   {composerErrorMessage && (
                     <p className="text-xs font-medium text-red-600">{composerErrorMessage}</p>
+                  )}
+                  {demoChatComposerDisabled && (
+                    <p className="text-xs font-medium text-slate-500">
+                      {t('demoChatReplyDisabled')}
+                    </p>
                   )}
                 </div>
               </div>

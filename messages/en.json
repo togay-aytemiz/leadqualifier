@@ -516,6 +516,8 @@
     "markConversationRead": "Mark as read",
     "replyPlaceholder": "Write a reply...",
     "takeOverPlaceholder": "Take over the conversation...",
+    "demoChatReplyDisabledShort": "Demo chat is read-only",
+    "demoChatReplyDisabled": "Replies are disabled for Demo Chat. Testers only receive AI replies.",
     "botActiveTitle": "AI assistant is active.",
     "botActiveBody": "Take over to send messages manually.",
     "botInactiveShadowTitle": "AI assistant is not active.",
@@ -660,7 +662,10 @@
     "id": "ID",
     "keyInfo": "Conversation details",
     "platform": "Platform",
+    "platformSimulator": "Simulator",
     "platformSimulatorShort": "S",
+    "platformDemoChat": "Demo Chat",
+    "platformDemoChatShort": "D",
     "aiProcessingControl": "AI Controls",
     "aiProcessingPauseLabel": "Pause AI for this contact",
     "aiProcessingPauseHelp": "When enabled, both AI replies and lead extraction are paused for this conversation.",
@@ -817,6 +822,16 @@
         }
       }
     }
+  },
+  "demoChat": {
+    "subtitle": "Admissions demo chat",
+    "introMessage": "Hello, I am {name}. You can ask questions like a prospective student about programs, registration, scholarships, dorms, contact details, or regulations.",
+    "placeholder": "Ask a question",
+    "send": "Send message",
+    "thinking": "Preparing an answer...",
+    "sendFailed": "The message could not be sent. Please try again.",
+    "emptyReply": "I could not prepare a clear answer right now. Please try another question.",
+    "imageAlt": "Demo response visual"
   },
   "General": {
     "title": "General Settings",

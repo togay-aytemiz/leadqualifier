@@ -13,7 +13,7 @@ type BotDisclaimerSettings = Pick<
     'bot_disclaimer_enabled' | 'bot_disclaimer_message_tr' | 'bot_disclaimer_message_en'
 >
 
-type BotDisclaimerPlatform = 'whatsapp' | 'telegram' | 'instagram'
+type BotDisclaimerPlatform = 'whatsapp' | 'telegram' | 'instagram' | 'demo_chat'
 
 function resolveDisclaimerMessage(
     responseLanguage: 'tr' | 'en',

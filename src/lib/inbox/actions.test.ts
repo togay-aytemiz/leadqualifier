@@ -1121,6 +1121,25 @@ describe('sendMessage durability', () => {
     })
   })
 
+  it('blocks operator replies for demo chat conversations before queueing outbound messages', async () => {
+    const { supabase, rpcMock } = createSendMessageSupabaseMock({
+      conversation: {
+        platform: 'demo_chat',
+        organization_id: 'org-1',
+        contact_phone: 'demo:channel-1:session-1',
+      },
+    })
+    createClientMock.mockResolvedValueOnce(supabase)
+
+    await expect(sendMessage('conv-1', 'Merhaba')).rejects.toThrow(
+      'Operator replies are disabled for demo chat conversations'
+    )
+
+    expect(rpcMock).not.toHaveBeenCalled()
+    expect(supabase.from).not.toHaveBeenCalledWith('messages')
+    expect(supabase.from).not.toHaveBeenCalledWith('channels')
+  })
+
   it('queues a pending WhatsApp operator message before provider send and finalizes it as sent', async () => {
     const latestInboundAt = new Date(Date.now() - 60_000).toISOString()
     const { supabase, rpcMock, messageUpdateBuilder } = createSendMessageSupabaseMock({

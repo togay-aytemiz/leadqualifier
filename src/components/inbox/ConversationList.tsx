@@ -11,6 +11,12 @@ interface ConversationListProps {
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
     const t = useTranslations('inbox')
+    const resolvePlatformLabel = (platform: Conversation['platform']) => {
+        if (platform === 'demo_chat') return t('platformDemoChat')
+        if (platform === 'simulator') return t('platformSimulator')
+        return platform
+    }
+
     return (
         <aside className="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -44,9 +50,9 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                                 <Avatar name={conv.contact_name} src={conv.contact_avatar_url} size="sm" />
                                 <div>
                                     <span className="font-semibold text-sm text-gray-900 block">{conv.contact_name}</span>
-                                    {conv.platform !== 'simulator' && (
-                                        <span className="text-[10px] text-gray-400 capitalize">{conv.platform}</span>
-                                    )}
+                                    <span className="text-[10px] text-gray-400 capitalize">
+                                        {resolvePlatformLabel(conv.platform)}
+                                    </span>
                                 </div>
                             </div>
                             <span className="text-xs text-gray-500 whitespace-nowrap">

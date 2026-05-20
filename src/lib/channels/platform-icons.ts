@@ -15,5 +15,6 @@ export function getChannelPlatformIconSrc(platform: ChannelPlatformIconType) {
 
 export function getConversationPlatformIconSrc(platform: ConversationPlatform): string | null {
     if (platform === 'simulator') return null
+    if (platform === 'demo_chat') return '/demo-chat.svg'
     return getChannelPlatformIconSrc(platform)
 }

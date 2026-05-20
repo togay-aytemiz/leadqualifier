@@ -516,6 +516,8 @@
     "markConversationRead": "Okunmuş yap",
     "replyPlaceholder": "Bir yanıt yazın...",
     "takeOverPlaceholder": "Sohbeti devralın...",
+    "demoChatReplyDisabledShort": "Demo Chat salt okunur",
+    "demoChatReplyDisabled": "Demo Chat konuşmalarında operatör yanıtı kapalı. Test kullanıcıları yalnızca AI yanıtlarını alır.",
     "botActiveTitle": "Yapay zeka asistanı devrede.",
     "botActiveBody": "Manuel mesaj göndermek için devralın.",
     "botInactiveShadowTitle": "Yapay zeka asistanı devrede değil.",
@@ -660,7 +662,10 @@
     "id": "ID",
     "keyInfo": "Konuşma detayları",
     "platform": "Platform",
+    "platformSimulator": "Simülatör",
     "platformSimulatorShort": "S",
+    "platformDemoChat": "Demo Chat",
+    "platformDemoChatShort": "D",
     "aiProcessingControl": "AI Kontrolleri",
     "aiProcessingPauseLabel": "Bu kişi için AI işlemlerini durdur",
     "aiProcessingPauseHelp": "Açıkken bu konuşmada hem AI yanıtı hem kişi çıkarımı durur.",
@@ -817,6 +822,16 @@
         }
       }
     }
+  },
+  "demoChat": {
+    "subtitle": "Aday öğrenci demo sohbeti",
+    "introMessage": "Merhaba, ben {name}. Aday öğrenci gibi programlar, kayıt, burs, yurt, iletişim veya yönetmeliklerle ilgili soru sorabilirsiniz.",
+    "placeholder": "Bir soru yazın",
+    "send": "Mesaj gönder",
+    "thinking": "Cevap hazırlanıyor...",
+    "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
+    "emptyReply": "Şu anda net bir cevap hazırlayamadım. Lütfen başka bir soru deneyin.",
+    "imageAlt": "Demo yanıt görseli"
   },
   "General": {
     "title": "Genel Ayarlar",

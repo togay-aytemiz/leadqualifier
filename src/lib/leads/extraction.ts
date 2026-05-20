@@ -1355,7 +1355,7 @@ export async function runLeadExtraction(options: {
     latestMessage?: string
     preferredLocale?: string | null
     supabase?: SupabaseClientLike
-    source?: 'telegram' | 'whatsapp' | 'instagram'
+    source?: 'telegram' | 'whatsapp' | 'instagram' | 'demo_chat'
 }) {
     const supabase = options.supabase ?? await createClient()
     const latencyStartedAt = Date.now()

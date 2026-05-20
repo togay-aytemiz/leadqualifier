@@ -12,10 +12,11 @@ describe('getChannelPlatformIconSrc', () => {
 })
 
 describe('getConversationPlatformIconSrc', () => {
-    it('returns shared SVG paths for channel-backed conversation platforms and null for simulator', () => {
+    it('returns shared SVG paths for channel-backed conversation platforms, demo chat, and null for simulator', () => {
         expect(getConversationPlatformIconSrc('telegram')).toBe('/Telegram.svg')
         expect(getConversationPlatformIconSrc('whatsapp')).toBe('/whatsapp.svg')
         expect(getConversationPlatformIconSrc('instagram')).toBe('/instagram.svg')
+        expect(getConversationPlatformIconSrc('demo_chat')).toBe('/demo-chat.svg')
         expect(getConversationPlatformIconSrc('simulator')).toBeNull()
     })
 })

@@ -545,6 +545,66 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('processes demo_chat messages through the shared reply path without scheduling side effects', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'demo_chat',
+            contact_phone: 'demo:demo-channel-1:session-1',
+        }))
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder],
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Demo Bilgi',
+                response_text: 'Demo response',
+            },
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'demo_chat',
+            source: 'demo_chat',
+            contactId: 'demo:demo-channel-1:session-1',
+            inboundMessageId: 'demo-message-1',
+            inboundMessageIdMetadataKey: 'demo_chat_message_id',
+            inboundMessageMetadata: {
+                demo_chat_message_id: 'demo-message-1',
+                demo_chat_channel_id: 'demo-channel-1',
+                demo_chat_session_id: 'session-1',
+            },
+            logPrefix: 'Demo Chat',
+        }))
+
+        expect(maybeHandleSchedulingRequestMock).not.toHaveBeenCalled()
+        expect(inboundInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'contact',
+            content: 'Merhaba',
+            metadata: expect.objectContaining({
+                demo_chat_message_id: 'demo-message-1',
+                demo_chat_session_id: 'session-1',
+            }),
+        }))
+        expect(sendOutbound).toHaveBeenCalledWith('Demo response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: 'Demo response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',
+            metadata: expect.objectContaining({
+                skill_id: 'skill-1',
+            }),
+        }))
+    })
+
     it('isolates deferred lead extraction failures from the reply path', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)

@@ -1953,6 +1953,9 @@ export async function sendMessage(
     .single()
 
   if (!conversation) throw new Error('Conversation not found')
+  if (conversation.platform === 'demo_chat') {
+    throw new Error('Operator replies are disabled for demo chat conversations')
+  }
   if (!conversation.contact_phone) throw new Error('Conversation contact is missing')
   if (await isOrganizationWorkspaceLocked(conversation.organization_id, supabase)) {
     throw new Error('Billing workspace is locked')

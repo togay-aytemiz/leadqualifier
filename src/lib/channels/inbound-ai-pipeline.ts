@@ -74,8 +74,8 @@ const INSTAGRAM_REQUEST_TAG = 'instagram_request'
 export interface InboundAiPipelineInput {
     supabase: SupabaseClient
     organizationId: string
-    platform: 'whatsapp' | 'telegram' | 'instagram'
-    source: 'whatsapp' | 'telegram' | 'instagram'
+    platform: 'whatsapp' | 'telegram' | 'instagram' | 'demo_chat'
+    source: 'whatsapp' | 'telegram' | 'instagram' | 'demo_chat'
     contactId: string
     contactName: string | null
     contactAvatarUrl?: string | null
@@ -194,6 +194,18 @@ function buildSkillImageMetadata(
         }
     }
 
+    if (platform === 'demo_chat') {
+        return {
+            demo_chat_message_type: 'image',
+            demo_chat_media_type: 'image',
+            demo_chat_media_mime_type: image.mimeType ?? 'image/webp',
+            demo_chat_media_filename: image.fileName ?? null,
+            demo_chat_outbound_status: status,
+            demo_chat_is_media_placeholder: true,
+            demo_chat_media: baseMedia
+        }
+    }
+
     return {
         whatsapp_message_type: 'image',
         whatsapp_media_type: 'image',
@@ -230,6 +242,10 @@ function buildOutboundProviderMetadata(
             ...metadata,
             telegram_message_id: providerMessageId
         }
+    }
+
+    if (platform === 'demo_chat') {
+        return metadata
     }
 
     return {
@@ -1003,33 +1019,65 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
     const llmResponseStartedAt = Date.now()
 
-    try {
-        const schedulingResult = await maybeHandleSchedulingRequest({
-            supabase: options.supabase,
-            organizationId: orgId,
-            conversationId: conversation.id,
-            message: options.text,
-            platform: options.platform,
-            customerName: conversation.contact_name ?? null,
-            customerPhone: conversation.contact_phone ?? null,
-            responseLanguage,
-            formatOutboundBotMessage,
-            sendOutbound: async (content) => {
-                await options.sendOutbound(content)
-            },
-            persistBotMessage
-        })
-        const schedulingHandled = typeof schedulingResult === 'object'
-            ? schedulingResult.handled
-            : schedulingResult
-        const schedulingRequiresHumanHandover = typeof schedulingResult === 'object'
-            ? Boolean(schedulingResult.requiresHumanHandover)
-            : false
+    if (options.platform !== 'demo_chat') {
+        try {
+            const schedulingResult = await maybeHandleSchedulingRequest({
+                supabase: options.supabase,
+                organizationId: orgId,
+                conversationId: conversation.id,
+                message: options.text,
+                platform: options.platform,
+                customerName: conversation.contact_name ?? null,
+                customerPhone: conversation.contact_phone ?? null,
+                responseLanguage,
+                formatOutboundBotMessage,
+                sendOutbound: async (content) => {
+                    await options.sendOutbound(content)
+                },
+                persistBotMessage
+            })
+            const schedulingHandled = typeof schedulingResult === 'object'
+                ? schedulingResult.handled
+                : schedulingResult
+            const schedulingRequiresHumanHandover = typeof schedulingResult === 'object'
+                ? Boolean(schedulingResult.requiresHumanHandover)
+                : false
 
-        if (schedulingHandled) {
-            if (schedulingRequiresHumanHandover) {
-                await applyEscalationAfterReply({ skillRequiresHumanHandover: true })
+            if (schedulingHandled) {
+                if (schedulingRequiresHumanHandover) {
+                    await applyEscalationAfterReply({ skillRequiresHumanHandover: true })
+                }
+                await recordAiLatencyEvent({
+                    organizationId: orgId,
+                    conversationId: conversation.id,
+                    metricKey: 'llm_response',
+                    durationMs: Date.now() - llmResponseStartedAt,
+                    source: options.source,
+                    metadata: {
+                        response_kind: 'calendar',
+                        platform: options.platform
+                    }
+                }, {
+                    supabase: options.supabase
+                })
+                return
             }
+        } catch (error) {
+            console.error(`${options.logPrefix}: Scheduling branch failed`, error)
+
+            const schedulingFailureReply = responseLanguage === 'tr'
+                ? 'Takvim işlemini şu anda tamamlayamadım. Ekibimiz buradan devam edecek.'
+                : 'I could not complete the calendar action right now. Our team will continue from here.'
+            const formattedSchedulingFailureReply = formatOutboundBotMessage(schedulingFailureReply)
+            const outboundMetadata = await sendOutboundAndCollectMetadata(formattedSchedulingFailureReply)
+            await persistBotMessage(formattedSchedulingFailureReply, {
+                ...outboundMetadata,
+                is_booking_response: true,
+                booking_action: 'handoff',
+                booking_error: 'scheduling_branch_failure'
+            })
+            await applyEscalationAfterReply({ skillRequiresHumanHandover: true })
+
             await recordAiLatencyEvent({
                 organizationId: orgId,
                 conversationId: conversation.id,
@@ -1045,36 +1093,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             })
             return
         }
-    } catch (error) {
-        console.error(`${options.logPrefix}: Scheduling branch failed`, error)
-
-        const schedulingFailureReply = responseLanguage === 'tr'
-            ? 'Takvim işlemini şu anda tamamlayamadım. Ekibimiz buradan devam edecek.'
-            : 'I could not complete the calendar action right now. Our team will continue from here.'
-        const formattedSchedulingFailureReply = formatOutboundBotMessage(schedulingFailureReply)
-        const outboundMetadata = await sendOutboundAndCollectMetadata(formattedSchedulingFailureReply)
-        await persistBotMessage(formattedSchedulingFailureReply, {
-            ...outboundMetadata,
-            is_booking_response: true,
-            booking_action: 'handoff',
-            booking_error: 'scheduling_branch_failure'
-        })
-        await applyEscalationAfterReply({ skillRequiresHumanHandover: true })
-
-        await recordAiLatencyEvent({
-            organizationId: orgId,
-            conversationId: conversation.id,
-            metricKey: 'llm_response',
-            durationMs: Date.now() - llmResponseStartedAt,
-            source: options.source,
-            metadata: {
-                response_kind: 'calendar',
-                platform: options.platform
-            }
-        }, {
-            supabase: options.supabase
-        })
-        return
     }
 
     const skillMatchResult = await matchSkillsWithStatus({
