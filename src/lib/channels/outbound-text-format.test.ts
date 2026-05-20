@@ -84,6 +84,28 @@ describe('formatOutboundTextForChannel', () => {
         expect(formatted).toBe('Bilgi İşlem için bilgiislem@yuksekihtisas.edu.tr adresine yazabilirsiniz.')
     })
 
+    it('keeps punctuation after emails readable instead of joining the next sentence', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Kütüphane e-posta adresi: kutuphane@yuksekihtisas.edu.tr.Başka bir konuda yardımcı olabilir miyim?',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'Kütüphane e-posta adresi: kutuphane@yuksekihtisas.edu.tr. Başka bir konuda yardımcı olabilir miyim?'
+        )
+    })
+
+    it('adds a sentence break between an email and assistant continuation text', () => {
+        const formatted = formatOutboundTextForChannel(
+            'E-Posta: bilgiislem@yuksekihtisas.edu.tr Başka bir konuda yardımcı olabilir miyim?',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'E-Posta: bilgiislem@yuksekihtisas.edu.tr. Başka bir konuda yardımcı olabilir miyim?'
+        )
+    })
+
     it('removes orphan domain fragments left by upstream response guards', () => {
         const formatted = formatOutboundTextForChannel(
             'edu. tr. Buradan devam ederek uygun seçenekleri netleştirebiliriz.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',

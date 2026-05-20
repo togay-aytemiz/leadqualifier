@@ -57,15 +57,44 @@ function normalizeRawUrlsForPlainChat(content: string) {
 }
 
 function normalizeEmailWhitespaceForPlainChat(content: string) {
-    return content.replace(
-        /\b([A-Z0-9._%+-]+)@([A-Z0-9-]+(?:\s*\.\s*[A-Z0-9-]+)+)\b/gi,
-        (_match, localPart: string, rawDomain: string) => {
-            const domain = rawDomain
-                .replace(/\s*\.\s*/g, '.')
-                .replace(/\s+/g, '')
-            return `${localPart}@${domain}`
-        }
-    )
+    return content
+        .replace(
+            /\b([A-Z0-9._%+-]+)@((?:[A-Z0-9-]+\s*\.\s*)+[A-Z]{2,24})(?!\s*\.)/gi,
+            (_match, localPart: string, rawDomain: string) => {
+                const domain = rawDomain
+                    .replace(/\s*\.\s*/g, '.')
+                    .replace(/\s+/g, '')
+                return `${localPart}@${domain}`
+            }
+        )
+        .replace(
+            /(@[A-Z0-9.-]+)\.\s+(tr|com|net|org|edu|gov|io|ai)\b/gi,
+            '$1.$2'
+        )
+}
+
+function normalizeEmailSentenceSpacingForPlainChat(content: string) {
+    return content
+        .replace(
+            /\b([A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,24})\.(?=[A-ZÇĞİÖŞÜ])/gi,
+            '$1. '
+        )
+        .replace(
+            /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:tr|com|net|org|edu|gov|io|ai))\s+(?=(?:Başka|Daha|Herhangi)\b)/gi,
+            '$1. '
+        )
+}
+
+function normalizeTurkishDomainWhitespaceForPlainChat(content: string) {
+    return content
+        .replace(
+            /\b([A-Z0-9-]+(?:\.[A-Z0-9-]+)+)\.\s+(tr)\b/gi,
+            '$1.$2'
+        )
+        .replace(
+            /\b([A-Z0-9.-]+\.(?:tr|com|net|org|edu|gov|io|ai))\s+(Başka|Daha|Herhangi)\b/gi,
+            '$1. $2'
+        )
 }
 
 function stripOrphanDomainFragmentsForPlainChat(content: string) {
@@ -142,22 +171,28 @@ export function formatOutboundTextForChannel(content: string, options: OutboundT
     const withPlainLinks = normalizeUrlLineBreaks(
         normalizeInlineBullets(
             normalizeRawUrlsForPlainChat(
-                normalizeEmailWhitespaceForPlainChat(
-                    stripOrphanDomainFragmentsForPlainChat(
-                        normalizeMarkdownLinksForPlainChat(content)
+                normalizeEmailSentenceSpacingForPlainChat(
+                    normalizeEmailWhitespaceForPlainChat(
+                        stripOrphanDomainFragmentsForPlainChat(
+                            normalizeMarkdownLinksForPlainChat(content)
+                        )
                     )
                 )
             )
         )
     )
+    const withCleanEmails = normalizeEmailSentenceSpacingForPlainChat(
+        normalizeEmailWhitespaceForPlainChat(withPlainLinks)
+    )
+    const withCleanDomains = normalizeTurkishDomainWhitespaceForPlainChat(withCleanEmails)
 
     if (options.platform === 'whatsapp') {
-        return normalizeBotDisclaimerFooter(convertDoubleStarToSingleStar(withPlainLinks), {
+        return normalizeBotDisclaimerFooter(convertDoubleStarToSingleStar(withCleanDomains), {
             quoteFooter: true
         })
     }
 
-    const plainText = stripPlainTextMarkdown(withPlainLinks)
+    const plainText = stripPlainTextMarkdown(withCleanDomains)
     if (options.platform === 'telegram') {
         return normalizeBotDisclaimerFooter(plainText, {
             quoteFooter: true

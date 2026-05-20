@@ -10,6 +10,7 @@ const ENGLISH_SIGNAL_PATTERN = /\b(i|we|you|your|can|could|would|should|please|c
 const EXTERNAL_CONTACT_REDIRECT_PATTERNS = [
     /\bweb\s*site\b/i,
     /\bwebsite\b/i,
+    /\bweb\s*sitesi(?:ni|ne|nde|nden)?\b/i,
     /\bphone\b/i,
     /\bcall\b/i,
     /\breach us\b/i,
@@ -19,6 +20,22 @@ const EXTERNAL_CONTACT_REDIRECT_PATTERNS = [
     /\bnumaram[iı]z\b/i,
     /\bileti[sş]im bilgileri(?:nizi)?\b/i
 ]
+
+const GENERIC_CONTINUATION_TEXT: Record<MvpResponseLanguage, string> = {
+    tr: 'Buradan devam ederek uygun seçenekleri netleştirebiliriz.',
+    en: 'We can continue here and clarify the best available options.'
+}
+
+const GENERIC_CONTINUATION_ARTIFACT_PATTERNS: Record<MvpResponseLanguage, RegExp[]> = {
+    tr: [
+        /\bBuradan devam ederek uygun seçenekleri netleştirebiliriz\.?/gi,
+        /\bdevam ederek uygun seçenekleri netleştirebiliriz\.?/gi
+    ],
+    en: [
+        /\bWe can continue here and clarify the best available options\.?/gi,
+        /\bcontinue here and clarify the best available options\.?/gi
+    ]
+}
 
 const CONTACT_INFO_REQUEST_PATTERNS = [
     /\bileti[sş]im(?:\s+bilgisi|\s+bilgileri)?\b/i,
@@ -143,6 +160,14 @@ function splitIntoSentenceLikeChunks(message: string) {
     return chunks.map((chunk) => chunk.trim()).filter(Boolean)
 }
 
+function compactGuardedResponse(value: string) {
+    return value
+        .replace(/\s+([,.;!?])/g, '$1')
+        .replace(/:\s*\./g, ':')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
 function hasQuestionIntent(value: string) {
     return hasRequiredIntakeQuestionIntent(value)
 }
@@ -257,16 +282,27 @@ function sanitizeExternalContactRedirectResponse(input: {
 
     const chunks = splitIntoSentenceLikeChunks(response)
     const filtered = chunks.filter((chunk) => !EXTERNAL_CONTACT_REDIRECT_PATTERNS.some((pattern) => pattern.test(chunk)))
-    const replacement = input.responseLanguage === 'tr'
-        ? 'Buradan devam ederek uygun seçenekleri netleştirebiliriz.'
-        : 'We can continue here and clarify the best available options.'
+    const replacement = GENERIC_CONTINUATION_TEXT[input.responseLanguage]
 
     if (filtered.length === 0) return replacement
-    const merged = filtered.join(' ').replace(/\s+/g, ' ').trim()
-    if (merged.toLowerCase().includes(replacement.toLowerCase())) return merged
+    return compactGuardedResponse(filtered.join(' '))
+}
 
-    const separator = /[.!?]$/.test(merged) ? ' ' : '. '
-    return `${merged}${separator}${replacement}`.replace(/\s+/g, ' ').trim()
+function stripGenericContinuationArtifacts(input: {
+    response: string
+    responseLanguage: MvpResponseLanguage
+}) {
+    const response = input.response.trim()
+    if (!response) return response
+
+    let stripped = response
+    for (const pattern of GENERIC_CONTINUATION_ARTIFACT_PATTERNS[input.responseLanguage]) {
+        stripped = stripped.replace(pattern, '')
+    }
+
+    stripped = compactGuardedResponse(stripped)
+    if (!stripped || stripped === response) return response
+    return stripped
 }
 
 function stripRepeatedEngagementQuestions(input: {
@@ -489,8 +525,12 @@ export function applyLiveAssistantResponseGuards(input: {
         userMessage: input.userMessage,
         responseLanguage: input.responseLanguage
     })
-    const blockedFieldReaskSanitized = stripBlockedFieldReaskQuestions({
+    const genericContinuationStripped = stripGenericContinuationArtifacts({
         response: redirectSanitized,
+        responseLanguage: input.responseLanguage
+    })
+    const blockedFieldReaskSanitized = stripBlockedFieldReaskQuestions({
+        response: genericContinuationStripped,
         blockedReaskFields: input.blockedReaskFields,
         responseLanguage: input.responseLanguage
     })

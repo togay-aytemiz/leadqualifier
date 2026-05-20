@@ -42,6 +42,7 @@ import {
     appendCanonicalRagSourceLinks,
     isLikelySourceLinkRequest
 } from '@/lib/knowledge-base/rag-source-links'
+import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -1265,6 +1266,7 @@ Answer the user's question based strictly on the provided context below.
 Treat document titles, section labels, and source URLs in the context as valid evidence.
 If a relevant context chunk partially answers the question, answer the known part and say only the missing detail is not in the knowledge base.
 For find, view, where, or link requests, a matching source URL is enough to answer.
+For regulation or policy questions asking purpose, scope, coverage, or what a rule regulates, answer the factual Madde/Amaç/Kapsam content first. Do not answer with only a source link when the context contains the factual text.
 Do not use Markdown links like [label](url). When sharing a link, put the full raw URL on its own final line.
 Copy source URLs exactly and never insert spaces inside a URL. Do not add punctuation or words after the URL.
 When several chunks are similar, prefer the one that matches the user wording most closely, such as student vs staff or a specific department name.
@@ -1304,9 +1306,15 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
                     })
                     : ''
+                const repairedRagResponse = repairLinkOnlyRagAnswer({
+                    response: guardedRagResponse,
+                    userMessage: options.text,
+                    responseLanguage,
+                    chunks
+                })
                 const sourceLinkRequested = isLikelySourceLinkRequest(options.text)
-                const finalRagResponse = appendCanonicalRagSourceLinks(guardedRagResponse, chunks, {
-                    force: sourceLinkRequested,
+                const finalRagResponse = appendCanonicalRagSourceLinks(repairedRagResponse, chunks, {
+                    force: sourceLinkRequested || repairedRagResponse !== guardedRagResponse,
                     limit: 1
                 })
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)

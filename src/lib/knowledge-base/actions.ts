@@ -860,6 +860,11 @@ function normalizeSearchText(value: string): string {
 
 function stemSearchToken(token: string): string {
     const normalized = normalizeSearchText(token)
+
+    if (normalized.endsWith('igi') && normalized.length > 5) {
+        return `${normalized.slice(0, -3)}ik`
+    }
+
     const suffixes = [
         'lerinin',
         'larinin',
@@ -976,22 +981,51 @@ function allMeaningfulSearchTokens(value: string) {
     return Array.from(new Set(tokens))
 }
 
+const DOCUMENT_TITLE_QUERY_STOPWORDS = new Set([
+    'amac',
+    'amaci',
+    'kapsam',
+    'kapsami',
+    'kapsiyor',
+    'kapsar',
+    'duzenler',
+    'duzenleme',
+    'dokuman',
+    'belge',
+    'numara',
+    'numarasi',
+    'karar',
+    'karari',
+    'senato',
+    'kabul',
+    'edildi',
+    'gecerli'
+])
+
+function documentTitleQueryTokens(query: string) {
+    return allMeaningfulSearchTokens(query)
+        .filter((token) => !DOCUMENT_TITLE_QUERY_STOPWORDS.has(token))
+}
+
 function documentTitleCoverageScore(query: string, title?: string | null) {
     if (!hasQuerySignal(query, ['dokuman', 'doküman', 'belge', 'yonerge', 'yönerge', 'mevzuat', 'numara', 'no'])) {
         return 0
     }
     if (!title) return 0
 
-    const queryTokens = new Set(allMeaningfulSearchTokens(query))
+    const queryTokenList = documentTitleQueryTokens(query)
+    const queryTokens = new Set(queryTokenList)
     const titleTokens = allMeaningfulSearchTokens(title)
     if (queryTokens.size === 0 || titleTokens.length === 0) return 0
 
     const hits = titleTokens.filter((token) => queryTokens.has(token)).length
-    const coverage = hits / titleTokens.length
-    if (coverage < 0.72) return 0
+    const titleCoverage = hits / titleTokens.length
+    const queryCoverage = hits / queryTokenList.length
+    if (queryTokenList.length >= 4 && queryCoverage < 0.55) return 0
+    if (titleCoverage < 0.72 && queryCoverage < 0.72) return 0
 
     const extraTitleTokenCount = titleTokens.length - hits
-    return Math.max(0, coverage * 0.26 - extraTitleTokenCount * 0.04)
+    return Math.max(0, titleCoverage * 0.18 + queryCoverage * 0.18 - extraTitleTokenCount * 0.03)
 }
 
 const SOURCE_SLUG_CONNECTORS = new Set(['ve', 'and', 'ile'])

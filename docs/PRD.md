@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-05-20):** University-pilot Knowledge Base demos must be verified through the actual inbound AI pipeline, not only retrieval or formatter tests. Live checks should cover candidate and administrative personas, PDF and website sources, raw source links, phone/e-mail formatting, and deterministic repair of PDF regulation purpose/scope answers when the model returns only a source link or drops important article terms.
+
 > **Update Note (2026-05-20):** Pilot demo readiness for crawl-imported Knowledge Base answers requires live inbound-pipeline verification with real model/database calls. Contact-information questions should prefer the canonical root contact table when it explicitly contains the asked unit, and link/page answers should expose a single raw canonical URL rather than multiple adjacent source candidates.
 
 > **Update Note (2026-05-20):** Customer-facing guardrails must distinguish unwanted generic external-contact redirects from valid Knowledge Base contact answers. If a user asks for phone, e-mail, address, or contact information and the answer contains a concrete value, the response must pass through intact; final channel formatting must still remove impossible orphan domain fragments such as `edu. tr.` before delivery.

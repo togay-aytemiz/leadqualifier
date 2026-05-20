@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-20):** Yüksek İhtisas demo readiness now requires a real 30-question inbound-pipeline smoke over the live Supabase organization, live Knowledge Base, and live OpenAI calls. The current run passed 30/30 across candidate/admin personas, website pages, and PDF regulations; PDF purpose/scope answers are repaired from retrieved `Madde/Amaç/Kapsam` text when the model returns a link-only or overly short answer, and messenger formatting keeps e-mail domains/source URLs intact.
+
 > **Update Note (2026-05-20):** Live RAG pipeline QA must cover the real inbound pipeline, not only unit tests, before university demo fixes are considered ready. The Yüksek İhtisas contact/link smoke now runs against real Supabase/OpenAI flow, verifies concrete phone/e-mail values, blocks orphan domain fragments, and limits customer-facing source replies to one canonical raw URL for cleaner WhatsApp/Instagram/Telegram demos.
 
 > **Update Note (2026-05-20):** Response guards must preserve concrete phone/e-mail/contact answers when the customer explicitly asks for contact information. The external-contact redirect guard should not split e-mail domains into sentence fragments or collapse valid Knowledge Base answers into orphan text like `edu. tr`; outbound channel formatting also strips impossible leading domain fragments as a final safety net before send/persist.

@@ -1342,6 +1342,40 @@ describe('searchKnowledgeBase', () => {
         expect(results[0]?.chunk_id).toBe('exact-title-1')
     })
 
+    it('prefers a full regulation title over a short partial title for ethics regulation questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'short-title-1',
+                    document_id: 'doc-short-title-1',
+                    document_title: 'Yayın Yönergesi',
+                    document_type: 'article',
+                    content: 'Document Title: Yayın Yönergesi\nSource URL: https://example.edu.tr/yayin.pdf\n\nBu yönergenin amacı; Yayın Komisyonu tarafından uygun görülen yayınların planlanmasına ve yayımlanmasına ilişkin usul ve esasları düzenlemektir.',
+                    similarity: 0.72
+                },
+                {
+                    chunk_id: 'full-title-1',
+                    document_id: 'doc-full-title-1',
+                    document_title: 'Yükseköğretim Kurumları Bilimsel Araştırma ve Yayın Etiği Yönergesi',
+                    document_type: 'article',
+                    content: 'Document Title: Yükseköğretim Kurumları Bilimsel Araştırma ve Yayın Etiği Yönergesi\nSource URL: https://example.edu.tr/bilimsel-arastirma-yayin-etigi.pdf\n\nAmaç Madde 1 - Bu Yönerge, bilimsel araştırma, çalışma, yayın ve etkinliklerde uyulması gereken etik kurallarını ve bilimsel araştırma ve yayın etiği kurullarının görev, yetki ve sorumluluklarını düzenler.',
+                    similarity: 0.64
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Bilimsel Araştırma ve Yayın Etiği Yönergesinin amacı nedir?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('full-title-1')
+    })
+
     it('does not let generic contact pages outrank a named coordinator page', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [

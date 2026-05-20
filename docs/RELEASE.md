@@ -8,6 +8,7 @@
 
 ### Added
 
+- Added a real 30-question Yüksek İhtisas live pipeline QA runner for the demo organization, exercising the actual inbound AI pipeline with real Supabase Knowledge Base reads and OpenAI calls across candidate/admin personas, website pages, and PDF regulations (`scripts/knowledge/qa-live-yiu-pipeline.ts`, latest report: `tmp/crawl-output/live-yiu-demo-pipeline-qa-2026-05-20T12-07-33-456Z.md`).
 - Added a second 50-question Yüksek İhtisas Knowledge Base QA report for pilot demo readiness, mixing student-style and administrator-style questions across website pages and PDF regulations, with answer-term, source-link, and messenger-cosmetic checks (`tmp/crawl-output/yuksek-ihtisas-rag-50-student-admin-qa-after-patch.md`).
 - Added a 40-question crawl RAG QA runner for the Yüksek İhtisas Üniversitesi corpus, covering 20 PDF/regulation questions and 20 website-page questions with source URL, title, and evidence-term checks (`scripts/knowledge/qa-crawl-rag.mjs`, `tmp/crawl-output/yuksek-ihtisas-full-pdf-rag-40qa-report.md`).
 - Added an admin token-breakdown hover detail on the total-token stat card, showing input, output, text embedding, weighted chat-token units, and credit usage for the selected period (`src/app/[locale]/(dashboard)/admin/page.tsx`, `src/lib/admin/read-models.ts`, `src/lib/admin/dashboard-usage-metrics.ts`, `messages/en.json`, `messages/tr.json`).
@@ -96,6 +97,9 @@
 
 ### Fixed
 
+- Fixed live RAG PDF regulation answers that could return only a source link or omit important `Kapsam` details by repairing purpose/scope responses from the retrieved article text before appending the canonical source URL (`src/lib/knowledge-base/rag-answer-repair.ts`, `src/lib/channels/inbound-ai-pipeline.ts`).
+- Fixed messenger e-mail formatting edge cases where model output could leave spaces inside Turkish domains or join the next assistant sentence directly after an e-mail address (`src/lib/channels/outbound-text-format.ts`).
+- Fixed service-role manual subscription renewal checks so live pipeline requests no longer log `Not authenticated` renewal warnings before answering (`supabase/migrations/20260520112357_allow_service_role_manual_renewal.sql`).
 - Fixed live RAG pipeline contact/link regressions found in the real Yüksek İhtisas QA flow: named unit contact questions now prefer the root `/iletisim` contact table when it contains the exact unit, model-written source URLs are normalized to one canonical raw link, and the fix was verified against the real Supabase/OpenAI inbound pipeline instead of only mocked unit behavior (`src/lib/knowledge-base/actions.ts`, `src/lib/knowledge-base/rag-source-links.ts`, `src/lib/channels/inbound-ai-pipeline.ts`).
 - Fixed contact-information RAG replies being over-sanitized by the live response guard. Concrete phone/e-mail answers now survive when the customer asks for contact details, and outbound channel formatting removes impossible leading domain fragments like `edu. tr.` as a final safety net (`src/lib/ai/response-guards.ts`, `src/lib/channels/outbound-text-format.ts`, `src/lib/channels/inbound-ai-pipeline.test.ts`).
 - Fixed customer-facing Knowledge Base formatting for spaced e-mail domains and malformed model-emitted source URLs, preventing outputs like `bilgiislem@yuksekihtisas.edu. tr` or orphan `edu. tr` fragments from being sent or persisted (`src/lib/channels/outbound-text-format.ts`, `src/lib/knowledge-base/rag-source-links.ts`).

@@ -62,6 +62,44 @@ describe('response guards', () => {
         expect(response.toLowerCase()).not.toContain('telefonla')
     })
 
+    it('removes external-contact redirect chunks without appending generic continuation to factual answers', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'İş Sağlığı ve Güvenliği İç Yönergesi, Yüksek İhtisas Üniversitesi’nin tüm birimleri ve bunlara bağlı bina ve eklentilerini kapsar. Detaylar için web sitesini ziyaret edin.',
+            userMessage: 'İş Sağlığı ve Güvenliği İç Yönergesi hangi birimleri kapsıyor?',
+            responseLanguage: 'tr',
+            recentAssistantMessages: []
+        })
+
+        expect(response).toContain('tüm birimleri')
+        expect(response).toContain('bina ve eklentilerini')
+        expect(response).not.toContain('web sitesini')
+        expect(response).not.toContain('Buradan devam ederek uygun seçenekleri netleştirebiliriz')
+    })
+
+    it('strips generic continuation artifacts from grounded knowledge answers', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'İş Sağlığı ve Güvenliği İç Yönergesi, Yüksek İhtisas Üniversitesi’nin tüm birimlerini kapsar. Başka bir konuda yardımcı olabilir miyim? Buradan devam ederek uygun seçenekleri netleştirebiliriz.',
+            userMessage: 'İş Sağlığı ve Güvenliği İç Yönergesi hangi birimleri kapsıyor?',
+            responseLanguage: 'tr',
+            recentAssistantMessages: []
+        })
+
+        expect(response).toContain('tüm birimlerini kapsar')
+        expect(response).not.toContain('Buradan devam ederek uygun seçenekleri netleştirebiliriz')
+    })
+
+    it('strips partial generic continuation artifacts before source URLs', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Daha fazla bilgi için buraya göz atabilirsin: devam ederek uygun seçenekleri netleştirebiliriz.\nhttps://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/a8000307970dd11d84d2efe4288598bc.pdf',
+            userMessage: 'Bilimsel Araştırma ve Yayın Etiği Yönergesinin amacı nedir?',
+            responseLanguage: 'tr',
+            recentAssistantMessages: []
+        })
+
+        expect(response).toContain('https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/a8000307970dd11d84d2efe4288598bc.pdf')
+        expect(response).not.toContain('devam ederek uygun seçenekleri netleştirebiliriz')
+    })
+
     it('does not treat phone-number intake question as external-contact redirect', () => {
         const response = applyLiveAssistantResponseGuards({
             response: 'Size ulaşabileceğimiz bir numara paylaşabilir misiniz?',
