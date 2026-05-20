@@ -33,6 +33,9 @@ describe('manual admin billing renewal helper', () => {
                 functionName: string,
                 args: Record<string, unknown>
             ) {
+                void functionName
+                void args
+
                 if (!this?.rest) {
                     throw new TypeError("Cannot read properties of undefined (reading 'rest')")
                 }

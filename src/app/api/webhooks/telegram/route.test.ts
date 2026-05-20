@@ -3,33 +3,19 @@ import { NextRequest } from 'next/server'
 
 const {
     createClientMock,
-    decideHumanEscalationMock,
-    getOrgAiSettingsMock,
-    getRequiredIntakeFieldsMock,
-    isOperatorActiveMock,
-    matchSkillsSafelyMock,
-    resolveBotModeActionMock,
-    resolveLeadExtractionAllowanceMock,
-    resolveOrganizationUsageEntitlementMock,
-    runLeadExtractionMock,
+    processInboundAiPipelineMock,
     telegramCtorMock,
     telegramGetFileMock,
     telegramGetUserProfilePhotosMock,
+    telegramSendImageMock,
     telegramSendMessageMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
-    decideHumanEscalationMock: vi.fn(),
-    getOrgAiSettingsMock: vi.fn(),
-    getRequiredIntakeFieldsMock: vi.fn(),
-    isOperatorActiveMock: vi.fn(),
-    matchSkillsSafelyMock: vi.fn(),
-    resolveBotModeActionMock: vi.fn(),
-    resolveLeadExtractionAllowanceMock: vi.fn(),
-    resolveOrganizationUsageEntitlementMock: vi.fn(),
-    runLeadExtractionMock: vi.fn(),
+    processInboundAiPipelineMock: vi.fn(),
     telegramCtorMock: vi.fn(),
     telegramGetFileMock: vi.fn(),
     telegramGetUserProfilePhotosMock: vi.fn(),
+    telegramSendImageMock: vi.fn(),
     telegramSendMessageMock: vi.fn()
 }))
 
@@ -37,51 +23,8 @@ vi.mock('@supabase/supabase-js', () => ({
     createClient: createClientMock
 }))
 
-vi.mock('@/lib/ai/settings', () => ({
-    getOrgAiSettings: getOrgAiSettingsMock
-}))
-
-vi.mock('@/lib/ai/followup', () => ({
-    getRequiredIntakeFields: getRequiredIntakeFieldsMock,
-    buildRequiredIntakeFollowupGuidance: vi.fn(() => ''),
-    analyzeRequiredIntakeState: vi.fn(() => ({
-        requestMode: 'lead_qualification',
-        requiredFields: [],
-        effectiveRequiredFields: [],
-        collectedFields: [],
-        blockedReaskFields: [],
-        missingFields: [],
-        dynamicMinimumCount: 0,
-        isShortConversation: false,
-        latestRefusal: false,
-        noProgressStreak: false,
-        suppressIntakeQuestions: false
-    }))
-}))
-
-vi.mock('@/lib/leads/extraction', () => ({
-    runLeadExtraction: runLeadExtractionMock
-}))
-
-vi.mock('@/lib/ai/bot-mode', () => ({
-    resolveBotModeAction: resolveBotModeActionMock,
-    resolveLeadExtractionAllowance: resolveLeadExtractionAllowanceMock
-}))
-
-vi.mock('@/lib/skills/match-safe', () => ({
-    matchSkillsSafely: matchSkillsSafelyMock
-}))
-
-vi.mock('@/lib/ai/escalation', () => ({
-    decideHumanEscalation: decideHumanEscalationMock
-}))
-
-vi.mock('@/lib/billing/entitlements', () => ({
-    resolveOrganizationUsageEntitlement: resolveOrganizationUsageEntitlementMock
-}))
-
-vi.mock('@/lib/inbox/operator-state', () => ({
-    isOperatorActive: isOperatorActiveMock
+vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
+    processInboundAiPipeline: processInboundAiPipelineMock
 }))
 
 vi.mock('@/lib/telegram/client', () => ({
@@ -92,6 +35,7 @@ vi.mock('@/lib/telegram/client', () => ({
 
         getFile = telegramGetFileMock
         getUserProfilePhotos = telegramGetUserProfilePhotosMock
+        sendImage = telegramSendImageMock
         sendMessage = telegramSendMessageMock
     }
 }))
@@ -118,15 +62,12 @@ function createSupabaseMock(plan: Record<string, QueryBuilder[]>) {
     }
 }
 
-function createChannelLookupBuilder() {
+function createChannelLookupBuilder(config: Record<string, unknown> = { webhook_secret: 'secret-1', bot_token: 'token-1' }) {
     const singleMock = vi.fn(async () => ({
         data: {
             id: 'channel-1',
             organization_id: 'org-1',
-            config: {
-                webhook_secret: 'secret-1',
-                bot_token: 'token-1'
-            }
+            config
         }
     }))
     const eqMock = vi.fn(() => ({
@@ -142,26 +83,9 @@ function createChannelLookupBuilder() {
     }
 }
 
-function createConversationLookupBuilder(overrides: Record<string, unknown> = {}) {
+function createConversationAvatarLookupBuilder(avatarUrl: string | null = 'https://api.telegram.org/file/bottoken-1/photos/existing.jpg') {
     const maybeSingleMock = vi.fn(async () => ({
-        data: {
-            id: 'conv-1',
-            organization_id: 'org-1',
-            platform: 'telegram',
-            contact_name: 'Ayse',
-            contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/existing.jpg',
-            contact_phone: '123',
-            status: 'open',
-            assignee_id: null,
-            active_agent: 'bot',
-            ai_processing_paused: true,
-            last_message_at: '2026-02-25T09:00:00.000Z',
-            unread_count: 0,
-            tags: [],
-            created_at: '2026-02-25T09:00:00.000Z',
-            updated_at: '2026-02-25T09:00:00.000Z',
-            ...overrides
-        }
+        data: avatarUrl === null ? { contact_avatar_url: null } : { contact_avatar_url: avatarUrl }
     }))
     const limitMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
     const eqContactMock = vi.fn(() => ({ limit: limitMock }))
@@ -176,69 +100,26 @@ function createConversationLookupBuilder(overrides: Record<string, unknown> = {}
     }
 }
 
-function createInboundDedupeBuilder() {
-    const maybeSingleMock = vi.fn(async () => ({
-        data: null
-    }))
-    const eqMessageIdMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
-    const eqOrgMock = vi.fn(() => ({ eq: eqMessageIdMock }))
-    const selectMock = vi.fn(() => ({ eq: eqOrgMock }))
-
-    return {
-        builder: {
-            select: selectMock
-        }
-    }
-}
-
-function createInsertMessageBuilder() {
-    const insertMock = vi.fn(async () => ({ error: null }))
-    return {
-        builder: {
-            insert: insertMock
+function createTelegramRequest(body: unknown, headers: Record<string, string> = {}) {
+    return new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            ...headers
         },
-        insertMock
-    }
+        body: typeof body === 'string' ? body : JSON.stringify(body)
+    })
 }
 
-function createConversationUpdateBuilder() {
-    const eqMock = vi.fn(async () => ({ error: null }))
-    const updateMock = vi.fn(() => ({ eq: eqMock }))
+function createValidTelegramUpdate(overrides: Record<string, unknown> = {}) {
     return {
-        builder: {
-            update: updateMock
-        },
-        updateMock
-    }
-}
-
-function createSkillDetailsBuilder() {
-    const maybeSingleMock = vi.fn(async () => ({
-        data: { requires_human_handover: true },
-        error: null
-    }))
-    const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
-    const selectMock = vi.fn(() => ({ eq: eqMock }))
-
-    return {
-        builder: {
-            select: selectMock
-        },
-        selectMock
-    }
-}
-
-function createLeadScoreBuilder(totalScore: number | null = null) {
-    const maybeSingleMock = vi.fn(async () => ({
-        data: totalScore === null ? null : { total_score: totalScore },
-        error: null
-    }))
-    const eqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }))
-    const selectMock = vi.fn(() => ({ eq: eqMock }))
-
-    return {
-        builder: {
-            select: selectMock
+        update_id: 1001,
+        message: {
+            message_id: 12,
+            text: 'Merhaba',
+            chat: { id: 123 },
+            from: { id: 456, first_name: 'Ayse' },
+            ...overrides
         }
     }
 }
@@ -249,28 +130,7 @@ describe('Telegram webhook route', () => {
         vi.unstubAllEnvs()
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
-
-        getOrgAiSettingsMock.mockResolvedValue({
-            match_threshold: 0.7,
-            bot_mode: 'active',
-            allow_lead_extraction_during_operator: false,
-            hot_lead_score_threshold: 8,
-            hot_lead_action: 'notify_only',
-            hot_lead_handover_message_tr: 'Talebin destek ekibine iletildi.',
-            hot_lead_handover_message_en: 'Your request was forwarded to support.',
-            prompt: null,
-            bot_name: null
-        })
-        getRequiredIntakeFieldsMock.mockResolvedValue([])
-        resolveBotModeActionMock.mockReturnValue({ allowReplies: true })
-        resolveLeadExtractionAllowanceMock.mockReturnValue(false)
-        decideHumanEscalationMock.mockReturnValue({ shouldEscalate: false })
-        resolveOrganizationUsageEntitlementMock.mockResolvedValue({
-            isUsageAllowed: true,
-            lockReason: null,
-            membershipState: null,
-            snapshot: null
-        })
+        processInboundAiPipelineMock.mockResolvedValue(undefined)
         telegramGetUserProfilePhotosMock.mockResolvedValue({
             total_count: 0,
             photos: []
@@ -279,19 +139,14 @@ describe('Telegram webhook route', () => {
             file_id: 'file-1',
             file_path: 'photos/avatar.jpg'
         })
+        telegramSendMessageMock.mockResolvedValue({ message_id: 88 })
+        telegramSendImageMock.mockResolvedValue({ message_id: 89 })
     })
 
     it('returns 400 for malformed JSON without creating a service client', async () => {
-        const req = new NextRequest('http://localhost/api/webhooks/telegram', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'x-telegram-bot-api-secret-token': 'secret-1'
-            },
-            body: '{bad-json'
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest('{bad-json', {
+            'x-telegram-bot-api-secret-token': 'secret-1'
+        }))
 
         expect(res.status).toBe(400)
         await expect(res.json()).resolves.toEqual({ error: 'Invalid JSON body' })
@@ -299,24 +154,17 @@ describe('Telegram webhook route', () => {
     })
 
     it('ignores non-message updates without creating a service client', async () => {
-        const req = new NextRequest('http://localhost/api/webhooks/telegram', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'x-telegram-bot-api-secret-token': 'secret-1'
-            },
-            body: JSON.stringify({
-                update_id: 1000,
-                edited_message: {
-                    message_id: 11,
-                    text: 'Düzenlendi',
-                    chat: { id: 123 },
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest({
+            update_id: 1000,
+            edited_message: {
+                message_id: 11,
+                text: 'Düzenlendi',
+                chat: { id: 123 },
+                from: { id: 456, first_name: 'Ayse' }
+            }
+        }, {
+            'x-telegram-bot-api-secret-token': 'secret-1'
+        }))
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
@@ -324,23 +172,16 @@ describe('Telegram webhook route', () => {
     })
 
     it('returns 400 for text messages missing required chat or sender data', async () => {
-        const req = new NextRequest('http://localhost/api/webhooks/telegram', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'x-telegram-bot-api-secret-token': 'secret-1'
-            },
-            body: JSON.stringify({
-                update_id: 1000,
-                message: {
-                    message_id: 11,
-                    text: 'Merhaba',
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest({
+            update_id: 1000,
+            message: {
+                message_id: 11,
+                text: 'Merhaba',
+                from: { id: 456, first_name: 'Ayse' }
+            }
+        }, {
+            'x-telegram-bot-api-secret-token': 'secret-1'
+        }))
 
         expect(res.status).toBe(400)
         await expect(res.json()).resolves.toEqual({ error: 'Invalid Telegram message payload' })
@@ -350,274 +191,113 @@ describe('Telegram webhook route', () => {
     it('does not accept query-string webhook secrets in production', async () => {
         vi.stubEnv('NODE_ENV', 'production')
 
-        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                update_id: 1001,
-                message: {
-                    message_id: 12,
-                    text: 'Merhaba',
-                    chat: { id: 123 },
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest(createValidTelegramUpdate()))
 
         expect(res.status).toBe(401)
         await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' })
         expect(createClientMock).not.toHaveBeenCalled()
     })
 
-    it('stores inbound message and skips AI flow when conversation processing is paused', async () => {
+    it('delegates valid text messages to the shared inbound AI pipeline', async () => {
         const channelLookup = createChannelLookupBuilder()
-        const conversationLookup = createConversationLookupBuilder()
-        const dedupeLookup = createInboundDedupeBuilder()
-        const inboundInsert = createInsertMessageBuilder()
-        const conversationUpdate = createConversationUpdateBuilder()
-
+        const conversationAvatarLookup = createConversationAvatarLookupBuilder()
         const supabase = createSupabaseMock({
             channels: [channelLookup.builder],
-            conversations: [conversationLookup.builder, conversationUpdate.builder],
-            messages: [dedupeLookup.builder, inboundInsert.builder]
+            conversations: [conversationAvatarLookup.builder]
         })
-
         createClientMock.mockReturnValue(supabase)
 
-        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                update_id: 1001,
-                message: {
-                    message_id: 12,
-                    text: 'Merhaba',
-                    chat: { id: 123 },
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest(createValidTelegramUpdate()))
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
-        expect(runLeadExtractionMock).not.toHaveBeenCalled()
-        expect(resolveOrganizationUsageEntitlementMock).not.toHaveBeenCalled()
-        expect(isOperatorActiveMock).not.toHaveBeenCalled()
-        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
-        expect(telegramCtorMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            supabase,
+            organizationId: 'org-1',
+            platform: 'telegram',
+            source: 'telegram',
+            contactId: '123',
+            contactName: 'Ayse',
+            contactAvatarUrl: 'https://api.telegram.org/file/bottoken-1/photos/existing.jpg',
+            text: 'Merhaba',
+            inboundMessageId: '12',
+            inboundMessageIdMetadataKey: 'telegram_message_id',
+            inboundMessageMetadata: {
+                telegram_message_id: '12',
+                telegram_contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/existing.jpg'
+            },
+            skipAutomation: false,
+            logPrefix: 'Telegram Webhook'
+        }))
     })
 
-    it('hydrates missing telegram avatar urls from bot api profile photos', async () => {
+    it('hydrates missing telegram avatar urls before delegating to the pipeline', async () => {
         const channelLookup = createChannelLookupBuilder()
-        const conversationLookup = createConversationLookupBuilder({
-            ai_processing_paused: true,
-            contact_avatar_url: null
-        })
-        const dedupeLookup = createInboundDedupeBuilder()
-        const inboundInsert = createInsertMessageBuilder()
-        const conversationUpdate = createConversationUpdateBuilder()
-
+        const conversationAvatarLookup = createConversationAvatarLookupBuilder(null)
         const supabase = createSupabaseMock({
             channels: [channelLookup.builder],
-            conversations: [conversationLookup.builder, conversationUpdate.builder],
-            messages: [dedupeLookup.builder, inboundInsert.builder]
+            conversations: [conversationAvatarLookup.builder]
         })
-
+        createClientMock.mockReturnValue(supabase)
         telegramGetUserProfilePhotosMock.mockResolvedValueOnce({
             total_count: 1,
             photos: [[{ file_id: 'file-1' }]]
         })
-        createClientMock.mockReturnValue(supabase)
 
-        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                update_id: 1005,
-                message: {
-                    message_id: 15,
-                    text: 'Merhaba',
-                    chat: { id: 123 },
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest(createValidTelegramUpdate()))
 
         expect(res.status).toBe(200)
-        await expect(res.json()).resolves.toEqual({ ok: true })
-        expect(telegramCtorMock).toHaveBeenCalledWith('token-1')
         expect(telegramGetUserProfilePhotosMock).toHaveBeenCalledWith(456, { limit: 1 })
         expect(telegramGetFileMock).toHaveBeenCalledWith('file-1')
-        expect(inboundInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
-            metadata: expect.objectContaining({
-                telegram_message_id: '15',
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            contactAvatarUrl: 'https://api.telegram.org/file/bottoken-1/photos/avatar.jpg',
+            inboundMessageMetadata: expect.objectContaining({
                 telegram_contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/avatar.jpg'
             })
         }))
-        expect(conversationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
-            contact_name: 'Ayse',
-            contact_avatar_url: 'https://api.telegram.org/file/bottoken-1/photos/avatar.jpg'
-        }))
-        expect(telegramSendMessageMock).not.toHaveBeenCalled()
     })
 
-    it('runs lead extraction but does not auto-reply in shadow mode', async () => {
+    it('adapts shared outbound text and image messages to Telegram', async () => {
         const channelLookup = createChannelLookupBuilder()
-        const conversationLookup = createConversationLookupBuilder({
-            ai_processing_paused: false
-        })
-        const dedupeLookup = createInboundDedupeBuilder()
-        const inboundInsert = createInsertMessageBuilder()
-        const conversationUpdate = createConversationUpdateBuilder()
-        const leadScore = createLeadScoreBuilder(5)
-
+        const conversationAvatarLookup = createConversationAvatarLookupBuilder()
         const supabase = createSupabaseMock({
             channels: [channelLookup.builder],
-            conversations: [conversationLookup.builder, conversationUpdate.builder],
-            messages: [dedupeLookup.builder, inboundInsert.builder],
-            leads: [leadScore.builder]
+            conversations: [conversationAvatarLookup.builder]
         })
-
         createClientMock.mockReturnValue(supabase)
-        getOrgAiSettingsMock.mockResolvedValueOnce({
-            match_threshold: 0.7,
-            bot_mode: 'shadow',
-            allow_lead_extraction_during_operator: false,
-            hot_lead_score_threshold: 8,
-            hot_lead_action: 'notify_only',
-            hot_lead_handover_message_tr: 'Talebin destek ekibine iletildi.',
-            hot_lead_handover_message_en: 'Your request was forwarded to support.',
-            prompt: null,
-            bot_name: null
-        })
-        resolveBotModeActionMock.mockReturnValueOnce({ allowReplies: false })
-        resolveLeadExtractionAllowanceMock.mockReturnValueOnce(true)
-        isOperatorActiveMock.mockReturnValueOnce(false)
 
-        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                update_id: 1011,
-                message: {
-                    message_id: 22,
-                    text: 'Merhaba',
-                    chat: { id: 123 },
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
+        await POST(createTelegramRequest(createValidTelegramUpdate()))
+
+        const pipelineInput = processInboundAiPipelineMock.mock.calls[0]?.[0]
+        await pipelineInput.sendOutbound('Cevap metni')
+        await pipelineInput.sendOutbound({
+            type: 'image',
+            imageUrl: 'https://cdn.example.com/image.png',
+            caption: 'Görsel açıklaması'
         })
 
-        const res = await POST(req)
-
-        expect(res.status).toBe(200)
-        await expect(res.json()).resolves.toEqual({ ok: true })
-        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
-            supabase,
-            failClosedBotMode: true
-        })
-        expect(resolveLeadExtractionAllowanceMock).toHaveBeenCalledWith({
-            botMode: 'shadow',
-            operatorActive: false,
-            allowDuringOperator: false
-        })
-        expect(runLeadExtractionMock).toHaveBeenCalledWith(expect.objectContaining({
-            organizationId: 'org-1',
-            conversationId: 'conv-1',
-            latestMessage: 'Merhaba',
-            source: 'telegram'
-        }))
-        expect(matchSkillsSafelyMock).not.toHaveBeenCalled()
-        expect(telegramCtorMock).not.toHaveBeenCalled()
-        expect(telegramSendMessageMock).not.toHaveBeenCalled()
+        expect(telegramSendMessageMock).toHaveBeenCalledWith('123', 'Cevap metni')
+        expect(telegramSendImageMock).toHaveBeenCalledWith(
+            '123',
+            'https://cdn.example.com/image.png',
+            'Görsel açıklaması'
+        )
     })
 
-    it('writes human attention flags when escalation is required', async () => {
-        const channelLookup = createChannelLookupBuilder()
-        const conversationLookup = createConversationLookupBuilder({
-            ai_processing_paused: false
-        })
-        const dedupeLookup = createInboundDedupeBuilder()
-        const inboundInsert = createInsertMessageBuilder()
-        const botInsert = createInsertMessageBuilder()
-        const conversationUpdateAfterInbound = createConversationUpdateBuilder()
-        const conversationUpdateAfterBotReply = createConversationUpdateBuilder()
-        const escalationUpdate = createConversationUpdateBuilder()
-        const skillDetails = createSkillDetailsBuilder()
-
+    it('stores inbound messages without automation when the channel has no bot token', async () => {
+        const channelLookup = createChannelLookupBuilder({ webhook_secret: 'secret-1' })
+        const conversationAvatarLookup = createConversationAvatarLookupBuilder()
         const supabase = createSupabaseMock({
             channels: [channelLookup.builder],
-            conversations: [
-                conversationLookup.builder,
-                conversationUpdateAfterInbound.builder,
-                conversationUpdateAfterBotReply.builder,
-                escalationUpdate.builder
-            ],
-            messages: [dedupeLookup.builder, inboundInsert.builder, botInsert.builder],
-            skills: [skillDetails.builder]
+            conversations: [conversationAvatarLookup.builder]
         })
-
         createClientMock.mockReturnValue(supabase)
-        isOperatorActiveMock.mockReturnValue(false)
-        matchSkillsSafelyMock.mockResolvedValueOnce([
-            {
-                skill_id: 'skill-1',
-                title: 'Handover',
-                response_text: 'Ekibimize iletiyorum.',
-                trigger_text: 'Yardım istiyorum',
-                similarity: 0.95
-            }
-        ])
-        decideHumanEscalationMock.mockReturnValueOnce({
-            shouldEscalate: true,
-            reason: 'skill_handover',
-            action: 'switch_to_operator',
-            noticeMode: 'none',
-            noticeMessage: null
-        })
 
-        const req = new NextRequest('http://localhost/api/webhooks/telegram?secret=secret-1', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                update_id: 1002,
-                message: {
-                    message_id: 13,
-                    text: 'yardım istiyorum',
-                    chat: { id: 123 },
-                    from: { id: 456, first_name: 'Ayse' }
-                }
-            })
-        })
-
-        const res = await POST(req)
+        const res = await POST(createTelegramRequest(createValidTelegramUpdate()))
 
         expect(res.status).toBe(200)
-        expect(telegramCtorMock).toHaveBeenCalledTimes(1)
-        expect(telegramSendMessageMock).toHaveBeenCalledTimes(1)
-        expect(skillDetails.selectMock).toHaveBeenCalledWith('requires_human_handover, title, image_public_url, image_mime_type, image_original_filename')
-        expect(escalationUpdate.updateMock).toHaveBeenCalledWith(expect.objectContaining({
-            active_agent: 'operator',
-            human_attention_required: true,
-            human_attention_reason: 'skill_handover',
-            human_attention_requested_at: expect.any(String),
-            human_attention_resolved_at: null
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            skipAutomation: true
         }))
     })
 })

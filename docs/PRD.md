@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-05-20):** Telegram, WhatsApp, and Instagram customer replies should share the same inbound AI pipeline. Channel-specific webhook routes may validate provider payloads and adapt outbound delivery, but RAG, fallback, skill matching, formatting, deadlines, usage recording, and deferred lead extraction must live in the shared pipeline so Telegram cannot stall on slow lead scoring before answering the user.
+
 > **Update Note (2026-05-20):** University-pilot RAG quality must be checked with student-like and administrator-like questions, not only crawler/import success. For mixed PDF and website corpora, retrieval should prioritize canonical pages for broad institutional questions, such as `/iletisim` for general or rectorate contact requests, route natural İSG coordinator questions to the official occupational-health coordinator page, preserve raw source links, keep messenger formatting clean, and explicitly say the person name is not in the Knowledge Base when the source only defines a role.
 
 > **Update Note (2026-05-20):** Knowledge Base browsing for large crawl imports must use exact-count paginated reads instead of relying on unbounded Supabase REST responses. The main content pane should show the real total above 1000 and load additional document pages on demand; the desktop sidebar should keep first paint lightweight by loading folder summaries/counts first and fetching folder file pages only when expanded.

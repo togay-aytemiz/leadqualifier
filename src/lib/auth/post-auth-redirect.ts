@@ -69,7 +69,6 @@ async function isExplicitOrganizationSelectionValid(
 
 export async function resolvePostAuthRedirectPath({
   cookieOrganizationId,
-  locale,
   onboarding,
   supabase,
   userId,

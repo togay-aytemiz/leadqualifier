@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 describe('Telegram RAG prompt source guard', () => {
     it('keeps chat-channel link instructions aligned with shared inbound RAG replies', () => {
-        const source = readFileSync('src/app/api/webhooks/telegram/route.ts', 'utf8')
+        const routeSource = readFileSync('src/app/api/webhooks/telegram/route.ts', 'utf8')
+        const source = readFileSync('src/lib/channels/inbound-ai-pipeline.ts', 'utf8')
 
+        expect(routeSource).toContain("platform: 'telegram'")
+        expect(routeSource).toContain('processInboundAiPipeline')
         expect(source).toContain('Treat document titles, section labels, and source URLs in the context as valid evidence.')
         expect(source).toContain('Do not use Markdown links like [label](url).')
         expect(source).toContain('put the full raw URL on its own final line')

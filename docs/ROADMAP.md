@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-20):** Telegram inbound automation must use the shared channel AI pipeline, not a separate legacy copy of the RAG/skill/fallback flow. Lead extraction should be deferred after the customer-facing reply so slower lead scoring cannot consume the webhook budget and leave Telegram users waiting without a bot response.
+
 > **Update Note (2026-05-20):** Yüksek İhtisas pilot Knowledge Base has a second 50-question student/admin QA pass over mixed PDF and website content. The regression now covers student-style admissions/department questions plus rectorate/admin audit questions, and the product should prefer the canonical root contact page for general/rektorate contact requests, prefer the official İş Sağlığı ve Güvenliği Koordinatörlüğü page for natural İSG coordinator questions, and refuse to invent a person name when the retrieved context only describes a role.
 
 > **Update Note (2026-05-20):** Knowledge Base large-corpus browsing now avoids Supabase's default 1000-row cap and the heavy first-load file tree. The main content pane loads an exact-count first page with a `Daha fazla yükle / Load more` action, while the desktop Knowledge sidebar loads only folder summaries plus a small uncategorized page first, then fetches folder files in explicit pages when a folder is expanded.
