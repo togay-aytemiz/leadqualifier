@@ -41,4 +41,13 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain("t('themeToggleLight')")
         expect(source).toContain("t('themeToggleDark')")
     })
+
+    it('renders assistant replies as plain answer text with a reveal animation instead of chat bubbles', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('messageContainerClassName')
+        expect(source).toContain('messageBodyClassName')
+        expect(source).toContain('demo-chat-assistant-reveal')
+        expect(source).toContain('assistant text remains unframed')
+    })
 })

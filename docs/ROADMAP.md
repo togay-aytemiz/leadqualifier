@@ -1,6 +1,6 @@
 # WhatsApp AI Qualy — Roadmap
 
-> **Update Note (2026-05-20):** Public university demo chat should read as a reusable demo assistant, not only an admissions chat. The Yüksek İhtisas demo now uses the university logo asset, a neutral `Üniversite demo asistanı` subtitle, a non-message demo information panel with the `app.askqualy.com` promotion link, clickable links and WhatsApp-style bold in demo bubbles, a light/dark header switch, mobile-friendly widths, subtle message animation, and rotating friendly loading copy while the AI response is being prepared.
+> **Update Note (2026-05-20):** Public university demo chat should read as a reusable demo assistant, not only an admissions chat. The Yüksek İhtisas demo now uses the university logo asset, a neutral `Üniversite demo asistanı` subtitle, a non-message demo information panel with the `app.askqualy.com` promotion link, clickable links and WhatsApp-style bold, a light/dark header switch, mobile-friendly widths, plain unframed assistant answers with a top-to-bottom reveal animation, clearer dark mobile contrast, and rotating friendly loading copy while the AI response is being prepared.
 
 > **Update Note (2026-05-20):** University demo chat now runs under `app.askqualy.com` with a public slug mapped server-side to a Qualy organization. Each tester browser session becomes a separate `demo_chat` Inbox conversation, AI replies use the shared inbound pipeline, and operator replies are disabled for the demo channel so WhatsApp, Instagram, and Telegram connections remain isolated.
 

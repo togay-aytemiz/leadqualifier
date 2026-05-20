@@ -208,7 +208,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                     <div
                         className={`demo-chat-message-enter rounded-xl border px-4 py-3 text-sm shadow-sm transition-colors duration-300 ${
                             isDark
-                                ? 'border-cyan-300/20 bg-cyan-300/10 text-slate-200'
+                                ? 'border-white/10 bg-slate-800/80 text-slate-200'
                                 : 'border-sky-200 bg-sky-50 text-slate-700'
                         }`}
                     >
@@ -222,22 +222,23 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
 
                     {messages.map((message) => {
                         const isUser = message.role === 'user'
+                        const messageContainerClassName = isUser
+                            ? 'demo-chat-message-enter flex justify-end'
+                            : 'demo-chat-assistant-reveal flex justify-start'
+                        const messageBodyClassName = isUser
+                            ? `max-w-[92%] rounded-2xl px-4 py-2 text-sm leading-6 shadow-sm transition-colors duration-300 sm:max-w-[84%] ${
+                                  isDark
+                                      ? 'rounded-br-md bg-cyan-300 text-slate-950'
+                                      : 'rounded-br-md bg-slate-900 text-white'
+                              }`
+                            : `w-full max-w-none px-1 py-4 text-sm leading-7 shadow-none transition-colors duration-300 sm:max-w-[92%] sm:px-0 sm:py-5 ${
+                                  // assistant text remains unframed to match modern chat answer surfaces
+                                  isDark ? 'text-slate-100' : 'text-slate-900'
+                              }`
+
                         return (
-                            <div
-                                key={message.id}
-                                className={`demo-chat-message-enter flex ${isUser ? 'justify-end' : 'justify-start'}`}
-                            >
-                                <div
-                                    className={`max-w-[92%] rounded-2xl px-4 py-2 text-sm leading-6 shadow-sm transition-colors duration-300 sm:max-w-[84%] ${
-                                        isUser
-                                            ? isDark
-                                                ? 'rounded-br-md bg-cyan-300 text-slate-950'
-                                                : 'rounded-br-md bg-slate-900 text-white'
-                                            : isDark
-                                              ? 'rounded-bl-md border border-white/10 bg-slate-800 text-slate-100'
-                                              : 'rounded-bl-md border border-slate-200 bg-slate-50 text-slate-900'
-                                    }`}
-                                >
+                            <div key={message.id} className={messageContainerClassName}>
+                                <div className={messageBodyClassName}>
                                     <div className="whitespace-pre-wrap">
                                         <MessageRichText content={message.content} />
                                     </div>
@@ -256,10 +257,10 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                     {isSending ? (
                         <div className="demo-chat-message-enter flex justify-start">
                             <div
-                                className={`inline-flex items-center rounded-2xl rounded-bl-md border px-4 py-2 text-sm shadow-sm transition-colors duration-300 ${
+                                className={`inline-flex items-center px-1 py-3 text-sm transition-colors duration-300 ${
                                     isDark
-                                        ? 'border-white/10 bg-slate-800 text-slate-300'
-                                        : 'border-slate-200 bg-slate-50 text-slate-500'
+                                        ? 'text-slate-400'
+                                        : 'text-slate-500'
                                 }`}
                                 aria-live={POLITE_LIVE_REGION}
                             >
