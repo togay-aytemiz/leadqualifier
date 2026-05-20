@@ -59,6 +59,9 @@ import {
     createKnowledgeBaseEntry,
     generateKnowledgeBaseDraft,
     getCollections,
+    getKnowledgeBaseEntriesPage,
+    getSidebarData,
+    getSidebarFilesPage,
     processKnowledgeDocument,
     searchKnowledgeBase
 } from '@/lib/knowledge-base/actions'
@@ -247,6 +250,192 @@ function createKnowledgeDraftSupabase() {
             from: fromMock
         },
         fromMock
+    }
+}
+
+function createKnowledgeEntriesPageSupabase() {
+    const rangeMock = vi.fn(async () => ({
+        data: [
+            {
+                id: 'doc-51',
+                organization_id: 'org-1',
+                collection_id: 'col-1',
+                title: 'Page 51',
+                type: 'article',
+                content: 'Page content',
+                status: 'ready',
+                created_at: '2026-05-19T10:00:00.000Z',
+                updated_at: '2026-05-19T10:00:00.000Z',
+                collection: {
+                    id: 'col-1',
+                    organization_id: 'org-1',
+                    name: 'Website Crawl',
+                    description: null,
+                    icon: 'folder',
+                    created_at: '2026-05-19T09:00:00.000Z'
+                }
+            }
+        ],
+        count: 1240,
+        error: null
+    }))
+    const queryChain: {
+        order: ReturnType<typeof vi.fn>
+        eq: ReturnType<typeof vi.fn>
+        range: ReturnType<typeof vi.fn>
+    } = {
+        order: vi.fn(),
+        eq: vi.fn(),
+        range: rangeMock
+    }
+    queryChain.order.mockReturnValue(queryChain)
+    queryChain.eq.mockReturnValue(queryChain)
+
+    const selectMock = vi.fn(() => queryChain)
+    const fromMock = vi.fn((table: string) => {
+        if (table !== 'knowledge_documents') {
+            throw new Error(`Unexpected table ${table}`)
+        }
+
+        return { select: selectMock }
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        selectMock,
+        rangeMock,
+        eqMock: queryChain.eq
+    }
+}
+
+function createSidebarSummarySupabase() {
+    const collectionsEqMock = vi.fn(async () => ({
+        data: [
+            {
+                id: 'col-1',
+                organization_id: 'org-1',
+                name: 'Website Crawl',
+                description: null,
+                icon: 'folder',
+                created_at: '2026-05-19T09:00:00.000Z'
+            }
+        ],
+        error: null
+    }))
+    const collectionsOrderMock = vi.fn(() => ({
+        eq: collectionsEqMock
+    }))
+    const collectionsSelectMock = vi.fn(() => ({
+        order: collectionsOrderMock
+    }))
+
+    const totalEqMock = vi.fn(async () => ({
+        count: 1250,
+        error: null
+    }))
+    const uncategorizedRangeMock = vi.fn(async () => ({
+        data: [
+            {
+                id: 'root-1',
+                title: 'Root document',
+                type: 'article',
+                collection_id: null
+            }
+        ],
+        count: 1,
+        error: null
+    }))
+    const uncategorizedChain: {
+        eq: ReturnType<typeof vi.fn>
+        is: ReturnType<typeof vi.fn>
+        order: ReturnType<typeof vi.fn>
+        range: ReturnType<typeof vi.fn>
+    } = {
+        eq: vi.fn(),
+        is: vi.fn(),
+        order: vi.fn(),
+        range: uncategorizedRangeMock
+    }
+    uncategorizedChain.eq.mockReturnValue(uncategorizedChain)
+    uncategorizedChain.is.mockReturnValue(uncategorizedChain)
+    uncategorizedChain.order.mockReturnValue(uncategorizedChain)
+
+    const documentsSelectMock = vi.fn((_selection: string, options?: { count?: string; head?: boolean }) => {
+        if (options?.head) return { eq: totalEqMock }
+        return uncategorizedChain
+    })
+
+    const fromMock = vi.fn((table: string) => {
+        if (table === 'knowledge_collections') {
+            return { select: collectionsSelectMock }
+        }
+        if (table === 'knowledge_documents') {
+            return { select: documentsSelectMock }
+        }
+        throw new Error(`Unexpected table ${table}`)
+    })
+    const rpcMock = vi.fn(async () => ({
+        data: [
+            { collection_id: 'col-1', document_count: 1240 }
+        ],
+        error: null
+    }))
+
+    return {
+        supabase: {
+            from: fromMock,
+            rpc: rpcMock
+        },
+        documentsSelectMock,
+        uncategorizedRangeMock
+    }
+}
+
+function createSidebarFilesPageSupabase() {
+    const rangeMock = vi.fn(async () => ({
+        data: [
+            {
+                id: 'doc-26',
+                title: 'Loaded document',
+                type: 'article',
+                collection_id: 'col-1'
+            }
+        ],
+        count: 1240,
+        error: null
+    }))
+    const queryChain: {
+        eq: ReturnType<typeof vi.fn>
+        is: ReturnType<typeof vi.fn>
+        order: ReturnType<typeof vi.fn>
+        range: ReturnType<typeof vi.fn>
+    } = {
+        eq: vi.fn(),
+        is: vi.fn(),
+        order: vi.fn(),
+        range: rangeMock
+    }
+    queryChain.eq.mockReturnValue(queryChain)
+    queryChain.is.mockReturnValue(queryChain)
+    queryChain.order.mockReturnValue(queryChain)
+
+    const selectMock = vi.fn(() => queryChain)
+    const fromMock = vi.fn((table: string) => {
+        if (table !== 'knowledge_documents') {
+            throw new Error(`Unexpected table ${table}`)
+        }
+        return { select: selectMock }
+    })
+
+    return {
+        supabase: {
+            from: fromMock
+        },
+        selectMock,
+        rangeMock,
+        eqMock: queryChain.eq
     }
 }
 
@@ -507,6 +696,85 @@ describe('getCollections', () => {
     })
 })
 
+describe('Knowledge Base paginated list actions', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('loads a bounded document page with exact total count instead of relying on the Supabase default row cap', async () => {
+        const { supabase, selectMock, rangeMock, eqMock } = createKnowledgeEntriesPageSupabase()
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await getKnowledgeBaseEntriesPage({
+            collectionId: 'col-1',
+            organizationId: 'org-1',
+            offset: 50,
+            limit: 25
+        })
+
+        expect(selectMock).toHaveBeenCalledWith(expect.stringContaining('collection:knowledge_collections(*)'), { count: 'exact' })
+        expect(eqMock).toHaveBeenCalledWith('organization_id', 'org-1')
+        expect(eqMock).toHaveBeenCalledWith('collection_id', 'col-1')
+        expect(rangeMock).toHaveBeenCalledWith(50, 74)
+        expect(result).toMatchObject({
+            entries: [expect.objectContaining({ id: 'doc-51', collection: expect.objectContaining({ id: 'col-1' }) })],
+            totalCount: 1240,
+            nextOffset: 51,
+            hasMore: true
+        })
+        expect(result.pageSize).toBe(25)
+    })
+
+    it('keeps sidebar summary lightweight and does not load every document into every folder on first paint', async () => {
+        const { supabase, documentsSelectMock, uncategorizedRangeMock } = createSidebarSummarySupabase()
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await getSidebarData('org-1')
+
+        expect(documentsSelectMock).toHaveBeenCalledWith('id', { count: 'exact', head: true })
+        expect(uncategorizedRangeMock).toHaveBeenCalledWith(0, 24)
+        expect(result).toEqual({
+            collections: [
+                expect.objectContaining({
+                    id: 'col-1',
+                    count: 1240,
+                    files: [],
+                    loadedFileCount: 0,
+                    hasMoreFiles: true
+                })
+            ],
+            uncategorized: [expect.objectContaining({ id: 'root-1' })],
+            uncategorizedCount: 1,
+            uncategorizedHasMore: false,
+            totalCount: 1250
+        })
+    })
+
+    it('loads sidebar folder files in explicit pages when a folder is expanded', async () => {
+        const { supabase, selectMock, rangeMock, eqMock } = createSidebarFilesPageSupabase()
+        createClientMock.mockResolvedValue(supabase)
+
+        const result = await getSidebarFilesPage({
+            collectionId: 'col-1',
+            organizationId: 'org-1',
+            offset: 25,
+            limit: 25
+        })
+
+        expect(selectMock).toHaveBeenCalledWith('id, title, type, collection_id', { count: 'exact' })
+        expect(eqMock).toHaveBeenCalledWith('organization_id', 'org-1')
+        expect(eqMock).toHaveBeenCalledWith('collection_id', 'col-1')
+        expect(rangeMock).toHaveBeenCalledWith(25, 49)
+        expect(result).toMatchObject({
+            files: [expect.objectContaining({ id: 'doc-26' })],
+            totalCount: 1240,
+            nextOffset: 26,
+            hasMore: true
+        })
+        expect(result.pageSize).toBe(25)
+    })
+})
+
 describe('createKnowledgeBaseEntry', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -632,7 +900,7 @@ describe('searchKnowledgeBase', () => {
     })
 
     it('prefers evergreen department pages over announcements for generic department information questions', async () => {
-        const { supabase, orMock } = createHybridSearchSupabase({
+        const { supabase } = createHybridSearchSupabase({
             rpcRows: [
                 {
                     chunk_id: 'duyuru-1',
@@ -666,7 +934,7 @@ describe('searchKnowledgeBase', () => {
     })
 
     it('boosts direct contact pages for contact and address questions', async () => {
-        const { supabase, orMock } = createHybridSearchSupabase({
+        const { supabase } = createHybridSearchSupabase({
             rpcRows: [
                 {
                     chunk_id: 'faculty-1',
@@ -697,6 +965,110 @@ describe('searchKnowledgeBase', () => {
         )
 
         expect(results[0]?.chunk_id).toBe('contact-1')
+    })
+
+    it('prefers the root contact page for rectorate-wide phone questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'faculty-quality-contact-1',
+                    document_id: 'doc-faculty-quality-contact-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi/kalite/paydas-katilimi-ve-iletisim/iletisim\n\nTıp Fakültesi telefon numarası +90 312 329 10 10.',
+                    similarity: 0.66
+                },
+                {
+                    chunk_id: 'root-contact-1',
+                    document_id: 'doc-root-contact-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/iletisim\n\nRektörlük ve Tıp Fakültesi telefon numarası 444 9 844.',
+                    similarity: 0.58
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'İletişim sayfasında Rektörlük ve Tıp Fakültesi telefon numarası nedir?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('root-contact-1')
+    })
+
+    it('prefers the root contact page for general university phone and address questions', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'institute-contact-1',
+                    document_id: 'doc-institute-contact-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/enstituler/lisansustu-egitim-enstitusu/iletisim\n\nLisansüstü Eğitim Enstitüsü iletişim ve ulaşım bilgileri.',
+                    similarity: 0.66
+                },
+                {
+                    chunk_id: 'root-contact-1',
+                    document_id: 'doc-root-contact-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/iletisim\n\nBize Ulaşın. Rektörlük ve Tıp Fakültesi adres ve telefon bilgileri.',
+                    similarity: 0.58
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Üniversitenin iletişim telefonunu ve adresini öğrenebilir miyim?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('root-contact-1')
+        expect(orMock.mock.calls.some((call) => call[0].includes('/iletisim'))).toBe(true)
+    })
+
+    it('prefers the official occupational health coordinator page for natural İSG coordinator questions', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-coordinator-pdf-1',
+                    document_id: 'doc-generic-coordinator-pdf-1',
+                    document_title: 'Koordinatör Görev, Yetki ve Sorumluluklar',
+                    document_type: 'article',
+                    content: 'Page Title: Koordinatör Görev, Yetki ve Sorumluluklar\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/Uploads/idari_birim_alt_kategorileri_view/icerik_yonetimi_view/8f2e37363388791b73323b3662a1e6bb.pdf\n\nKoordinatör görev, yetki ve sorumlulukları.',
+                    similarity: 0.64
+                },
+                {
+                    chunk_id: 'isg-page-1',
+                    document_id: 'doc-isg-page-1',
+                    document_title: 'İş Sağlığı ve Güvenliği Koordinatörlüğü',
+                    document_type: 'article',
+                    content: 'Page Title: İş Sağlığı ve Güvenliği Koordinatörlüğü\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/is-sagligi-ve-guvenligi-koordinatorlugu\n\nİSG Koordinatörü Doç. Dr. Elanur DİKİCİOĞLU.',
+                    similarity: 0.52
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'İSG koordinatörü kim olarak görünüyor?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('isg-page-1')
+        expect(orMock.mock.calls.some((call) => call[0].includes('is-sagligi-ve-guvenligi-koordinatorlugu'))).toBe(true)
     })
 
     it('matches Turkish suffix variants in URL slugs for specific evergreen pages', async () => {
@@ -837,6 +1209,69 @@ describe('searchKnowledgeBase', () => {
         )
 
         expect(results[0]?.chunk_id).toBe('main-calendar-1')
+    })
+
+    it('returns source_url metadata extracted from chunk content for downstream source-link formatting', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'source-1',
+                    document_id: 'doc-source-1',
+                    document_title: 'Akademik Takvim',
+                    document_type: 'article',
+                    content: 'Page Title: Akademik Takvim\nSource URL: https://example.edu.tr/akademik-takvim\n\nAkademik takvim bilgisi.',
+                    similarity: 0.62
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Akademik takvim linki nedir?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'source-1',
+            source_url: 'https://example.edu.tr/akademik-takvim'
+        })
+    })
+
+    it('prefers the exact PDF title over a similarly named document when asking for a document number', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'similar-title-1',
+                    document_id: 'doc-similar-title-1',
+                    document_title: 'Tıp Fakültesi Eğitim Öğretim Ve Sınav Uygulamaları Yönergesi',
+                    document_type: 'article',
+                    content: 'Document Title: Tıp Fakültesi Eğitim Öğretim Ve Sınav Uygulamaları Yönergesi\nSource URL: https://example.edu.tr/uygulamalari.pdf\n\nDoküman No TIP.YNG.0018',
+                    similarity: 0.72
+                },
+                {
+                    chunk_id: 'exact-title-1',
+                    document_id: 'doc-exact-title-1',
+                    document_title: 'Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi',
+                    document_type: 'article',
+                    content: 'Document Title: Tıp Fakültesi Eğitim- Öğretim Ve Sınav Yönergesi\nSource URL: https://example.edu.tr/sinav.pdf\n\nDoküman No TIP.YNG.0013',
+                    similarity: 0.64
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesinin doküman numarası nedir?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('exact-title-1')
     })
 
     it('does not let generic contact pages outrank a named coordinator page', async () => {

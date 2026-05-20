@@ -36,6 +36,10 @@ import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { withAiTimeout } from '@/lib/ai/deadline'
 import { formatOutboundTextForChannel } from '@/lib/channels/outbound-text-format'
+import {
+    appendCanonicalRagSourceLinks,
+    isLikelySourceLinkRequest
+} from '@/lib/knowledge-base/rag-source-links'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -791,6 +795,9 @@ For find, view, where, or link requests, a matching source URL is enough to answ
 Do not use Markdown links like [label](url). When sharing a link, put the full raw URL on its own final line.
 Copy source URLs exactly and never insert spaces inside a URL. Do not add punctuation or words after the URL.
 When several chunks are similar, prefer the one that matches the user wording most closely, such as student vs staff or a specific department name.
+For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, or email addresses, copy only the value explicitly shown in the context. If multiple conflicting values appear, prefer the chunk whose title/source best matches the question and mention the source link when useful.
+If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base.
+When answering with three or more items, use one plain dash bullet per line.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
 Keep the answer concise and friendly.
@@ -824,6 +831,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                             noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
                         })
                         : ''
+                    const finalRagResponse = appendCanonicalRagSourceLinks(guardedRagResponse, chunks, {
+                        force: isLikelySourceLinkRequest(text)
+                    })
                     const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                     const ragUsage = completion.usage
                         ? {
@@ -833,8 +843,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         }
                         : {
                             inputTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text),
-                            outputTokens: estimateTokenCount(guardedRagResponse ?? ''),
-                            totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text) + estimateTokenCount(guardedRagResponse ?? '')
+                            outputTokens: estimateTokenCount(finalRagResponse ?? ''),
+                            totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(text) + estimateTokenCount(finalRagResponse ?? '')
                         }
 
                     await recordAiUsage({
@@ -851,8 +861,8 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         supabase
                     })
 
-                    if (guardedRagResponse && !guardedRagResponse.includes(noAnswerToken)) {
-                        const formattedRagReply = formatOutboundBotMessage(guardedRagResponse)
+                    if (finalRagResponse && !finalRagResponse.includes(noAnswerToken)) {
+                        const formattedRagReply = formatOutboundBotMessage(finalRagResponse)
                         await client.sendMessage(chatId, formattedRagReply)
 
                         await persistBotMessage(formattedRagReply, {

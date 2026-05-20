@@ -2356,6 +2356,8 @@
     "newFolder": "Yeni Klasör",
     "home": "Ana Sayfa",
     "loading": "Yükleniyor...",
+    "loadMore": "Daha fazla yükle",
+    "loadingMore": "Yükleniyor...",
     "folders": "Klasörler",
     "files": "Dosyalar",
     "emptyFolder": "Boş Klasör",
@@ -2477,7 +2479,9 @@
     "empty": "Boş",
     "uncategorized": "Klasörsüz",
     "showAll": "Tümünü göster ({count})",
-    "showLess": "Daha az göster"
+    "showLess": "Daha az göster",
+    "loadMore": "Daha fazla yükle",
+    "loadingMore": "Yükleniyor..."
   },
   "deleteFolder": {
     "title": "Klasörü Sil",

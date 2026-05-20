@@ -3,7 +3,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Folder, FileText, LayoutGrid, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
 import { Sidebar, SidebarGroup, SidebarItem, Button, Skeleton } from '@/design'
-import { getSidebarData, type SidebarData, createCollection } from '@/lib/knowledge-base/actions'
+import {
+    getSidebarData,
+    getSidebarFilesPage,
+    type SidebarData,
+    createCollection
+} from '@/lib/knowledge-base/actions'
+import { DEFAULT_SIDEBAR_FILES_PAGE_SIZE } from '@/lib/knowledge-base/pagination'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
@@ -29,15 +35,14 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
     // New state for folder modal
     const [showFolderModal, setShowFolderModal] = useState(false)
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-    const [showAllUncategorized, setShowAllUncategorized] = useState(false)
+    const [loadingCollectionIds, setLoadingCollectionIds] = useState<Record<string, boolean>>({})
+    const [loadingUncategorized, setLoadingUncategorized] = useState(false)
 
     const collections = data?.collections ?? []
     const uncategorized = data?.uncategorized ?? []
     const totalCount = data?.totalCount ?? 0
-    const uncategorizedLimit = 10
-    const visibleUncategorized = showAllUncategorized
-        ? uncategorized
-        : uncategorized.slice(0, uncategorizedLimit)
+    const uncategorizedCount = data?.uncategorizedCount ?? uncategorized.length
+    const uncategorizedHasMore = data?.uncategorizedHasMore ?? false
 
     const currentFileId = useMemo(() => {
         const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
@@ -53,14 +58,97 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
         try {
             const sidebarData = await getSidebarData(organizationId)
             setData(sidebarData)
-            const initialExpanded: Record<string, boolean> = {}
-            sidebarData.collections.forEach(c => initialExpanded[c.id] = true)
-            setExpanded(initialExpanded)
-            setShowAllUncategorized(false)
+            setExpanded(prev => {
+                const nextExpanded: Record<string, boolean> = {}
+                sidebarData.collections.forEach(collection => {
+                    if (prev[collection.id]) {
+                        nextExpanded[collection.id] = true
+                    }
+                })
+                if (currentCollectionId) {
+                    nextExpanded[currentCollectionId] = true
+                }
+                return nextExpanded
+            })
         } catch (error) {
             console.error(error)
         }
+    }, [currentCollectionId, organizationId])
+
+    const loadCollectionFiles = useCallback(async (collectionId: string, offset = 0) => {
+        setLoadingCollectionIds(prev => ({ ...prev, [collectionId]: true }))
+        try {
+            const page = await getSidebarFilesPage({
+                collectionId,
+                organizationId,
+                offset,
+                limit: DEFAULT_SIDEBAR_FILES_PAGE_SIZE
+            })
+
+            setData(prev => {
+                if (!prev) return prev
+                return {
+                    ...prev,
+                    collections: prev.collections.map(collection => {
+                        if (collection.id !== collectionId) return collection
+
+                        const existingFiles = offset === 0 ? [] : collection.files
+                        const seen = new Set(existingFiles.map(file => file.id))
+                        const files = [
+                            ...existingFiles,
+                            ...page.files.filter(file => !seen.has(file.id))
+                        ]
+
+                        return {
+                            ...collection,
+                            files,
+                            count: page.totalCount,
+                            loadedFileCount: files.length,
+                            hasMoreFiles: page.hasMore
+                        }
+                    })
+                }
+            })
+        } catch (error) {
+            console.error('Failed to load sidebar files', error)
+        } finally {
+            setLoadingCollectionIds(prev => ({ ...prev, [collectionId]: false }))
+        }
     }, [organizationId])
+
+    const loadMoreUncategorized = useCallback(async () => {
+        if (!data || loadingUncategorized) return
+
+        setLoadingUncategorized(true)
+        try {
+            const page = await getSidebarFilesPage({
+                collectionId: null,
+                organizationId,
+                offset: data.uncategorized.length,
+                limit: DEFAULT_SIDEBAR_FILES_PAGE_SIZE
+            })
+
+            setData(prev => {
+                if (!prev) return prev
+                const seen = new Set(prev.uncategorized.map(file => file.id))
+                const uncategorizedFiles = [
+                    ...prev.uncategorized,
+                    ...page.files.filter(file => !seen.has(file.id))
+                ]
+
+                return {
+                    ...prev,
+                    uncategorized: uncategorizedFiles,
+                    uncategorizedCount: page.totalCount,
+                    uncategorizedHasMore: page.hasMore
+                }
+            })
+        } catch (error) {
+            console.error('Failed to load uncategorized sidebar files', error)
+        } finally {
+            setLoadingUncategorized(false)
+        }
+    }, [data, loadingUncategorized, organizationId])
 
     useEffect(() => {
         const handleUpdate = () => {
@@ -73,6 +161,16 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
             window.removeEventListener('knowledge-updated', handleUpdate)
         }
     }, [loadSidebar])
+
+    useEffect(() => {
+        if (!data || !currentCollectionId || !expanded[currentCollectionId]) return
+
+        const activeCollection = data.collections.find(collection => collection.id === currentCollectionId)
+        if (!activeCollection || activeCollection.count === 0 || activeCollection.loadedFileCount > 0) return
+        if (loadingCollectionIds[currentCollectionId]) return
+
+        void loadCollectionFiles(currentCollectionId)
+    }, [currentCollectionId, data, expanded, loadCollectionFiles, loadingCollectionIds])
 
     useEffect(() => {
         if (!organizationId) return
@@ -119,7 +217,13 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
 
     function toggleExpand(id: string, e: React.MouseEvent) {
         e.stopPropagation()
-        setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
+        const willExpand = !expanded[id]
+        setExpanded(prev => ({ ...prev, [id]: willExpand }))
+        if (!willExpand) return
+
+        const collection = collections.find(item => item.id === id)
+        if (!collection || collection.count === 0 || collection.loadedFileCount > 0) return
+        void loadCollectionFiles(id)
     }
 
     async function handleCreateFolder(name: string) {
@@ -187,10 +291,10 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                     <div className="mt-5">
                         <div className="px-3 text-xs font-semibold text-gray-500 mb-2 flex items-center justify-between">
                             <span>{t('uncategorized')}</span>
-                            <span className="text-xs text-gray-400">{uncategorized.length}</span>
+                            <span className="text-xs text-gray-400">{uncategorizedCount}</span>
                         </div>
                         <div className="space-y-0.5">
-                            {visibleUncategorized.map(file => (
+                            {uncategorized.map(file => (
                                 <div
                                     key={file.id}
                                     className={cn(
@@ -206,15 +310,14 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                                 </div>
                             ))}
                         </div>
-                        {uncategorized.length > uncategorizedLimit && (
+                        {uncategorizedHasMore && (
                             <button
                                 type="button"
-                                onClick={() => setShowAllUncategorized((prev) => !prev)}
+                                onClick={() => void loadMoreUncategorized()}
+                                disabled={loadingUncategorized}
                                 className="mt-1 ml-3 text-xs text-[#242A40] hover:text-[#1B2033]"
                             >
-                                {showAllUncategorized
-                                    ? t('showLess')
-                                    : t('showAll', { count: uncategorized.length })}
+                                {loadingUncategorized ? t('loadingMore') : t('loadMore')}
                             </button>
                         )}
                     </div>
@@ -276,10 +379,26 @@ export function KnowledgeSidebar({ organizationId, isReadOnly = false }: Knowled
                                             <span className="truncate">{file.title}</span>
                                         </div>
                                     ))}
-                                    {col.files.length === 0 && (
+                                    {loadingCollectionIds[col.id] && col.files.length === 0 && (
+                                        <div className="space-y-1 px-2 py-1">
+                                            <Skeleton className="h-6 w-full rounded-md" />
+                                            <Skeleton className="h-6 w-5/6 rounded-md" />
+                                        </div>
+                                    )}
+                                    {col.files.length === 0 && !loadingCollectionIds[col.id] && (
                                         <div className="px-2 py-1.5 text-xs text-gray-400 italic">
                                             {t('empty')}
                                         </div>
+                                    )}
+                                    {col.hasMoreFiles && (
+                                        <button
+                                            type="button"
+                                            onClick={() => void loadCollectionFiles(col.id, col.loadedFileCount)}
+                                            disabled={loadingCollectionIds[col.id]}
+                                            className="mt-1 px-2 text-xs text-[#242A40] hover:text-[#1B2033]"
+                                        >
+                                            {loadingCollectionIds[col.id] ? t('loadingMore') : t('loadMore')}
+                                        </button>
                                     )}
                                 </div>
                             )}

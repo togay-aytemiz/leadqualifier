@@ -2356,6 +2356,8 @@
     "newFolder": "New Folder",
     "home": "Home",
     "loading": "Loading...",
+    "loadMore": "Load more",
+    "loadingMore": "Loading...",
     "folders": "Folders",
     "files": "Files",
     "emptyFolder": "Empty Folder",
@@ -2477,7 +2479,9 @@
     "empty": "Empty",
     "uncategorized": "No folder",
     "showAll": "Show all ({count})",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "loadMore": "Load more",
+    "loadingMore": "Loading..."
   },
   "deleteFolder": {
     "title": "Delete Folder",

@@ -69,13 +69,13 @@ function convertDoubleStarToSingleStar(content: string) {
 }
 
 function normalizeInlineBullets(content: string) {
-    const bulletStartPattern = /\s+-\s+(?=(?:\*\*)?[A-Za-zÇĞİÖŞÜçğıöşü0-9])/g
+    const bulletStartPattern = /\s+-\s+(?=(?:\*\*)?[A-Za-zÇĞİÖŞÜçğıöşü])/g
     const matches = content.match(bulletStartPattern) ?? []
-    const hasListIntro = /[:：]\s+-\s+(?=(?:\*\*)?[A-Za-zÇĞİÖŞÜçğıöşü0-9])/.test(content)
+    const hasListIntro = /[:：]\s+-\s+(?=(?:\*\*)?[A-Za-zÇĞİÖŞÜçğıöşü])/.test(content)
     if (!hasListIntro && matches.length < 2) return content
 
     return content
-        .replace(/([:：])\s+-\s+(?=(?:\*\*)?[A-Za-zÇĞİÖŞÜçğıöşü0-9])/g, '$1\n- ')
+        .replace(/([:：])\s+-\s+(?=(?:\*\*)?[A-Za-zÇĞİÖŞÜçğıöşü])/g, '$1\n- ')
         .replace(bulletStartPattern, '\n- ')
 }
 

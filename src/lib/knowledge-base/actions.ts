@@ -13,6 +13,12 @@ import {
     appendOfferingProfileSuggestion,
     appendRequiredIntakeFields
 } from '@/lib/leads/offering-profile'
+import {
+    DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE,
+    DEFAULT_SIDEBAR_FILES_PAGE_SIZE,
+    MAX_KNOWLEDGE_ENTRIES_PAGE_SIZE,
+    MAX_SIDEBAR_FILES_PAGE_SIZE
+} from '@/lib/knowledge-base/pagination'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
 
@@ -52,6 +58,38 @@ type KnowledgeCountRow = { collection_id: string | null }
 type KnowledgeCollectionCountRow = { collection_id: string | null; document_count: number | string | null }
 type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { collection_id: string | null }
 const MAX_PROFILE_CONTEXT_CHARS = 6000
+const COUNT_SCAN_PAGE_SIZE = 1000
+
+export interface KnowledgeEntriesPage {
+    entries: KnowledgeBaseEntry[]
+    totalCount: number
+    nextOffset: number
+    hasMore: boolean
+    pageSize: number
+}
+
+export interface SidebarFilesPage {
+    files: SidebarFile[]
+    totalCount: number
+    nextOffset: number
+    hasMore: boolean
+    pageSize: number
+}
+
+interface KnowledgeEntriesPageOptions {
+    collectionId?: string | null
+    organizationId?: string | null
+    offset?: number
+    limit?: number
+}
+
+interface SidebarFilesPageOptions {
+    collectionId: string | null
+    organizationId?: string | null
+    offset?: number
+    limit?: number
+    supabase?: SupabaseClientLike
+}
 
 interface KnowledgeSearchResult {
     chunk_id: string
@@ -60,6 +98,7 @@ interface KnowledgeSearchResult {
     document_type: string
     content: string
     similarity: number
+    source_url?: string | null
 }
 
 interface KeywordSearchRow {
@@ -133,6 +172,33 @@ function buildProfileContextContent(title: string, content: string) {
         : `${truncatedContent}\n\n[TRUNCATED_FOR_PROFILE_CONTEXT]`
 }
 
+function normalizePageWindow(offset: number | undefined, limit: number | undefined, defaultLimit: number, maxLimit: number) {
+    const safeOffset = Number.isFinite(offset) && Number(offset) > 0
+        ? Math.floor(Number(offset))
+        : 0
+    const requestedLimit = Number.isFinite(limit) && Number(limit) > 0
+        ? Math.floor(Number(limit))
+        : defaultLimit
+    const safeLimit = Math.min(Math.max(requestedLimit, 1), maxLimit)
+
+    return {
+        from: safeOffset,
+        to: safeOffset + safeLimit - 1,
+        limit: safeLimit
+    }
+}
+
+function normalizeExactCount(count: number | null | undefined) {
+    return Number.isFinite(count) ? Number(count) : 0
+}
+
+function mapKnowledgeEntry(item: KnowledgeBaseEntry & { collection?: KnowledgeCollection | KnowledgeCollection[] | null }) {
+    return {
+        ...item,
+        collection: Array.isArray(item.collection) ? item.collection[0] : item.collection
+    } as KnowledgeBaseEntry
+}
+
 /**
  * --- COLLECTIONS ---
  */
@@ -165,17 +231,7 @@ export async function getCollections(organizationId?: string | null) {
     if (aggregatedCountError) {
         console.warn('Falling back to document row scan for knowledge collection counts:', aggregatedCountError)
 
-        let countsQuery = supabase
-            .from('knowledge_documents')
-            .select('collection_id')
-        if (scopedOrganizationId) {
-            countsQuery = countsQuery.eq('organization_id', scopedOrganizationId)
-        }
-
-        const { data: counts, error: countError } = await countsQuery
-
-        if (countError) throw new Error(countError.message)
-
+        const counts = await scanKnowledgeDocumentCollectionIds(supabase, scopedOrganizationId)
         ;(counts ?? []).forEach((item: KnowledgeCountRow) => {
             if (item.collection_id) {
                 countMap.set(item.collection_id, (countMap.get(item.collection_id) || 0) + 1)
@@ -416,42 +472,65 @@ export async function updateKnowledgeBaseEntry(id: string, entry: Partial<Knowle
     return data as KnowledgeBaseEntry
 }
 
-export async function getKnowledgeBaseEntries(collectionId?: string | null, organizationId?: string | null) {
+export async function getKnowledgeBaseEntriesPage(options: KnowledgeEntriesPageOptions = {}): Promise<KnowledgeEntriesPage> {
     const supabase = await createClient()
-    const scopedOrganizationId = await getScopedOrganizationId(supabase, organizationId)
-    // Explicitly filtering by org is safer even with RLS, but for read-only RLS is sufficient usually.
-    // However, knowing the org context is good. 
-    // For now, reliance on RLS for SELECT is standard in Supabase apps unless we need optimization.
+    const scopedOrganizationId = await getScopedOrganizationId(supabase, options.organizationId)
+    const { from, to, limit } = normalizePageWindow(
+        options.offset,
+        options.limit,
+        DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE,
+        MAX_KNOWLEDGE_ENTRIES_PAGE_SIZE
+    )
 
     let query = supabase
         .from('knowledge_documents')
         .select(`
             id, organization_id, content, title, type, collection_id, status, created_at, updated_at,
             collection:knowledge_collections(*)
-        `)
-        .order('created_at', { ascending: false })
+        `, { count: 'exact' })
 
     if (scopedOrganizationId) {
         query = query.eq('organization_id', scopedOrganizationId)
     }
 
-    if (collectionId) {
-        query = query.eq('collection_id', collectionId)
+    if (options.collectionId) {
+        query = query.eq('collection_id', options.collectionId)
     } else {
         // If collectionId is specifically null (root), filter for null.
-        if (collectionId === null) {
+        if (options.collectionId === null) {
             query = query.is('collection_id', null)
         }
     }
 
-    const { data, error } = await query
+    const { data, count, error } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to)
 
     if (error) throw new Error(error.message)
 
-    return (data ?? []).map(item => ({
-        ...item,
-        collection: Array.isArray(item.collection) ? item.collection[0] : item.collection
-    })) as KnowledgeBaseEntry[]
+    const entries = (data ?? []).map((item) => mapKnowledgeEntry(item as KnowledgeBaseEntry & {
+        collection?: KnowledgeCollection | KnowledgeCollection[] | null
+    }))
+    const totalCount = normalizeExactCount(count)
+    const nextOffset = from + entries.length
+
+    return {
+        entries,
+        totalCount,
+        nextOffset,
+        hasMore: nextOffset < totalCount,
+        pageSize: limit
+    }
+}
+
+export async function getKnowledgeBaseEntries(collectionId?: string | null, organizationId?: string | null) {
+    const page = await getKnowledgeBaseEntriesPage({
+        collectionId,
+        organizationId,
+        limit: DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE
+    })
+
+    return page.entries
 }
 
 export async function searchKnowledgeBase(
@@ -520,8 +599,10 @@ export async function searchKnowledgeBase(
     return mergeSearchResults(query, data, lexicalResults, limit)
 }
 export interface SidebarCollection extends KnowledgeCollection {
-    files: Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>[]
+    files: SidebarFile[]
     count: number
+    loadedFileCount: number
+    hasMoreFiles: boolean
 }
 
 export type SidebarFile = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>
@@ -529,6 +610,8 @@ export type SidebarFile = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'>
 export interface SidebarData {
     collections: SidebarCollection[]
     uncategorized: SidebarFile[]
+    uncategorizedCount: number
+    uncategorizedHasMore: boolean
     totalCount: number
 }
 
@@ -549,47 +632,146 @@ export async function getSidebarData(organizationId?: string | null) {
 
     if (colsError) throw new Error(colsError.message)
 
-    // 2. Get Files (only needed fields)
+    const countMap = new Map<string, number>()
+    const { data: aggregatedCounts, error: aggregatedCountError } = await supabase.rpc(
+        'count_knowledge_documents_by_collection',
+        {
+            target_organization_id: scopedOrganizationId ?? null
+        }
+    )
+
+    if (aggregatedCountError) {
+        console.warn('Falling back to paginated document row scan for knowledge sidebar counts:', aggregatedCountError)
+        const counts = await scanKnowledgeDocumentCollectionIds(supabase, scopedOrganizationId)
+        ;(counts ?? []).forEach((item: KnowledgeCountRow) => {
+            if (item.collection_id) {
+                countMap.set(item.collection_id, (countMap.get(item.collection_id) || 0) + 1)
+            }
+        })
+    } else {
+        ;((aggregatedCounts ?? []) as KnowledgeCollectionCountRow[]).forEach((item) => {
+            if (!item.collection_id) return
+            const nextCount = Number(item.document_count ?? 0)
+            countMap.set(item.collection_id, Number.isFinite(nextCount) ? nextCount : 0)
+        })
+    }
+
+    let totalCountQuery = supabase
+        .from('knowledge_documents')
+        .select('id', { count: 'exact', head: true })
+    if (scopedOrganizationId) {
+        totalCountQuery = totalCountQuery.eq('organization_id', scopedOrganizationId)
+    }
+
+    const { count: totalDocumentCount, error: totalCountError } = await totalCountQuery
+    if (totalCountError) throw new Error(totalCountError.message)
+
+    const uncategorizedPage = await getSidebarFilesPage({
+        collectionId: null,
+        organizationId: scopedOrganizationId,
+        offset: 0,
+        limit: DEFAULT_SIDEBAR_FILES_PAGE_SIZE,
+        supabase
+    })
+
+    const typedCollections = (collections ?? []) as KnowledgeCollection[]
+    const sidebarData: SidebarCollection[] = listToTree(typedCollections, countMap)
+
+    return {
+        collections: sidebarData,
+        uncategorized: uncategorizedPage.files,
+        uncategorizedCount: uncategorizedPage.totalCount,
+        uncategorizedHasMore: uncategorizedPage.hasMore,
+        totalCount: normalizeExactCount(totalDocumentCount)
+    } as SidebarData
+}
+
+export async function getSidebarFilesPage(options: SidebarFilesPageOptions): Promise<SidebarFilesPage> {
+    const supabase = options.supabase ?? await createClient()
+    const scopedOrganizationId = await getScopedOrganizationId(supabase, options.organizationId)
+    const { from, to, limit } = normalizePageWindow(
+        options.offset,
+        options.limit,
+        DEFAULT_SIDEBAR_FILES_PAGE_SIZE,
+        MAX_SIDEBAR_FILES_PAGE_SIZE
+    )
+
     let filesQuery = supabase
         .from('knowledge_documents')
-        .select('id, title, type, collection_id')
-        .order('title')
+        .select('id, title, type, collection_id', { count: 'exact' })
+
     if (scopedOrganizationId) {
         filesQuery = filesQuery.eq('organization_id', scopedOrganizationId)
     }
 
-    const { data: files, error: filesError } = await filesQuery
+    if (options.collectionId) {
+        filesQuery = filesQuery.eq('collection_id', options.collectionId)
+    } else {
+        filesQuery = filesQuery.is('collection_id', null)
+    }
 
-    if (filesError) throw new Error(filesError.message)
+    const { data, count, error } = await filesQuery
+        .order('title')
+        .range(from, to)
+    if (error) throw new Error(error.message)
 
-    // 3. Merge data
-    const typedCollections = (collections ?? []) as KnowledgeCollection[]
-    const typedFiles = (files ?? []) as KnowledgeFileRow[]
-    const sidebarData: SidebarCollection[] = listToTree(typedCollections, typedFiles)
-    const uncategorized = typedFiles
-        .filter(f => !f.collection_id)
-        .map((file) => ({
-            id: file.id,
-            title: file.title,
-            type: file.type
-        })) as SidebarFile[]
+    const files = ((data ?? []) as KnowledgeFileRow[]).map((file) => ({
+        id: file.id,
+        title: file.title,
+        type: file.type
+    })) as SidebarFile[]
+    const totalCount = normalizeExactCount(count)
+    const nextOffset = from + files.length
 
     return {
-        collections: sidebarData,
-        uncategorized,
-        totalCount: typedFiles.length
-    } as SidebarData
+        files,
+        totalCount,
+        nextOffset,
+        hasMore: nextOffset < totalCount,
+        pageSize: limit
+    }
 }
 
-function listToTree(collections: KnowledgeCollection[], files: KnowledgeFileRow[]): SidebarCollection[] {
+function listToTree(collections: KnowledgeCollection[], countMap: Map<string, number>): SidebarCollection[] {
     return collections.map(col => {
-        const colFiles = files.filter(f => f.collection_id === col.id)
+        const count = countMap.get(col.id) || 0
         return {
             ...col,
-            files: colFiles,
-            count: colFiles.length
+            files: [],
+            count,
+            loadedFileCount: 0,
+            hasMoreFiles: count > 0
         }
     })
+}
+
+async function scanKnowledgeDocumentCollectionIds(
+    supabase: SupabaseClientLike,
+    organizationId?: string | null
+): Promise<KnowledgeCountRow[]> {
+    const rows: KnowledgeCountRow[] = []
+    let offset = 0
+
+    while (true) {
+        let countsQuery = supabase
+            .from('knowledge_documents')
+            .select('collection_id')
+        if (organizationId) {
+            countsQuery = countsQuery.eq('organization_id', organizationId)
+        }
+
+        const { data, error } = await countsQuery
+            .order('created_at', { ascending: true })
+            .range(offset, offset + COUNT_SCAN_PAGE_SIZE - 1)
+        if (error) throw new Error(error.message)
+
+        const page = (data ?? []) as KnowledgeCountRow[]
+        rows.push(...page)
+        if (page.length < COUNT_SCAN_PAGE_SIZE) break
+        offset += page.length
+    }
+
+    return rows
 }
 
 const KEYWORD_STOPWORDS = new Set([
@@ -778,6 +960,40 @@ function lexicalMatchScore(query: string, value: string) {
     return hits / groups.length
 }
 
+function allMeaningfulSearchTokens(value: string) {
+    const normalized = value
+        .toLocaleLowerCase('tr-TR')
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .trim()
+
+    if (!normalized) return []
+
+    const tokens = normalized
+        .split(/\s+/)
+        .map(stemSearchToken)
+        .filter((token) => token.length >= 3 && !isKeywordStopword(token))
+
+    return Array.from(new Set(tokens))
+}
+
+function documentTitleCoverageScore(query: string, title?: string | null) {
+    if (!hasQuerySignal(query, ['dokuman', 'doküman', 'belge', 'yonerge', 'yönerge', 'mevzuat', 'numara', 'no'])) {
+        return 0
+    }
+    if (!title) return 0
+
+    const queryTokens = new Set(allMeaningfulSearchTokens(query))
+    const titleTokens = allMeaningfulSearchTokens(title)
+    if (queryTokens.size === 0 || titleTokens.length === 0) return 0
+
+    const hits = titleTokens.filter((token) => queryTokens.has(token)).length
+    const coverage = hits / titleTokens.length
+    if (coverage < 0.72) return 0
+
+    const extraTitleTokenCount = titleTokens.length - hits
+    return Math.max(0, coverage * 0.26 - extraTitleTokenCount * 0.04)
+}
+
 const SOURCE_SLUG_CONNECTORS = new Set(['ve', 'and', 'ile'])
 const SOURCE_SLUG_STOPWORDS = new Set([
     'sayfasinda',
@@ -791,6 +1007,28 @@ const SOURCE_SLUG_STOPWORDS = new Set([
     'hedefliyor',
     'yetistirmeyi'
 ])
+
+function hasSpecificContactSubjectSignal(query: string) {
+    return hasQuerySignal(query, [
+        'koordinatorluk',
+        'koordinatörlük',
+        'koordinatorlugu',
+        'koordinatörlüğü',
+        'fakulte',
+        'fakülte',
+        'fakultesi',
+        'fakültesi',
+        'yuksekokul',
+        'yüksekokul',
+        'yuksekokulu',
+        'yüksekokulu',
+        'enstitu',
+        'enstitü',
+        'ogrenci isleri',
+        'öğrenci işleri',
+        'erasmus'
+    ])
+}
 
 function sourceSlugTokenSequence(query: string) {
     const normalized = normalizeSearchText(query)
@@ -816,6 +1054,19 @@ function sourceSlugCandidates(query: string) {
 
     if (hasQuerySignal(query, ['aday ogrenci', 'aday öğrenci'])) {
         priorityCandidates.add('aday-ogrenci')
+    }
+
+    const genericContactQuery = hasQuerySignal(query, ['iletisim', 'iletişim', 'ulasim', 'ulaşım', 'adres', 'telefon'])
+        && !hasSpecificContactSubjectSignal(query)
+    const rectorateContactQuery = hasQuerySignal(query, ['rektor', 'rektör', 'rektorluk', 'rektörlük'])
+        && hasQuerySignal(query, ['iletisim', 'iletişim', 'telefon', 'adres'])
+    if (genericContactQuery || rectorateContactQuery) {
+        priorityCandidates.add('/iletisim')
+    }
+
+    if (hasQuerySignal(query, ['isg', 'is sagligi', 'iş sağlığı'])
+        && hasQuerySignal(query, ['koordinator', 'koordinatör', 'koordinatoru', 'koordinatörü', 'koordinatorluk', 'koordinatörlük'])) {
+        priorityCandidates.add('is-sagligi-ve-guvenligi-koordinatorlugu')
     }
 
     tokens.forEach((token, index) => {
@@ -873,8 +1124,15 @@ function shouldUseSourcePathFallback(query: string) {
         'akademik takvim',
         'iletisim',
         'iletişim',
+        'koordinator',
+        'koordinatör',
+        'koordinatoru',
+        'koordinatörü',
         'koordinatorluk',
         'koordinatörlük',
+        'isg',
+        'is sagligi',
+        'iş sağlığı',
         'yurt',
         'yurtlar'
     ])
@@ -903,6 +1161,10 @@ function sourceSlugMatchScore(query: string, sourceUrl: string) {
 
 function extractSourceUrlFromContent(content: string) {
     return content.match(/^Source URL:\s*(.+)$/im)?.[1]?.trim() ?? ''
+}
+
+function sourceUrlFromResult(result: KnowledgeSearchResult) {
+    return result.source_url ?? (extractSourceUrlFromContent(result.content) || null)
 }
 
 function sourcePath(sourceUrl: string) {
@@ -976,30 +1238,31 @@ function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSe
     const title = normalizeSearchText(result.document_title ?? '')
     const sourceSlugScore = sourceSlugMatchScore(query, sourceUrl)
     let score = 0
-    const hasSpecificContactSubject = hasQuerySignal(query, [
-        'koordinatorluk',
-        'koordinatörlük',
-        'koordinatorlugu',
-        'koordinatörlüğü',
-        'fakulte',
-        'fakülte',
-        'fakultesi',
-        'fakültesi',
-        'yuksekokul',
-        'yüksekokul',
-        'yuksekokulu',
-        'yüksekokulu',
-        'enstitu',
-        'enstitü',
-        'ogrenci isleri',
-        'öğrenci işleri',
-        'erasmus'
-    ])
+    const hasSpecificContactSubject = hasSpecificContactSubjectSignal(query)
 
     if (hasQuerySignal(query, ['iletisim', 'iletişim', 'ulasim', 'ulaşım', 'adres', 'telefon'])
         && (pathname.includes('iletisim') || pathname.includes('ulasim'))
         && (!hasSpecificContactSubject || lexicalMatchScore(query, `${result.document_title}\n${sourceUrl}`) >= 0.5)) {
         score += 0.18
+    }
+
+    if (hasQuerySignal(query, ['iletisim', 'iletişim', 'ulasim', 'ulaşım', 'adres', 'telefon'])
+        && !hasSpecificContactSubject
+        && sourcePath(sourceUrl) === '/iletisim') {
+        score += 0.28
+    }
+
+    if (hasQuerySignal(query, ['rektor', 'rektör', 'rektorluk', 'rektörlük'])
+        && hasQuerySignal(query, ['iletisim', 'iletişim', 'telefon', 'adres'])
+        && sourcePath(sourceUrl) === '/iletisim') {
+        score += 0.32
+    }
+
+    if (hasQuerySignal(query, ['isg', 'is sagligi', 'iş sağlığı'])
+        && hasQuerySignal(query, ['koordinator', 'koordinatör', 'koordinatoru', 'koordinatörü', 'koordinatorluk', 'koordinatörlük'])
+        && sourcePath(sourceUrl).startsWith('/sayfa/')
+        && pathname.includes('is-sagligi-ve-guvenligi-koordinatorlugu')) {
+        score += 0.42
     }
 
     if (hasQuerySignal(query, ['aday ogrenci', 'aday öğrenci'])
@@ -1088,19 +1351,31 @@ function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSe
 
 function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
     const similarity = Number.isFinite(result.similarity) ? Number(result.similarity) : 0
-    const sourceUrl = extractSourceUrlFromContent(result.content)
+    const sourceUrl = sourceUrlFromResult(result) ?? ''
     const contentScore = lexicalMatchScore(query, `${result.document_title}\n${result.content}`)
     const titleScore = lexicalMatchScore(query, result.document_title ?? '')
+    const titleCoverageScore = documentTitleCoverageScore(query, result.document_title)
     const sourceUrlScore = lexicalMatchScore(query, sourceUrl)
     const sourceSlugScore = sourceSlugMatchScore(query, sourceUrl)
 
     return similarity * 0.6
         + contentScore * 0.4
         + titleScore * 0.15
+        + titleCoverageScore
         + sourceUrlScore * 0.18
         + sourceSlugScore * 0.3
         + pageTypeScore(query, sourceUrl)
         + directIntentScore(query, sourceUrl, result)
+}
+
+function enrichKnowledgeSearchResult(result: KnowledgeSearchResult): KnowledgeSearchResult {
+    const sourceUrl = sourceUrlFromResult(result)
+    if (!sourceUrl) return result
+
+    return {
+        ...result,
+        source_url: sourceUrl
+    }
 }
 
 function mergeSearchResults(
@@ -1111,7 +1386,8 @@ function mergeSearchResults(
 ) {
     const byChunk = new Map<string, KnowledgeSearchResult>()
 
-    for (const result of [...vectorResults, ...keywordResults]) {
+    for (const rawResult of [...vectorResults, ...keywordResults]) {
+        const result = enrichKnowledgeSearchResult(rawResult)
         const existing = byChunk.get(result.chunk_id)
         if (!existing || scoreKnowledgeResult(query, result) > scoreKnowledgeResult(query, existing)) {
             byChunk.set(result.chunk_id, result)

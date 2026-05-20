@@ -10,5 +10,6 @@ describe('Telegram RAG prompt source guard', () => {
         expect(source).toContain('put the full raw URL on its own final line')
         expect(source).toContain('Copy source URLs exactly and never insert spaces inside a URL.')
         expect(source).toContain('Do not add punctuation or words after the URL.')
+        expect(source).toContain('If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base')
     })
 })

@@ -128,6 +128,17 @@ describe('formatOutboundTextForChannel', () => {
         )
     })
 
+    it('does not split hyphenated item labels such as video numbers into fake bullets', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Fizyoterapi ve Rehabilitasyon Bölümü sayfasında şu tanıtım videoları yer alıyor: - Fizyoterapi ve Rehabilitasyon Bölümü Tanıtım Videosu - 1 - Fizyoterapi ve Rehabilitasyon Bölümü Tanıtım Videosu - 2 - Fizyoterapi Araştırma Derneği Tanıtım Videosu',
+            { platform: 'whatsapp' }
+        )
+
+        expect(formatted).toBe(
+            'Fizyoterapi ve Rehabilitasyon Bölümü sayfasında şu tanıtım videoları yer alıyor:\n- Fizyoterapi ve Rehabilitasyon Bölümü Tanıtım Videosu - 1\n- Fizyoterapi ve Rehabilitasyon Bölümü Tanıtım Videosu - 2\n- Fizyoterapi Araştırma Derneği Tanıtım Videosu'
+        )
+    })
+
     it('sends Telegram as plain text when parse mode is not configured', () => {
         const formatted = formatOutboundTextForChannel(
             '**Tıp Fakültesi:**\n- [Detay](https://example.com/tip)',

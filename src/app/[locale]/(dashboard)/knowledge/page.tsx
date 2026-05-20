@@ -1,10 +1,11 @@
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/server'
 import {
-    getKnowledgeBaseEntries,
+    getKnowledgeBaseEntriesPage,
     getCollections,
     KnowledgeCollection
 } from '@/lib/knowledge-base/actions'
+import { DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE } from '@/lib/knowledge-base/pagination'
 import { DashboardRouteSkeleton } from '@/components/common/DashboardRouteSkeleton'
 import { getPendingOfferingProfileSuggestionCount } from '@/lib/leads/settings'
 import { resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
@@ -26,8 +27,13 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
     const orgContext = await resolveActiveOrganizationContext()
     const organizationId = orgContext?.activeOrganizationId ?? null
 
-    const [entries, allCollections, offeringProfileResult, pendingSuggestions, processingKnowledgeResult] = await Promise.all([
-        getKnowledgeBaseEntries(collectionId, organizationId),
+    const [entriesPage, allCollections, offeringProfileResult, pendingSuggestions, processingKnowledgeResult] = await Promise.all([
+        getKnowledgeBaseEntriesPage({
+            collectionId,
+            organizationId,
+            offset: 0,
+            limit: DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE
+        }),
         getCollections(organizationId),
         organizationId
             ? supabase
@@ -67,7 +73,9 @@ export default async function KnowledgeBasePage({ searchParams }: KnowledgePageP
 
     return (
         <KnowledgeContainer
-            initialEntries={entries}
+            initialEntries={entriesPage.entries}
+            initialEntriesTotalCount={entriesPage.totalCount}
+            entriesPageSize={entriesPage.pageSize}
             initialCollections={displayCollections}
             currentCollection={currentCollection}
             collectionId={collectionId}

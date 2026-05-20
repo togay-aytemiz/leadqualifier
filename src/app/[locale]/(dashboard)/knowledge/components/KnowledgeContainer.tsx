@@ -12,15 +12,19 @@ import { FolderActions } from './FolderActions'
 import {
     deleteKnowledgeBaseEntry,
     createCollection,
+    getKnowledgeBaseEntriesPage,
     KnowledgeBaseEntry,
     KnowledgeCollection,
 } from '@/lib/knowledge-base/actions'
+import { DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE } from '@/lib/knowledge-base/pagination'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 
 interface KnowledgeContainerProps {
     initialEntries: KnowledgeBaseEntry[]
+    initialEntriesTotalCount?: number
+    entriesPageSize?: number
     initialCollections: KnowledgeCollection[]
     currentCollection: KnowledgeCollection | null
     collectionId?: string | null
@@ -33,6 +37,8 @@ interface KnowledgeContainerProps {
 
 export function KnowledgeContainer({
     initialEntries,
+    initialEntriesTotalCount = initialEntries.length,
+    entriesPageSize = DEFAULT_KNOWLEDGE_ENTRIES_PAGE_SIZE,
     initialCollections,
     currentCollection,
     collectionId,
@@ -49,6 +55,8 @@ export function KnowledgeContainer({
 
     // State (initialized from props, updated by local actions or refreshes)
     const [entries, setEntries] = useState<KnowledgeBaseEntry[]>(initialEntries)
+    const [entriesTotalCount, setEntriesTotalCount] = useState(initialEntriesTotalCount)
+    const [isLoadingMoreEntries, setIsLoadingMoreEntries] = useState(false)
     const [collections, setCollections] = useState<KnowledgeCollection[]>(initialCollections)
     const [pendingSuggestions, setPendingSuggestions] = useState(initialPendingSuggestions)
     const [knowledgeExtractionInProgress, setKnowledgeExtractionInProgress] = useState(initialKnowledgeExtractionInProgress)
@@ -56,8 +64,9 @@ export function KnowledgeContainer({
     // Sync state if props change (re-validation)
     useEffect(() => {
         setEntries(initialEntries)
+        setEntriesTotalCount(initialEntriesTotalCount)
         setCollections(initialCollections)
-    }, [initialEntries, initialCollections])
+    }, [initialEntries, initialEntriesTotalCount, initialCollections])
 
     useEffect(() => {
         setPendingSuggestions(initialPendingSuggestions)
@@ -155,6 +164,7 @@ export function KnowledgeContainer({
         try {
             await deleteKnowledgeBaseEntry(deleteDialog.id)
             setEntries(prev => prev.filter(e => e.id !== deleteDialog.id))
+            setEntriesTotalCount(prev => Math.max(0, prev - 1))
             window.dispatchEvent(new Event('knowledge-updated'))
             window.dispatchEvent(new Event('pending-suggestions-updated'))
             setDeleteDialog(prev => ({ ...prev, isOpen: false }))
@@ -182,6 +192,31 @@ export function KnowledgeContainer({
         router.refresh()
     }
 
+    async function handleLoadMoreEntries() {
+        if (isLoadingMoreEntries) return
+
+        setIsLoadingMoreEntries(true)
+        try {
+            const page = await getKnowledgeBaseEntriesPage({
+                collectionId: collectionId ?? undefined,
+                organizationId,
+                offset: entries.length,
+                limit: entriesPageSize
+            })
+
+            setEntries(prev => {
+                const seen = new Set(prev.map(entry => entry.id))
+                const nextEntries = page.entries.filter(entry => !seen.has(entry.id))
+                return [...prev, ...nextEntries]
+            })
+            setEntriesTotalCount(page.totalCount)
+        } catch (error) {
+            console.error('Failed to load more knowledge entries', error)
+        } finally {
+            setIsLoadingMoreEntries(false)
+        }
+    }
+
     const isEmpty = entries.length === 0 && collections.length === 0
 
     useEffect(() => {
@@ -196,7 +231,8 @@ export function KnowledgeContainer({
     }, [knowledgeExtractionInProgress, router])
 
     const pageTitle = currentCollection ? currentCollection.name : tSidebar('allContent')
-    const totalVisibleItems = entries.length + collections.length
+    const totalVisibleItems = entriesTotalCount + collections.length
+    const hasMoreEntries = entries.length < entriesTotalCount
 
     return (
         <div className="flex flex-col h-full bg-white">
@@ -371,6 +407,17 @@ export function KnowledgeContainer({
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-500 mb-3 px-1">{t('files')}</h3>
                                 <KnowledgeTable entries={entries} />
+                                {hasMoreEntries && (
+                                    <div className="mt-4 flex justify-center">
+                                        <Button
+                                            variant="secondary"
+                                            onClick={handleLoadMoreEntries}
+                                            disabled={isLoadingMoreEntries}
+                                        >
+                                            {isLoadingMoreEntries ? t('loadingMore') : t('loadMore')}
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

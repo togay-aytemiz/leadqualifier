@@ -68,6 +68,7 @@ vi.mock('./FolderActions', () => ({
 vi.mock('@/lib/knowledge-base/actions', () => ({
   deleteKnowledgeBaseEntry: vi.fn(),
   createCollection: vi.fn(),
+  getKnowledgeBaseEntriesPage: vi.fn(),
 }))
 
 import { KnowledgeContainer } from '@/app/[locale]/(dashboard)/knowledge/components/KnowledgeContainer'
@@ -125,6 +126,21 @@ describe('KnowledgeContainer', () => {
     expect(markup).toContain('aiSuggestionsBannerTitle')
     expect(markup).toContain('aiSuggestionsBannerDescription')
     expect(markup).toContain('aiSuggestionsBannerCta')
+  })
+
+  it('shows a load-more action when the server count is larger than the initial document page', () => {
+    const markup = renderToStaticMarkup(
+      <KnowledgeContainer
+        initialEntries={[buildEntry('ready')]}
+        initialCollections={[]}
+        currentCollection={null}
+        organizationId="org-1"
+        initialEntriesTotalCount={1250}
+        entriesPageSize={50}
+      />
+    )
+
+    expect(markup).toContain('loadMore')
   })
 
   it('does not refetch pending suggestions on mount when the server provided the initial count', () => {

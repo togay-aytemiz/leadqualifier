@@ -1,5 +1,11 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-20):** Yüksek İhtisas pilot Knowledge Base has a second 50-question student/admin QA pass over mixed PDF and website content. The regression now covers student-style admissions/department questions plus rectorate/admin audit questions, and the product should prefer the canonical root contact page for general/rektorate contact requests, prefer the official İş Sağlığı ve Güvenliği Koordinatörlüğü page for natural İSG coordinator questions, and refuse to invent a person name when the retrieved context only describes a role.
+
+> **Update Note (2026-05-20):** Knowledge Base large-corpus browsing now avoids Supabase's default 1000-row cap and the heavy first-load file tree. The main content pane loads an exact-count first page with a `Daha fazla yükle / Load more` action, while the desktop Knowledge sidebar loads only folder summaries plus a small uncategorized page first, then fetches folder files in explicit pages when a folder is expanded.
+
+> **Update Note (2026-05-19):** Crawl-imported Knowledge Base answers now have stronger demo guardrails after the mixed 50-question PDF/web audit: selected chunks expose canonical `source_url` metadata to the outbound layer, link/page/document requests append raw source links deterministically, exact document-title reranking is limited to regulation/document-number style questions, root `/iletisim` can win rectorate-wide phone queries, and messenger formatting preserves labels such as `Tanıtım Videosu - 1` without fake bullet splits.
+
 > **Update Note (2026-05-19):** Crawl corpus imports now record one compact embedding usage row per completed import, and customer credit history keeps old Knowledge Base indexing audit rows but collapses same-day KB indexing debits into one visible `Bilgi Bankası indeksleme` row in `Settings > Usage`.
 
 > **Update Note (2026-05-19):** Crawl-imported Knowledge Base retrieval now has a 40-question regression suite for the Yüksek İhtisas corpus. The current suite passes 20/20 PDF questions and 20/20 website-page questions after adding bounded source-URL slug fallback for page/link-style questions, so canonical pages like `/aday-ogrenci` and department URLs can beat older announcements or nearby program pages.
@@ -275,7 +281,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-19 (Knowledge Base RAG retrieval improved for large crawl/PDF corpora; sidebar remaining credits and Settings usage reconcile after historical embedding debit correction.)
+> **Last Updated:** 2026-05-20 (Yüksek İhtisas student/admin RAG QA added a second 50-question mixed PDF/web pass and hardened contact, İSG coordinator, and exact-person-answer behavior.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -789,6 +795,7 @@
 - [x] **Suggestions Realtime Publication:** Add offering profile suggestions to Supabase realtime publication
 - [x] **KB Non-blocking UI:** Create/edit/delete return immediately while background jobs continue
 - [x] **KB Sidebar Uncategorized:** Show uncategorized items (max 10) with expand and correct all-content counts
+- [x] **KB Large Corpus Pagination:** Load Knowledge documents with exact-count pages and lazy-load sidebar folder files on expand so imported crawl corpora can browse beyond Supabase's 1000-row default without loading the full tree at once
 - [x] **KB Terminology:** Replace "collection" labels with "folder" in UI copy
 - [x] **KB Keyword Fallback:** Use keyword search when embedding lookup fails or returns no matches
 - [x] **KB Banner Styling:** Use an amber tone for pending AI suggestion banners

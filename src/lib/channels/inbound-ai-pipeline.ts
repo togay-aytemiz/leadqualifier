@@ -38,6 +38,10 @@ import { recordAiLatencyEvent } from '@/lib/ai/latency'
 import { maybeHandleSchedulingRequest } from '@/lib/ai/booking'
 import { withAiTimeout } from '@/lib/ai/deadline'
 import { formatOutboundTextForChannel } from '@/lib/channels/outbound-text-format'
+import {
+    appendCanonicalRagSourceLinks,
+    isLikelySourceLinkRequest
+} from '@/lib/knowledge-base/rag-source-links'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 
@@ -62,70 +66,6 @@ function isRagNoAnswerResponse(response: string | null | undefined) {
     } catch {
         return false
     }
-}
-
-function normalizeSourceUrl(value: unknown) {
-    const raw = readTrimmedString(value)
-    if (!raw) return null
-    const compacted = raw.replace(/\s+/g, '')
-    try {
-        const parsed = new URL(compacted)
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
-        return parsed.toString()
-    } catch {
-        return null
-    }
-}
-
-function collectRagSourceUrls(chunks: unknown[]) {
-    const urls: string[] = []
-    const seen = new Set<string>()
-
-    for (const chunk of chunks) {
-        if (!isRecord(chunk)) continue
-        const sourceUrl = normalizeSourceUrl(chunk.source_url ?? chunk.sourceUrl)
-        if (!sourceUrl || seen.has(sourceUrl)) continue
-
-        seen.add(sourceUrl)
-        urls.push(sourceUrl)
-        if (urls.length >= 2) break
-    }
-
-    return urls
-}
-
-function stripRagUrlArtifacts(response: string) {
-    let stripped = response
-        .replace(/\[([^\]\n]+)]\(\s*https?:\/\/[\s\S]*?\)/gi, '$1')
-
-    if (/https?:\/\/\s/i.test(stripped)) {
-        stripped = stripped.replace(/https?:\/\/[\s\S]*$/i, '')
-    } else {
-        stripped = stripped.replace(/https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi, '')
-    }
-
-    return stripped
-        .replace(/\s+([,.;!?])/g, '$1')
-        .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/[ \t]{2,}/g, ' ')
-        .trim()
-}
-
-function appendCanonicalRagSourceLinks(response: string, chunks: unknown[]) {
-    if (!/https?:\/\//i.test(response)) return response
-
-    const sourceUrls = collectRagSourceUrls(chunks)
-    if (sourceUrls.length === 0) return response
-
-    const responseWithoutUrlArtifacts = stripRagUrlArtifacts(response)
-    return [
-        responseWithoutUrlArtifacts,
-        ...sourceUrls
-    ]
-        .filter(Boolean)
-        .join('\n')
-        .trim()
 }
 
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
@@ -1328,6 +1268,9 @@ For find, view, where, or link requests, a matching source URL is enough to answ
 Do not use Markdown links like [label](url). When sharing a link, put the full raw URL on its own final line.
 Copy source URLs exactly and never insert spaces inside a URL. Do not add punctuation or words after the URL.
 When several chunks are similar, prefer the one that matches the user wording most closely, such as student vs staff or a specific department name.
+For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, or email addresses, copy only the value explicitly shown in the context. If multiple conflicting values appear, prefer the chunk whose title/source best matches the question and mention the source link when useful.
+If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base.
+When answering with three or more items, use one plain dash bullet per line.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
 Keep the answer concise and friendly.
@@ -1361,7 +1304,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
                     })
                     : ''
-                const finalRagResponse = appendCanonicalRagSourceLinks(guardedRagResponse, chunks)
+                const finalRagResponse = appendCanonicalRagSourceLinks(guardedRagResponse, chunks, {
+                    force: isLikelySourceLinkRequest(options.text)
+                })
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                 const ragUsage = completion.usage
                     ? {
