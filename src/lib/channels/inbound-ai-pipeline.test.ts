@@ -2342,7 +2342,7 @@ describe('processInboundAiPipeline guardrails', () => {
             buildInput(supabase, sendOutbound, { text: 'Akademik takvim nerede?' })
         )
 
-        expect(sendOutbound).toHaveBeenCalledWith('Akademik takvime buradan:\nhttps://example.edu.tr/akademik-takvim\nulaşabilirsiniz.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).toHaveBeenCalledWith('Akademik takvime buradan ulaşabilirsiniz.\nhttps://example.edu.tr/akademik-takvim\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('[buradan]('))
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
@@ -2424,6 +2424,80 @@ describe('processInboundAiPipeline guardrails', () => {
             '> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
         ].join('\n')
         expect(sendOutbound).toHaveBeenCalledWith(expectedReply)
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: expectedReply
+        }))
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps concrete RAG contact details instead of stripping them into orphan domain fragments', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Bilgi İşlem Birimi iletişim bilgisi',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-contact',
+                document_title: 'İletişim',
+                content: 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.',
+                source_url: 'https://yuksekihtisasuniversitesi.edu.tr/iletisim'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: [
+                'Document Title: İletişim',
+                'Source URL: https://yuksekihtisasuniversitesi.edu.tr/iletisim',
+                '',
+                'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.'
+            ].join('\n'),
+            chunks: [{
+                document_id: 'doc-contact',
+                document_title: 'İletişim',
+                content: 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.',
+                source_url: 'https://yuksekihtisasuniversitesi.edu.tr/iletisim'
+            }],
+            tokenCount: 18
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{
+                message: {
+                    content: 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.'
+                }
+            }]
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'Bilgi İşlem Birimi iletişim bilgisi nedir?' })
+        )
+
+        const expectedReply = 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+        expect(sendOutbound).toHaveBeenCalledWith(expectedReply)
+        expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringMatching(/^edu\./i))
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
             sender_type: 'bot',
             content: expectedReply

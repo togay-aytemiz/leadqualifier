@@ -1014,6 +1014,15 @@ function hasSpecificContactSubjectSignal(query: string) {
         'koordinatörlük',
         'koordinatorlugu',
         'koordinatörlüğü',
+        'mudurluk',
+        'müdürlük',
+        'mudurlugu',
+        'müdürlüğü',
+        'birim',
+        'birimi',
+        'sekreterlik',
+        'dekanlik',
+        'dekanlık',
         'fakulte',
         'fakülte',
         'fakultesi',
@@ -1349,6 +1358,37 @@ function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSe
     return score
 }
 
+function isContactInfoQuery(query: string) {
+    return hasQuerySignal(query, [
+        'iletisim',
+        'iletişim',
+        'telefon',
+        'e posta',
+        'e-posta',
+        'email',
+        'mail',
+        'dahili',
+        'adres'
+    ])
+}
+
+function hasConcreteContactValue(value: string) {
+    return /(?:\+?\s*90|0\s*312|\b312\b|444\s*9\s*844|\bdahili\b|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(value)
+}
+
+function rootContactInformationScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!isContactInfoQuery(query)) return 0
+    if (sourcePath(sourceUrl) !== '/iletisim') return 0
+
+    const searchable = `${result.document_title}\n${result.content}\n${sourceUrl}`
+    if (!hasConcreteContactValue(searchable)) return 0
+
+    const contentScore = lexicalMatchScore(query, `${result.document_title}\n${result.content}`)
+    if (contentScore < 0.42) return 0
+
+    return 0.42 + contentScore * 0.28
+}
+
 function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
     const similarity = Number.isFinite(result.similarity) ? Number(result.similarity) : 0
     const sourceUrl = sourceUrlFromResult(result) ?? ''
@@ -1366,6 +1406,7 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + sourceSlugScore * 0.3
         + pageTypeScore(query, sourceUrl)
         + directIntentScore(query, sourceUrl, result)
+        + rootContactInformationScore(query, sourceUrl, result)
 }
 
 function enrichKnowledgeSearchResult(result: KnowledgeSearchResult): KnowledgeSearchResult {

@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-20):** Live RAG pipeline QA must cover the real inbound pipeline, not only unit tests, before university demo fixes are considered ready. The Yüksek İhtisas contact/link smoke now runs against real Supabase/OpenAI flow, verifies concrete phone/e-mail values, blocks orphan domain fragments, and limits customer-facing source replies to one canonical raw URL for cleaner WhatsApp/Instagram/Telegram demos.
+
+> **Update Note (2026-05-20):** Response guards must preserve concrete phone/e-mail/contact answers when the customer explicitly asks for contact information. The external-contact redirect guard should not split e-mail domains into sentence fragments or collapse valid Knowledge Base answers into orphan text like `edu. tr`; outbound channel formatting also strips impossible leading domain fragments as a final safety net before send/persist.
+
 > **Update Note (2026-05-20):** Customer-facing Knowledge Base answers must repair model-inserted whitespace inside e-mail domains as well as source URLs. RAG source-link cleanup should remove malformed spaced URL fragments such as `https://example. edu. tr` before appending canonical chunk links, so Telegram/WhatsApp/Instagram replies cannot persist orphan fragments like `edu. tr`.
 
 > **Update Note (2026-05-20):** Telegram inbound automation must use the shared channel AI pipeline, not a separate legacy copy of the RAG/skill/fallback flow. Lead extraction should be deferred after the customer-facing reply so slower lead scoring cannot consume the webhook budget and leave Telegram users waiting without a bot response.

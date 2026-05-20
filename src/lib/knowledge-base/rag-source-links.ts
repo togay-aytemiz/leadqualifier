@@ -11,7 +11,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function normalizeSourceUrl(value: unknown) {
     const raw = readTrimmedString(value)
     if (!raw) return null
-    const compacted = raw.replace(/\s+/g, '')
+    const compacted = raw
+        .replace(/\s+/g, '')
+        .replace(/[)\].,;:!?]+$/g, '')
     try {
         const parsed = new URL(compacted)
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
@@ -49,6 +51,23 @@ export function collectRagSourceUrls(chunks: unknown[], limit = 2) {
 
 const SPACED_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
 const SIMPLE_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi
+
+function collectResponseSourceUrls(response: string, limit: number) {
+    const urls: string[] = []
+    const seen = new Set<string>()
+    const matches = response.match(SPACED_RAW_URL_PATTERN) ?? response.match(SIMPLE_RAW_URL_PATTERN) ?? []
+
+    for (const match of matches) {
+        const normalized = normalizeSourceUrl(match)
+        if (!normalized || seen.has(normalized)) continue
+
+        seen.add(normalized)
+        urls.push(normalized)
+        if (urls.length >= limit) break
+    }
+
+    return urls
+}
 
 function stripRagUrlArtifacts(response: string) {
     let stripped = response
@@ -95,12 +114,16 @@ export function isLikelySourceLinkRequest(message: string | null | undefined) {
 export function appendCanonicalRagSourceLinks(
     response: string,
     chunks: unknown[],
-    options: { force?: boolean } = {}
+    options: { force?: boolean; limit?: number } = {}
 ) {
     if (!options.force && !/https?:\/\//i.test(response)) return response
 
-    const sourceUrls = collectRagSourceUrls(chunks)
-    if (sourceUrls.length === 0) return response
+    const limit = Math.max(1, options.limit ?? 2)
+    const sourceUrls = collectRagSourceUrls(chunks, limit)
+    const urls = sourceUrls.length > 0
+        ? sourceUrls
+        : collectResponseSourceUrls(response, limit)
+    if (urls.length === 0) return response
 
     const responseWithoutUrlArtifacts = /https?:\/\//i.test(response)
         ? stripRagUrlArtifacts(response)
@@ -108,7 +131,7 @@ export function appendCanonicalRagSourceLinks(
 
     return [
         responseWithoutUrlArtifacts,
-        ...sourceUrls
+        ...urls
     ]
         .filter(Boolean)
         .join('\n')

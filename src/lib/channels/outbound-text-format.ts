@@ -68,6 +68,13 @@ function normalizeEmailWhitespaceForPlainChat(content: string) {
     )
 }
 
+function stripOrphanDomainFragmentsForPlainChat(content: string) {
+    return content.replace(
+        /^\s*(?:edu|com|net|org|gov|bel|k12|av|dr|tr|io|ai)(?:\.\s*(?:tr|com|net|org|edu|gov|io|ai))?\.\s+/i,
+        ''
+    )
+}
+
 function normalizeUrlLineBreaks(content: string) {
     return content
         .replace(/[ \t]*\n[ \t]*/g, '\n')
@@ -136,7 +143,9 @@ export function formatOutboundTextForChannel(content: string, options: OutboundT
         normalizeInlineBullets(
             normalizeRawUrlsForPlainChat(
                 normalizeEmailWhitespaceForPlainChat(
-                    normalizeMarkdownLinksForPlainChat(content)
+                    stripOrphanDomainFragmentsForPlainChat(
+                        normalizeMarkdownLinksForPlainChat(content)
+                    )
                 )
             )
         )

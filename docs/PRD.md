@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-05-20):** Pilot demo readiness for crawl-imported Knowledge Base answers requires live inbound-pipeline verification with real model/database calls. Contact-information questions should prefer the canonical root contact table when it explicitly contains the asked unit, and link/page answers should expose a single raw canonical URL rather than multiple adjacent source candidates.
+
+> **Update Note (2026-05-20):** Customer-facing guardrails must distinguish unwanted generic external-contact redirects from valid Knowledge Base contact answers. If a user asks for phone, e-mail, address, or contact information and the answer contains a concrete value, the response must pass through intact; final channel formatting must still remove impossible orphan domain fragments such as `edu. tr.` before delivery.
+
 > **Update Note (2026-05-20):** Messenger-safe RAG formatting must cover e-mail addresses, not only `https://` URLs. If the model inserts spaces inside domains such as `yuksekihtisas.edu. tr`, outbound formatting must compact the address before send/persist, and source-link canonicalization must strip malformed model URL fragments before adding the trusted source URL.
 
 > **Update Note (2026-05-20):** Telegram, WhatsApp, and Instagram customer replies should share the same inbound AI pipeline. Channel-specific webhook routes may validate provider payloads and adapt outbound delivery, but RAG, fallback, skill matching, formatting, deadlines, usage recording, and deferred lead extraction must live in the shared pipeline so Telegram cannot stall on slow lead scoring before answering the user.

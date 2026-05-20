@@ -1036,6 +1036,74 @@ describe('searchKnowledgeBase', () => {
         expect(orMock.mock.calls.some((call) => call[0].includes('/iletisim'))).toBe(true)
     })
 
+    it('prefers the root contact table when a named administrative unit contact is asked', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'director-page-1',
+                    document_id: 'doc-director-page-1',
+                    document_title: 'Yazı İşleri Müdürlüğü',
+                    document_type: 'article',
+                    content: 'Page Title: Yazı İşleri Müdürlüğü\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/kurumsal/idari-birimler/mudurlukler/yazi-isleri-mudurlugu\n\nYazı İşleri Müdürü Furkan GÜNDOĞDU. E-posta furkan.gundogdu@yuksekihtisas.edu.tr.',
+                    similarity: 0.66
+                },
+                {
+                    chunk_id: 'root-contact-yazi-1',
+                    document_id: 'doc-root-contact-yazi-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/iletisim\n\nYazı İşleri Müdürlüğü iletişim bilgileri. Dahili 201. E-posta yaziisleri@yuksekihtisas.edu.tr.',
+                    similarity: 0.56
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Yazı İşleri Müdürlüğü iletişim bilgisi nedir?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('root-contact-yazi-1')
+    })
+
+    it('prefers the root contact table for named faculty secretariat contact questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'faculty-page-1',
+                    document_id: 'doc-faculty-page-1',
+                    document_title: 'Tıp Fakültesi',
+                    document_type: 'article',
+                    content: 'Page Title: Tıp Fakültesi\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi\n\nTıp Fakültesi genel tanıtım ve akademik bilgiler.',
+                    similarity: 0.66
+                },
+                {
+                    chunk_id: 'root-contact-tip-1',
+                    document_id: 'doc-root-contact-tip-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://yuksekihtisasuniversitesi.edu.tr/iletisim\n\nTıp Fakültesi Sekreterliği iletişim bilgileri. Dahili 261. E-posta tipfakultesi@yuksekihtisas.edu.tr.',
+                    similarity: 0.54
+                }
+            ],
+            fallbackRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp Fakültesi Sekreterliği iletişim bilgisi nedir?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]?.chunk_id).toBe('root-contact-tip-1')
+    })
+
     it('prefers the official occupational health coordinator page for natural İSG coordinator questions', async () => {
         const { supabase, orMock } = createHybridSearchSupabase({
             rpcRows: [

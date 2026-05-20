@@ -73,6 +73,30 @@ describe('response guards', () => {
         expect(response).toBe('Size ulaşabileceğimiz bir numara paylaşabilir misiniz?')
     })
 
+    it('keeps concrete contact answers when the user asks for contact information', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Bilgi İşlem Birimi iletişim bilgisi: +90 312 329 10 10, dahili 256-258 ve bilgiislem@yuksekihtisas.edu.tr.',
+            userMessage: 'Bilgi İşlem Birimi iletişim bilgisi nedir?',
+            responseLanguage: 'tr',
+            recentAssistantMessages: []
+        })
+
+        expect(response).toBe('Bilgi İşlem Birimi iletişim bilgisi: +90 312 329 10 10, dahili 256-258 ve bilgiislem@yuksekihtisas.edu.tr.')
+        expect(response).not.toBe('edu. Buradan devam ederek uygun seçenekleri netleştirebiliriz.')
+    })
+
+    it('does not leave orphan email-domain fragments when preserving concrete contact answers', () => {
+        const response = applyLiveAssistantResponseGuards({
+            response: 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.',
+            userMessage: 'Bilgi İşlem Birimi iletişim bilgisi nedir?',
+            responseLanguage: 'tr',
+            recentAssistantMessages: []
+        })
+
+        expect(response).toBe('Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.')
+        expect(response).not.toMatch(/^edu\./i)
+    })
+
     it('strips intake-like question after explicit refusal', () => {
         const response = applyLiveAssistantResponseGuards({
             response: 'Anladım. Bütçe aralığınızı paylaşabilir misiniz?',

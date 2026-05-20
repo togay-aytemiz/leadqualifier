@@ -20,6 +20,26 @@ const EXTERNAL_CONTACT_REDIRECT_PATTERNS = [
     /\bileti[sş]im bilgileri(?:nizi)?\b/i
 ]
 
+const CONTACT_INFO_REQUEST_PATTERNS = [
+    /\bileti[sş]im(?:\s+bilgisi|\s+bilgileri)?\b/i,
+    /\btelefon(?:\s+numaras[iı])?\b/i,
+    /\bnumara(?:s[iı])?\b/i,
+    /\bdahili\b/i,
+    /\be-?posta\b/i,
+    /\bemail\b/i,
+    /\bmail\b/i,
+    /\badres\b/i,
+    /\bnereden ula[sş]/i,
+    /\bnas[iı]l ula[sş]/i
+]
+
+const CONCRETE_CONTACT_VALUE_PATTERNS = [
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
+    /\+?\d[\d\s().-]{7,}\d/,
+    /https?:\/\//i,
+    /\bdahili\s*\d/i
+]
+
 const REFUSAL_PATTERNS = [
     /payla[sş](mak)? istemiyorum/i,
     /detay vermek istemiyorum/i,
@@ -208,6 +228,7 @@ export function sanitizeAssistantResponseSurfaceArtifacts(response: string) {
     if (!normalized) return normalized
 
     return normalized
+        .replace(/^\s*(?:edu|com|net|org|gov|bel|k12|av|dr|tr|io|ai)(?:\.\s*(?:tr|com|net|org|edu|gov|io|ai))?\.\s+/i, '')
         .replace(/(\d)\.\s+(?=\d{3}\b)/g, '$1.')
         .replace(/\s+([,.;!?])/g, '$1')
         .replace(/\(\s+/g, '(')
@@ -218,10 +239,17 @@ export function sanitizeAssistantResponseSurfaceArtifacts(response: string) {
 
 function sanitizeExternalContactRedirectResponse(input: {
     response: string
+    userMessage: string
     responseLanguage: MvpResponseLanguage
 }) {
     const response = input.response.trim()
     if (!response) return response
+
+    const userAskedForContactInfo = CONTACT_INFO_REQUEST_PATTERNS.some((pattern) => pattern.test(input.userMessage))
+    const responseHasConcreteContactValue = CONCRETE_CONTACT_VALUE_PATTERNS.some((pattern) => pattern.test(response))
+    if (userAskedForContactInfo && responseHasConcreteContactValue) {
+        return response
+    }
 
     if (!EXTERNAL_CONTACT_REDIRECT_PATTERNS.some((pattern) => pattern.test(response))) {
         return response
@@ -458,6 +486,7 @@ export function applyLiveAssistantResponseGuards(input: {
     })
     const redirectSanitized = sanitizeExternalContactRedirectResponse({
         response: stopContactStripped,
+        userMessage: input.userMessage,
         responseLanguage: input.responseLanguage
     })
     const blockedFieldReaskSanitized = stripBlockedFieldReaskQuestions({

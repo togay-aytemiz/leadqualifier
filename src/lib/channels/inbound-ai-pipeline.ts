@@ -1304,8 +1304,10 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         noProgressLoopBreak: requiredIntakeAnalysis.noProgressStreak
                     })
                     : ''
+                const sourceLinkRequested = isLikelySourceLinkRequest(options.text)
                 const finalRagResponse = appendCanonicalRagSourceLinks(guardedRagResponse, chunks, {
-                    force: isLikelySourceLinkRequest(options.text)
+                    force: sourceLinkRequested,
+                    limit: 1
                 })
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                 const ragUsage = completion.usage
