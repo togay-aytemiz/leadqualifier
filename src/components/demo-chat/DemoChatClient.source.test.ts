@@ -9,10 +9,21 @@ describe('DemoChatClient source guards', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 
         expect(source).toContain("localStorage.getItem(storageKey)")
+        expect(source).toContain("qualy-demo-chat-messages:${slug}")
+        expect(source).toContain('localStorage.setItem(messageStorageKey')
         expect(source).toContain('crypto.randomUUID()')
         expect(source).toContain("fetch(`/api/demo/${slug}/chat`")
         expect(source).toContain('sessionId')
         expect(source).not.toContain('organizationId')
+    })
+
+    it('lets demo testers start over with a new browser-local session', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('handleResetConversation')
+        expect(source).toContain("localStorage.removeItem(messageStorageKey)")
+        expect(source).toContain("t('resetShort')")
+        expect(source).toContain("t('resetConversation')")
     })
 
     it('keeps demo context as an informational panel instead of an assistant message', () => {
@@ -30,7 +41,17 @@ describe('DemoChatClient source guards', () => {
 
         expect(source).toContain("t.raw('thinkingMessages')")
         expect(source).toContain('setInterval')
+        expect(source).toContain('THINKING_ROTATION_MS')
+        expect(source).toContain('demo-chat-thinking-dot')
         expect(source).toContain('thinkingIndex')
+    })
+
+    it('keeps the demo disclaimer near the composer instead of repeating under each bot reply', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("t('composerDisclaimer')")
+        expect(source).toContain('type="text"')
+        expect(source).not.toContain('textarea')
     })
 
     it('keeps the demo surface brandable with a theme toggle', () => {

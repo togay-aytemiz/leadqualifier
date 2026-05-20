@@ -147,6 +147,15 @@ describe('formatOutboundTextForChannel', () => {
         expect(formatted).toBe('Tıp Fakültesi:\nDetaylar için sayfayı aç:\nhttps://example.com/tip')
     })
 
+    it('keeps demo chat markdown emphasis for the browser renderer while repairing links', () => {
+        const formatted = formatOutboundTextForChannel(
+            '**Tıp Fakültesi:** Detaylar için [sayfayı aç](https://example. edu. tr/tip).',
+            { platform: 'demo_chat' }
+        )
+
+        expect(formatted).toBe('**Tıp Fakültesi:** Detaylar için sayfayı aç:\nhttps://example.edu.tr/tip')
+    })
+
     it('keeps Instagram bot disclaimers on a separate quoted footer line', () => {
         const formatted = formatOutboundTextForChannel(
             "Evet, Tıp Fakültesi'nde İngilizce eğitim verilmektedir.\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.",

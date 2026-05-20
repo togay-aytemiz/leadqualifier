@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { Moon, Send, Sun } from 'lucide-react'
+import { Moon, RefreshCcw, Send, Sun } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { MessageRichText } from '@/components/inbox/messageRichText'
 
@@ -16,6 +16,8 @@ type DemoTheme = 'light' | 'dark'
 
 const POLITE_LIVE_REGION = 'polite'
 const THEME_STORAGE_KEY = 'qualy-demo-chat-theme'
+const THINKING_ROTATION_MS = 2600
+const MAX_STORED_MESSAGES = 80
 
 interface DemoChatClientProps {
     slug: string
@@ -31,6 +33,36 @@ function createSessionId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function parseStoredMessages(value: string | null): DemoChatMessage[] {
+    if (!value) return []
+
+    try {
+        const parsed = JSON.parse(value)
+        if (!Array.isArray(parsed)) return []
+
+        return parsed
+            .filter((item): item is DemoChatMessage => {
+                const candidate = item as Partial<DemoChatMessage> | null
+
+                return Boolean(
+                    candidate
+                    && typeof candidate === 'object'
+                    && typeof candidate.id === 'string'
+                    && (candidate.role === 'user' || candidate.role === 'assistant')
+                    && typeof candidate.content === 'string'
+                    && (
+                        typeof candidate.imageUrl === 'undefined'
+                        || typeof candidate.imageUrl === 'string'
+                        || candidate.imageUrl === null
+                    )
+                )
+            })
+            .slice(-MAX_STORED_MESSAGES)
+    } catch {
+        return []
+    }
+}
+
 export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientProps) {
     const t = useTranslations('demoChat')
     const [sessionId, setSessionId] = useState('')
@@ -40,9 +72,11 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
     const [thinkingIndex, setThinkingIndex] = useState(0)
     const [theme, setTheme] = useState<DemoTheme>('light')
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [hasLoadedBrowserState, setHasLoadedBrowserState] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
     const storageKey = useMemo(() => `qualy-demo-chat-session:${slug}`, [slug])
+    const messageStorageKey = useMemo(() => `qualy-demo-chat-messages:${slug}`, [slug])
     const thinkingMessages = useMemo(() => {
         const rawMessages = t.raw('thinkingMessages')
         if (!Array.isArray(rawMessages)) return [t('thinking')]
@@ -57,11 +91,29 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
     const isDark = theme === 'dark'
 
     useEffect(() => {
-        const existingSessionId = localStorage.getItem(storageKey)
-        const nextSessionId = existingSessionId || createSessionId()
-        localStorage.setItem(storageKey, nextSessionId)
-        setSessionId(nextSessionId)
-    }, [storageKey])
+        try {
+            const existingSessionId = localStorage.getItem(storageKey)
+            const nextSessionId = existingSessionId || createSessionId()
+            localStorage.setItem(storageKey, nextSessionId)
+            setSessionId(nextSessionId)
+            setMessages(parseStoredMessages(localStorage.getItem(messageStorageKey)))
+        } catch {
+            setSessionId(createSessionId())
+            setMessages([])
+        } finally {
+            setHasLoadedBrowserState(true)
+        }
+    }, [messageStorageKey, storageKey])
+
+    useEffect(() => {
+        if (!hasLoadedBrowserState) return
+
+        try {
+            localStorage.setItem(messageStorageKey, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)))
+        } catch {
+            // The demo should keep working even when browser storage is unavailable.
+        }
+    }, [hasLoadedBrowserState, messageStorageKey, messages])
 
     useEffect(() => {
         const storedTheme = localStorage.getItem(THEME_STORAGE_KEY)
@@ -82,7 +134,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
 
         const interval = window.setInterval(() => {
             setThinkingIndex((current) => (current + 1) % thinkingMessages.length)
-        }, 1800)
+        }, THINKING_ROTATION_MS)
 
         return () => window.clearInterval(interval)
     }, [isSending, thinkingMessages.length])
@@ -93,6 +145,25 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
             localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
             return nextTheme
         })
+    }
+
+    const handleResetConversation = () => {
+        if (isSending) return
+
+        const nextSessionId = createSessionId()
+
+        try {
+            localStorage.setItem(storageKey, nextSessionId)
+            localStorage.removeItem(messageStorageKey)
+        } catch {
+            // Browser storage is a convenience for the public demo, not a hard dependency.
+        }
+
+        setSessionId(nextSessionId)
+        setMessages([])
+        setInput('')
+        setErrorMessage(null)
+        setThinkingIndex(0)
     }
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -185,6 +256,21 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                     </div>
                     <button
                         type="button"
+                        onClick={handleResetConversation}
+                        disabled={isSending || !hasLoadedBrowserState}
+                        aria-label={t('resetConversation')}
+                        title={t('resetConversation')}
+                        className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+                            isDark
+                                ? 'border-white/15 bg-white/10 text-slate-100 hover:bg-white/15'
+                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
+                        }`}
+                    >
+                        <RefreshCcw size={15} />
+                        <span className="hidden sm:inline">{t('resetShort')}</span>
+                    </button>
+                    <button
+                        type="button"
                         onClick={toggleTheme}
                         aria-label={isDark ? t('themeToggleLight') : t('themeToggleDark')}
                         title={isDark ? t('themeToggleLight') : t('themeToggleDark')}
@@ -265,7 +351,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                                 aria-live={POLITE_LIVE_REGION}
                             >
                                 <span
-                                    className={`mr-2 h-2 w-2 rounded-full motion-safe:animate-pulse ${
+                                    className={`demo-chat-thinking-dot mr-2 h-2.5 w-2.5 rounded-full ${
                                         isDark ? 'bg-cyan-300' : 'bg-slate-400'
                                     }`}
                                 />
@@ -285,14 +371,14 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                     {errorMessage ? (
                         <p className="mb-2 text-xs font-medium text-red-600">{errorMessage}</p>
                     ) : null}
-                    <div className="flex items-end gap-2">
-                        <textarea
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
                             value={input}
                             onChange={(event) => setInput(event.target.value)}
                             placeholder={t('placeholder')}
                             disabled={!sessionId || isSending}
-                            rows={1}
-                            className={`min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors placeholder:text-slate-400 ${
+                            className={`h-11 flex-1 rounded-lg border px-3 text-sm leading-none outline-none transition-colors placeholder:text-slate-400 ${
                                 isDark
                                     ? 'border-white/10 bg-slate-950 text-slate-100 focus:border-cyan-300/60 focus:bg-slate-950'
                                     : 'border-slate-200 bg-slate-50 text-slate-950 focus:border-slate-400 focus:bg-white'
@@ -317,6 +403,9 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                             <Send size={18} />
                         </button>
                     </div>
+                    <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                        <MessageRichText content={t('composerDisclaimer')} />
+                    </p>
                 </form>
             </section>
         </main>

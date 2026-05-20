@@ -563,11 +563,14 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         failClosedBotMode: true
     })
     const formatOutboundBotMessage = (content: string) => {
+        const disclaimerSettings = options.platform === 'demo_chat'
+            ? { ...aiSettings, bot_disclaimer_enabled: false }
+            : aiSettings
         const withDisclaimer = applyBotMessageDisclaimer({
             message: content,
             platform: options.platform,
             responseLanguage,
-            settings: aiSettings
+            settings: disclaimerSettings
         })
         return formatOutboundTextForChannel(withDisclaimer, { platform: options.platform })
     }

@@ -29,6 +29,8 @@ describe('MessageRichText', () => {
     const html = render('Demo hesabı için app.askqualy.com adresini ziyaret edebilirsiniz.')
 
     expect(html).toContain('href="https://app.askqualy.com"')
+    expect(html).toContain('target="_blank"')
+    expect(html).toContain('rel="noopener noreferrer"')
     expect(html).toContain('>app.askqualy.com</a>')
   })
 

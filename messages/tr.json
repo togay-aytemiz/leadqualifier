@@ -826,11 +826,14 @@
   "demoChat": {
     "subtitle": "Üniversite demo asistanı",
     "demoNoticeTitle": "Demo bilgilendirmesi",
-    "demoNoticeBody": "Bu ekran {name} için hazırlanmış *demo* bir yapay zeka asistanıdır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için app.askqualy.com adresini ziyaret edebilirsiniz. Yanıtlar demo amaçlıdır ve hata içerebilir.",
+    "demoNoticeBody": "Bu ekran YİÜ için hazırlanmış demo bir AI asistandır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için app.askqualy.com adresini ziyaret edebilirsiniz.",
     "placeholder": "Bir soru yazın",
     "send": "Mesaj gönder",
+    "resetShort": "Yeniden başla",
+    "resetConversation": "Konuşmayı sıfırla ve yeni demo oturumu başlat",
     "themeToggleLight": "Açık temaya geç",
     "themeToggleDark": "Koyu temaya geç",
+    "composerDisclaimer": "Bu demo deneyimi bilgi amaçlıdır; canlı kullanımda kurumunuzun süreçlerine göre daha kontrollü, kapsamlı ve programlı hale getirilebilir.",
     "thinking": "Cevap hazırlanıyor...",
     "thinkingMessages": [
       "Kaynaklara bakıyorum...",
@@ -838,6 +841,12 @@
       "Notları karşılaştırıyorum...",
       "Yönetmeliklere de bir göz atıyorum...",
       "Kampüste minik bir bilgi turu atıyorum...",
+      "Doğru parçaları bir araya getiriyorum...",
+      "Biraz sabır, bilgi dolabını karıştırıyorum...",
+      "Linkleri ve ayrıntıları temizliyorum...",
+      "Cevabı daha okunur hale getiriyorum...",
+      "Demo sahnesine düzgün bir yanıt hazırlıyorum...",
+      "Son kontrolü yapıyorum...",
       "Cevabı toparlıyorum, az kaldı..."
     ],
     "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",

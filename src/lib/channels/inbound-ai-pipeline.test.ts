@@ -545,7 +545,7 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
-    it('processes demo_chat messages through the shared reply path without scheduling side effects', async () => {
+    it('processes demo_chat messages through the shared reply path without scheduling side effects or per-message disclaimers', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)
         const lookup = createConversationLookupBuilder(createConversation({
@@ -595,10 +595,10 @@ describe('processInboundAiPipeline guardrails', () => {
                 demo_chat_session_id: 'session-1',
             }),
         }))
-        expect(sendOutbound).toHaveBeenCalledWith('Demo response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(sendOutbound).toHaveBeenCalledWith('Demo response')
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
             sender_type: 'bot',
-            content: 'Demo response\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',
+            content: 'Demo response',
             metadata: expect.objectContaining({
                 skill_id: 'skill-1',
             }),

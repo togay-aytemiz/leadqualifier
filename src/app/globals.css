@@ -160,6 +160,21 @@ body {
   }
 }
 
+@keyframes demo-chat-thinking-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(148 163 184 / 0.42);
+    opacity: 0.72;
+    transform: scale(0.92);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgb(148 163 184 / 0);
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
 .demo-chat-message-enter {
   animation: demo-chat-message-in 180ms ease-out both;
 }
@@ -169,9 +184,14 @@ body {
   transform-origin: top center;
 }
 
+.demo-chat-thinking-dot {
+  animation: demo-chat-thinking-pulse 1500ms ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .demo-chat-message-enter,
-  .demo-chat-assistant-reveal {
+  .demo-chat-assistant-reveal,
+  .demo-chat-thinking-dot {
     animation: none;
   }
 }

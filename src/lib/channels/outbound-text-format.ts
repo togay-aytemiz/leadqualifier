@@ -192,6 +192,12 @@ export function formatOutboundTextForChannel(content: string, options: OutboundT
         })
     }
 
+    if (options.platform === 'demo_chat') {
+        return normalizeBotDisclaimerFooter(withCleanDomains, {
+            quoteFooter: true
+        })
+    }
+
     const plainText = stripPlainTextMarkdown(withCleanDomains)
     if (options.platform === 'telegram') {
         return normalizeBotDisclaimerFooter(plainText, {

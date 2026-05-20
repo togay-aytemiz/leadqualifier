@@ -826,11 +826,14 @@
   "demoChat": {
     "subtitle": "University demo assistant",
     "demoNoticeTitle": "Demo note",
-    "demoNoticeBody": "This is a *demo* AI assistant account prepared for {name}. You can ask questions as a prospective student, current student, or administrative user. To learn more about Qualy, visit app.askqualy.com. Answers are for demo purposes and may contain mistakes.",
+    "demoNoticeBody": "This screen is a demo AI assistant prepared for YIU. You can ask questions as a prospective student, current student, or administrative user. To learn more about Qualy, visit app.askqualy.com.",
     "placeholder": "Ask a question",
     "send": "Send message",
+    "resetShort": "Start over",
+    "resetConversation": "Reset this conversation and start a new demo session",
     "themeToggleLight": "Switch to light mode",
     "themeToggleDark": "Switch to dark mode",
+    "composerDisclaimer": "This demo experience is informational; in live use it can be made more controlled, comprehensive, and scheduled around your institution's workflows.",
     "thinking": "Preparing an answer...",
     "thinkingMessages": [
       "Checking the sources...",
@@ -838,6 +841,12 @@
       "Comparing the notes...",
       "Taking a quick look at the regulations...",
       "Taking a tiny campus lap through the data...",
+      "Connecting the right pieces...",
+      "One moment, checking the knowledge shelf...",
+      "Cleaning up links and details...",
+      "Making the answer easier to read...",
+      "Preparing a demo-ready answer...",
+      "Running one last check...",
       "Putting the answer together, almost there..."
     ],
     "sendFailed": "The message could not be sent. Please try again.",
