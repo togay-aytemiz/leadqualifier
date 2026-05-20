@@ -26,12 +26,12 @@ describe('MessageRichText', () => {
   })
 
   it('renders bare domains as clickable https links for demo and messaging channels', () => {
-    const html = render('Demo hesabı için app.askqualy.com adresini ziyaret edebilirsiniz.')
+    const html = render('Demo hesabı için www.askqualy.com adresini ziyaret edebilirsiniz.')
 
-    expect(html).toContain('href="https://app.askqualy.com"')
+    expect(html).toContain('href="https://www.askqualy.com"')
     expect(html).toContain('target="_blank"')
     expect(html).toContain('rel="noopener noreferrer"')
-    expect(html).toContain('>app.askqualy.com</a>')
+    expect(html).toContain('>www.askqualy.com</a>')
   })
 
   it('renders trailing disclaimer quote as a separated blockquote', () => {

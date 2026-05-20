@@ -38,6 +38,14 @@ body {
   font-family: var(--font-sans);
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 @media (min-width: 1024px) {
   .dashboard-content-type-scale {
     --text-xs: var(--dashboard-content-text-xs);

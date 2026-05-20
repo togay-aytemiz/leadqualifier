@@ -826,7 +826,7 @@
   "demoChat": {
     "subtitle": "University demo assistant",
     "demoNoticeTitle": "Demo note",
-    "demoNoticeBody": "This screen is a demo AI assistant prepared for YIU. You can ask questions as a prospective student, current student, or administrative user. To learn more about Qualy, visit app.askqualy.com.",
+    "demoNoticeBody": "This screen is a demo AI assistant prepared for YIU. You can ask questions as a prospective student, current student, or administrative user. To learn more about Qualy, visit www.askqualy.com.",
     "placeholder": "Ask a question",
     "send": "Send message",
     "resetShort": "Start over",

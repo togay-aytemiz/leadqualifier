@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Moon, RefreshCcw, Send, Sun } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { MessageRichText } from '@/components/inbox/messageRichText'
@@ -18,6 +18,7 @@ const POLITE_LIVE_REGION = 'polite'
 const THEME_STORAGE_KEY = 'qualy-demo-chat-theme'
 const THINKING_ROTATION_MS = 2600
 const MAX_STORED_MESSAGES = 80
+const COMPOSER_MAX_HEIGHT_PX = 156
 
 interface DemoChatClientProps {
     slug: string
@@ -74,6 +75,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [hasLoadedBrowserState, setHasLoadedBrowserState] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement | null>(null)
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
     const storageKey = useMemo(() => `qualy-demo-chat-session:${slug}`, [slug])
     const messageStorageKey = useMemo(() => `qualy-demo-chat-messages:${slug}`, [slug])
@@ -138,6 +140,25 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
 
         return () => window.clearInterval(interval)
     }, [isSending, thinkingMessages.length])
+
+    const resetComposerHeight = useCallback((element = textareaRef.current) => {
+        if (!element) return
+
+        const maxHeight = COMPOSER_MAX_HEIGHT_PX
+        element.style.height = 'auto'
+        const nextHeight = Math.min(element.scrollHeight, maxHeight)
+        element.style.height = `${nextHeight}px`
+        element.style.overflowY = element.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    }, [])
+
+    useEffect(() => {
+        resetComposerHeight()
+    }, [input, resetComposerHeight])
+
+    const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+        setInput(event.target.value)
+        resetComposerHeight(event.target)
+    }
 
     const toggleTheme = () => {
         setTheme((currentTheme) => {
@@ -371,17 +392,24 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                     {errorMessage ? (
                         <p className="mb-2 text-xs font-medium text-red-600">{errorMessage}</p>
                     ) : null}
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="text"
+                    <div
+                        className={`flex items-end gap-2 rounded-2xl border px-3 py-2 transition-colors ${
+                            isDark
+                                ? 'border-white/10 bg-slate-950 focus-within:border-cyan-300/60'
+                                : 'border-slate-200 bg-slate-50 focus-within:border-slate-400 focus-within:bg-white'
+                        }`}
+                    >
+                        <textarea
+                            ref={textareaRef}
+                            rows={1}
                             value={input}
-                            onChange={(event) => setInput(event.target.value)}
+                            onChange={handleInputChange}
                             placeholder={t('placeholder')}
                             disabled={!sessionId || isSending}
-                            className={`h-11 flex-1 rounded-lg border px-3 text-sm leading-none outline-none transition-colors placeholder:text-slate-400 ${
+                            className={`scrollbar-none max-h-[156px] min-h-10 flex-1 resize-none bg-transparent py-2 text-sm leading-6 outline-none transition-colors placeholder:text-slate-400 ${
                                 isDark
-                                    ? 'border-white/10 bg-slate-950 text-slate-100 focus:border-cyan-300/60 focus:bg-slate-950'
-                                    : 'border-slate-200 bg-slate-50 text-slate-950 focus:border-slate-400 focus:bg-white'
+                                    ? 'text-slate-100'
+                                    : 'text-slate-950'
                             }`}
                             onKeyDown={(event) => {
                                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -394,7 +422,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                             type="submit"
                             disabled={!input.trim() || !sessionId || isSending}
                             aria-label={t('send')}
-                            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+                            className={`inline-flex h-9 w-9 shrink-0 self-end rounded-full items-center justify-center transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
                                 isDark
                                     ? 'bg-cyan-300 text-slate-950 hover:bg-cyan-200'
                                     : 'bg-slate-900 text-white hover:bg-slate-800'

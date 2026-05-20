@@ -195,4 +195,12 @@ describe('pickMessageNamespaces', () => {
     expect(trMessages.simulator.introModal.items.debugDesktop.title).toBe('Detayı masaüstünde izle')
     expect(trMessages.simulator.introModal.secondaryCta).toBe('AI ayarlarına git')
   })
+
+  it('keeps the public demo notice pointed at the marketing website', () => {
+    expect(trMessages.demoChat.demoNoticeBody).toBe(
+      'Bu ekran YİÜ için hazırlanmış bir demo AI asistandır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için www.askqualy.com adresini ziyaret edebilirsiniz.'
+    )
+    expect(enMessages.demoChat.demoNoticeBody).toContain('www.askqualy.com')
+    expect(enMessages.demoChat.demoNoticeBody).not.toContain('app.askqualy.com')
+  })
 })

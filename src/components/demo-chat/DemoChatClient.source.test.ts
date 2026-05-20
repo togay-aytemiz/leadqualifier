@@ -50,8 +50,22 @@ describe('DemoChatClient source guards', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 
         expect(source).toContain("t('composerDisclaimer')")
-        expect(source).toContain('type="text"')
-        expect(source).not.toContain('textarea')
+        expect(source).not.toContain('AI disclaimer')
+    })
+
+    it('renders the demo composer as an autosizing textarea with a bottom-right send button', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('textareaRef')
+        expect(source).toContain('resetComposerHeight')
+        expect(source).toContain('<textarea')
+        expect(source).toContain('rows={1}')
+        expect(source).toContain('resize-none')
+        expect(source).toContain('scrollbar-none')
+        expect(source).toContain('maxHeight =')
+        expect(source).toContain("event.key === 'Enter' && !event.shiftKey")
+        expect(source).toContain('items-end')
+        expect(source).toContain('self-end')
     })
 
     it('keeps the demo surface brandable with a theme toggle', () => {

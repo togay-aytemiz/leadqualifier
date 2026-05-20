@@ -826,7 +826,7 @@
   "demoChat": {
     "subtitle": "Üniversite demo asistanı",
     "demoNoticeTitle": "Demo bilgilendirmesi",
-    "demoNoticeBody": "Bu ekran YİÜ için hazırlanmış demo bir AI asistandır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için app.askqualy.com adresini ziyaret edebilirsiniz.",
+    "demoNoticeBody": "Bu ekran YİÜ için hazırlanmış bir demo AI asistandır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için www.askqualy.com adresini ziyaret edebilirsiniz.",
     "placeholder": "Bir soru yazın",
     "send": "Mesaj gönder",
     "resetShort": "Yeniden başla",
