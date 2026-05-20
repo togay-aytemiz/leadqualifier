@@ -8,6 +8,7 @@
 
 ### Added
 
+- Added a safe live QA cleanup utility for Yüksek İhtisas demo conversations. It defaults to dry-run, matches only `codex_live_qa` / `codex_yiu_demo_qa` tags or `Codex YIU Demo QA` contact prefixes, and was used to remove 180 QA conversations from the demo organization after verification (`scripts/knowledge/cleanup-live-qa-conversations.mjs`).
 - Added a real 30-question Yüksek İhtisas live pipeline QA runner for the demo organization, exercising the actual inbound AI pipeline with real Supabase Knowledge Base reads and OpenAI calls across candidate/admin personas, website pages, and PDF regulations (`scripts/knowledge/qa-live-yiu-pipeline.ts`, latest report: `tmp/crawl-output/live-yiu-demo-pipeline-qa-2026-05-20T12-07-33-456Z.md`).
 - Added a second 50-question Yüksek İhtisas Knowledge Base QA report for pilot demo readiness, mixing student-style and administrator-style questions across website pages and PDF regulations, with answer-term, source-link, and messenger-cosmetic checks (`tmp/crawl-output/yuksek-ihtisas-rag-50-student-admin-qa-after-patch.md`).
 - Added a 40-question crawl RAG QA runner for the Yüksek İhtisas Üniversitesi corpus, covering 20 PDF/regulation questions and 20 website-page questions with source URL, title, and evidence-term checks (`scripts/knowledge/qa-crawl-rag.mjs`, `tmp/crawl-output/yuksek-ihtisas-full-pdf-rag-40qa-report.md`).
@@ -97,6 +98,7 @@
 
 ### Fixed
 
+- Fixed operator Inbox message rendering so stored customer/bot text displays closer to messenger output: raw URLs, e-mail addresses, and Turkish phone numbers are clickable; `*bold*` / `**bold**` render as bold; and quoted disclaimer lines stay visually separated in conversation bubbles (`src/components/inbox/messageRichText.tsx`, `src/components/inbox/InboxContainer.tsx`).
 - Fixed live RAG PDF regulation answers that could return only a source link or omit important `Kapsam` details by repairing purpose/scope responses from the retrieved article text before appending the canonical source URL (`src/lib/knowledge-base/rag-answer-repair.ts`, `src/lib/channels/inbound-ai-pipeline.ts`).
 - Fixed messenger e-mail formatting edge cases where model output could leave spaces inside Turkish domains or join the next assistant sentence directly after an e-mail address (`src/lib/channels/outbound-text-format.ts`).
 - Fixed service-role manual subscription renewal checks so live pipeline requests no longer log `Not authenticated` renewal warnings before answering (`supabase/migrations/20260520112357_allow_service_role_manual_renewal.sql`).

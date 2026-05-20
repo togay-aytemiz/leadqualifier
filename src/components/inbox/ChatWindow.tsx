@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { getInboxMessageBubbleClasses } from '@/components/inbox/chatWindowStyles'
+import { MessageRichText } from '@/components/inbox/messageRichText'
 import { Avatar } from '@/design'
 
 interface ChatWindowProps {
@@ -88,7 +89,9 @@ export function ChatWindow({ conversation, messages, onSendMessage }: ChatWindow
 
                             <div className={`flex flex-col space-y-1 max-w-xl ${isMe || isBot ? 'items-end' : ''}`}>
                                 <div className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${getInboxMessageBubbleClasses(msg.sender_type)}`}>
-                                    <p className="whitespace-pre-wrap text-left">{msg.content}</p>
+                                    <div className="whitespace-pre-wrap text-left">
+                                        <MessageRichText content={msg.content} />
+                                    </div>
                                 </div>
                                 <span className="text-[10px] text-gray-400">
                                     {format(new Date(msg.created_at), 'HH:mm')}

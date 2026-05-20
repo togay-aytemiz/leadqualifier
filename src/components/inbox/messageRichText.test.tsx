@@ -1,0 +1,38 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+import { MessageRichText } from './messageRichText'
+
+function render(content: string) {
+  return renderToStaticMarkup(<MessageRichText content={content} />)
+}
+
+describe('MessageRichText', () => {
+  it('renders WhatsApp-style single asterisk emphasis as bold text', () => {
+    const html = render('Merhaba *Tıp Fakültesi* hakkında bilgi verebilirim.')
+
+    expect(html).toContain('<strong>Tıp Fakültesi</strong>')
+    expect(html).not.toContain('*Tıp Fakültesi*')
+  })
+
+  it('renders markdown links, raw URLs, email addresses and phone numbers as clickable links', () => {
+    const html = render(
+      'Detay: [Akademik takvim](https://example.com/takvim). Tel: +90 312 329 10 10 Mail: bilgiislem@yuksekihtisas.edu.tr URL: https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim'
+    )
+
+    expect(html).toContain('href="https://example.com/takvim"')
+    expect(html).toContain('href="tel:+903123291010"')
+    expect(html).toContain('href="mailto:bilgiislem@yuksekihtisas.edu.tr"')
+    expect(html).toContain('href="https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim"')
+  })
+
+  it('renders trailing disclaimer quote as a separated blockquote', () => {
+    const html = render(
+      'Cevap burada.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+    )
+
+    expect(html).toContain('Cevap burada.')
+    expect(html).toContain('<blockquote')
+    expect(html).toContain('&gt;')
+    expect(html).toContain('Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+  })
+})

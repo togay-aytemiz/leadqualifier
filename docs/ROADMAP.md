@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-20):** Live demo QA runs must be removable without touching real customer conversations. The Yüksek İhtisas QA runner now leaves deterministic tags/contact prefixes, the cleanup script defaults to dry-run and deletes only matching QA conversations, and the operator Inbox renders bot/customer text closer to messenger output with clickable raw links, e-mail/phone links, quoted disclaimer lines, and WhatsApp-style `*bold*` emphasis.
+
 > **Update Note (2026-05-20):** Yüksek İhtisas demo readiness now requires a real 30-question inbound-pipeline smoke over the live Supabase organization, live Knowledge Base, and live OpenAI calls. The current run passed 30/30 across candidate/admin personas, website pages, and PDF regulations; PDF purpose/scope answers are repaired from retrieved `Madde/Amaç/Kapsam` text when the model returns a link-only or overly short answer, and messenger formatting keeps e-mail domains/source URLs intact.
 
 > **Update Note (2026-05-20):** Live RAG pipeline QA must cover the real inbound pipeline, not only unit tests, before university demo fixes are considered ready. The Yüksek İhtisas contact/link smoke now runs against real Supabase/OpenAI flow, verifies concrete phone/e-mail values, blocks orphan domain fragments, and limits customer-facing source replies to one canonical raw URL for cleaner WhatsApp/Instagram/Telegram demos.

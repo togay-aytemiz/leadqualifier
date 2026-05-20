@@ -105,6 +105,7 @@ import {
   extractSkillTitleFromMetadata,
   splitBotMessageDisclaimer,
 } from '@/components/inbox/botMessageContent'
+import { MessageRichText } from '@/components/inbox/messageRichText'
 import { filterInstagramEchoDuplicates } from '@/components/inbox/instagramEchoDuplicates'
 import {
   collectOptimisticPreviewUrls,
@@ -4589,8 +4590,13 @@ export function InboxContainer({
                                     </div>
                                   )}
                                   {renderMessageText && (
-                                    <div className={cn('whitespace-pre-wrap text-left', media && 'mt-2')}>
-                                      {renderMessageText}
+                                    <div
+                                      className={cn(
+                                        'whitespace-pre-wrap text-left',
+                                        media && 'mt-2'
+                                      )}
+                                    >
+                                      <MessageRichText content={renderMessageText} />
                                     </div>
                                   )}
                                 </div>
@@ -4736,8 +4742,10 @@ export function InboxContainer({
                                   </div>
                                 )}
                                 {renderMessageText && (
-                                  <div className={cn('whitespace-pre-wrap text-left', media && 'mt-2')}>
-                                    {renderMessageText}
+                                  <div
+                                    className={cn('whitespace-pre-wrap text-left', media && 'mt-2')}
+                                  >
+                                    <MessageRichText content={renderMessageText} />
                                   </div>
                                 )}
                               </div>

@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-05-20):** Operator-facing conversation history should mirror customer-channel readability, not raw stored text. Inbox bubbles must make raw URLs, e-mail addresses, and Turkish phone numbers clickable, render WhatsApp-style single-asterisk/double-asterisk emphasis as bold, keep quoted AI-disclaimer lines visually separated, and provide a safe live-QA cleanup path that removes only tagged/prefixed demo test conversations.
+
 > **Update Note (2026-05-20):** University-pilot Knowledge Base demos must be verified through the actual inbound AI pipeline, not only retrieval or formatter tests. Live checks should cover candidate and administrative personas, PDF and website sources, raw source links, phone/e-mail formatting, and deterministic repair of PDF regulation purpose/scope answers when the model returns only a source link or drops important article terms.
 
 > **Update Note (2026-05-20):** Pilot demo readiness for crawl-imported Knowledge Base answers requires live inbound-pipeline verification with real model/database calls. Contact-information questions should prefer the canonical root contact table when it explicitly contains the asked unit, and link/page answers should expose a single raw canonical URL rather than multiple adjacent source candidates.
