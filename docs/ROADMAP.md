@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-20):** Customer-facing Knowledge Base answers must repair model-inserted whitespace inside e-mail domains as well as source URLs. RAG source-link cleanup should remove malformed spaced URL fragments such as `https://example. edu. tr` before appending canonical chunk links, so Telegram/WhatsApp/Instagram replies cannot persist orphan fragments like `edu. tr`.
+
 > **Update Note (2026-05-20):** Telegram inbound automation must use the shared channel AI pipeline, not a separate legacy copy of the RAG/skill/fallback flow. Lead extraction should be deferred after the customer-facing reply so slower lead scoring cannot consume the webhook budget and leave Telegram users waiting without a bot response.
 
 > **Update Note (2026-05-20):** Yüksek İhtisas pilot Knowledge Base has a second 50-question student/admin QA pass over mixed PDF and website content. The regression now covers student-style admissions/department questions plus rectorate/admin audit questions, and the product should prefer the canonical root contact page for general/rektorate contact requests, prefer the official İş Sağlığı ve Güvenliği Koordinatörlüğü page for natural İSG coordinator questions, and refuse to invent a person name when the retrieved context only describes a role.

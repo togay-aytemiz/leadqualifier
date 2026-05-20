@@ -75,6 +75,15 @@ describe('formatOutboundTextForChannel', () => {
         expect(formatted).toBe('Akademik takvim:\nhttps://example.edu.tr/akademik-takvim')
     })
 
+    it('repairs whitespace inside email domains before sending to chat channels', () => {
+        const formatted = formatOutboundTextForChannel(
+            'Bilgi İşlem için bilgiislem@yuksekihtisas.edu. tr adresine yazabilirsiniz.',
+            { platform: 'telegram' }
+        )
+
+        expect(formatted).toBe('Bilgi İşlem için bilgiislem@yuksekihtisas.edu.tr adresine yazabilirsiniz.')
+    })
+
     it('keeps WhatsApp bot disclaimers on a separate quoted footer line', () => {
         const formatted = formatOutboundTextForChannel(
             "Evet, Tıp Fakültesi'nde İngilizce eğitim verilmektedir.\nBu mesaj AI bot tarafından oluşturuldu, hata içerebilir.",

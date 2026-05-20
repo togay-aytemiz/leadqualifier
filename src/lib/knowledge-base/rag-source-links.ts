@@ -47,14 +47,18 @@ export function collectRagSourceUrls(chunks: unknown[], limit = 2) {
     return urls
 }
 
+const SPACED_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
+const SIMPLE_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi
+
 function stripRagUrlArtifacts(response: string) {
     let stripped = response
         .replace(/\[([^\]\n]+)]\(\s*https?:\/\/[\s\S]*?\)/gi, '$1')
+        .replace(SPACED_RAW_URL_PATTERN, '')
 
     if (/https?:\/\/\s/i.test(stripped)) {
         stripped = stripped.replace(/https?:\/\/[\s\S]*$/i, '')
     } else {
-        stripped = stripped.replace(/https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi, '')
+        stripped = stripped.replace(SIMPLE_RAW_URL_PATTERN, '')
     }
 
     return stripped

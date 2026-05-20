@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-05-20):** Messenger-safe RAG formatting must cover e-mail addresses, not only `https://` URLs. If the model inserts spaces inside domains such as `yuksekihtisas.edu. tr`, outbound formatting must compact the address before send/persist, and source-link canonicalization must strip malformed model URL fragments before adding the trusted source URL.
+
 > **Update Note (2026-05-20):** Telegram, WhatsApp, and Instagram customer replies should share the same inbound AI pipeline. Channel-specific webhook routes may validate provider payloads and adapt outbound delivery, but RAG, fallback, skill matching, formatting, deadlines, usage recording, and deferred lead extraction must live in the shared pipeline so Telegram cannot stall on slow lead scoring before answering the user.
 
 > **Update Note (2026-05-20):** University-pilot RAG quality must be checked with student-like and administrator-like questions, not only crawler/import success. For mixed PDF and website corpora, retrieval should prioritize canonical pages for broad institutional questions, such as `/iletisim` for general or rectorate contact requests, route natural İSG coordinator questions to the official occupational-health coordinator page, preserve raw source links, keep messenger formatting clean, and explicitly say the person name is not in the Knowledge Base when the source only defines a role.

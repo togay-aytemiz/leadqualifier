@@ -56,6 +56,18 @@ function normalizeRawUrlsForPlainChat(content: string) {
     )
 }
 
+function normalizeEmailWhitespaceForPlainChat(content: string) {
+    return content.replace(
+        /\b([A-Z0-9._%+-]+)@([A-Z0-9-]+(?:\s*\.\s*[A-Z0-9-]+)+)\b/gi,
+        (_match, localPart: string, rawDomain: string) => {
+            const domain = rawDomain
+                .replace(/\s*\.\s*/g, '.')
+                .replace(/\s+/g, '')
+            return `${localPart}@${domain}`
+        }
+    )
+}
+
 function normalizeUrlLineBreaks(content: string) {
     return content
         .replace(/[ \t]*\n[ \t]*/g, '\n')
@@ -121,7 +133,13 @@ export function formatOutboundTextForChannel(content: string, options: OutboundT
     }
 
     const withPlainLinks = normalizeUrlLineBreaks(
-        normalizeInlineBullets(normalizeRawUrlsForPlainChat(normalizeMarkdownLinksForPlainChat(content)))
+        normalizeInlineBullets(
+            normalizeRawUrlsForPlainChat(
+                normalizeEmailWhitespaceForPlainChat(
+                    normalizeMarkdownLinksForPlainChat(content)
+                )
+            )
+        )
     )
 
     if (options.platform === 'whatsapp') {
