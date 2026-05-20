@@ -824,11 +824,22 @@
     }
   },
   "demoChat": {
-    "subtitle": "Aday öğrenci demo sohbeti",
-    "introMessage": "Merhaba, ben {name}. Aday öğrenci gibi programlar, kayıt, burs, yurt, iletişim veya yönetmeliklerle ilgili soru sorabilirsiniz.",
+    "subtitle": "Üniversite demo asistanı",
+    "demoNoticeTitle": "Demo bilgilendirmesi",
+    "demoNoticeBody": "Bu ekran {name} için hazırlanmış *demo* bir yapay zeka asistanıdır. Aday öğrenci, mevcut öğrenci ve idari personel senaryolarıyla soru sorabilirsiniz. Qualy hakkında bilgi almak için app.askqualy.com adresini ziyaret edebilirsiniz. Yanıtlar demo amaçlıdır ve hata içerebilir.",
     "placeholder": "Bir soru yazın",
     "send": "Mesaj gönder",
+    "themeToggleLight": "Açık temaya geç",
+    "themeToggleDark": "Koyu temaya geç",
     "thinking": "Cevap hazırlanıyor...",
+    "thinkingMessages": [
+      "Kaynaklara bakıyorum...",
+      "İlgili sayfaları tarıyorum...",
+      "Notları karşılaştırıyorum...",
+      "Yönetmeliklere de bir göz atıyorum...",
+      "Kampüste minik bir bilgi turu atıyorum...",
+      "Cevabı toparlıyorum, az kaldı..."
+    ],
     "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
     "emptyReply": "Şu anda net bir cevap hazırlayamadım. Lütfen başka bir soru deneyin.",
     "imageAlt": "Demo yanıt görseli"

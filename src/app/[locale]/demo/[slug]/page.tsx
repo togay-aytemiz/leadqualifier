@@ -6,6 +6,8 @@ import { DemoChatClient } from '@/components/demo-chat/DemoChatClient'
 import { resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { getScopedMessages } from '@/i18n/messages'
 
+const UNIVERSITY_DEMO_LOGO_URL = '/yuksek-ihtisas-universitesi.png'
+
 type DemoChatPageProps = {
     params: Promise<{
         locale: string
@@ -40,13 +42,14 @@ export default async function DemoChatPage({ params }: DemoChatPageProps) {
     }
 
     const messages = await getScopedMessages(locale, ['demoChat'])
+    const defaultLogoUrl = channel.slug === 'yiu-qualy-ai-demo' ? UNIVERSITY_DEMO_LOGO_URL : null
 
     return (
         <NextIntlClientProvider locale={locale} messages={messages}>
             <DemoChatClient
                 slug={channel.slug}
                 displayName={channel.displayName}
-                logoUrl={channel.logoUrl}
+                logoUrl={channel.logoUrl || defaultLogoUrl}
             />
         </NextIntlClientProvider>
     )

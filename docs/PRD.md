@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — PRD (MVP)
 
+> **Update Note (2026-05-20):** Public demo-chat surfaces for university stakeholders should avoid persona-specific labels when the same demo is used by candidates, current students, and administrative reviewers. The demo header should use the institution logo when available, explain demo/account context in a static notice instead of an assistant message, promote `app.askqualy.com`, render links and WhatsApp-style bold text cleanly, support a light/dark mode toggle, stay mobile-friendly, and keep longer AI waits readable with rotating friendly loading states.
+
 > **Update Note (2026-05-20):** University stakeholder demos should use a first-party `app.askqualy.com` demo chat URL backed by server-side slug-to-organization mapping. Demo Chat is a separate `demo_chat` conversation platform: each tester session is isolated, messages and AI replies persist into Inbox for operator review, and manual operator replies are disabled while normal WhatsApp, Instagram, and Telegram channels remain unaffected.
 
 > **Update Note (2026-05-20):** Operator-facing conversation history should mirror customer-channel readability, not raw stored text. Inbox bubbles must make raw URLs, e-mail addresses, and Turkish phone numbers clickable, render WhatsApp-style single-asterisk/double-asterisk emphasis as bold, keep quoted AI-disclaimer lines visually separated, and provide a safe live-QA cleanup path that removes only tagged/prefixed demo test conversations.

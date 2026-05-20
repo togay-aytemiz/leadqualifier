@@ -5,7 +5,7 @@ type MessageRichTextProps = {
 }
 
 const TOKEN_PATTERN =
-  /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+)|([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})|(\+90[\d\s().-]{8,}\d|0\d[\d\s().-]{8,}\d)/gi
+  /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+)|([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})|(\+90[\d\s().-]{8,}\d|0\d[\d\s().-]{8,}\d)|(\b(?:[A-Z0-9-]+\.)+[A-Z]{2,}(?:\/[^\s<]*)?)/gi
 const BOLD_PATTERN = /(\*\*([^*\n]+)\*\*|\*([^*\n]+)\*)/g
 const TRAILING_URL_PUNCTUATION = /[.,!?;:]+$/
 
@@ -73,6 +73,7 @@ function parseInlineText(text: string, keyPrefix: string): ReactNode[] {
     const rawUrl = match[3]
     const email = match[4]
     const phone = match[5]
+    const bareDomain = match[6]
 
     if (markdownLabel && markdownHref) {
       nodes.push(renderLink(markdownLabel, markdownHref, `${keyPrefix}-md-link-${match.index}`))
@@ -85,6 +86,10 @@ function parseInlineText(text: string, keyPrefix: string): ReactNode[] {
     } else if (phone) {
       const hrefPhone = phone.replace(/[^\d+]/g, '')
       nodes.push(renderLink(phone, `tel:${hrefPhone}`, `${keyPrefix}-phone-${match.index}`))
+    } else if (bareDomain) {
+      const { link, trailing } = splitTrailingUrlPunctuation(bareDomain)
+      nodes.push(renderLink(link, `https://${link}`, `${keyPrefix}-domain-${match.index}`))
+      if (trailing) nodes.push(trailing)
     }
 
     cursor = match.index + match[0].length
@@ -105,7 +110,7 @@ function renderLine(line: string, index: number) {
         key={`quote-${index}`}
         className="mt-3 border-l-2 border-current/30 pl-3 text-left opacity-90"
       >
-        <span aria-hidden="true">&gt; </span>
+        <span aria-hidden={true}>{'> '}</span>
         {parseInlineText(quoteMatch[1] ?? '', `quote-${index}`)}
       </blockquote>
     )

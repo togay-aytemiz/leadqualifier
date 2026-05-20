@@ -824,11 +824,22 @@
     }
   },
   "demoChat": {
-    "subtitle": "Admissions demo chat",
-    "introMessage": "Hello, I am {name}. You can ask questions like a prospective student about programs, registration, scholarships, dorms, contact details, or regulations.",
+    "subtitle": "University demo assistant",
+    "demoNoticeTitle": "Demo note",
+    "demoNoticeBody": "This is a *demo* AI assistant account prepared for {name}. You can ask questions as a prospective student, current student, or administrative user. To learn more about Qualy, visit app.askqualy.com. Answers are for demo purposes and may contain mistakes.",
     "placeholder": "Ask a question",
     "send": "Send message",
+    "themeToggleLight": "Switch to light mode",
+    "themeToggleDark": "Switch to dark mode",
     "thinking": "Preparing an answer...",
+    "thinkingMessages": [
+      "Checking the sources...",
+      "Scanning the relevant pages...",
+      "Comparing the notes...",
+      "Taking a quick look at the regulations...",
+      "Taking a tiny campus lap through the data...",
+      "Putting the answer together, almost there..."
+    ],
     "sendFailed": "The message could not be sent. Please try again.",
     "emptyReply": "I could not prepare a clear answer right now. Please try another question.",
     "imageAlt": "Demo response visual"

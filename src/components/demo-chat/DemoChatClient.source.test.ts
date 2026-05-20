@@ -14,4 +14,31 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('sessionId')
         expect(source).not.toContain('organizationId')
     })
+
+    it('keeps demo context as an informational panel instead of an assistant message', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("t('demoNoticeTitle')")
+        expect(source).toContain("t('demoNoticeBody', { name: displayName })")
+        expect(source).toContain('MessageRichText')
+        expect(source).toContain('useState<DemoChatMessage[]>(() => [])')
+        expect(source).not.toContain("id: 'intro'")
+    })
+
+    it('rotates friendly loading copy while the demo bot is answering', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("t.raw('thinkingMessages')")
+        expect(source).toContain('setInterval')
+        expect(source).toContain('thinkingIndex')
+    })
+
+    it('keeps the demo surface brandable with a theme toggle', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("type DemoTheme = 'light' | 'dark'")
+        expect(source).toContain('toggleTheme')
+        expect(source).toContain("t('themeToggleLight')")
+        expect(source).toContain("t('themeToggleDark')")
+    })
 })

@@ -25,6 +25,13 @@ describe('MessageRichText', () => {
     expect(html).toContain('href="https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim"')
   })
 
+  it('renders bare domains as clickable https links for demo and messaging channels', () => {
+    const html = render('Demo hesabı için app.askqualy.com adresini ziyaret edebilirsiniz.')
+
+    expect(html).toContain('href="https://app.askqualy.com"')
+    expect(html).toContain('>app.askqualy.com</a>')
+  })
+
   it('renders trailing disclaimer quote as a separated blockquote', () => {
     const html = render(
       'Cevap burada.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'

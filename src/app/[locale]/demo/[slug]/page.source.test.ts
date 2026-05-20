@@ -13,4 +13,12 @@ describe('public demo chat page source', () => {
         expect(source).toContain('NextIntlClientProvider')
         expect(source).not.toContain('organizationId=')
     })
+
+    it('uses the university logo asset as the demo fallback logo', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("'/yuksek-ihtisas-universitesi.png'")
+        expect(source).toContain("'yiu-qualy-ai-demo'")
+        expect(source).toContain('channel.logoUrl || defaultLogoUrl')
+    })
 })
