@@ -212,4 +212,9 @@ describe('pickMessageNamespaces', () => {
       "This demo is informational; live use can be tailored to your institution's workflows."
     )
   })
+
+  it('starts public demo loading copy with a neutral thinking message', () => {
+    expect(trMessages.demoChat.thinkingMessages[0]).toBe('Düşünüyorum...')
+    expect(enMessages.demoChat.thinkingMessages[0]).toBe('Thinking...')
+  })
 })
