@@ -584,6 +584,20 @@ export async function searchKnowledgeBase(
     const supabase = options?.supabase || await createClient()
     let data: KnowledgeSearchResult[] | null = null
     const vectorLimit = Math.max(limit, Math.min(12, limit * 2))
+    const fallbackLimit = Math.max(limit * 8, 40)
+    const fallbackOptions = {
+        collectionId: options?.collectionId ?? null,
+        type: options?.type ?? null,
+        language: options?.language ?? null,
+        supabase
+    }
+
+    const policyDurationResults = isPolicyDurationQuery(query)
+        ? await searchKnowledgeBaseByPolicyDurationEvidence(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
+        : []
+    if (shouldReturnPolicyDurationResultsEarly(query, policyDurationResults)) {
+        return mergeSearchResults(query, [], policyDurationResults, limit)
+    }
 
     let embedding: number[] | null = null
     try {
@@ -625,14 +639,6 @@ export async function searchKnowledgeBase(
         }
     }
 
-    const fallbackLimit = Math.max(limit * 8, 40)
-    const fallbackOptions = {
-        collectionId: options?.collectionId ?? null,
-        type: options?.type ?? null,
-        language: options?.language ?? null,
-        supabase
-    }
-    const policyDurationResults = await searchKnowledgeBaseByPolicyDurationEvidence(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     if (isPolicyDurationQuery(query) && policyDurationResults.length >= limit) {
         return mergeSearchResults(query, data ?? [], policyDurationResults, limit)
     }
@@ -2014,6 +2020,38 @@ function policyDurationEvidenceFilters(subjectGroups: string[][]) {
         .join(',')
 }
 
+function sanitizeTextSearchTerm(value: string) {
+    const normalized = value
+        .replace(/[^\p{L}\p{N}]+/gu, '')
+        .trim()
+
+    return normalized.length >= 3 ? normalized.replace(/'/g, '') : ''
+}
+
+function policyDurationSubjectTextSearchExpression(subjectGroups: string[][]) {
+    const groups = subjectGroups
+        .map((group) => Array.from(new Set(group.map(sanitizeTextSearchTerm).filter(Boolean))).slice(0, 4))
+        .filter((group) => group.length > 0)
+        .slice(0, 4)
+
+    if (groups.length === 0) return ''
+
+    return groups
+        .map((group) => {
+            const variants = group.map((term) => `'${term}'`)
+            return variants.length === 1 ? variants[0] : `(${variants.join(' | ')})`
+        })
+        .join(' & ')
+}
+
+function shouldReturnPolicyDurationResultsEarly(query: string, results: KnowledgeSearchResult[]) {
+    if (results.length === 0) return false
+
+    const requiredTokens = policyDurationRequiredSubjectTokens(policyDurationSubjectTokens(query))
+
+    return requiredTokens.some((token) => !POLICY_DURATION_GENERIC_SUBJECT_TOKENS.has(token))
+}
+
 async function searchKnowledgeBaseByPolicyDurationEvidence(
     query: string,
     organizationId: string,
@@ -2032,13 +2070,19 @@ async function searchKnowledgeBaseByPolicyDurationEvidence(
 
     const supabase = options?.supabase || await createClient()
     const filters = policyDurationEvidenceFilters(subjectGroups)
-    if (!filters) return []
+    const textSearchExpression = policyDurationSubjectTextSearchExpression(subjectGroups)
+    if (!filters && !textSearchExpression) return []
 
     let policyQuery = supabase
         .from('knowledge_chunks')
         .select('id, document_id, content, knowledge_documents(title, type, status, collection_id, language)')
         .eq('organization_id', organizationId)
-        .or(filters)
+
+    if (textSearchExpression) {
+        policyQuery = policyQuery.textSearch('content', textSearchExpression, { config: 'simple' })
+    } else {
+        policyQuery = policyQuery.or(filters)
+    }
 
     if (options?.collectionId) {
         policyQuery = policyQuery.eq('knowledge_documents.collection_id', options.collectionId)

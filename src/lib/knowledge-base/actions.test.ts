@@ -540,14 +540,17 @@ function createHybridSearchSupabase(options?: {
     const keywordChain: {
         eq: ReturnType<typeof vi.fn>
         or: ReturnType<typeof vi.fn>
+        textSearch: ReturnType<typeof vi.fn>
         limit: ReturnType<typeof vi.fn>
     } = {
         eq: vi.fn(),
         or: vi.fn(),
+        textSearch: vi.fn(),
         limit: limitMock
     }
     keywordChain.eq.mockReturnValue(keywordChain)
     keywordChain.or.mockReturnValue(keywordChain)
+    keywordChain.textSearch.mockReturnValue(keywordChain)
 
     const titleDocumentLimitMock = vi.fn(async () => ({
         data: titleRows,
