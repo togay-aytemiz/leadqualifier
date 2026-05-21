@@ -203,4 +203,13 @@ describe('pickMessageNamespaces', () => {
     expect(enMessages.demoChat.demoNoticeBody).toContain('www.askqualy.com')
     expect(enMessages.demoChat.demoNoticeBody).not.toContain('app.askqualy.com')
   })
+
+  it('keeps the public demo composer disclaimer concise', () => {
+    expect(trMessages.demoChat.composerDisclaimer).toBe(
+      'Bu demo bilgi amaçlıdır; canlı kullanım kurum süreçlerinize göre uyarlanabilir.'
+    )
+    expect(enMessages.demoChat.composerDisclaimer).toBe(
+      "This demo is informational; live use can be tailored to your institution's workflows."
+    )
+  })
 })

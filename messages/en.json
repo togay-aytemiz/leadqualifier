@@ -833,7 +833,7 @@
     "resetConversation": "Reset this conversation and start a new demo session",
     "themeToggleLight": "Switch to light mode",
     "themeToggleDark": "Switch to dark mode",
-    "composerDisclaimer": "This demo experience is informational; in live use it can be made more controlled, comprehensive, and scheduled around your institution's workflows.",
+    "composerDisclaimer": "This demo is informational; live use can be tailored to your institution's workflows.",
     "thinking": "Preparing an answer...",
     "thinkingMessages": [
       "Checking the sources...",
