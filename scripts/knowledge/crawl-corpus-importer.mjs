@@ -142,41 +142,104 @@ export function parseCrawlMarkdown(markdown, fallback = {}) {
 function cleanHeading(line) {
     return String(line ?? '')
         .replace(/^#{1,6}\s+/, '')
+        .replace(/\s+/g, ' ')
         .trim()
+        .slice(0, 140)
+        .trim()
+}
+
+function isShortHeadingLikeLine(value) {
+    if (value.length < 4 || value.length > 110) return false
+    if (!hasLetter(value)) return false
+    if (/[.!?;,]$/.test(value)) return false
+    if (estimateTokenCount(value) > 12) return false
+
+    return true
+}
+
+function isMostlyUppercaseHeading(value) {
+    const letters = String(value ?? '').match(/\p{L}/gu) ?? []
+    if (letters.length < 4) return false
+
+    const uppercaseLetters = letters.filter((letter) => letter === letter.toLocaleUpperCase('tr-TR')).length
+    return uppercaseLetters / letters.length >= 0.72
+}
+
+function hasStandaloneHeadingContext(previousLine, nextLine) {
+    const hasBoundaryBefore = !previousLine || !previousLine.trim()
+    const hasBodyAfter = Boolean(nextLine?.trim())
+
+    return hasBoundaryBefore && hasBodyAfter
+}
+
+function extractStructuredHeading(line, previousLine, nextLine) {
+    const trimmedLine = String(line ?? '').trim()
+    const markdownHeading = trimmedLine.match(/^#{2,6}\s+(.+)$/)
+    if (markdownHeading?.[1]) return cleanHeading(markdownHeading[1])
+
+    const normalized = cleanHeading(trimmedLine)
+    if (!normalized) return null
+
+    const legalArticleHeading = normalized.match(/^(?:MADDE|Madde|madde)\s+\d+[\p{L}0-9/]*(?:\s*[-–—:.]\s*[^.;!?]{1,100})?/u)
+    if (legalArticleHeading?.[0]) return cleanHeading(legalArticleHeading[0])
+
+    const numberedHeading = normalized.match(/^(?:\d+(?:\.\d+){0,4}|[IVXLCDM]+)\.?\s+.+$/iu)
+    if (
+        numberedHeading
+        && !/^\d{1,2}[./]\d{1,2}[./]\d{2,4}\b/.test(normalized)
+        && hasStandaloneHeadingContext(previousLine, nextLine)
+        && isShortHeadingLikeLine(normalized)
+    ) {
+        return normalized
+    }
+
+    if (
+        hasStandaloneHeadingContext(previousLine, nextLine)
+        && isShortHeadingLikeLine(normalized)
+        && isMostlyUppercaseHeading(normalized)
+    ) {
+        return normalized
+    }
+
+    return null
 }
 
 function splitIntoSections(content) {
     const lines = normalizeWhitespace(content).split('\n')
+    const headings = []
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const title = extractStructuredHeading(lines[index], lines[index - 1], lines[index + 1])
+        if (title) headings.push({ index, title })
+    }
+
+    if (headings.length < 2) {
+        const normalizedContent = normalizeWhitespace(content)
+        return normalizedContent
+            ? [{ title: 'Main content', lines: [normalizedContent] }]
+            : []
+    }
+
     const sections = []
-    let current = {
-        title: 'Main content',
-        lines: []
-    }
-
-    for (const line of lines) {
-        if (/^#{2,6}\s+/.test(line)) {
-            if (current.lines.join('\n').trim()) {
-                sections.push(current)
-            }
-            current = {
-                title: cleanHeading(line),
-                lines: []
-            }
-            continue
+    if (headings[0]?.index && headings[0].index > 0) {
+        const preamble = lines.slice(0, headings[0].index).join('\n').trim()
+        if (preamble) {
+            sections.push({
+                title: 'Main content',
+                lines: [preamble]
+            })
         }
-
-        current.lines.push(line)
     }
 
-    if (current.lines.join('\n').trim()) {
-        sections.push(current)
-    }
-
-    if (sections.length === 0 && normalizeWhitespace(content)) {
-        sections.push({
-            title: 'Main content',
-            lines: [normalizeWhitespace(content)]
-        })
+    for (const [index, heading] of headings.entries()) {
+        const nextHeading = headings[index + 1]
+        const sectionLines = lines.slice(heading.index, nextHeading?.index ?? lines.length)
+        if (sectionLines.join('\n').trim()) {
+            sections.push({
+                title: heading.title,
+                lines: sectionLines
+            })
+        }
     }
 
     return sections
@@ -228,9 +291,9 @@ export function createWebsiteChunks(page, options = {}) {
     const sections = splitIntoSections(page?.content || '')
     const chunks = []
     let chunkIndex = 1
-    let previousBody = ''
 
     for (const section of sections) {
+        let previousBody = ''
         const prefixTokens = estimateTokenCount(buildChunkContent({
             title,
             sourceUrl,

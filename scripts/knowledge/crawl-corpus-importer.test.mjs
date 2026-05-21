@@ -90,6 +90,49 @@ Tez teslim tarihleri ve danisman atama surecleri.`
         expect(chunks.at(-1).sectionTitle).toBe('Lisansustu')
     })
 
+    it('creates separate chunks for legal article headings without cross-section overlap', () => {
+        const chunks = createWebsiteChunks({
+            title: 'İzin Kullanımı Yönergesi',
+            sourceUrl: 'https://example.edu.tr/izin.pdf',
+            content: `MADDE 9 - Mazeret İzni
+Personelin eşinin anne, baba veya kardeşinin ölümünde 3 (üç) iş günü mazeret izni verilir.
+
+MADDE 10 - Yıllık İzin
+Yıllık izin talepleri ilgili amirin onayı ile kullanılır.
+
+MADDE 11 - Ücretsiz İzin
+Ücretsiz izin süresi en fazla 1 (bir) yıldır.`
+        }, {
+            maxTokens: 80,
+            overlapTokens: 8
+        })
+
+        expect(chunks).toHaveLength(3)
+        expect(chunks[0].sectionTitle).toBe('MADDE 9 - Mazeret İzni')
+        expect(chunks[2].sectionTitle).toBe('MADDE 11 - Ücretsiz İzin')
+        expect(chunks[2].content).toContain('Ücretsiz izin süresi en fazla 1 (bir) yıldır.')
+        expect(chunks[2].content).not.toContain('3 (üç) iş günü')
+    })
+
+    it('uses strong standalone headings as reusable section boundaries for non-regulation pages', () => {
+        const chunks = createWebsiteChunks({
+            title: 'Aday Öğrenci Bilgilendirme',
+            sourceUrl: 'https://example.edu.tr/aday',
+            content: `BAŞVURU ŞARTLARI
+Aday öğrenciler başvuru formunu eksiksiz doldurmalıdır.
+
+İLETİŞİM BİLGİLERİ
+Aday öğrenci ofisine telefon ve e-posta ile ulaşılabilir.`
+        }, {
+            maxTokens: 80,
+            overlapTokens: 8
+        })
+
+        expect(chunks).toHaveLength(2)
+        expect(chunks[0].sectionTitle).toBe('BAŞVURU ŞARTLARI')
+        expect(chunks[1].sectionTitle).toBe('İLETİŞİM BİLGİLERİ')
+    })
+
     it('builds a dry-run report from a copied crawler output without database writes', async () => {
         const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
 

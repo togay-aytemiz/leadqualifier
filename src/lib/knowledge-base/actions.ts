@@ -59,6 +59,7 @@ type KnowledgeCollectionCountRow = { collection_id: string | null; document_coun
 type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { collection_id: string | null }
 const MAX_PROFILE_CONTEXT_CHARS = 6000
 const COUNT_SCAN_PAGE_SIZE = 1000
+const VECTOR_SEARCH_TIMEOUT_MS = 2500
 
 export interface KnowledgeEntriesPage {
     entries: KnowledgeBaseEntry[]
@@ -127,6 +128,10 @@ interface IndexedSourceChunk {
     content: string
     tokenCount: number
     sectionTitle?: string
+}
+
+type AbortableQuery<T> = PromiseLike<T> & {
+    abortSignal?: (signal: AbortSignal) => PromiseLike<T>
 }
 
 /**
@@ -203,6 +208,31 @@ function mapKnowledgeEntry(item: KnowledgeBaseEntry & { collection?: KnowledgeCo
         ...item,
         collection: Array.isArray(item.collection) ? item.collection[0] : item.collection
     } as KnowledgeBaseEntry
+}
+
+function withQueryTimeout<T>(query: PromiseLike<T> | AbortableQuery<T>, timeoutMs: number, label: string) {
+    const abortSignal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+        ? AbortSignal.timeout(timeoutMs)
+        : null
+    const abortableQuery = abortSignal && typeof (query as AbortableQuery<T>).abortSignal === 'function'
+        ? (query as AbortableQuery<T>).abortSignal?.(abortSignal) ?? query
+        : query
+
+    return new Promise<T>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error(`${label} timed out after ${timeoutMs}ms`))
+        }, timeoutMs)
+
+        Promise.resolve(abortableQuery)
+            .then((result) => {
+                clearTimeout(timeoutId)
+                resolve(result)
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId)
+                reject(error)
+            })
+    })
 }
 
 /**
@@ -555,31 +585,44 @@ export async function searchKnowledgeBase(
     let data: KnowledgeSearchResult[] | null = null
     const vectorLimit = Math.max(limit, Math.min(12, limit * 2))
 
+    let embedding: number[] | null = null
     try {
-        const embedding = await generateEmbedding(query, {
+        embedding = await generateEmbedding(query, {
             organizationId,
             supabase,
             usageMetadata: {
                 source: 'knowledge_search_query_embedding'
             }
         })
-        const { data: result, error } = await supabase.rpc('match_knowledge_chunks', {
-            query_embedding: formatEmbeddingForPgvector(embedding),
-            match_threshold: threshold,
-            match_count: vectorLimit,
-            filter_org_id: organizationId,
-            filter_collection_id: options?.collectionId ?? null,
-            filter_type: options?.type ?? null,
-            filter_language: options?.language ?? null
-        })
-
-        if (error) {
-            console.error('RAG Search failed:', error)
-        } else {
-            data = (result ?? null) as KnowledgeSearchResult[] | null
-        }
     } catch (error) {
         console.error('Embedding generation failed:', error)
+    }
+
+    if (embedding) {
+        try {
+            const vectorQuery = supabase.rpc('match_knowledge_chunks', {
+                query_embedding: formatEmbeddingForPgvector(embedding),
+                match_threshold: threshold,
+                match_count: vectorLimit,
+                filter_org_id: organizationId,
+                filter_collection_id: options?.collectionId ?? null,
+                filter_type: options?.type ?? null,
+                filter_language: options?.language ?? null
+            })
+            const { data: result, error } = await withQueryTimeout(
+                vectorQuery,
+                VECTOR_SEARCH_TIMEOUT_MS,
+                'Knowledge vector search'
+            )
+
+            if (error) {
+                console.error('RAG Search failed:', error)
+            } else {
+                data = (result ?? null) as KnowledgeSearchResult[] | null
+            }
+        } catch (error) {
+            console.warn('Knowledge vector search unavailable:', error)
+        }
     }
 
     const fallbackLimit = Math.max(limit * 8, 40)
@@ -589,6 +632,7 @@ export async function searchKnowledgeBase(
         language: options?.language ?? null,
         supabase
     }
+    const policyDurationResults = await searchKnowledgeBaseByPolicyDurationEvidence(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions)
     const documentCodeResults = await searchKnowledgeBaseByDocumentCode(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const abbreviationResults = await searchKnowledgeBaseByAbbreviation(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
@@ -599,6 +643,7 @@ export async function searchKnowledgeBase(
         ? await searchKnowledgeBaseBySourcePath(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
         : []
     const lexicalResults = [
+        ...policyDurationResults,
         ...fallbackResults,
         ...documentCodeResults,
         ...abbreviationResults,
@@ -1903,6 +1948,132 @@ function isPolicyDurationQuery(query: string) {
         || /\b(?:kac|ne kadar)\s+(?:is\s+gunu|gun|hafta|ay|yil|saat|dakika)\b/i.test(normalized)
         || normalized.includes('ne kadar')
             && hasQuerySignal(normalized, ['izin', 'rapor', 'sinav', 'basvuru', 'staj', 'egitim', 'muafiyet'])
+}
+
+function policyDurationSubjectKeywordGroups(query: string) {
+    const requiredTokens = policyDurationRequiredSubjectTokens(policyDurationSubjectTokens(query))
+    if (requiredTokens.length === 0) return []
+
+    const keywordTokens = extractKeywordTokens(query)
+    return requiredTokens
+        .map((requiredToken) => {
+            const sourceToken = keywordTokens.find((keyword) => {
+                const normalized = normalizeSearchText(keyword)
+                return normalized === requiredToken || stemSearchToken(normalized) === requiredToken
+            }) ?? requiredToken
+
+            return expandKeywordToken(sourceToken)
+        })
+        .filter((group) => group.length > 0)
+        .slice(0, 3)
+}
+
+function policyDurationEvidenceFilters(subjectGroups: string[][]) {
+    const durationKeywords = [
+        'gün',
+        'gun',
+        'iş günü',
+        'is gunu',
+        'hafta',
+        'ay',
+        'yıl',
+        'yil',
+        'saat',
+        'dakika',
+        'en fazla',
+        'azami'
+    ].map(sanitizeKeyword)
+
+    const subjectCombinations = subjectGroups.reduce<string[][]>((combinations, group) => {
+        const variants = Array.from(new Set(group.map(sanitizeKeyword)))
+            .filter((keyword) => keyword.length >= 3)
+            .slice(0, 4)
+
+        if (variants.length === 0) return combinations
+        if (combinations.length === 0) return variants.map((variant) => [variant])
+
+        return combinations.flatMap((combination) => (
+            variants.map((variant) => [...combination, variant])
+        ))
+    }, [])
+
+    return subjectCombinations
+        .slice(0, 24)
+        .flatMap((subjects) => durationKeywords.map((durationKeyword) => {
+            const filters = [
+                ...subjects.map((subject) => `content.ilike.%${subject}%`),
+                `content.ilike.%${durationKeyword}%`
+            ]
+
+            return `and(${filters.join(',')})`
+        }))
+        .join(',')
+}
+
+async function searchKnowledgeBaseByPolicyDurationEvidence(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    if (!isPolicyDurationQuery(query)) return []
+
+    const subjectGroups = policyDurationSubjectKeywordGroups(query)
+    if (subjectGroups.length === 0) return []
+
+    const supabase = options?.supabase || await createClient()
+    const filters = policyDurationEvidenceFilters(subjectGroups)
+    if (!filters) return []
+
+    let policyQuery = supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, content, knowledge_documents(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .or(filters)
+
+    if (options?.collectionId) {
+        policyQuery = policyQuery.eq('knowledge_documents.collection_id', options.collectionId)
+    }
+    if (options?.type) {
+        policyQuery = policyQuery.eq('knowledge_documents.type', options.type)
+    }
+    if (options?.language) {
+        policyQuery = policyQuery.eq('knowledge_documents.language', options.language)
+    }
+
+    const { data, error } = await policyQuery.limit(Math.max(24, Math.min(80, limit * 3)))
+    if (error || !data) {
+        console.error('Policy-duration fallback search failed:', error)
+        return []
+    }
+
+    return (data as KeywordSearchRow[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => {
+            const documentTitle = row.knowledge_documents?.title ?? 'Untitled'
+            const content = row.content as string
+            const sourceUrl = extractSourceUrlFromContent(content)
+            const result = {
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: documentTitle,
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content,
+                similarity: 0.72
+            }
+            const durationScore = policyDurationEvidenceScore(query, sourceUrl, result)
+            const lexicalScore = lexicalMatchScore(query, `${documentTitle}\n${content}`)
+
+            return {
+                ...result,
+                similarity: Math.max(0.2, 0.72 + durationScore * 0.18 + lexicalScore * 0.12)
+            }
+        })
 }
 
 function policyDurationSubjectTokens(query: string) {

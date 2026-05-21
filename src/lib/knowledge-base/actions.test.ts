@@ -1781,6 +1781,45 @@ describe('searchKnowledgeBase', () => {
         })
     })
 
+    it('continues with keyword fallback when vector search exceeds the deadline', async () => {
+        vi.useFakeTimers()
+        try {
+            const { supabase, rpcMock } = createHybridSearchSupabase({
+                fallbackRows: [
+                    {
+                        id: 'kw-unpaid-leave-1',
+                        document_id: 'doc-leave-policy-1',
+                        content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\nSection: Madde 11- Ücretsiz izinler\n\nÜcretsiz izin süresi en fazla 1 (bir) yıldır.',
+                        knowledge_documents: {
+                            title: 'İzin Kullanımı Yönergesi',
+                            type: 'pdf',
+                            status: 'ready'
+                        }
+                    }
+                ],
+                titleRows: []
+            })
+            rpcMock.mockImplementationOnce(() => new Promise(() => {}))
+
+            const searchPromise = searchKnowledgeBase(
+                'personelin ücretsiz izin süresi ne kadar',
+                'org-1',
+                0.6,
+                3,
+                { supabase }
+            )
+            await vi.advanceTimersByTimeAsync(2501)
+            const results = await searchPromise
+
+            expect(results[0]).toMatchObject({
+                chunk_id: 'kw-unpaid-leave-1',
+                document_id: 'doc-leave-policy-1'
+            })
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it('keeps exact policy duration evidence for non-leave duration questions', async () => {
         const longExamCalendarText = Array.from({ length: 40 }, () =>
             'Mazeret sınavı takvimi, sınav salonları, öğrenci listeleri ve duyuru yayınlama süreçleri hakkında genel bilgi verir.'
