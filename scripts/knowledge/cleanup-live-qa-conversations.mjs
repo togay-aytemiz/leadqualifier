@@ -5,6 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 export const QA_TAGS = ['codex_live_qa', 'codex_yiu_demo_qa']
 export const QA_CONTACT_NAME_PREFIX = 'Codex YIU Demo QA'
 export const QA_CONTACT_PHONE_PREFIX = 'codex-live-yiu-demo-qa-'
+export const QA_CONTACT_NAME_PREFIXES = [QA_CONTACT_NAME_PREFIX, 'Codex Live QA']
+export const QA_CONTACT_PHONE_PREFIXES = [QA_CONTACT_PHONE_PREFIX, 'codex-live-rag-qa-']
 
 const DEFAULT_ORG_ID = '37222032-c2e8-4125-a027-be39eb6603f8'
 
@@ -96,11 +98,11 @@ export function isLiveQaConversation(conversation) {
 
   const contactName =
     typeof conversation.contact_name === 'string' ? conversation.contact_name.trim() : ''
-  if (contactName.startsWith(QA_CONTACT_NAME_PREFIX)) return true
+  if (QA_CONTACT_NAME_PREFIXES.some((prefix) => contactName.startsWith(prefix))) return true
 
   const contactPhone =
     typeof conversation.contact_phone === 'string' ? conversation.contact_phone.trim() : ''
-  return contactPhone.startsWith(QA_CONTACT_PHONE_PREFIX)
+  return QA_CONTACT_PHONE_PREFIXES.some((prefix) => contactPhone.startsWith(prefix))
 }
 
 async function fetchQaConversations(supabase, organizationId) {
@@ -109,7 +111,11 @@ async function fetchQaConversations(supabase, organizationId) {
     .select('id, contact_name, contact_phone, tags, created_at, last_message_at')
     .eq('organization_id', organizationId)
     .or(
-      `tags.cs.{${QA_TAGS.join(',')}},contact_name.ilike.${QA_CONTACT_NAME_PREFIX}%,contact_phone.ilike.${QA_CONTACT_PHONE_PREFIX}%`
+      [
+        `tags.cs.{${QA_TAGS.join(',')}}`,
+        ...QA_CONTACT_NAME_PREFIXES.map((prefix) => `contact_name.ilike.${prefix}%`),
+        ...QA_CONTACT_PHONE_PREFIXES.map((prefix) => `contact_phone.ilike.${prefix}%`),
+      ].join(',')
     )
     .order('created_at', { ascending: true })
 

@@ -27,6 +27,14 @@ describe('cleanup-live-qa-conversations helpers', () => {
 
     expect(
       isLiveQaConversation({
+        contact_name: 'Codex Live QA 10',
+        contact_phone: 'codex-live-rag-qa-2026-05-20T10-43-33-182Z-10',
+        tags: [],
+      })
+    ).toBe(true)
+
+    expect(
+      isLiveQaConversation({
         contact_name: 'Togay Aytemiz',
         contact_phone: '6418397365',
         tags: ['vip'],

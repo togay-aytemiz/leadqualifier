@@ -1,6 +1,10 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-21):** Yüksek İhtisas demo RAG retrieval now covers PDF-backed staff leave, TLT acronym/contact-table, and health-report mazeret-exam questions that previously fell back despite the evidence existing in the uploaded corpus. Hybrid search now uses token-bound lexical matching, focused multi-keyword coverage, and a narrow health-report exam policy reranker so schedule notices cannot outrank governing regulation chunks.
+
 > **Update Note (2026-05-21):** Public Demo Chat composer polish now matches the Yüksek İhtisas mobile-demo need: the fixed single-line input is replaced by an autosizing textarea, long questions grow the composer up to a controlled height, native scrollbars stay hidden while internal scrolling still works, the disclosure copy is shortened, loading feedback starts with a neutral `Düşünüyorum...` before source-specific messages, Enter sends while Shift+Enter inserts line breaks, and the only action inside the composer is the bottom-right send button.
+
+> **Update Note (2026-05-21):** Live QA cleanup now also covers earlier RAG-test conversations that appear in Inbox as `Codex Live QA` with `codex-live-rag-qa-` phone prefixes, so lingering Codex test traffic can be removed from pilot/demo organizations without widening deletion beyond deterministic QA markers.
 
 > **Update Note (2026-05-20):** Public Demo Chat sessions now stay browser-local per demo slug: a refresh keeps the same session and local message history, while the header reset action clears local messages and creates a new session so operators see the next test as a separate Inbox conversation. Demo Chat no longer appends the AI-disclaimer footer under every bot answer; the disclosure moved to the composer area, the input is vertically centered, loading copy rotates more slowly with a pulsing status dot, and `demo_chat` output preserves markdown emphasis plus repaired raw links for browser/operator rendering.
 
@@ -301,7 +305,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-21 (Public Demo Chat loading feedback now starts with a neutral thinking message while the composer keeps concise disclosure text and autosizing mobile-friendly scrolling without visible scrollbars.)
+> **Last Updated:** 2026-05-21 (Yüksek İhtisas demo RAG retrieval now answers PDF-backed staff leave, TLT acronym, and health-report mazeret-exam questions from the uploaded corpus.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -892,6 +896,7 @@
 - [x] **Usage & Billing Reliability:** Paginate storage fallback reads for Skills and Knowledge documents so `Settings > Usage` can show Knowledge document counts above 1000
 - [x] **Usage & Billing Reliability:** Reconcile historical current-period embedding overcharges back into `organization_billing_accounts` and ledger adjustments so sidebar remaining credits match corrected Usage totals
 - [x] **Knowledge Base RAG Reliability:** Add bounded title-document fallback and regulation/directive reranking so imported crawl/PDF corpora answer exact mevzuat questions from the matching source chunks
+- [x] **Knowledge Base RAG Reliability:** Add token-bound keyword matching, focused multi-keyword fallback, and health-report exam policy reranking so the YİÜ demo retrieves uploaded PDF/contact-table evidence for staff leave, TLT acronym, and mazeret-exam eligibility questions
 - [x] **Billing Lock Enforcement:** Add runtime entitlement re-check stages in shared inbound pipeline + Telegram webhook to stop follow-up AI calls after lock transition
 - [x] **Billing Lock Enforcement:** Block offering-profile suggestion/service-catalog/required-intake AI generation when organization usage is locked
 - [x] **Webhook Reliability:** Add Telegram inbound duplicate dedupe (`metadata.telegram_message_id`) to avoid duplicate processing and duplicate AI spend
@@ -1438,6 +1443,8 @@
 - [x] Add dashboard-wide performance refactor plan for Calendar, Settings, and workspace navigation (`docs/plans/2026-04-14-dashboard-performance-refactor-plan.md`)
 - [x] Add university admissions-season GTM sales plan with competitor scan, build-vs-buy objection handling, pilot package, demo strategy, and rector/IT/admissions stakeholder talk tracks (`docs/plans/2026-05-12-university-gtm-sales-plan.md`)
 - [x] Polish the public university Demo Chat composer with neutral first loading copy, a shorter disclosure, autosizing textarea, hidden native scrollbars, Enter/Shift+Enter keyboard behavior, and a single bottom-right send button for mobile demo use
+- [x] Extend safe live-QA cleanup to remove deterministic `Codex Live QA` / `codex-live-rag-qa-` RAG-test conversations from pilot Inbox views
+- [x] Re-check YİÜ demo uploaded PDFs/contact-table evidence and fix retrieval for the staff leave, TLT acronym, and health-report mazeret-exam questions observed in demo screenshots
 - [ ] Execute dashboard performance hardening before expanding pilot usage
   - [x] Add route/action timing harness across the dashboard shell, Settings layout, Calendar page, and Calendar page action
   - [ ] Capture baseline Calendar/Settings measurements with `DASHBOARD_PERF_DEBUG=1`

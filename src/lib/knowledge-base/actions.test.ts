@@ -460,6 +460,18 @@ function createHybridSearchSupabase(options?: {
             language?: string | null
         }
     }>
+    fallbackRowPages?: Array<Array<{
+        id: string
+        document_id: string
+        content: string
+        knowledge_documents: {
+            title: string
+            type: string
+            status: string
+            collection_id?: string | null
+            language?: string | null
+        }
+    }>>
     titleRows?: Array<{
         id: string
         title: string
@@ -517,21 +529,24 @@ function createHybridSearchSupabase(options?: {
 
     const titleRows = options?.titleRows ?? []
     const titleChunkRows = options?.titleChunkRows ?? []
+    const fallbackRowPages = options?.fallbackRowPages ?? [fallbackRows]
+    let fallbackLimitCallCount = 0
 
     const limitMock = vi.fn(async () => ({
-        data: fallbackRows,
+        data: fallbackRowPages[Math.min(fallbackLimitCallCount++, fallbackRowPages.length - 1)] ?? [],
         error: null
     }))
     const keywordChain: {
         eq: ReturnType<typeof vi.fn>
         or: ReturnType<typeof vi.fn>
+        limit: ReturnType<typeof vi.fn>
     } = {
         eq: vi.fn(),
-        or: vi.fn(() => ({
-            limit: limitMock
-        }))
+        or: vi.fn(),
+        limit: limitMock
     }
     keywordChain.eq.mockReturnValue(keywordChain)
+    keywordChain.or.mockReturnValue(keywordChain)
 
     const titleDocumentLimitMock = vi.fn(async () => ({
         data: titleRows,
@@ -1606,6 +1621,208 @@ describe('searchKnowledgeBase', () => {
         )
 
         expect(results[0]?.chunk_id).toBe('health-management-1')
+    })
+
+    it('rescues staff leave policy chunks when broad keyword fallback is crowded by substring-only matches', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRowPages: [
+                [
+                    {
+                        id: 'faq-crowded-1',
+                        document_id: 'doc-faq-crowded-1',
+                        content: 'Page Title: Sıkça Sorulan Sorular\nSource URL: https://example.edu.tr/sss\n\nSizin için ücretsiz psikolojik danışmanlık desteği vardır.',
+                        knowledge_documents: {
+                            title: 'Sıkça Sorulan Sorular',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    },
+                    {
+                        id: 'candidate-fees-1',
+                        document_id: 'doc-candidate-fees-1',
+                        content: 'Page Title: Aday Öğrenci\nSource URL: https://example.edu.tr/aday-ogrenci\n\nÜcretler, burslar ve kontenjanlar aday öğrenciler içindir.',
+                        knowledge_documents: {
+                            title: 'Aday Öğrenci',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ],
+                [
+                    {
+                        id: 'leave-policy-1',
+                        document_id: 'doc-leave-policy-1',
+                        content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Ücretsiz izinler aşağıdaki esaslara göre kullanılır. Ücretsiz izin süresi en fazla 1 (bir) yıldır.',
+                        knowledge_documents: {
+                            title: 'İzin Kullanımı Yönergesi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Personelin ücretsiz izin süresi nedir?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'leave-policy-1',
+            document_id: 'doc-leave-policy-1'
+        })
+    })
+
+    it('rescues acronym contact-table chunks for TLT abbreviation questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRowPages: [
+                [
+                    {
+                        id: 'erasmus-program-1',
+                        document_id: 'doc-erasmus-program-1',
+                        content: 'Page Title: Öğrenci Hareketliliği\nSource URL: https://example.edu.tr/erasmus\n\nErasmus program hareketliliği ve başvuru bilgileri.',
+                        knowledge_documents: {
+                            title: 'Öğrenci Hareketliliği',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ],
+                [
+                    {
+                        id: 'contact-tlt-1',
+                        document_id: 'doc-contact-tlt-1',
+                        content: 'Page Title: İletişim\nSource URL: https://example.edu.tr/iletisim\n\nTıbbi Laboratuvar Teknikleri Program Başkanı tlt@yiu.edu.tr.',
+                        knowledge_documents: {
+                            title: 'İletişim',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tlt hangi programın kısaltması olabilir?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'contact-tlt-1',
+            document_id: 'doc-contact-tlt-1'
+        })
+    })
+
+    it('rescues exam regulation chunks over exam calendar notices for health-report excuse questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRowPages: [
+                [
+                    {
+                        id: 'exam-calendar-1',
+                        document_id: 'doc-exam-calendar-1',
+                        content: 'Page Title: Sağlık Bilimleri Fakültesi Mazeret Sınav Takvimi\nSource URL: https://example.edu.tr/takvim\n\nMazeret sınav tarihleri ve öğrenci listesi yayınlanmıştır.',
+                        knowledge_documents: {
+                            title: 'Sağlık Bilimleri Fakültesi Mazeret Sınav Takvimi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ],
+                [
+                    {
+                        id: 'focused-calendar-1',
+                        document_id: 'doc-focused-calendar-1',
+                        content: 'Page Title: Sağlık Bilimleri Fakültesi Mazeret Sınav Takvimi\nSource URL: https://example.edu.tr/takvim-pdf\n\nSağlık Bilimleri Fakültesi mazeret sınav takvimi ve sınava girecek öğrenci listesi.',
+                        knowledge_documents: {
+                            title: 'Sağlık Bilimleri Fakültesi Mazeret Sınav Takvimi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    },
+                    {
+                        id: 'exam-regulation-1',
+                        document_id: 'doc-exam-regulation-1',
+                        content: 'Page Title: Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği\nSource URL: https://example.edu.tr/sinav-yonetmeligi.pdf\n\nSağlık mazereti nedeniyle sınavlara katılmayan öğrencilerin bu durumu sağlık raporu ile belgelendirmesi ve raporun ilgili birim yönetim kurulu tarafından kabul edilmesi gerekir. Sağlık raporu olduğu halde, sınava giren öğrencinin sınavı geçersiz sayılır.',
+                        knowledge_documents: {
+                            title: 'Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Sağlık raporu vermeden mazeret sınavına giremez miyim?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'exam-regulation-1',
+            document_id: 'doc-exam-regulation-1'
+        })
+    })
+
+    it('prefers health-report eligibility rules over calendar notices that share the same query terms', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'exam-calendar-vector-1',
+                    document_id: 'doc-exam-calendar-vector-1',
+                    document_title: 'Sağlık Bilimleri Fakültesi Mazeret Sınav Takvimi',
+                    document_type: 'article',
+                    content: 'Page Title: Sağlık Bilimleri Fakültesi Mazeret Sınav Takvimi\nSource URL: https://example.edu.tr/duyuru/mazeret-sinav-takvimi\n\nSağlık raporu olan öğrenciler için mazeret sınav takvimi ve sınava girecek öğrenci listesi yayınlanmıştır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRowPages: [
+                [],
+                [
+                    {
+                        id: 'exam-regulation-focused-1',
+                        document_id: 'doc-exam-regulation-focused-1',
+                        content: 'Page Title: Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği\nSource URL: https://example.edu.tr/sinav-yonetmeligi.pdf\n\nSağlık mazereti nedeniyle sınavlara katılmayan öğrencilerin bu durumu sağlık raporu ile belgelendirmesi ve raporun ilgili birim yönetim kurulu tarafından kabul edilmesi gerekir. Sağlık raporu olduğu halde, sınava giren öğrencinin sınavı geçersiz sayılır.',
+                        knowledge_documents: {
+                            title: 'Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Sağlık raporu vermeden mazeret sınavına giremez miyim?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'exam-regulation-focused-1',
+            document_id: 'doc-exam-regulation-focused-1'
+        })
     })
 })
 

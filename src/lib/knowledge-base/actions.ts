@@ -584,11 +584,12 @@ export async function searchKnowledgeBase(
         supabase
     }
     const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions)
+    const focusedKeywordResults = await searchKnowledgeBaseByFocusedKeywords(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const titleResults = await searchKnowledgeBaseByTitle(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const sourceResults = shouldUseSourcePathFallback(query)
         ? await searchKnowledgeBaseBySourcePath(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
         : []
-    const lexicalResults = [...fallbackResults, ...titleResults, ...sourceResults]
+    const lexicalResults = [...fallbackResults, ...focusedKeywordResults, ...titleResults, ...sourceResults]
 
     if ((!data || data.length === 0) && lexicalResults.length > 0) {
         return mergeSearchResults(query, [], lexicalResults, limit)
@@ -788,6 +789,25 @@ const KEYWORD_STOPWORDS = new Set([
     'nereye',
     'nerede',
     'nereden',
+    'mı',
+    'mi',
+    'mu',
+    'mü',
+    'miyim',
+    'miyiz',
+    'misin',
+    'musun',
+    'müsün',
+    'olabilir',
+    'olmadan',
+    'vermeden',
+    'girmeden',
+    'giremez',
+    'giremem',
+    'girebilir',
+    'acaba',
+    'lütfen',
+    'lutfen',
     'bulabilir',
     'göster',
     'goster',
@@ -877,6 +897,8 @@ function stemSearchToken(token: string): string {
         'ini',
         'ina',
         'ine',
+        'in',
+        'un',
         'nin',
         'imiz',
         'imizle',
@@ -953,13 +975,49 @@ function keywordGroups(query: string): string[][] {
         .filter((group) => group.length > 0)
 }
 
+function normalizedTokenSet(value: string) {
+    const normalized = normalizeSearchText(value)
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .trim()
+    const tokenSet = new Set<string>()
+    if (!normalized) return tokenSet
+
+    for (const token of normalized.split(/\s+/)) {
+        if (!token) continue
+        tokenSet.add(token)
+        tokenSet.add(stemSearchToken(token))
+    }
+
+    return tokenSet
+}
+
+function keywordGroupMatchesValue(group: string[], value: string, tokenSet: Set<string>) {
+    const haystack = normalizeSearchText(value)
+
+    return group.some((keyword) => {
+        const normalized = normalizeSearchText(keyword).trim()
+        if (!normalized) return false
+
+        if (normalized.includes(' ')) {
+            return haystack.includes(normalized)
+        }
+
+        const stemmed = stemSearchToken(normalized)
+        if (tokenSet.has(normalized) || tokenSet.has(stemmed)) return true
+
+        // Long variants can legitimately appear inside inflected forms or URL slugs.
+        // Short Turkish words such as "izin" must stay token-bound so "sizin" cannot match.
+        return normalized.length >= 5 && haystack.includes(normalized)
+    })
+}
+
 function lexicalMatchScore(query: string, value: string) {
     const groups = keywordGroups(query)
     if (groups.length === 0) return 0
 
-    const haystack = normalizeSearchText(value)
+    const tokenSet = normalizedTokenSet(value)
     const hits = groups.filter((group) => {
-        return group.some((keyword) => haystack.includes(normalizeSearchText(keyword)))
+        return keywordGroupMatchesValue(group, value, tokenSet)
     }).length
 
     return hits / groups.length
@@ -1423,6 +1481,46 @@ function rootContactInformationScore(query: string, sourceUrl: string, result: K
     return 0.42 + contentScore * 0.28
 }
 
+function isHealthReportExcuseExamQuery(query: string) {
+    const normalized = normalizeSearchText(query)
+
+    return normalized.includes('rapor')
+        && normalized.includes('mazeret')
+        && (normalized.includes('sinav') || normalized.includes('gire'))
+}
+
+function healthReportExamPolicyScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!isHealthReportExcuseExamQuery(query)) return 0
+
+    const title = normalizeSearchText(result.document_title ?? '')
+    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    const hasPolicyDocumentSignal = title.includes('yonetmel') || title.includes('yonerge')
+    const hasRuleEvidence = searchable.includes('belgelendirm')
+        || searchable.includes('yonetim kurulu')
+        || searchable.includes('gecersiz sayilir')
+        || searchable.includes('raporlu ogrenci')
+    const hasCalendarNoticeSignal = searchable.includes('takvim')
+        || searchable.includes('ogrenci listesi')
+        || searchable.includes('yayinlanmistir')
+        || searchable.includes('yayimlanmistir')
+        || sourcePath(sourceUrl).startsWith('/duyuru/')
+
+    let score = 0
+
+    if (searchable.includes('saglik raporu')) score += 0.16
+    if (hasPolicyDocumentSignal && searchable.includes('sinav')) score += 0.18
+    if (searchable.includes('belgelendirm')) score += 0.18
+    if (searchable.includes('yonetim kurulu')) score += 0.14
+    if (searchable.includes('gecersiz sayilir')) score += 0.18
+    if (searchable.includes('raporlu ogrenci') && searchable.includes('sinavlara giremez')) score += 0.18
+
+    if (hasCalendarNoticeSignal && !hasRuleEvidence) {
+        score -= 0.36
+    }
+
+    return score
+}
+
 function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
     const similarity = Number.isFinite(result.similarity) ? Number(result.similarity) : 0
     const sourceUrl = sourceUrlFromResult(result) ?? ''
@@ -1441,6 +1539,7 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + pageTypeScore(query, sourceUrl)
         + directIntentScore(query, sourceUrl, result)
         + rootContactInformationScore(query, sourceUrl, result)
+        + healthReportExamPolicyScore(query, sourceUrl, result)
 }
 
 function enrichKnowledgeSearchResult(result: KnowledgeSearchResult): KnowledgeSearchResult {
@@ -1529,6 +1628,141 @@ async function searchKnowledgeBaseByKeyword(
                 0.45 + lexicalMatchScore(query, `${row.knowledge_documents?.title ?? ''}\n${row.content}`) * 0.25
             )
         }))
+}
+
+const MAX_FOCUSED_KEYWORD_QUERIES = 6
+
+function keywordGroupKey(group: string[]) {
+    return group
+        .map((keyword) => stemSearchToken(keyword))
+        .sort()
+        .join('|')
+}
+
+function keywordGroupSetsForFocusedSearch(query: string) {
+    const groups = keywordGroups(query)
+    if (groups.length < 2) return []
+
+    const groupSets: string[][][] = []
+    const seen = new Set<string>()
+    const addGroupSet = (indexes: number[]) => {
+        const selectedGroups = indexes
+            .map((index) => groups[index])
+            .filter((group): group is string[] => Boolean(group?.length))
+
+        if (selectedGroups.length < 2) return
+
+        const key = selectedGroups.map(keywordGroupKey).join('&&')
+        if (seen.has(key)) return
+        seen.add(key)
+        groupSets.push(selectedGroups)
+    }
+
+    for (let index = 0; index < groups.length - 1; index += 1) {
+        addGroupSet([index, index + 1])
+    }
+
+    for (let index = 0; index < groups.length - 2; index += 1) {
+        addGroupSet([index, index + 1, index + 2])
+    }
+
+    const acronymIndex = groups.findIndex((group) => {
+        return group.some((keyword) => /^[a-z0-9]{2,5}$/.test(normalizeSearchText(keyword)))
+    })
+    if (acronymIndex >= 0) {
+        for (let index = 0; index < groups.length; index += 1) {
+            if (index !== acronymIndex) addGroupSet([acronymIndex, index])
+        }
+    }
+
+    for (let left = 0; left < groups.length - 1; left += 1) {
+        for (let right = left + 1; right < groups.length; right += 1) {
+            addGroupSet([left, right])
+        }
+    }
+
+    return groupSets.slice(0, MAX_FOCUSED_KEYWORD_QUERIES)
+}
+
+function keywordGroupContentFilter(group: string[]) {
+    const filters = Array.from(new Set(group.map(sanitizeKeyword)))
+        .filter((keyword) => keyword.length >= 3)
+        .map((keyword) => `content.ilike.%${keyword}%`)
+
+    return filters.join(',')
+}
+
+async function searchKnowledgeBaseByFocusedKeywords(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const supabase = options?.supabase || await createClient()
+    const groupSets = keywordGroupSetsForFocusedSearch(query)
+    if (groupSets.length === 0) return []
+
+    const results: KnowledgeSearchResult[] = []
+    const seenChunks = new Set<string>()
+    const focusedLimit = Math.max(12, Math.min(32, limit))
+
+    for (const groupSet of groupSets) {
+        let focusedQuery = supabase
+            .from('knowledge_chunks')
+            .select('id, document_id, content, knowledge_documents(title, type, status, collection_id, language)')
+            .eq('organization_id', organizationId)
+
+        for (const group of groupSet) {
+            const filters = keywordGroupContentFilter(group)
+            if (filters) {
+                focusedQuery = focusedQuery.or(filters)
+            }
+        }
+
+        if (options?.collectionId) {
+            focusedQuery = focusedQuery.eq('knowledge_documents.collection_id', options.collectionId)
+        }
+        if (options?.type) {
+            focusedQuery = focusedQuery.eq('knowledge_documents.type', options.type)
+        }
+        if (options?.language) {
+            focusedQuery = focusedQuery.eq('knowledge_documents.language', options.language)
+        }
+
+        const { data, error } = await focusedQuery.limit(focusedLimit)
+        if (error || !data) {
+            console.error('Focused keyword fallback search failed:', error)
+            continue
+        }
+
+        for (const row of data as KeywordSearchRow[]) {
+            if (row.knowledge_documents?.status !== 'ready') continue
+            if (seenChunks.has(row.id)) continue
+
+            seenChunks.add(row.id)
+            const content = row.content as string
+            const documentTitle = row.knowledge_documents?.title ?? 'Untitled'
+            const coverage = lexicalMatchScore(query, `${documentTitle}\n${content}`)
+
+            results.push({
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: documentTitle,
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content,
+                similarity: Math.max(0.25, 0.56 + coverage * 0.3)
+            })
+        }
+
+        if (results.length >= limit * 3) break
+    }
+
+    return results
 }
 
 async function searchKnowledgeBaseByTitle(
