@@ -65,6 +65,7 @@ import {
     processKnowledgeDocument,
     searchKnowledgeBase
 } from '@/lib/knowledge-base/actions'
+import { buildRagContext } from '@/lib/knowledge-base/rag'
 
 function createCollectionsSupabase() {
     const collectionsEqMock = vi.fn(async () => ({
@@ -1677,6 +1678,65 @@ describe('searchKnowledgeBase', () => {
             chunk_id: 'leave-policy-1',
             document_id: 'doc-leave-policy-1'
         })
+    })
+
+    it('keeps unpaid staff leave duration evidence inside the RAG context despite crowded staff matches', async () => {
+        const longStaffMobilityText = Array.from({ length: 40 }, () =>
+            'Personelin aktarmalı olarak seyahat etmesi, faaliyet süresini tamamlaması ve hareketlilik hibe tutarları açıklanır.'
+        ).join(' ')
+        const longAnnualLeaveText = Array.from({ length: 35 }, () =>
+            'Yıllık Ücretli İzin Süreleri Madde 6- Akademik ve İdari personelin yıllık hizmetlerine göre izin süreleri 14, 20 ve 26 iş günüdür.'
+        ).join(' ')
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'erasmus-staff-mobility-1',
+                    document_id: 'doc-erasmus-staff-mobility-1',
+                    document_title: 'Personel Hareketliliği',
+                    document_type: 'article',
+                    content: `Page Title: Personel Hareketliliği\nSource URL: https://example.edu.tr/erasmus/personel-hareketliligi\n\n${longStaffMobilityText}`,
+                    similarity: 0.99
+                }
+            ],
+            fallbackRowPages: [
+                [
+                    {
+                        id: 'annual-paid-leave-1',
+                        document_id: 'doc-leave-policy-1',
+                        content: `Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\n${longAnnualLeaveText}`,
+                        knowledge_documents: {
+                            title: 'İzin Kullanımı Yönergesi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ],
+                [
+                    {
+                        id: 'unpaid-leave-duration-1',
+                        document_id: 'doc-leave-policy-1',
+                        content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Ücretsiz izinler aşağıdaki esaslara göre kullanılır. a) Ücretsiz izin süresi en fazla 1 (bir) yıldır. b) Akademik Personel için ücretsiz izin onay süreci belirtilir. c) İdari personelin talep ettiği ücretsiz izinler ilgili onaylarla verilir.',
+                        knowledge_documents: {
+                            title: 'İzin Kullanımı Yönergesi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'personelin ücretsiz izin süresi ne kadar',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(context).toContain('Ücretsiz izin süresi en fazla 1 (bir) yıldır.')
     })
 
     it('rescues acronym contact-table chunks for TLT abbreviation questions', async () => {

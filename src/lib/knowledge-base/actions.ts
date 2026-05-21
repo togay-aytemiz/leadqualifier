@@ -1832,6 +1832,53 @@ function healthReportExamPolicyScore(query: string, sourceUrl: string, result: K
     return score
 }
 
+function isStaffUnpaidLeaveDurationQuery(query: string) {
+    const normalized = normalizeSearchText(query)
+
+    return normalized.includes('ucretsiz')
+        && normalized.includes('izin')
+        && (normalized.includes('personel')
+            || normalized.includes('akademik')
+            || normalized.includes('idari')
+            || normalized.includes('calisan'))
+        && (normalized.includes('sure')
+            || normalized.includes('suresi')
+            || normalized.includes('kadar')
+            || normalized.includes('kac')
+            || normalized.includes('azami')
+            || normalized.includes('en fazla'))
+}
+
+function staffUnpaidLeaveDurationPolicyScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!isStaffUnpaidLeaveDurationQuery(query)) return 0
+
+    const title = normalizeSearchText(result.document_title ?? '')
+    const sourcePathText = normalizeSearchText(sourcePath(sourceUrl))
+    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    const hasUnpaidLeaveDuration = searchable.includes('ucretsiz izin suresi')
+        || searchable.includes('ucretsiz izinler')
+            && searchable.includes('suresi en fazla')
+    const hasOneYearLimit = /\ben fazla\s+1\s*(?:\(bir\)\s*)?yil/.test(searchable)
+        || /\b1\s*(?:\(bir\)\s*)?yildir\b/.test(searchable)
+    const hasErasmusStaffMobilitySignal = title.includes('personel hareketliligi')
+        || sourcePathText.includes('erasmus')
+        || searchable.includes('personel hareketliligi')
+    let score = 0
+
+    if (title.includes('izin kullanimi yonergesi')) score += 0.6
+    if (hasUnpaidLeaveDuration) score += 0.9
+    if (hasOneYearLimit) score += 0.45
+    if (searchable.includes('madde 11') && searchable.includes('ucretsiz izin')) score += 0.24
+    if (searchable.includes('akademik personel') || searchable.includes('idari personel')) score += 0.12
+    if (sourceUrl.toLowerCase().includes('.pdf')) score += 0.08
+
+    if (hasErasmusStaffMobilitySignal && !searchable.includes('ucretsiz izin')) score -= 1
+    if (searchable.includes('yillik ucretli izin') && !hasUnpaidLeaveDuration) score -= 0.45
+    if (searchable.includes('sut izni') && !hasUnpaidLeaveDuration) score -= 0.2
+
+    return score
+}
+
 function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
     const similarity = Number.isFinite(result.similarity) ? Number(result.similarity) : 0
     const sourceUrl = sourceUrlFromResult(result) ?? ''
@@ -1851,6 +1898,7 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + directIntentScore(query, sourceUrl, result)
         + rootContactInformationScore(query, sourceUrl, result)
         + healthReportExamPolicyScore(query, sourceUrl, result)
+        + staffUnpaidLeaveDurationPolicyScore(query, sourceUrl, result)
         + documentCodeLookupScore(query, result)
         + abbreviationLookupScore(query, result)
         + abbreviationInitialismScore(query, result.document_title)

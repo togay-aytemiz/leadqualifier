@@ -257,6 +257,63 @@ function includesAny(normalized: string, terms: string[]) {
     return terms.some((term) => normalized.includes(term))
 }
 
+function asksForStaffUnpaidLeaveDuration(normalizedUserMessage: string) {
+    return normalizedUserMessage.includes('ucretsiz')
+        && normalizedUserMessage.includes('izin')
+        && (normalizedUserMessage.includes('personel')
+            || normalizedUserMessage.includes('akademik')
+            || normalizedUserMessage.includes('idari')
+            || normalizedUserMessage.includes('calisan'))
+        && (normalizedUserMessage.includes('sure')
+            || normalizedUserMessage.includes('suresi')
+            || normalizedUserMessage.includes('kadar')
+            || normalizedUserMessage.includes('kac')
+            || normalizedUserMessage.includes('azami')
+            || normalizedUserMessage.includes('en fazla'))
+}
+
+function responseAlreadyHasOneYearLimit(response: string) {
+    return /\b1\s*(?:\(bir\)\s*)?yil/.test(normalizeSearch(response))
+}
+
+function extractStaffUnpaidLeaveDurationSentence(content: string) {
+    const normalizedContent = content.replace(/\s+/g, ' ').trim()
+    const match = normalizedContent.match(/Ücretsiz\s+izin\s+süresi\s+[^.?!]*(?:yıldır|yildir|yıl|yil)/iu)
+    if (!match?.[0]) return null
+
+    return match[0]
+        .replace(/\s+/g, ' ')
+        .replace(/[;,.!?]+$/g, '')
+        .trim()
+}
+
+function repairStaffUnpaidLeaveDurationAnswer(input: {
+    response: string
+    userMessage: string
+    responseLanguage: MvpResponseLanguage
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!asksForStaffUnpaidLeaveDuration(normalizedUserMessage)) return null
+    if (responseAlreadyHasOneYearLimit(input.response)) return null
+
+    const durationSentence = input.chunks
+        .map((chunk) => extractStaffUnpaidLeaveDurationSentence(chunk.content))
+        .find((value): value is string => Boolean(value))
+    if (!durationSentence) return null
+
+    if (input.responseLanguage === 'en') {
+        return 'Staff unpaid leave duration is at most 1 (one) year.'
+    }
+
+    const staffSentence = durationSentence.replace(
+        /^Ücretsiz\s+izin\s+süresi/iu,
+        'Personelin ücretsiz izin süresi'
+    )
+
+    return `${staffSentence}.`
+}
+
 function isArticleAnswerMissingImportantTerms(response: string, articleText: string, articleNumber: number) {
     const normalizedResponse = normalizeSearch(stripGenericAssistantContinuation(response))
     const normalizedArticle = normalizeSearch(articleText)
@@ -314,6 +371,12 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (senatoMeetingNumberRepair) return senatoMeetingNumberRepair
+
+    const staffUnpaidLeaveDurationRepair = repairStaffUnpaidLeaveDurationAnswer({
+        ...input,
+        response
+    })
+    if (staffUnpaidLeaveDurationRepair) return staffUnpaidLeaveDurationRepair
 
     const articleNumber = requestedArticleNumber(input.userMessage)
     if (!articleNumber) return response

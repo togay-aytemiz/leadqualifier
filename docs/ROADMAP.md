@@ -1,5 +1,9 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-21):** YİÜ demo RAG must keep the specific unpaid-staff-leave duration sentence inside context when broad staff/personnel matches compete with the governing PDF. Retrieval now boosts `İzin Kullanımı Yönergesi` chunks that explicitly state `Ücretsiz izin süresi en fazla 1 (bir) yıldır`, demotes Erasmus/personel-hareketliliği and annual-paid-leave distractions for that intent, and repairs a model no-information response from the retrieved policy sentence when needed.
+
+> **Update Note (2026-05-21):** Live QA cleanup now also covers the newer `Codex YIU Mevzuat QA` conversations, `codex-live-yiu-mevzuat-qa-` phone prefixes, and ad-hoc demo-chat sessions whose generated session id starts with `codex-`, so deterministic Codex QA/debug records can be removed from the YİÜ pilot Inbox without matching normal `Demo ziyaretçi` sessions.
+
 > **Update Note (2026-05-21):** Public Demo Chat now avoids platform 504s on slow university RAG replies. The demo API returns a fast `202 pending` response after a short sync deadline, keeps the shared inbound AI pipeline running after the response, tags persisted bot messages with the originating demo message id, and the browser polls a `GET` endpoint until the answer is ready instead of showing a send failure.
 
 > **Update Note (2026-05-21):** Yüksek İhtisas demo RAG retrieval now covers PDF-backed staff leave, TLT acronym/contact-table, and health-report mazeret-exam questions that previously fell back despite the evidence existing in the uploaded corpus. Hybrid search now uses token-bound lexical matching, focused multi-keyword coverage, and a narrow health-report exam policy reranker so schedule notices cannot outrank governing regulation chunks.
@@ -307,7 +311,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-21 (Public Demo Chat now soft-times out slow AI/RAG answers into a pending/polling flow instead of surfacing platform 504 send failures.)
+> **Last Updated:** 2026-05-21 (YİÜ staff unpaid-leave duration retrieval now keeps the exact `1 (bir) yıl` policy sentence in RAG context and repairs no-information answers from that evidence.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1450,8 +1454,10 @@
 - [x] Add university admissions-season GTM sales plan with competitor scan, build-vs-buy objection handling, pilot package, demo strategy, and rector/IT/admissions stakeholder talk tracks (`docs/plans/2026-05-12-university-gtm-sales-plan.md`)
 - [x] Polish the public university Demo Chat composer with neutral first loading copy, a shorter disclosure, autosizing textarea, hidden native scrollbars, Enter/Shift+Enter keyboard behavior, and a single bottom-right send button for mobile demo use
 - [x] Prevent public Demo Chat 504 send failures by converting slow shared-pipeline replies into a pending/polling response flow
+- [x] Extend safe live-QA cleanup to remove deterministic `Codex YIU Mevzuat QA` / `codex-live-yiu-mevzuat-qa-` conversations plus ad-hoc `codex-` demo-chat sessions from pilot Inbox views
 - [x] Extend safe live-QA cleanup to remove deterministic `Codex Live QA` / `codex-live-rag-qa-` RAG-test conversations from pilot Inbox views
 - [x] Re-check YİÜ demo uploaded PDFs/contact-table evidence and fix retrieval for the staff leave, TLT acronym, and health-report mazeret-exam questions observed in demo screenshots
+- [x] Keep YİÜ staff unpaid-leave duration evidence inside RAG context and repair no-information replies from the retrieved `Ücretsiz izin süresi en fazla 1 (bir) yıldır` policy sentence
 - [ ] Execute dashboard performance hardening before expanding pilot usage
   - [x] Add route/action timing harness across the dashboard shell, Settings layout, Calendar page, and Calendar page action
   - [ ] Capture baseline Calendar/Settings measurements with `DASHBOARD_PERF_DEBUG=1`

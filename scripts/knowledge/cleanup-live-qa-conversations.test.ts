@@ -4,6 +4,9 @@ import {
   normalizeCleanupArgs,
   QA_CONTACT_NAME_PREFIX,
   QA_CONTACT_PHONE_PREFIX,
+  QA_DEMO_CHAT_CODEX_SESSION_MARKER,
+  QA_MEVZUAT_CONTACT_NAME_PREFIX,
+  QA_MEVZUAT_CONTACT_PHONE_PREFIX,
   QA_TAGS,
 } from './cleanup-live-qa-conversations.mjs'
 
@@ -35,6 +38,22 @@ describe('cleanup-live-qa-conversations helpers', () => {
 
     expect(
       isLiveQaConversation({
+        contact_name: 'Codex YIU Mevzuat QA 11',
+        contact_phone: 'codex-live-yiu-mevzuat-qa-2026-05-21T09-05-50-670Z-11',
+        tags: [],
+      })
+    ).toBe(true)
+
+    expect(
+      isLiveQaConversation({
+        contact_name: 'Demo ziyaretçi',
+        contact_phone: 'demo:dd291fa7-9886-451e-84ce-13e44cacc91e:codex-local-rag-fix-1779347396409',
+        tags: [],
+      })
+    ).toBe(true)
+
+    expect(
+      isLiveQaConversation({
         contact_name: 'Togay Aytemiz',
         contact_phone: '6418397365',
         tags: ['vip'],
@@ -48,8 +67,11 @@ describe('cleanup-live-qa-conversations helpers', () => {
   })
 
   it('exports the exact cleanup guard markers', () => {
-    expect(QA_TAGS).toEqual(['codex_live_qa', 'codex_yiu_demo_qa'])
+    expect(QA_TAGS).toEqual(['codex_live_qa', 'codex_yiu_demo_qa', 'codex_yiu_mevzuat_qa'])
     expect(QA_CONTACT_NAME_PREFIX).toBe('Codex YIU Demo QA')
     expect(QA_CONTACT_PHONE_PREFIX).toBe('codex-live-yiu-demo-qa-')
+    expect(QA_MEVZUAT_CONTACT_NAME_PREFIX).toBe('Codex YIU Mevzuat QA')
+    expect(QA_MEVZUAT_CONTACT_PHONE_PREFIX).toBe('codex-live-yiu-mevzuat-qa-')
+    expect(QA_DEMO_CHAT_CODEX_SESSION_MARKER).toBe(':codex-')
   })
 })

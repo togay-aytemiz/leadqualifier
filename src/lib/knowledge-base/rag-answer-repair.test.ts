@@ -174,6 +174,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('13 sayılı Senato toplantısında')
     })
 
+    it('repairs no-information answers when staff unpaid leave duration is explicit in the retrieved policy', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok. Ücretsiz izin süresi hakkında detaylı bilgi almak için ilgili birimle iletişime geçmeni öneririm.',
+            userMessage: 'personelin ücretsiz izin süresi ne kadar',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Ücretsiz izinler aşağıdaki esaslara göre kullanılır. a) Ücretsiz izin süresi en fazla 1 (bir) yıldır. b) Akademik Personel için ücretsiz izin onay süreci belirtilir. c) İdari personelin talep ettiği ücretsiz izinler ilgili onaylarla verilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Personelin ücretsiz izin süresi en fazla 1 (bir) yıldır.')
+    })
+
     it('leaves factual answers unchanged', () => {
         const response = 'Bu yönergenin amacı, etik kuralları ve kurul sorumluluklarını düzenlemektir.'
         const repaired = repairLinkOnlyRagAnswer({

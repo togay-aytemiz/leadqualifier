@@ -2,11 +2,22 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
-export const QA_TAGS = ['codex_live_qa', 'codex_yiu_demo_qa']
+export const QA_TAGS = ['codex_live_qa', 'codex_yiu_demo_qa', 'codex_yiu_mevzuat_qa']
 export const QA_CONTACT_NAME_PREFIX = 'Codex YIU Demo QA'
+export const QA_MEVZUAT_CONTACT_NAME_PREFIX = 'Codex YIU Mevzuat QA'
 export const QA_CONTACT_PHONE_PREFIX = 'codex-live-yiu-demo-qa-'
-export const QA_CONTACT_NAME_PREFIXES = [QA_CONTACT_NAME_PREFIX, 'Codex Live QA']
-export const QA_CONTACT_PHONE_PREFIXES = [QA_CONTACT_PHONE_PREFIX, 'codex-live-rag-qa-']
+export const QA_MEVZUAT_CONTACT_PHONE_PREFIX = 'codex-live-yiu-mevzuat-qa-'
+export const QA_DEMO_CHAT_CODEX_SESSION_MARKER = ':codex-'
+export const QA_CONTACT_NAME_PREFIXES = [
+  QA_CONTACT_NAME_PREFIX,
+  QA_MEVZUAT_CONTACT_NAME_PREFIX,
+  'Codex Live QA',
+]
+export const QA_CONTACT_PHONE_PREFIXES = [
+  QA_CONTACT_PHONE_PREFIX,
+  QA_MEVZUAT_CONTACT_PHONE_PREFIX,
+  'codex-live-rag-qa-',
+]
 
 const DEFAULT_ORG_ID = '37222032-c2e8-4125-a027-be39eb6603f8'
 
@@ -102,6 +113,8 @@ export function isLiveQaConversation(conversation) {
 
   const contactPhone =
     typeof conversation.contact_phone === 'string' ? conversation.contact_phone.trim() : ''
+  if (contactPhone.includes(QA_DEMO_CHAT_CODEX_SESSION_MARKER)) return true
+
   return QA_CONTACT_PHONE_PREFIXES.some((prefix) => contactPhone.startsWith(prefix))
 }
 
@@ -115,6 +128,7 @@ async function fetchQaConversations(supabase, organizationId) {
         `tags.cs.{${QA_TAGS.join(',')}}`,
         ...QA_CONTACT_NAME_PREFIXES.map((prefix) => `contact_name.ilike.${prefix}%`),
         ...QA_CONTACT_PHONE_PREFIXES.map((prefix) => `contact_phone.ilike.${prefix}%`),
+        'contact_phone.ilike.demo:%:codex-%',
       ].join(',')
     )
     .order('created_at', { ascending: true })
