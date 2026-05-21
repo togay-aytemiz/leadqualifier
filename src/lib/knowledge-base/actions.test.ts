@@ -621,14 +621,21 @@ function createHybridSearchSupabase(options?: {
     }
 }
 
-function createProcessKnowledgeDocumentSupabase() {
+function createProcessKnowledgeDocumentSupabase(documentOverrides: Partial<{
+    id: string
+    organization_id: string
+    title: string
+    content: string
+}> = {}) {
+    const document = {
+        id: 'doc-1',
+        organization_id: 'org-1',
+        title: 'Tıp Fakültesi Kurulları',
+        content: 'Board of Coordinators\nProf. Dr. Ayla KURKCUOGLU',
+        ...documentOverrides
+    }
     const documentSingleMock = vi.fn(async () => ({
-        data: {
-            id: 'doc-1',
-            organization_id: 'org-1',
-            title: 'Tıp Fakültesi Kurulları',
-            content: 'Board of Coordinators\nProf. Dr. Ayla KURKCUOGLU'
-        },
+        data: document,
         error: null
     }))
     const documentEqMock = vi.fn(() => ({
@@ -646,10 +653,7 @@ function createProcessKnowledgeDocumentSupabase() {
 
     const readySingleMock = vi.fn(async () => ({
         data: {
-            id: 'doc-1',
-            organization_id: 'org-1',
-            title: 'Tıp Fakültesi Kurulları',
-            content: 'Board of Coordinators\nProf. Dr. Ayla KURKCUOGLU',
+            ...document,
             status: 'ready'
         },
         error: null
@@ -1739,6 +1743,44 @@ describe('searchKnowledgeBase', () => {
         expect(context).toContain('Ücretsiz izin süresi en fazla 1 (bir) yıldır.')
     })
 
+    it('prefers exact leave-type duration evidence over nearby mazeret leave durations', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'relative-death-leave-1',
+                    document_id: 'doc-leave-policy-1',
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 9- d) Personelin eşinin anne, baba veya kardeşinin ölümünde 3 (üç) iş günü, mazeret izini verilir.',
+                    similarity: 0.99
+                },
+                {
+                    chunk_id: 'unpaid-leave-duration-1',
+                    document_id: 'doc-leave-policy-1',
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Ücretsiz izinler aşağıdaki esaslara göre kullanılır. a) Ücretsiz izin süresi en fazla 1 (bir) yıldır.',
+                    similarity: 0.62
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'personelin ücretsiz izin süresi ne kadar',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'unpaid-leave-duration-1',
+            document_id: 'doc-leave-policy-1'
+        })
+    })
+
     it('keeps exact policy duration evidence for non-leave duration questions', async () => {
         const longExamCalendarText = Array.from({ length: 40 }, () =>
             'Mazeret sınavı takvimi, sınav salonları, öğrenci listeleri ve duyuru yayınlama süreçleri hakkında genel bilgi verir.'
@@ -2115,5 +2157,65 @@ describe('processKnowledgeDocument', () => {
                 content: expect.stringContaining('Document Title: Tıp Fakültesi Kurulları')
             })
         ])
+    })
+
+    it('stores legal article sections as separate indexed chunks with section metadata', async () => {
+        generateEmbeddingsMock.mockResolvedValueOnce([
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6],
+            [0.7, 0.8, 0.9]
+        ])
+        const { supabase, insertMock } = createProcessKnowledgeDocumentSupabase({
+            title: 'İzin Kullanımı Yönergesi',
+            content: [
+                'MADDE 9 - Mazeret İzni',
+                'Personelin eşinin anne, baba veya kardeşinin ölümünde 3 (üç) iş günü mazeret izni verilir.',
+                '',
+                'MADDE 10 - Yıllık İzin',
+                'Yıllık izin talepleri ilgili amirin onayı ile kullanılır.',
+                '',
+                'MADDE 11 - Ücretsiz İzin',
+                'Ücretsiz izin süresi en fazla 1 (bir) yıldır.'
+            ].join('\n')
+        })
+
+        await processKnowledgeDocument('doc-1', supabase)
+
+        const embeddedContents = generateEmbeddingsMock.mock.calls.at(-1)?.[0] as string[]
+        expect(embeddedContents).toHaveLength(3)
+        expect(embeddedContents[0]).toContain('Section: MADDE 9 - Mazeret İzni')
+        expect(embeddedContents[2]).toContain('Section: MADDE 11 - Ücretsiz İzin')
+        expect(embeddedContents[2]).toContain('Ücretsiz izin süresi en fazla 1 (bir) yıldır.')
+        expect(embeddedContents[2]).not.toContain('3 (üç) iş günü')
+        expect(insertMock).toHaveBeenCalledWith(expect.arrayContaining([
+            expect.objectContaining({
+                chunk_index: 2,
+                content: expect.stringContaining('Section: MADDE 11 - Ücretsiz İzin')
+            })
+        ]))
+    })
+
+    it('uses the same section-aware chunking for non-regulation document headings', async () => {
+        generateEmbeddingsMock.mockResolvedValueOnce([
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6]
+        ])
+        const { supabase } = createProcessKnowledgeDocumentSupabase({
+            title: 'Aday Öğrenci Bilgilendirme',
+            content: [
+                'BAŞVURU ŞARTLARI',
+                'Aday öğrenciler başvuru formunu eksiksiz doldurmalıdır.',
+                '',
+                'İLETİŞİM BİLGİLERİ',
+                'Aday öğrenci ofisine telefon ve e-posta ile ulaşılabilir.'
+            ].join('\n')
+        })
+
+        await processKnowledgeDocument('doc-1', supabase)
+
+        const embeddedContents = generateEmbeddingsMock.mock.calls.at(-1)?.[0] as string[]
+        expect(embeddedContents).toHaveLength(2)
+        expect(embeddedContents[0]).toContain('Section: BAŞVURU ŞARTLARI')
+        expect(embeddedContents[1]).toContain('Section: İLETİŞİM BİLGİLERİ')
     })
 })

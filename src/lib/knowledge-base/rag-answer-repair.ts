@@ -303,6 +303,23 @@ const DURATION_QUERY_SUBJECT_STOPWORDS = new Set([
     'saat',
     'dakika'
 ])
+const DURATION_QUERY_ACTOR_TOKENS = new Set([
+    'aday',
+    'akademik',
+    'calisan',
+    'idari',
+    'ogrenci',
+    'personel'
+])
+const DURATION_QUERY_GENERIC_SUBJECT_TOKENS = new Set([
+    'basvuru',
+    'egitim',
+    'izin',
+    'muafiyet',
+    'rapor',
+    'sinav',
+    'staj'
+])
 
 function stemDurationToken(token: string) {
     const normalized = normalizeSearch(token)
@@ -394,6 +411,27 @@ function durationSubjectCoverage(tokens: string[], value: string) {
     return hits / tokens.length
 }
 
+function durationRequiredSubjectTokens(tokens: string[]) {
+    return tokens.filter((token) => (
+        !DURATION_QUERY_ACTOR_TOKENS.has(token)
+        && !DURATION_QUERY_GENERIC_SUBJECT_TOKENS.has(token)
+    ))
+}
+
+function durationHasRequiredSubjectTokens(tokens: string[], value: string) {
+    if (tokens.length === 0) return true
+    const normalized = normalizeSearch(value)
+    const normalizedTokens = new Set(
+        normalized
+            .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+            .split(/\s+/)
+            .filter(Boolean)
+            .flatMap((token) => [token, stemDurationToken(token)])
+    )
+
+    return tokens.every((token) => normalizedTokens.has(token) || normalized.includes(token))
+}
+
 function cleanDurationEvidenceSentence(value: string) {
     return value
         .replace(/^(?:Madde|MADDE)\s+\d+\s*[-–—]?\s*/u, '')
@@ -415,11 +453,12 @@ function splitDurationCandidateSentences(content: string) {
         .filter((sentence) => sentence.length >= 24)
 }
 
-function extractPolicyDurationEvidenceSentence(content: string, subjectTokens: string[]) {
+function extractPolicyDurationEvidenceSentence(content: string, subjectTokens: string[], requiredSubjectTokens: string[]) {
     for (const sentence of splitDurationCandidateSentences(content)) {
         const normalizedSentence = normalizeSearch(sentence)
         DURATION_VALUE_REGEX.lastIndex = 0
         if (!DURATION_VALUE_REGEX.test(normalizedSentence)) continue
+        if (!durationHasRequiredSubjectTokens(requiredSubjectTokens, sentence)) continue
         if (subjectTokens.length > 0 && durationSubjectCoverage(subjectTokens, sentence) < 0.6) continue
 
         return `${sentence}.`
@@ -446,8 +485,9 @@ function repairPolicyDurationAnswer(input: {
     if (!asksForPolicyDuration(normalizedUserMessage)) return null
 
     const subjectTokens = durationSubjectTokens(normalizedUserMessage)
+    const requiredSubjectTokens = durationRequiredSubjectTokens(subjectTokens)
     const evidenceSentence = input.chunks
-        .map((chunk) => extractPolicyDurationEvidenceSentence(chunk.content, subjectTokens))
+        .map((chunk) => extractPolicyDurationEvidenceSentence(chunk.content, subjectTokens, requiredSubjectTokens))
         .find((value): value is string => Boolean(value))
     if (!evidenceSentence) return null
     if (responseHasEvidenceDuration(input.response, evidenceSentence)) return null

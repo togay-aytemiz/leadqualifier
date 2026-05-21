@@ -123,6 +123,12 @@ interface TitleSearchDocumentRow {
     status: string | null
 }
 
+interface IndexedSourceChunk {
+    content: string
+    tokenCount: number
+    sectionTitle?: string
+}
+
 /**
  * --- COLLECTIONS ---
  */
@@ -1850,6 +1856,23 @@ const POLICY_DURATION_SUBJECT_STOPWORDS = new Set([
     'saat',
     'dakika'
 ])
+const POLICY_DURATION_ACTOR_TOKENS = new Set([
+    'aday',
+    'akademik',
+    'calisan',
+    'idari',
+    'ogrenci',
+    'personel'
+])
+const POLICY_DURATION_GENERIC_SUBJECT_TOKENS = new Set([
+    'basvuru',
+    'egitim',
+    'izin',
+    'muafiyet',
+    'rapor',
+    'sinav',
+    'staj'
+])
 const POLICY_DURATION_VALUE_PATTERN = [
     '\\d+',
     'bir',
@@ -1888,6 +1911,13 @@ function policyDurationSubjectTokens(query: string) {
         .slice(0, 6)
 }
 
+function policyDurationRequiredSubjectTokens(tokens: string[]) {
+    return tokens.filter((token) => (
+        !POLICY_DURATION_ACTOR_TOKENS.has(token)
+        && !POLICY_DURATION_GENERIC_SUBJECT_TOKENS.has(token)
+    ))
+}
+
 function policyDurationSubjectCoverage(tokens: string[], value: string) {
     if (tokens.length === 0) return 0
 
@@ -1896,6 +1926,15 @@ function policyDurationSubjectCoverage(tokens: string[], value: string) {
     const hits = tokens.filter((token) => tokenSet.has(token) || normalized.includes(token)).length
 
     return hits / tokens.length
+}
+
+function policyDurationHasRequiredSubjectTokens(tokens: string[], value: string) {
+    if (tokens.length === 0) return true
+
+    const normalized = normalizeSearchText(value)
+    const tokenSet = normalizedTokenSet(value)
+
+    return tokens.every((token) => tokenSet.has(token) || normalized.includes(token))
 }
 
 function hasPolicyDurationEvidence(value: string) {
@@ -1912,6 +1951,8 @@ function policyDurationEvidenceScore(query: string, sourceUrl: string, result: K
     const sourcePathText = normalizeSearchText(sourcePath(sourceUrl))
     const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
     const subjectCoverage = policyDurationSubjectCoverage(subjectTokens, searchable)
+    const requiredSubjectTokens = policyDurationRequiredSubjectTokens(subjectTokens)
+    const hasRequiredSubjectFocus = policyDurationHasRequiredSubjectTokens(requiredSubjectTokens, searchable)
     const hasDurationEvidence = hasPolicyDurationEvidence(searchable)
     const policyDocumentSignal = hasDirectiveWord(title)
         || hasRegulationWord(title)
@@ -1919,7 +1960,11 @@ function policyDurationEvidenceScore(query: string, sourceUrl: string, result: K
         || sourceUrl.toLowerCase().includes('.pdf')
     let score = 0
 
-    if (hasDurationEvidence && subjectCoverage > 0.67) {
+    if (!hasRequiredSubjectFocus) {
+        score -= hasDurationEvidence ? 0.72 : 0.36
+    }
+
+    if (hasDurationEvidence && hasRequiredSubjectFocus && subjectCoverage > 0.67) {
         score += 0.42 + subjectCoverage * 0.58
         if (policyDocumentSignal) score += 0.2
         if (searchable.includes('madde')) score += 0.08
@@ -1927,6 +1972,7 @@ function policyDurationEvidenceScore(query: string, sourceUrl: string, result: K
     }
 
     if (hasDurationEvidence
+        && hasRequiredSubjectFocus
         && subjectCoverage >= 0.6
         && (searchable.includes('en fazla') || searchable.includes('en gec') || searchable.includes('azami'))) {
         score += 0.18
@@ -2668,12 +2714,155 @@ function chunkContentHasMetadata(content: string) {
     return /^Page Title:\s+/im.test(content) || /^Document Title:\s+/im.test(content)
 }
 
-function buildIndexedChunkContent(title: string, content: string) {
+function chunkContentHasSectionMetadata(content: string) {
+    return /^Section:\s+/im.test(content)
+}
+
+function normalizeSectionHeading(value: string) {
+    return value
+        .replace(/^#{1,6}\s+/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 140)
+        .trim()
+}
+
+function hasTurkishOrLatinLetter(value: string) {
+    return /[A-Za-zÇĞİÖŞÜçğıöşü]/.test(value)
+}
+
+function isMostlyUppercaseHeading(value: string) {
+    const letters = value.match(/[A-Za-zÇĞİÖŞÜçğıöşü]/g) ?? []
+    if (letters.length < 4) return false
+
+    const uppercaseLetters = letters.filter((letter) => letter === letter.toLocaleUpperCase('tr-TR')).length
+    return uppercaseLetters / letters.length >= 0.72
+}
+
+function hasStandaloneHeadingContext(previousLine: string | undefined, nextLine: string | undefined) {
+    const hasBoundaryBefore = !previousLine || previousLine.trim().length === 0
+    const hasBodyAfter = Boolean(nextLine?.trim())
+
+    return hasBoundaryBefore && hasBodyAfter
+}
+
+function isShortHeadingLikeLine(value: string) {
+    if (value.length < 4 || value.length > 110) return false
+    if (!hasTurkishOrLatinLetter(value)) return false
+    if (/[.!?;,]$/.test(value)) return false
+    if (estimateTokenCount(value) > 12) return false
+
+    return true
+}
+
+function extractStructuredHeading(line: string, previousLine?: string, nextLine?: string) {
+    const trimmedLine = line.trim()
+    const markdownHeading = trimmedLine.match(/^#{1,6}\s+(.+)$/)
+    if (markdownHeading?.[1]) return normalizeSectionHeading(markdownHeading[1])
+
+    const normalized = normalizeSectionHeading(trimmedLine)
+    if (!normalized) return null
+
+    const legalArticleHeading = normalized.match(/^(?:MADDE|Madde|madde)\s+\d+[A-Za-zÇĞİÖŞÜçğıöşü0-9/]*(?:\s*[-–—:.]\s*[^.;!?]{1,100})?/)
+    if (legalArticleHeading?.[0]) return normalizeSectionHeading(legalArticleHeading[0])
+
+    const numberedHeading = normalized.match(/^(?:\d+(?:\.\d+){0,4}|[IVXLCDM]+)\.?\s+.+$/i)
+    if (
+        numberedHeading
+        && !/^\d{1,2}[./]\d{1,2}[./]\d{2,4}\b/.test(normalized)
+        && hasStandaloneHeadingContext(previousLine, nextLine)
+        && isShortHeadingLikeLine(normalized)
+    ) {
+        return normalized
+    }
+
+    if (
+        hasStandaloneHeadingContext(previousLine, nextLine)
+        && isShortHeadingLikeLine(normalized)
+        && isMostlyUppercaseHeading(normalized)
+    ) {
+        return normalized
+    }
+
+    return null
+}
+
+function splitStructuredDocumentSections(content: string) {
+    const normalizedContent = content
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .trim()
+    if (!normalizedContent) return []
+
+    const lines = normalizedContent.split('\n')
+    const headings: Array<{ index: number; title: string }> = []
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const title = extractStructuredHeading(lines[index] ?? '', lines[index - 1], lines[index + 1])
+        if (title) headings.push({ index, title })
+    }
+
+    if (headings.length < 2) return []
+
+    const sections: Array<{ sectionTitle?: string; content: string }> = []
+    if (headings[0]?.index && headings[0].index > 0) {
+        const preamble = lines.slice(0, headings[0].index).join('\n').trim()
+        if (preamble) sections.push({ content: preamble })
+    }
+
+    for (const [index, heading] of headings.entries()) {
+        const nextHeading = headings[index + 1]
+        const sectionContent = lines
+            .slice(heading.index, nextHeading?.index ?? lines.length)
+            .join('\n')
+            .trim()
+
+        if (sectionContent) {
+            sections.push({
+                sectionTitle: heading.title,
+                content: sectionContent
+            })
+        }
+    }
+
+    return sections
+}
+
+function chunkKnowledgeDocumentContent(content: string): IndexedSourceChunk[] {
+    const sections = splitStructuredDocumentSections(content)
+    if (sections.length === 0) return chunkText(content)
+
+    const chunks = sections.flatMap((section) => (
+        chunkText(section.content).map((chunk) => ({
+            ...chunk,
+            sectionTitle: section.sectionTitle
+        }))
+    ))
+
+    if (chunks.length > 200) {
+        throw new Error(`Content too large for indexing (chunks=${chunks.length}, max=200).`)
+    }
+
+    return chunks
+}
+
+function buildIndexedChunkContent(title: string, content: string, sectionTitle?: string) {
     const normalizedTitle = title.trim()
     const normalizedContent = content.trim()
-    if (!normalizedTitle || chunkContentHasMetadata(normalizedContent)) return normalizedContent
+    const normalizedSectionTitle = normalizeSectionHeading(sectionTitle ?? '')
+    const metadataLines: string[] = []
 
-    return `Document Title: ${normalizedTitle}\n\n${normalizedContent}`
+    if (normalizedTitle && !chunkContentHasMetadata(normalizedContent)) {
+        metadataLines.push(`Document Title: ${normalizedTitle}`)
+    }
+
+    if (normalizedSectionTitle && !chunkContentHasSectionMetadata(normalizedContent)) {
+        metadataLines.push(`Section: ${normalizedSectionTitle}`)
+    }
+
+    if (metadataLines.length === 0) return normalizedContent
+
+    return `${metadataLines.join('\n')}\n\n${normalizedContent}`
 }
 
 async function buildAndStoreChunks(
@@ -2683,10 +2872,10 @@ async function buildAndStoreChunks(
     title: string,
     content: string
 ) {
-    const chunks = chunkText(content)
+    const chunks = chunkKnowledgeDocumentContent(content)
     if (chunks.length === 0) return
     const indexedChunks = chunks.map((chunk) => {
-        const indexedContent = buildIndexedChunkContent(title, chunk.content)
+        const indexedContent = buildIndexedChunkContent(title, chunk.content, chunk.sectionTitle)
         return {
             ...chunk,
             content: indexedContent,

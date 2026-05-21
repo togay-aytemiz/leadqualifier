@@ -190,6 +190,26 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Personelin ücretsiz izin süresi en fazla 1 (bir) yıldır.')
     })
 
+    it('does not repair duration answers from a nearby but different leave type', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok. Ücretsiz izin süresi hakkında detaylı bilgi almak için ilgili birimle iletişime geçmeni öneririm.',
+            userMessage: 'personelin ücretsiz izin süresi ne kadar',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 9- d) Personelin eşinin anne, baba veya kardeşinin ölümünde 3 (üç) iş günü, mazeret izini verilir.'
+                },
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Ücretsiz izinler aşağıdaki esaslara göre kullanılır. a) Ücretsiz izin süresi en fazla 1 (bir) yıldır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Personelin ücretsiz izin süresi en fazla 1 (bir) yıldır.')
+    })
+
     it('repairs no-information answers from explicit policy duration evidence beyond staff leave', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Bu konuda elimde net bilgi yok. İlgili birimle iletişime geçmeni öneririm.',
