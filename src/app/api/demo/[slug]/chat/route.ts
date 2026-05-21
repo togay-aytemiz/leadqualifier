@@ -36,6 +36,7 @@ type DemoChatPipelineResult = {
 }
 
 type DemoChatMessageRow = {
+    id?: string | null
     content: string | null
     metadata: Record<string, unknown> | null
 }
@@ -76,6 +77,11 @@ function readSyncReplyTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS ?? '', 10)
     if (Number.isFinite(raw) && raw >= 1000) return raw
     return DEFAULT_SYNC_REPLY_TIMEOUT_MS
+}
+
+function readMessageText(value: unknown) {
+    if (typeof value !== 'string') return ''
+    return value.trim()
 }
 
 function waitForPipelineResult(promise: Promise<DemoChatPipelineResult>, timeoutMs: number) {
@@ -141,8 +147,9 @@ async function runDemoChatPipeline(input: {
     sessionId: string
     message: string
     inboundMessageId: string
+    reprocessExistingInbound?: boolean
 }): Promise<DemoChatPipelineResult> {
-    const { supabase, channel, sessionId, message, inboundMessageId } = input
+    const { supabase, channel, sessionId, message, inboundMessageId, reprocessExistingInbound } = input
     let replyText = ''
     let skillImage: DemoChatSkillImage | null = null
 
@@ -162,6 +169,7 @@ async function runDemoChatPipeline(input: {
             demo_chat_slug: channel.slug,
             demo_chat_session_id: sessionId,
         },
+        reprocessExistingInbound,
         sendOutbound: async (content) => {
             const text = readTextReply(content)
             if (text) replyText = text
@@ -233,6 +241,63 @@ async function findCompletedDemoChatReply(input: {
     }
 }
 
+async function findPendingDemoChatInboundMessage(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+}): Promise<DemoChatMessageRow | null> {
+    const contactId = buildDemoChatContactId(input.channel.id, input.sessionId)
+    const { data: conversation, error: conversationError } = await input.supabase
+        .from('conversations')
+        .select('id')
+        .eq('organization_id', input.channel.organizationId)
+        .eq('platform', 'demo_chat')
+        .eq('contact_phone', contactId)
+        .maybeSingle()
+
+    if (conversationError) throw conversationError
+
+    const conversationRow = conversation as DemoChatConversationRow | null
+    if (!conversationRow?.id) return null
+
+    const { data: message, error: messageError } = await input.supabase
+        .from('messages')
+        .select('id, content')
+        .eq('conversation_id', conversationRow.id)
+        .eq('sender_type', 'contact')
+        .eq('metadata->>demo_chat_message_id', input.messageId)
+        .maybeSingle()
+
+    if (messageError) throw messageError
+
+    return (message ?? null) as DemoChatMessageRow | null
+}
+
+async function recoverPendingDemoChatReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+    fallbackMessage: string
+}): Promise<DemoChatPipelineResult | null> {
+    const inboundMessage = await findPendingDemoChatInboundMessage(input)
+    const message = (readMessageText(inboundMessage?.content) || input.fallbackMessage).slice(0, MAX_MESSAGE_CHARS)
+    if (!message) return null
+
+    const recoveredReply = await runDemoChatPipeline({
+        supabase: input.supabase,
+        channel: input.channel,
+        sessionId: input.sessionId,
+        message,
+        inboundMessageId: input.messageId,
+        reprocessExistingInbound: Boolean(inboundMessage?.id)
+    })
+
+    if (recoveredReply.replyText || recoveredReply.skillImage) return recoveredReply
+    return findCompletedDemoChatReply(input)
+}
+
 export async function POST(req: NextRequest, context: RouteContext) {
     let body: DemoChatBody
     try {
@@ -241,7 +306,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    const message = typeof body.message === 'string' ? body.message.trim() : ''
+    const message = readMessageText(body.message)
     if (!message) {
         return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
@@ -297,6 +362,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 export async function GET(req: NextRequest, context: RouteContext) {
     const sessionId = normalizeSessionId(req.nextUrl.searchParams.get('sessionId'))
     const messageId = normalizeSessionId(req.nextUrl.searchParams.get('messageId'))
+    const message = readMessageText(req.nextUrl.searchParams.get('message')).slice(0, MAX_MESSAGE_CHARS)
     if (!sessionId || !messageId) {
         return NextResponse.json({ error: 'Session and message id are required' }, { status: 400 })
     }
@@ -317,7 +383,23 @@ export async function GET(req: NextRequest, context: RouteContext) {
         })
 
         if (!completedReply) {
-            return NextResponse.json({ pending: true }, { status: 202 })
+            const recoveredReply = await recoverPendingDemoChatReply({
+                supabase,
+                channel,
+                sessionId,
+                messageId,
+                fallbackMessage: message
+            })
+
+            if (!recoveredReply) {
+                return NextResponse.json({ pending: true }, { status: 202 })
+            }
+
+            return NextResponse.json({
+                pending: false,
+                response: recoveredReply.replyText,
+                skillImage: recoveredReply.skillImage
+            })
         }
 
         return NextResponse.json({

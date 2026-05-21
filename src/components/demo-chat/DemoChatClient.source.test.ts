@@ -56,6 +56,16 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('encodeURIComponent(sessionId)')
     })
 
+    it('keeps the header and composer fixed while only the message timeline scrolls', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('h-dvh overflow-hidden')
+        expect(source).toContain('shrink-0 border-b')
+        expect(source).toContain('flex-1 overflow-hidden')
+        expect(source).toContain('overflow-y-auto')
+        expect(source).toContain('shrink-0 rounded-b-xl')
+    })
+
     it('keeps the demo disclaimer near the composer instead of repeating under each bot reply', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 

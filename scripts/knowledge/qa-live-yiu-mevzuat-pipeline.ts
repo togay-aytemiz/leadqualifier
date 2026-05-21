@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 
 const ORG_ID = process.env.QA_ORG_ID?.trim() || '37222032-c2e8-4125-a027-be39eb6603f8'
@@ -234,7 +234,7 @@ function evaluateAnswer(testCase: QaCase, answer: string, sourceTitles: string[]
 }
 
 async function getBotMessageAndSources(
-    supabase: any,
+    supabase: SupabaseClient,
     conversationId: string | null
 ) {
     if (!conversationId) return { message: null, sourceTitles: [] as string[] }

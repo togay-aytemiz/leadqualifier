@@ -226,11 +226,11 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
         setIsSending(true)
 
         try {
-            const pollPendingReply = async (messageId: string) => {
+            const pollPendingReply = async (messageId: string, originalMessage: string) => {
                 for (let attempt = 0; attempt < REPLY_POLL_ATTEMPTS; attempt += 1) {
                     await sleep(REPLY_POLL_INTERVAL_MS)
                     const pollResponse = await fetch(
-                        `/api/demo/${slug}/chat?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}`
+                        `/api/demo/${slug}/chat?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}&message=${encodeURIComponent(originalMessage)}`
                     )
                     const pollData = readDemoChatReplyPayload(await pollResponse.json())
 
@@ -262,7 +262,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                 throw new Error('Demo chat pending response is missing a message id')
             }
             const data = response.status === 202
-                ? await pollPendingReply(initialData.messageId)
+                ? await pollPendingReply(initialData.messageId, message)
                 : initialData
 
             setMessages((current) => [
@@ -283,12 +283,12 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
 
     return (
         <main
-            className={`flex min-h-dvh flex-col transition-colors duration-300 ${
+            className={`flex h-dvh overflow-hidden flex-col transition-colors duration-300 ${
                 isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-950'
             }`}
         >
             <header
-                className={`border-b transition-colors duration-300 ${
+                className={`shrink-0 border-b transition-colors duration-300 ${
                     isDark ? 'border-white/10 bg-slate-950/95' : 'border-slate-200 bg-white'
                 }`}
             >
@@ -346,7 +346,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                 </div>
             </header>
 
-            <section className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-3 py-3 sm:px-4 sm:py-4">
+            <section className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 overflow-hidden flex-col px-3 py-3 sm:px-4 sm:py-4">
                 <div
                     className={`min-h-0 flex-1 space-y-3 overflow-y-auto rounded-t-xl p-3 shadow-sm transition-colors duration-300 sm:p-4 ${
                         isDark ? 'bg-slate-900' : 'bg-white'
@@ -425,7 +425,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
 
                 <form
                     onSubmit={handleSubmit}
-                    className={`rounded-b-xl border-t p-3 shadow-sm transition-colors duration-300 ${
+                    className={`shrink-0 rounded-b-xl border-t p-3 shadow-sm transition-colors duration-300 ${
                         isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'
                     }`}
                 >

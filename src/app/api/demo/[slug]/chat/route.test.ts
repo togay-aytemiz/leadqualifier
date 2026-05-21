@@ -88,6 +88,18 @@ describe('demo chat API route', () => {
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
+    it('rejects overlong demo messages instead of silently truncating them', async () => {
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'a'.repeat(2001),
+        }), createContext())
+
+        expect(res.status).toBe(400)
+        await expect(res.json()).resolves.toEqual({ error: 'Message is too long' })
+        expect(resolveDemoChatChannelMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
     it('persists a session as a demo_chat conversation and returns the AI reply', async () => {
         const res = await POST(createRequest({
             sessionId: 'session-1',
@@ -189,6 +201,79 @@ describe('demo chat API route', () => {
         })
         expect(buildDemoChatContactIdMock).toHaveBeenCalledWith('demo-channel-1', 'session-1')
         expect(messagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_reply_to_message_id', 'message-1')
+    })
+
+    it('recovers a pending reply during polling when deferred processing did not persist a bot response', async () => {
+        const createConversationChain = () => {
+            const chain = {
+                eq: vi.fn(),
+                maybeSingle: vi.fn(async () => ({
+                    data: { id: 'conversation-1' },
+                    error: null,
+                })),
+            }
+            chain.eq.mockReturnValue(chain)
+            return chain
+        }
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'personelin ücretsiz izin süresi ne kadar',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const conversations = [createConversationChain(), createConversationChain()]
+        const messagesTable = {
+            select: vi.fn((columns: string) => (
+                columns.includes('metadata') ? completedMessagesChain : inboundMessagesChain
+            )),
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) throw new Error('Unexpected conversation lookup')
+                return { select: vi.fn(() => chain) }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
+            await input.sendOutbound('Ücretsiz izin süresi en fazla 1 yıldır.')
+        })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Ücretsiz izin süresi en fazla 1 yıldır.',
+            skillImage: null,
+        })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            text: 'personelin ücretsiz izin süresi ne kadar',
+            inboundMessageId: 'message-1',
+            reprocessExistingInbound: true,
+        }))
+        expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
     })
 
     it('keeps parallel testers isolated by forwarding distinct session contact ids', async () => {

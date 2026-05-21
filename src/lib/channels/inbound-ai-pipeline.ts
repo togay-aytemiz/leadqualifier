@@ -83,6 +83,7 @@ export interface InboundAiPipelineInput {
     inboundMessageId: string
     inboundMessageIdMetadataKey: string
     inboundMessageMetadata: Record<string, unknown>
+    reprocessExistingInbound?: boolean
     inboundActionSelection?: {
         kind: 'skill_action'
         sourceSkillId: string
@@ -401,6 +402,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const markInstagramRequest = shouldMarkInstagramRequest(options)
     const contactAvatarUrl = normalizeContactAvatarUrl(options.contactAvatarUrl)
     const isInstagramDeleted = isInstagramDeletedEvent(options)
+    let reuseExistingInbound = false
 
     if (!isInstagramDeleted) {
         const dedupeFilter = `metadata->>${options.inboundMessageIdMetadataKey}`
@@ -412,7 +414,10 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             .maybeSingle()
         const existingInbound = existingInboundData as { id?: string } | null
 
-        if (existingInbound?.id) return
+        if (existingInbound?.id) {
+            if (!options.reprocessExistingInbound) return
+            reuseExistingInbound = true
+        }
     }
 
     let { data: conversation } = await options.supabase
@@ -436,6 +441,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     }
 
     if (!conversation) {
+        if (reuseExistingInbound) return
+
         const conversationTags = mergeConversationTags([], markInstagramRequest ? INSTAGRAM_REQUEST_TAG : null)
         const { data: newConversation, error: createConversationError } = await options.supabase
             .from('conversations')
@@ -482,38 +489,40 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     )
     const isInstagramSeen = isInstagramSeenEvent(options)
 
-    const { error: inboundInsertError } = await options.supabase
-        .from('messages')
-        .insert({
-            id: uuidv4(),
-            conversation_id: conversation.id,
-            organization_id: orgId,
-            sender_type: 'contact',
-            content: options.text,
-            metadata: options.inboundMessageMetadata
-        })
+    if (!reuseExistingInbound) {
+        const { error: inboundInsertError } = await options.supabase
+            .from('messages')
+            .insert({
+                id: uuidv4(),
+                conversation_id: conversation.id,
+                organization_id: orgId,
+                sender_type: 'contact',
+                content: options.text,
+                metadata: options.inboundMessageMetadata
+            })
 
-    if (inboundInsertError) {
-        if (inboundInsertError.code === '23505') return
-        console.error(`${options.logPrefix}: Failed to save incoming message`, inboundInsertError)
-        return
+        if (inboundInsertError) {
+            if (inboundInsertError.code === '23505') return
+            console.error(`${options.logPrefix}: Failed to save incoming message`, inboundInsertError)
+            return
+        }
+
+        await options.supabase
+            .from('conversations')
+            .update({
+                contact_name: options.contactName || conversation.contact_name,
+                contact_avatar_url: contactAvatarUrl || conversation.contact_avatar_url || null,
+                tags: updatedConversationTags,
+                ...(!isInstagramSeen
+                    ? {
+                        last_message_at: new Date().toISOString(),
+                        unread_count: (conversation.unread_count ?? 0) + 1
+                    }
+                    : {}),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id)
     }
-
-    await options.supabase
-        .from('conversations')
-        .update({
-            contact_name: options.contactName || conversation.contact_name,
-            contact_avatar_url: contactAvatarUrl || conversation.contact_avatar_url || null,
-            tags: updatedConversationTags,
-            ...(!isInstagramSeen
-                ? {
-                    last_message_at: new Date().toISOString(),
-                    unread_count: (conversation.unread_count ?? 0) + 1
-                }
-                : {}),
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', conversation.id)
 
     if (options.skipAutomation) {
         console.info(`${options.logPrefix}: Automation skipped for inbound message`, {

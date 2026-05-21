@@ -605,6 +605,60 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('reprocesses a stored demo_chat inbound message without duplicating the contact row', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder('contact-message-1')
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'demo_chat',
+            contact_phone: 'demo:demo-channel-1:session-1',
+        }))
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder],
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Demo Bilgi',
+                response_text: 'Recovered demo response',
+            },
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'demo_chat',
+            source: 'demo_chat',
+            contactId: 'demo:demo-channel-1:session-1',
+            inboundMessageId: 'demo-message-1',
+            inboundMessageIdMetadataKey: 'demo_chat_message_id',
+            inboundMessageMetadata: {
+                demo_chat_message_id: 'demo-message-1',
+                demo_chat_channel_id: 'demo-channel-1',
+                demo_chat_session_id: 'session-1',
+            },
+            reprocessExistingInbound: true,
+            logPrefix: 'Demo Chat',
+        }))
+
+        expect(sendOutbound).toHaveBeenCalledWith('Recovered demo response')
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            sender_type: 'bot',
+            content: 'Recovered demo response',
+            metadata: expect.objectContaining({
+                skill_id: 'skill-1',
+            }),
+        }))
+        expect(conversationUpdateAfterBotReply.updateMock).toHaveBeenCalledWith(expect.objectContaining({
+            last_message_at: expect.any(String),
+            updated_at: expect.any(String),
+        }))
+    })
+
     it('isolates deferred lead extraction failures from the reply path', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
