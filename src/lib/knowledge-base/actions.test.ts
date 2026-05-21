@@ -1739,6 +1739,62 @@ describe('searchKnowledgeBase', () => {
         expect(context).toContain('Ücretsiz izin süresi en fazla 1 (bir) yıldır.')
     })
 
+    it('keeps exact policy duration evidence for non-leave duration questions', async () => {
+        const longExamCalendarText = Array.from({ length: 40 }, () =>
+            'Mazeret sınavı takvimi, sınav salonları, öğrenci listeleri ve duyuru yayınlama süreçleri hakkında genel bilgi verir.'
+        ).join(' ')
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'exam-calendar-noise-1',
+                    document_id: 'doc-exam-calendar-noise-1',
+                    document_title: 'Mazeret Sınav Takvimi',
+                    document_type: 'article',
+                    content: `Page Title: Mazeret Sınav Takvimi\nSource URL: https://example.edu.tr/duyuru/mazeret-sinav-takvimi\n\n${longExamCalendarText}`,
+                    similarity: 0.99
+                }
+            ],
+            fallbackRowPages: [
+                [
+                    {
+                        id: 'exam-calendar-keyword-1',
+                        document_id: 'doc-exam-calendar-keyword-1',
+                        content: `Page Title: Mazeret Sınav Takvimi\nSource URL: https://example.edu.tr/duyuru/mazeret-sinav-takvimi\n\n${longExamCalendarText}`,
+                        knowledge_documents: {
+                            title: 'Mazeret Sınav Takvimi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ],
+                [
+                    {
+                        id: 'exam-policy-duration-1',
+                        document_id: 'doc-exam-policy-duration-1',
+                        content: 'Page Title: Mazeret Sınavı Yönergesi\nSource URL: https://example.edu.tr/mazeret.pdf\n\nMadde 8- Mazeret sınavı başvurusu, sınav tarihinden itibaren en geç 5 (beş) iş günü içinde yapılır. Başvurular ilgili birime iletilir.',
+                        knowledge_documents: {
+                            title: 'Mazeret Sınavı Yönergesi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Mazeret sınavı başvuru süresi ne kadar?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(context).toContain('en geç 5 (beş) iş günü')
+    })
+
     it('rescues acronym contact-table chunks for TLT abbreviation questions', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [],

@@ -1832,49 +1832,110 @@ function healthReportExamPolicyScore(query: string, sourceUrl: string, result: K
     return score
 }
 
-function isStaffUnpaidLeaveDurationQuery(query: string) {
+const POLICY_DURATION_SUBJECT_STOPWORDS = new Set([
+    'sure',
+    'suresi',
+    'kadar',
+    'kac',
+    'azami',
+    'fazla',
+    'cok',
+    'gec',
+    'nedir',
+    'gun',
+    'gunu',
+    'hafta',
+    'ay',
+    'yil',
+    'saat',
+    'dakika'
+])
+const POLICY_DURATION_VALUE_PATTERN = [
+    '\\d+',
+    'bir',
+    'iki',
+    'uc',
+    'dort',
+    'bes',
+    'alti',
+    'yedi',
+    'sekiz',
+    'dokuz',
+    'on',
+    'on\\s+bes',
+    'yirmi',
+    'otuz'
+].join('|')
+const POLICY_DURATION_UNIT_PATTERN = '(?:is\\s+gunu|gunu|gun|hafta|ay|yil|saat|dakika)(?:dur|dir|tir)?'
+const POLICY_DURATION_VALUE_REGEX = new RegExp(`\\b(?:${POLICY_DURATION_VALUE_PATTERN})\\s+(?:\\([^)]*\\)\\s*)?${POLICY_DURATION_UNIT_PATTERN}\\b`, 'iu')
+
+function isPolicyDurationQuery(query: string) {
     const normalized = normalizeSearchText(query)
 
-    return normalized.includes('ucretsiz')
-        && normalized.includes('izin')
-        && (normalized.includes('personel')
-            || normalized.includes('akademik')
-            || normalized.includes('idari')
-            || normalized.includes('calisan'))
-        && (normalized.includes('sure')
-            || normalized.includes('suresi')
-            || normalized.includes('kadar')
-            || normalized.includes('kac')
-            || normalized.includes('azami')
-            || normalized.includes('en fazla'))
+    return normalized.includes('sure')
+        || normalized.includes('suresi')
+        || normalized.includes('azami')
+        || normalized.includes('en fazla')
+        || normalized.includes('en cok')
+        || /\b(?:kac|ne kadar)\s+(?:is\s+gunu|gun|hafta|ay|yil|saat|dakika)\b/i.test(normalized)
+        || normalized.includes('ne kadar')
+            && hasQuerySignal(normalized, ['izin', 'rapor', 'sinav', 'basvuru', 'staj', 'egitim', 'muafiyet'])
 }
 
-function staffUnpaidLeaveDurationPolicyScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
-    if (!isStaffUnpaidLeaveDurationQuery(query)) return 0
+function policyDurationSubjectTokens(query: string) {
+    return allMeaningfulSearchTokens(query)
+        .filter((token) => !POLICY_DURATION_SUBJECT_STOPWORDS.has(token))
+        .slice(0, 6)
+}
+
+function policyDurationSubjectCoverage(tokens: string[], value: string) {
+    if (tokens.length === 0) return 0
+
+    const normalized = normalizeSearchText(value)
+    const tokenSet = normalizedTokenSet(value)
+    const hits = tokens.filter((token) => tokenSet.has(token) || normalized.includes(token)).length
+
+    return hits / tokens.length
+}
+
+function hasPolicyDurationEvidence(value: string) {
+    return POLICY_DURATION_VALUE_REGEX.test(value)
+}
+
+function policyDurationEvidenceScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!isPolicyDurationQuery(query)) return 0
+
+    const subjectTokens = policyDurationSubjectTokens(query)
+    if (subjectTokens.length === 0) return 0
 
     const title = normalizeSearchText(result.document_title ?? '')
     const sourcePathText = normalizeSearchText(sourcePath(sourceUrl))
     const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
-    const hasUnpaidLeaveDuration = searchable.includes('ucretsiz izin suresi')
-        || searchable.includes('ucretsiz izinler')
-            && searchable.includes('suresi en fazla')
-    const hasOneYearLimit = /\ben fazla\s+1\s*(?:\(bir\)\s*)?yil/.test(searchable)
-        || /\b1\s*(?:\(bir\)\s*)?yildir\b/.test(searchable)
-    const hasErasmusStaffMobilitySignal = title.includes('personel hareketliligi')
-        || sourcePathText.includes('erasmus')
-        || searchable.includes('personel hareketliligi')
+    const subjectCoverage = policyDurationSubjectCoverage(subjectTokens, searchable)
+    const hasDurationEvidence = hasPolicyDurationEvidence(searchable)
+    const policyDocumentSignal = hasDirectiveWord(title)
+        || hasRegulationWord(title)
+        || searchable.includes('madde')
+        || sourceUrl.toLowerCase().includes('.pdf')
     let score = 0
 
-    if (title.includes('izin kullanimi yonergesi')) score += 0.6
-    if (hasUnpaidLeaveDuration) score += 0.9
-    if (hasOneYearLimit) score += 0.45
-    if (searchable.includes('madde 11') && searchable.includes('ucretsiz izin')) score += 0.24
-    if (searchable.includes('akademik personel') || searchable.includes('idari personel')) score += 0.12
-    if (sourceUrl.toLowerCase().includes('.pdf')) score += 0.08
+    if (hasDurationEvidence && subjectCoverage > 0.67) {
+        score += 0.42 + subjectCoverage * 0.58
+        if (policyDocumentSignal) score += 0.2
+        if (searchable.includes('madde')) score += 0.08
+        if (sourceUrl.toLowerCase().includes('.pdf')) score += 0.08
+    }
 
-    if (hasErasmusStaffMobilitySignal && !searchable.includes('ucretsiz izin')) score -= 1
-    if (searchable.includes('yillik ucretli izin') && !hasUnpaidLeaveDuration) score -= 0.45
-    if (searchable.includes('sut izni') && !hasUnpaidLeaveDuration) score -= 0.2
+    if (hasDurationEvidence
+        && subjectCoverage >= 0.6
+        && (searchable.includes('en fazla') || searchable.includes('en gec') || searchable.includes('azami'))) {
+        score += 0.18
+    }
+
+    if (subjectCoverage < 0.45) {
+        score -= 0.34
+        if (title.includes('hareketliligi') || sourcePathText.includes('erasmus')) score -= 0.24
+    }
 
     return score
 }
@@ -1898,7 +1959,7 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + directIntentScore(query, sourceUrl, result)
         + rootContactInformationScore(query, sourceUrl, result)
         + healthReportExamPolicyScore(query, sourceUrl, result)
-        + staffUnpaidLeaveDurationPolicyScore(query, sourceUrl, result)
+        + policyDurationEvidenceScore(query, sourceUrl, result)
         + documentCodeLookupScore(query, result)
         + abbreviationLookupScore(query, result)
         + abbreviationInitialismScore(query, result.document_title)

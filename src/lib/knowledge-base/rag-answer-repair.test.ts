@@ -190,6 +190,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Personelin ücretsiz izin süresi en fazla 1 (bir) yıldır.')
     })
 
+    it('repairs no-information answers from explicit policy duration evidence beyond staff leave', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok. İlgili birimle iletişime geçmeni öneririm.',
+            userMessage: 'Mazeret sınavı başvuru süresi ne kadar?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Mazeret Sınavı Yönergesi',
+                    content: 'Page Title: Mazeret Sınavı Yönergesi\nSource URL: https://example.edu.tr/mazeret.pdf\n\nMadde 8- Mazeret sınavı başvurusu, sınav tarihinden itibaren en geç 5 (beş) iş günü içinde yapılır. Başvurular ilgili birime iletilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Mazeret sınavı başvurusu, sınav tarihinden itibaren en geç 5 (beş) iş günü içinde yapılır.')
+    })
+
     it('leaves factual answers unchanged', () => {
         const response = 'Bu yönergenin amacı, etik kuralları ve kurul sorumluluklarını düzenlemektir.'
         const repaired = repairLinkOnlyRagAnswer({

@@ -257,61 +257,206 @@ function includesAny(normalized: string, terms: string[]) {
     return terms.some((term) => normalized.includes(term))
 }
 
-function asksForStaffUnpaidLeaveDuration(normalizedUserMessage: string) {
-    return normalizedUserMessage.includes('ucretsiz')
-        && normalizedUserMessage.includes('izin')
-        && (normalizedUserMessage.includes('personel')
-            || normalizedUserMessage.includes('akademik')
-            || normalizedUserMessage.includes('idari')
-            || normalizedUserMessage.includes('calisan'))
-        && (normalizedUserMessage.includes('sure')
-            || normalizedUserMessage.includes('suresi')
-            || normalizedUserMessage.includes('kadar')
-            || normalizedUserMessage.includes('kac')
-            || normalizedUserMessage.includes('azami')
-            || normalizedUserMessage.includes('en fazla'))
+const DURATION_VALUE_PATTERN = [
+    '\\d+',
+    'bir',
+    'iki',
+    'uc',
+    'dort',
+    'bes',
+    'alti',
+    'yedi',
+    'sekiz',
+    'dokuz',
+    'on',
+    'on\\s+bes',
+    'yirmi',
+    'otuz'
+].join('|')
+const DURATION_UNIT_PATTERN = '(?:is\\s+gunu|gunu|gun|hafta|ay|yil|saat|dakika)(?:dur|dir|tir)?'
+const DURATION_VALUE_REGEX = new RegExp(`\\b(?:${DURATION_VALUE_PATTERN})\\s+(?:\\([^)]*\\)\\s*)?${DURATION_UNIT_PATTERN}\\b`, 'giu')
+const DURATION_QUERY_SUBJECT_STOPWORDS = new Set([
+    'sure',
+    'sures',
+    'suresi',
+    'kadar',
+    'kac',
+    'kaç',
+    'azami',
+    'fazla',
+    'cok',
+    'çok',
+    'gec',
+    'geç',
+    'ne',
+    'nedir',
+    'midir',
+    'mi',
+    'gun',
+    'gün',
+    'gunu',
+    'günü',
+    'hafta',
+    'ay',
+    'yil',
+    'yıl',
+    'saat',
+    'dakika'
+])
+
+function stemDurationToken(token: string) {
+    const normalized = normalizeSearch(token)
+    const suffixes = [
+        'lerinin',
+        'larinin',
+        'lerini',
+        'larini',
+        'sinin',
+        'sini',
+        'sina',
+        'sine',
+        'ini',
+        'ina',
+        'ine',
+        'nin',
+        'in',
+        'un',
+        'leri',
+        'lari',
+        'ler',
+        'lar',
+        'si'
+    ]
+
+    for (const suffix of suffixes) {
+        if (normalized.endsWith(suffix) && normalized.length - suffix.length >= 4) {
+            return normalized.slice(0, -suffix.length)
+        }
+    }
+
+    return normalized
 }
 
-function responseAlreadyHasOneYearLimit(response: string) {
-    return /\b1\s*(?:\(bir\)\s*)?yil/.test(normalizeSearch(response))
+function durationSubjectTokens(value: string) {
+    const normalized = normalizeSearch(value)
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .trim()
+    if (!normalized) return []
+
+    const tokens = normalized
+        .split(/\s+/)
+        .map(stemDurationToken)
+        .filter((token) => token.length >= 3 && !DURATION_QUERY_SUBJECT_STOPWORDS.has(token))
+
+    return Array.from(new Set(tokens)).slice(0, 6)
 }
 
-function extractStaffUnpaidLeaveDurationSentence(content: string) {
-    const normalizedContent = content.replace(/\s+/g, ' ').trim()
-    const match = normalizedContent.match(/Ücretsiz\s+izin\s+süresi\s+[^.?!]*(?:yıldır|yildir|yıl|yil)/iu)
-    if (!match?.[0]) return null
+function asksForPolicyDuration(normalizedUserMessage: string) {
+    return normalizedUserMessage.includes('sure')
+        || normalizedUserMessage.includes('suresi')
+        || normalizedUserMessage.includes('azami')
+        || normalizedUserMessage.includes('en fazla')
+        || normalizedUserMessage.includes('en cok')
+        || /\b(?:kac|ne kadar)\s+(?:is\s+gunu|gun|hafta|ay|yil|saat|dakika)\b/i.test(normalizedUserMessage)
+        || normalizedUserMessage.includes('ne kadar')
+            && includesAny(normalizedUserMessage, ['izin', 'rapor', 'sinav', 'basvuru', 'staj', 'egitim', 'muafiyet'])
+}
 
-    return match[0]
+function compactDurationEvidence(value: string) {
+    return normalizeSearch(value).replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function extractDurationValues(value: string) {
+    DURATION_VALUE_REGEX.lastIndex = 0
+    return Array.from(normalizeSearch(value).matchAll(DURATION_VALUE_REGEX))
+        .map((match) => compactDurationEvidence(match[0] ?? ''))
+        .filter(Boolean)
+}
+
+function responseHasEvidenceDuration(response: string, evidenceSentence: string) {
+    const compactResponse = compactDurationEvidence(response)
+    const evidenceDurations = extractDurationValues(evidenceSentence)
+
+    return evidenceDurations.some((duration) => compactResponse.includes(duration))
+}
+
+function durationSubjectCoverage(tokens: string[], value: string) {
+    if (tokens.length === 0) return 0
+    const normalized = normalizeSearch(value)
+    const normalizedTokens = new Set(
+        normalized
+            .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+            .split(/\s+/)
+            .filter(Boolean)
+            .flatMap((token) => [token, stemDurationToken(token)])
+    )
+    const hits = tokens.filter((token) => normalizedTokens.has(token) || normalized.includes(token)).length
+    return hits / tokens.length
+}
+
+function cleanDurationEvidenceSentence(value: string) {
+    return value
+        .replace(/^(?:Madde|MADDE)\s+\d+\s*[-–—]?\s*/u, '')
+        .replace(/^[a-zçğıöşü]\)\s*/iu, '')
         .replace(/\s+/g, ' ')
         .replace(/[;,.!?]+$/g, '')
         .trim()
 }
 
-function repairStaffUnpaidLeaveDurationAnswer(input: {
+function splitDurationCandidateSentences(content: string) {
+    return content
+        .replace(/^(?:Page|Document) Title:\s*.*$/gim, ' ')
+        .replace(/^Source URL:\s*.*$/gim, ' ')
+        .replace(/^Section:\s*.*$/gim, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(/(?<=[.!?])\s+|(?=(?:^|\s)[a-zçğıöşü]\)\s+)/iu)
+        .map(cleanDurationEvidenceSentence)
+        .filter((sentence) => sentence.length >= 24)
+}
+
+function extractPolicyDurationEvidenceSentence(content: string, subjectTokens: string[]) {
+    for (const sentence of splitDurationCandidateSentences(content)) {
+        const normalizedSentence = normalizeSearch(sentence)
+        DURATION_VALUE_REGEX.lastIndex = 0
+        if (!DURATION_VALUE_REGEX.test(normalizedSentence)) continue
+        if (subjectTokens.length > 0 && durationSubjectCoverage(subjectTokens, sentence) < 0.6) continue
+
+        return `${sentence}.`
+    }
+
+    return null
+}
+
+function personalizeDurationEvidenceSentence(sentence: string, normalizedUserMessage: string) {
+    if (normalizedUserMessage.includes('personel') && /^Ücretsiz\s+izin\s+süresi/iu.test(sentence)) {
+        return sentence.replace(/^Ücretsiz\s+izin\s+süresi/iu, 'Personelin ücretsiz izin süresi')
+    }
+
+    return sentence
+}
+
+function repairPolicyDurationAnswer(input: {
     response: string
     userMessage: string
     responseLanguage: MvpResponseLanguage
     chunks: RagAnswerRepairChunk[]
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
-    if (!asksForStaffUnpaidLeaveDuration(normalizedUserMessage)) return null
-    if (responseAlreadyHasOneYearLimit(input.response)) return null
+    if (!asksForPolicyDuration(normalizedUserMessage)) return null
 
-    const durationSentence = input.chunks
-        .map((chunk) => extractStaffUnpaidLeaveDurationSentence(chunk.content))
+    const subjectTokens = durationSubjectTokens(normalizedUserMessage)
+    const evidenceSentence = input.chunks
+        .map((chunk) => extractPolicyDurationEvidenceSentence(chunk.content, subjectTokens))
         .find((value): value is string => Boolean(value))
-    if (!durationSentence) return null
+    if (!evidenceSentence) return null
+    if (responseHasEvidenceDuration(input.response, evidenceSentence)) return null
 
     if (input.responseLanguage === 'en') {
-        return 'Staff unpaid leave duration is at most 1 (one) year.'
+        return `According to the retrieved policy: ${evidenceSentence}`
     }
 
-    const staffSentence = durationSentence.replace(
-        /^Ücretsiz\s+izin\s+süresi/iu,
-        'Personelin ücretsiz izin süresi'
-    )
-
-    return `${staffSentence}.`
+    return personalizeDurationEvidenceSentence(evidenceSentence, normalizedUserMessage)
 }
 
 function isArticleAnswerMissingImportantTerms(response: string, articleText: string, articleNumber: number) {
@@ -372,11 +517,11 @@ export function repairLinkOnlyRagAnswer(input: {
     })
     if (senatoMeetingNumberRepair) return senatoMeetingNumberRepair
 
-    const staffUnpaidLeaveDurationRepair = repairStaffUnpaidLeaveDurationAnswer({
+    const policyDurationRepair = repairPolicyDurationAnswer({
         ...input,
         response
     })
-    if (staffUnpaidLeaveDurationRepair) return staffUnpaidLeaveDurationRepair
+    if (policyDurationRepair) return policyDurationRepair
 
     const articleNumber = requestedArticleNumber(input.userMessage)
     if (!articleNumber) return response
