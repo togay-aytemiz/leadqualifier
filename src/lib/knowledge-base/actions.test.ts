@@ -1512,7 +1512,7 @@ describe('searchKnowledgeBase', () => {
         )
 
         expect(titleDocumentOrMock).toHaveBeenCalled()
-        expect(titleDocumentLimitMock).toHaveBeenCalledWith(128)
+        expect(titleDocumentLimitMock).toHaveBeenCalledWith(500)
         expect(titleChunkLimitMock).toHaveBeenCalled()
         expect(results[0]).toMatchObject({
             chunk_id: 'title-chunk-1',
@@ -1822,6 +1822,158 @@ describe('searchKnowledgeBase', () => {
         expect(results[0]).toMatchObject({
             chunk_id: 'exam-regulation-focused-1',
             document_id: 'doc-exam-regulation-focused-1'
+        })
+    })
+
+    it('prefers exact document codes over generic document-control templates', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-document-template-1',
+                    document_id: 'doc-generic-document-template-1',
+                    document_title: 'Doküman Hazırlama ve Kontrol Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: Doküman Hazırlama ve Kontrol Yönergesi\nSource URL: https://example.edu.tr/dokuman-hazirlama.pdf\n\nDoküman No YNG.0001 Yayın Tarihi ve revizyon bilgileri.',
+                    similarity: 0.98
+                },
+                {
+                    chunk_id: 'exact-document-code-1',
+                    document_id: 'doc-exact-document-code-1',
+                    document_title: 'Engelli Öğrenci Birimi Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: Engelli Öğrenci Birimi Yönergesi\nSource URL: https://example.edu.tr/engelli-ogrenci-birimi-yonergesi.pdf\n\nDoküman No EÖB.YNG.0001 Yayın Tarihi 13.08.2021.',
+                    similarity: 0.52
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'EÖB.YNG.0001 hangi yönergeye ait?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'exact-document-code-1',
+            document_id: 'doc-exact-document-code-1'
+        })
+    })
+
+    it('prefers acronym-bearing institutional documents for abbreviation questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-unit-1',
+                    document_id: 'doc-generic-unit-1',
+                    document_title: 'Engelli Öğrenci Birimi Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: Engelli Öğrenci Birimi Yönergesi\nSource URL: https://example.edu.tr/engelli-ogrenci-birimi.pdf\n\nEngelli Öğrenci Birimi faaliyetleri ve çalışma usulleri.',
+                    similarity: 0.95
+                },
+                {
+                    chunk_id: 'bidb-document-1',
+                    document_id: 'doc-bidb-document-1',
+                    document_title: 'Bilgi İşlem Daire Başkanlığı Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: Bilgi İşlem Daire Başkanlığı Yönergesi\nSource URL: https://example.edu.tr/bidb-yonergesi.pdf\n\nDoküman No BİDB.YNG.0001. BİDB, Bilgi İşlem Daire Başkanlığını ifade eder.',
+                    similarity: 0.5
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'BİDB kısaltması hangi birimi ifade ediyor olabilir?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'bidb-document-1',
+            document_id: 'doc-bidb-document-1'
+        })
+    })
+
+    it('prefers the named yönerge over a broad program page for policy-detail questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'erasmus-program-page-1',
+                    document_id: 'doc-erasmus-program-page-1',
+                    document_title: 'Erasmus + Programı',
+                    document_type: 'article',
+                    content: 'Page Title: Erasmus + Programı\nSource URL: https://example.edu.tr/erasmus-programi\n\nErasmus öğrencileri için başvuru takvimi ve program hakkında genel bilgiler.',
+                    similarity: 0.99
+                },
+                {
+                    chunk_id: 'erasmus-directive-1',
+                    document_id: 'doc-erasmus-directive-1',
+                    document_title: 'Erasmus + Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: Erasmus + Yönergesi\nSource URL: https://example.edu.tr/erasmus-yonergesi.pdf\n\nErasmus+ Programı kapsamında hazırlık sınıfı öğrencileri programdan yararlanamaz.',
+                    similarity: 0.55
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Erasmus+ Programı Yönergesinde hazırlık öğrencileri programdan yararlanabilir mi?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'erasmus-directive-1',
+            document_id: 'doc-erasmus-directive-1'
+        })
+    })
+
+    it('prefers exact regulation PDFs over broad landing pages with matching slugs', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'purchase-page-1',
+                    document_id: 'doc-purchase-page-1',
+                    document_title: 'Satın Alma ve İhaleler',
+                    document_type: 'article',
+                    content: 'Page Title: Satın Alma ve İhaleler\nSource URL: https://example.edu.tr/satin-alma-ve-ihaleler\n\nSatın Alma ve İhale Yönetmeliği bağlantısı ve ihale listesi.',
+                    similarity: 0.9
+                },
+                {
+                    chunk_id: 'purchase-regulation-1',
+                    document_id: 'doc-purchase-regulation-1',
+                    document_title: 'Satın Alma ve İhale Yönetmeliği',
+                    document_type: 'pdf',
+                    content: 'Page Title: Satın Alma ve İhale Yönetmeliği\nSource URL: https://example.edu.tr/satin-alma-ve-ihale-yonetmeligi.pdf\n\nBu Yönetmeliğin amacı, mal, hizmet ve yapım işleri alımlarında uygulanacak usul ve esasları belirlemektir.',
+                    similarity: 0.68
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Satın Alma ve İhale Yönetmeliği hangi alımlar için usul ve esas belirliyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'purchase-regulation-1',
+            document_id: 'doc-purchase-regulation-1'
         })
     })
 })

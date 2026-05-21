@@ -32,4 +32,28 @@ describe('buildRagContext', () => {
         expect(result.context).not.toContain('Document Title: Öğrenci Hareketliliği')
         expect(result.context.match(/Source URL: https:\/\/example.edu.tr\/erasmus/g)).toHaveLength(1)
     })
+
+    it('keeps the top oversized chunk by trimming it to the context budget', () => {
+        const oversizedContent = [
+            'Page Title: Satın Alma ve İhale Yönetmeliği',
+            'Source URL: https://example.edu.tr/satinalma.pdf',
+            'Amaç ve kapsam MADDE 1 - Bu Yönetmelik mal ve hizmet alım-satımları için usul ve esasları belirler.',
+            ...Array.from({ length: 160 }, (_, index) => `devam-${index}`)
+        ].join(' ')
+
+        const result = buildRagContext([
+            {
+                document_id: 'doc-1',
+                document_title: 'Satın Alma ve İhale Yönetmeliği',
+                content: oversizedContent
+            }
+        ], {
+            maxTokens: 90
+        })
+
+        expect(result.chunks).toHaveLength(1)
+        expect(result.context).toContain('mal ve hizmet')
+        expect(result.context).toContain('usul ve esasları')
+        expect(result.tokenCount).toBeLessThanOrEqual(90)
+    })
 })

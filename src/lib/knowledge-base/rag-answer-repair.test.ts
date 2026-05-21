@@ -43,6 +43,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('yetki ve sorumluluklarını')
     })
 
+    it('repairs link-only procedure-scope answers from the retrieved regulation purpose article', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Daha fazla bilgi için şu bağlantıya göz atabilirsin: https://example.edu.tr/satinalma.pdf',
+            userMessage: 'Satın Alma ve İhale Yönetmeliği hangi alımlar için usul ve esas belirliyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    content: 'SATIN ALMA VE İHALE YÖNETMELİĞİ Amaç ve kapsam MADDE 1 - Bu Yönetmeliğin amacı; Yüksek İhtisas Üniversitesi tarafından yapılacak mal ve hizmet alım-satımları, yapım, taşınmaz alım-satım, kiralama, kiraya verme ve trampa işlemlerinde uygulanacak usul ve esasları belirlemektir. MADDE 2 - Bu Yönetmelik diğer hükümleri kapsar.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('mal ve hizmet')
+        expect(repaired).toContain('usul ve esasları')
+    })
+
     it('repairs link-only scope answers from the retrieved regulation article', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Detaylı bilgi için buraya göz atabilirsiniz: https://example.edu.tr/isg.pdf',
@@ -77,6 +93,85 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('bina ve eklentileri')
         expect(repaired).toContain('stajyerler')
         expect(repaired).not.toMatch(/\bDayanak\s*$/i)
+    })
+
+    it('does not treat abbreviation expansion questions as scope requests', () => {
+        const response = 'BİDB, Bilgi İşlem Daire Başkanlığı anlamına gelir.'
+        const repaired = repairLinkOnlyRagAnswer({
+            response,
+            userMessage: 'BİDB kısaltması hangi birimi ifade ediyor olabilir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    content: 'BİDB Çalışma Usul ve Esasları Hakkındaki Yönerge Amaç MADDE 1 – Amaç. Kapsam MADDE 2 – Bu yönerge üniversite bilişim kaynaklarını kapsar.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe(response)
+    })
+
+    it('repairs link-only abbreviation-title answers from the retrieved document title', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Daha fazla bilgi istersen, buradan ulaşabilirsin: https://example.edu.tr/bap.pdf',
+            userMessage: 'BAP kısaltması hangi yönerge başlığında geçiyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Bilimsel Araştırma Projeleri Uygulama Yönergesi',
+                    content: 'Page Title: Bilimsel Araştırma Projeleri Uygulama Yönergesi\nSource URL: https://example.edu.tr/bap.pdf\n\nDoküman No BAP.YNG.0001'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Bilimsel Araştırma Projeleri Uygulama Yönergesi')
+    })
+
+    it('repairs partial document-number answers from the retrieved document metadata', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'YNG. 0001dir. Başka bir konuda yardımcı olabilir miyim?',
+            userMessage: 'Bilimsel Araştırma Projeleri Uygulama Yönergesinin doküman numarası nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Bilimsel Araştırma Projeleri Uygulama Yönergesi',
+                    content: 'Page Title: Bilimsel Araştırma Projeleri Uygulama Yönergesi\nDoküman No BAP. YNG. 0001\nYürürlük Tarihi 2025'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('BAP.YNG.0001')
+        expect(repaired).toContain('Bilimsel Araştırma Projeleri Uygulama Yönergesi')
+    })
+
+    it('adds the explicit Senato meeting number when the answer only includes the date', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıp Fakültesi Çevrimiçi Sınav Yönergesi, 06.06.2023 tarihinde yapılan Senato toplantısında kabul edilmiştir.',
+            userMessage: 'Tıp Fakültesi Çevrimiçi Sınav Yönergesi hangi Senato toplantısında kabul edilmiş?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    content: 'Tıp Fakültesi Çevrimiçi Sınav Yönergesi 06.06.2023 tarihinde yapılan 13 sayılı Senato toplantısında kabul edilmiştir.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('13 sayılı Senato toplantısında')
+    })
+
+    it('adds the explicit Senato meeting number from decision table metadata', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıp Fakültesi Çevrimiçi Sınav Yönergesi, 06.06.2023 tarihinde yapılan Senato toplantısında kabul edilmiştir.',
+            userMessage: 'Tıp Fakültesi Çevrimiçi Sınav Yönergesi hangi Senato toplantısında kabul edilmiş?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    content: 'KARAR TARİHİ: 06.06.2023 TOPLANTI SAYISI: 13 KARARLAR 2023/80 Tıp Fakültesi Çevrimiçi Sınav Yönergesi.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('13 sayılı Senato toplantısında')
     })
 
     it('leaves factual answers unchanged', () => {

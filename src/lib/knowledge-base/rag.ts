@@ -21,6 +21,7 @@ export interface RagContextOptions {
 }
 
 const DEFAULT_MAX_CONTEXT_TOKENS = 1200
+const MIN_TRUNCATED_CHUNK_TOKENS = 80
 
 function hasMetadataLine(content: string, label: string, value?: string | null) {
     if (!value) {
@@ -49,6 +50,13 @@ function formatChunkForContext(chunk: RagChunk) {
     return `${metadata.join('\n')}\n\n${content}`.trim()
 }
 
+function trimToTokenBudget(content: string, maxTokens: number) {
+    const words = content.split(/\s+/).filter(Boolean)
+    if (words.length <= maxTokens) return content
+
+    return `${words.slice(0, maxTokens).join(' ').trim()}...`
+}
+
 export function buildRagContext<T extends RagChunk>(
     chunks: T[],
     options: RagContextOptions = {}
@@ -60,10 +68,17 @@ export function buildRagContext<T extends RagChunk>(
     let tokenCount = 0
 
     for (const chunk of chunks) {
-        const contextContent = formatChunkForContext(chunk)
-        const chunkTokens = estimateTokenCount(contextContent)
+        let contextContent = formatChunkForContext(chunk)
+        let chunkTokens = estimateTokenCount(contextContent)
+        const remainingTokens = maxTokens - tokenCount
+
+        if (remainingTokens <= 0) break
         if (chunkTokens === 0) continue
-        if (tokenCount + chunkTokens > maxTokens) continue
+        if (chunkTokens > remainingTokens) {
+            if (remainingTokens < MIN_TRUNCATED_CHUNK_TOKENS) continue
+            contextContent = trimToTokenBudget(contextContent, remainingTokens)
+            chunkTokens = estimateTokenCount(contextContent)
+        }
 
         selected.push(chunk)
         contextParts.push(contextContent)

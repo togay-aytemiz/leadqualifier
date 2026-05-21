@@ -2,6 +2,7 @@ import type { MvpResponseLanguage } from '@/lib/ai/language'
 
 type RagAnswerRepairChunk = {
     content: string
+    document_title?: string | null
     source_url?: string | null
     sourceUrl?: string | null
 }
@@ -10,11 +11,15 @@ const URL_PATTERN = /https?:\/\/\S+/gi
 
 const LINK_ONLY_FILLER_PATTERNS = [
     /\bdaha fazla bilgi için\b/gi,
+    /\bdaha fazla bilgi istersen(?:iz)?\b/gi,
     /\bdetaylı bilgi için\b/gi,
     /\bburaya göz atabilirsin\b/gi,
     /\bburaya göz atabilirsiniz\b/gi,
+    /\bburadan ulaşabilirsin\b/gi,
+    /\bburadan ulaşabilirsiniz\b/gi,
     /\başağıdaki linkten ulaşabilirsin\b/gi,
     /\bşu linkten ulaşabilirsin\b/gi,
+    /\b(?:şu|bu)?\s*(?:linke|linkten|bağlantıya|bağlantıdan|buraya|buradan)\s+(?:göz atabilir|ulaşabilir)\w*/gi,
     /\bfor more information\b/gi,
     /\byou can check\b/gi
 ]
@@ -64,9 +69,91 @@ function stripGenericAssistantContinuation(value: string) {
 
 function requestedArticleNumber(userMessage: string) {
     const normalized = normalizeSearch(userMessage)
+    if (isAbbreviationExpansionQuestion(normalized)) return null
     if (/\b(kapsam|kapsami|kapsiyor|kapsar|hangi birim)/i.test(normalized)) return 2
-    if (/\b(amac|amaci|neyi duzenler|ne amaclar)/i.test(normalized)) return 1
+    if (/\b(amac|amaci|neyi duzenler|ne amaclar|usul ve esas|hangi alimlar|hangi islemler)/i.test(normalized)) return 1
     return null
+}
+
+function isAbbreviationExpansionQuestion(normalizedUserMessage: string) {
+    return /\b(kisaltma\w*|acilim\w*|neyi ifade|ifade ediyor|ne anlama|ne demek)\b/i.test(normalizedUserMessage)
+}
+
+function asksForAbbreviationTitle(normalizedUserMessage: string) {
+    return isAbbreviationExpansionQuestion(normalizedUserMessage)
+        && /\b(baslik\w*|basliginda|basligi|yonerge basligi)\b/i.test(normalizedUserMessage)
+}
+
+function extractChunkTitle(chunk: RagAnswerRepairChunk) {
+    const directTitle = chunk.document_title?.trim()
+    if (directTitle) return directTitle
+
+    const metadataTitle = chunk.content.match(/^(?:Page|Document) Title:\s*(.+)$/im)?.[1]?.trim()
+    if (!metadataTitle) return null
+
+    return metadataTitle
+        .replace(/\s+Source URL:\s+https?:\/\/\S+.*$/i, '')
+        .replace(/\s+Section:\s+.*$/i, '')
+        .trim()
+}
+
+const DOCUMENT_CODE_PATTERN = /\p{Lu}{2,12}(?:\.\p{Lu}{2,12}){0,2}\.\d{3,4}|\p{Lu}{2,12}YNG\.\d{3,4}/u
+
+function canonicalDocumentCode(value: string) {
+    return normalizeSearch(value).replace(/\s+/g, '')
+}
+
+function normalizeDocumentCodeCandidate(value: string) {
+    const compacted = value
+        .normalize('NFKC')
+        .toLocaleUpperCase('tr-TR')
+        .replace(/\s*\.\s*/g, '.')
+        .replace(/\s+/g, '')
+        .replace(/[^\p{L}\p{N}.]+$/gu, '')
+
+    return compacted.match(DOCUMENT_CODE_PATTERN)?.[0] ?? null
+}
+
+function extractDocumentCode(content: string) {
+    const labelMatch = content.match(/(?:Doküman|Dokuman|Belge)\s*(?:No|Numarası|Numarasi)\s*[:：-]?\s*([^\n\r|]{0,90})/iu)
+    const labelCode = labelMatch?.[1] ? normalizeDocumentCodeCandidate(labelMatch[1]) : null
+    if (labelCode) return labelCode
+
+    return normalizeDocumentCodeCandidate(content)
+}
+
+function asksForDocumentCode(normalizedUserMessage: string) {
+    return /\b(?:dokuman|belge)\s+(?:numara\w*|no(?:su)?)\b/i.test(normalizedUserMessage)
+        || /\b(?:numara\w*|no(?:su)?)\s+(?:nedir|ne)\b/i.test(normalizedUserMessage)
+}
+
+function repairDocumentCodeAnswer(input: {
+    response: string
+    userMessage: string
+    responseLanguage: MvpResponseLanguage
+    chunks: RagAnswerRepairChunk[]
+}) {
+    if (!asksForDocumentCode(normalizeSearch(input.userMessage))) return null
+
+    const match = input.chunks
+        .map((chunk) => ({
+            code: extractDocumentCode(chunk.content),
+            title: extractChunkTitle(chunk)
+        }))
+        .find((item): item is { code: string; title: string | null } => Boolean(item.code))
+
+    if (!match) return null
+    if (canonicalDocumentCode(input.response).includes(canonicalDocumentCode(match.code))) return null
+
+    if (input.responseLanguage === 'en') {
+        return match.title
+            ? `The document number for "${match.title}" is ${match.code}.`
+            : `The document number is ${match.code}.`
+    }
+
+    return match.title
+        ? `"${match.title}" doküman numarası ${match.code}'dir.`
+        : `Doküman numarası ${match.code}'dir.`
 }
 
 function cleanArticleText(value: string) {
@@ -91,10 +178,66 @@ function trimToAnswerSizedText(value: string) {
     return `${cleaned.slice(0, 500).trim()}...`
 }
 
+function repairAbbreviationTitleAnswer(input: {
+    response: string
+    userMessage: string
+    responseLanguage: MvpResponseLanguage
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!asksForAbbreviationTitle(normalizedUserMessage)) return null
+    if (!isLikelyLinkOnlyResponse(input.response)) return null
+
+    const title = input.chunks
+        .map(extractChunkTitle)
+        .find((value): value is string => Boolean(value?.trim()))
+
+    if (!title) return null
+
+    if (input.responseLanguage === 'en') {
+        return `This abbreviation appears in the "${title}" title.`
+    }
+
+    return `Bu kısaltma "${title}" başlığında geçiyor.`
+}
+
+function extractSenatoMeetingNumber(content: string) {
+    const normalized = content.replace(/\s+/g, ' ').trim()
+    const directMatch = normalized.match(/(\d{1,3})\s+sayılı\s+Senato\s+toplantısında/i)
+        ?? normalized.match(/(\d{1,3})\s+(?:nolu|numaralı)\s+Senato\s+toplantısında/i)
+        ?? normalized.match(/TOPLANTI\s+SAYISI\s*[:：-]?\s*(\d{1,3})/i)
+
+    return directMatch?.[1] ?? null
+}
+
+function repairSenatoMeetingNumberAnswer(input: {
+    response: string
+    userMessage: string
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!normalizedUserMessage.includes('senato') || !normalizedUserMessage.includes('toplanti')) return null
+    if (/\b\d{1,3}\s+(?:sayili|nolu|numarali)\s+senato\s+toplant/i.test(normalizeSearch(input.response))) {
+        return null
+    }
+
+    const meetingNumber = input.chunks
+        .map((chunk) => extractSenatoMeetingNumber(chunk.content))
+        .find((value): value is string => Boolean(value))
+
+    if (!meetingNumber) return null
+
+    if (/Senato toplantısında/i.test(input.response)) {
+        return input.response.replace(/Senato toplantısında/i, `${meetingNumber} sayılı Senato toplantısında`)
+    }
+
+    return `${input.response.replace(/\s+$/, '')} Toplantı numarası ${meetingNumber}'tür.`
+}
+
 function extractArticleText(content: string, articleNumber: number) {
     const normalized = content.replace(/\s+/g, ' ').trim()
     const articlePattern = new RegExp(
-        `(?:Amaç|Kapsam)?\\s*(?:Madde|MADDE)\\s*${articleNumber}\\s*[-–—]?\\s*(?:\\(\\d+\\)\\s*)?`,
+        `(?:Amaç(?:\\s+ve\\s+kapsam)?|Kapsam)?\\s*(?:Madde|MADDE)\\s*${articleNumber}\\s*[-–—]?\\s*(?:\\(\\d+\\)\\s*)?`,
         'i'
     )
     const match = articlePattern.exec(normalized)
@@ -153,6 +296,24 @@ export function repairLinkOnlyRagAnswer(input: {
 }) {
     const response = input.response.trim()
     if (!response) return response
+
+    const abbreviationTitleRepair = repairAbbreviationTitleAnswer({
+        ...input,
+        response
+    })
+    if (abbreviationTitleRepair) return abbreviationTitleRepair
+
+    const documentCodeRepair = repairDocumentCodeAnswer({
+        ...input,
+        response
+    })
+    if (documentCodeRepair) return documentCodeRepair
+
+    const senatoMeetingNumberRepair = repairSenatoMeetingNumberAnswer({
+        ...input,
+        response
+    })
+    if (senatoMeetingNumberRepair) return senatoMeetingNumberRepair
 
     const articleNumber = requestedArticleNumber(input.userMessage)
     if (!articleNumber) return response

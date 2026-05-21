@@ -584,12 +584,23 @@ export async function searchKnowledgeBase(
         supabase
     }
     const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions)
+    const documentCodeResults = await searchKnowledgeBaseByDocumentCode(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
+    const abbreviationResults = await searchKnowledgeBaseByAbbreviation(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const focusedKeywordResults = await searchKnowledgeBaseByFocusedKeywords(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
+    const exactTitlePhraseResults = await searchKnowledgeBaseByExactTitlePhrase(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const titleResults = await searchKnowledgeBaseByTitle(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const sourceResults = shouldUseSourcePathFallback(query)
         ? await searchKnowledgeBaseBySourcePath(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
         : []
-    const lexicalResults = [...fallbackResults, ...focusedKeywordResults, ...titleResults, ...sourceResults]
+    const lexicalResults = [
+        ...fallbackResults,
+        ...documentCodeResults,
+        ...abbreviationResults,
+        ...focusedKeywordResults,
+        ...exactTitlePhraseResults,
+        ...titleResults,
+        ...sourceResults
+    ]
 
     if ((!data || data.length === 0) && lexicalResults.length > 0) {
         return mergeSearchResults(query, [], lexicalResults, limit)
@@ -952,6 +963,10 @@ function sanitizeKeyword(keyword: string): string {
     return keyword.replace(/[%_]/g, '')
 }
 
+function sanitizeIlikePattern(value: string): string {
+    return value.replace(/[%_]/g, '')
+}
+
 function expandKeywordToken(token: string): string[] {
     const normalized = normalizeSearchText(token)
     const stemmed = stemSearchToken(normalized)
@@ -1066,7 +1081,9 @@ function documentTitleQueryTokens(query: string) {
 }
 
 function documentTitleCoverageScore(query: string, title?: string | null) {
-    if (!hasQuerySignal(query, ['dokuman', 'doküman', 'belge', 'yonerge', 'yönerge', 'mevzuat', 'numara', 'no'])) {
+    if (!hasQuerySignal(query, ['dokuman', 'doküman', 'belge', 'mevzuat', 'numara', 'no'])
+        && !hasDirectiveWord(query)
+        && !hasRegulationWord(query)) {
         return 0
     }
     if (!title) return 0
@@ -1084,6 +1101,288 @@ function documentTitleCoverageScore(query: string, title?: string | null) {
 
     const extraTitleTokenCount = titleTokens.length - hits
     return Math.max(0, titleCoverage * 0.18 + queryCoverage * 0.18 - extraTitleTokenCount * 0.03)
+}
+
+interface DocumentCodeCandidate {
+    raw: string
+    normalized: string
+    compact: string
+    prefix: string
+}
+
+function compactSearchText(value: string) {
+    return normalizeSearchText(value).replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function extractDocumentCodeCandidates(query: string): DocumentCodeCandidate[] {
+    const matches = query.match(/[\p{L}\p{N}]{2,10}(?:[.-][\p{L}\p{N}]{2,10}){2,}/gu) ?? []
+    const seen = new Set<string>()
+
+    return matches
+        .map((raw) => {
+            const normalized = normalizeSearchText(raw).replace(/\s+/g, '')
+            const compact = compactSearchText(raw)
+            const prefix = normalizeSearchText(raw.split(/[.-]/)[0] ?? '')
+
+            return {
+                raw,
+                normalized,
+                compact,
+                prefix
+            }
+        })
+        .filter((candidate) => {
+            if (!candidate.compact || seen.has(candidate.compact)) return false
+            seen.add(candidate.compact)
+            return true
+        })
+}
+
+function hasDocumentNumberQuestionSignal(query: string) {
+    return hasQuerySignal(query, [
+        'dokuman numarasi',
+        'doküman numarası',
+        'dokuman no',
+        'doküman no',
+        'belge numarasi',
+        'belge numarası'
+    ])
+}
+
+function hasExtractableDocumentNumber(value: string) {
+    const normalized = normalizeSearchText(value)
+
+    return /dokuman\s+no\s+[\p{L}\p{N}]{2,10}[.-][\p{L}\p{N}]{2,10}[.-][\p{L}\p{N}]{2,10}/u.test(normalized)
+}
+
+function isGenericDocumentControlTitle(title: string) {
+    const normalized = normalizeSearchText(title)
+
+    return normalized.includes('dokuman hazirlama')
+        || normalized.includes('dokuman kontrol')
+        || normalized.includes('dokuman hazirlama ve kontrol')
+}
+
+function documentCodeLookupScore(query: string, result: KnowledgeSearchResult) {
+    const candidates = extractDocumentCodeCandidates(query)
+    const sourceUrl = sourceUrlFromResult(result) ?? ''
+    const title = normalizeSearchText(result.document_title ?? '')
+    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    const searchableCompact = compactSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    let score = 0
+
+    for (const candidate of candidates) {
+        const hasExactCode = searchable.includes(candidate.normalized)
+            || searchableCompact.includes(candidate.compact)
+        const hasLooseSuffixOnly = candidate.compact.length > candidate.prefix.length
+            && !hasExactCode
+            && searchableCompact.includes(candidate.compact.slice(candidate.prefix.length))
+
+        if (hasExactCode) {
+            score += 0.9
+            if (hasDirectiveWord(title) || hasRegulationWord(title)) score += 0.14
+            if (searchable.includes('dokuman no')) score += 0.08
+        } else if (hasLooseSuffixOnly) {
+            score -= 0.28
+        }
+    }
+
+    if (candidates.length > 0 && isGenericDocumentControlTitle(result.document_title ?? '')) {
+        const hasAnyExactCode = candidates.some((candidate) => searchableCompact.includes(candidate.compact))
+        if (!hasAnyExactCode) score -= 0.42
+    }
+
+    if (hasDocumentNumberQuestionSignal(query)) {
+        const hasDocumentNumber = hasExtractableDocumentNumber(`${result.document_title}\n${result.content}`)
+        if (hasDocumentNumber) {
+            score += 0.44
+            if (sourceUrl.toLowerCase().includes('.pdf')) score += 0.08
+        } else {
+            score -= 0.14
+        }
+    }
+
+    return score
+}
+
+interface AbbreviationCandidate {
+    raw: string
+    normalized: string
+    compact: string
+}
+
+function uppercaseLetterCount(value: string) {
+    return (value.match(/\p{Lu}/gu) ?? []).length
+}
+
+function extractAbbreviationCandidates(query: string): AbbreviationCandidate[] {
+    if (extractDocumentCodeCandidates(query).length > 0) return []
+
+    const hasAbbreviationSignal = hasQuerySignal(query, [
+        'kisaltma',
+        'kısaltma',
+        'acilim',
+        'açılım',
+        'neyi ifade',
+        'ne anlama',
+        'ne demek'
+    ])
+    const rawTokens = query.match(/[\p{L}\p{N}]{2,8}(?:-[\p{L}\p{N}]{2,8})?/gu) ?? []
+    const candidates: AbbreviationCandidate[] = []
+    const seen = new Set<string>()
+
+    for (const raw of rawTokens) {
+        const normalized = normalizeSearchText(raw)
+        const compact = compactSearchText(raw)
+        const letterCount = (raw.match(/\p{L}/gu) ?? []).length
+        const uppercaseLike = uppercaseLetterCount(raw) >= Math.min(2, letterCount)
+        const allowSignalToken = hasAbbreviationSignal && candidates.length === 0 && compact.length >= 2 && compact.length <= 4
+
+        if (compact.length < 2 || compact.length > 12) continue
+        if (isKeywordStopword(normalized) || KEYWORD_STOPWORDS.has(compact)) continue
+        if (!uppercaseLike && !allowSignalToken) continue
+        if (seen.has(compact)) continue
+
+        seen.add(compact)
+        candidates.push({
+            raw,
+            normalized,
+            compact
+        })
+    }
+
+    return candidates
+}
+
+function containsAbbreviationCandidate(value: string, candidate: AbbreviationCandidate) {
+    const normalized = normalizeSearchText(value)
+    const tokenSet = normalizedTokenSet(value)
+    const compactValue = compactSearchText(value)
+
+    if (candidate.normalized.includes('-')) {
+        return normalized.includes(candidate.normalized)
+            || compactValue.includes(candidate.compact)
+    }
+
+    if (candidate.compact.length <= 4) {
+        return tokenSet.has(candidate.normalized)
+    }
+
+    return tokenSet.has(candidate.normalized)
+        || normalized.includes(candidate.normalized)
+        || compactValue.includes(candidate.compact)
+}
+
+function abbreviationLookupScore(query: string, result: KnowledgeSearchResult) {
+    const candidates = extractAbbreviationCandidates(query)
+    if (candidates.length === 0) return 0
+
+    const sourceUrl = sourceUrlFromResult(result) ?? ''
+    const title = normalizeSearchText(result.document_title ?? '')
+    const searchable = `${result.document_title}\n${result.content}\n${sourceUrl}`
+    let score = 0
+
+    for (const candidate of candidates) {
+        const appearsInSearchable = containsAbbreviationCandidate(searchable, candidate)
+        const appearsInTitle = containsAbbreviationCandidate(result.document_title ?? '', candidate)
+        const appearsInSource = containsAbbreviationCandidate(sourceUrl, candidate)
+
+        if (appearsInSearchable) score += 0.36
+        if (appearsInTitle) score += 0.18
+        if (appearsInSource) score += 0.12
+        if (appearsInSearchable && normalizeSearchText(searchable).includes(`(${candidate.normalized})`)) score += 0.24
+
+        if (!appearsInSearchable) {
+            score -= 0.16
+        }
+    }
+
+    if (hasQuerySignal(query, ['kisaltma', 'kısaltma', 'neyi ifade', 'ifade ediyor'])
+        && normalizeSearchText(result.content).includes('ifade')) {
+        score += 0.1
+    }
+
+    if (hasQuerySignal(query, ['birim', 'birimi', 'neyi ifade', 'ifade ediyor'])
+        && normalizeSearchText(searchable).includes('daire baskanligi')) {
+        score += 0.22
+    }
+
+    if (isGenericDocumentControlTitle(result.document_title ?? '')) {
+        score -= 0.24
+    }
+
+    if (hasQuerySignal(query, ['tip fakultesi', 'tıp fakültesi'])
+        && title.includes('tip fakultesi')) {
+        score += 0.08
+    }
+
+    return score
+}
+
+function abbreviationInitialismScore(query: string, title?: string | null) {
+    const candidates = extractAbbreviationCandidates(query)
+    if (candidates.length === 0 || !title) return 0
+
+    const titleTokens = allMeaningfulSearchTokens(title)
+    if (titleTokens.length === 0) return 0
+
+    let score = 0
+
+    for (const candidate of candidates) {
+        if (!/^[a-z]{2,6}$/.test(candidate.compact)) continue
+
+        for (let start = 0; start <= titleTokens.length - candidate.compact.length; start += 1) {
+            const initials = titleTokens
+                .slice(start, start + candidate.compact.length)
+                .map((token) => token[0] ?? '')
+                .join('')
+
+            if (initials === candidate.compact) {
+                score += start === 0 ? 0.58 : 0.44
+                break
+            }
+        }
+    }
+
+    return score
+}
+
+function directiveDetailScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!hasDirectiveWord(query) && !hasRegulationWord(query)) return 0
+
+    const title = normalizeSearchText(result.document_title ?? '')
+    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    const asksDirective = hasDirectiveWord(query)
+    const asksRegulation = hasRegulationWord(query)
+    const titleIsDirective = hasDirectiveWord(title)
+    const titleIsRegulation = hasRegulationWord(title)
+    const titleCoverage = documentTitleCoverageScore(query, result.document_title)
+    let score = 0
+
+    if ((asksDirective && titleIsDirective) || (asksRegulation && titleIsRegulation)) {
+        score += 0.42
+        if (titleCoverage > 0) score += 0.5 + titleCoverage
+        if (sourceUrl.toLowerCase().includes('.pdf')) score += 0.12
+    } else if ((asksDirective || asksRegulation) && !titleIsDirective && !titleIsRegulation) {
+        score -= 0.9
+        if (!sourceUrl.toLowerCase().includes('.pdf')) score -= 0.24
+    }
+
+    if (hasQuerySignal(query, ['hazirlik', 'hazırlık']) && searchable.includes('hazirlik')) {
+        score += 0.22
+    }
+
+    if (hasQuerySignal(query, ['yararlanabilir', 'yararlanabilir mi', 'yararlanamaz'])
+        && (searchable.includes('yararlanamaz') || searchable.includes('yararlanabilir'))) {
+        score += 0.18
+    }
+
+    if (hasQuerySignal(query, ['program'])
+        && searchable.includes('program')) {
+        score += 0.06
+    }
+
+    return score
 }
 
 const SOURCE_SLUG_CONNECTORS = new Set(['ve', 'and', 'ile'])
@@ -1281,6 +1580,18 @@ function hasQuerySignal(query: string, signals: string[]) {
     return signals.some((signal) => normalized.includes(normalizeSearchText(signal)))
 }
 
+function hasDirectiveWord(value: string) {
+    return normalizeSearchText(value).includes('yonerge')
+}
+
+function hasRegulationWord(value: string) {
+    const normalized = normalizeSearchText(value)
+
+    return normalized.includes('yonetmelik')
+        || normalized.includes('yonetmeligi')
+        || normalized.includes('yonetmeligin')
+}
+
 function isTimeSensitiveQuery(query: string) {
     return hasQuerySignal(query, [
         'duyuru',
@@ -1422,8 +1733,8 @@ function directIntentScore(query: string, sourceUrl: string, result: KnowledgeSe
         score += 0.14
     }
 
-    if (hasQuerySignal(query, ['yonetmelik', 'yönetmelik'])
-        && title.includes('yonetmelik')) {
+    if (hasRegulationWord(query)
+        && hasRegulationWord(title)) {
         score += 0.14
     }
 
@@ -1540,6 +1851,10 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + directIntentScore(query, sourceUrl, result)
         + rootContactInformationScore(query, sourceUrl, result)
         + healthReportExamPolicyScore(query, sourceUrl, result)
+        + documentCodeLookupScore(query, result)
+        + abbreviationLookupScore(query, result)
+        + abbreviationInitialismScore(query, result.document_title)
+        + directiveDetailScore(query, sourceUrl, result)
 }
 
 function enrichKnowledgeSearchResult(result: KnowledgeSearchResult): KnowledgeSearchResult {
@@ -1628,6 +1943,318 @@ async function searchKnowledgeBaseByKeyword(
                 0.45 + lexicalMatchScore(query, `${row.knowledge_documents?.title ?? ''}\n${row.content}`) * 0.25
             )
         }))
+}
+
+async function searchKnowledgeBaseByDocumentCode(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const candidates = extractDocumentCodeCandidates(query)
+    if (candidates.length === 0) return []
+
+    const supabase = options?.supabase || await createClient()
+    const filters = Array.from(new Set(candidates.flatMap((candidate) => [
+        candidate.raw,
+        candidate.normalized
+    ])))
+        .map(sanitizeIlikePattern)
+        .filter((candidate) => candidate.length >= 6)
+        .map((candidate) => `content.ilike.%${candidate}%`)
+        .join(',')
+
+    if (!filters) return []
+
+    let codeQuery = supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, content, knowledge_documents(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .or(filters)
+        .limit(Math.max(limit * 2, 24))
+
+    if (options?.collectionId) {
+        codeQuery = codeQuery.eq('knowledge_documents.collection_id', options.collectionId)
+    }
+    if (options?.type) {
+        codeQuery = codeQuery.eq('knowledge_documents.type', options.type)
+    }
+    if (options?.language) {
+        codeQuery = codeQuery.eq('knowledge_documents.language', options.language)
+    }
+
+    const { data, error } = await codeQuery
+    if (error || !data) {
+        console.error('Document-code fallback search failed:', error)
+        return []
+    }
+
+    return (data as KeywordSearchRow[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => {
+            const documentTitle = row.knowledge_documents?.title ?? 'Untitled'
+            const result = {
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: documentTitle,
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content: row.content as string,
+                similarity: 0.72
+            }
+
+            return {
+                ...result,
+                similarity: Math.max(0.2, 0.72 + Math.max(0, documentCodeLookupScore(query, result)) * 0.12)
+            }
+        })
+}
+
+async function searchKnowledgeBaseByAbbreviation(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const candidates = extractAbbreviationCandidates(query)
+    if (candidates.length === 0) return []
+
+    const supabase = options?.supabase || await createClient()
+    const filters = Array.from(new Set(candidates.flatMap((candidate) => [
+        candidate.raw,
+        candidate.normalized
+    ])))
+        .map(sanitizeIlikePattern)
+        .filter((candidate) => candidate.length >= 2)
+        .map((candidate) => `content.ilike.%${candidate}%`)
+        .join(',')
+
+    if (!filters) return []
+
+    let abbreviationQuery = supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, content, knowledge_documents(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .or(filters)
+        .limit(Math.max(limit * 3, 32))
+
+    if (options?.collectionId) {
+        abbreviationQuery = abbreviationQuery.eq('knowledge_documents.collection_id', options.collectionId)
+    }
+    if (options?.type) {
+        abbreviationQuery = abbreviationQuery.eq('knowledge_documents.type', options.type)
+    }
+    if (options?.language) {
+        abbreviationQuery = abbreviationQuery.eq('knowledge_documents.language', options.language)
+    }
+
+    const { data, error } = await abbreviationQuery
+    if (error || !data) {
+        console.error('Abbreviation fallback search failed:', error)
+        return []
+    }
+
+    return (data as KeywordSearchRow[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => {
+            const documentTitle = row.knowledge_documents?.title ?? 'Untitled'
+            const result = {
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: documentTitle,
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content: row.content as string,
+                similarity: 0.6
+            }
+
+            return {
+                ...result,
+                similarity: Math.max(0.2, 0.6 + Math.max(0, abbreviationLookupScore(query, result)) * 0.16)
+            }
+        })
+}
+
+function stripFinalTitlePossessiveSuffix(value: string) {
+    const parts = value.trim().split(/\s+/)
+    if (parts.length === 0) return value.trim()
+
+    const last = parts[parts.length - 1] ?? ''
+    const strippedLast = last
+        .replace(/(nin|nın|nun|nün)$/iu, '')
+        .replace(/(in|ın|un|ün)$/iu, '')
+
+    if (strippedLast.length >= 4 && strippedLast !== last) {
+        parts[parts.length - 1] = strippedLast
+    }
+
+    return parts.join(' ').trim()
+}
+
+function documentTitlePhraseCandidates(query: string) {
+    if (extractAbbreviationCandidates(query).length > 0) return []
+
+    let candidate = query
+        .replace(/[?!.]+$/g, '')
+        .replace(/\b(?:doküman|dokuman|belge)\s+(?:numarası|numarasi|no(?:su)?)\b[\s\S]*$/iu, '')
+        .replace(/\b(?:hangi|nedir|ne|kaç|kac|kim|midir|mi|mı)\b[\s\S]*$/iu, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    if (!candidate || (!hasDirectiveWord(candidate) && !hasRegulationWord(candidate))) return []
+
+    const candidates = new Set<string>()
+    candidates.add(candidate)
+    candidate = stripFinalTitlePossessiveSuffix(candidate)
+    candidates.add(candidate)
+
+    return [...candidates]
+        .map((value) => value.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim())
+        .filter((value) => value.length >= 8)
+        .slice(0, 3)
+}
+
+async function searchKnowledgeBaseByExactTitlePhrase(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const candidates = documentTitlePhraseCandidates(query)
+    if (candidates.length === 0) return []
+
+    const supabase = options?.supabase || await createClient()
+    const titleCandidates = candidates
+        .map(sanitizeIlikePattern)
+        .filter((candidate) => candidate.length >= 8)
+
+    if (titleCandidates.length === 0) return []
+
+    const hasPostgrestLogicSeparator = titleCandidates.some((candidate) => /[,()]/.test(candidate))
+    let documents: TitleSearchDocumentRow[] = []
+
+    if (hasPostgrestLogicSeparator) {
+        const documentsById = new Map<string, TitleSearchDocumentRow>()
+        for (const candidate of titleCandidates) {
+            let documentQuery = supabase
+                .from('knowledge_documents')
+                .select('id, title, type, status')
+                .eq('organization_id', organizationId)
+                .eq('status', 'ready')
+                .ilike('title', `%${candidate}%`)
+
+            if (options?.collectionId) {
+                documentQuery = documentQuery.eq('collection_id', options.collectionId)
+            }
+            if (options?.type) {
+                documentQuery = documentQuery.eq('type', options.type)
+            }
+            if (options?.language) {
+                documentQuery = documentQuery.eq('language', options.language)
+            }
+
+            const { data, error: documentError } = await documentQuery.limit(Math.max(20, limit))
+            if (documentError || !data) {
+                console.error('Exact title phrase document search failed:', documentError)
+                continue
+            }
+
+            for (const document of data as TitleSearchDocumentRow[]) {
+                documentsById.set(document.id, document)
+            }
+        }
+        documents = [...documentsById.values()]
+    } else {
+        const filters = titleCandidates
+            .map((candidate) => `title.ilike.%${candidate}%`)
+            .join(',')
+
+        let documentQuery = supabase
+            .from('knowledge_documents')
+            .select('id, title, type, status')
+            .eq('organization_id', organizationId)
+            .eq('status', 'ready')
+
+        if (options?.collectionId) {
+            documentQuery = documentQuery.eq('collection_id', options.collectionId)
+        }
+        if (options?.type) {
+            documentQuery = documentQuery.eq('type', options.type)
+        }
+        if (options?.language) {
+            documentQuery = documentQuery.eq('language', options.language)
+        }
+
+        const { data, error: documentError } = await documentQuery
+            .or(filters)
+            .limit(Math.max(20, limit))
+        if (documentError || !data) {
+            console.error('Exact title phrase document search failed:', documentError)
+            return []
+        }
+
+        documents = data as TitleSearchDocumentRow[]
+    }
+
+    const rankedDocuments = documents
+        .filter((row) => row.status === 'ready')
+        .map((row) => ({
+            ...row,
+            score: lexicalMatchScore(query, row.title ?? '')
+                + documentTitleCoverageScore(query, row.title)
+        }))
+        .sort((left, right) => right.score - left.score)
+        .slice(0, Math.max(4, Math.min(12, limit)))
+
+    const documentIds = rankedDocuments.map((row) => row.id)
+    if (documentIds.length === 0) return []
+
+    const documentById = new Map(rankedDocuments.map((row) => [row.id, row]))
+    const { data: chunks, error: chunkError } = await supabase
+        .from('knowledge_chunks')
+        .select('id, document_id, chunk_index, content, knowledge_documents(title, type, status, collection_id, language)')
+        .eq('organization_id', organizationId)
+        .in('document_id', documentIds)
+        .order('chunk_index')
+        .limit(Math.max(limit * 4, 32))
+
+    if (chunkError || !chunks) {
+        console.error('Exact title phrase chunk search failed:', chunkError)
+        return []
+    }
+
+    return (chunks as KeywordSearchRow[])
+        .filter((row) => row.knowledge_documents?.status === 'ready')
+        .map((row) => {
+            const documentScore = documentById.get(row.document_id)?.score ?? 0
+            const chunkScore = lexicalMatchScore(query, `${row.knowledge_documents?.title ?? ''}\n${row.content}`)
+            const earlyChunkBoost = Math.max(0, 0.12 - Number(row.chunk_index ?? 0) * 0.015)
+
+            return {
+                chunk_id: row.id as string,
+                document_id: row.document_id as string,
+                document_title: row.knowledge_documents?.title ?? 'Untitled',
+                document_type: row.knowledge_documents?.type ?? 'article',
+                content: row.content as string,
+                similarity: Math.max(
+                    0.2,
+                    0.68 + documentScore * 0.18 + chunkScore * 0.18 + earlyChunkBoost
+                )
+            }
+        })
 }
 
 const MAX_FOCUSED_KEYWORD_QUERIES = 6
@@ -1800,7 +2427,12 @@ async function searchKnowledgeBaseByTitle(
         documentQuery = documentQuery.eq('language', options.language)
     }
 
-    const documentCandidateLimit = Math.max(limit * 8, 120)
+    const broadDocumentTitleQuery = hasDocumentNumberQuestionSignal(query)
+        || hasDirectiveWord(query)
+        || hasRegulationWord(query)
+    const documentCandidateLimit = broadDocumentTitleQuery
+        ? Math.max(limit * 16, 500)
+        : Math.max(limit * 8, 120)
     const { data: documents, error: documentError } = await documentQuery
         .or(filters)
         .limit(documentCandidateLimit)
@@ -1814,6 +2446,8 @@ async function searchKnowledgeBaseByTitle(
         .map((row) => ({
             ...row,
             score: lexicalMatchScore(query, row.title ?? '')
+                + documentTitleCoverageScore(query, row.title)
+                + abbreviationInitialismScore(query, row.title)
         }))
         .filter((row) => row.score >= 0.35)
         .sort((left, right) => right.score - left.score)
@@ -1829,7 +2463,7 @@ async function searchKnowledgeBaseByTitle(
         .eq('organization_id', organizationId)
         .in('document_id', documentIds)
         .order('chunk_index')
-        .limit(Math.max(limit * 3, 24))
+        .limit(broadDocumentTitleQuery ? Math.max(limit * 5, 40) : Math.max(limit * 3, 24))
 
     if (chunkError || !chunks) {
         console.error('Title fallback chunk search failed:', chunkError)
