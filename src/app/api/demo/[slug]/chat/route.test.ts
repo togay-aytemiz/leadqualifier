@@ -101,6 +101,11 @@ describe('demo chat API route', () => {
     })
 
     it('persists a session as a demo_chat conversation and returns the AI reply', async () => {
+        let outboundResult: unknown = null
+        processInboundAiPipelineMock.mockImplementationOnce(async (input) => {
+            outboundResult = await input.sendOutbound('Merhaba, nasıl yardımcı olabilirim?')
+        })
+
         const res = await POST(createRequest({
             sessionId: 'session-1',
             message: 'Merhaba',
@@ -122,6 +127,12 @@ describe('demo chat API route', () => {
             inboundMessageIdMetadataKey: 'demo_chat_message_id',
             logPrefix: 'Demo Chat',
         }))
+        expect(outboundResult).toEqual({
+            providerMetadata: {
+                demo_chat_reply_to_message_id: expect.any(String),
+                demo_chat_reply_kind: 'text',
+            },
+        })
     })
 
     it('returns a pending response before a slow AI pipeline can hit the platform timeout', async () => {

@@ -171,10 +171,11 @@ async function runDemoChatPipeline(input: {
         },
         reprocessExistingInbound,
         sendOutbound: async (content) => {
+            const isImage = isOutboundImageMessage(content)
             const text = readTextReply(content)
             if (text) replyText = text
 
-            if (isOutboundImageMessage(content)) {
+            if (isImage) {
                 skillImage = {
                     imageUrl: content.imageUrl,
                     mimeType: content.mimeType,
@@ -184,7 +185,8 @@ async function runDemoChatPipeline(input: {
 
             return {
                 providerMetadata: {
-                    demo_chat_reply_to_message_id: inboundMessageId
+                    demo_chat_reply_to_message_id: inboundMessageId,
+                    demo_chat_reply_kind: isImage ? 'image' : 'text'
                 }
             }
         },

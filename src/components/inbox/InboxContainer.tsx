@@ -106,6 +106,7 @@ import {
   splitBotMessageDisclaimer,
 } from '@/components/inbox/botMessageContent'
 import { MessageRichText } from '@/components/inbox/messageRichText'
+import { filterDemoChatBotReplyDuplicates } from '@/components/inbox/demoChatDuplicates'
 import { filterInstagramEchoDuplicates } from '@/components/inbox/instagramEchoDuplicates'
 import {
   collectOptimisticPreviewUrls,
@@ -3216,7 +3217,9 @@ export function InboxContainer({
   )
   const visibleMessages = useMemo(
     () =>
-      showConversationSkeleton ? EMPTY_VISIBLE_MESSAGES : filterInstagramEchoDuplicates(messages),
+      showConversationSkeleton
+        ? EMPTY_VISIBLE_MESSAGES
+        : filterDemoChatBotReplyDuplicates(filterInstagramEchoDuplicates(messages)),
     [messages, showConversationSkeleton]
   )
   const selectedConversationUnresolvedInstagramContactId = selectedConversation

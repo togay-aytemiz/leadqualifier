@@ -620,6 +620,38 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     })
 
     const persistBotMessage = async (content: string, metadata: Record<string, unknown>) => {
+        const demoChatReplyToMessageId = readTrimmedString(metadata.demo_chat_reply_to_message_id)
+        const demoChatReplyKind = readTrimmedString(metadata.demo_chat_reply_kind)
+
+        if (demoChatReplyToMessageId && demoChatReplyKind) {
+            const { data: existingDemoReply, error: existingDemoReplyError } = await options.supabase
+                .from('messages')
+                .select('id')
+                .eq('conversation_id', conversation.id)
+                .eq('sender_type', 'bot')
+                .eq('metadata->>demo_chat_reply_to_message_id', demoChatReplyToMessageId)
+                .eq('metadata->>demo_chat_reply_kind', demoChatReplyKind)
+                .maybeSingle()
+
+            if (existingDemoReplyError) {
+                console.error(`${options.logPrefix}: Failed to check existing demo bot reply`, {
+                    organization_id: orgId,
+                    conversation_id: conversation.id,
+                    inbound_message_id: demoChatReplyToMessageId,
+                    reply_kind: demoChatReplyKind,
+                    error: existingDemoReplyError
+                })
+            } else if (isRecord(existingDemoReply) && readTrimmedString(existingDemoReply.id)) {
+                console.info(`${options.logPrefix}: Skipped duplicate demo bot reply`, {
+                    organization_id: orgId,
+                    conversation_id: conversation.id,
+                    inbound_message_id: demoChatReplyToMessageId,
+                    reply_kind: demoChatReplyKind
+                })
+                return
+            }
+        }
+
         await options.supabase
             .from('messages')
             .insert({

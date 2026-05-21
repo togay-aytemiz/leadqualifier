@@ -659,6 +659,66 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('does not persist duplicate demo_chat bot replies when recovery reprocesses the same inbound message', async () => {
+        const sendOutbound = vi.fn(async () => ({
+            providerMetadata: {
+                demo_chat_reply_to_message_id: 'demo-message-1',
+                demo_chat_reply_kind: 'text',
+            },
+        }))
+        const dedupe = createDedupeBuilder('contact-message-1')
+        const lookup = createConversationLookupBuilder(createConversation({
+            platform: 'demo_chat',
+            contact_phone: 'demo:demo-channel-1:session-1',
+        }))
+        const duplicateReplyCheck: Record<string, unknown> = {}
+        const duplicateInsertMock = vi.fn(async () => ({ error: null }))
+        duplicateReplyCheck.select = vi.fn(() => duplicateReplyCheck)
+        duplicateReplyCheck.eq = vi.fn(() => duplicateReplyCheck)
+        duplicateReplyCheck.maybeSingle = vi.fn(async () => ({
+            data: { id: 'bot-message-1' },
+            error: null,
+        }))
+        duplicateReplyCheck.insert = duplicateInsertMock
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, duplicateReplyCheck],
+            conversations: [lookup.builder, conversationUpdateAfterBotReply.builder],
+            skills: [skillDetails.builder],
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Demo Bilgi',
+                response_text: 'Recovered demo response',
+            },
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound, {
+            platform: 'demo_chat',
+            source: 'demo_chat',
+            contactId: 'demo:demo-channel-1:session-1',
+            inboundMessageId: 'demo-message-1',
+            inboundMessageIdMetadataKey: 'demo_chat_message_id',
+            inboundMessageMetadata: {
+                demo_chat_message_id: 'demo-message-1',
+                demo_chat_channel_id: 'demo-channel-1',
+                demo_chat_session_id: 'session-1',
+            },
+            reprocessExistingInbound: true,
+            logPrefix: 'Demo Chat',
+        }))
+
+        expect(sendOutbound).toHaveBeenCalledWith('Recovered demo response')
+        expect(duplicateReplyCheck.eq).toHaveBeenCalledWith('metadata->>demo_chat_reply_to_message_id', 'demo-message-1')
+        expect(duplicateReplyCheck.eq).toHaveBeenCalledWith('metadata->>demo_chat_reply_kind', 'text')
+        expect(duplicateInsertMock).not.toHaveBeenCalled()
+        expect(conversationUpdateAfterBotReply.updateMock).not.toHaveBeenCalled()
+    })
+
     it('isolates deferred lead extraction failures from the reply path', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
