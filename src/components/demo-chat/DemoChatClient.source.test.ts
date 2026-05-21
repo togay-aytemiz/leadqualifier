@@ -46,6 +46,16 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('thinkingIndex')
     })
 
+    it('polls pending demo replies instead of surfacing platform timeout failures', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('REPLY_POLL_INTERVAL_MS')
+        expect(source).toContain('pollPendingReply')
+        expect(source).toContain('response.status === 202')
+        expect(source).toContain('messageId')
+        expect(source).toContain('encodeURIComponent(sessionId)')
+    })
+
     it('keeps the demo disclaimer near the composer instead of repeating under each bot reply', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 

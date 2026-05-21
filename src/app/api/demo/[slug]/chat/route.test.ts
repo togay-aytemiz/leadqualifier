@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const {
@@ -26,7 +26,7 @@ vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
     processInboundAiPipeline: processInboundAiPipelineMock,
 }))
 
-import { POST } from '@/app/api/demo/[slug]/chat/route'
+import { GET, POST } from '@/app/api/demo/[slug]/chat/route'
 
 function createRequest(body: unknown) {
     return new NextRequest('https://app.askqualy.com/api/demo/yiu-aday-asistani/chat', {
@@ -34,6 +34,15 @@ function createRequest(body: unknown) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
     })
+}
+
+function createGetRequest(searchParams: Record<string, string>) {
+    const url = new URL('https://app.askqualy.com/api/demo/yiu-aday-asistani/chat')
+    for (const [key, value] of Object.entries(searchParams)) {
+        url.searchParams.set(key, value)
+    }
+
+    return new NextRequest(url)
 }
 
 function createContext(slug = 'yiu-aday-asistani') {
@@ -60,6 +69,10 @@ describe('demo chat API route', () => {
         processInboundAiPipelineMock.mockImplementation(async (input) => {
             await input.sendOutbound('Merhaba, nasıl yardımcı olabilirim?')
         })
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     it('returns 404 for disabled or missing demo slugs before running AI', async () => {
@@ -97,6 +110,85 @@ describe('demo chat API route', () => {
             inboundMessageIdMetadataKey: 'demo_chat_message_id',
             logPrefix: 'Demo Chat',
         }))
+    })
+
+    it('returns a pending response before a slow AI pipeline can hit the platform timeout', async () => {
+        vi.useFakeTimers()
+        vi.stubEnv('DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS', '1000')
+        let resolvePipeline: (() => void) | null = null
+        processInboundAiPipelineMock.mockImplementationOnce(async () => {
+            await new Promise<void>((resolve) => {
+                resolvePipeline = resolve
+            })
+        })
+
+        const responsePromise = POST(createRequest({
+            sessionId: 'session-1',
+            message: 'personelin ücretsiz izin süresi ne kadar',
+        }), createContext())
+
+        await vi.advanceTimersByTimeAsync(1000)
+        const res = await responsePromise
+
+        expect(res.status).toBe(202)
+        const body = await res.json()
+        expect(body).toMatchObject({ pending: true })
+        expect(typeof body.messageId).toBe('string')
+
+        resolvePipeline?.()
+        await vi.runOnlyPendingTimersAsync()
+    })
+
+    it('returns a completed pending reply from persisted demo bot messages', async () => {
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const messagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [
+                    {
+                        content: 'Ücretsiz izin süresi en fazla 1 yıldır.',
+                        metadata: {
+                            demo_chat_reply_to_message_id: 'message-1',
+                        },
+                    },
+                ],
+                error: null,
+            })),
+        }
+        messagesChain.eq.mockReturnValue(messagesChain)
+
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                return { select: vi.fn(() => conversationChain) }
+            }
+            if (table === 'messages') {
+                return { select: vi.fn(() => messagesChain) }
+            }
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Ücretsiz izin süresi en fazla 1 yıldır.',
+            skillImage: null,
+        })
+        expect(buildDemoChatContactIdMock).toHaveBeenCalledWith('demo-channel-1', 'session-1')
+        expect(messagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_reply_to_message_id', 'message-1')
     })
 
     it('keeps parallel testers isolated by forwarding distinct session contact ids', async () => {

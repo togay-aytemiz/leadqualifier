@@ -19,6 +19,8 @@ const THEME_STORAGE_KEY = 'qualy-demo-chat-theme'
 const THINKING_ROTATION_MS = 2600
 const MAX_STORED_MESSAGES = 80
 const COMPOSER_MAX_HEIGHT_PX = 156
+const REPLY_POLL_INTERVAL_MS = 1500
+const REPLY_POLL_ATTEMPTS = 40
 
 interface DemoChatClientProps {
     slug: string
@@ -61,6 +63,26 @@ function parseStoredMessages(value: string | null): DemoChatMessage[] {
             .slice(-MAX_STORED_MESSAGES)
     } catch {
         return []
+    }
+}
+
+function sleep(ms: number) {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, ms)
+    })
+}
+
+function readDemoChatReplyPayload(data: unknown) {
+    const payload = data && typeof data === 'object' ? data as Record<string, unknown> : {}
+    const skillImage = payload.skillImage && typeof payload.skillImage === 'object'
+        ? payload.skillImage as Record<string, unknown>
+        : null
+
+    return {
+        pending: payload.pending === true,
+        messageId: typeof payload.messageId === 'string' ? payload.messageId : '',
+        response: typeof payload.response === 'string' ? payload.response.trim() : '',
+        imageUrl: typeof skillImage?.imageUrl === 'string' ? skillImage.imageUrl : null
     }
 }
 
@@ -204,6 +226,22 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
         setIsSending(true)
 
         try {
+            const pollPendingReply = async (messageId: string) => {
+                for (let attempt = 0; attempt < REPLY_POLL_ATTEMPTS; attempt += 1) {
+                    await sleep(REPLY_POLL_INTERVAL_MS)
+                    const pollResponse = await fetch(
+                        `/api/demo/${slug}/chat?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}`
+                    )
+                    const pollData = readDemoChatReplyPayload(await pollResponse.json())
+
+                    if (pollResponse.status === 202 && pollData.pending) continue
+                    if (!pollResponse.ok) throw new Error(`Demo chat poll failed: ${pollResponse.status}`)
+                    return pollData
+                }
+
+                throw new Error('Demo chat reply polling timed out')
+            }
+
             const response = await fetch(`/api/demo/${slug}/chat`, {
                 method: 'POST',
                 headers: {
@@ -215,23 +253,25 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                 }),
             })
 
-            if (!response.ok) {
+            if (!response.ok && response.status !== 202) {
                 throw new Error(`Demo chat request failed: ${response.status}`)
             }
 
-            const data = await response.json()
-            const reply = typeof data.response === 'string' ? data.response.trim() : ''
-            const imageUrl = data.skillImage && typeof data.skillImage.imageUrl === 'string'
-                ? data.skillImage.imageUrl
-                : null
+            const initialData = readDemoChatReplyPayload(await response.json())
+            if (response.status === 202 && (!initialData.pending || !initialData.messageId)) {
+                throw new Error('Demo chat pending response is missing a message id')
+            }
+            const data = response.status === 202
+                ? await pollPendingReply(initialData.messageId)
+                : initialData
 
             setMessages((current) => [
                 ...current,
                 {
                     id: createSessionId(),
                     role: 'assistant',
-                    content: reply || t('emptyReply'),
-                    imageUrl,
+                    content: data.response || t('emptyReply'),
+                    imageUrl: data.imageUrl,
                 },
             ])
         } catch {
