@@ -1820,6 +1820,57 @@ describe('searchKnowledgeBase', () => {
         }
     })
 
+    it('does not run broad lexical fallbacks when policy-duration evidence already fills the result set', async () => {
+        const { supabase, limitMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [
+                {
+                    id: 'unpaid-leave-duration-1',
+                    document_id: 'doc-leave-policy-1',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Ücretsiz izinler aşağıdaki esaslara göre kullanılır. Ücretsiz izin süresi en fazla 1 (bir) yıldır.',
+                    knowledge_documents: {
+                        title: 'İzin Kullanımı Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                },
+                {
+                    id: 'unpaid-leave-duration-2',
+                    document_id: 'doc-leave-policy-1',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- Akademik personel ücretsiz izin süresi en fazla 1 (bir) yıldır.',
+                    knowledge_documents: {
+                        title: 'İzin Kullanımı Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                },
+                {
+                    id: 'unpaid-leave-duration-3',
+                    document_id: 'doc-leave-policy-1',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin.pdf\n\nMadde 11- İdari personel ücretsiz izin süresi en fazla 1 (bir) yıldır.',
+                    knowledge_documents: {
+                        title: 'İzin Kullanımı Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'personelin ücretsiz izin süresi ne kadar',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results).toHaveLength(3)
+        expect(results.map((result) => result.chunk_id)).toContain('unpaid-leave-duration-1')
+        expect(limitMock).toHaveBeenCalledTimes(1)
+    })
+
     it('keeps exact policy duration evidence for non-leave duration questions', async () => {
         const longExamCalendarText = Array.from({ length: 40 }, () =>
             'Mazeret sınavı takvimi, sınav salonları, öğrenci listeleri ve duyuru yayınlama süreçleri hakkında genel bilgi verir.'

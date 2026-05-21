@@ -633,6 +633,10 @@ export async function searchKnowledgeBase(
         supabase
     }
     const policyDurationResults = await searchKnowledgeBaseByPolicyDurationEvidence(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
+    if (isPolicyDurationQuery(query) && policyDurationResults.length >= limit) {
+        return mergeSearchResults(query, data ?? [], policyDurationResults, limit)
+    }
+
     const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions)
     const documentCodeResults = await searchKnowledgeBaseByDocumentCode(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
     const abbreviationResults = await searchKnowledgeBaseByAbbreviation(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
@@ -2052,8 +2056,16 @@ async function searchKnowledgeBaseByPolicyDurationEvidence(
         return []
     }
 
+    const requiredSubjectTokens = policyDurationRequiredSubjectTokens(policyDurationSubjectTokens(query))
+
     return (data as KeywordSearchRow[])
         .filter((row) => row.knowledge_documents?.status === 'ready')
+        .filter((row) => {
+            const searchable = `${row.knowledge_documents?.title ?? ''}\n${row.content}`
+
+            return policyDurationHasRequiredSubjectTokens(requiredSubjectTokens, searchable)
+                && hasPolicyDurationEvidence(searchable)
+        })
         .map((row) => {
             const documentTitle = row.knowledge_documents?.title ?? 'Untitled'
             const content = row.content as string
@@ -2083,10 +2095,14 @@ function policyDurationSubjectTokens(query: string) {
 }
 
 function policyDurationRequiredSubjectTokens(tokens: string[]) {
-    return tokens.filter((token) => (
+    const subjectTokens = tokens.filter((token) => !POLICY_DURATION_ACTOR_TOKENS.has(token))
+    const specificTokens = subjectTokens.filter((token) => (
         !POLICY_DURATION_ACTOR_TOKENS.has(token)
         && !POLICY_DURATION_GENERIC_SUBJECT_TOKENS.has(token)
     ))
+    const genericTokens = subjectTokens.filter((token) => POLICY_DURATION_GENERIC_SUBJECT_TOKENS.has(token))
+
+    return [...specificTokens, ...genericTokens].slice(0, 4)
 }
 
 function policyDurationSubjectCoverage(tokens: string[], value: string) {
@@ -2094,9 +2110,16 @@ function policyDurationSubjectCoverage(tokens: string[], value: string) {
 
     const normalized = normalizeSearchText(value)
     const tokenSet = normalizedTokenSet(value)
-    const hits = tokens.filter((token) => tokenSet.has(token) || normalized.includes(token)).length
+    const hits = tokens.filter((token) => policyDurationTokenMatches(token, normalized, tokenSet)).length
 
     return hits / tokens.length
+}
+
+function policyDurationTokenMatches(token: string, normalized: string, tokenSet: Set<string>) {
+    if (tokenSet.has(token)) return true
+
+    // Keep short policy nouns token-bound so "izin" does not match "sizin".
+    return token.length >= 5 && normalized.includes(token)
 }
 
 function policyDurationHasRequiredSubjectTokens(tokens: string[], value: string) {
@@ -2105,11 +2128,11 @@ function policyDurationHasRequiredSubjectTokens(tokens: string[], value: string)
     const normalized = normalizeSearchText(value)
     const tokenSet = normalizedTokenSet(value)
 
-    return tokens.every((token) => tokenSet.has(token) || normalized.includes(token))
+    return tokens.every((token) => policyDurationTokenMatches(token, normalized, tokenSet))
 }
 
 function hasPolicyDurationEvidence(value: string) {
-    return POLICY_DURATION_VALUE_REGEX.test(value)
+    return POLICY_DURATION_VALUE_REGEX.test(normalizeSearchText(value))
 }
 
 function policyDurationEvidenceScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {

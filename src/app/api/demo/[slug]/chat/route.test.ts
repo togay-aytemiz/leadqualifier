@@ -276,6 +276,81 @@ describe('demo chat API route', () => {
         expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
     })
 
+    it('keeps polling pending when recovery processing is slower than the sync reply budget', async () => {
+        vi.useFakeTimers()
+        vi.stubEnv('DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS', '1000')
+        const createConversationChain = () => {
+            const chain = {
+                eq: vi.fn(),
+                maybeSingle: vi.fn(async () => ({
+                    data: { id: 'conversation-1' },
+                    error: null,
+                })),
+            }
+            chain.eq.mockReturnValue(chain)
+            return chain
+        }
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'personelin ücretsiz izin süresi ne kadar',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const conversations = [createConversationChain(), createConversationChain()]
+        const messagesTable = {
+            select: vi.fn((columns: string) => (
+                columns.includes('metadata') ? completedMessagesChain : inboundMessagesChain
+            )),
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) throw new Error('Unexpected conversation lookup')
+                return { select: vi.fn(() => chain) }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => {
+            await new Promise<void>(() => {})
+        })
+
+        const responsePromise = GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+        }), createContext())
+        let settled = false
+        responsePromise.then(() => {
+            settled = true
+        })
+
+        await vi.advanceTimersByTimeAsync(0)
+        await vi.advanceTimersByTimeAsync(1000)
+        await Promise.resolve()
+
+        expect(settled).toBe(true)
+        const res = await responsePromise
+        expect(res.status).toBe(202)
+        await expect(res.json()).resolves.toEqual({ pending: true })
+    })
+
     it('keeps parallel testers isolated by forwarding distinct session contact ids', async () => {
         await POST(createRequest({
             sessionId: 'session-a',

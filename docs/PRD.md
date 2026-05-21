@@ -2,6 +2,8 @@
 
 > **Update Note (2026-05-21):** Knowledge Base ingestion must preserve document structure before embedding in both app-side reprocessing and crawler-corpus imports. When uploaded or imported content contains legal articles, numbered sections, markdown headings, or strong standalone headings, indexing should split at those boundaries and prepend reusable `Section:` metadata so RAG can retrieve the exact clause/section instead of a blended chunk that mixes adjacent policies or unrelated topics.
 
+> **Update Note (2026-05-21):** Public Demo Chat polling must never turn slow recovery processing into a generic browser send failure. When a pending-reply GET request cannot finish a recovered AI pipeline run within the sync reply budget, it should return `202 pending`, keep the browser in the thinking/polling state, and defer the recovery attempt behind the response.
+
 > **Update Note (2026-05-21):** Large Knowledge Base organizations must not let a slow vector RPC block customer replies. If `match_knowledge_chunks` exceeds the bounded vector-search deadline, runtime should continue with keyword, document-code, abbreviation, title, and source fallback retrieval instead of waiting for the database statement timeout and risking demo/API 504s.
 
 > **Update Note (2026-05-21):** RAG answers for duration/limit questions must distinguish the exact policy topic, not only the broad entity and unit. If a user asks for `ücretsiz izin süresi`, evidence about `mazeret izni`, `yıllık izin`, or another nearby leave type must be demoted and cannot be used to repair a no-answer unless it also contains the distinctive subject modifier from the question.

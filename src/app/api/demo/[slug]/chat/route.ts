@@ -84,9 +84,9 @@ function readMessageText(value: unknown) {
     return value.trim()
 }
 
-function waitForPipelineResult(promise: Promise<DemoChatPipelineResult>, timeoutMs: number) {
+function waitForPipelineResult<T>(promise: Promise<T>, timeoutMs: number) {
     return new Promise<
-        | { status: 'completed'; result: DemoChatPipelineResult }
+        | { status: 'completed'; result: T }
         | { status: 'timeout' }
     >((resolve, reject) => {
         const timeoutId = setTimeout(() => resolve({ status: 'timeout' }), timeoutMs)
@@ -383,14 +383,23 @@ export async function GET(req: NextRequest, context: RouteContext) {
         })
 
         if (!completedReply) {
-            const recoveredReply = await recoverPendingDemoChatReply({
+            const recoveryPromise = recoverPendingDemoChatReply({
                 supabase,
                 channel,
                 sessionId,
                 messageId,
                 fallbackMessage: message
             })
+            const recoveryResult = await waitForPipelineResult(recoveryPromise, readSyncReplyTimeoutMs())
+            if (recoveryResult.status === 'timeout') {
+                scheduleAfterResponse('pending reply recovery', async () => {
+                    await recoveryPromise
+                })
 
+                return NextResponse.json({ pending: true }, { status: 202 })
+            }
+
+            const recoveredReply = recoveryResult.result
             if (!recoveredReply) {
                 return NextResponse.json({ pending: true }, { status: 202 })
             }

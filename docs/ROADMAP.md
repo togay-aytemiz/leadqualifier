@@ -2,6 +2,8 @@
 
 > **Update Note (2026-05-21):** Knowledge Base indexing now needs section-aware chunking before generic token chunking in both document reprocessing and crawler-corpus import paths. Structural headings such as `MADDE 11 - Ücretsiz İzin`, numbered headings, markdown headings, and strong standalone document headings should become `Section:` metadata and chunk boundaries so nearby policy clauses or unrelated document sections do not contaminate each other's retrieval evidence across PDF, article, and process-style sources.
 
+> **Update Note (2026-05-21):** Demo Chat polling recovery must use the same bounded reply budget as the initial POST path. If a pending reply lookup has to re-run the inbound AI pipeline and that recovery is still slow, the GET endpoint should return `202 pending` and defer the recovery work instead of letting Netlify surface a generic `502` send failure.
+
 > **Update Note (2026-05-21):** Large-corpus RAG retrieval must degrade gracefully when org-wide vector matching becomes slow. The runtime now needs a bounded vector-search deadline and should continue through lexical/title/source fallbacks when the vector RPC exceeds that deadline, preventing slow PDF-heavy organizations from turning retrieval latency into demo/API timeouts.
 
 > **Update Note (2026-05-21):** University-pilot RAG must avoid answering duration questions from nearby but different policy topics. Duration retrieval and answer repair now require the retrieved evidence to include the question's distinctive subject modifier, such as `ücretsiz` in `ücretsiz izin`, before a duration sentence like `3 iş günü mazeret izni` can outrank or repair an answer.
