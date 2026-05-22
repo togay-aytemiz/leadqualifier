@@ -26,6 +26,11 @@ function asRecord(value: unknown): Record<string, unknown> {
     return value as Record<string, unknown>
 }
 
+function readString(record: Record<string, unknown>, key: string) {
+    const value = record[key]
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
 function buildPlansRedirectUrl(input: {
     req: NextRequest
     locale: 'tr' | 'en'
@@ -57,8 +62,13 @@ async function readCallbackPayload(req: NextRequest) {
 async function handle(req: NextRequest) {
     const locale = resolveLocale(req.nextUrl.searchParams.get('locale'))
     const callbackPayload = await readCallbackPayload(req)
-    const recordId = req.nextUrl.searchParams.get('recordId')?.trim()
-        || (typeof callbackPayload.conversationId === 'string' ? callbackPayload.conversationId.trim() : '')
+    const callbackConversationId = readString(callbackPayload, 'conversationId')
+    const recordId = req.nextUrl.searchParams.get('recordId')?.trim() || callbackConversationId || ''
+    const callbackToken = readString(callbackPayload, 'token')
+        || readString(callbackPayload, 'checkoutFormToken')
+        || req.nextUrl.searchParams.get('token')?.trim()
+        || req.nextUrl.searchParams.get('checkoutFormToken')?.trim()
+        || null
 
     const status = typeof callbackPayload.status === 'string'
         ? callbackPayload.status.toLowerCase()
@@ -92,11 +102,28 @@ async function handle(req: NextRequest) {
     }
 
     const metadata = asRecord(subscriptionRecord.metadata)
+    const expectedToken = readString(metadata, 'card_update_checkout_token')
+    if (
+        !expectedToken
+        || !callbackToken
+        || callbackToken !== expectedToken
+        || (callbackConversationId && callbackConversationId !== recordId)
+    ) {
+        return NextResponse.redirect(buildPlansRedirectUrl({
+            req,
+            locale,
+            status: 'error',
+            error: 'request_failed'
+        }))
+    }
+
     const { error: updateError } = await serviceSupabase
         .from('organization_subscription_records')
         .update({
             metadata: {
                 ...metadata,
+                card_update_checkout_token: null,
+                card_update_checkout_form_content: null,
                 last_card_update_callback_at: new Date().toISOString(),
                 last_card_update_callback_payload: callbackPayload
             }

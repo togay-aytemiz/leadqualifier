@@ -545,6 +545,52 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('checks manual renewal once while keeping stage-level billing gates', async () => {
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const botInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({ total_score: 4 })
+        const skillDetails = createSkillDetailsBuilder({ requires_human_handover: false })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            skills: [skillDetails.builder]
+        })
+
+        resolveLeadExtractionAllowanceMock.mockReturnValueOnce(true)
+        matchSkillsSafelyMock.mockResolvedValueOnce([
+            {
+                skill_id: 'skill-1',
+                title: 'Bilgi',
+                response_text: 'Skill response'
+            }
+        ])
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+        await flushAfterCallbacks()
+
+        expect(resolveOrganizationUsageEntitlementMock).toHaveBeenNthCalledWith(1, 'org-1', {
+            supabase
+        })
+        expect(resolveOrganizationUsageEntitlementMock).toHaveBeenNthCalledWith(2, 'org-1', {
+            supabase,
+            skipManualRenewal: true
+        })
+        expect(resolveOrganizationUsageEntitlementMock).toHaveBeenNthCalledWith(3, 'org-1', {
+            supabase,
+            skipManualRenewal: true
+        })
+        expect(runLeadExtractionMock).toHaveBeenCalledWith(expect.objectContaining({
+            skipManualRenewal: true
+        }))
+    })
+
     it('processes demo_chat messages through the shared reply path without scheduling side effects or per-message disclaimers', async () => {
         const sendOutbound = vi.fn(async () => undefined)
         const dedupe = createDedupeBuilder(null)

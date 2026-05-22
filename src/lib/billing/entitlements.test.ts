@@ -146,6 +146,29 @@ describe('billing entitlements', () => {
         expect(calls).toEqual(['rpc', 'select'])
     })
 
+    it('can skip manual-admin renewal when the request already checked it', async () => {
+        const supabase = createSupabaseMock({
+            data: createBillingAccount({
+                membership_state: 'premium_active',
+                trial_credit_used: 120,
+                current_period_start: '2026-05-01T10:00:00.000Z',
+                current_period_end: '2026-06-01T10:00:00.000Z',
+                monthly_package_credit_limit: 1000,
+                monthly_package_credit_used: 0
+            }),
+            error: null
+        })
+        createClientMock.mockResolvedValue(supabase)
+
+        const entitlement = await resolveOrganizationUsageEntitlement('org_1', {
+            supabase,
+            skipManualRenewal: true
+        })
+
+        expect(entitlement.isUsageAllowed).toBe(true)
+        expect(supabase.rpc).not.toHaveBeenCalled()
+    })
+
     it('throws BillingUsageLockedError when usage is not allowed', async () => {
         const supabase = createSupabaseMock({
             data: createBillingAccount({

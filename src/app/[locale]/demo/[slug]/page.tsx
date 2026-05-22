@@ -3,6 +3,7 @@ import { setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { DemoChatClient } from '@/components/demo-chat/DemoChatClient'
+import { createDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { getScopedMessages } from '@/i18n/messages'
 
@@ -43,6 +44,10 @@ export default async function DemoChatPage({ params }: DemoChatPageProps) {
 
     const messages = await getScopedMessages(locale, ['demoChat'])
     const defaultLogoUrl = channel.slug === 'yiu-qualy-ai-demo' ? UNIVERSITY_DEMO_LOGO_URL : null
+    const accessToken = createDemoChatAccessToken({ channel })
+    if (!accessToken) {
+        notFound()
+    }
 
     return (
         <NextIntlClientProvider locale={locale} messages={messages}>
@@ -50,6 +55,7 @@ export default async function DemoChatPage({ params }: DemoChatPageProps) {
                 slug={channel.slug}
                 displayName={channel.displayName}
                 logoUrl={channel.logoUrl || defaultLogoUrl}
+                accessToken={accessToken}
             />
         </NextIntlClientProvider>
     )

@@ -7,6 +7,7 @@ import {
     type OutboundMessageInput,
 } from '@/lib/channels/outbound-message'
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
+import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 
 export const runtime = 'nodejs'
@@ -14,6 +15,8 @@ export const runtime = 'nodejs'
 const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 8000
+const DEMO_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000
+const DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE = 20
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -44,6 +47,8 @@ type DemoChatMessageRow = {
 type DemoChatConversationRow = {
     id?: string | null
 }
+
+const demoChatRateLimitBuckets = new Map<string, { windowStartMs: number; count: number }>()
 
 function createServiceClient() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -82,6 +87,65 @@ function readSyncReplyTimeoutMs() {
 function readMessageText(value: unknown) {
     if (typeof value !== 'string') return ''
     return value.trim()
+}
+
+function readDemoChatAccessToken(req: NextRequest) {
+    const authorization = req.headers.get('authorization')?.trim()
+    if (authorization?.toLowerCase().startsWith('bearer ')) {
+        return authorization.slice('bearer '.length).trim()
+    }
+
+    return req.headers.get('x-demo-chat-access-token')?.trim() || null
+}
+
+function isDemoChatRequestAuthorized(
+    req: NextRequest,
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+) {
+    return verifyDemoChatAccessToken({
+        channel,
+        token: readDemoChatAccessToken(req),
+    })
+}
+
+function readDemoChatRateLimitMax() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_RATE_LIMIT_PER_MINUTE ?? '', 10)
+    if (Number.isFinite(raw) && raw > 0) return Math.min(raw, 120)
+    return DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE
+}
+
+function readClientIp(req: NextRequest) {
+    const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    return forwardedFor || req.headers.get('x-real-ip')?.trim() || 'unknown'
+}
+
+function pruneDemoChatRateLimitBuckets(nowMs: number) {
+    if (demoChatRateLimitBuckets.size < 1000) return
+
+    for (const [key, bucket] of demoChatRateLimitBuckets.entries()) {
+        if (nowMs - bucket.windowStartMs >= DEMO_CHAT_RATE_LIMIT_WINDOW_MS) {
+            demoChatRateLimitBuckets.delete(key)
+        }
+    }
+}
+
+function isDemoChatRateLimited(input: {
+    req: NextRequest
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+}) {
+    const nowMs = Date.now()
+    pruneDemoChatRateLimitBuckets(nowMs)
+
+    const key = `${input.channel.id}:${input.sessionId}:${readClientIp(input.req)}`
+    const current = demoChatRateLimitBuckets.get(key)
+    if (!current || nowMs - current.windowStartMs >= DEMO_CHAT_RATE_LIMIT_WINDOW_MS) {
+        demoChatRateLimitBuckets.set(key, { windowStartMs: nowMs, count: 1 })
+        return false
+    }
+
+    current.count += 1
+    return current.count > readDemoChatRateLimitMax()
 }
 
 function waitForPipelineResult<T>(promise: Promise<T>, timeoutMs: number) {
@@ -328,6 +392,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!channel) {
         return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
     }
+    if (!isDemoChatRequestAuthorized(req, channel)) {
+        return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
+    }
+    if (isDemoChatRateLimited({ req, channel, sessionId })) {
+        return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
+    }
 
     const inboundMessageId = uuidv4()
     const pipelinePromise = runDemoChatPipeline({
@@ -375,6 +445,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
     if (!channel) {
         return NextResponse.json({ error: 'Demo not found' }, { status: 404 })
     }
+    if (!isDemoChatRequestAuthorized(req, channel)) {
+        return NextResponse.json({ error: 'Demo access denied' }, { status: 401 })
+    }
 
     try {
         const completedReply = await findCompletedDemoChatReply({
@@ -385,6 +458,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
         })
 
         if (!completedReply) {
+            if (isDemoChatRateLimited({ req, channel, sessionId })) {
+                return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
+            }
+
             const recoveryPromise = recoverPendingDemoChatReply({
                 supabase,
                 channel,

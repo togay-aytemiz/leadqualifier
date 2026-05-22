@@ -254,7 +254,10 @@ export async function beginSubscriptionPaymentMethodUpdate(input: {
     const checkoutFormContent = typeof initResult.checkoutFormContent === 'string'
         ? initResult.checkoutFormContent
         : null
-    if (!checkoutFormContent) {
+    const checkoutToken = typeof initResult.token === 'string' && initResult.token.trim()
+        ? initResult.token.trim()
+        : null
+    if (!checkoutFormContent || !checkoutToken) {
         return errorResult('request_failed')
     }
 
@@ -269,6 +272,7 @@ export async function beginSubscriptionPaymentMethodUpdate(input: {
         .update({
             metadata: {
                 ...metadata,
+                card_update_checkout_token: checkoutToken,
                 card_update_checkout_form_content: checkoutFormContent,
                 last_card_update_requested_at: new Date().toISOString()
             }

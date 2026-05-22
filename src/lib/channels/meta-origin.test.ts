@@ -39,7 +39,7 @@ describe('resolveMetaOrigin', () => {
         expect(origin).toBe('https://app.askqualy.com')
     })
 
-    it('uses forwarded host when configured urls are invalid', () => {
+    it('ignores forwarded host when it does not match a configured origin', () => {
         const origin = resolveMetaOrigin({
             appUrl: 'not-a-url',
             siteUrl: '',
@@ -48,15 +48,27 @@ describe('resolveMetaOrigin', () => {
             requestOrigin: 'https://main--leadqualifier.netlify.app'
         })
 
-        expect(origin).toBe('https://app.askqualy.com')
+        expect(origin).toBe('https://main--leadqualifier.netlify.app')
     })
 
-    it('handles comma-separated forwarded headers', () => {
+    it('accepts comma-separated forwarded headers only when they match a configured origin', () => {
         const origin = resolveMetaOrigin({
-            appUrl: '',
+            appUrl: 'https://app.askqualy.com',
             siteUrl: '',
             forwardedHost: 'app.askqualy.com, main--leadqualifier.netlify.app',
             forwardedProto: 'https,http',
+            requestOrigin: 'https://main--leadqualifier.netlify.app'
+        })
+
+        expect(origin).toBe('https://app.askqualy.com')
+    })
+
+    it('does not let a spoofed forwarded host override configured urls', () => {
+        const origin = resolveMetaOrigin({
+            appUrl: '',
+            siteUrl: 'https://app.askqualy.com',
+            forwardedHost: 'evil.example',
+            forwardedProto: 'https',
             requestOrigin: 'https://main--leadqualifier.netlify.app'
         })
 

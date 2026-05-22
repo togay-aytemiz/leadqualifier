@@ -492,6 +492,7 @@ function createHybridSearchSupabase(options?: {
             language?: string | null
         }
     }>
+    holdFallbackLimits?: boolean
 }) {
     const rpcMock = vi.fn(async () => ({
         data: options?.rpcRows ?? [
@@ -532,11 +533,28 @@ function createHybridSearchSupabase(options?: {
     const titleChunkRows = options?.titleChunkRows ?? []
     const fallbackRowPages = options?.fallbackRowPages ?? [fallbackRows]
     let fallbackLimitCallCount = 0
+    let releaseFallbackLimits = false
+    const pendingFallbackLimitResolvers: Array<() => void> = []
 
-    const limitMock = vi.fn(async () => ({
-        data: fallbackRowPages[Math.min(fallbackLimitCallCount++, fallbackRowPages.length - 1)] ?? [],
-        error: null
-    }))
+    const releaseHeldFallbackLimits = () => {
+        releaseFallbackLimits = true
+        for (const resolve of pendingFallbackLimitResolvers.splice(0)) {
+            resolve()
+        }
+    }
+
+    const limitMock = vi.fn(async () => {
+        if (options?.holdFallbackLimits && !releaseFallbackLimits) {
+            await new Promise<void>((resolve) => {
+                pendingFallbackLimitResolvers.push(resolve)
+            })
+        }
+
+        return {
+            data: fallbackRowPages[Math.min(fallbackLimitCallCount++, fallbackRowPages.length - 1)] ?? [],
+            error: null
+        }
+    })
     const keywordChain: {
         eq: ReturnType<typeof vi.fn>
         or: ReturnType<typeof vi.fn>
@@ -618,6 +636,7 @@ function createHybridSearchSupabase(options?: {
         rpcMock,
         orMock: keywordChain.or,
         limitMock,
+        releaseHeldFallbackLimits,
         titleDocumentOrMock: titleDocumentChain.or,
         titleDocumentLimitMock,
         titleChunkLimitMock
@@ -920,6 +939,34 @@ describe('searchKnowledgeBase', () => {
             document_id: 'doc-kw-1'
         })
         expect(results.map((result) => result.chunk_id)).toEqual(['kw-1', 'vec-1', 'vec-2'])
+    })
+
+    it('starts independent lexical fallbacks before the first fallback query resolves', async () => {
+        const { supabase, limitMock, releaseHeldFallbackLimits } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            holdFallbackLimits: true
+        })
+
+        const searchPromise = searchKnowledgeBase(
+            'TLT yönergesi 2024/17 iletişim bilgileri',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        let assertionError: unknown = null
+        try {
+            expect(limitMock.mock.calls.length).toBeGreaterThan(1)
+        } catch (error) {
+            assertionError = error
+        }
+
+        releaseHeldFallbackLimits()
+        await searchPromise
+        if (assertionError) throw assertionError
     })
 
     it('prefers evergreen department pages over announcements for generic department information questions', async () => {

@@ -594,10 +594,14 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     const botMode = aiSettings.bot_mode ?? 'active'
     const { allowReplies } = resolveBotModeAction(botMode)
     const allowDuringOperator = aiSettings.allow_lead_extraction_during_operator ?? false
+    let manualRenewalChecked = false
     const ensureUsageAllowed = async (stage: string) => {
+        const skipManualRenewal = manualRenewalChecked
         const entitlement = await resolveOrganizationUsageEntitlement(orgId, {
-            supabase: options.supabase
+            supabase: options.supabase,
+            ...(skipManualRenewal ? { skipManualRenewal: true } : {})
         })
+        manualRenewalChecked = true
 
         if (entitlement.isUsageAllowed) return true
 
@@ -759,7 +763,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 conversationId: conversation.id,
                 latestMessage: options.text,
                 supabase: options.supabase,
-                source: options.source
+                source: options.source,
+                skipManualRenewal: true
             })
 
             if (operatorActive || !allowReplies) return
@@ -1457,6 +1462,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
         leadSnapshot: leadSnapshotForReply,
         aiSettings,
         supabase: options.supabase,
+        skipManualRenewal: true,
         usageMetadata: {
             conversation_id: conversation.id,
             source: options.source

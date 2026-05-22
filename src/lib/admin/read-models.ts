@@ -583,6 +583,24 @@ interface AdminUsageDateRange {
     nextMonthStartIso: string
 }
 
+interface AdminUsageTotals {
+    totalTokenCount: number
+    inputTokenCount: number
+    outputTokenCount: number
+    embeddingTokenCount: number
+    weightedChatTokenCount: number
+    totalCreditUsage: number
+}
+
+interface AdminUsageTotalsRpcRow {
+    total_token_count: number | string | null
+    input_token_count: number | string | null
+    output_token_count: number | string | null
+    embedding_token_count: number | string | null
+    weighted_chat_token_count: number | string | null
+    total_credit_usage: number | string | null
+}
+
 async function getMessageCountForRange(
     supabase: SupabaseClient,
     options: {
@@ -620,6 +638,70 @@ async function getMessageCountForRange(
     return toNonNegativeInteger(count)
 }
 
+function createEmptyUsageTotals(): AdminUsageTotals {
+    return {
+        totalTokenCount: 0,
+        inputTokenCount: 0,
+        outputTokenCount: 0,
+        embeddingTokenCount: 0,
+        weightedChatTokenCount: 0,
+        totalCreditUsage: 0
+    }
+}
+
+function mapAdminUsageTotalsRpcRow(row: AdminUsageTotalsRpcRow | null | undefined): AdminUsageTotals {
+    if (!row) return createEmptyUsageTotals()
+
+    return {
+        totalTokenCount: Math.floor(toNonNegativeNumber(row.total_token_count)),
+        inputTokenCount: Math.floor(toNonNegativeNumber(row.input_token_count)),
+        outputTokenCount: Math.floor(toNonNegativeNumber(row.output_token_count)),
+        embeddingTokenCount: Math.floor(toNonNegativeNumber(row.embedding_token_count)),
+        weightedChatTokenCount: Math.floor(toNonNegativeNumber(row.weighted_chat_token_count)),
+        totalCreditUsage: Math.round(toNonNegativeNumber(row.total_credit_usage) * 10) / 10
+    }
+}
+
+function isMissingAdminUsageTotalsRpc(error: unknown) {
+    const message = error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : ''
+
+    return message.includes('get_admin_ai_usage_totals')
+}
+
+async function getUsageTotalsForRangeFromRpc(
+    supabase: SupabaseClient,
+    options: {
+        organizationId?: string
+        organizationIds?: string[]
+        dateRange?: AdminUsageDateRange | null
+    }
+): Promise<AdminUsageTotals | null> {
+    const targetOrganizationIds = options.organizationId
+        ? [options.organizationId]
+        : options.organizationIds && options.organizationIds.length > 0
+            ? options.organizationIds
+            : null
+
+    const { data, error } = await supabase.rpc('get_admin_ai_usage_totals', {
+        target_organization_ids: targetOrganizationIds,
+        range_start: options.dateRange?.monthStartIso ?? null,
+        range_end: options.dateRange?.nextMonthStartIso ?? null
+    })
+
+    if (error) {
+        if (!isMissingAdminUsageTotalsRpc(error)) {
+            console.error('Failed to load AI usage totals through admin aggregate RPC:', error)
+        }
+
+        return null
+    }
+
+    const rows = (data ?? []) as AdminUsageTotalsRpcRow[]
+    return mapAdminUsageTotalsRpcRow(rows[0])
+}
+
 async function getUsageTotalsForRange(
     supabase: SupabaseClient,
     options: {
@@ -629,15 +711,11 @@ async function getUsageTotalsForRange(
     }
 ) {
     if (options.organizationIds && options.organizationIds.length === 0) {
-        return {
-            totalTokenCount: 0,
-            inputTokenCount: 0,
-            outputTokenCount: 0,
-            embeddingTokenCount: 0,
-            weightedChatTokenCount: 0,
-            totalCreditUsage: 0
-        }
+        return createEmptyUsageTotals()
     }
+
+    const rpcTotals = await getUsageTotalsForRangeFromRpc(supabase, options)
+    if (rpcTotals) return rpcTotals
 
     const pageSize = 1000
     let offset = 0

@@ -1,27 +1,10 @@
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import autocannon from 'autocannon'
 
 function parsePositiveInteger(value, fallback) {
     const parsed = Number.parseInt(value ?? '', 10)
     if (!Number.isFinite(parsed) || parsed <= 0) return fallback
     return parsed
-}
-
-function sumStatusCounts(statusCodeStats = {}, isWanted) {
-    return Object.entries(statusCodeStats).reduce((sum, [code, stat]) => {
-        const numericCode = Number.parseInt(code, 10)
-        if (!Number.isFinite(numericCode)) return sum
-        if (!isWanted(numericCode)) return sum
-
-        if (typeof stat === 'number') return sum + stat
-        if (stat && typeof stat === 'object' && 'count' in stat) {
-            const count = Number.parseInt(String(stat.count), 10)
-            if (Number.isFinite(count)) return sum + count
-        }
-
-        return sum
-    }, 0)
 }
 
 async function startHarnessServer() {
@@ -109,37 +92,46 @@ async function run() {
     })
 
     const targetUrl = `${baseUrl.replace(/\/$/, '')}/api/webhooks/whatsapp`
+    const startedAt = Date.now()
+    const endAt = startedAt + (durationSeconds * 1000)
+    let totalRequests = 0
+    let success2xx = 0
+    const latencies = []
 
-    const result = await new Promise((resolve, reject) => {
-        autocannon({
-            url: targetUrl,
-            method: 'POST',
-            connections,
-            duration: durationSeconds,
-            headers: {
-                'content-type': 'application/json',
-                'x-hub-signature-256': 'sha256=load-test'
-            },
-            body: payload,
-            pipelining: 1
-        }, (error, summary) => {
-            if (error) {
-                reject(error)
-                return
+    async function worker() {
+        while (Date.now() < endAt) {
+            const requestStartedAt = Date.now()
+            const response = await fetch(targetUrl, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-hub-signature-256': 'sha256=load-test'
+                },
+                body: payload
+            })
+
+            await response.arrayBuffer()
+            const latency = Date.now() - requestStartedAt
+            latencies.push(latency)
+            totalRequests += 1
+            if (response.status >= 200 && response.status < 300) {
+                success2xx += 1
             }
-            resolve(summary)
-        })
-    })
+        }
+    }
+
+    await Promise.all(Array.from({ length: connections }, () => worker()))
 
     if (harness?.server) {
         await new Promise((resolve) => harness.server.close(resolve))
     }
 
-    const totalRequests = result?.requests?.total ?? 0
-    const avgReqPerSec = result?.requests?.average ?? 0
-    const p95LatencyMs = result?.latency?.p95 ?? 0
-    const success2xx = sumStatusCounts(result?.statusCodeStats, (code) => code >= 200 && code < 300)
-    const non2xx = sumStatusCounts(result?.statusCodeStats, (code) => code < 200 || code >= 300)
+    latencies.sort((a, b) => a - b)
+    const elapsedSeconds = Math.max(0.001, (Date.now() - startedAt) / 1000)
+    const avgReqPerSec = totalRequests / elapsedSeconds
+    const p95Index = Math.max(0, Math.ceil(latencies.length * 0.95) - 1)
+    const p95LatencyMs = latencies[p95Index] ?? 0
+    const non2xx = totalRequests - success2xx
     const successRatio = totalRequests > 0 ? success2xx / totalRequests : 0
 
     console.log('[load-test] target:', targetUrl)

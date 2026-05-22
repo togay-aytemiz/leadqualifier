@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const {
+    afterCallbacks,
+    afterMock,
     createClientMock,
     downloadMediaMock,
     extractWhatsAppInboundMessagesMock,
@@ -15,6 +17,10 @@ const {
     storageUploadMock,
     whatsAppCtorMock
 } = vi.hoisted(() => ({
+    afterCallbacks: [] as Array<() => void | Promise<void>>,
+    afterMock: vi.fn((callback: () => void | Promise<void>) => {
+        afterCallbacks.push(callback)
+    }),
     createClientMock: vi.fn(),
     downloadMediaMock: vi.fn(),
     extractWhatsAppInboundMessagesMock: vi.fn(),
@@ -28,6 +34,14 @@ const {
     storageUploadMock: vi.fn(),
     whatsAppCtorMock: vi.fn()
 }))
+
+vi.mock('next/server', async () => {
+    const actual = await vi.importActual<typeof import('next/server')>('next/server')
+    return {
+        ...actual,
+        after: afterMock
+    }
+})
 
 vi.mock('@supabase/supabase-js', () => ({
     createClient: createClientMock
@@ -56,6 +70,14 @@ vi.mock('@/lib/whatsapp/client', () => ({
 }))
 
 import { GET, POST } from '@/app/api/webhooks/whatsapp/route'
+
+async function flushAfterCallbacks() {
+    while (afterCallbacks.length > 0) {
+        const callback = afterCallbacks.shift()
+        if (!callback) continue
+        await callback()
+    }
+}
 
 function createChannelLookupSupabaseMock(channelData: unknown) {
     const maybeSingleMock = vi.fn(async () => ({ data: channelData }))
@@ -121,6 +143,8 @@ function createGlobalVerifySupabaseMock(channelData: unknown) {
 describe('WhatsApp webhook route', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        processInboundAiPipelineMock.mockReset()
+        afterCallbacks.length = 0
         process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
     })
@@ -272,6 +296,7 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        await flushAfterCallbacks()
         expect(selectMock).toHaveBeenCalledWith('id, organization_id, config')
         expect(whatsAppCtorMock).toHaveBeenCalledWith('token-1')
         expect(updateMock).toHaveBeenCalledWith({
@@ -298,6 +323,54 @@ describe('WhatsApp webhook route', () => {
             to: '905551112233',
             text: 'Bot reply'
         })
+    })
+
+    it('acknowledges valid POST before running the AI pipeline', async () => {
+        const event = {
+            phoneNumberId: 'phone-1',
+            contactPhone: '905551112233',
+            contactName: 'Ayse',
+            messageId: 'wamid-1',
+            text: 'Merhaba',
+            timestamp: '1738000000'
+        }
+        const { supabase } = createChannelLookupSupabaseMock({
+            id: 'channel-1',
+            organization_id: 'org-1',
+            config: {
+                phone_number_id: 'phone-1',
+                app_secret: 'app-secret',
+                permanent_access_token: 'token-1',
+                webhook_status: 'verified',
+                webhook_verified_at: '2026-05-22T00:00:00.000Z'
+            }
+        })
+
+        createClientMock.mockReturnValue(supabase)
+        extractWhatsAppInboundMessagesMock.mockReturnValue([{
+            kind: 'text',
+            ...event
+        }])
+        isValidMetaSignatureMock.mockReturnValue(true)
+        processInboundAiPipelineMock.mockImplementationOnce(() => new Promise(() => undefined))
+
+        const req = new NextRequest('http://localhost/api/webhooks/whatsapp', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-hub-signature-256': 'sha256=valid'
+            },
+            body: JSON.stringify({ entry: [{}] })
+        })
+
+        const result = await Promise.race([
+            POST(req),
+            new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 25))
+        ])
+
+        expect(result).not.toBe('timeout')
+        expect(afterMock).toHaveBeenCalledTimes(1)
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
     it('forwards interactive button-reply event with parsed skill action selection', async () => {
@@ -339,6 +412,7 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        await flushAfterCallbacks()
         expect(processInboundAiPipelineMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 organizationId: 'org-1',
@@ -412,6 +486,7 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        await flushAfterCallbacks()
         expect(sendReplyButtonsMock).toHaveBeenCalledWith({
             phoneNumberId: 'phone-1',
             to: '905551112233',
@@ -472,6 +547,7 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        await flushAfterCallbacks()
         expect(sendReplyButtonsMock).toHaveBeenCalledTimes(1)
         expect(sendTextMock).toHaveBeenCalledWith({
             phoneNumberId: 'phone-1',
@@ -543,6 +619,7 @@ describe('WhatsApp webhook route', () => {
 
         expect(res.status).toBe(200)
         await expect(res.json()).resolves.toEqual({ ok: true })
+        await flushAfterCallbacks()
         expect(getMediaMetadataMock).toHaveBeenCalledWith('media-1')
         expect(downloadMediaMock).toHaveBeenCalledWith('https://graph.example.com/media-1')
         expect(storageFromMock).toHaveBeenCalledWith('whatsapp-media')

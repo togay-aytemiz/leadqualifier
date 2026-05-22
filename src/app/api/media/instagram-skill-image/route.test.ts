@@ -39,6 +39,61 @@ describe('instagram skill image proxy route', () => {
         await expect(res.json()).resolves.toEqual({ error: 'Invalid skill image source' })
     })
 
+    it('rejects sources that only contain the skill-images path as a prefix trick', async () => {
+        const req = new NextRequest(
+            'https://app.askqualy.com/api/media/instagram-skill-image?source='
+            + encodeURIComponent('https://example.supabase.co/storage/v1/object/public/skill-images-malicious/org-1/image.webp')
+        )
+
+        const res = await GET(req)
+
+        expect(res.status).toBe(400)
+        expect(sharpMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects oversized source images before buffering them into sharp', async () => {
+        const fetchMock = vi.mocked(fetch)
+        fetchMock.mockResolvedValue(new Response(Buffer.from('too-large'), {
+            status: 200,
+            headers: {
+                'content-type': 'image/webp',
+                'content-length': String((5 * 1024 * 1024) + 1)
+            }
+        }))
+
+        const req = new NextRequest(
+            'https://app.askqualy.com/api/media/instagram-skill-image?source='
+            + encodeURIComponent('https://example.supabase.co/storage/v1/object/public/skill-images/org-1/skill-image.webp')
+        )
+
+        const res = await GET(req)
+
+        expect(res.status).toBe(413)
+        await expect(res.json()).resolves.toEqual({ error: 'Skill image is too large' })
+        expect(sharpMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects non-raster content types before image conversion', async () => {
+        const fetchMock = vi.mocked(fetch)
+        fetchMock.mockResolvedValue(new Response('<svg />', {
+            status: 200,
+            headers: {
+                'content-type': 'image/svg+xml'
+            }
+        }))
+
+        const req = new NextRequest(
+            'https://app.askqualy.com/api/media/instagram-skill-image?source='
+            + encodeURIComponent('https://example.supabase.co/storage/v1/object/public/skill-images/org-1/skill-image.svg')
+        )
+
+        const res = await GET(req)
+
+        expect(res.status).toBe(415)
+        await expect(res.json()).resolves.toEqual({ error: 'Unsupported skill image type' })
+        expect(sharpMock).not.toHaveBeenCalled()
+    })
+
     it('converts allowed skill images to jpeg', async () => {
         const fetchMock = vi.mocked(fetch)
         fetchMock.mockResolvedValue(new Response(Buffer.from('webp-binary'), {

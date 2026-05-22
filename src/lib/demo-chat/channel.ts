@@ -6,6 +6,7 @@ export interface DemoChatChannel {
     slug: string
     displayName: string
     logoUrl: string | null
+    sharedSecretHash: string | null
 }
 
 function normalizeSlug(slug: string) {
@@ -29,7 +30,7 @@ export async function resolveDemoChatChannel(args: {
 
     const { data, error } = await args.supabase
         .from('demo_chat_channels')
-        .select('id, organization_id, slug, display_name, logo_url, enabled')
+        .select('id, organization_id, slug, display_name, logo_url, enabled, shared_secret_hash')
         .eq('slug', slug)
         .eq('enabled', true)
         .maybeSingle()
@@ -42,5 +43,8 @@ export async function resolveDemoChatChannel(args: {
         slug: String(data.slug),
         displayName: String(data.display_name),
         logoUrl: typeof data.logo_url === 'string' ? data.logo_url : null,
+        sharedSecretHash: typeof data.shared_secret_hash === 'string' && data.shared_secret_hash.trim()
+            ? data.shared_secret_hash.trim()
+            : null,
     }
 }

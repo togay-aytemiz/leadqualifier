@@ -3,31 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as iyzicoClient from '@/lib/billing/providers/iyzico/client'
 
 const {
-    getBillingProviderConfigMock,
-    subscriptionCardUpdateWithSubscriptionReferenceCodeMock,
-    subscriptionPaymentRetryMock,
-    paymentRetrieveMock,
-    iyzipayConstructorMock
+    getBillingProviderConfigMock
 } = vi.hoisted(() => {
-    const subscriptionCardUpdateWithSubscriptionReferenceCodeMock = vi.fn()
-    const subscriptionPaymentRetryMock = vi.fn()
-    const subscriptionUpgradeMock = vi.fn()
-    const paymentRetrieveMock = vi.fn()
-    const iyzipayConstructorMock = vi.fn(() => ({
-        subscriptionCard: {
-            updateWithSubscriptionReferenceCode: subscriptionCardUpdateWithSubscriptionReferenceCodeMock
-        },
-        subscriptionPayment: {
-            retry: subscriptionPaymentRetryMock
-        },
-        subscription: {
-            upgrade: subscriptionUpgradeMock
-        },
-        payment: {
-            retrieve: paymentRetrieveMock
-        }
-    }))
-
     return {
         getBillingProviderConfigMock: vi.fn(() => ({
             provider: 'iyzico',
@@ -43,29 +20,9 @@ const {
                 webhookSecret: null,
                 error: null
             }
-        })),
-        subscriptionCardUpdateWithSubscriptionReferenceCodeMock,
-        subscriptionPaymentRetryMock,
-        subscriptionUpgradeMock,
-        paymentRetrieveMock,
-        iyzipayConstructorMock
+        }))
     }
 })
-
-vi.mock('iyzipay', () => ({
-    default: Object.assign(iyzipayConstructorMock, {
-        LOCALE: {
-            TR: 'tr',
-            EN: 'en'
-        },
-        PAYMENT_GROUP: {
-            PRODUCT: 'PRODUCT'
-        },
-        SUBSCRIPTION_INITIAL_STATUS: {
-            ACTIVE: 'ACTIVE'
-        }
-    })
-}))
 
 vi.mock('@/lib/billing/providers/config', () => ({
     getBillingProviderConfig: getBillingProviderConfigMock
@@ -83,13 +40,14 @@ describe('iyzico billing client', () => {
     it('exposes a subscription card-update initializer', async () => {
         expect(typeof (iyzicoClient as Record<string, unknown>).initializeIyzicoSubscriptionCardUpdateCheckout).toBe('function')
 
-        subscriptionCardUpdateWithSubscriptionReferenceCodeMock.mockImplementation((payload, cb) => {
-            cb(null, {
+        const fetchMock = vi.fn(async () => ({
+            json: async () => ({
                 status: 'success',
                 token: 'card-update-token',
                 checkoutFormContent: '<div />'
             })
-        })
+        }))
+        vi.stubGlobal('fetch', fetchMock)
 
         const result = await (iyzicoClient as typeof iyzicoClient & {
             initializeIyzicoSubscriptionCardUpdateCheckout: (input: {
@@ -109,22 +67,29 @@ describe('iyzico billing client', () => {
             status: 'success',
             token: 'card-update-token'
         }))
-        expect(subscriptionCardUpdateWithSubscriptionReferenceCodeMock).toHaveBeenCalledWith({
-            locale: 'tr',
-            conversationId: 'conv_1',
-            subscriptionReferenceCode: 'sub_ref_1',
-            callbackUrl: 'https://app.test/api/billing/iyzico/card-update/callback'
-        }, expect.any(Function))
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://sandbox-api.iyzipay.com/v2/subscription/card-update/checkoutform/initialize/with-subscription',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    locale: 'tr',
+                    conversationId: 'conv_1',
+                    subscriptionReferenceCode: 'sub_ref_1',
+                    callbackUrl: 'https://app.test/api/billing/iyzico/card-update/callback'
+                })
+            })
+        )
     })
 
     it('exposes a failed-payment retry wrapper', async () => {
         expect(typeof (iyzicoClient as Record<string, unknown>).retryIyzicoSubscriptionPayment).toBe('function')
 
-        subscriptionPaymentRetryMock.mockImplementation((payload, cb) => {
-            cb(null, {
+        const fetchMock = vi.fn(async () => ({
+            json: async () => ({
                 status: 'success'
             })
-        })
+        }))
+        vi.stubGlobal('fetch', fetchMock)
 
         const result = await (iyzicoClient as typeof iyzicoClient & {
             retryIyzicoSubscriptionPayment: (input: {
@@ -141,24 +106,31 @@ describe('iyzico billing client', () => {
         expect(result).toEqual(expect.objectContaining({
             status: 'success'
         }))
-        expect(subscriptionPaymentRetryMock).toHaveBeenCalledWith({
-            locale: 'tr',
-            conversationId: 'conv_retry_1',
-            referenceCode: 'order_ref_failed_1'
-        }, expect.any(Function))
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://sandbox-api.iyzipay.com/v2/subscription/operation/retry',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    locale: 'tr',
+                    conversationId: 'conv_retry_1',
+                    referenceCode: 'order_ref_failed_1'
+                })
+            })
+        )
     })
 
     it('retrieves payment detail by payment id for subscription order settlement amounts', async () => {
         expect(typeof (iyzicoClient as Record<string, unknown>).retrieveIyzicoPayment).toBe('function')
 
-        paymentRetrieveMock.mockImplementation((payload, cb) => {
-            cb(null, {
+        const fetchMock = vi.fn(async () => ({
+            json: async () => ({
                 status: 'success',
                 paymentId: '29512645',
                 paidPrice: 649,
                 paymentStatus: 'SUCCESS'
             })
-        })
+        }))
+        vi.stubGlobal('fetch', fetchMock)
 
         const result = await (iyzicoClient as typeof iyzicoClient & {
             retrieveIyzicoPayment: (input: {
@@ -175,10 +147,16 @@ describe('iyzico billing client', () => {
             paymentId: '29512645',
             paidPrice: 649
         }))
-        expect(paymentRetrieveMock).toHaveBeenCalledWith({
-            locale: 'tr',
-            paymentId: '29512645'
-        }, expect.any(Function))
+        expect(fetchMock).toHaveBeenCalledWith(
+            'https://sandbox-api.iyzipay.com/payment/detail',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    locale: 'tr',
+                    paymentId: '29512645'
+                })
+            })
+        )
     })
 
     it('sends documented recurrence fields to subscription upgrades', async () => {

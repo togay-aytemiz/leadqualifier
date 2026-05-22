@@ -169,6 +169,7 @@ describe('subscription payment recovery actions', () => {
         })
         expect(spies.updateMock).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
+                card_update_checkout_token: 'card_update_token_1',
                 card_update_checkout_form_content: '<div id=\"iyzipay-checkout-form\"></div>'
             })
         }))

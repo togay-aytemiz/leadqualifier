@@ -64,14 +64,17 @@ export async function resolveOrganizationUsageEntitlement(
     organizationId: string,
     options?: {
         supabase?: SupabaseClientLike
+        skipManualRenewal?: boolean
     }
 ): Promise<OrganizationUsageEntitlement> {
     const supabase = options?.supabase ?? await createClient()
 
-    await renewDueManualAdminSubscription({
-        organizationId,
-        supabase
-    })
+    if (!options?.skipManualRenewal) {
+        await renewDueManualAdminSubscription({
+            organizationId,
+            supabase
+        })
+    }
 
     const { data, error } = await supabase
         .from('organization_billing_accounts')

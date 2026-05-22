@@ -38,4 +38,18 @@ describe('auth signout route', () => {
         expect(signOutMock).toHaveBeenCalledTimes(1)
         expect(res.headers.get('location')).toBe('https://app.askqualy.com/register')
     })
+
+    it('ignores spoofed forwarded host headers when building the register redirect', async () => {
+        const req = new NextRequest('https://app.askqualy.com/api/auth/signout', {
+            method: 'POST',
+            headers: {
+                'x-forwarded-host': 'evil.example',
+                'x-forwarded-proto': 'https'
+            }
+        })
+
+        const res = await POST(req)
+
+        expect(res.headers.get('location')).toBe('https://app.askqualy.com/register')
+    })
 })

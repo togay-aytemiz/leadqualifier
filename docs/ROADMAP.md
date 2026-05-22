@@ -1,5 +1,25 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-22):** Runtime dependency security must not rely on vulnerable payment/load-test packages. Iyzico provider calls now use a small signed `fetch` client instead of the `iyzipay` SDK dependency chain, the load-test harness no longer depends on `autocannon`, Vitest/Supabase/next-intl/uuid transitive packages are updated, and `npm audit` currently reports zero vulnerabilities.
+
+> **Update Note (2026-05-22):** WhatsApp webhook POST handling must acknowledge provider retries before expensive AI/media work. After signature/channel validation, the route now schedules inbound AI pipeline and media-download work with Next `after()`, logs deferred failures, and returns `200` without waiting for the AI reply path.
+
+> **Update Note (2026-05-22):** Inbound billing checks should keep stage-level credit gates without rerunning manual-admin renewal RPCs on every gate. The shared pipeline marks manual renewal as checked after the first entitlement read and passes that state into deferred lead extraction and fallback calls while still re-reading current billing entitlement before token-consuming stages.
+
+> **Update Note (2026-05-22):** Instagram skill-image proxying must bound remote image work before loading data into Sharp. The proxy now accepts only the exact public `skill-images` Supabase bucket path, rejects non-raster MIME types, enforces a 5 MB content-length/body-size cap, and returns controlled errors for oversized or unconvertible images.
+
+> **Update Note (2026-05-22):** Redirect/callback origin resolution must not trust arbitrary `x-forwarded-host` values. Meta/Google origin resolution now accepts forwarded origins only when they match configured app/site origins or the request origin, and signout redirects use the concrete request origin directly so spoofed forwarded headers cannot move users to another host.
+
+> **Update Note (2026-05-22):** Iyzico card-update callbacks must prove they belong to the active hosted card-update attempt before service-role metadata writes. The recovery action now stores the provider card-update token, and the public callback rejects missing/wrong tokens or mismatched `conversationId` values before recording callback payloads; successful callbacks consume the token to prevent replay.
+
+> **Update Note (2026-05-22):** Admin dashboard AI usage totals must aggregate in Postgres instead of paging every `organization_ai_usage` row through the server read model. The dashboard now calls `get_admin_ai_usage_totals`, which enforces authenticated organization scope, sums token/credit totals in SQL, and keeps the old row-paging path only as a migration fallback.
+
+> **Update Note (2026-05-22):** Knowledge Base RAG lexical fallback fan-out must not serialize independent database reads after vector search. Keyword, document-code, abbreviation, focused-keyword, exact-title, title, and source-path fallback searches now start concurrently with the same scoped Supabase client/options, reducing slow large-corpus recovery latency while preserving the existing merge/rerank behavior.
+
+> **Update Note (2026-05-22):** Next.js security baseline now tracks the patched 16.2.x line. The app pins `next` and `eslint-config-next` together at `16.2.6`, and npm overrides `postcss` to a patched 8.5.x release so active App Router/proxy routes no longer sit on the high-severity Next 16.1.6 advisory set or its bundled vulnerable PostCSS copy.
+
+> **Update Note (2026-05-22):** Public Demo Chat API access must fail closed before any service-role AI pipeline work. Demo pages now mint short-lived signed access tokens from each channel's server-only `shared_secret_hash`, the `POST` and polling `GET` routes reject missing/invalid tokens, unprotected demo-channel rows no longer render as usable demos, and per session/IP rate limits throttle repeated AI or recovery runs.
+
 > **Update Note (2026-05-21):** Public Demo Chat recovery must be idempotent at the bot-message layer, not only at the contact-message layer. Demo bot replies now carry a `demo_chat_reply_kind` (`text` or `image`) together with the originating message id, the shared inbound pipeline skips persisting an already stored reply for the same id/kind pair, and Inbox hides legacy duplicate demo bot bubbles so operators see one answer per user question.
 
 > **Update Note (2026-05-21):** Knowledge Base indexing now needs section-aware chunking before generic token chunking in both document reprocessing and crawler-corpus import paths. Structural headings such as `MADDE 11 - Ücretsiz İzin`, numbered headings, markdown headings, and strong standalone document headings should become `Section:` metadata and chunk boundaries so nearby policy clauses or unrelated document sections do not contaminate each other's retrieval evidence across PDF, article, and process-style sources.
@@ -325,7 +345,7 @@
 > **Update Note (2026-03-26):** Inbox media bubbles now reserve a stable placeholder frame during image loading. Inline image messages and gallery tiles should show an in-frame spinner instead of blank bubbles that jump to a larger height after the asset finishes loading.
 > **Update Note (2026-03-26):** `/inbox` hydration now keeps the server-seeded conversation list intact on initial mount. Client-side filter reloads are keyed to actual filter changes, preventing React Strict Mode from clearing the list and causing a false `No messages / Mesaj yok` flash before the inbox content appears.
 > **Update Note (2026-03-26):** `/leads` client caching now also preserves browser-navigation semantics: page/sort/search changes push real history entries, back/forward restores the cached table state from URL params, and stale in-flight requests are invalidated when operators jump back to an already loaded result.
-> **Last Updated:** 2026-05-21 (Demo Chat bot replies are idempotent by originating message id/kind, Knowledge Base indexing preserves structural section boundaries, and large-corpus vector search now has a bounded fallback path to avoid API timeouts.)
+> **Last Updated:** 2026-05-22 (Public Demo Chat and Iyzico card-update callbacks now require signed/provider tokens before service-role writes, redirect/image proxy inputs are bounded, WhatsApp webhook work is deferred after acknowledgement, billing renewal checks avoid repeated RPCs, and runtime dependency audit is clean.)
 > **Update Note (2026-03-26):** Leads background prefetch now stays strictly in cache and no longer overwrites the visible table state, preventing page-entry jumps such as rendering page 1 and then snapping to page 2. Inbox/Leads route entry also avoids stacked pending overlays by letting the segment loader be the single visible loading surface for those routes.
 > **Update Note (2026-03-26):** Inbox now seeds the first selected thread from a combined server payload and keeps a per-conversation client cache for hot thread reopens, while Leads switches sort/search/pagination onto a client-side cache seeded from the initial server payload so operators are not forced through a full route transition for every table interaction.
 > **Update Note (2026-03-26):** Required-intake fulfillment now uses one shared sector-agnostic semantic analyzer in live follow-up and response-guard paths, while lead extraction runs a conservative exact-label repair step plus a constrained missing-field repair pass so contextual answers can be captured and re-asks suppressed without sector-specific hardcoding.
@@ -1467,6 +1487,16 @@
 - [x] Add dashboard-wide performance refactor plan for Calendar, Settings, and workspace navigation (`docs/plans/2026-04-14-dashboard-performance-refactor-plan.md`)
 - [x] Add university admissions-season GTM sales plan with competitor scan, build-vs-buy objection handling, pilot package, demo strategy, and rector/IT/admissions stakeholder talk tracks (`docs/plans/2026-05-12-university-gtm-sales-plan.md`)
 - [x] Polish the public university Demo Chat composer with neutral first loading copy, a shorter disclosure, autosizing textarea, hidden native scrollbars, Enter/Shift+Enter keyboard behavior, and a single bottom-right send button for mobile demo use
+- [x] Protect the public Demo Chat API with signed channel access tokens and per session/IP rate limiting before service-role AI pipeline execution
+- [x] Upgrade Next.js and `eslint-config-next` to the patched 16.2.x security line and force patched PostCSS resolution for App Router/proxy builds
+- [x] Parallelize independent Knowledge Base RAG lexical fallback searches so large-corpus recovery no longer waits on each fallback query serially
+- [x] Move Admin dashboard AI usage totals to a scoped Postgres aggregate RPC so all-time metrics do not page every usage row through the server
+- [x] Require active Iyzico card-update checkout tokens before public callback routes write subscription metadata
+- [x] Harden redirect/callback origin resolution so spoofed `x-forwarded-host` headers cannot override configured or request origins
+- [x] Bound Instagram skill-image proxying with exact bucket-path checks, raster MIME allowlist, and 5 MB source-size limits before Sharp conversion
+- [x] Defer WhatsApp webhook AI pipeline and media-download work with Next `after()` so provider POST acknowledgements do not wait on customer reply generation
+- [x] Avoid repeated manual-admin renewal RPCs inside one inbound AI request while preserving billing entitlement gates before token-consuming stages
+- [x] Remove vulnerable Iyzico SDK and autocannon dependency chains, update audit-sensitive dev/runtime packages, and verify `npm audit` reports zero vulnerabilities
 - [x] Prevent public Demo Chat 504 send failures by converting slow shared-pipeline replies into a pending/polling response flow
 - [x] Prevent duplicate public Demo Chat bot bubbles in the operator Inbox by tagging text/image replies by original message id, skipping already-persisted id/kind replies, and filtering legacy duplicates from the thread view
 - [x] Extend safe live-QA cleanup to remove deterministic `Codex YIU Mevzuat QA` / `codex-live-yiu-mevzuat-qa-` conversations plus ad-hoc `codex-` demo-chat sessions from pilot Inbox views

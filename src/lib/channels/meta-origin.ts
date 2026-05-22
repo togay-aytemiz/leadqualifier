@@ -48,15 +48,30 @@ function resolveForwardedOrigin(forwardedHost: string | null | undefined, forwar
     return parseOrigin(`${proto}://${host}`)
 }
 
+function isTrustedForwardedOrigin(
+    forwardedOrigin: string | null,
+    requestOrigin: string | null,
+    configuredOrigins: string[]
+) {
+    if (!forwardedOrigin) return false
+    if (configuredOrigins.includes(forwardedOrigin)) return true
+    return Boolean(requestOrigin && forwardedOrigin === requestOrigin)
+}
+
 export function resolveMetaOrigin(input: ResolveMetaOriginInput): string {
     const requestOrigin = parseOrigin(input.requestOrigin)
     if (requestOrigin && isLocalOrigin(requestOrigin)) {
         return requestOrigin
     }
 
+    const appOrigin = parseOrigin(input.appUrl)
+    const siteOrigin = parseOrigin(input.siteUrl)
+    const configuredOrigins = [appOrigin, siteOrigin].filter((origin): origin is string => Boolean(origin))
+    const forwardedOrigin = resolveForwardedOrigin(input.forwardedHost, input.forwardedProto)
+
     return parseOrigin(input.appUrl)
         || parseOrigin(input.siteUrl)
-        || resolveForwardedOrigin(input.forwardedHost, input.forwardedProto)
+        || (isTrustedForwardedOrigin(forwardedOrigin, requestOrigin, configuredOrigins) ? forwardedOrigin : null)
         || requestOrigin
         || 'http://localhost:3000'
 }

@@ -25,6 +25,7 @@ const REPLY_POLL_ATTEMPTS = 40
 interface DemoChatClientProps {
     slug: string
     displayName: string
+    accessToken: string
     logoUrl?: string | null
 }
 
@@ -86,7 +87,7 @@ function readDemoChatReplyPayload(data: unknown) {
     }
 }
 
-export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientProps) {
+export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: DemoChatClientProps) {
     const t = useTranslations('demoChat')
     const [sessionId, setSessionId] = useState('')
     const [messages, setMessages] = useState<DemoChatMessage[]>(() => [])
@@ -230,7 +231,12 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
                 for (let attempt = 0; attempt < REPLY_POLL_ATTEMPTS; attempt += 1) {
                     await sleep(REPLY_POLL_INTERVAL_MS)
                     const pollResponse = await fetch(
-                        `/api/demo/${slug}/chat?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}&message=${encodeURIComponent(originalMessage)}`
+                        `/api/demo/${slug}/chat?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}&message=${encodeURIComponent(originalMessage)}`,
+                        {
+                            headers: {
+                                Authorization: `Bearer ${accessToken}`,
+                            },
+                        }
                     )
                     const pollData = readDemoChatReplyPayload(await pollResponse.json())
 
@@ -245,6 +251,7 @@ export function DemoChatClient({ slug, displayName, logoUrl }: DemoChatClientPro
             const response = await fetch(`/api/demo/${slug}/chat`, {
                 method: 'POST',
                 headers: {
+                    Authorization: `Bearer ${accessToken}`,
                     'content-type': 'application/json',
                 },
                 body: JSON.stringify({

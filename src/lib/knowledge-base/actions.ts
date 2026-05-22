@@ -643,15 +643,26 @@ export async function searchKnowledgeBase(
         return mergeSearchResults(query, data ?? [], policyDurationResults, limit)
     }
 
-    const fallbackResults = await searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions)
-    const documentCodeResults = await searchKnowledgeBaseByDocumentCode(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
-    const abbreviationResults = await searchKnowledgeBaseByAbbreviation(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
-    const focusedKeywordResults = await searchKnowledgeBaseByFocusedKeywords(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
-    const exactTitlePhraseResults = await searchKnowledgeBaseByExactTitlePhrase(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
-    const titleResults = await searchKnowledgeBaseByTitle(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
-    const sourceResults = shouldUseSourcePathFallback(query)
-        ? await searchKnowledgeBaseBySourcePath(query, organizationId, Math.max(limit * 4, 16), fallbackOptions)
-        : []
+    const fallbackSearchLimit = Math.max(limit * 4, 16)
+    const [
+        fallbackResults,
+        documentCodeResults,
+        abbreviationResults,
+        focusedKeywordResults,
+        exactTitlePhraseResults,
+        titleResults,
+        sourceResults
+    ] = await Promise.all([
+        searchKnowledgeBaseByKeyword(query, organizationId, fallbackLimit, fallbackOptions),
+        searchKnowledgeBaseByDocumentCode(query, organizationId, fallbackSearchLimit, fallbackOptions),
+        searchKnowledgeBaseByAbbreviation(query, organizationId, fallbackSearchLimit, fallbackOptions),
+        searchKnowledgeBaseByFocusedKeywords(query, organizationId, fallbackSearchLimit, fallbackOptions),
+        searchKnowledgeBaseByExactTitlePhrase(query, organizationId, fallbackSearchLimit, fallbackOptions),
+        searchKnowledgeBaseByTitle(query, organizationId, fallbackSearchLimit, fallbackOptions),
+        shouldUseSourcePathFallback(query)
+            ? searchKnowledgeBaseBySourcePath(query, organizationId, fallbackSearchLimit, fallbackOptions)
+            : Promise.resolve([])
+    ])
     const lexicalResults = [
         ...policyDurationResults,
         ...fallbackResults,

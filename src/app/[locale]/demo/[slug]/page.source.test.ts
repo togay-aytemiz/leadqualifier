@@ -9,6 +9,8 @@ describe('public demo chat page source', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 
         expect(source).toContain('resolveDemoChatChannel')
+        expect(source).toContain('createDemoChatAccessToken')
+        expect(source).toContain('accessToken=')
         expect(source).toContain('<DemoChatClient')
         expect(source).toContain('NextIntlClientProvider')
         expect(source).not.toContain('organizationId=')

@@ -1356,9 +1356,11 @@ export async function runLeadExtraction(options: {
     preferredLocale?: string | null
     supabase?: SupabaseClientLike
     source?: 'telegram' | 'whatsapp' | 'instagram' | 'demo_chat'
+    skipManualRenewal?: boolean
 }) {
     const supabase = options.supabase ?? await createClient()
     const latencyStartedAt = Date.now()
+    let manualRenewalChecked = Boolean(options.skipManualRenewal)
 
     const [{ data: profile }, { data: catalog }, { data: messages }, { data: suggestions }, { data: existingLead }] = await Promise.all([
         supabase
@@ -1389,7 +1391,11 @@ export async function runLeadExtraction(options: {
             .maybeSingle()
     ])
 
-    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, {
+        supabase,
+        ...(manualRenewalChecked ? { skipManualRenewal: true } : {})
+    })
+    manualRenewalChecked = true
     if (!entitlement.isUsageAllowed) {
         console.info('Lead extraction skipped due to billing lock', {
             organization_id: options.organizationId,
@@ -1495,7 +1501,10 @@ export async function runLeadExtraction(options: {
     addUsage(completion, userPrompt, response)
 
     if (!hasJsonKey(response, 'score') || !hasJsonKey(response, 'status') || !hasJsonKey(response, 'summary')) {
-        const retryEntitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+        const retryEntitlement = await resolveOrganizationUsageEntitlement(options.organizationId, {
+            supabase,
+            skipManualRenewal: true
+        })
         if (!retryEntitlement.isUsageAllowed) {
             console.info('Lead extraction retry skipped due to billing lock', {
                 organization_id: options.organizationId,

@@ -1,5 +1,4 @@
 import crypto from 'node:crypto'
-import Iyzipay from 'iyzipay'
 import { getBillingProviderConfig } from '@/lib/billing/providers/config'
 
 export type IyzicoLocale = 'tr' | 'en'
@@ -131,6 +130,13 @@ export interface IyzicoResultEnvelope {
     [key: string]: unknown
 }
 
+type IyzicoHttpMethod = 'GET' | 'POST'
+type IyzicoAuthVersion = 'v1' | 'v2'
+
+const IYZICO_CLIENT_VERSION = 'qualy-direct-fetch-1.0'
+const IYZICO_SUBSCRIPTION_INITIAL_STATUS_ACTIVE = 'ACTIVE'
+const IYZICO_PAYMENT_GROUP_PRODUCT = 'PRODUCT'
+
 function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -186,159 +192,106 @@ function generateIyzicoAuthorizationHeaderV2(input: {
     return `IYZWSv2 ${Buffer.from(authorizationParams).toString('base64')}`
 }
 
-function invokeIyzicoResource<T>(
-    call: (cb: (error: unknown, result: unknown) => void) => void
-): Promise<T> {
-    return new Promise((resolve, reject) => {
-        call((error, result) => {
-            if (error) {
-                reject(new IyzicoClientError('request_failed', toErrorMessage(error)))
-                return
-            }
+function generateIyzicoAuthorizationHeaderV1(input: {
+    apiKey: string
+    secretKey: string
+    randomString: string
+    pkiString: string
+}) {
+    const hash = crypto
+        .createHash('sha1')
+        .update(`${input.apiKey}${input.randomString}${input.secretKey}${input.pkiString}`, 'utf8')
+        .digest('base64')
 
-            try {
-                const envelope = assertSuccessResult(result) as unknown as T
-                resolve(envelope)
-            } catch (validationError) {
-                reject(validationError)
-            }
-        })
-    })
+    return `IYZWS ${input.apiKey}:${hash}`
 }
 
-function createIyzicoSdkClient() {
+function getIyzicoConfigOrThrow(): {
+    apiKey: string
+    secretKey: string
+    baseUrl: string
+} {
     const config = getBillingProviderConfig()
     if (!config.iyzico.enabled || !config.iyzico.apiKey || !config.iyzico.secretKey || !config.iyzico.baseUrl) {
         throw new IyzicoClientError('provider_not_configured', 'iyzico provider is not configured')
     }
 
-    return new Iyzipay({
-        uri: config.iyzico.baseUrl,
+    return {
         apiKey: config.iyzico.apiKey,
-        secretKey: config.iyzico.secretKey
-    })
+        secretKey: config.iyzico.secretKey,
+        baseUrl: config.iyzico.baseUrl
+    }
 }
 
-export async function initializeIyzicoSubscriptionCheckout(input: IyzicoSubscriptionCheckoutInitInput) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscriptionCheckoutForm.initialize({
-        locale: input.locale,
-        conversationId: input.conversationId,
-        callbackUrl: input.callbackUrl,
-        pricingPlanReferenceCode: input.pricingPlanReferenceCode,
-        subscriptionInitialStatus: Iyzipay.SUBSCRIPTION_INITIAL_STATUS.ACTIVE,
-        customer: input.customer
-    }, cb))
-}
-
-export async function retrieveIyzicoSubscriptionCheckoutResult(checkoutFormToken: string) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscriptionCheckoutForm.retrieve({
-        checkoutFormToken
-    }, cb))
-}
-
-export async function initializeIyzicoTopupCheckout(input: IyzicoTopupCheckoutInitInput) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.checkoutFormInitialize.create({
-        locale: input.locale,
-        conversationId: input.conversationId,
-        price: input.price,
-        paidPrice: input.paidPrice,
-        currency: input.currency,
-        basketId: input.basketId,
-        paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
-        callbackUrl: input.callbackUrl,
-        buyer: input.buyer,
-        shippingAddress: input.shippingAddress,
-        billingAddress: input.billingAddress,
-        basketItems: input.basketItems
-    }, cb))
-}
-
-export async function retrieveIyzicoTopupCheckoutResult(token: string, conversationId: string) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.checkoutForm.retrieve({
-        locale: Iyzipay.LOCALE.TR,
-        conversationId,
-        token
-    }, cb))
-}
-
-export async function initializeIyzicoSubscriptionCardUpdateCheckout(input: IyzicoSubscriptionCardUpdateInitInput) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscriptionCard.updateWithSubscriptionReferenceCode({
-        locale: input.locale,
-        conversationId: input.conversationId,
-        subscriptionReferenceCode: input.subscriptionReferenceCode,
-        callbackUrl: input.callbackUrl
-    }, cb))
-}
-
-export async function retryIyzicoSubscriptionPayment(input: {
-    locale: IyzicoLocale
-    conversationId: string
-    referenceCode: string
-}) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscriptionPayment.retry({
-        locale: input.locale,
-        conversationId: input.conversationId,
-        referenceCode: input.referenceCode
-    }, cb))
-}
-
-export async function retrieveIyzicoPayment(input: IyzicoPaymentRetrieveInput) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.payment.retrieve({
-        locale: input.locale ?? 'tr',
-        paymentId: input.paymentId,
-        ...(input.paymentConversationId ? { paymentConversationId: input.paymentConversationId } : {})
-    }, cb))
-}
-
-export async function upgradeIyzicoSubscription(input: {
-    conversationId?: string
-    locale?: IyzicoLocale
-    subscriptionReferenceCode: string
-    newPricingPlanReferenceCode: string
-    upgradePeriod?: IyzicoSubscriptionUpgradePeriod
-    resetRecurrenceCount?: boolean
-    useTrial?: boolean
-}) {
-    const config = getBillingProviderConfig()
-    if (!config.iyzico.enabled || !config.iyzico.apiKey || !config.iyzico.secretKey || !config.iyzico.baseUrl) {
-        throw new IyzicoClientError('provider_not_configured', 'iyzico provider is not configured')
+function formatIyzicoPrice(value: unknown) {
+    if ((typeof value !== 'number' && typeof value !== 'string') || !Number.isFinite(Number(value))) {
+        return value
     }
 
-    const path = `/v2/subscription/subscriptions/${encodeURIComponent(input.subscriptionReferenceCode)}/upgrade`
-    const body = {
-        locale: input.locale ?? 'tr',
-        conversationId: input.conversationId,
-        newPricingPlanReferenceCode: input.newPricingPlanReferenceCode,
-        // Iyzico samples document NEXT_PERIOD even though the SDK constant map only exposes NOW.
-        upgradePeriod: input.upgradePeriod ?? 'NOW',
-        useTrial: input.useTrial ?? false,
-        resetRecurrenceCount: input.resetRecurrenceCount ?? false
+    const normalized = Number.parseFloat(String(value)).toString()
+    return normalized.includes('.') ? normalized : `${normalized}.0`
+}
+
+function removeUndefinedDeep(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(removeUndefinedDeep)
+    if (!isObject(value)) return value
+
+    const next: Record<string, unknown> = {}
+    for (const [key, child] of Object.entries(value)) {
+        if (typeof child === 'undefined' || typeof child === 'function') continue
+        next[key] = removeUndefinedDeep(child)
     }
+    return next
+}
+
+function toIyzicoPkiString(value: unknown): string {
+    if (Array.isArray(value)) {
+        return `[${value.map(toIyzicoPkiString).join(', ')}]`
+    }
+    if (isObject(value)) {
+        const parts = Object.entries(value)
+            .filter(([, child]) => typeof child !== 'undefined' && typeof child !== 'function')
+            .map(([key, child]) => `${key}=${isObject(child) || Array.isArray(child) ? toIyzicoPkiString(child) : String(child)}`)
+        return `[${parts.join(',')}]`
+    }
+    return String(value)
+}
+
+async function requestIyzico(input: {
+    path: string
+    method: IyzicoHttpMethod
+    authVersion: IyzicoAuthVersion
+    body?: Record<string, unknown>
+}) {
+    const config = getIyzicoConfigOrThrow()
+    const body = removeUndefinedDeep(input.body ?? {}) as Record<string, unknown>
     const bodyText = JSON.stringify(body)
     const randomString = generateIyzicoRandomString()
-    const baseUrl = config.iyzico.baseUrl.replace(/\/$/, '')
-    const response = await fetch(`${baseUrl}${path}`, {
-        method: 'POST',
+    const baseUrl = config.baseUrl.replace(/\/$/, '')
+    const authorization = input.authVersion === 'v2'
+        ? generateIyzicoAuthorizationHeaderV2({
+            apiKey: config.apiKey,
+            secretKey: config.secretKey,
+            path: input.path,
+            randomString,
+            bodyText
+        })
+        : generateIyzicoAuthorizationHeaderV1({
+            apiKey: config.apiKey,
+            secretKey: config.secretKey,
+            randomString,
+            pkiString: toIyzicoPkiString(body)
+        })
+
+    const response = await fetch(`${baseUrl}${input.path}`, {
+        method: input.method,
         headers: {
-            Authorization: generateIyzicoAuthorizationHeaderV2({
-                apiKey: config.iyzico.apiKey,
-                secretKey: config.iyzico.secretKey,
-                path,
-                randomString,
-                bodyText
-            }),
+            Authorization: authorization,
             'Content-Type': 'application/json',
             'x-iyzi-rnd': randomString,
-            'x-iyzi-client-version': 'iyzipay-node-2.0.64'
+            'x-iyzi-client-version': IYZICO_CLIENT_VERSION
         },
-        body: bodyText
+        ...(input.method === 'GET' ? {} : { body: bodyText })
     })
 
     let result: unknown
@@ -351,20 +304,213 @@ export async function upgradeIyzicoSubscription(input: {
     return assertSuccessResult(result) as unknown as IyzicoResultEnvelope
 }
 
+function buildSubscriptionAddress(address: IyzicoSubscriptionCustomer['billingAddress']) {
+    return {
+        address: address.address,
+        zipCode: address.zipCode,
+        contactName: address.contactName,
+        city: address.city,
+        country: address.country,
+        district: address.district
+    }
+}
+
+function buildSubscriptionCustomer(customer: IyzicoSubscriptionCustomer) {
+    return {
+        name: customer.name,
+        surname: customer.surname,
+        identityNumber: customer.identityNumber,
+        email: customer.email,
+        gsmNumber: customer.gsmNumber,
+        billingAddress: buildSubscriptionAddress(customer.billingAddress),
+        shippingAddress: buildSubscriptionAddress(customer.shippingAddress)
+    }
+}
+
+function buildAddress(address: IyzicoTopupCheckoutInitInput['billingAddress']) {
+    return {
+        address: address.address,
+        zipCode: address.zipCode,
+        contactName: address.contactName,
+        city: address.city,
+        country: address.country
+    }
+}
+
+function buildBuyer(buyer: IyzicoTopupCheckoutInitInput['buyer']) {
+    return {
+        id: buyer.id,
+        name: buyer.name,
+        surname: buyer.surname,
+        identityNumber: buyer.identityNumber,
+        email: buyer.email,
+        gsmNumber: buyer.gsmNumber,
+        registrationDate: buyer.registrationDate,
+        lastLoginDate: buyer.lastLoginDate,
+        registrationAddress: buyer.registrationAddress,
+        city: buyer.city,
+        country: buyer.country,
+        zipCode: buyer.zipCode,
+        ip: buyer.ip
+    }
+}
+
+function buildBasketItem(item: IyzicoTopupCheckoutInitInput['basketItems'][number]) {
+    return {
+        id: item.id,
+        price: formatIyzicoPrice(item.price),
+        name: item.name,
+        category1: item.category1,
+        category2: item.category2,
+        itemType: item.itemType
+    }
+}
+
+export async function initializeIyzicoSubscriptionCheckout(input: IyzicoSubscriptionCheckoutInitInput) {
+    return requestIyzico({
+        path: '/v2/subscription/checkoutform/initialize',
+        method: 'POST',
+        authVersion: 'v2',
+        body: {
+            locale: input.locale,
+            conversationId: input.conversationId,
+            callbackUrl: input.callbackUrl,
+            customer: buildSubscriptionCustomer(input.customer),
+            pricingPlanReferenceCode: input.pricingPlanReferenceCode,
+            subscriptionInitialStatus: IYZICO_SUBSCRIPTION_INITIAL_STATUS_ACTIVE
+        }
+    })
+}
+
+export async function retrieveIyzicoSubscriptionCheckoutResult(checkoutFormToken: string) {
+    return requestIyzico({
+        path: `/v2/subscription/checkoutform/${encodeURIComponent(checkoutFormToken)}`,
+        method: 'GET',
+        authVersion: 'v2'
+    })
+}
+
+export async function initializeIyzicoTopupCheckout(input: IyzicoTopupCheckoutInitInput) {
+    return requestIyzico({
+        path: '/payment/iyzipos/checkoutform/initialize/auth/ecom',
+        method: 'POST',
+        authVersion: 'v1',
+        body: {
+            locale: input.locale,
+            conversationId: input.conversationId,
+            price: formatIyzicoPrice(input.price),
+            basketId: input.basketId,
+            paymentGroup: IYZICO_PAYMENT_GROUP_PRODUCT,
+            buyer: buildBuyer(input.buyer),
+            shippingAddress: buildAddress(input.shippingAddress),
+            billingAddress: buildAddress(input.billingAddress),
+            basketItems: input.basketItems.map(buildBasketItem),
+            callbackUrl: input.callbackUrl,
+            currency: input.currency,
+            paidPrice: formatIyzicoPrice(input.paidPrice)
+        }
+    })
+}
+
+export async function retrieveIyzicoTopupCheckoutResult(token: string, conversationId: string) {
+    return requestIyzico({
+        path: '/payment/iyzipos/checkoutform/auth/ecom/detail',
+        method: 'POST',
+        authVersion: 'v1',
+        body: {
+            locale: 'tr',
+            conversationId,
+            token
+        }
+    })
+}
+
+export async function initializeIyzicoSubscriptionCardUpdateCheckout(input: IyzicoSubscriptionCardUpdateInitInput) {
+    return requestIyzico({
+        path: '/v2/subscription/card-update/checkoutform/initialize/with-subscription',
+        method: 'POST',
+        authVersion: 'v2',
+        body: {
+            locale: input.locale,
+            conversationId: input.conversationId,
+            subscriptionReferenceCode: input.subscriptionReferenceCode,
+            callbackUrl: input.callbackUrl
+        }
+    })
+}
+
+export async function retryIyzicoSubscriptionPayment(input: {
+    locale: IyzicoLocale
+    conversationId: string
+    referenceCode: string
+}) {
+    return requestIyzico({
+        path: '/v2/subscription/operation/retry',
+        method: 'POST',
+        authVersion: 'v2',
+        body: {
+            locale: input.locale,
+            conversationId: input.conversationId,
+            referenceCode: input.referenceCode
+        }
+    })
+}
+
+export async function retrieveIyzicoPayment(input: IyzicoPaymentRetrieveInput) {
+    return requestIyzico({
+        path: '/payment/detail',
+        method: 'POST',
+        authVersion: 'v1',
+        body: {
+            locale: input.locale ?? 'tr',
+            paymentId: input.paymentId,
+            ...(input.paymentConversationId ? { paymentConversationId: input.paymentConversationId } : {})
+        }
+    })
+}
+
+export async function upgradeIyzicoSubscription(input: {
+    conversationId?: string
+    locale?: IyzicoLocale
+    subscriptionReferenceCode: string
+    newPricingPlanReferenceCode: string
+    upgradePeriod?: IyzicoSubscriptionUpgradePeriod
+    resetRecurrenceCount?: boolean
+    useTrial?: boolean
+}) {
+    const path = `/v2/subscription/subscriptions/${encodeURIComponent(input.subscriptionReferenceCode)}/upgrade`
+    return requestIyzico({
+        path,
+        method: 'POST',
+        authVersion: 'v2',
+        body: {
+            locale: input.locale ?? 'tr',
+            conversationId: input.conversationId,
+            newPricingPlanReferenceCode: input.newPricingPlanReferenceCode,
+            // Iyzico samples document NEXT_PERIOD even though older SDK constants only exposed NOW.
+            upgradePeriod: input.upgradePeriod ?? 'NOW',
+            useTrial: input.useTrial ?? false,
+            resetRecurrenceCount: input.resetRecurrenceCount ?? false
+        }
+    })
+}
+
 export async function cancelIyzicoSubscription(input: {
     subscriptionReferenceCode: string
 }) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.cancel({
-        subscriptionReferenceCode: input.subscriptionReferenceCode
-    }, cb))
+    return requestIyzico({
+        path: `/v2/subscription/subscriptions/${encodeURIComponent(input.subscriptionReferenceCode)}/cancel`,
+        method: 'POST',
+        authVersion: 'v2'
+    })
 }
 
 export async function retrieveIyzicoSubscription(input: {
     subscriptionReferenceCode: string
 }) {
-    const client = createIyzicoSdkClient()
-    return invokeIyzicoResource<IyzicoResultEnvelope>((cb) => client.subscription.retrieve({
-        subscriptionReferenceCode: input.subscriptionReferenceCode
-    }, cb))
+    return requestIyzico({
+        path: `/v2/subscription/subscriptions/${encodeURIComponent(input.subscriptionReferenceCode)}`,
+        method: 'GET',
+        authVersion: 'v2'
+    })
 }

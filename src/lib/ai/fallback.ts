@@ -266,6 +266,7 @@ export async function buildFallbackResponse(options: {
     usageMetadata?: Record<string, unknown>
     requiredIntakeAnalysis?: RequiredIntakeStateAnalysis
     knowledgeContext?: string | null
+    skipManualRenewal?: boolean
 }) {
     const supabase = options.supabase ?? await createClient()
     const aiSettings = options.aiSettings ?? await getOrgAiSettings(options.organizationId, { supabase })
@@ -277,7 +278,10 @@ export async function buildFallbackResponse(options: {
         recentAssistantMessages: options.recentAssistantMessages ?? [],
         leadSnapshot: options.leadSnapshot ?? null
     })
-    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, { supabase })
+    const entitlement = await resolveOrganizationUsageEntitlement(options.organizationId, {
+        supabase,
+        ...(options.skipManualRenewal ? { skipManualRenewal: true } : {})
+    })
     if (!entitlement.isUsageAllowed) {
         return renderStrictFallback(
             '',

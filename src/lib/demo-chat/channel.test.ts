@@ -24,6 +24,7 @@ describe('resolveDemoChatChannel', () => {
             display_name: 'YIU Aday Asistanı',
             logo_url: null,
             enabled: true,
+            shared_secret_hash: 'sha256:demo-secret-hash',
         })
 
         await expect(resolveDemoChatChannel({
@@ -35,6 +36,7 @@ describe('resolveDemoChatChannel', () => {
             slug: 'yiu-aday-asistani',
             displayName: 'YIU Aday Asistanı',
             logoUrl: null,
+            sharedSecretHash: 'sha256:demo-secret-hash',
         })
     })
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { createDemoChatAccessToken } from '@/lib/demo-chat/access'
 
 const {
     buildDemoChatContactIdMock,
@@ -28,21 +29,45 @@ vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
 
 import { GET, POST } from '@/app/api/demo/[slug]/chat/route'
 
-function createRequest(body: unknown) {
+const demoChannel = {
+    id: 'demo-channel-1',
+    organizationId: 'org-1',
+    slug: 'yiu-aday-asistani',
+    displayName: 'YIU Aday Asistanı',
+    logoUrl: null,
+    sharedSecretHash: 'sha256:demo-secret-hash',
+}
+
+function createAccessToken(channel = demoChannel) {
+    const token = createDemoChatAccessToken({ channel })
+    if (!token) throw new Error('Expected demo access token')
+    return token
+}
+
+function createRequest(body: unknown, options: { token?: string | null; ip?: string } = {}) {
+    const token = options.token === undefined ? createAccessToken() : options.token
+    const headers = new Headers({ 'content-type': 'application/json' })
+    if (token) headers.set('authorization', `Bearer ${token}`)
+    if (options.ip) headers.set('x-forwarded-for', options.ip)
+
     return new NextRequest('https://app.askqualy.com/api/demo/yiu-aday-asistani/chat', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
     })
 }
 
-function createGetRequest(searchParams: Record<string, string>) {
+function createGetRequest(searchParams: Record<string, string>, options: { token?: string | null } = {}) {
     const url = new URL('https://app.askqualy.com/api/demo/yiu-aday-asistani/chat')
     for (const [key, value] of Object.entries(searchParams)) {
         url.searchParams.set(key, value)
     }
 
-    return new NextRequest(url)
+    const token = options.token === undefined ? createAccessToken() : options.token
+    const headers = new Headers()
+    if (token) headers.set('authorization', `Bearer ${token}`)
+
+    return new NextRequest(url, { headers })
 }
 
 function createContext(slug = 'yiu-aday-asistani') {
@@ -56,13 +81,7 @@ describe('demo chat API route', () => {
         vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
         vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
         createClientMock.mockReturnValue({ from: vi.fn() })
-        resolveDemoChatChannelMock.mockResolvedValue({
-            id: 'demo-channel-1',
-            organizationId: 'org-1',
-            slug: 'yiu-aday-asistani',
-            displayName: 'YIU Aday Asistanı',
-            logoUrl: null,
-        })
+        resolveDemoChatChannelMock.mockResolvedValue(demoChannel)
         buildDemoChatContactIdMock.mockImplementation((channelId: string, sessionId: string) => (
             `demo:${channelId}:${sessionId}`
         ))
@@ -85,6 +104,28 @@ describe('demo chat API route', () => {
 
         expect(res.status).toBe(404)
         await expect(res.json()).resolves.toEqual({ error: 'Demo not found' })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects demo chat posts without a signed access token before running AI', async () => {
+        const res = await POST(createRequest({
+            sessionId: 'session-1',
+            message: 'Merhaba',
+        }, { token: null }), createContext())
+
+        expect(res.status).toBe(401)
+        await expect(res.json()).resolves.toEqual({ error: 'Demo access denied' })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects demo chat polling without a signed access token before recovery', async () => {
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+        }, { token: null }), createContext())
+
+        expect(res.status).toBe(401)
+        await expect(res.json()).resolves.toEqual({ error: 'Demo access denied' })
         expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
@@ -380,5 +421,23 @@ describe('demo chat API route', () => {
             contactId: 'demo:demo-channel-1:session-b',
             text: 'İkinci soru',
         }))
+    })
+
+    it('rate-limits repeated demo chat posts per client session before running AI again', async () => {
+        vi.stubEnv('DEMO_CHAT_RATE_LIMIT_PER_MINUTE', '1')
+
+        const firstResponse = await POST(createRequest({
+            sessionId: 'rate-session',
+            message: 'İlk soru',
+        }, { ip: '203.0.113.10' }), createContext())
+        const secondResponse = await POST(createRequest({
+            sessionId: 'rate-session',
+            message: 'İkinci soru',
+        }, { ip: '203.0.113.10' }), createContext())
+
+        expect(firstResponse.status).toBe(200)
+        expect(secondResponse.status).toBe(429)
+        await expect(secondResponse.json()).resolves.toEqual({ error: 'Demo rate limit exceeded' })
+        expect(processInboundAiPipelineMock).toHaveBeenCalledTimes(1)
     })
 })
