@@ -461,6 +461,21 @@ function createHybridSearchSupabase(options?: {
             language?: string | null
         }
     }>
+    fallbackRowsByFilter?: Array<{
+        includes: string
+        rows: Array<{
+            id: string
+            document_id: string
+            content: string
+            knowledge_documents: {
+                title: string
+                type: string
+                status: string
+                collection_id?: string | null
+                language?: string | null
+            }
+        }>
+    }>
     fallbackRowPages?: Array<Array<{
         id: string
         document_id: string
@@ -533,6 +548,7 @@ function createHybridSearchSupabase(options?: {
     const titleChunkRows = options?.titleChunkRows ?? []
     const fallbackRowPages = options?.fallbackRowPages ?? [fallbackRows]
     let fallbackLimitCallCount = 0
+    let lastFallbackFilter = ''
     let releaseFallbackLimits = false
     const pendingFallbackLimitResolvers: Array<() => void> = []
 
@@ -551,24 +567,35 @@ function createHybridSearchSupabase(options?: {
         }
 
         return {
-            data: fallbackRowPages[Math.min(fallbackLimitCallCount++, fallbackRowPages.length - 1)] ?? [],
+            data: options?.fallbackRowsByFilter?.find((item) => lastFallbackFilter.includes(item.includes))?.rows
+                ?? fallbackRowPages[Math.min(fallbackLimitCallCount++, fallbackRowPages.length - 1)]
+                ?? [],
             error: null
         }
     })
     const keywordChain: {
         eq: ReturnType<typeof vi.fn>
+        ilike: ReturnType<typeof vi.fn>
         or: ReturnType<typeof vi.fn>
         textSearch: ReturnType<typeof vi.fn>
         limit: ReturnType<typeof vi.fn>
     } = {
         eq: vi.fn(),
-        or: vi.fn(),
-        textSearch: vi.fn(),
+        ilike: vi.fn((_column: string, pattern: string) => {
+            lastFallbackFilter = `${lastFallbackFilter},${pattern}`
+            return keywordChain
+        }),
+        or: vi.fn((filter: string) => {
+            lastFallbackFilter = filter
+            return keywordChain
+        }),
+        textSearch: vi.fn((_column: string, queryValue: string) => {
+            lastFallbackFilter = queryValue
+            return keywordChain
+        }),
         limit: limitMock
     }
     keywordChain.eq.mockReturnValue(keywordChain)
-    keywordChain.or.mockReturnValue(keywordChain)
-    keywordChain.textSearch.mockReturnValue(keywordChain)
 
     const titleDocumentLimitMock = vi.fn(async () => ({
         data: titleRows,
@@ -1831,6 +1858,425 @@ describe('searchKnowledgeBase', () => {
         })
     })
 
+    it('prefers annual paid leave duration evidence over broad personnel matches', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'staff-law-noise-1',
+                    document_id: 'doc-staff-law-noise-1',
+                    document_title: 'Yükseköğretim Kanunu',
+                    document_type: 'article',
+                    content: 'Page Title: Yükseköğretim Kanunu\nSource URL: https://example.edu.tr/yuksekogretim-kanunu.pdf\n\nPersonelin özlük hakları, izinleri ve genel hükümler hakkında mevzuat bilgileri yer alır.',
+                    similarity: 0.99
+                },
+                {
+                    chunk_id: 'staff-mobility-noise-1',
+                    document_id: 'doc-staff-mobility-noise-1',
+                    document_title: 'Personel Hareketliliği',
+                    document_type: 'article',
+                    content: 'Page Title: Personel Hareketliliği\nSource URL: https://example.edu.tr/erasmus/personel-hareketliligi\n\nPersonelin hareketlilik başvuruları ve faaliyet süreleri hakkında duyuru metni.',
+                    similarity: 0.97
+                }
+            ],
+            fallbackRows: [
+                {
+                    id: 'annual-paid-leave-duration-1',
+                    document_id: 'doc-leave-policy-1',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin-kullanimi-yonergesi.pdf\n\nYıllık Ücretli İzin Süreleri Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri; 1 yıldan 5 yıla kadar olanlar için 14 iş günü, 5 yıldan fazla 15 yıldan az olanlar için 20 iş günü, 15 yıl ve daha fazla olanlar için 26 iş günüdür. 18 ve daha küçük yaştaki işçilerle 50 ve daha yukarı yaştaki işçilere verilecek yıllık ücretli izin süresi 20 iş gününden az olamaz.',
+                    knowledge_documents: {
+                        title: 'İzin Kullanımı Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Personelin yıllık izin hakkı ne kadar?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'annual-paid-leave-duration-1',
+            document_id: 'doc-leave-policy-1'
+        })
+    })
+
+    it('prefers the annual paid leave bracket when the user asks about five-plus years of service', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'staff-general-rights-noise-1',
+                    document_id: 'doc-staff-general-rights-noise-1',
+                    document_title: 'Personel Hakları',
+                    document_type: 'article',
+                    content: 'Personelin genel hakları, görevlendirme süreçleri ve izin başlıkları hakkında özet bilgiler.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: '5 yıldan fazla 15 yıldan az',
+                rows: [{
+                    id: 'annual-paid-leave-five-plus-1',
+                    document_id: 'doc-leave-policy-2',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin-kullanimi-yonergesi.pdf\n\nYıllık Ücretli İzin Süreleri Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri; 1 yıldan 5 yıla kadar olanlar için 14 iş günü, 5 yıldan fazla 15 yıldan az olanlar için 20 iş günü, 15 yıl ve daha fazla olanlar için 26 iş günüdür.',
+                    knowledge_documents: {
+                        title: 'İzin Kullanımı Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            '5 yıldan fazla çalışan personelin yıllık izni kaç iş günü?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'annual-paid-leave-five-plus-1',
+            document_id: 'doc-leave-policy-2'
+        })
+    })
+
+    it('prefers the current medicine directive for maximum completion duration questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'medicine-duration-general-1',
+                    document_id: 'doc-medicine-duration-general-1',
+                    document_title: 'Tıp Fakültesi Eğitim Süresi',
+                    document_type: 'article',
+                    content: 'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'dokuz yılda',
+                rows: [{
+                    id: 'medicine-max-duration-current-1',
+                    document_id: 'doc-medicine-directive-current-1',
+                    content: 'Page Title: TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nMADDE 10- Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. Öğrenciler, tıp eğitimini en fazla dokuz yılda tamamlamak zorundadır.',
+                    knowledge_documents: {
+                        title: 'TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesi azami kaç yılda bitirilmeli?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-max-duration-current-1',
+            document_id: 'doc-medicine-directive-current-1'
+        })
+    })
+
+    it('prefers the medicine Dönem VI elective deadline over generic elective-course policy matches', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-elective-policy-noise-1',
+                    document_id: 'doc-generic-elective-policy-noise-1',
+                    document_title: 'Yüksekokul Seçmeli Ders Politikası',
+                    document_type: 'article',
+                    content: 'Seçmeli derslerin sayısı ve alınma şartları yüksekokul kurulu tarafından belirlenir.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Seçmeli derslerden Dönem VI sonuna',
+                rows: [{
+                    id: 'medicine-elective-deadline-current-1',
+                    document_id: 'doc-medicine-directive-current-2',
+                    content: 'Page Title: TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nFakülte eğitim programında Dönem IV ve Dönem V’te; öğrenciler, Fakülte müfredatında yer alan Seçmeli derslerden Dönem VI sonuna kadar başarılı olmalıdırlar.',
+                    knowledge_documents: {
+                        title: 'TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp Fakültesinde seçmeli dersleri ne zamana kadar geçmem gerekiyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-elective-deadline-current-1',
+            document_id: 'doc-medicine-directive-current-2'
+        })
+    })
+
+    it('treats current-campus wording as a campus lookup for SBF acronyms', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'sbf-program-report-noise-1',
+                    document_id: 'doc-sbf-program-report-noise-1',
+                    document_title: 'Öz Değerlendirme Raporu',
+                    document_type: 'pdf',
+                    content: 'Page Title: Öz Değerlendirme Raporu\nSource URL: https://example.edu.tr/program-raporu.pdf\n\nSağlık Bilimleri Fakültesi öğrencilerine uygulama alanı sağlanır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Bağlıca',
+                rows: [{
+                    id: 'sbf-current-campus-acronym-1',
+                    document_id: 'doc-sbf-current-campus-acronym-1',
+                    content: 'Page Title: Üniversitemizde Yeni Düzenleme Kapsamında Yapılan Yerleşke Konumları Güncellendi\nSource URL: https://example.edu.tr/duyuru/yerleske-konumlari-guncellendi\n\nSAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No :1 Bağlıca',
+                    knowledge_documents: {
+                        title: 'Yerleşke Konumları Güncellendi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'SBF şu an hangi yerleşkede eğitim veriyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'sbf-current-campus-acronym-1',
+            document_id: 'doc-sbf-current-campus-acronym-1'
+        })
+    })
+
+    it('prefers current program-campus evidence over older TLT report campus text', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'tlt-old-report-campus-1',
+                    document_id: 'doc-tlt-old-report-campus-1',
+                    document_title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                    document_type: 'pdf',
+                    content: 'Page Title: TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU\nSource URL: https://example.edu.tr/tlt-rapor.pdf\n\nTıbbi Laboratuvar Teknikleri Programı Sağlık Hizmetleri Meslek Yüksekokulu Bağlum yerleşkesi olanaklarından yararlanır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [{
+                id: 'tlt-current-campus-1',
+                document_id: 'doc-tlt-current-campus-1',
+                content: 'Page Title: Üniversitemizde Yeni Düzenleme Kapsamında Yapılan Yerleşke Konumları Güncellendi\nSource URL: https://example.edu.tr/duyuru/yerleske-konumlari-guncellendi\n\nMESLEK YÜKSEKOKULU\nEczane Hizmetleri\nTıbbi Laboratuvar Teknikleri\nBALGAT YERLEŞKESİ: Oğuzlar Mahallesi 1375 Sokak No: 8 Balgat',
+                knowledge_documents: {
+                    title: 'Yerleşke Konumları Güncellendi',
+                    type: 'article',
+                    status: 'ready'
+                }
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıbbi Laboratuvar Teknikleri hangi yerleşkede?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-current-campus-1',
+            document_id: 'doc-tlt-current-campus-1'
+        })
+    })
+
+    it('prioritizes TLT double-major responsible contact over generic program contact details', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'tlt-generic-contact-1',
+                    document_id: 'doc-tlt-generic-contact-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://example.edu.tr/iletisim\n\nTıbbi Laboratuvar Teknikleri Programı Telefon: +90 312 329 10 10 E-posta: tlt@yiu.edu.tr',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [{
+                id: 'tlt-double-major-responsible-1',
+                document_id: 'doc-tlt-double-major-responsible-1',
+                content: 'Page Title: Çift Anadal Programları\nSource URL: https://example.edu.tr/cift-anadal-programlari\n\nProgram Sorumluları\nPROGRAM ADI\nÖĞRETİM ELEMANI\nE-MAİL İLETİŞİM\nTıbbi Laboratuvar Teknikleri\nDoç. Dr. Esma Sari Üzek\nesmasariuzek@yiu.edu.tr\nÇift Anadal Yapılabilecek Programlar\nTıbbi Laboratuvar Teknikleri\nEczane Hizmetleri',
+                knowledge_documents: {
+                    title: 'Çift Anadal Programları',
+                    type: 'article',
+                    status: 'ready'
+                }
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'TLT çift anadal program sorumlusu kim ve maili ne?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-double-major-responsible-1',
+            document_id: 'doc-tlt-double-major-responsible-1'
+        })
+    })
+
+    it('keeps the medicine elective Dönem VI rule ahead of generic elective policy rows', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [
+                {
+                    id: 'generic-elective-policy-row-1',
+                    document_id: 'doc-generic-elective-policy-row-1',
+                    content: 'Page Title: MYO Eğitim Öğretim Yönergesi\nSource URL: https://example.edu.tr/myo-yonerge.pdf\n\nSeçmeli ders sayısına, alınması gereken seçmeli derslere ve seçmeli derslerin hangi derslerden oluşacağına Yüksekokul Kurulu karar verir.',
+                    knowledge_documents: {
+                        title: 'MYO Eğitim Öğretim Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                },
+                {
+                    id: 'medicine-elective-deadline-row-1',
+                    document_id: 'doc-medicine-elective-deadline-row-1',
+                    content: 'Page Title: TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ\nSource URL: https://example.edu.tr/tip-yonerge.pdf\n\nÖğrenciler, Fakülte müfredatında yer alan Seçmeli derslerden Dönem VI sonuna kadar başarılı olmalıdırlar.',
+                    knowledge_documents: {
+                        title: 'TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp Fakültesinde seçmeli dersleri ne zamana kadar geçmem gerekiyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-elective-deadline-row-1',
+            document_id: 'doc-medicine-elective-deadline-row-1'
+        })
+    })
+
+    it('recognizes shorthand Tıpta grade-formula questions as medicine exam policy lookups', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'postgraduate-grade-noise-1',
+                    document_id: 'doc-postgraduate-grade-noise-1',
+                    document_title: 'Lisansüstü Eğitim Öğretim ve Sınav Yönetmeliği',
+                    document_type: 'pdf',
+                    content: 'Page Title: Lisansüstü Eğitim Öğretim ve Sınav Yönetmeliği\nSource URL: https://example.edu.tr/lisansustu.pdf\n\nGenel başarı notu, ALES/TUS puanının %50’si, not ortalamasının %20’si ve mülakat notunun %30’u ile hesaplanır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [{
+                id: 'medicine-grade-formula-current-1',
+                document_id: 'doc-medicine-grade-formula-current-1',
+                content: 'Page Title: TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ\nSource URL: https://example.edu.tr/tip-yonerge.pdf\n\nDönem sonu başarı notu; Dönem içi kurul notunun %60’ı, final notu veya bütünleme notunun %40’ı toplanarak elde edilir. Dönem içi kurul notu ise ders kurulu sınavlarının not ortalamasının %96’sı ile Hekimliğe Uyum Kurulu ve Kanıta Dayalı Tıp Kurulu notlarının her birinin %2’si toplanarak hesaplanır.',
+                knowledge_documents: {
+                    title: 'TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ',
+                    type: 'pdf',
+                    status: 'ready'
+                }
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıpta dönem içi kurul notu başarı notuna nasıl yansıyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-grade-formula-current-1',
+            document_id: 'doc-medicine-grade-formula-current-1'
+        })
+    })
+
+    it('retrieves final exemption evidence for pass-without-final wording', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'final-makeup-noise-1',
+                    document_id: 'doc-final-makeup-noise-1',
+                    document_title: 'Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği',
+                    document_type: 'pdf',
+                    content: 'Final sınavına girmeyen öğrenciler bütünleme sınavına girer.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [{
+                id: 'medicine-final-exemption-current-1',
+                document_id: 'doc-medicine-final-exemption-current-1',
+                content: 'Page Title: TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ\nSource URL: https://example.edu.tr/tip-yonerge.pdf\n\nDers kurulu sınav notlarının her biri en az 60 ve dönem içi kurul notu 80 veya üzerindeyse öğrenci final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir.',
+                knowledge_documents: {
+                    title: 'TIP FAKÜLTESİ EĞİTİM- ÖĞRETİM VE SINAV YÖNERGESİ',
+                    type: 'pdf',
+                    status: 'ready'
+                }
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıpta hangi şartlarda finale girmeden geçebilirim?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-final-exemption-current-1',
+            document_id: 'doc-medicine-final-exemption-current-1'
+        })
+    })
+
     it('continues with keyword fallback when vector search exceeds the deadline', async () => {
         vi.useFakeTimers()
         try {
@@ -2023,6 +2469,98 @@ describe('searchKnowledgeBase', () => {
         })
     })
 
+    it('runs a focused contact search for TLT program responsibility questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'wrong-faculty-person-1',
+                    document_id: 'doc-wrong-faculty-person-1',
+                    document_title: 'Eczane Hizmetleri Programı',
+                    document_type: 'article',
+                    content: 'Page Title: Eczane Hizmetleri Programı\nSource URL: https://example.edu.tr/eczane\n\nDoç. Dr. Esma SARI ÜZEK-Tıbbi Laboratuvar Teknikleri Programı sorumlusu.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'tlt@yiu.edu.tr',
+                rows: [{
+                    id: 'tlt-contact-focused-1',
+                    document_id: 'doc-tlt-contact-focused-1',
+                    content: 'Page Title: Program Bilgi Notu\nSource URL: https://example.edu.tr/tlt-bilgi-notu.pdf\n\nTIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI\nAdres: Yüksek İhtisas Üniversitesi Sağlık Hizmetleri Meslek Yüksekokulu Oğuzlar Mahallesi 1375 Sokak No:8 06520 Balgat/Ankara\nTelefon: +90 312 329 1010\nE-Mail: tlt@yiu.edu.tr',
+                    knowledge_documents: {
+                        title: 'Program Bilgi Notu',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıbbi Laboratuvar Teknikleri programının sorumlusu kim iletişim bilgisi var mı',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-contact-focused-1',
+            document_id: 'doc-tlt-contact-focused-1'
+        })
+        expect(context).toContain('tlt@yiu.edu.tr')
+    })
+
+    it('runs a focused evidence search for TLT double-major questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-double-major-1',
+                    document_id: 'doc-generic-double-major-1',
+                    document_title: 'Yatay Geçiş ve Çift Anadal Yönergesi',
+                    document_type: 'article',
+                    content: 'Page Title: Yönerge\nSource URL: https://example.edu.tr/genel-cift-anadal.pdf\n\nÇift anadal başvuruları hakkında genel koşullar.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Eczane Hizmetleri',
+                rows: [{
+                    id: 'tlt-double-major-focused-1',
+                    document_id: 'doc-tlt-report-1',
+                    content: 'Page Title: TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU\nSource URL: https://example.edu.tr/tlt-oz-degerlendirme.pdf\n\n*Tıbbi Dokümantasyon ve Sekreterlik Programı öğrencileri, Tıbbi Tanıtım ve Pazarlama Programında çift anadal programına kayıt yaptırabilirler.\n\n*Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında ve Eczane Hizmetleri Programı öğrencileri ise Tıbbi Laboratuvar Teknikleri Programında çift anadal programına kayıt yaptırabilirler. Her iki programa kaydedilecek öğrenci kontenjanları, her yıl Eğitim-Öğretim yılı başlamadan önce yüksekokul tarafından belirlenir. Kontenjanları belirlenen ve yayınlanan çift anadal programına öğrenciler, üçüncü yarıyılın başında başvurabilir.',
+                    knowledge_documents: {
+                        title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıbbi Laboratuvar Teknikleri programında çift anadal yapabilir miyim',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-double-major-focused-1',
+            document_id: 'doc-tlt-report-1',
+            source_url: 'https://example.edu.tr/tlt-oz-degerlendirme.pdf'
+        })
+        expect(context).toContain('Eczane Hizmetleri Programında')
+        expect(context).not.toContain('Tıbbi Dokümantasyon')
+    })
+
     it('rescues exam regulation chunks over exam calendar notices for health-report excuse questions', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [],
@@ -2121,6 +2659,771 @@ describe('searchKnowledgeBase', () => {
             chunk_id: 'exam-regulation-focused-1',
             document_id: 'doc-exam-regulation-focused-1'
         })
+    })
+
+    it('prefers medical school exam directive rules over broad faculty event pages for final and makeup questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'medicine-event-noise-1',
+                    document_id: 'doc-medicine-event-noise-1',
+                    document_title: 'Tıp Fakültesinden Mezun Olunca',
+                    document_type: 'article',
+                    content: 'Page Title: Tıp Fakültesinden Mezun Olunca\nSource URL: https://example.edu.tr/etkinlik/tip-fakultesinden-mezun-olunca\n\nTıp Fakültesi final ve bütünleme döneminde düzenlenen mezuniyet etkinliği hakkında genel bilgiler.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [
+                {
+                    id: 'medicine-final-makeup-rule-1',
+                    document_id: 'doc-medicine-exam-directive-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nMadde 23- Final sınavına girmesi gerektiği halde girmeyen veya final sınavından başarısız olan öğrenci bütünleme sınavına girer. Bütünleme sınavında alınan not final sınavı notu yerine geçer.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-final-makeup-rule-1',
+            document_id: 'doc-medicine-exam-directive-1'
+        })
+    })
+
+    it('keeps medical school grade calculation rules inside RAG context over broad faculty pages', async () => {
+        const broadFacultyText = Array.from({ length: 45 }, () =>
+            'Tıp Fakültesi eğitim süreci, sınıf düzeyleri, kurul sınavları ve öğrenci etkinlikleri hakkında genel tanıtım bilgileri.'
+        ).join(' ')
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'medicine-broad-page-1',
+                    document_id: 'doc-medicine-broad-page-1',
+                    document_title: 'Tıp Fakültesi',
+                    document_type: 'article',
+                    content: `Page Title: Tıp Fakültesi\nSource URL: https://example.edu.tr/sayfa/akademik/fakulteler/tip-fakultesi\n\n${broadFacultyText}`,
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [
+                {
+                    id: 'medicine-grade-calculation-rule-1',
+                    document_id: 'doc-medicine-exam-directive-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nMadde 30- Dönem sonu başarı notu, kurul sınavları ortalamasının %60\'ı ile final veya bütünleme sınavı notunun %40\'ının toplamından oluşur. Öğrencinin dönemden başarılı sayılabilmesi için dönem sonu başarı notunun en az 60 olması gerekir.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(context).toContain('kurul sınavları ortalamasının %60')
+        expect(context).toContain('final veya bütünleme sınavı notunun %40')
+    })
+
+    it('runs a focused medical-school policy search when broad fallback misses grade calculation evidence', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'medicine-directive-intro-1',
+                    document_id: 'doc-medicine-exam-directive-1',
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    document_type: 'article',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nMadde 5- Tıp Fakültesinde eğitim-öğretim süresi altı yıldır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [
+                {
+                    id: 'medicine-broad-keyword-1',
+                    document_id: 'doc-medicine-broad-keyword-1',
+                    content: 'Page Title: Tıp Fakültesi\nSource URL: https://example.edu.tr/tip-fakultesi\n\nTıp Fakültesi sınıf düzeyleri ve kurul sınavları hakkında genel tanıtım bilgileri.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }
+            ],
+            fallbackRowsByFilter: [{
+                includes: 'dönem sonu başarı',
+                rows: [{
+                    id: 'medicine-grade-focused-1',
+                    document_id: 'doc-medicine-exam-directive-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nDönem I, II ve III Ders Kurulları puanlarının ortalamasının %60’ı ile yıl sonu sınavı final veya bütünleme sınavı notunun %40’ı toplanarak dönem sonu başarı notu elde edilir.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(context).toContain('ortalamasının %60')
+        expect(context).toContain('notunun %40')
+    })
+
+    it('runs a focused medical-school policy search for final-to-makeup rights when generic retrieval misses the article', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'strategic-plan-noise-1',
+                    document_id: 'doc-strategic-plan-noise-1',
+                    document_title: '2024-2028 Stratejik Plan',
+                    document_type: 'article',
+                    content: 'Page Title: 2024-2028 Stratejik Plan\nSource URL: https://example.edu.tr/stratejik-plan.pdf\n\nTıp Fakültesi final ve bütünleme başarı göstergeleri stratejik plan kapsamında izlenir.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Yıl Sonu genel sınavının mazeret sınavı',
+                rows: [{
+                    id: 'medicine-final-makeup-focused-1',
+                    document_id: 'doc-medicine-exam-directive-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nYıl Sonu genel sınavının mazeret sınavı Bütünleme sınavıdır. Yıl Sonu ve Bütünleme sınavları için ayrıca mazeret sınavı yapılmaz.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-final-makeup-focused-1',
+            document_id: 'doc-medicine-exam-directive-1'
+        })
+        expect(context).toContain('Yıl Sonu genel sınavının mazeret sınavı Bütünleme sınavıdır.')
+    })
+
+    it('runs a focused final policy search when a generic final/class-pass question misses the rule', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'calendar-noise-1',
+                    document_id: 'doc-calendar-noise-1',
+                    document_title: 'Final Sınav Takvimi',
+                    document_type: 'article',
+                    content: 'Page Title: Final Sınav Takvimi\nSource URL: https://example.edu.tr/final-takvimi\n\nFinal ve bütünleme sınav tarihleri yayınlanmıştır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'yarıyıl sonu sınavında başarısız olan veya yarıyıl sonu sınavına girmeyen',
+                rows: [{
+                    id: 'generic-final-policy-focused-1',
+                    document_id: 'doc-undergrad-regulation-1',
+                    content: 'Page Title: Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği\nSource URL: https://example.edu.tr/onlisans-lisans-sinav-yonetmeligi.pdf\n\nBütünleme sınavları, yarıyıl sonu sınavında başarısız olan veya yarıyıl sonu sınavına girmeyen öğrencilere uygulanır.',
+                    knowledge_documents: {
+                        title: 'Ön Lisans ve Lisans Eğitim-Öğretim ve Sınav Yönetmeliği',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Finale girmeden sınıf geçebilir miyim?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'generic-final-policy-focused-1',
+            document_id: 'doc-undergrad-regulation-1'
+        })
+        expect(context).toContain('yarıyıl sonu sınavına girmeyen öğrencilere uygulanır')
+    })
+
+    it('runs a focused medical-school training search for medicine internship questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'national-internship-noise-1',
+                    document_id: 'doc-national-internship-noise-1',
+                    document_title: 'Ulusal Staj Programı',
+                    document_type: 'article',
+                    content: 'Page Title: Ulusal Staj Programı\nSource URL: https://example.edu.tr/ulusal-staj\n\nUlusal staj programı kapsamında öğrenciler başvuru yapabilir.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Dönem IV ve V’te stajlardan',
+                rows: [{
+                    id: 'medicine-training-staj-focused-1',
+                    document_id: 'doc-medicine-training-policy-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nTıp eğitim- öğretimi; Dönem I, II ve III’te temel olarak ders kurullarından, Dönem IV ve V’te stajlardan oluşan Klinik Tıp Bilimleri eğitim-öğretimi ve Dönem VI’da İntörnlük Stajlarından oluşan İntörnlük eğitim- öğretimi esasına göre yapılır.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesinde yaz stajı var mı?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-training-staj-focused-1',
+            document_id: 'doc-medicine-training-policy-1'
+        })
+        expect(context).toContain('Dönem IV ve V’te stajlardan')
+        expect(context).toContain('Dönem VI’da İntörnlük Stajlarından')
+    })
+
+    it('runs a focused learning-platform search when the user asks where lecture notes are shared', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'course-info-noise-1',
+                    document_id: 'doc-course-info-noise-1',
+                    document_title: 'Ders Bilgileri',
+                    document_type: 'article',
+                    content: 'Page Title: Ders Bilgileri\nSource URL: https://example.edu.tr/ders-bilgileri.pdf\n\nDersin amacı, öğrenme çıktıları ve haftalık programı açıklanır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'ders notlarının paylaşımı',
+                rows: [{
+                    id: 'lecture-notes-platform-focused-1',
+                    document_id: 'doc-quality-report-1',
+                    content: 'Page Title: Kalite Raporu\nSource URL: https://example.edu.tr/kalite-raporu.pdf\n\nUZEM/MEDU sistemleri ile uzaktan eğitim başarı ile yürütülmüştür. Bu sistem sayesinde çevrim içi dersler gerçekleştirilmiş olup, aynı zamanda ders notlarının paylaşımı da kolaylıkla sağlanmıştır.',
+                    knowledge_documents: {
+                        title: 'Kalite Raporu',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Ders notlarına nereden ulaşabilirim?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'lecture-notes-platform-focused-1',
+            document_id: 'doc-quality-report-1'
+        })
+        expect(context).toContain('UZEM/MEDU')
+        expect(context).toContain('ders notlarının paylaşımı')
+    })
+
+    it('runs a focused elective policy search when the user asks how many electives are required', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'quality-system-noise-1',
+                    document_id: 'doc-quality-system-noise-1',
+                    document_title: 'Quality Assurance Systems',
+                    document_type: 'article',
+                    content: 'Page Title: Quality Assurance Systems\nSource URL: https://example.edu.tr/kalite\n\nMezuniyet sürecinde kalite güvencesi, ders bilgi paketleri ve öğrenci geri bildirimleri izlenir.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'seçmeli ders sayısına',
+                rows: [{
+                    id: 'elective-count-focused-1',
+                    document_id: 'doc-undergrad-regulation-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nSeçmeli derslerin hangi derslerden oluşacağına, yarıyıllara dağılımına, öğrenci tarafından alınması gereken seçmeli ders sayısına, AKTS kredisine ve bu derslerin açılabilmesi için gerekli öğrenci sayısına Fakülte Kurulu karar verir.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Mezun olana kadar kaç seçmeli ders almalıyım?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(context).toContain('öğrenci tarafından alınması gereken seçmeli ders sayısına')
+        expect(context).toContain('Fakülte Kurulu karar verir')
+    })
+
+    it('prefers subject-specific address evidence over the generic contact page for address questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'root-contact-noise-1',
+                    document_id: 'doc-root-contact-noise-1',
+                    document_title: 'İletişim',
+                    document_type: 'article',
+                    content: 'Page Title: İletişim\nSource URL: https://example.edu.tr/iletisim\n\nAdres: Oğuzlar Mahallesi 1375. Sokak No: 8 Balgat / Ankara. Telefon: +90 312 329 10 10.',
+                    similarity: 0.98
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Adres:',
+                rows: [{
+                    id: 'shmyo-address-evidence-1',
+                    document_id: 'doc-shmyo-address-evidence-1',
+                    content: 'Page Title: Sağlık Hizmetleri Meslek Yüksekokulu\nSource URL: https://example.edu.tr/shmyo-tanitim.pdf\n\nSağlık Hizmetleri Meslek Yüksekokulu (SHMYO) kampüsü adres bilgisi: Karakaya Mahallesi Bağlum Bulvarı No:1, 06291 Keçiören/Ankara.',
+                    knowledge_documents: {
+                        title: 'Sağlık Hizmetleri Meslek Yüksekokulu Tanıtım PDF',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Sağlık Hizmetleri MYO nerede, açık adresi nedir?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'shmyo-address-evidence-1',
+            document_id: 'doc-shmyo-address-evidence-1'
+        })
+        expect(context).toContain('Karakaya Mahallesi')
+        expect(context).toContain('Keçiören/Ankara')
+    })
+
+    it('uses acronym/entity address evidence for short district questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'shmyo-announcement-noise-1',
+                    document_id: 'doc-shmyo-announcement-noise-1',
+                    document_title: 'SHMYO Tek Ders Sınavı Duyurusu',
+                    document_type: 'article',
+                    content: 'Page Title: SHMYO Tek Ders Sınavı Duyurusu\nSource URL: https://example.edu.tr/duyuru/shmyo-tek-ders\n\nSağlık Hizmetleri Meslek Yüksekokulu tek ders sınav takvimi yayınlanmıştır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Adres:',
+                rows: [{
+                    id: 'shmyo-district-evidence-1',
+                    document_id: 'doc-shmyo-district-evidence-1',
+                    content: 'Page Title: Sağlık Hizmetleri Meslek Yüksekokulu\nSource URL: https://example.edu.tr/shmyo-tanitim.pdf\n\nSHMYO adresi: Karakaya Mahallesi Bağlum Bulvarı No:1, 06291 Keçiören/Ankara.',
+                    knowledge_documents: {
+                        title: 'Sağlık Hizmetleri Meslek Yüksekokulu Tanıtım PDF',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'SHMYO hangi ilçede?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'shmyo-district-evidence-1',
+            document_id: 'doc-shmyo-district-evidence-1'
+        })
+    })
+
+    it('prefers campus-location evidence over generic SBF PDF footer addresses', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'sbf-footer-pdf-1',
+                    document_id: 'doc-sbf-footer-pdf-1',
+                    document_title: 'SBF Koordinatörler Kurulu Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: SBF Koordinatörler Kurulu Yönergesi\nSource URL: https://example.edu.tr/sbf-koordinatorler-kurulu.pdf\n\nSBF DEKANI Sağlık Bilimleri Fakültesi Kalite Koordinatörlüğü. Adres : Yüksek İhtisas Üniversitesi Rektörlüğü 06530 Telefon : 0312 329 10 10.',
+                    similarity: 0.995
+                },
+                {
+                    chunk_id: 'sbf-campus-location-1',
+                    document_id: 'doc-sbf-campus-location-1',
+                    document_title: 'Sıkça Sorulan Sorular',
+                    document_type: 'article',
+                    content: 'Page Title: Sıkça Sorulan Sorular\nSource URL: https://example.edu.tr/sikca-sorulan-sorular\n\nÜniversite Ankara’nın neresindedir?\nBalgat yerleşkesi (Sağlık Bilimleri Fakültesi)\nOğuzlar Mahallesi, 1375. Sk. No: 8, Çankaya / Ankara.',
+                    similarity: 0.82
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Sbf kampüsü nerede?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'sbf-campus-location-1',
+            document_id: 'doc-sbf-campus-location-1'
+        })
+    })
+
+    it('does not let unrelated program reports outrank a campus-location source for faculty campus questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'program-report-address-noise-1',
+                    document_id: 'doc-program-report-address-noise-1',
+                    document_title: 'Öz Değerlendirme Raporu',
+                    document_type: 'pdf',
+                    content: 'Page Title: Öz Değerlendirme Raporu\nSource URL: https://example.edu.tr/yuksekokul_bolum_icerikleri_view/program-raporu.pdf\n\nSağlık Bilimleri Fakültesi öğrencileriyle ortak etkinlik yapılır. Adres: Oğuzlar Mahallesi 1375. Sokak No:8, Balgat/Ankara.',
+                    similarity: 0.99
+                },
+                {
+                    chunk_id: 'sbf-campus-location-2',
+                    document_id: 'doc-sbf-campus-location-2',
+                    document_title: 'Yerleşke Konumları Güncellendi',
+                    document_type: 'article',
+                    content: 'Page Title: Üniversitemizde Yeni Düzenleme Kapsamında Yapılan Yerleşke Konumları Güncellendi\nSource URL: https://example.edu.tr/duyuru/yerleske-konumlari-guncellendi\n\nSAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No :1 Bağlıca',
+                    similarity: 0.78
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Adres :',
+                rows: [{
+                    id: 'sbf-address-pdf-2',
+                    document_id: 'doc-sbf-address-pdf-2',
+                    content: 'Page Title: SBF Koordinatörler Kurulu Yönergesi\nSource URL: https://example.edu.tr/sbf-koordinatorler-kurulu.pdf\n\nSBF DEKANI Sağlık Bilimleri Fakültesi Kalite Koordinatörlüğü. Adres : Yüksek İhtisas Üniversitesi Rektörlüğü 06530 Telefon : 0312 329 10 10.',
+                    knowledge_documents: {
+                        title: 'SBF Koordinatörler Kurulu Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Sağlık Bilimleri Fakültesi hangi yerleşkede eğitim veriyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'sbf-campus-location-2',
+            document_id: 'doc-sbf-campus-location-2'
+        })
+    })
+
+    it('treats course materials wording as lecture-notes access evidence', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'course-package-noise-1',
+                    document_id: 'doc-course-package-noise-1',
+                    document_title: 'Ders Bilgi Paketi',
+                    document_type: 'article',
+                    content: 'Page Title: Ders Bilgi Paketi\nSource URL: https://example.edu.tr/bilgi-paketi\n\nDerslerin AKTS ve içerik bilgileri listelenir.',
+                    similarity: 0.97
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Ders Materyali',
+                rows: [{
+                    id: 'course-materials-evidence-1',
+                    document_id: 'doc-course-materials-evidence-1',
+                    content: 'Page Title: Eğitim Öğretim Süreçleri\nSource URL: https://example.edu.tr/egitim-ogretim-surecleri.pdf\n\nDers içeriği ve Ders Materyali UZEM/MEDU sistemlerine yüklenerek öğrencilerin erişimine açılır. Ders notlarının paylaşımı bu sistemler üzerinden yapılır.',
+                    knowledge_documents: {
+                        title: 'Eğitim Öğretim Süreçleri PDF',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Ders materyalleri ve notlar nerede paylaşılır?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'course-materials-evidence-1',
+            document_id: 'doc-course-materials-evidence-1'
+        })
+        expect(context).toContain('UZEM/MEDU')
+        expect(context).toContain('Ders Materyali')
+    })
+
+    it('does not treat "nereden" learning-material questions as address lookups', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'address-pdf-noise-1',
+                    document_id: 'doc-address-pdf-noise-1',
+                    document_title: 'Program Bilgi Notu',
+                    document_type: 'pdf',
+                    content: 'Page Title: Program Bilgi Notu\nSource URL: https://example.edu.tr/program-bilgi-notu.pdf\n\nAdres: Oğuzlar Mahallesi 1375 Sokak No:8, 06520 Çankaya/Ankara.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'ders notlarının paylaşımı',
+                rows: [{
+                    id: 'lecture-notes-nereden-evidence-1',
+                    document_id: 'doc-lecture-notes-nereden-evidence-1',
+                    content: 'Page Title: Eğitim Öğretim Süreçleri\nSource URL: https://example.edu.tr/egitim-ogretim-surecleri.pdf\n\nDers notlarının paylaşımı UZEM/MEDU sistemleri üzerinden sağlanır. Ders Materyali öğrencilerin erişimine açılır.',
+                    knowledge_documents: {
+                        title: 'Eğitim Öğretim Süreçleri PDF',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Ders notlarına nereden ulaşabilirim?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'lecture-notes-nereden-evidence-1',
+            document_id: 'doc-lecture-notes-nereden-evidence-1'
+        })
+    })
+
+    it('prefers elective governance policy when the user asks who determines electives', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'program-contact-noise-1',
+                    document_id: 'doc-program-contact-noise-1',
+                    document_title: 'Tıbbi Laboratuvar Teknikleri',
+                    document_type: 'article',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri\nSource URL: https://example.edu.tr/tlt\n\nProgram iletişim bilgisi: Telefon +90 312 329 10 10.',
+                    similarity: 0.98
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Fakülte Kurulu karar verir',
+                rows: [{
+                    id: 'elective-governance-evidence-1',
+                    document_id: 'doc-elective-governance-evidence-1',
+                    content: 'Page Title: Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/egitim-ogretim-ve-sinav-yonergesi.pdf\n\nSeçmeli derslerin hangi derslerden oluşacağına, yarıyıllara dağılımına, öğrenci tarafından alınması gereken seçmeli ders sayısına ve AKTS kredisine Fakülte Kurulu karar verir.',
+                    knowledge_documents: {
+                        title: 'Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Seçmeli ders sayısını kim belirliyor?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'elective-governance-evidence-1',
+            document_id: 'doc-elective-governance-evidence-1'
+        })
+        expect(context).toContain('Fakülte Kurulu karar verir')
+    })
+
+    it('routes standalone makeup/final abbreviations to final-exam policy evidence', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'exam-announcement-noise-1',
+                    document_id: 'doc-exam-announcement-noise-1',
+                    document_title: 'Final Sınav Takvimi',
+                    document_type: 'article',
+                    content: 'Page Title: Final Sınav Takvimi\nSource URL: https://example.edu.tr/duyuru/final-takvimi\n\nFinal sınav tarihleri ve salon listesi yayınlanmıştır.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Final sınavına girmesi gerektiği halde girmeyen',
+                rows: [{
+                    id: 'final-makeup-evidence-1',
+                    document_id: 'doc-final-makeup-evidence-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-sinav-yonergesi.pdf\n\nFinal sınavına girmesi gerektiği halde girmeyen öğrenci başarısız sayılır. Bütünleme sınavında alınan not final sınavı notu yerine geçer.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Finale girmeden büt hakkım olur mu?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'final-makeup-evidence-1',
+            document_id: 'doc-final-makeup-evidence-1'
+        })
+        expect(context).toContain('Final sınavına girmesi gerektiği halde girmeyen')
+        expect(context).toContain('Bütünleme sınavında alınan not')
+    })
+
+    it('prefers excuse-exam policy for sick/board-exam questions without exact faculty wording', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'proctor-rule-noise-1',
+                    document_id: 'doc-proctor-rule-noise-1',
+                    document_title: 'Tıp Fakültesi Sınav Uygulamaları',
+                    document_type: 'pdf',
+                    content: 'Page Title: Tıp Fakültesi Sınav Uygulamaları\nSource URL: https://example.edu.tr/sinav-uygulamalari.pdf\n\nKurul sınavında gözetmenlerin görevleri ve salon düzeni açıklanır.',
+                    similarity: 0.98
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'sağlık raporu ile belgelendirmesi',
+                rows: [{
+                    id: 'excuse-exam-evidence-1',
+                    document_id: 'doc-excuse-exam-evidence-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-sinav-yonergesi.pdf\n\nÖğrencinin sınava girmesini engelleyen hastalık durumunu sağlık raporu ile belgelendirmesi gerekir. Yönetim Kurulu tarafından kabul edilen mazeretler için mazeret sınavı yapılır.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Kurul sınavına hastalık nedeniyle giremedim, telafi sınavı hakkım var mı?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'excuse-exam-evidence-1',
+            document_id: 'doc-excuse-exam-evidence-1'
+        })
+        expect(context).toContain('sağlık raporu ile belgelendirmesi')
+        expect(context).toContain('mazeret sınavı yapılır')
     })
 
     it('prefers exact document codes over generic document-control templates', async () => {

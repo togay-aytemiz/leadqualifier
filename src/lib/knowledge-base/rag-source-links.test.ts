@@ -26,6 +26,23 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).toBe('Sayfa burada:\nhttps://yuksekihtisasuniversitesi.edu.tr/akademik-takvim')
     })
 
+    it('removes scheme-less spaced source fragments before appending canonical source links', () => {
+        const response = [
+            'Sağlık raporu olmadığı halde sınava giren öğrencinin sınavı geçersiz sayılır.',
+            'edu. tr/Uploads/icerik_yonetimi_view/d9c23f27ab20bbdca2e4ffeb8b8fb9bb. pdf'
+        ].join(' ')
+
+        const formatted = appendCanonicalRagSourceLinks(response, [{
+            source_url: 'https://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/d9c23f27ab20bbdca2e4ffeb8b8fb9bb.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Sağlık raporu olmadığı halde sınava giren öğrencinin sınavı geçersiz sayılır.\nhttps://yuksekihtisasuniversitesi.edu.tr/Uploads/icerik_yonetimi_view/d9c23f27ab20bbdca2e4ffeb8b8fb9bb.pdf')
+        expect(formatted).not.toContain('edu. tr')
+    })
+
     it('normalizes model-written multiple raw URLs to one URL when chunk metadata is unavailable', () => {
         const response = [
             'Akademik takvim linki:',
@@ -39,5 +56,46 @@ describe('appendCanonicalRagSourceLinks', () => {
         })
 
         expect(formatted).toBe('Akademik takvim linki:\nhttps://yuksekihtisasuniversitesi.edu.tr/akademik-takvim')
+    })
+
+    it('removes orphan path fragments before appending the canonical source link', () => {
+        const response = [
+            'Detaylı bilgi için buraya göz atabilirsin:',
+            'üksekokulu/cift-anadal-programlari',
+            'https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/cift-anadal-programlari'
+        ].join(' ')
+
+        const formatted = appendCanonicalRagSourceLinks(response, [{
+            source_url: 'https://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/cift-anadal-programlari'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Detaylı bilgi için buraya göz atabilirsin:\nhttps://yuksekihtisasuniversitesi.edu.tr/sayfa/akademik/yuksekokullar/saglik-hizmetleri-meslek-yuksekokulu/cift-anadal-programlari')
+        expect(formatted).not.toContain('üksekokulu/cift-anadal-programlari')
+    })
+
+    it('removes domain-only fragments left by malformed source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Mazeret sınavına girebilirsiniz. edu. tr', [{
+            source_url: 'https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/1efd58697c84b44e7a58977222c363ce.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Mazeret sınavına girebilirsiniz.\nhttps://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/icerik_yonetimi_view/1efd58697c84b44e7a58977222c363ce.pdf')
+        expect(formatted).not.toContain('edu. tr')
+    })
+
+    it('does not strip edu.tr inside email addresses while appending source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('E-posta: tlt@yiu.edu.tr', [{
+            source_url: 'https://yuksekihtisasuniversitesi.edu.tr/iletisim'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('E-posta: tlt@yiu.edu.tr\nhttps://yuksekihtisasuniversitesi.edu.tr/iletisim')
     })
 })

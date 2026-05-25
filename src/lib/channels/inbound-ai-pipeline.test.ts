@@ -342,6 +342,7 @@ function buildInputBase(supabase: unknown, sendOutbound: ReturnType<typeof vi.fn
 describe('processInboundAiPipeline guardrails', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        delete process.env.OPENAI_RAG_MODEL
         afterCallbacks.length = 0
         afterMock.mockImplementation((callback: () => void | Promise<void>) => {
             afterCallbacks.push(callback)
@@ -2113,6 +2114,66 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
+    it('uses extractive RAG recovery instead of generic fallback when RAG completion times out with clear evidence', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'SBF kampüsü nerede',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-sbf',
+                content: 'SAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca',
+                source_url: 'https://example.edu.tr/yerleske'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'SAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca',
+            chunks: [{
+                document_id: 'doc-sbf',
+                content: 'SAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca',
+                source_url: 'https://example.edu.tr/yerleske'
+            }],
+            tokenCount: 10
+        })
+        openAiCreateMock.mockRejectedValueOnce(new Error('AI stage "rag_completion" exceeded 12000ms timeout'))
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'SBF kampüsü nerede' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith(
+            expect.stringContaining('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
+        )
+        expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('https://example.edu.tr/yerleske'))
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
     it('formats RAG inline bullets before sending and persisting the bot reply', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 
@@ -2492,10 +2553,80 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(systemPrompt).toContain('Do not add punctuation or words after the URL')
         expect(systemPrompt).toContain('When several chunks are similar, prefer the one that matches the user wording most closely')
         expect(systemPrompt).toContain('For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, or email addresses, copy only the value explicitly shown in the context')
+        expect(systemPrompt).toContain('For campus, address, or where questions, copy the exact address/postal code if present')
         expect(systemPrompt).toContain('If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base')
         expect(systemPrompt).toContain('When answering with three or more items, use one plain dash bullet per line')
         expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('uses the configured RAG model only for grounded answer generation and usage records', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+        process.env.OPENAI_RAG_MODEL = 'gpt-strong-rag'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder(null)
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'SBF kampüsü nerede?',
+            reason: 'knowledge_base',
+            usage: {
+                inputTokens: 11,
+                outputTokens: 2,
+                totalTokens: 13
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'SBF Bağlıca Yerleşkesindedir.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'SBF Bağlıca Yerleşkesindedir.',
+            chunks: [{ document_id: 'doc-1', content: 'SBF Bağlıca Yerleşkesindedir.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'SBF Bağlıca Yerleşkesindedir.' } }],
+            usage: {
+                prompt_tokens: 100,
+                completion_tokens: 15,
+                total_tokens: 115
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(openAiCreateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'gpt-strong-rag'
+            })
+        )
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            category: 'rag',
+            model: 'gpt-strong-rag'
+        }))
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            category: 'router',
+            model: 'gpt-4o-mini'
+        }))
     })
 
     it('converts RAG Markdown links into raw URLs for chat channels', async () => {
@@ -2715,7 +2846,7 @@ describe('processInboundAiPipeline guardrails', () => {
             buildInput(supabase, sendOutbound, { text: 'Bilgi İşlem Birimi iletişim bilgisi nedir?' })
         )
 
-        const expectedReply = 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+        const expectedReply = 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr. https://yuksekihtisasuniversitesi.edu.tr/iletisim\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
         expect(sendOutbound).toHaveBeenCalledWith(expectedReply)
         expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringMatching(/^edu\./i))
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({

@@ -476,6 +476,11 @@ function defaultCollectionName(pageChunks, crawlOutputDir) {
     return `Website Crawl - ${path.basename(crawlOutputDir)}`
 }
 
+function knowledgeDocumentTypeForPage(page) {
+    const sourceUrl = `${page?.sourceUrl ?? ''}`.trim()
+    return /\.pdf(?:$|[?#])/i.test(sourceUrl) ? 'pdf' : 'article'
+}
+
 export async function buildCrawlCorpus(options = {}) {
     const crawlOutputDir = options.crawlOutputDir
     if (!crawlOutputDir) {
@@ -619,7 +624,7 @@ async function importPageBatch({
         organization_id: organizationId,
         collection_id: collectionId,
         title: page.title || 'Untitled page',
-        type: 'article',
+        type: knowledgeDocumentTypeForPage(page),
         source: 'website_crawl',
         content: buildDocumentContent(page),
         language: language || null,

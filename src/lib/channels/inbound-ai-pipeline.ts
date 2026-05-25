@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { after } from 'next/server'
 import { matchSkills } from '@/lib/skills/actions'
-import { buildRagContext } from '@/lib/knowledge-base/rag'
+import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
@@ -45,6 +45,11 @@ import {
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
+const DEFAULT_RAG_COMPLETION_MODEL = 'gpt-4o-mini'
+
+function resolveRagCompletionModel() {
+    return process.env.OPENAI_RAG_MODEL?.trim() || DEFAULT_RAG_COMPLETION_MODEL
+}
 
 function payloadContainsNoAnswer(value: unknown): boolean {
     if (typeof value === 'string') {
@@ -946,6 +951,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         extracted_fields?: Record<string, unknown> | null
     } | null = null
     let fallbackKnowledgeContext: string | null = null
+    let fallbackKnowledgeChunks: RagChunk[] | null = null
     let requiredIntakeAnalysis = analyzeRequiredIntakeState({
         requiredFields: requiredIntakeFields,
         recentCustomerMessages: customerHistoryForFollowup,
@@ -1315,12 +1321,14 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 }
                 if (!fallbackKnowledgeContext) {
                     fallbackKnowledgeContext = context.replace(/\s+/g, ' ').trim().slice(0, 1500)
+                    fallbackKnowledgeChunks = chunks
                 }
 
                 const noAnswerToken = 'NO_ANSWER'
                 if (!await ensureUsageAllowed('before_rag_completion')) return
                 const { default: OpenAI } = await import('openai')
                 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+                const ragCompletionModel = resolveRagCompletionModel()
 
                 const basePrompt = withBotNamePrompt(aiSettings.prompt || DEFAULT_FLEXIBLE_PROMPT, aiSettings.bot_name)
                 const continuityGuidance = buildConversationContinuityGuidance({
@@ -1338,7 +1346,10 @@ Do not use Markdown links like [label](url). When sharing a link, put the full r
 Copy source URLs exactly and never insert spaces inside a URL. Do not add punctuation or words after the URL.
 When several chunks are similar, prefer the one that matches the user wording most closely, such as student vs staff or a specific department name.
 For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, or email addresses, copy only the value explicitly shown in the context. If multiple conflicting values appear, prefer the chunk whose title/source best matches the question and mention the source link when useful.
+For campus, address, or where questions, copy the exact address/postal code if present; do not answer only with the city or province.
 If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base.
+For can/cannot, eligibility, permission, exam, application, deadline, or policy-right questions, answer from the specific rule sentence. Do not start with a blanket denial when the context includes a conditional right, exception, or eligibility path; state the condition and right together.
+Before finalizing, check your answer for internal contradictions against the context. If one sentence says "cannot / no right / not possible" but another context sentence says the user can under stated conditions, remove the unsupported denial and answer with the grounded condition.
 When answering with three or more items, use one plain dash bullet per line.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.
@@ -1350,7 +1361,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 const historyMessages = toOpenAiConversationMessages(history, options.text, 10)
 
                 const completion = await withAiTimeout(openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
+                    model: ragCompletionModel,
                     messages: [
                         { role: 'system', content: systemPrompt },
                         ...historyMessages,
@@ -1381,7 +1392,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 })
                 const sourceLinkRequested = isLikelySourceLinkRequest(options.text)
                 const finalRagResponse = appendCanonicalRagSourceLinks(repairedRagResponse, chunks, {
-                    force: sourceLinkRequested || repairedRagResponse !== guardedRagResponse,
+                    force: sourceLinkRequested || !isRagNoAnswerResponse(repairedRagResponse),
                     limit: 1
                 })
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
@@ -1400,7 +1411,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 await recordAiUsage({
                     organizationId: orgId,
                     category: 'rag',
-                    model: 'gpt-4o-mini',
+                    model: ragCompletionModel,
                     inputTokens: ragUsage.inputTokens,
                     outputTokens: ragUsage.outputTokens,
                     totalTokens: ragUsage.totalTokens,
@@ -1448,6 +1459,47 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             return
         }
         console.error(`${options.logPrefix}: RAG error`, error)
+
+        if (fallbackKnowledgeChunks?.length) {
+            const noInformationSeed = responseLanguage === 'tr'
+                ? 'Bu konuda elimde net bilgi yok.'
+                : 'I do not have clear information about this in the knowledge base.'
+            const extractiveRagFallback = repairLinkOnlyRagAnswer({
+                response: noInformationSeed,
+                userMessage: options.text,
+                responseLanguage,
+                chunks: fallbackKnowledgeChunks
+            })
+            if (extractiveRagFallback && extractiveRagFallback !== noInformationSeed && !isRagNoAnswerResponse(extractiveRagFallback)) {
+                const extractiveRagWithSources = appendCanonicalRagSourceLinks(extractiveRagFallback, fallbackKnowledgeChunks, {
+                    force: true,
+                    limit: 1
+                })
+                const formattedExtractiveRagReply = formatOutboundBotMessage(extractiveRagWithSources)
+                const outboundMetadata = await sendOutboundAndCollectMetadata(formattedExtractiveRagReply)
+                await persistBotMessage(formattedExtractiveRagReply, {
+                    ...outboundMetadata,
+                    is_rag: true,
+                    sources: fallbackKnowledgeChunks.map((chunk) => chunk.document_id).filter(Boolean)
+                })
+                await recordAiLatencyEvent({
+                    organizationId: orgId,
+                    conversationId: conversation.id,
+                    metricKey: 'llm_response',
+                    durationMs: Date.now() - llmResponseStartedAt,
+                    source: options.source,
+                    metadata: {
+                        response_kind: 'rag_extractive_timeout_recovery',
+                        platform: options.platform,
+                        document_count: fallbackKnowledgeChunks.length
+                    }
+                }, {
+                    supabase: options.supabase
+                })
+                await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
+                return
+            }
+        }
     }
 
     if (!await ensureUsageAllowed('before_fallback')) return
@@ -1471,7 +1523,13 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
         knowledgeContext: fallbackKnowledgeContext
     })
 
-    const formattedFallbackReply = formatOutboundBotMessage(fallbackText)
+    const fallbackWithSourceLinks = fallbackKnowledgeChunks?.length
+        ? appendCanonicalRagSourceLinks(fallbackText, fallbackKnowledgeChunks, {
+            force: !isRagNoAnswerResponse(fallbackText),
+            limit: 1
+        })
+        : fallbackText
+    const formattedFallbackReply = formatOutboundBotMessage(fallbackWithSourceLinks)
     const outboundMetadata = await sendOutboundAndCollectMetadata(formattedFallbackReply)
     await persistBotMessage(formattedFallbackReply, {
         ...outboundMetadata,

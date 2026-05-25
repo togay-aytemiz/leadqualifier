@@ -51,6 +51,17 @@ export function collectRagSourceUrls(chunks: unknown[], limit = 2) {
 
 const SPACED_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
 const SIMPLE_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi
+const SCHEMELESS_SPACED_SOURCE_FRAGMENT_PATTERN = /\b(?:[A-Za-z0-9-]{2,}\s*\.\s*)?(?:edu|com|net|org|gov)\s*\.\s*(?:tr|com|net|org|edu|gov|io|ai)\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
+const SCHEMELESS_SPACED_DOMAIN_FRAGMENT_PATTERN = /(?<![@.\p{L}\p{N}-])(?:edu|com|net|org|gov)\s*\.\s*(?:tr|com|net|org|edu|gov|io|ai)\b/giu
+const ORPHAN_SOURCE_PATH_FRAGMENT_PATTERN = /[\p{L}\p{N}-]{3,}\/(?=[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]*-)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/giu
+
+function hasRagUrlArtifact(response: string) {
+    SCHEMELESS_SPACED_SOURCE_FRAGMENT_PATTERN.lastIndex = 0
+    SCHEMELESS_SPACED_DOMAIN_FRAGMENT_PATTERN.lastIndex = 0
+    return /https?:\/\//i.test(response)
+        || SCHEMELESS_SPACED_SOURCE_FRAGMENT_PATTERN.test(response)
+        || SCHEMELESS_SPACED_DOMAIN_FRAGMENT_PATTERN.test(response)
+}
 
 function collectResponseSourceUrls(response: string, limit: number) {
     const urls: string[] = []
@@ -73,6 +84,9 @@ function stripRagUrlArtifacts(response: string) {
     let stripped = response
         .replace(/\[([^\]\n]+)]\(\s*https?:\/\/[\s\S]*?\)/gi, '$1')
         .replace(SPACED_RAW_URL_PATTERN, '')
+        .replace(SCHEMELESS_SPACED_SOURCE_FRAGMENT_PATTERN, '')
+        .replace(SCHEMELESS_SPACED_DOMAIN_FRAGMENT_PATTERN, '')
+        .replace(ORPHAN_SOURCE_PATH_FRAGMENT_PATTERN, '')
 
     if (/https?:\/\/\s/i.test(stripped)) {
         stripped = stripped.replace(/https?:\/\/[\s\S]*$/i, '')
@@ -116,7 +130,8 @@ export function appendCanonicalRagSourceLinks(
     chunks: unknown[],
     options: { force?: boolean; limit?: number } = {}
 ) {
-    if (!options.force && !/https?:\/\//i.test(response)) return response
+    const hasUrlArtifact = hasRagUrlArtifact(response)
+    if (!options.force && !hasUrlArtifact) return response
 
     const limit = Math.max(1, options.limit ?? 2)
     const sourceUrls = collectRagSourceUrls(chunks, limit)
@@ -125,7 +140,7 @@ export function appendCanonicalRagSourceLinks(
         : collectResponseSourceUrls(response, limit)
     if (urls.length === 0) return response
 
-    const responseWithoutUrlArtifacts = /https?:\/\//i.test(response)
+    const responseWithoutUrlArtifacts = hasUrlArtifact
         ? stripRagUrlArtifacts(response)
         : response.trim()
 

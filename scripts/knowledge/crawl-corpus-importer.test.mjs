@@ -343,6 +343,75 @@ Kayit tarihleri ve ders baslangic bilgileri.
         }
     })
 
+    it('marks crawled PDF pages as pdf documents during import', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
+        const calls = {
+            insertedDocuments: [],
+            insertedChunks: [],
+            usageRows: []
+        }
+        const repository = {
+            getOrganization: async (organizationId) => ({ id: organizationId, name: 'Test Org' }),
+            findCollection: async () => null,
+            createCollection: async () => ({ id: 'collection-1', name: 'Website Crawl - example.edu.tr' }),
+            deleteDocumentsByCollection: async () => {},
+            insertDocuments: async (rows) => {
+                calls.insertedDocuments.push(...rows)
+                return rows.map((row, index) => ({
+                    id: `doc-${index + 1}`,
+                    title: row.title
+                }))
+            },
+            insertChunks: async (rows) => {
+                calls.insertedChunks.push(...rows)
+            },
+            updateDocumentsStatus: async () => {},
+            recordEmbeddingUsage: async (row) => {
+                calls.usageRows.push(row)
+            }
+        }
+
+        try {
+            await mkdir(path.join(tempDir, 'corpus'), { recursive: true })
+            await writeFile(path.join(tempDir, 'corpus-report.json'), JSON.stringify({
+                corpusPages: [{
+                    url: 'https://example.edu.tr/uploads/izin-kullanimi.pdf',
+                    title: 'İzin Kullanımı Yönergesi',
+                    corpusPath: 'corpus/izin-kullanimi.md',
+                    wordCount: 16
+                }]
+            }), 'utf8')
+            await writeFile(path.join(tempDir, 'corpus', 'izin-kullanimi.md'), `# İzin Kullanımı Yönergesi
+
+Source URL: https://example.edu.tr/uploads/izin-kullanimi.pdf
+
+## Content
+
+Madde 6- Yıllık ücretli izin süreleri personel için düzenlenir.
+`, 'utf8')
+
+            await importCrawlCorpus({
+                crawlOutputDir: tempDir,
+                organizationId: 'org-1',
+                repository,
+                embedTexts: async (texts) => ({
+                    embeddings: texts.map(() => [0.1, 0.2, 0.3]),
+                    promptTokens: 42
+                }),
+                batchSize: 10,
+                embeddingBatchSize: 10
+            })
+
+            expect(calls.insertedDocuments[0]).toMatchObject({
+                title: 'İzin Kullanımı Yönergesi',
+                type: 'pdf',
+                source: 'website_crawl'
+            })
+        } finally {
+            await rm(tempDir, { recursive: true, force: true })
+        }
+    })
+
     it('records one compact embedding usage row per completed crawl import', async () => {
         const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
         const calls = {
