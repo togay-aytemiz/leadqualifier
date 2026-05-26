@@ -64,6 +64,7 @@ type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { co
 const MAX_PROFILE_CONTEXT_CHARS = 6000
 const COUNT_SCAN_PAGE_SIZE = 1000
 const VECTOR_SEARCH_TIMEOUT_MS = 2500
+const EVIDENCE_SEARCH_TIMEOUT_MS = 4500
 const LEXICAL_EVIDENCE_FIRST_TIMEOUT_MS = 750
 const PLANNED_QUERY_SHORT_CIRCUIT_MIN_RESULTS = 3
 const PLANNED_QUERY_SHORT_CIRCUIT_MIN_SCORE = 1.2
@@ -936,6 +937,20 @@ export async function searchKnowledgeBaseFocusedEvidence(
         supabase
     }
     const focusedEvidenceLimit = Math.max(limit * 4, 16)
+
+    const currentCampusResults = await searchKnowledgeBaseByCurrentCampusListingEvidence(
+        query,
+        organizationId,
+        focusedEvidenceLimit,
+        executionOptions
+    )
+    if (currentCampusResults.length > 0) {
+        const mergedCurrentCampusResults = mergeSearchResults(query, [], currentCampusResults, limit)
+        if (shouldReturnFocusedEvidenceResultsEarly(query, mergedCurrentCampusResults)) {
+            return mergedCurrentCampusResults
+        }
+    }
+
     const results = (await Promise.all(
         buildFocusedEvidenceSearches(query, organizationId, focusedEvidenceLimit, executionOptions)
     )).flat()
@@ -2879,12 +2894,17 @@ function hasCurrentNamedProgramCampusEvidence(query: string, result: KnowledgeSe
     if (!isCampusLocationQuery(query)) return false
 
     const normalizedQuery = normalizeSearchText(query)
-    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrlFromResult(result) ?? ''}`)
+    const searchableText = `${result.document_title}\n${result.content}\n${sourceUrlFromResult(result) ?? ''}`
+    const searchable = normalizeSearchText(searchableText)
     const isCurrentCampusListing = searchable.includes('konumlari guncellendi')
         || searchable.includes('yerleske konumlari')
         || searchable.includes('tasindi')
 
     if (!isCurrentCampusListing) return false
+
+    if (hasCurrentCampusLocationEvidence(query, result) && evidenceSubjectCoverageScore(query, searchableText) >= 0.5) {
+        return true
+    }
 
     if (normalizedQuery.includes('sbf') || normalizedQuery.includes('saglik bilim')) {
         return searchable.includes('saglik bilimleri fakultesi')
@@ -2905,22 +2925,36 @@ function hasCurrentNamedProgramCampusEvidence(query: string, result: KnowledgeSe
 function campusLocationRequiredFilterGroups(query: string) {
     const normalized = normalizeSearchText(query)
     const groups: string[][] = []
+    const seen = new Set<string>()
+    const addGroup = (filters: string[]) => {
+        const normalizedFilters = filters
+            .map((filter) => filter.trim())
+            .filter(Boolean)
+        if (normalizedFilters.length === 0) return
+
+        const key = normalizedFilters
+            .map((filter) => normalizeSearchText(filter))
+            .join('\u0000')
+        if (seen.has(key)) return
+        seen.add(key)
+        groups.push(normalizedFilters)
+    }
 
     if (normalized.includes('sbf') || normalized.includes('saglik bilim')) {
-        groups.push(
-            ['Sağlık Bilimleri', 'Bağlıca'],
-            ['SBF', 'Bağlıca'],
-            ['Fakültemiz', 'Bağlıca']
-        )
+        addGroup(['Sağlık Bilimleri', 'Bağlıca'])
+        addGroup(['SBF', 'Bağlıca'])
+        addGroup(['Fakültemiz', 'Bağlıca'])
     }
     if (
         normalized.includes('tlt')
         || (normalized.includes('tibbi') && normalized.includes('laboratuvar') && normalized.includes('teknik'))
     ) {
-        groups.push(
-            ['Tıbbi Laboratuvar Teknikleri', 'Balgat'],
-            ['TLT', 'Balgat']
-        )
+        addGroup(['Tıbbi Laboratuvar Teknikleri', 'Balgat'])
+        addGroup(['TLT', 'Balgat'])
+    }
+
+    for (const subjectFilter of addressSubjectEvidenceFilters(query).slice(0, 5)) {
+        addGroup([subjectFilter, 'Yerleşke'])
     }
 
     return groups
@@ -3143,6 +3177,28 @@ async function searchKnowledgeBaseByCurrentCampusListingEvidence(
 ) {
     if (!isCampusLocationQuery(query)) return []
 
+    const buildCurrentCampusResults = (rows: KeywordSearchRow[]) => rows
+        .map((row) => buildKeywordResultFromRow(row, 3.1))
+        .filter((result) => hasCurrentNamedProgramCampusEvidence(query, result))
+        .map((result) => ({
+            ...result,
+            similarity: Math.max(
+                0.2,
+                3.1 + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
+            )
+        }))
+
+    const listingRows = await searchKnowledgeBaseByEvidenceFilters('Current campus listing evidence', [
+        'Yerleşke Konumları',
+        'Konumları Güncellendi',
+        'Yerleşkesine Taşındı',
+        'BAĞLICA YERLEŞKESİ',
+        'BALGAT YERLEŞKESİ',
+        'BAĞLUM YERLEŞKESİ'
+    ], organizationId, Math.max(limit * 4, 96), options)
+    const listingResults = buildCurrentCampusResults(listingRows)
+    if (listingResults.length > 0) return listingResults
+
     const groups = campusLocationRequiredFilterGroups(query)
     if (groups.length === 0) return []
 
@@ -3156,17 +3212,7 @@ async function searchKnowledgeBaseByCurrentCampusListingEvidence(
         ))
     )
 
-    return rowGroups
-        .flat()
-        .map((row) => buildKeywordResultFromRow(row, 3.1))
-        .filter((result) => hasCurrentNamedProgramCampusEvidence(query, result))
-        .map((result) => ({
-            ...result,
-            similarity: Math.max(
-                0.2,
-                3.1 + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
-            )
-        }))
+    return buildCurrentCampusResults(rowGroups.flat())
 }
 
 async function searchKnowledgeBaseByEvidenceFilters(
@@ -3200,9 +3246,26 @@ async function searchKnowledgeBaseByEvidenceFilters(
         evidenceQuery = evidenceQuery.eq('knowledge_documents.language', options.language)
     }
 
-    const { data, error } = await evidenceQuery.limit(Math.max(24, Math.min(160, limit * 3)))
+    let data: KeywordSearchRow[] | null = null
+    let error: unknown = null
+    try {
+        const result = await withQueryTimeout(
+            evidenceQuery.limit(Math.max(24, Math.min(160, limit * 3))),
+            EVIDENCE_SEARCH_TIMEOUT_MS,
+            `${queryName} evidence search`
+        )
+        data = (result.data ?? null) as KeywordSearchRow[] | null
+        error = result.error
+    } catch (queryError) {
+        error = queryError
+    }
+
     if (error || !data) {
-        console.error(`${queryName} evidence search failed:`, error)
+        if (isQueryTimeoutError(error)) {
+            console.warn(`${queryName} evidence search timed out; continuing without those rows:`, error)
+        } else {
+            console.error(`${queryName} evidence search failed:`, error)
+        }
         return []
     }
 
@@ -3243,9 +3306,26 @@ async function searchKnowledgeBaseByRequiredEvidenceFilters(
         evidenceQuery = evidenceQuery.eq('knowledge_documents.language', options.language)
     }
 
-    const { data, error } = await evidenceQuery.limit(Math.max(16, Math.min(80, limit * 2)))
+    let data: KeywordSearchRow[] | null = null
+    let error: unknown = null
+    try {
+        const result = await withQueryTimeout(
+            evidenceQuery.limit(Math.max(16, Math.min(80, limit * 2))),
+            EVIDENCE_SEARCH_TIMEOUT_MS,
+            `${queryName} required evidence search`
+        )
+        data = (result.data ?? null) as KeywordSearchRow[] | null
+        error = result.error
+    } catch (queryError) {
+        error = queryError
+    }
+
     if (error || !data) {
-        console.error(`${queryName} required evidence search failed:`, error)
+        if (isQueryTimeoutError(error)) {
+            console.warn(`${queryName} required evidence search timed out; continuing without those rows:`, error)
+        } else {
+            console.error(`${queryName} required evidence search failed:`, error)
+        }
         return []
     }
 

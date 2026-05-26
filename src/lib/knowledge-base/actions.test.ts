@@ -69,7 +69,8 @@ import {
     getSidebarData,
     getSidebarFilesPage,
     processKnowledgeDocument,
-    searchKnowledgeBase
+    searchKnowledgeBase,
+    searchKnowledgeBaseFocusedEvidence
 } from '@/lib/knowledge-base/actions'
 import { buildRagContext } from '@/lib/knowledge-base/rag'
 
@@ -980,6 +981,66 @@ describe('searchKnowledgeBase', () => {
             document_id: 'doc-kw-1'
         })
         expect(results.map((result) => result.chunk_id)).toEqual(['kw-1', 'vec-1', 'vec-2'])
+    })
+
+    it('returns high-confidence campus evidence before broader address scans can block polling', async () => {
+        const currentCampusRow = {
+            id: 'campus-current-1',
+            document_id: 'doc-campus-current-1',
+            content: 'Page Title: Yerleşke Konumları Güncellendi\nSource URL: https://example.edu.tr/yerleske-konumlari\n\nSağlık Hizmetleri Meslek Yüksekokulu BAĞLUM YERLEŞKESİ içindedir.',
+            knowledge_documents: {
+                title: 'Yerleşke Konumları Güncellendi',
+                type: 'article',
+                status: 'ready'
+            }
+        }
+        const filtersSeen: string[] = []
+        const queryChain: {
+            eq: ReturnType<typeof vi.fn>
+            ilike: ReturnType<typeof vi.fn>
+            or: ReturnType<typeof vi.fn>
+            limit: ReturnType<typeof vi.fn>
+        } = {
+            eq: vi.fn(),
+            ilike: vi.fn((_column: string, pattern: string) => {
+                filtersSeen.push(pattern)
+                return queryChain
+            }),
+            or: vi.fn((filter: string) => {
+                filtersSeen.push(filter)
+                return queryChain
+            }),
+            limit: vi.fn(async () => ({
+                data: filtersSeen.some((filter) => filter.includes('Yerleşke Konumları'))
+                    ? [currentCampusRow]
+                    : [],
+                error: null
+            }))
+        }
+        queryChain.eq.mockReturnValue(queryChain)
+        const supabase = {
+            from: vi.fn((table: string) => {
+                if (table !== 'knowledge_chunks') throw new Error(`Unexpected table ${table}`)
+                return {
+                    select: vi.fn(() => queryChain)
+                }
+            })
+        }
+
+        const results = await searchKnowledgeBaseFocusedEvidence(
+            'SHMYO kampüsü nerede?',
+            'org-1',
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'campus-current-1',
+            document_id: 'doc-campus-current-1'
+        })
+        const combinedFilters = filtersSeen.join('\n')
+        expect(combinedFilters).toContain('Yerleşke Konumları')
+        expect(combinedFilters).not.toContain('Adres')
     })
 
     it('logs vector timeout errors as recoverable warnings while continuing with lexical evidence', async () => {

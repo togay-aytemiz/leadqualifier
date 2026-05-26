@@ -691,6 +691,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 readFastRagReplyTimeoutMs()
             )
             if (extractiveRecoveryResult.status === 'timeout') {
+                scheduleAfterResponse('extractive pending reply recovery', async () => {
+                    await extractiveRecoveryPromise
+                })
+
                 return NextResponse.json({ pending: true }, { status: 202 })
             }
 
