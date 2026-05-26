@@ -60,6 +60,7 @@ type KnowledgeFileRow = Pick<KnowledgeBaseEntry, 'id' | 'title' | 'type'> & { co
 const MAX_PROFILE_CONTEXT_CHARS = 6000
 const COUNT_SCAN_PAGE_SIZE = 1000
 const VECTOR_SEARCH_TIMEOUT_MS = 2500
+const LEXICAL_EVIDENCE_FIRST_TIMEOUT_MS = 750
 
 export interface KnowledgeEntriesPage {
     entries: KnowledgeBaseEntry[]
@@ -232,6 +233,21 @@ function withQueryTimeout<T>(query: PromiseLike<T> | AbortableQuery<T>, timeoutM
                 clearTimeout(timeoutId)
                 reject(error)
             })
+    })
+}
+
+async function readBeforeDeadline<T>(promise: Promise<T>, timeoutMs: number) {
+    let timeout: ReturnType<typeof setTimeout> | null = null
+
+    const timeoutPromise = new Promise<{ status: 'timeout' }>((resolve) => {
+        timeout = setTimeout(() => resolve({ status: 'timeout' }), timeoutMs)
+    })
+
+    return Promise.race([
+        promise.then((value) => ({ status: 'fulfilled' as const, value })),
+        timeoutPromise
+    ]).finally(() => {
+        if (timeout) clearTimeout(timeout)
     })
 }
 
@@ -607,6 +623,7 @@ export async function searchKnowledgeBase(
         searchKnowledgeBaseByTltDoubleMajorEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByMedicalSchoolExamPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByMedicalSchoolTrainingEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
+        searchKnowledgeBaseByInternshipEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByLectureNotesEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByFinalExemptionPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByFinalExamPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
@@ -633,6 +650,18 @@ export async function searchKnowledgeBase(
     const focusedPolicyEvidenceResults = await focusedPolicyEvidenceResultsPromise
     if (shouldReturnFocusedEvidenceResultsEarly(query, focusedPolicyEvidenceResults)) {
         return mergeSearchResults(query, [], focusedPolicyEvidenceResults, limit)
+    }
+
+    if (extractAbbreviationCandidates(query).length > 0) {
+        const abbreviationLexicalResults = (await lexicalFallbackResultsPromise).flat()
+        if (abbreviationLexicalResults.length > 0) {
+            return mergeSearchResults(query, [], abbreviationLexicalResults, limit)
+        }
+    }
+
+    const lexicalEvidenceBeforeVector = await getQuickLexicalEvidenceBeforeVector(query, lexicalFallbackResultsPromise)
+    if (lexicalEvidenceBeforeVector && shouldReturnLexicalEvidenceResultsEarly(query, lexicalEvidenceBeforeVector)) {
+        return mergeSearchResults(query, [], lexicalEvidenceBeforeVector, limit)
     }
 
     let embedding: number[] | null = null
@@ -1757,6 +1786,7 @@ function isPolicyRuleQuery(query: string) {
         || normalized.includes('saglik raporu')
         || normalized.includes('secmeli ders')
         || normalized.includes('cift anadal')
+        || new Set(normalized.split(/\s+/).filter(Boolean)).has('cap')
         || normalized.includes('yaz staji')
 }
 
@@ -2768,8 +2798,10 @@ async function searchKnowledgeBaseByProgramContactEvidence(
 
 function isTltDoubleMajorQuery(query: string) {
     const normalized = normalizeSearchText(query)
+    const tokens = new Set(normalized.split(/\s+/).filter(Boolean))
+
     return isTltProgramQuery(query)
-        && normalized.includes('cift anadal')
+        && (normalized.includes('cift anadal') || tokens.has('cap'))
 }
 
 function extractTltDoubleMajorExcerpt(content: string) {
@@ -2971,6 +3003,104 @@ function medicalSchoolTrainingEvidenceFilters(query: string) {
     }
 
     return [...filters]
+}
+
+function isInternshipEvidenceQuery(query: string) {
+    const normalized = normalizeSearchText(query)
+
+    return normalized.includes('staj')
+        || normalized.includes('intern')
+        || normalized.includes('uygulama')
+}
+
+function extractInternshipEvidenceExcerpt(content: string) {
+    const flattened = content.replace(/\s+/g, ' ').trim()
+    const start = flattened.search(/(?:Yaz\s+Stajı|staj(?:ı|i)?|iş\s+günü)/iu)
+    if (start === -1) return null
+
+    const excerpt = flattened.slice(Math.max(0, start - 180), Math.min(flattened.length, start + 620)).trim()
+    return excerpt || null
+}
+
+function focusInternshipEvidenceResult(result: KnowledgeSearchResult): KnowledgeSearchResult {
+    const excerpt = extractInternshipEvidenceExcerpt(result.content)
+    if (!excerpt) return result
+
+    const sourceUrl = sourceUrlFromResult(result)
+    const metadata = [
+        result.document_title ? `Page Title: ${result.document_title}` : null,
+        sourceUrl ? `Source URL: ${sourceUrl}` : null
+    ].filter((value): value is string => Boolean(value))
+
+    return {
+        ...result,
+        source_url: sourceUrl ?? result.source_url ?? null,
+        content: [
+            ...metadata,
+            '',
+            excerpt
+        ].join('\n').trim()
+    }
+}
+
+async function searchKnowledgeBaseByInternshipEvidence(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    const normalized = normalizeSearchText(query)
+    if (!isInternshipEvidenceQuery(query)) return []
+    if (isMedicalSchoolTrainingQuery(query) && normalized.includes('tip')) return []
+
+    const filters = new Set<string>(['staj'])
+    if (normalized.includes('yaz')) filters.add('Yaz Stajı')
+    if (isTltProgramQuery(query)) filters.add('Tıbbi Laboratuvar Teknikleri')
+    if (hasQuerySignal(query, ['kaç gün', 'kac gun', 'süre', 'sure', 'ne kadar', 'kaç iş günü', 'kac is gunu'])) {
+        filters.add('iş günü')
+    }
+    if (filters.size < 2) return []
+
+    const rows = await searchKnowledgeBaseByRequiredEvidenceFilters(
+        'Internship evidence',
+        [...filters],
+        organizationId,
+        limit,
+        options
+    )
+
+    return rows
+        .map((row) => buildKeywordResultFromRow(row, 2.2))
+        .map(focusInternshipEvidenceResult)
+        .filter((result) => {
+            const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
+            if (!searchable.includes('staj')) return false
+            if (isTltProgramQuery(query) && !searchable.includes('tibbi laboratuvar teknikleri') && !searchable.includes('tlt')) return false
+
+            return true
+        })
+        .map((result) => {
+            const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
+            let evidenceScore = 0
+            if (searchable.includes('yaz staji')) evidenceScore += 0.34
+            if (searchable.includes('is gunu')) evidenceScore += 0.28
+            if (searchable.includes('tibbi laboratuvar teknikleri') || searchable.includes('tlt')) evidenceScore += 0.32
+
+            return {
+                ...result,
+                similarity: Math.max(
+                    0.2,
+                    2.2 + evidenceScore + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
+                )
+            }
+        })
+        .sort((left, right) => scoreKnowledgeResult(query, right) - scoreKnowledgeResult(query, left))
+        .slice(0, limit)
 }
 
 async function searchKnowledgeBaseByMedicalSchoolTrainingEvidence(
@@ -3995,7 +4125,62 @@ function shouldReturnFocusedEvidenceResultsEarly(query: string, results: Knowled
         || isMedicalSchoolTrainingQuery(query)
         || isLectureNotesAccessQuery(query)
         || isElectiveCourseRequirementQuery(query)
+        || isInternshipEvidenceQuery(query)
     ) && topScore >= 1.05
+}
+
+function shouldProbeLexicalEvidenceBeforeVector(query: string) {
+    return isPolicyRuleQuery(query)
+        || isContactInfoQuery(query)
+        || isAddressLookupQuery(query)
+        || isLectureNotesAccessQuery(query)
+        || isInternshipEvidenceQuery(query)
+        || isPolicyDurationQuery(query)
+        || isProgramContactResponsibilityQuery(query)
+        || isTltDoubleMajorQuery(query)
+        || isAnnualPaidLeaveQuery(query)
+        || extractAbbreviationCandidates(query).length > 0
+}
+
+async function getQuickLexicalEvidenceBeforeVector(
+    query: string,
+    fallbackResultsPromise: Promise<KnowledgeSearchResult[][]>
+) {
+    if (!shouldProbeLexicalEvidenceBeforeVector(query)) return null
+
+    const result = await readBeforeDeadline(fallbackResultsPromise, LEXICAL_EVIDENCE_FIRST_TIMEOUT_MS)
+    if (result.status !== 'fulfilled') return null
+
+    return result.value.flat()
+}
+
+function shouldReturnLexicalEvidenceResultsEarly(query: string, results: KnowledgeSearchResult[]) {
+    if (results.length === 0) return false
+
+    const ranked = mergeSearchResults(query, [], results, Math.min(6, Math.max(3, results.length)))
+    const top = ranked[0]
+    if (!top) return false
+
+    const searchable = `${top.document_title}\n${top.content}\n${sourceUrlFromResult(top) ?? ''}`
+    const lexicalCoverage = lexicalMatchScore(query, searchable)
+    const subjectCoverage = evidenceSubjectCoverageScore(query, searchable)
+    const topScore = scoreKnowledgeResult(query, enrichKnowledgeSearchResult(top))
+    const hasAbbreviationCandidate = extractAbbreviationCandidates(query).length > 0
+
+    if (hasAbbreviationCandidate && abbreviationLookupScore(query, top) >= 0.25) return true
+
+    if (topScore >= 1.35 && lexicalCoverage >= 0.45) return true
+
+    return lexicalCoverage >= 0.7
+        && subjectCoverage >= 0.45
+        && (
+            isPolicyRuleQuery(query)
+            || isContactInfoQuery(query)
+            || isAddressLookupQuery(query)
+            || isLectureNotesAccessQuery(query)
+            || isAnnualPaidLeaveQuery(query)
+            || hasAbbreviationCandidate
+        )
 }
 
 async function searchKnowledgeBaseByKeyword(

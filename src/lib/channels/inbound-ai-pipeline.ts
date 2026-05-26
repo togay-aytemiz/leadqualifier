@@ -45,10 +45,42 @@ import {
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
+const RAG_REASONING_MAX_COMPLETION_TOKENS = 1024
 const DEFAULT_RAG_COMPLETION_MODEL = 'gpt-4o-mini'
 
 function resolveRagCompletionModel() {
     return process.env.OPENAI_RAG_MODEL?.trim() || DEFAULT_RAG_COMPLETION_MODEL
+}
+
+function usesReasoningChatCompletionParameters(model: string) {
+    const normalized = model.trim().toLowerCase()
+    return /^gpt-5(?:[.-]|$)/.test(normalized) || /^o\d/.test(normalized)
+}
+
+function buildRagCompletionParameters(model: string) {
+    const normalized = model.trim().toLowerCase()
+    if (/^gpt-5\.[4-9](?:[.-]|$)/.test(normalized)) {
+        return {
+            reasoning_effort: 'none' as const,
+            max_completion_tokens: RAG_MAX_OUTPUT_TOKENS
+        }
+    }
+
+    if (/^gpt-5(?:[.-]|$)/.test(normalized)) {
+        return {
+            reasoning_effort: 'minimal' as const,
+            max_completion_tokens: RAG_MAX_OUTPUT_TOKENS
+        }
+    }
+
+    if (usesReasoningChatCompletionParameters(model)) {
+        return { max_completion_tokens: RAG_REASONING_MAX_COMPLETION_TOKENS }
+    }
+
+    return {
+        temperature: 0.3,
+        max_tokens: RAG_MAX_OUTPUT_TOKENS
+    }
 }
 
 function payloadContainsNoAnswer(value: unknown): boolean {
@@ -1367,8 +1399,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         ...historyMessages,
                         { role: 'user', content: options.text }
                     ],
-                    temperature: 0.3,
-                    max_tokens: RAG_MAX_OUTPUT_TOKENS
+                    ...buildRagCompletionParameters(ragCompletionModel)
                 }), { stage: 'rag_completion' })
 
                 const ragResponse = completion.choices[0]?.message?.content?.trim()
@@ -1391,8 +1422,9 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     chunks
                 })
                 const sourceLinkRequested = isLikelySourceLinkRequest(options.text)
+                const hasRepairedRagResponse = Boolean(repairedRagResponse?.trim())
                 const finalRagResponse = appendCanonicalRagSourceLinks(repairedRagResponse, chunks, {
-                    force: sourceLinkRequested || !isRagNoAnswerResponse(repairedRagResponse),
+                    force: sourceLinkRequested || (hasRepairedRagResponse && !isRagNoAnswerResponse(repairedRagResponse)),
                     limit: 1
                 })
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)

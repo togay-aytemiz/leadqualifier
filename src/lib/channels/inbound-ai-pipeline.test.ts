@@ -2629,6 +2629,139 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('uses reasoning-compatible Chat Completions parameters for GPT-5 RAG models', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+        process.env.OPENAI_RAG_MODEL = 'gpt-5-mini'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder(null)
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'SBF kampüsü nerede?',
+            reason: 'knowledge_base',
+            usage: {
+                inputTokens: 11,
+                outputTokens: 2,
+                totalTokens: 13
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'SBF Bağlıca Yerleşkesindedir.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'SBF Bağlıca Yerleşkesindedir.',
+            chunks: [{ document_id: 'doc-1', content: 'SBF Bağlıca Yerleşkesindedir.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'SBF Bağlıca Yerleşkesindedir.' } }],
+            usage: {
+                prompt_tokens: 100,
+                completion_tokens: 80,
+                total_tokens: 180
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        const request = openAiCreateMock.mock.calls[0]?.[0] as Record<string, unknown> | undefined
+        expect(request).toEqual(expect.objectContaining({
+            model: 'gpt-5-mini',
+            reasoning_effort: 'minimal',
+            max_completion_tokens: 320
+        }))
+        expect(request).not.toHaveProperty('max_tokens')
+        expect(request).not.toHaveProperty('temperature')
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            category: 'rag',
+            model: 'gpt-5-mini',
+            outputTokens: 80
+        }))
+    })
+
+    it('uses supported none reasoning effort for newer GPT-5 mini-family RAG models', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+        process.env.OPENAI_RAG_MODEL = 'gpt-5.4-mini'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder(null)
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'SBF kampüsü nerede?',
+            reason: 'knowledge_base',
+            usage: {
+                inputTokens: 11,
+                outputTokens: 2,
+                totalTokens: 13
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'SBF Bağlıca Yerleşkesindedir.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'SBF Bağlıca Yerleşkesindedir.',
+            chunks: [{ document_id: 'doc-1', content: 'SBF Bağlıca Yerleşkesindedir.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'SBF Bağlıca Yerleşkesindedir.' } }],
+            usage: {
+                prompt_tokens: 100,
+                completion_tokens: 15,
+                total_tokens: 115
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        const request = openAiCreateMock.mock.calls[0]?.[0] as Record<string, unknown> | undefined
+        expect(request).toEqual(expect.objectContaining({
+            model: 'gpt-5.4-mini',
+            reasoning_effort: 'none',
+            max_completion_tokens: 320
+        }))
+        expect(request).not.toHaveProperty('max_tokens')
+        expect(request).not.toHaveProperty('temperature')
+    })
+
     it('converts RAG Markdown links into raw URLs for chat channels', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 

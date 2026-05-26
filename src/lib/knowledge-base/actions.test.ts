@@ -2316,6 +2316,86 @@ describe('searchKnowledgeBase', () => {
         }
     })
 
+    it('skips broad vector search when quick lexical evidence is already strong enough', async () => {
+        const { supabase, rpcMock } = createHybridSearchSupabase({
+            rpcRows: [{
+                chunk_id: 'irrelevant-vector-1',
+                document_id: 'doc-irrelevant-vector-1',
+                document_title: 'Genel duyuru',
+                document_type: 'article',
+                content: 'Genel öğrenci duyuruları.',
+                similarity: 0.99
+            }],
+            fallbackRows: [{
+                id: 'tlt-staj-lexical-1',
+                document_id: 'doc-tlt-staj-1',
+                content: 'Page Title: Tıbbi Laboratuvar Teknikleri Staj Rehberi\nSource URL: https://example.edu.tr/tlt-staj.pdf\n\nTLT 216 Yaz Stajı 20 iş günü süresince yapılır. Tıbbi Laboratuvar Teknikleri öğrencileri yaz stajını ilgili sağlık kuruluşlarında tamamlar.',
+                knowledge_documents: {
+                    title: 'Tıbbi Laboratuvar Teknikleri Staj Rehberi',
+                    type: 'pdf',
+                    status: 'ready'
+                }
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-staj-lexical-1',
+            document_id: 'doc-tlt-staj-1'
+        })
+    })
+
+    it('uses focused internship evidence before broad vector search', async () => {
+        const { supabase, rpcMock } = createHybridSearchSupabase({
+            rpcRows: [{
+                chunk_id: 'irrelevant-vector-1',
+                document_id: 'doc-irrelevant-vector-1',
+                document_title: 'Genel duyuru',
+                document_type: 'article',
+                content: 'Genel öğrenci duyuruları.',
+                similarity: 0.99
+            }],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'iş günü',
+                rows: [{
+                    id: 'tlt-staj-focused-1',
+                    document_id: 'doc-tlt-staj-focused-1',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri Staj Rehberi\nSource URL: https://example.edu.tr/tlt-staj.pdf\n\nTıbbi Laboratuvar Teknikleri Programı öğrencileri TLT 216 Yaz Stajı dersini 20 iş günü süresince tamamlar.',
+                    knowledge_documents: {
+                        title: 'Tıbbi Laboratuvar Teknikleri Staj Rehberi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'TLT programında yaz stajı var mı, kaç gün?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-staj-focused-1',
+            document_id: 'doc-tlt-staj-focused-1'
+        })
+    })
+
     it('does not run broad lexical fallbacks when policy-duration evidence already fills the result set', async () => {
         const { supabase, limitMock } = createHybridSearchSupabase({
             rpcRows: [],
@@ -2423,8 +2503,8 @@ describe('searchKnowledgeBase', () => {
         expect(context).toContain('en geç 5 (beş) iş günü')
     })
 
-    it('rescues acronym contact-table chunks for TLT abbreviation questions', async () => {
-        const { supabase } = createHybridSearchSupabase({
+    it('rescues acronym contact-table chunks for TLT abbreviation questions before broad vector search', async () => {
+        const { supabase, rpcMock } = createHybridSearchSupabase({
             rpcRows: [],
             fallbackRowPages: [
                 [
@@ -2463,6 +2543,7 @@ describe('searchKnowledgeBase', () => {
             { supabase }
         )
 
+        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
         expect(results[0]).toMatchObject({
             chunk_id: 'contact-tlt-1',
             document_id: 'doc-contact-tlt-1'
@@ -2559,6 +2640,48 @@ describe('searchKnowledgeBase', () => {
         })
         expect(context).toContain('Eczane Hizmetleri Programında')
         expect(context).not.toContain('Tıbbi Dokümantasyon')
+    })
+
+    it('treats ÇAP as a double-major intent before broad vector search', async () => {
+        const { supabase, rpcMock } = createHybridSearchSupabase({
+            rpcRows: [{
+                chunk_id: 'generic-cap-1',
+                document_id: 'doc-generic-cap-1',
+                document_title: 'Genel Öğrenci Duyurusu',
+                document_type: 'article',
+                content: 'Genel duyuru.',
+                similarity: 0.99
+            }],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'Eczane Hizmetleri',
+                rows: [{
+                    id: 'tlt-cap-focused-1',
+                    document_id: 'doc-tlt-cap-1',
+                    content: 'Page Title: TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU\nSource URL: https://example.edu.tr/tlt-oz-degerlendirme.pdf\n\n*Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında ve Eczane Hizmetleri Programı öğrencileri ise Tıbbi Laboratuvar Teknikleri Programında çift anadal programına kayıt yaptırabilirler. Her iki programa kaydedilecek öğrenci kontenjanları her yıl belirlenir; öğrenciler üçüncü yarıyılın başında başvurabilir.',
+                    knowledge_documents: {
+                        title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'TLT öğrencisi ÇAP şartları nelerdir?',
+            'org-1',
+            0.6,
+            6,
+            { supabase }
+        )
+
+        expect(rpcMock).not.toHaveBeenCalledWith('match_knowledge_chunks', expect.anything())
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-cap-focused-1',
+            document_id: 'doc-tlt-cap-1'
+        })
     })
 
     it('rescues exam regulation chunks over exam calendar notices for health-report excuse questions', async () => {

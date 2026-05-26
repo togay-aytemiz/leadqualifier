@@ -582,6 +582,55 @@ function repairMedicineElectiveAnswer(input: {
     return evidence
 }
 
+function asksForElectiveCourseRequirement(normalizedUserMessage: string) {
+    return normalizedUserMessage.includes('secmeli')
+        && includesAny(normalizedUserMessage, [
+            'kac',
+            'kadar',
+            'mezun',
+            'almaliy',
+            'gecmem',
+            'gecmeli',
+            'basarili',
+            'sayisi',
+            'sayisina',
+            'belirliyor',
+            'belirlen',
+            'nasil'
+        ])
+}
+
+function extractElectiveCourseRequirementEvidence(content: string) {
+    const flattened = content.replace(/\s+/g, ' ').trim()
+    const match = flattened.match(/Seçmeli derslerin hangi derslerden oluşacağına,[\s\S]{0,340}?(?:Fakülte|Yüksekokul) Kurulu karar verir\./iu)
+        ?? flattened.match(/Seçmeli derslerin hangi derslerden oluşacağına,[\s\S]{0,340}?(?:Kurulu kararı ile belirlenir|kurulu kararı ile belirlenir)\./iu)
+        ?? flattened.match(/Seçmeli ders sayısına,[\s\S]{0,260}?(?:Fakülte|Yüksekokul) Kurulu karar verir\./iu)
+    if (!match?.[0]) return null
+
+    return cleanExtractedInlineValue(match[0])
+}
+
+function repairElectiveCourseRequirementAnswer(input: {
+    response: string
+    userMessage: string
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!asksForElectiveCourseRequirement(normalizedUserMessage)) return null
+
+    const evidence = input.chunks
+        .map((chunk) => extractElectiveCourseRequirementEvidence(chunk.content))
+        .find((value): value is string => Boolean(value))
+    if (!evidence) return null
+
+    const normalizedResponse = normalizeSearch(input.response)
+    const alreadyGrounded = normalizedResponse.includes('secmeli ders')
+        && includesAny(normalizedResponse, ['fakulte kurulu', 'yuksekokul kurulu', 'secmeli ders kurulu', 'donem vi', 'ogretim plan'])
+    if (alreadyGrounded) return null
+
+    return evidence
+}
+
 function asksForPassWithoutFinal(normalizedUserMessage: string) {
     return normalizedUserMessage.includes('final')
         && includesAny(normalizedUserMessage, ['girmeden', 'girmeksizin'])
@@ -681,9 +730,22 @@ function extractSbfCampusAddress(content: string) {
     return null
 }
 
+function extractShmyoCampusAddress(content: string) {
+    const updateMatch = content.match(/SAĞLIK\s+HİZMETLERİ\s+MESLEK\s+YÜKSEKOKULU[\s\S]{0,500}?BAĞLUM\s+YERLEŞKESİ\s*:?\s*([\s\S]{8,180}?)(?=\n\s*\n|SPOR\s+BİLİMLERİ|MESLEK\s+YÜKSEKOKULU|SAĞLIK\s+BİLİMLERİ|Son\s+Duyurular|$)/iu)
+    if (updateMatch?.[1]) {
+        const address = cleanExtractedInlineValue(updateMatch[1])
+        if (address.length >= 12) return address
+    }
+
+    return null
+}
+
 function extractCampusAddress(content: string, normalizedUserMessage: string) {
     if (normalizedUserMessage.includes('sbf') || normalizedUserMessage.includes('saglik bilimleri')) {
         return extractSbfCampusAddress(content)
+    }
+    if (normalizedUserMessage.includes('shmyo') || normalizedUserMessage.includes('saglik hizmetleri')) {
+        return extractShmyoCampusAddress(content)
     }
     if (
         normalizedUserMessage.includes('tlt')
@@ -894,9 +956,11 @@ function repairContactAnswer(input: {
 }
 
 function asksForTltDoubleMajor(normalizedUserMessage: string) {
+    const tokens = new Set(normalizedUserMessage.split(/\s+/).filter(Boolean))
+
     return (normalizedUserMessage.includes('tlt')
             || (normalizedUserMessage.includes('tibbi') && normalizedUserMessage.includes('laboratuvar') && normalizedUserMessage.includes('teknik')))
-        && normalizedUserMessage.includes('cift anadal')
+        && (normalizedUserMessage.includes('cift anadal') || tokens.has('cap'))
 }
 
 function hasTltDoubleMajorEvidence(content: string) {
@@ -991,6 +1055,20 @@ function extractMedicineGradeFormula(content: string) {
     if (!match?.[0]) return null
 
     return cleanExtractedInlineValue(match[0].replace('final notu veya bütünleme notunun %40’ı', 'final/bütünleme notunun %40’ı'))
+        .replace('final notu veya bütünleme notunun %40\'ı', 'final/bütünleme notunun %40’ı')
+        .replace('final notu veya bütünleme notunun %40ı', 'final/bütünleme notunun %40’ı')
+
+}
+
+function buildMedicineGradeFormulaFromEvidence(content: string) {
+    const normalized = normalizeSearch(content)
+    if (!normalized.includes('donem sonu basari notu')) return null
+    if (!normalized.includes('donem ici kurul notunun %60')) return null
+    if (!normalized.includes('%40')) return null
+    if (!normalized.includes('final') || !normalized.includes('butunleme')) return null
+    if (!normalized.includes('ders kurulu') || !normalized.includes('%96')) return null
+
+    return 'Dönem sonu başarı notu; Dönem içi kurul notunun %60’ı ile final/bütünleme notunun %40’ı toplanarak elde edilir. Dönem içi kurul notu; ders kurulu sınavlarının not ortalamasının %96’sı ile varsa Hekimliğe Uyum Kurulu ve Kanıta Dayalı Tıp Kurulu notlarının her birinin %2’si, yoksa birinin %4’ü toplanarak hesaplanır.'
 }
 
 function repairGradeCalculationAnswer(input: {
@@ -1003,7 +1081,7 @@ function repairGradeCalculationAnswer(input: {
 
     const normalizedResponse = normalizeSearch(input.response)
     const formulaEvidence = input.chunks
-        .map((chunk) => extractMedicineGradeFormula(chunk.content))
+        .map((chunk) => extractMedicineGradeFormula(chunk.content) ?? buildMedicineGradeFormulaFromEvidence(chunk.content))
         .find((value): value is string => Boolean(value))
     if (formulaEvidence && (!normalizedResponse.includes('60') || !normalizedResponse.includes('40') || normalizedResponse.includes('ogrenci isleri'))) {
         return formulaEvidence
@@ -1142,28 +1220,34 @@ function repairFinalExamAnswer(input: {
             'katilmadan butunleme sinavina giremez',
             'katilmadan butunlemeye giremez',
             'butunleme sinavina giremezsin',
-            'butunlemeye giremezsin'
+            'butunlemeye giremezsin',
+            'dogrudan butunlemeye girme hakki yok',
+            'butunlemeye girme hakki yok',
+            'butunleme sinavina girme hakki yok'
         ])
     const responseStatesMissingFinalEligibility = normalizedResponse.includes('final sinavina girmesi gerektigi halde girmeyen')
         && normalizedResponse.includes('butunleme')
-        && includesAny(normalizedResponse, ['girebilir', 'girer'])
+        && includesAny(normalizedResponse, ['girebilir', 'girer', 'girecek'])
     const responseStatesShortFinalEligibility = normalizedResponse.includes('final sinavina girmesi gereken')
         && normalizedResponse.includes('butunleme')
-        && includesAny(normalizedResponse, ['butunleme sinavina girebilir', 'bu sinava girebilir'])
+        && includesAny(normalizedResponse, ['butunleme sinavina girebilir', 'butunleme sinavina girecek', 'bu sinava girebilir', 'bu sinava girecek'])
     const responseStatesMissedFinalEligibility = normalizedResponse.includes('final sinavina girmediysen')
         && normalizedResponse.includes('butunleme')
         && includesAny(normalizedResponse, ['hakkin var', 'katilma hakkin', 'girebilirsin', 'girebilirsiniz'])
+    const startsWithNoDespiteEligibility = /^\s*(?:yiu\s+ai\W*)?(?:kisa\s+cevap\W*)?hayir\b/iu.test(normalizedResponse)
+        && normalizedUserMessage.includes('butunleme')
+        && (responseStatesMissingFinalEligibility || responseStatesShortFinalEligibility || responseStatesMissedFinalEligibility)
 
     const evidence = input.chunks
         .map((chunk) => extractFinalMakeupEvidence(chunk.content))
         .find((value): value is { kind: 'medicine-final' | 'generic-final'; text: string } => Boolean(value))
     if (!evidence) {
-        return contradictsMakeupEligibility
+        return (contradictsMakeupEligibility || startsWithNoDespiteEligibility)
             && (responseStatesMissingFinalEligibility || responseStatesShortFinalEligibility || responseStatesMissedFinalEligibility)
             ? 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.'
             : null
     }
-    const contradictsRetrievedMedicinePolicy = contradictsMakeupEligibility && evidence.kind === 'medicine-final'
+    const contradictsRetrievedMedicinePolicy = (contradictsMakeupEligibility || startsWithNoDespiteEligibility) && evidence.kind === 'medicine-final'
 
     if (!contradictsRetrievedMedicinePolicy
         && !isGenericNoInformationResponse(input.response)
@@ -1177,6 +1261,52 @@ function repairFinalExamAnswer(input: {
     }
 
     return 'Final/yarıyıl sonu sınavına girmeyen öğrenciler için bütünleme sınavı uygulanır; kaynakta finale girmeden doğrudan sınıf geçme değil, final yerine bütünleme hakkı düzenleniyor.'
+}
+
+function asksForExamExcusePolicy(normalizedUserMessage: string) {
+    return includesAny(normalizedUserMessage, ['sinav', 'kurul', 'final', 'butunleme', 'telafi', 'mazeret'])
+        && includesAny(normalizedUserMessage, ['hasta', 'hastalik', 'saglik raporu', 'rapor', 'mazeret', 'hak', 'giremedim', 'katilamadim'])
+}
+
+function extractExamExcuseEvidence(content: string) {
+    const normalized = normalizeSearch(content)
+    if (!normalized.includes('mazeret sinavi')) return null
+    if (!normalized.includes('saglik raporu') && !normalized.includes('saglik mazereti')) return null
+    if (!normalized.includes('fakulte yonetim kurulu') && !normalized.includes('ilgili birim yonetim kurulu')) return null
+
+    const board = normalized.includes('fakulte yonetim kurulu')
+        ? 'Fakülte Yönetim Kurulu'
+        : 'ilgili birim yönetim kurulu'
+    return `Sağlık mazereti sağlık raporu ile belgelendirilir; rapor/mazeret ${board} tarafından kabul edilirse mazeret sınavı açılır.`
+}
+
+function repairExamExcusePolicyAnswer(input: {
+    response: string
+    userMessage: string
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!asksForExamExcusePolicy(normalizedUserMessage)) return null
+
+    const normalizedResponse = normalizeSearch(input.response)
+    const asksWithoutHealthReport = includesAny(normalizedUserMessage, ['raporu vermeden', 'rapor vermeden', 'raporsuz', 'raporu olmadan', 'rapor olmadan'])
+    const responseCorrectlyDeniesWithoutReport = normalizedResponse.includes('saglik raporu')
+        && includesAny(normalizedResponse, ['giremez', 'girilemez', 'olmadan mazeret sinavina', 'vermeden mazeret sinavina'])
+    if (asksWithoutHealthReport && responseCorrectlyDeniesWithoutReport) return null
+
+    const evidence = input.chunks
+        .map((chunk) => extractExamExcuseEvidence(chunk.content))
+        .find((value): value is string => Boolean(value))
+    if (!evidence) return null
+
+    if (normalizedResponse.includes('telafi sinavi')) return null
+    if (normalizedResponse.includes('baska bir sinav hakki taninabilir')) return null
+    if (normalizedResponse.includes('mazeret sinavi')
+        && (normalizedResponse.includes('fakulte yonetim kurulu') || normalizedResponse.includes('ilgili birim yonetim kurulu'))) {
+        return null
+    }
+
+    return evidence
 }
 
 const GROUNDING_SUBJECT_STOPWORDS = new Set([
@@ -1351,7 +1481,7 @@ function repairContradictoryEligibilityAnswer(input: {
 const EVIDENCE_PREFERRED_TERMS = [
     {
         official: 'mazeret sınavı',
-        synonymPattern: /telafi\s+sınavı/giu
+        synonymPattern: /telafi\s+sınavı|başka\s+bir\s+sınav\s+hakkı|sinav\s+hakki\s+taninabilir|sınav\s+hakkı\s+tanınabilir/giu
     }
 ]
 
@@ -1413,8 +1543,12 @@ export function repairLinkOnlyRagAnswer(input: {
     responseLanguage: MvpResponseLanguage
     chunks: RagAnswerRepairChunk[]
 }) {
-    const response = input.response.trim()
-    if (!response) return response
+    const originalResponse = input.response.trim()
+    const response = originalResponse || (
+        input.responseLanguage === 'en'
+            ? 'I do not have clear information about this in the knowledge base.'
+            : 'Bu konuda elimde net bilgi yok.'
+    )
 
     const abbreviationTitleRepair = repairAbbreviationTitleAnswer({
         ...input,
@@ -1451,6 +1585,12 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (medicineElectiveRepair) return medicineElectiveRepair
+
+    const electiveCourseRequirementRepair = repairElectiveCourseRequirementAnswer({
+        ...input,
+        response
+    })
+    if (electiveCourseRequirementRepair) return electiveCourseRequirementRepair
 
     const medicineFinalExemptionRepair = repairMedicineFinalExemptionAnswer({
         ...input,
@@ -1494,6 +1634,12 @@ export function repairLinkOnlyRagAnswer(input: {
     })
     if (contradictoryEligibilityRepair) return contradictoryEligibilityRepair
 
+    const examExcusePolicyRepair = repairExamExcusePolicyAnswer({
+        ...input,
+        response
+    })
+    if (examExcusePolicyRepair) return examExcusePolicyRepair
+
     const evidenceTerminologyRepair = repairEvidencePreferredTerminology({
         ...input,
         response
@@ -1507,13 +1653,19 @@ export function repairLinkOnlyRagAnswer(input: {
     if (finalExamRepair) return finalExamRepair
 
     const articleNumber = requestedArticleNumber(input.userMessage)
-    if (!articleNumber) return sanitizeRagAnswerForReturn(response, input.userMessage)
+    if (!articleNumber) {
+        return originalResponse
+            ? sanitizeRagAnswerForReturn(response, input.userMessage)
+            : originalResponse
+    }
 
     for (const chunk of input.chunks) {
         const articleText = extractArticleText(chunk.content, articleNumber)
         if (!articleText) continue
         if (!isWeakArticleAnswer(response, articleText, articleNumber)) {
-            return sanitizeRagAnswerForReturn(response, input.userMessage)
+            return originalResponse
+                ? sanitizeRagAnswerForReturn(response, input.userMessage)
+                : originalResponse
         }
 
         if (input.responseLanguage === 'en') {
@@ -1527,5 +1679,7 @@ export function repairLinkOnlyRagAnswer(input: {
             : `Bu yönergenin kapsamı: ${articleText}`
     }
 
-    return sanitizeRagAnswerForReturn(response, input.userMessage)
+    return originalResponse
+        ? sanitizeRagAnswerForReturn(response, input.userMessage)
+        : originalResponse
 }

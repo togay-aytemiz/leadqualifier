@@ -90,6 +90,14 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('self-end')
     })
 
+    it('keeps the mobile composer textarea at 16px to avoid iOS focus zoom', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+        const textareaMatch = source.match(/<textarea[\s\S]*?className={`([\s\S]*?)`}/)
+
+        expect(textareaMatch?.[1]).toContain('text-base')
+        expect(textareaMatch?.[1]).not.toContain('text-sm')
+    })
+
     it('keeps the demo surface brandable with a theme toggle', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 

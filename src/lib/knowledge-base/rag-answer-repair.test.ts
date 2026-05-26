@@ -242,6 +242,23 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Tıp Fakültesinde öğrenciler, fakülte müfredatında yer alan seçmeli derslerden Dönem VI sonuna kadar başarılı olmalıdır.')
     })
 
+    it('repairs generic elective-count clarification answers from retrieved policy evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bunu net söyleyebilmem için hangi program/yıl ve başvuru türü olduğunu belirtmen gerekiyor.',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Seçmeli derslerin hangi derslerden oluşacağına, yarıyıllara dağılımına, öğrenci tarafından alınması gereken seçmeli ders sayısına ve AKTS kredisine Fakülte Kurulu karar verir.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('seçmeli ders sayısına')
+        expect(repaired).toContain('Fakülte Kurulu karar verir')
+    })
+
     it('repairs medicine in-year board-grade answers from explicit grade formula evidence', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Tıp Fakültesi ile ilgili detaylı bilgi almak için öğrenci işleriyle iletişime geçmeni öneririm.',
@@ -316,6 +333,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         })
 
         expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No :1 Bağlıca.')
+    })
+
+    it('repairs SHMYO abbreviation campus answers from current campus listing evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu kampüs adına bilgi tabanımda net kayıt yok. Bağlıca, Balgat veya Bağlum yerleşkelerinden biri mi?',
+            userMessage: 'Shmyo kampüsü nerede',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Yerleşke Konumları Güncellendi',
+                    content: 'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU\nBAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören\nSPOR BİLİMLERİ FAKÜLTESİ'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.')
     })
 
     it('repairs TLT campus answers from explicit program yerleşke evidence', () => {
@@ -456,6 +489,42 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('2,72/4,0')
     })
 
+    it('repairs TLT ÇAP acronym answers from double-major evidence after completion timeout', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'ÇAP için belirli akademik başarı kriterlerini sağlamanız gerekir. Detaylı bilgi için bölümle iletişime geçin.',
+            userMessage: 'TLT öğrencisi ÇAP şartları nelerdir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                    content: '*Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında ve Eczane Hizmetleri Programı öğrencileri ise Tıbbi Laboratuvar Teknikleri Programında çift anadal programına kayıt yaptırabilirler. Her iki programa kaydedilecek öğrenci kontenjanları, her yıl Eğitim-Öğretim yılı başlamadan önce yüksekokul tarafından belirlenir. Kontenjanları belirlenen ve yayınlanan çift anadal programına öğrenciler, üçüncü yarıyılın başında başvurabilir. Koşullarda genel ağırlıklı not ortalaması en az 2,72/4,0 ve/veya başarı sıralaması ya da taban puan şartı belirtilmiştir.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Eczane Hizmetleri Programında')
+        expect(repaired).toContain('üçüncü yarıyılın başında')
+        expect(repaired).toContain('2,72/4,0')
+    })
+
+    it('repairs blank RAG completions from retrieved double-major evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında çift anadal yapabilir miyim',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                    content: '*Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında ve Eczane Hizmetleri Programı öğrencileri ise Tıbbi Laboratuvar Teknikleri Programında çift anadal programına kayıt yaptırabilirler. Her iki programa kaydedilecek öğrenci kontenjanları, her yıl Eğitim-Öğretim yılı başlamadan önce yüksekokul tarafından belirlenir. Kontenjanları belirlenen ve yayınlanan çift anadal programına öğrenciler, üçüncü yarıyılın başında başvurabilir. Koşullarda genel ağırlıklı not ortalaması en az 2,72/4,0 ve/veya başarı sıralaması ya da taban puan şartı belirtilmiştir.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Tıbbi Laboratuvar Teknikleri Programı')
+        expect(repaired).toContain('Eczane Hizmetleri Programında')
+        expect(repaired).toContain('2,72/4,0')
+    })
+
     it('keeps TLT double-major answers deterministic instead of adding unrequested contacts', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Evet, Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında çift anadal yapabilirler. İlgili kişi: Doç. Dr. Esma SARI ÜZEK.',
@@ -557,6 +626,38 @@ describe('repairLinkOnlyRagAnswer', () => {
 
         expect(repaired).toContain('final/bütünleme notunun %40')
         expect(repaired).toContain('en az 60')
+    })
+
+    it('repairs medicine board-grade answers that omit the final or makeup forty percent share', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: "Dönem içi kurul notu, dönem sonu başarı notunun %60'ını oluşturur. Dönem içi kurul notu ders kurulu sınavlarının not ortalamasının %96'sı ile hesaplanır. Dönem sonu başarı notu için en az 60 alınması gerekir.",
+            userMessage: 'Tıpta dönem içi kurul notu başarı notuna nasıl yansıyor?',
+            responseLanguage: 'tr',
+            chunks: [{
+                document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                content: 'Dönem I, II ve III’te dönem sonu başarı notu dönem içi kurul notunun %60’ı ve final sınavı veya bütünleme sınavı notunun %40’ı toplanarak hesaplanır. Dönem içi kurul notu ders kurulu sınavlarının not ortalamasının %96’sı ile dönemde varsa Hekimliğe Uyum Kurulu ve Kanıta Dayalı Tıp Kurulu notlarının her birinin %2’si, yoksa birinin %4’ü toplanarak hesaplanır.'
+            }]
+        })
+
+        expect(repaired).toContain('Dönem içi kurul notunun %60')
+        expect(repaired).toContain('final/bütünleme notunun %40')
+        expect(repaired).toContain('ders kurulu sınavlarının not ortalamasının %96')
+    })
+
+    it('repairs blank RAG completions from retrieved grade-calculation evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '',
+            userMessage: 'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor',
+            responseLanguage: 'tr',
+            chunks: [{
+                document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                content: 'Dönem I, II ve III’te dönem sonu başarı notu dönem içi kurul notunun %60’ı ve final sınavı veya bütünleme sınavı notunun %40’ı toplanarak hesaplanır. Dönem içi kurul notu ders kurulu sınavlarının not ortalamasının %96’sı ile dönemde varsa Hekimliğe Uyum Kurulu ve Kanıta Dayalı Tıp Kurulu notlarının her birinin %2’si, yoksa birinin %4’ü toplanarak hesaplanır.'
+            }]
+        })
+
+        expect(repaired).toContain('Dönem içi kurul notunun %60')
+        expect(repaired).toContain('final/bütünleme notunun %40')
+        expect(repaired).toContain('ders kurulu sınavlarının not ortalamasının %96')
     })
 
     it('repairs no-information final answers when makeup exam eligibility is explicit', () => {
@@ -661,6 +762,40 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('Fakülte Yönetim Kurulu')
     })
 
+    it('adds the official evidence term when the answer says another exam right is granted', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Mazeretiniz Fakülte Yönetim Kurulu tarafından kabul edilirse, başka bir sınav hakkı tanınabilir.',
+            userMessage: 'Tıp fakültesinde kurul sınavına hasta olduğum için giremedim. Başka sınav hakkım var mı?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Sağlık mazereti nedeniyle sınavlara katılmayan öğrenciler sağlık raporu ile başvurur. Fakülte Yönetim Kurulu tarafından kabul edilen mazeretler için mazeret sınavı açılır.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('mazeret sınavı')
+        expect(repaired).toContain('Fakülte Yönetim Kurulu')
+    })
+
+    it('repairs vague health-excuse exam answers when the retrieved policy states makeup exam eligibility', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: "Mazeretinizin geçerli sayılması için Fakülte Yönetim Kurulu tarafından kabul edilmesi gerekir. Başka bir sınav hakkı olup olmadığı konusunda öğrenci işleriyle iletişime geçmenizi öneririm.",
+            userMessage: 'Tıp fakültesinde kurul sınavına hasta olduğum için giremedim. Başka sınav hakkım var mı?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Sağlık mazereti nedeniyle sınavlara katılmayan öğrenciler sağlık raporu ile başvurur. Fakülte Yönetim Kurulu tarafından kabul edilen mazeretler için mazeret sınavı açılır.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Sağlık mazereti')
+        expect(repaired).toContain('mazeret sınavı açılır')
+    })
+
     it('repairs contradictory medicine final makeup answers with katılmadan wording', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: "Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girebilir. Yani, final sınavına katılmadan bütünlemeye giremezsiniz.",
@@ -710,6 +845,65 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
     })
 
+    it('repairs direct-no-right final makeup denials against retrieved medicine policy', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Hayır, finale girmeden doğrudan bütünlemeye girme hakkı yok. Bütünleme sınavına girenler final sınavına girmesi gereken öğrencilerdir.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrenciler bütünleme sınavına girebilir. Bütünleme sınavında alınan not bütünleme notunu oluşturur. Bütünleme notu final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
+    it('repairs final makeup answers that start with no but then state eligibility', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Hayır. Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girerler.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrenciler bütünleme sınavına girebilir. Bütünleme sınavında alınan not bütünleme notunu oluşturur. Bütünleme notu final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
+    it('repairs prefixed final makeup answers that start with a no despite eligibility', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'YİÜ AI — Kısa cevap: Hayır, final sınavına girmeden doğrudan bütünlemeye girme hakkı yok. Final sınavına girmesi gerektiği halde girmeyenler bütünleme sınavına girer.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrenciler bütünleme sınavına girebilir. Bütünleme sınavında alınan not bütünleme notunu oluşturur. Bütünleme notu final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
+    it('repairs final makeup denials that describe eligible students as the students who will take makeup', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Kısa cevap: Hayır, final sınavına girmeden doğrudan bütünlemeye girme hakkı yok. Bütünleme sınavına girecek öğrenciler; final sınavına girmesi gerektiği halde girmeyenler, final notu 50’nin altında olanlar veya dönem sonu başarı notu 60’ın altında olan öğrencilerdir.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: []
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
     it('repairs self-contradictory final makeup answers with missed-final right wording', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: "Final sınavına girmeden bütünleme sınavına giremezsin. Ancak, final sınavına girmediysen veya final puanın 50'nin altında ise bütünleme sınavına katılma hakkın var.",
@@ -741,6 +935,22 @@ describe('repairLinkOnlyRagAnswer', () => {
     it('repairs no-information lecture-note answers when the learning platform evidence is explicit', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Bu konuda elimde net bilgi yok. Öğrenci işleriyle iletişime geçmeni öneririm.',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Kalite Raporu',
+                    content: 'UZEM/MEDU sistemleri ile uzaktan eğitim başarı ile yürütülmüştür. Bu sistem sayesinde çevrim içi dersler gerçekleştirilmiş olup, aynı zamanda ders notlarının paylaşımı da kolaylıkla sağlanmıştır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarının paylaşımı UZEM/MEDU sistemleri üzerinden sağlanmıştır.')
+    })
+
+    it('repairs blank RAG completions from retrieved lecture-note platform evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '',
             userMessage: 'Ders notlarına nereden ulaşabilirim?',
             responseLanguage: 'tr',
             chunks: [
@@ -892,6 +1102,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         })
 
         expect(repaired).toBe('seçmeli derslerin sayısı yüksekokul kurulu kararı ile belirlenir.')
+    })
+
+    it('keeps blank RAG completions blank when no extractive evidence matches', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '',
+            userMessage: 'Burs başvuru sonucu ne zaman açıklanır?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İletişim',
+                    content: 'Telefon: +90 312 329 10 10'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('')
     })
 
     it('leaves factual answers unchanged', () => {
