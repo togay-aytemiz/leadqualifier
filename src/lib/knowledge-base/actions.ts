@@ -921,6 +921,29 @@ export async function searchKnowledgeBase(
 
     return mergeSearchResults(query, [], mergedResults, limit)
 }
+
+export async function searchKnowledgeBaseFocusedEvidence(
+    query: string,
+    organizationId: string,
+    limit = 3,
+    options?: KnowledgeSearchOptions
+) {
+    const supabase = options?.supabase || await createClient()
+    const executionOptions: KnowledgeSearchExecutionOptions = {
+        collectionId: options?.collectionId ?? null,
+        type: options?.type ?? null,
+        language: options?.language ?? null,
+        supabase
+    }
+    const focusedEvidenceLimit = Math.max(limit * 4, 16)
+    const results = (await Promise.all(
+        buildFocusedEvidenceSearches(query, organizationId, focusedEvidenceLimit, executionOptions)
+    )).flat()
+
+    if (results.length === 0) return []
+    return mergeSearchResults(query, [], results, limit)
+}
+
 export interface SidebarCollection extends KnowledgeCollection {
     files: SidebarFile[]
     count: number

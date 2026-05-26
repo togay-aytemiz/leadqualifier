@@ -10,6 +10,7 @@ const {
     processInboundAiPipelineMock,
     repairLinkOnlyRagAnswerMock,
     resolveDemoChatChannelMock,
+    searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBaseMock,
 } = vi.hoisted(() => ({
     appendCanonicalRagSourceLinksMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
     processInboundAiPipelineMock: vi.fn(),
     repairLinkOnlyRagAnswerMock: vi.fn(),
     resolveDemoChatChannelMock: vi.fn(),
+    searchKnowledgeBaseFocusedEvidenceMock: vi.fn(),
     searchKnowledgeBaseMock: vi.fn(),
 }))
 
@@ -36,6 +38,7 @@ vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
 }))
 
 vi.mock('@/lib/knowledge-base/actions', () => ({
+    searchKnowledgeBaseFocusedEvidence: searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBase: searchKnowledgeBaseMock,
 }))
 
@@ -113,6 +116,7 @@ describe('demo chat API route', () => {
             await input.sendOutbound('Merhaba, nasıl yardımcı olabilirim?')
         })
         searchKnowledgeBaseMock.mockResolvedValue([])
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValue([])
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
         repairLinkOnlyRagAnswerMock.mockReturnValue(null)
         appendCanonicalRagSourceLinksMock.mockImplementation((response: string) => response)
@@ -320,6 +324,117 @@ describe('demo chat API route', () => {
         expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
     })
 
+    it('uses focused evidence recovery before broad knowledge search during polling', async () => {
+        const chunk = {
+            content: 'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU\nBAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören',
+            document_id: 'doc-shmyo',
+            document_title: 'Yerleşke Konumları',
+            source_url: 'https://example.edu.tr/yerleske',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 18,
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.'
+        )
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.\nhttps://example.edu.tr/yerleske'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'SHMYO kampüsü nerede?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain]
+        let messageSelectCount = 0
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                messageSelectCount += 1
+                if (messageSelectCount === 1) return completedMessagesChain
+                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'SHMYO kampüsü nerede?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.\nhttps://example.edu.tr/yerleske',
+            skillImage: null,
+        })
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
+            'SHMYO kampüsü nerede?',
+            'org-1',
+            6,
+            expect.objectContaining({ supabase: expect.any(Object) })
+        )
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+    })
+
     it('returns deterministic knowledge replies during polling without running the full AI pipeline', async () => {
         const chunk = {
             content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
@@ -371,16 +486,29 @@ describe('demo chat API route', () => {
         const botInsertChain = {
             insert: vi.fn(async () => ({ error: null })),
         }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
         const conversationUpdateChain = {
             update: vi.fn(() => conversationUpdateChain),
             eq: vi.fn(async () => ({ error: null })),
         }
 
         const conversations = [conversationChain, conversationChain, conversationChain]
+        let messageSelectCount = 0
         const messagesTable = {
-            select: vi.fn((columns: string) => (
-                columns.includes('metadata') ? completedMessagesChain : inboundMessagesChain
-            )),
+            select: vi.fn((columns: string) => {
+                messageSelectCount += 1
+                if (messageSelectCount === 1) return completedMessagesChain
+                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
             insert: botInsertChain.insert,
         }
         const fromMock = vi.fn((table: string) => {
@@ -427,6 +555,110 @@ describe('demo chat API route', () => {
                 sources: ['doc-1'],
             }),
         }))
+    })
+
+    it('does not insert a duplicate deterministic demo reply if another poll already persisted it', async () => {
+        const chunk = {
+            content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
+            document_id: 'doc-1',
+            document_title: 'Sağlık Bilimleri Fakültesi',
+            source_url: 'https://example.edu.tr/sbf.pdf',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 12,
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.')
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.\nhttps://example.edu.tr/sbf.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'SBF kampüsü nerede?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'bot-message-1' },
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain]
+        let messageSelectCount = 0
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                messageSelectCount += 1
+                if (messageSelectCount === 1) return completedMessagesChain
+                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'SBF kampüsü nerede?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.\nhttps://example.edu.tr/sbf.pdf',
+            skillImage: null,
+        })
+        expect(botInsertChain.insert).not.toHaveBeenCalled()
+        expect(conversationUpdateChain.update).not.toHaveBeenCalled()
     })
 
     it('keeps polling pending when recovery processing is slower than the sync reply budget', async () => {

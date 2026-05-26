@@ -10,7 +10,7 @@ import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
-import { searchKnowledgeBase } from '@/lib/knowledge-base/actions'
+import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/knowledge-base/actions'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
@@ -440,6 +440,41 @@ async function buildExtractiveDemoChatReply(input: {
     const message = readMessageText(input.message)
     if (!message) return null
 
+    const buildReplyFromResults = (kbResults: RagChunk[]): DemoChatExtractiveReply | null => {
+        if (!kbResults || kbResults.length === 0) return null
+
+        const { context, chunks } = buildRagContext(kbResults)
+        if (!context || chunks.length === 0) return null
+
+        const responseLanguage = resolveMvpResponseLanguage(message)
+        const noInformationSeed = buildNoInformationSeed(responseLanguage)
+        const repairedAnswer = repairLinkOnlyRagAnswer({
+            response: noInformationSeed,
+            userMessage: message,
+            responseLanguage,
+            chunks
+        })
+        if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
+
+        return {
+            replyText: appendCanonicalRagSourceLinks(repairedAnswer, chunks, {
+                force: true,
+                limit: 1
+            }),
+            skillImage: null,
+            chunks
+        }
+    }
+
+    const focusedResults = await searchKnowledgeBaseFocusedEvidence(
+        message,
+        input.channel.organizationId,
+        FAST_RAG_RESULT_LIMIT,
+        { supabase: input.supabase }
+    )
+    const focusedReply = buildReplyFromResults(focusedResults)
+    if (focusedReply) return focusedReply
+
     const kbResults = await searchKnowledgeBase(
         message,
         input.channel.organizationId,
@@ -447,29 +482,8 @@ async function buildExtractiveDemoChatReply(input: {
         FAST_RAG_RESULT_LIMIT,
         { supabase: input.supabase }
     )
-    if (!kbResults || kbResults.length === 0) return null
 
-    const { context, chunks } = buildRagContext(kbResults)
-    if (!context || chunks.length === 0) return null
-
-    const responseLanguage = resolveMvpResponseLanguage(message)
-    const noInformationSeed = buildNoInformationSeed(responseLanguage)
-    const repairedAnswer = repairLinkOnlyRagAnswer({
-        response: noInformationSeed,
-        userMessage: message,
-        responseLanguage,
-        chunks
-    })
-    if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
-
-    return {
-        replyText: appendCanonicalRagSourceLinks(repairedAnswer, chunks, {
-            force: true,
-            limit: 1
-        }),
-        skillImage: null,
-        chunks
-    }
+    return buildReplyFromResults(kbResults)
 }
 
 async function persistDemoChatExtractiveReply(input: {
@@ -481,6 +495,18 @@ async function persistDemoChatExtractiveReply(input: {
 }) {
     const conversationId = await findDemoChatConversationId(input)
     if (!conversationId) return false
+
+    const { data: existingReply, error: existingReplyError } = await input.supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('sender_type', 'bot')
+        .eq('metadata->>demo_chat_reply_to_message_id', input.messageId)
+        .eq('metadata->>demo_chat_reply_kind', 'text')
+        .maybeSingle()
+
+    if (existingReplyError) throw existingReplyError
+    if ((existingReply as { id?: string } | null)?.id) return true
 
     const now = new Date().toISOString()
     const { error: insertError } = await input.supabase
