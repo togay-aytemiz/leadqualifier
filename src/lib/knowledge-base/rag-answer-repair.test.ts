@@ -676,6 +676,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Mazeret sınavı başvurusu, sınav tarihinden itibaren en geç 5 (beş) iş günü içinde yapılır.')
     })
 
+    it('repairs acronym-based internship duration questions from expanded program evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'TLT programında yaz stajı var mı, kaç gün?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı Öz Değerlendirme',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri Programı Öz Değerlendirme\nSource URL: https://example.edu.tr/laboratuvar-teknikleri.pdf\n\nTıbbi Laboratuvar Teknikleri Programı öğrencileri Yaz Stajı dersini 20 iş günü süresince tamamlar.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıbbi Laboratuvar Teknikleri Programı öğrencileri Yaz Stajı dersini 20 iş günü süresince tamamlar.')
+    })
+
     it('repairs policy duration answers from matching list items when the model selected nearby unrelated policy text', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır ve görevlendirmede geçen süreler fiilen kendi mesleklerinde geçirilmiş olarak kabul edilir.',

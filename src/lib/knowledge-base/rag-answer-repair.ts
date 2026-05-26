@@ -401,6 +401,20 @@ const DURATION_QUERY_SUBJECT_STOPWORDS = new Set([
     'nedir',
     'midir',
     'mi',
+    'var',
+    'program',
+    'programi',
+    'programı',
+    'programinda',
+    'programında',
+    'bolum',
+    'bölüm',
+    'bolumu',
+    'bölümü',
+    'fakulte',
+    'fakülte',
+    'fakultesi',
+    'fakültesi',
     'gun',
     'gün',
     'gunu',
@@ -574,7 +588,7 @@ function durationSubjectCoverage(tokens: string[], value: string) {
             .filter(Boolean)
             .flatMap((token) => [token, stemDurationToken(token)])
     )
-    const hits = tokens.filter((token) => normalizedTokens.has(token) || normalized.includes(token)).length
+    const hits = tokens.filter((token) => durationTokenMatches(token, normalized, normalizedTokens)).length
     return hits / tokens.length
 }
 
@@ -596,7 +610,27 @@ function durationHasRequiredSubjectTokens(tokens: string[], value: string) {
             .flatMap((token) => [token, stemDurationToken(token)])
     )
 
-    return tokens.every((token) => normalizedTokens.has(token) || normalized.includes(token))
+    return tokens.every((token) => durationTokenMatches(token, normalized, normalizedTokens))
+}
+
+function durationTokenMatches(token: string, normalizedValue: string, normalizedTokens: Set<string>) {
+    if (normalizedTokens.has(token) || normalizedValue.includes(token)) return true
+    if (!/^[a-z]{2,6}$/.test(token)) return false
+
+    const valueTokens = normalizedValue
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .split(/\s+/)
+        .filter((valueToken) => valueToken.length >= 2)
+
+    for (let start = 0; start <= valueTokens.length - token.length; start += 1) {
+        const initials = valueTokens
+            .slice(start, start + token.length)
+            .map((valueToken) => valueToken[0] ?? '')
+            .join('')
+        if (initials === token) return true
+    }
+
+    return false
 }
 
 function cleanDurationEvidenceSentence(value: string) {
