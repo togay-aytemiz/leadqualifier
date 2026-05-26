@@ -1104,6 +1104,91 @@ describe('searchKnowledgeBase', () => {
         }))
     })
 
+    it('does not run planned variants when the original query already returns strong evidence', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'sbf',
+                rows: [
+                    {
+                        id: 'campus-1',
+                        document_id: 'doc-campus-1',
+                        content: 'Page Title: SBF kampüs duyurusu\n\nSBF kampüsü Bağlıca yerleşkesindedir.',
+                        knowledge_documents: {
+                            title: 'SBF kampüs duyurusu',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    },
+                    {
+                        id: 'campus-2',
+                        document_id: 'doc-campus-2',
+                        content: 'Page Title: Sağlık Bilimleri Fakültesi\n\nSağlık Bilimleri Fakültesi kampüs adresi Bağlıca yerleşkesidir.',
+                        knowledge_documents: {
+                            title: 'Sağlık Bilimleri Fakültesi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    },
+                    {
+                        id: 'campus-3',
+                        document_id: 'doc-campus-3',
+                        content: 'Page Title: Yerleşke konumları\n\nSBF için kampüs konumu Bağlıca olarak listelenmiştir.',
+                        knowledge_documents: {
+                            title: 'Yerleşke konumları',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            }, {
+                includes: 'baglica',
+                rows: [{
+                    id: 'planned-campus-1',
+                    document_id: 'doc-planned-campus-1',
+                    content: 'Page Title: Planned campus variant\n\nBu satır yalnızca planned varyant çalışırsa döner.',
+                    knowledge_documents: {
+                        title: 'Planned campus variant',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }]
+        })
+
+        planKnowledgeSearchQueryMock.mockResolvedValueOnce({
+            enabled: true,
+            model: 'gpt-4o-mini',
+            reason: 'planned',
+            searchQueries: [
+                'SBF kampüsü nerede?',
+                'Saglik Bilimleri Fakultesi Baglica yerleskesi'
+            ],
+            mustHaveTerms: ['SBF', 'kampüs']
+        })
+
+        const results = await searchKnowledgeBase(
+            'SBF kampüsü nerede?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        const filters = orMock.mock.calls
+            .map((call) => String(call[0] ?? ''))
+            .join('\n')
+            .toLocaleLowerCase('tr-TR')
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'campus-1',
+            document_id: 'doc-campus-1'
+        })
+        expect(filters).toContain('sbf')
+        expect(filters).not.toContain('baglica')
+    })
+
     it('falls back to original-query retrieval when query planning fails', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [],

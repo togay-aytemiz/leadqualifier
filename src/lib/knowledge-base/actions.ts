@@ -65,6 +65,8 @@ const MAX_PROFILE_CONTEXT_CHARS = 6000
 const COUNT_SCAN_PAGE_SIZE = 1000
 const VECTOR_SEARCH_TIMEOUT_MS = 2500
 const LEXICAL_EVIDENCE_FIRST_TIMEOUT_MS = 750
+const PLANNED_QUERY_SHORT_CIRCUIT_MIN_RESULTS = 3
+const PLANNED_QUERY_SHORT_CIRCUIT_MIN_SCORE = 1.2
 
 export interface KnowledgeEntriesPage {
     entries: KnowledgeBaseEntry[]
@@ -804,6 +806,27 @@ function dedupePlannedSearchQueries(originalQuery: string, plannedQueries: strin
     return queries.slice(0, 4)
 }
 
+function shouldSkipPlannedSearchVariants(
+    originalQuery: string,
+    originalResults: KnowledgeSearchResult[],
+    limit: number
+) {
+    if (originalResults.length === 0) return false
+
+    const requiredResultCount = Math.min(
+        Math.max(1, limit),
+        PLANNED_QUERY_SHORT_CIRCUIT_MIN_RESULTS
+    )
+    if (originalResults.length < requiredResultCount) return false
+
+    const topScore = originalResults.reduce(
+        (best, result) => Math.max(best, scoreKnowledgeResult(originalQuery, enrichKnowledgeSearchResult(result))),
+        0
+    )
+
+    return topScore >= PLANNED_QUERY_SHORT_CIRCUIT_MIN_SCORE
+}
+
 async function resolveKnowledgeSearchPlan(query: string, options?: KnowledgeSearchOptions) {
     try {
         const plan = await planKnowledgeSearchQuery(query, [], {})
@@ -844,8 +867,21 @@ export async function searchKnowledgeBase(
         return searchKnowledgeBaseSingleQuery(query, organizationId, threshold, limit, executionOptions)
     }
 
-    const mergedResults: KnowledgeSearchResult[] = []
-    for (const searchQuery of searchQueries) {
+    const [originalSearchQuery, ...plannedSearchQueries] = searchQueries
+    const originalResults = await searchKnowledgeBaseSingleQuery(
+        originalSearchQuery ?? query,
+        organizationId,
+        threshold,
+        limit,
+        executionOptions
+    )
+
+    if (shouldSkipPlannedSearchVariants(query, originalResults, limit)) {
+        return originalResults
+    }
+
+    const mergedResults: KnowledgeSearchResult[] = [...originalResults]
+    for (const searchQuery of plannedSearchQueries) {
         const results = await searchKnowledgeBaseSingleQuery(
             searchQuery,
             organizationId,
