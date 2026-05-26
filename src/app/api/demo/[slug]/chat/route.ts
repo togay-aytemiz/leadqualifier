@@ -9,14 +9,22 @@ import {
 import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
+import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
+import { searchKnowledgeBase } from '@/lib/knowledge-base/actions'
+import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
+import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
+import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
 
 export const runtime = 'nodejs'
 
 const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 8000
+const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 22000
 const DEMO_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000
 const DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE = 20
+const FAST_RAG_MATCH_THRESHOLD = 0.5
+const FAST_RAG_RESULT_LIMIT = 6
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -46,6 +54,10 @@ type DemoChatMessageRow = {
 
 type DemoChatConversationRow = {
     id?: string | null
+}
+
+type DemoChatExtractiveReply = DemoChatPipelineResult & {
+    chunks: RagChunk[]
 }
 
 const demoChatRateLimitBuckets = new Map<string, { windowStartMs: number; count: number }>()
@@ -82,6 +94,12 @@ function readSyncReplyTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS ?? '', 10)
     if (Number.isFinite(raw) && raw >= 1000) return raw
     return DEFAULT_SYNC_REPLY_TIMEOUT_MS
+}
+
+function readFastRagReplyTimeoutMs() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_FAST_RAG_REPLY_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, 28000)
+    return DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS
 }
 
 function readMessageText(value: unknown) {
@@ -205,6 +223,31 @@ function readSkillImageFromMessageMetadata(metadata: Record<string, unknown> | n
     }
 }
 
+function buildNoInformationSeed(responseLanguage: MvpResponseLanguage) {
+    return responseLanguage === 'tr'
+        ? 'Bu konuda elimde net bilgi yok.'
+        : 'I do not have clear information about this in the knowledge base.'
+}
+
+function responseContainsNoAnswer(value: unknown): boolean {
+    if (typeof value === 'string') return /\bno_answer\b|bu konuda elimde net bilgi yok|do not have clear information/i.test(value)
+    if (Array.isArray(value)) return value.some(responseContainsNoAnswer)
+    if (value && typeof value === 'object') return Object.values(value).some(responseContainsNoAnswer)
+    return false
+}
+
+function isNoAnswerReply(response: string | null | undefined) {
+    const trimmed = response?.trim()
+    if (!trimmed) return true
+    if (responseContainsNoAnswer(trimmed)) return true
+
+    try {
+        return responseContainsNoAnswer(JSON.parse(trimmed))
+    } catch {
+        return false
+    }
+}
+
 async function runDemoChatPipeline(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
@@ -307,6 +350,26 @@ async function findCompletedDemoChatReply(input: {
     }
 }
 
+async function findDemoChatConversationId(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+}) {
+    const contactId = buildDemoChatContactId(input.channel.id, input.sessionId)
+    const { data: conversation, error: conversationError } = await input.supabase
+        .from('conversations')
+        .select('id')
+        .eq('organization_id', input.channel.organizationId)
+        .eq('platform', 'demo_chat')
+        .eq('contact_phone', contactId)
+        .maybeSingle()
+
+    if (conversationError) throw conversationError
+
+    const conversationRow = conversation as DemoChatConversationRow | null
+    return conversationRow?.id ?? null
+}
+
 async function findPendingDemoChatInboundMessage(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
@@ -338,6 +401,159 @@ async function findPendingDemoChatInboundMessage(input: {
     if (messageError) throw messageError
 
     return (message ?? null) as DemoChatMessageRow | null
+}
+
+async function ingestDemoChatInboundOnly(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    message: string
+    inboundMessageId: string
+}) {
+    await processInboundAiPipeline({
+        supabase: input.supabase,
+        organizationId: input.channel.organizationId,
+        platform: 'demo_chat',
+        source: 'demo_chat',
+        contactId: buildDemoChatContactId(input.channel.id, input.sessionId),
+        contactName: 'Demo ziyaretçi',
+        text: input.message,
+        inboundMessageId: input.inboundMessageId,
+        inboundMessageIdMetadataKey: 'demo_chat_message_id',
+        inboundMessageMetadata: {
+            demo_chat_message_id: input.inboundMessageId,
+            demo_chat_channel_id: input.channel.id,
+            demo_chat_slug: input.channel.slug,
+            demo_chat_session_id: input.sessionId,
+        },
+        skipAutomation: true,
+        sendOutbound: async () => undefined,
+        logPrefix: 'Demo Chat',
+    })
+}
+
+async function buildExtractiveDemoChatReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    message: string
+}): Promise<DemoChatExtractiveReply | null> {
+    const message = readMessageText(input.message)
+    if (!message) return null
+
+    const kbResults = await searchKnowledgeBase(
+        message,
+        input.channel.organizationId,
+        FAST_RAG_MATCH_THRESHOLD,
+        FAST_RAG_RESULT_LIMIT,
+        { supabase: input.supabase }
+    )
+    if (!kbResults || kbResults.length === 0) return null
+
+    const { context, chunks } = buildRagContext(kbResults)
+    if (!context || chunks.length === 0) return null
+
+    const responseLanguage = resolveMvpResponseLanguage(message)
+    const noInformationSeed = buildNoInformationSeed(responseLanguage)
+    const repairedAnswer = repairLinkOnlyRagAnswer({
+        response: noInformationSeed,
+        userMessage: message,
+        responseLanguage,
+        chunks
+    })
+    if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
+
+    return {
+        replyText: appendCanonicalRagSourceLinks(repairedAnswer, chunks, {
+            force: true,
+            limit: 1
+        }),
+        skillImage: null,
+        chunks
+    }
+}
+
+async function persistDemoChatExtractiveReply(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+    reply: DemoChatExtractiveReply
+}) {
+    const conversationId = await findDemoChatConversationId(input)
+    if (!conversationId) return false
+
+    const now = new Date().toISOString()
+    const { error: insertError } = await input.supabase
+        .from('messages')
+        .insert({
+            id: uuidv4(),
+            conversation_id: conversationId,
+            organization_id: input.channel.organizationId,
+            sender_type: 'bot',
+            content: input.reply.replyText,
+            metadata: {
+                demo_chat_reply_to_message_id: input.messageId,
+                demo_chat_reply_kind: 'text',
+                is_rag: true,
+                rag_extractive: true,
+                sources: input.reply.chunks.map((chunk) => chunk.document_id).filter(Boolean)
+            }
+        })
+
+    if (insertError) throw insertError
+
+    const { error: updateError } = await input.supabase
+        .from('conversations')
+        .update({
+            last_message_at: now,
+            updated_at: now
+        })
+        .eq('id', conversationId)
+
+    if (updateError) throw updateError
+    return true
+}
+
+async function recoverPendingDemoChatReplyExtractively(input: {
+    supabase: DemoChatServiceClient
+    channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
+    sessionId: string
+    messageId: string
+    fallbackMessage: string
+}): Promise<DemoChatPipelineResult | null> {
+    const inboundMessage = await findPendingDemoChatInboundMessage(input)
+    const message = (readMessageText(inboundMessage?.content) || input.fallbackMessage).slice(0, MAX_MESSAGE_CHARS)
+    if (!message) return null
+
+    const reply = await buildExtractiveDemoChatReply({
+        supabase: input.supabase,
+        channel: input.channel,
+        message
+    })
+    if (!reply) return null
+
+    if (!inboundMessage?.id) {
+        await ingestDemoChatInboundOnly({
+            supabase: input.supabase,
+            channel: input.channel,
+            sessionId: input.sessionId,
+            message,
+            inboundMessageId: input.messageId
+        })
+    }
+
+    await persistDemoChatExtractiveReply({
+        supabase: input.supabase,
+        channel: input.channel,
+        sessionId: input.sessionId,
+        messageId: input.messageId,
+        reply
+    })
+
+    return {
+        replyText: reply.replyText,
+        skillImage: null
+    }
 }
 
 async function recoverPendingDemoChatReply(input: {
@@ -435,6 +651,30 @@ export async function GET(req: NextRequest, context: RouteContext) {
         if (!completedReply) {
             if (isDemoChatRateLimited({ req, channel, sessionId })) {
                 return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
+            }
+
+            const extractiveRecoveryPromise = recoverPendingDemoChatReplyExtractively({
+                supabase,
+                channel,
+                sessionId,
+                messageId,
+                fallbackMessage: message
+            })
+            const extractiveRecoveryResult = await waitForPipelineResult(
+                extractiveRecoveryPromise,
+                readFastRagReplyTimeoutMs()
+            )
+            if (extractiveRecoveryResult.status === 'timeout') {
+                return NextResponse.json({ pending: true }, { status: 202 })
+            }
+
+            const extractiveReply = extractiveRecoveryResult.result
+            if (extractiveReply) {
+                return NextResponse.json({
+                    pending: false,
+                    response: extractiveReply.replyText,
+                    skillImage: extractiveReply.skillImage
+                })
             }
 
             const recoveryPromise = recoverPendingDemoChatReply({
