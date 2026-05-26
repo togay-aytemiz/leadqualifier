@@ -400,31 +400,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const inboundMessageId = uuidv4()
-    const pipelinePromise = runDemoChatPipeline({
-        supabase,
-        channel,
-        sessionId,
-        message,
-        inboundMessageId
-    })
-
-    try {
-        const pipelineResult = await waitForPipelineResult(pipelinePromise, readSyncReplyTimeoutMs())
-        if (pipelineResult.status === 'completed') {
-            return NextResponse.json({
-                response: pipelineResult.result.replyText,
-                skillImage: pipelineResult.result.skillImage,
-            })
-        }
-    } catch (error) {
-        console.error('Demo Chat: Failed to process message', error)
-        return NextResponse.json({ error: 'Demo chat failed' }, { status: 502 })
-    }
-
-    scheduleAfterResponse('message processing', async () => {
-        await pipelinePromise
-    })
-
     return NextResponse.json({
         pending: true,
         messageId: inboundMessageId

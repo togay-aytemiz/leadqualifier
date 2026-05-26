@@ -634,6 +634,43 @@ export async function getKnowledgeBaseEntries(collectionId?: string | null, orga
     return page.entries
 }
 
+function buildFocusedEvidenceSearches(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options: KnowledgeSearchExecutionOptions
+) {
+    const searches: Array<Promise<KnowledgeSearchResult[]>> = []
+    const add = (enabled: boolean, search: () => Promise<KnowledgeSearchResult[]>) => {
+        if (enabled) searches.push(search())
+    }
+    const asksAddress = isAddressLookupQuery(query) || isCampusLocationQuery(query)
+    const asksContact = isContactInfoQuery(query)
+        || isLibraryContactQuery(query)
+        || isProgramContactResponsibilityQuery(query)
+
+    add(asksAddress, () => searchKnowledgeBaseByAddressEvidence(query, organizationId, limit, options))
+    add(asksAddress, () => searchKnowledgeBaseByCurrentCampusListingEvidence(query, organizationId, limit, options))
+    add(asksContact || isTltDoubleMajorQuery(query), () => searchKnowledgeBaseByTltDoubleMajorResponsibleEvidence(query, organizationId, limit, options))
+    add(asksContact, () => searchKnowledgeBaseByProgramContactEvidence(query, organizationId, limit, options))
+    add(asksContact, () => searchKnowledgeBaseByUnitContactEvidence(query, organizationId, limit, options))
+    add(isErasmusEligibilityQuery(query), () => searchKnowledgeBaseByErasmusEligibilityEvidence(query, organizationId, limit, options))
+    add(isTltDoubleMajorQuery(query), () => searchKnowledgeBaseByTltDoubleMajorEvidence(query, organizationId, limit, options))
+    add(isMedicalSchoolExamPolicyQuery(query), () => searchKnowledgeBaseByMedicalSchoolExamPolicyEvidence(query, organizationId, limit, options))
+    add(isMedicalSchoolTrainingQuery(query), () => searchKnowledgeBaseByMedicalSchoolTrainingEvidence(query, organizationId, limit, options))
+    add(isInternshipEvidenceQuery(query), () => searchKnowledgeBaseByInternshipEvidence(query, organizationId, limit, options))
+    add(isLectureNotesAccessQuery(query), () => searchKnowledgeBaseByLectureNotesEvidence(query, organizationId, limit, options))
+    add(isFinalExemptionPolicyQuery(query), () => searchKnowledgeBaseByFinalExemptionPolicyEvidence(query, organizationId, limit, options))
+    add(isFinalExamPolicyQuery(query), () => searchKnowledgeBaseByFinalExamPolicyEvidence(query, organizationId, limit, options))
+    add(isHealthReportExcuseExamQuery(query), () => searchKnowledgeBaseByHealthReportExamPolicyEvidence(query, organizationId, limit, options))
+    add(isElectiveCourseRequirementQuery(query), () => searchKnowledgeBaseByElectiveCoursePolicyEvidence(query, organizationId, limit, options))
+    add(isMedicineElectiveDeadlineQuery(query), () => searchKnowledgeBaseByMedicineElectiveDeadlineEvidence(query, organizationId, limit, options))
+    add(isMedicineMaxDurationQuery(query), () => searchKnowledgeBaseByMedicineMaxDurationEvidence(query, organizationId, limit, options))
+    add(isAnnualPaidLeaveQuery(query), () => searchKnowledgeBaseByAnnualPaidLeaveEvidence(query, organizationId, limit, options))
+
+    return searches
+}
+
 async function searchKnowledgeBaseSingleQuery(
     query: string,
     organizationId: string,
@@ -659,26 +696,14 @@ async function searchKnowledgeBaseSingleQuery(
         return mergeSearchResults(query, [], policyDurationResults, limit)
     }
     const focusedEvidenceLimit = Math.max(limit * 4, 16)
-    const focusedPolicyEvidenceResultsPromise = Promise.all([
-        searchKnowledgeBaseByAddressEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByCurrentCampusListingEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByTltDoubleMajorResponsibleEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByProgramContactEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByUnitContactEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByErasmusEligibilityEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByTltDoubleMajorEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByMedicalSchoolExamPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByMedicalSchoolTrainingEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByInternshipEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByLectureNotesEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByFinalExemptionPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByFinalExamPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByHealthReportExamPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByElectiveCoursePolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByMedicineElectiveDeadlineEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByMedicineMaxDurationEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
-        searchKnowledgeBaseByAnnualPaidLeaveEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions)
-    ]).then((results) => results.flat())
+    const focusedPolicyEvidenceResultsPromise = Promise.all(
+        buildFocusedEvidenceSearches(query, organizationId, focusedEvidenceLimit, fallbackOptions)
+    ).then((results) => results.flat())
+
+    const focusedPolicyEvidenceResults = await focusedPolicyEvidenceResultsPromise
+    if (shouldReturnFocusedEvidenceResultsEarly(query, focusedPolicyEvidenceResults)) {
+        return mergeSearchResults(query, [], focusedPolicyEvidenceResults, limit)
+    }
 
     const fallbackSearchLimit = Math.max(limit * 4, 16)
     const lexicalFallbackResultsPromise = Promise.all([
@@ -692,11 +717,6 @@ async function searchKnowledgeBaseSingleQuery(
             ? searchKnowledgeBaseBySourcePath(query, organizationId, fallbackSearchLimit, fallbackOptions)
             : Promise.resolve([])
     ])
-
-    const focusedPolicyEvidenceResults = await focusedPolicyEvidenceResultsPromise
-    if (shouldReturnFocusedEvidenceResultsEarly(query, focusedPolicyEvidenceResults)) {
-        return mergeSearchResults(query, [], focusedPolicyEvidenceResults, limit)
-    }
 
     if (extractAbbreviationCandidates(query).length > 0) {
         const abbreviationLexicalResults = (await lexicalFallbackResultsPromise).flat()

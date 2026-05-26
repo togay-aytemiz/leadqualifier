@@ -1190,6 +1190,67 @@ describe('searchKnowledgeBase', () => {
         expect(filters).not.toContain('baglica')
     })
 
+    it('does not run unrelated focused evidence probes for address-only questions', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'sbf',
+                rows: [
+                    {
+                        id: 'campus-1',
+                        document_id: 'doc-campus-1',
+                        content: 'Page Title: Yerleşke konumları\n\nSBF kampüsü Bağlıca Mahallesi Höyük Caddesi No:1 adresindedir.',
+                        knowledge_documents: {
+                            title: 'Yerleşke konumları',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    },
+                    {
+                        id: 'campus-2',
+                        document_id: 'doc-campus-2',
+                        content: 'Page Title: Sağlık Bilimleri Fakültesi\n\nSağlık Bilimleri Fakültesi Bağlıca yerleşkesindedir.',
+                        knowledge_documents: {
+                            title: 'Sağlık Bilimleri Fakültesi',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    },
+                    {
+                        id: 'campus-3',
+                        document_id: 'doc-campus-3',
+                        content: 'Page Title: Kampüs\n\nSBF için kampüs bilgisi Bağlıca olarak listelenmiştir.',
+                        knowledge_documents: {
+                            title: 'Kampüs',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            }]
+        })
+
+        await searchKnowledgeBase(
+            'SBF kampüsü nerede?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        const filters = orMock.mock.calls
+            .map((call) => String(call[0] ?? ''))
+            .join('\n')
+            .toLocaleLowerCase('tr-TR')
+
+        expect(filters).toContain('sbf')
+        expect(filters).not.toContain('erasmus')
+        expect(filters).not.toContain('staj')
+        expect(filters).not.toContain('final')
+        expect(filters).not.toContain('yıllık')
+    })
+
     it('falls back to original-query retrieval when query planning fails', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [],
