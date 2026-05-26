@@ -83,6 +83,17 @@ function buildRagCompletionParameters(model: string) {
     }
 }
 
+async function recordInboundAiUsage(
+    input: Parameters<typeof recordAiUsage>[0],
+    logPrefix: string
+) {
+    try {
+        await recordAiUsage(input)
+    } catch (error) {
+        console.error(`${logPrefix}: AI usage recording failed; continuing reply flow`, error)
+    }
+}
+
 function payloadContainsNoAnswer(value: unknown): boolean {
     if (typeof value === 'string') {
         return /\bno_answer\b/i.test(value.trim())
@@ -1323,7 +1334,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
         if (!await ensureUsageAllowed('before_router')) return
         const decision = await decideKnowledgeBaseRoute(options.text, history)
         if (decision.usage) {
-            await recordAiUsage({
+            await recordInboundAiUsage({
                 organizationId: orgId,
                 category: 'router',
                 model: 'gpt-4o-mini',
@@ -1335,7 +1346,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     reason: decision.reason
                 },
                 supabase: options.supabase
-            })
+            }, options.logPrefix)
         }
 
         if (decision.route_to_kb) {
@@ -1440,7 +1451,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         totalTokens: estimateTokenCount(systemPrompt) + historyTokenCount + estimateTokenCount(options.text) + estimateTokenCount(finalRagResponse ?? '')
                     }
 
-                await recordAiUsage({
+                await recordInboundAiUsage({
                     organizationId: orgId,
                     category: 'rag',
                     model: ragCompletionModel,
@@ -1452,7 +1463,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                         document_count: kbResults.length
                     },
                     supabase: options.supabase
-                })
+                }, options.logPrefix)
 
                 if (
                     finalRagResponse

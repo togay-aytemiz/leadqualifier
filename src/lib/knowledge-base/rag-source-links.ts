@@ -49,6 +49,87 @@ export function collectRagSourceUrls(chunks: unknown[], limit = 2) {
     return urls
 }
 
+function normalizeEvidenceText(value: string) {
+    return value
+        .toLocaleLowerCase('tr-TR')
+        .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => TURKISH_SOURCE_LINK_CHAR_MAP[char] ?? char)
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function extractEmailEvidence(value: string) {
+    return value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? []
+}
+
+function extractPhoneEvidence(value: string) {
+    return value.match(/(?:\+?\s*90\s*)?(?:0\s*)?312[\s)./-]*329[\s)./-]*10[\s)./-]*10|(?:\+?\s*90\s*)?(?:0\s*)?312[\s)./-]*[0-9][0-9\s)./-]{5,}/gi) ?? []
+}
+
+function answerEvidenceTerms(response: string) {
+    const normalized = normalizeEvidenceText(response)
+    return Array.from(new Set(normalized
+        .split(/[^a-z0-9@.]+/i)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 5)
+        .filter((token) => ![
+            'adres',
+            'adresi',
+            'bilgi',
+            'bilgisi',
+            'detayli',
+            'burada',
+            'sayfa',
+            'yardimci',
+            'olabilirim',
+            'universitesi',
+            'yuksek',
+            'ihtisas'
+        ].includes(token))))
+}
+
+function sourceEvidenceScore(response: string, chunk: unknown) {
+    if (!isRecord(chunk)) return 0
+
+    const chunkContent = readTrimmedString(chunk.content) ?? ''
+    const searchable = normalizeEvidenceText([
+        readTrimmedString(chunk.document_title ?? chunk.documentTitle) ?? '',
+        readTrimmedString(chunk.source_url ?? chunk.sourceUrl) ?? '',
+        chunkContent
+    ].join('\n'))
+    const normalizedResponse = normalizeEvidenceText(response)
+    let score = 0
+
+    for (const email of extractEmailEvidence(response)) {
+        if (searchable.includes(normalizeEvidenceText(email))) score += 8
+    }
+    for (const phone of extractPhoneEvidence(response)) {
+        const compactPhone = phone.replace(/\D/g, '')
+        if (compactPhone && searchable.replace(/\D/g, '').includes(compactPhone)) score += 5
+    }
+
+    const terms = answerEvidenceTerms(response)
+    for (const term of terms) {
+        if (searchable.includes(term)) score += 0.35
+    }
+
+    if (normalizedResponse.includes('e-posta') || normalizedResponse.includes('email') || normalizedResponse.includes('mail')) {
+        if (searchable.includes('e-posta') || searchable.includes('email') || searchable.includes('mail')) score += 1.2
+    }
+    if (normalizedResponse.includes('telefon') && searchable.includes('telefon')) score += 1.2
+
+    return score
+}
+
+function collectRagSourceUrlsByResponseEvidence(response: string, chunks: unknown[], limit: number) {
+    const indexedChunks = chunks.map((chunk, index) => ({ chunk, index, score: sourceEvidenceScore(response, chunk) }))
+    const hasPositiveScore = indexedChunks.some((item) => item.score > 0)
+    const rankedChunks = hasPositiveScore
+        ? indexedChunks.sort((left, right) => right.score - left.score || left.index - right.index).map((item) => item.chunk)
+        : chunks
+
+    return collectRagSourceUrls(rankedChunks, limit)
+}
+
 const SPACED_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
 const SIMPLE_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/gi
 const SCHEMELESS_SPACED_SOURCE_FRAGMENT_PATTERN = /\b(?:[A-Za-z0-9-]{2,}\s*\.\s*)?(?:edu|com|net|org|gov)\s*\.\s*(?:tr|com|net|org|edu|gov|io|ai)\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
@@ -134,7 +215,7 @@ export function appendCanonicalRagSourceLinks(
     if (!options.force && !hasUrlArtifact) return response
 
     const limit = Math.max(1, options.limit ?? 2)
-    const sourceUrls = collectRagSourceUrls(chunks, limit)
+    const sourceUrls = collectRagSourceUrlsByResponseEvidence(response, chunks, limit)
     const urls = sourceUrls.length > 0
         ? sourceUrls
         : collectResponseSourceUrls(response, limit)

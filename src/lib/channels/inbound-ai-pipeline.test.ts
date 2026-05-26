@@ -2629,6 +2629,67 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
     })
 
+    it('still sends grounded RAG replies when post-completion usage recording fails', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder(null)
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'SBF kampüsü nerede?',
+            reason: 'knowledge_base',
+            usage: {
+                inputTokens: 11,
+                outputTokens: 2,
+                totalTokens: 13
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-1',
+                content: 'SBF Bağlıca Yerleşkesindedir.'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'SBF Bağlıca Yerleşkesindedir.',
+            chunks: [{ document_id: 'doc-1', content: 'SBF Bağlıca Yerleşkesindedir.' }],
+            tokenCount: 5
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'SBF Bağlıca Yerleşkesindedir.' } }],
+            usage: {
+                prompt_tokens: 100,
+                completion_tokens: 15,
+                total_tokens: 115
+            }
+        })
+        recordAiUsageMock
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce(new Error('Failed to record AI usage'))
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(sendOutbound).toHaveBeenCalledWith('SBF Bağlıca Yerleşkesindedir.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(botInsert.insertMock).toHaveBeenCalled()
+        expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
     it('uses reasoning-compatible Chat Completions parameters for GPT-5 RAG models', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
         process.env.OPENAI_RAG_MODEL = 'gpt-5-mini'

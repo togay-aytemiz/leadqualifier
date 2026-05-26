@@ -845,6 +845,17 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
     })
 
+    it('repairs self-contradictory final makeup answers that express eligibility as an obligation', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Final sınavına girmeden bütünleme sınavına giremezsin. Bütünleme sınavına girebilmek için final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrencilerin bu sınava girmesi gerekmektedir.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: []
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
     it('repairs direct-no-right final makeup denials against retrieved medicine policy', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Hayır, finale girmeden doğrudan bütünlemeye girme hakkı yok. Bütünleme sınavına girenler final sınavına girmesi gereken öğrencilerdir.',
@@ -1102,6 +1113,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         })
 
         expect(repaired).toBe('seçmeli derslerin sayısı yüksekokul kurulu kararı ile belirlenir.')
+    })
+
+    it('repairs truncated elective-count answers from retrieved board-determination evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Detaylı bilgi için şu sayfayı inceleyebilirsin: çmeli derslerin sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir.',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Seçmeli derslerin sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli derslerin sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir')
     })
 
     it('keeps blank RAG completions blank when no extractive evidence matches', () => {

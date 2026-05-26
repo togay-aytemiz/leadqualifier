@@ -98,4 +98,30 @@ describe('appendCanonicalRagSourceLinks', () => {
 
         expect(formatted).toBe('E-posta: tlt@yiu.edu.tr\nhttps://yuksekihtisasuniversitesi.edu.tr/iletisim')
     })
+
+    it('prefers source URLs from chunks that contain concrete answer evidence', () => {
+        const formatted = appendCanonicalRagSourceLinks('Tıbbi Laboratuvar Teknikleri e-posta adresi: tlt@yiu.edu.tr.', [
+            {
+                content: [
+                    'Page Title: Yerleşke Konumları',
+                    'Source URL: https://yuksekihtisasuniversitesi.edu.tr/duyuru/universitemizde-yeni-duzenleme-kapsaminda-yapilan-yerleske-konumlari-guncellendi',
+                    '',
+                    'Tıbbi Laboratuvar Teknikleri Balgat Yerleşkesi adresinde eğitim verir.'
+                ].join('\n')
+            },
+            {
+                content: [
+                    'Page Title: İletişim',
+                    'Source URL: https://yuksekihtisasuniversitesi.edu.tr/iletisim',
+                    '',
+                    'Tıbbi Laboratuvar Teknikleri Programı iletişim bilgisi: Telefon +90 312 329 10 10, e-posta tlt@yiu.edu.tr.'
+                ].join('\n')
+            }
+        ], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Tıbbi Laboratuvar Teknikleri e-posta adresi: tlt@yiu.edu.tr.\nhttps://yuksekihtisasuniversitesi.edu.tr/iletisim')
+    })
 })

@@ -605,6 +605,8 @@ function extractElectiveCourseRequirementEvidence(content: string) {
     const match = flattened.match(/Seçmeli derslerin hangi derslerden oluşacağına,[\s\S]{0,340}?(?:Fakülte|Yüksekokul) Kurulu karar verir\./iu)
         ?? flattened.match(/Seçmeli derslerin hangi derslerden oluşacağına,[\s\S]{0,340}?(?:Kurulu kararı ile belirlenir|kurulu kararı ile belirlenir)\./iu)
         ?? flattened.match(/Seçmeli ders sayısına,[\s\S]{0,260}?(?:Fakülte|Yüksekokul) Kurulu karar verir\./iu)
+        ?? flattened.match(/Seçmeli derslerin sayısı,[\s\S]{0,260}?(?:Fakülte|Yüksekokul|Bölüm|Program) Kurulu tarafından belirlenir[\s\S]{0,120}?\./iu)
+        ?? flattened.match(/alınması gereken seçmeli ders sayısı[\s\S]{0,260}?(?:Fakülte|Yüksekokul|Bölüm|Program) Kurulu tarafından belirlenir[\s\S]{0,120}?\./iu)
     if (!match?.[0]) return null
 
     return cleanExtractedInlineValue(match[0])
@@ -1225,12 +1227,34 @@ function repairFinalExamAnswer(input: {
             'butunlemeye girme hakki yok',
             'butunleme sinavina girme hakki yok'
         ])
+    const finalMakeupEligibilityPhrases = [
+        'girebilir',
+        'girer',
+        'girecek',
+        'katilabilir',
+        'katilir',
+        'hakki var',
+        'girmesi gerekir',
+        'girmesi gerekmektedir',
+        'girmeleri gerekir',
+        'girmeleri gerekmektedir',
+        'girmek zorundadir'
+    ]
     const responseStatesMissingFinalEligibility = normalizedResponse.includes('final sinavina girmesi gerektigi halde girmeyen')
         && normalizedResponse.includes('butunleme')
-        && includesAny(normalizedResponse, ['girebilir', 'girer', 'girecek'])
+        && includesAny(normalizedResponse, finalMakeupEligibilityPhrases)
     const responseStatesShortFinalEligibility = normalizedResponse.includes('final sinavina girmesi gereken')
         && normalizedResponse.includes('butunleme')
-        && includesAny(normalizedResponse, ['butunleme sinavina girebilir', 'butunleme sinavina girecek', 'bu sinava girebilir', 'bu sinava girecek'])
+        && includesAny(normalizedResponse, [
+            'butunleme sinavina girebilir',
+            'butunleme sinavina girecek',
+            'butunleme sinavina girmesi gerekir',
+            'butunleme sinavina girmesi gerekmektedir',
+            'bu sinava girebilir',
+            'bu sinava girecek',
+            'bu sinava girmesi gerekir',
+            'bu sinava girmesi gerekmektedir'
+        ])
     const responseStatesMissedFinalEligibility = normalizedResponse.includes('final sinavina girmediysen')
         && normalizedResponse.includes('butunleme')
         && includesAny(normalizedResponse, ['hakkin var', 'katilma hakkin', 'girebilirsin', 'girebilirsiniz'])

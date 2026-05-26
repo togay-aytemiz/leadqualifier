@@ -3549,6 +3549,67 @@ describe('searchKnowledgeBase', () => {
         expect(context).toContain('mazeret sınavı yapılır')
     })
 
+    it('prefers remedy evidence over generic health-report attendance text for missed-exam questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'generic-health-report-vector-1',
+                    document_id: 'doc-generic-health-report-vector-1',
+                    document_title: 'Sağlık Raporu ve Devamsızlık',
+                    document_type: 'pdf',
+                    content: 'Page Title: Sağlık Raporu ve Devamsızlık\nSource URL: https://example.edu.tr/saglik-raporu.pdf\n\nSağlık raporu ile mazeretli sayılan öğrencilerin devamsızlık durumları açıklanır. Raporlu günlerde dersler ve sınavlar devamsızlık süresinden sayılmaz.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [
+                {
+                    includes: 'sağlık raporu ile belgelendirmesi',
+                    rows: [{
+                        id: 'generic-health-report-keyword-1',
+                        document_id: 'doc-generic-health-report-keyword-1',
+                        content: 'Page Title: Sağlık Raporu ve Devamsızlık\nSource URL: https://example.edu.tr/saglik-raporu.pdf\n\nSağlık raporu ile belgelendirmesi gereken mazeretlerde devamsızlık kayıtları ve raporlu öğrencinin derslere katılım durumu açıklanır.',
+                        knowledge_documents: {
+                            title: 'Sağlık Raporu ve Devamsızlık',
+                            type: 'pdf',
+                            status: 'ready'
+                        }
+                    }]
+                },
+                {
+                    includes: 'mazeret sınavı',
+                    rows: [{
+                        id: 'excuse-exam-remedy-evidence-1',
+                        document_id: 'doc-excuse-exam-remedy-evidence-1',
+                        content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-sinav-yonergesi.pdf\n\nÖğrencinin sınava girmesini engelleyen hastalık durumunu sağlık raporu ile belgelendirmesi gerekir. Yönetim Kurulu tarafından kabul edilen mazeretler için mazeret sınavı yapılır.',
+                        knowledge_documents: {
+                            title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                            type: 'pdf',
+                            status: 'ready'
+                        }
+                    }]
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Kurul sınavına hasta olduğum için giremedim. Başka sınav hakkım var mı?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'excuse-exam-remedy-evidence-1',
+            document_id: 'doc-excuse-exam-remedy-evidence-1'
+        })
+        expect(context).toContain('mazeret sınavı yapılır')
+        expect(context).not.toContain('devamsızlık kayıtları')
+    })
+
     it('prefers exact document codes over generic document-control templates', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [

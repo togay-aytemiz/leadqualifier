@@ -1980,6 +1980,42 @@ function isHealthReportExcuseExamQuery(query: string) {
     return hasHealthIssue && asksExam && asksMakeupOrExcuse
 }
 
+function asksForMissedExamRemedy(query: string) {
+    if (!isHealthReportExcuseExamQuery(query)) return false
+
+    const normalized = normalizeSearchText(query)
+    const missedExamSignal = normalized.includes('giremedim')
+        || normalized.includes('giremedi')
+        || normalized.includes('girememe')
+        || normalized.includes('katilamadim')
+        || normalized.includes('katilamadi')
+        || normalized.includes('katilamama')
+        || normalized.includes('engelleyen')
+    const remedySignal = normalized.includes('baska sinav')
+        || normalized.includes('sinav hak')
+        || normalized.includes('hakki')
+        || normalized.includes('telafi')
+        || normalized.includes('mazeret')
+
+    return missedExamSignal || remedySignal
+}
+
+function hasHealthReportExamRemedyEvidence(searchable: string) {
+    const hasHealthEvidence = searchable.includes('saglik raporu')
+        || searchable.includes('saglik mazereti')
+        || searchable.includes('hastalik')
+        || searchable.includes('hasta')
+    const hasMissedExamEvidence = searchable.includes('sinava girmesini engelleyen')
+        || searchable.includes('sinavlara katilmayan')
+        || searchable.includes('sinava giremeyen')
+        || searchable.includes('sinava giremem')
+    const hasRemedyOutcome = searchable.includes('mazeret sinavi')
+        || searchable.includes('telafi sinavi')
+        || (searchable.includes('sinav hak') && searchable.includes('mazeret'))
+
+    return hasHealthEvidence && searchable.includes('sinav') && hasRemedyOutcome && (hasMissedExamEvidence || searchable.includes('yonetim kurulu'))
+}
+
 function healthReportExamPolicyScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
     if (!isHealthReportExcuseExamQuery(query)) return 0
 
@@ -1996,6 +2032,8 @@ function healthReportExamPolicyScore(query: string, sourceUrl: string, result: K
         || searchable.includes('yayinlanmistir')
         || searchable.includes('yayimlanmistir')
         || sourcePath(sourceUrl).startsWith('/duyuru/')
+    const asksRemedy = asksForMissedExamRemedy(query)
+    const hasRemedyEvidence = hasHealthReportExamRemedyEvidence(searchable)
 
     let score = 0
 
@@ -2008,6 +2046,12 @@ function healthReportExamPolicyScore(query: string, sourceUrl: string, result: K
     if (searchable.includes('telafi') && searchable.includes('sinav')) score += 0.1
     if (searchable.includes('gecersiz sayilir')) score += 0.18
     if (searchable.includes('raporlu ogrenci') && searchable.includes('sinavlara giremez')) score += 0.18
+    if (asksRemedy && hasRemedyEvidence) score += 0.58
+    if (asksRemedy
+        && !hasRemedyEvidence
+        && (searchable.includes('devamsizlik') || searchable.includes('mazeretli sayilir'))) {
+        score -= 0.38
+    }
 
     if (hasCalendarNoticeSignal && !hasRuleEvidence) {
         score -= 0.36
@@ -3398,7 +3442,15 @@ async function searchKnowledgeBaseByHealthReportExamPolicyEvidence(
 ) {
     if (!isHealthReportExcuseExamQuery(query)) return []
 
-    const rows = await searchKnowledgeBaseByEvidenceFilters('Health-report exam policy', [
+    const remedyRows = asksForMissedExamRemedy(query)
+        ? (await Promise.all([
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'sağlık raporu'], organizationId, limit, options),
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'hastalık'], organizationId, limit, options),
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['mazeret sınavı', 'sağlık mazereti'], organizationId, limit, options),
+            searchKnowledgeBaseByRequiredEvidenceFilters('Health-report exam remedy', ['telafi sınavı', 'sağlık raporu'], organizationId, limit, options)
+        ])).flat()
+        : []
+    const broadRows = await searchKnowledgeBaseByEvidenceFilters('Health-report exam policy', [
         'sağlık raporu ile belgelendirmesi',
         'Sağlık raporu olduğu halde',
         'sınavı geçersiz sayılır',
@@ -3406,8 +3458,13 @@ async function searchKnowledgeBaseByHealthReportExamPolicyEvidence(
         'mazeret sınavı yapılır',
         'Yönetim Kurulu tarafından kabul edilen mazeretler'
     ], organizationId, limit, options)
+    const rowsById = new Map<string, KeywordSearchRow>()
 
-    return rows
+    for (const row of [...remedyRows, ...broadRows]) {
+        rowsById.set(row.id, row)
+    }
+
+    return [...rowsById.values()]
         .map((row) => buildKeywordResultFromRow(row, 0.8))
         .filter((result) => {
             const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
@@ -3421,6 +3478,7 @@ async function searchKnowledgeBaseByHealthReportExamPolicyEvidence(
             similarity: Math.max(
                 0.2,
                 0.8
+                    + (hasHealthReportExamRemedyEvidence(normalizeSearchText(`${result.document_title}\n${result.content}`)) ? 1.42 : 0)
                     + Math.max(0, healthReportExamPolicyScore(query, sourceUrlFromResult(result) ?? '', result)) * 0.18
                     + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
             )

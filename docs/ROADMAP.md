@@ -1,5 +1,7 @@
 # WhatsApp AI Qualy — Roadmap
 
+> **Update Note (2026-05-26):** Public demo readiness now includes a repeatable public Demo Chat canary with conversation/source trace metadata, a YİÜ corpus-health report, and a 33-question customer-screenshot-plus-variant challenge pass before asking stakeholders to retest. RAG hardening remains general: missed-exam health/rapor queries prefer remedy evidence over generic attendance text, final/bütünleme contradictions are repaired from eligibility language, elective-count policy answers repair truncated evidence, source links are ranked by concrete answer evidence, and RAG replies continue even if usage-recording writes fail. The latest local public-demo canary passed 12/12 and the live inbound challenge passed 33/33; the demo org then exhausted package credits during an attempted rerun, so customer retest requires a credit renewal/top-up first.
+
 > **Update Note (2026-05-25):** Yüksek İhtisas demo RAG P1 hardening now includes evidence-first performance shortcuts plus model-family cost/quality evaluation. The same 33-question live challenge passes with `gpt-5-mini`, `gpt-4o`, and `gpt-4o-mini`; `OPENAI_RAG_MODEL` can opt RAG completion into reasoning-compatible GPT-5-family models while the product default remains the lower-cost `gpt-4o-mini` unless a tenant/demo needs escalation.
 
 > **Update Note (2026-05-25):** Public Demo Chat composer textarea now uses an iOS-safe 16px text baseline so focusing the reusable institution demo on mobile no longer triggers Safari-style page auto-zoom.
