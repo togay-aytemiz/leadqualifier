@@ -64,6 +64,8 @@ function normalizeText(text: string): string {
     return text
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
+        .replace(/(https?:\/\/[^\s]+)\s+\.(?=[a-z]{2,}\b)/gi, '$1.')
+        .replace(/(https?:\/\/[^\s]+)\.\s+(?=[a-z]{2,}\/?)/gi, '$1.')
         .trim()
 }
 

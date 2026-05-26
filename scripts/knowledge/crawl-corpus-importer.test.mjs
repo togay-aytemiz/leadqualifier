@@ -90,6 +90,29 @@ Tez teslim tarihleri ve danisman atama surecleri.`
         expect(chunks.at(-1).sectionTitle).toBe('Lisansustu')
     })
 
+    it('normalizes URL line-break artifacts before website chunking', () => {
+        const chunks = createWebsiteChunks({
+            title: 'Başvuru Rehberi',
+            sourceUrl: 'https://example.edu.tr/basvuru',
+            content: `Başvuru bağlantıları:
+
+https://example.edu.tr/kayit.
+ com/form
+
+https://example.edu.tr/duyuru
+ .html`
+        }, {
+            maxTokens: 80,
+            overlapTokens: 8
+        })
+
+        const content = chunks.map((chunk) => chunk.content).join('\n')
+
+        expect(content).toContain('https://example.edu.tr/kayit.com/form')
+        expect(content).toContain('https://example.edu.tr/duyuru.html')
+        expect(content).not.toMatch(/https?:\/\/[^\s]*\s+\.[a-z]{2,}|https?:\/\/[^\s]+\.\s+[a-z]{2,}/i)
+    })
+
     it('creates separate chunks for legal article headings without cross-section overlap', () => {
         const chunks = createWebsiteChunks({
             title: 'İzin Kullanımı Yönergesi',

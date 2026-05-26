@@ -19,6 +19,10 @@ import {
     MAX_KNOWLEDGE_ENTRIES_PAGE_SIZE,
     MAX_SIDEBAR_FILES_PAGE_SIZE
 } from '@/lib/knowledge-base/pagination'
+import {
+    planKnowledgeSearchQuery,
+    type KnowledgeSearchQueryPlan
+} from '@/lib/knowledge-base/query-planner'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
 import { revalidatePath } from 'next/cache'
 
@@ -92,6 +96,16 @@ interface SidebarFilesPageOptions {
     limit?: number
     supabase?: SupabaseClientLike
 }
+
+interface KnowledgeSearchOptions {
+    collectionId?: string | null
+    type?: string | null
+    language?: string | null
+    supabase?: SupabaseClientLike
+    queryPlannerUsage?: (plan: KnowledgeSearchQueryPlan) => void | Promise<void>
+}
+
+type KnowledgeSearchExecutionOptions = Omit<KnowledgeSearchOptions, 'queryPlannerUsage'>
 
 interface KnowledgeSearchResult {
     chunk_id: string
@@ -234,6 +248,39 @@ function withQueryTimeout<T>(query: PromiseLike<T> | AbortableQuery<T>, timeoutM
                 reject(error)
             })
     })
+}
+
+function queryErrorText(error: unknown) {
+    if (error instanceof Error) return `${error.name} ${error.message}`
+    if (typeof error === 'string') return error
+    if (error && typeof error === 'object') {
+        const record = error as Record<string, unknown>
+        return [
+            record.name,
+            record.message,
+            record.code,
+            record.details,
+            record.hint
+        ]
+            .filter((value): value is string => typeof value === 'string')
+            .join(' ')
+    }
+
+    return ''
+}
+
+function isQueryTimeoutError(error: unknown) {
+    return /\b(?:timeout|timed out)\b|aborted due to timeout|operation was aborted|aborterror/i
+        .test(queryErrorText(error))
+}
+
+function logKnowledgeVectorSearchIssue(error: unknown) {
+    if (isQueryTimeoutError(error)) {
+        console.warn('Knowledge vector search timed out; continuing with lexical evidence:', error)
+        return
+    }
+
+    console.error('RAG Search failed:', error)
 }
 
 async function readBeforeDeadline<T>(promise: Promise<T>, timeoutMs: number) {
@@ -585,17 +632,12 @@ export async function getKnowledgeBaseEntries(collectionId?: string | null, orga
     return page.entries
 }
 
-export async function searchKnowledgeBase(
+async function searchKnowledgeBaseSingleQuery(
     query: string,
     organizationId: string,
     threshold = 0.5,
     limit = 3,
-    options?: {
-        collectionId?: string | null
-        type?: string | null
-        language?: string | null
-        supabase?: SupabaseClientLike
-    }
+    options?: KnowledgeSearchExecutionOptions
 ) {
     const supabase = options?.supabase || await createClient()
     let data: KnowledgeSearchResult[] | null = null
@@ -620,6 +662,8 @@ export async function searchKnowledgeBase(
         searchKnowledgeBaseByCurrentCampusListingEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByTltDoubleMajorResponsibleEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByProgramContactEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
+        searchKnowledgeBaseByUnitContactEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
+        searchKnowledgeBaseByErasmusEligibilityEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByTltDoubleMajorEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByMedicalSchoolExamPolicyEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
         searchKnowledgeBaseByMedicalSchoolTrainingEvidence(query, organizationId, focusedEvidenceLimit, fallbackOptions),
@@ -695,12 +739,16 @@ export async function searchKnowledgeBase(
             )
 
             if (error) {
-                console.error('RAG Search failed:', error)
+                logKnowledgeVectorSearchIssue(error)
             } else {
                 data = (result ?? null) as KnowledgeSearchResult[] | null
             }
         } catch (error) {
-            console.warn('Knowledge vector search unavailable:', error)
+            if (isQueryTimeoutError(error)) {
+                console.warn('Knowledge vector search timed out; continuing with lexical evidence:', error)
+            } else {
+                console.warn('Knowledge vector search unavailable:', error)
+            }
         }
     }
 
@@ -736,6 +784,79 @@ export async function searchKnowledgeBase(
     if (!data) return []
 
     return mergeSearchResults(query, data, lexicalResults, limit)
+}
+
+function dedupePlannedSearchQueries(originalQuery: string, plannedQueries: string[]) {
+    const seen = new Set<string>()
+    const queries: string[] = []
+    const addQuery = (value: string) => {
+        const trimmed = value.replace(/\s+/g, ' ').trim()
+        if (!trimmed) return
+        const key = trimmed.toLocaleLowerCase('tr-TR')
+        if (seen.has(key)) return
+        seen.add(key)
+        queries.push(trimmed)
+    }
+
+    addQuery(originalQuery)
+    plannedQueries.forEach(addQuery)
+
+    return queries.slice(0, 4)
+}
+
+async function resolveKnowledgeSearchPlan(query: string, options?: KnowledgeSearchOptions) {
+    try {
+        const plan = await planKnowledgeSearchQuery(query, [], {})
+        if (plan.usage && options?.queryPlannerUsage) {
+            await options.queryPlannerUsage(plan)
+        }
+        return plan
+    } catch (error) {
+        console.warn('Knowledge query planner failed unexpectedly:', error)
+        return {
+            enabled: false,
+            model: 'gpt-4o-mini',
+            reason: 'planner_error' as const,
+            searchQueries: [query],
+            mustHaveTerms: []
+        }
+    }
+}
+
+export async function searchKnowledgeBase(
+    query: string,
+    organizationId: string,
+    threshold = 0.5,
+    limit = 3,
+    options?: KnowledgeSearchOptions
+) {
+    const supabase = options?.supabase || await createClient()
+    const executionOptions: KnowledgeSearchExecutionOptions = {
+        collectionId: options?.collectionId ?? null,
+        type: options?.type ?? null,
+        language: options?.language ?? null,
+        supabase
+    }
+    const plan = await resolveKnowledgeSearchPlan(query, options)
+    const searchQueries = dedupePlannedSearchQueries(query, plan.searchQueries)
+
+    if (searchQueries.length <= 1) {
+        return searchKnowledgeBaseSingleQuery(query, organizationId, threshold, limit, executionOptions)
+    }
+
+    const mergedResults: KnowledgeSearchResult[] = []
+    for (const searchQuery of searchQueries) {
+        const results = await searchKnowledgeBaseSingleQuery(
+            searchQuery,
+            organizationId,
+            threshold,
+            limit,
+            executionOptions
+        )
+        mergedResults.push(...results)
+    }
+
+    return mergeSearchResults(query, [], mergedResults, limit)
 }
 export interface SidebarCollection extends KnowledgeCollection {
     files: SidebarFile[]
@@ -1067,6 +1188,22 @@ function isKeywordStopword(token: string) {
         || KEYWORD_STOPWORDS.has(stemmed)
 }
 
+function keywordTokenSignalScore(token: string, index: number, total: number) {
+    const normalized = normalizeSearchText(token)
+    const stemmed = stemSearchToken(normalized)
+    let score = Math.min(stemmed.length, 14) / 14
+
+    if (/\d/.test(normalized)) score += 0.18
+    if (stemmed.length <= 3) score -= 0.18
+
+    // Natural-language questions often put the actual subject near the end
+    // after greetings or conversational setup. Keep those terms in play.
+    if (index >= Math.max(0, total - 6)) score += 0.34
+    if (index >= Math.max(0, total - 3)) score += 0.12
+
+    return score
+}
+
 function extractKeywordTokens(query: string): string[] {
     const normalized = query
         .toLocaleLowerCase('tr-TR')
@@ -1076,14 +1213,33 @@ function extractKeywordTokens(query: string): string[] {
     if (!normalized) return []
 
     const tokens = normalized.split(/\s+/).filter(Boolean)
-    const keywords = tokens.filter(token => token.length >= 3 && !isKeywordStopword(token))
-    const unique = Array.from(new Set(keywords))
+    const keywordCandidates = tokens
+        .map((token, index) => ({ token, index }))
+        .filter(({ token }) => token.length >= 3 && !isKeywordStopword(token))
 
-    if (unique.length > 0) {
-        return unique.slice(0, 5)
+    const byNormalized = new Map<string, { token: string; index: number; score: number }>()
+    for (const candidate of keywordCandidates) {
+        const normalizedToken = normalizeSearchText(candidate.token)
+        const existing = byNormalized.get(normalizedToken)
+        if (existing) continue
+
+        byNormalized.set(normalizedToken, {
+            ...candidate,
+            score: keywordTokenSignalScore(candidate.token, candidate.index, tokens.length)
+        })
     }
 
-    return Array.from(new Set(tokens.filter(token => token.length >= 3))).slice(0, 5)
+    const unique = [...byNormalized.values()]
+        .sort((left, right) => right.score - left.score || left.index - right.index)
+        .slice(0, 8)
+        .sort((left, right) => left.index - right.index)
+        .map((candidate) => candidate.token)
+
+    if (unique.length > 0) {
+        return unique
+    }
+
+    return Array.from(new Set(tokens.filter(token => token.length >= 3))).slice(0, 8)
 }
 
 function sanitizeKeyword(keyword: string): string {
@@ -1788,6 +1944,7 @@ function isPolicyRuleQuery(query: string) {
         || normalized.includes('cift anadal')
         || new Set(normalized.split(/\s+/).filter(Boolean)).has('cap')
         || normalized.includes('yaz staji')
+        || isErasmusEligibilityQuery(query)
 }
 
 function pageTypeScore(query: string, sourceUrl: string) {
@@ -1958,6 +2115,76 @@ function rootContactInformationScore(query: string, sourceUrl: string, result: K
     if (contentScore < 0.42) return 0
 
     return 0.42 + contentScore * 0.28
+}
+
+function isLibraryContactQuery(query: string) {
+    const normalized = normalizeSearchText(query)
+
+    return normalized.includes('kutuphane') && isContactInfoQuery(query)
+}
+
+function hasLibraryContactEvidence(value: string) {
+    const normalized = normalizeSearchText(value)
+
+    return normalized.includes('kutuphane')
+        && normalized.includes('dokumantasyon')
+        && normalized.includes('kutuphane@yuksekihtisas.edu.tr')
+}
+
+function libraryContactEvidenceScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!isLibraryContactQuery(query)) return 0
+
+    const searchable = `${result.document_title}\n${result.content}\n${sourceUrl}`
+    const normalizedSearchable = normalizeSearchText(searchable)
+    let score = 0
+
+    if (hasLibraryContactEvidence(searchable)) score += 2.1
+    if (sourcePath(sourceUrl) === '/iletisim' && normalizedSearchable.includes('kutuphane')) score += 0.42
+    if (normalizedSearchable.includes('@') && !normalizedSearchable.includes('kutuphane@yuksekihtisas.edu.tr')) score -= 0.72
+
+    return score
+}
+
+function isErasmusEligibilityQuery(query: string) {
+    const normalized = normalizeSearchText(query)
+    if (!normalized.includes('erasmus')) return false
+
+    const asksEligibility = normalized.includes('yararlan')
+        || normalized.includes('faydalan')
+        || normalized.includes('katil')
+        || normalized.includes('hak')
+        || normalized.includes('olur mu')
+        || normalized.includes('var mi')
+        || /\bmi\b/u.test(normalized)
+    const hasStudentSubject = normalized.includes('hazirlik')
+        || normalized.includes('ogrenci')
+        || normalized.includes('program')
+
+    return asksEligibility && hasStudentSubject
+}
+
+function hasErasmusPreparationDenialEvidence(value: string) {
+    const normalized = normalizeSearchText(value)
+
+    return normalized.includes('erasmus')
+        && normalized.includes('hazirlik')
+        && normalized.includes('yararlanamaz')
+}
+
+function erasmusEligibilityEvidenceScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    if (!isErasmusEligibilityQuery(query)) return 0
+
+    const title = normalizeSearchText(result.document_title ?? '')
+    const searchable = normalizeSearchText(`${result.document_title}\n${result.content}\n${sourceUrl}`)
+    let score = 0
+
+    if (hasErasmusPreparationDenialEvidence(searchable)) score += 2.25
+    if (title.includes('yonerge') || isPdfLikeSource(sourceUrl, result)) score += 0.22
+    if ((title.includes('koordinator') || searchable.includes('iletisime gec')) && !hasErasmusPreparationDenialEvidence(searchable)) {
+        score -= 0.62
+    }
+
+    return score
 }
 
 function isHealthReportExcuseExamQuery(query: string) {
@@ -2271,6 +2498,168 @@ function evidenceSubjectCoverageScore(query: string, value: string) {
     }).length
 
     return hits / subjectTokens.length
+}
+
+const ACADEMIC_UNIT_PREFIXES = [
+    ['fakulte', 'fakulte'],
+    ['bolum', 'bolum'],
+    ['program', 'program'],
+    ['yuksekokul', 'yuksekokul'],
+    ['enstitu', 'enstitu']
+] as const
+
+const ACADEMIC_SUBJECT_PREFIX_STOPWORDS = new Set([
+    'hangi',
+    'kac',
+    'kaç',
+    'nerede',
+    'nerde',
+    'var',
+    'yok',
+    'mi',
+    'mı',
+    'nedir',
+    'ne',
+    'icin',
+    'için',
+    'bu',
+    'su',
+    'şu'
+])
+
+type AcademicSubjectFocus = {
+    descriptorTokens: string[]
+    unitToken: string
+}
+
+function normalizeAcademicUnitToken(token: string) {
+    const normalized = normalizeSearchText(token)
+    const unit = ACADEMIC_UNIT_PREFIXES.find(([prefix]) => normalized.startsWith(prefix))
+
+    return unit?.[1] ?? null
+}
+
+function extractAcademicSubjectFocuses(query: string): AcademicSubjectFocus[] {
+    const normalized = normalizeSearchText(query)
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .trim()
+    if (!normalized) return []
+
+    const rawTokens = normalized.split(/\s+/).filter(Boolean)
+    const focuses: AcademicSubjectFocus[] = []
+
+    rawTokens.forEach((token, index) => {
+        const unitToken = normalizeAcademicUnitToken(token)
+        if (!unitToken) return
+
+        const descriptorTokens: string[] = []
+        for (let cursor = index - 1; cursor >= 0 && descriptorTokens.length < 4; cursor -= 1) {
+            const descriptor = stemSearchToken(rawTokens[cursor] ?? '')
+            if (!descriptor || ACADEMIC_SUBJECT_PREFIX_STOPWORDS.has(descriptor)) break
+            if (normalizeAcademicUnitToken(descriptor)) break
+            if (isKeywordStopword(descriptor) || EVIDENCE_SUBJECT_STOPWORDS.has(descriptor)) break
+            descriptorTokens.unshift(descriptor)
+        }
+
+        if (descriptorTokens.length === 0) return
+        focuses.push({ descriptorTokens, unitToken })
+    })
+
+    const seen = new Set<string>()
+    return focuses.filter((focus) => {
+        const key = `${focus.descriptorTokens.join(' ')} ${focus.unitToken}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
+function academicTokenMatches(token: string, value: string, tokenSet: Set<string>) {
+    if (tokenSet.has(token) || tokenSet.has(stemSearchToken(token))) return true
+    return token.length >= 5 && value.includes(token)
+}
+
+function academicUnitMatches(unitToken: string, value: string, tokenSet: Set<string>) {
+    if (tokenSet.has(unitToken)) return true
+
+    return value.includes(unitToken)
+}
+
+function academicSubjectFocusMatches(focus: AcademicSubjectFocus, value: string) {
+    const normalized = normalizeSearchText(value)
+    const tokenSet = normalizedTokenSet(value)
+    const descriptorsMatch = focus.descriptorTokens.every((token) => academicTokenMatches(token, normalized, tokenSet))
+    if (!descriptorsMatch) return false
+
+    if (focus.descriptorTokens.length >= 2 && focus.unitToken === 'program') return true
+
+    return academicUnitMatches(focus.unitToken, normalized, tokenSet)
+}
+
+function hasAcademicUnitSignal(value: string) {
+    const normalized = normalizeSearchText(value)
+    return ACADEMIC_UNIT_PREFIXES.some(([prefix]) => normalized.includes(prefix))
+}
+
+function extractMetadataTitle(content: string) {
+    const match = content.match(/^(?:Page|Document) Title:\s*(.+)$/im)
+    return match?.[1]?.trim() ?? ''
+}
+
+function academicTitleLikeText(result: KnowledgeSearchResult, sourceUrl: string) {
+    return [
+        result.document_title ?? '',
+        extractMetadataTitle(result.content),
+        sourcePath(sourceUrl)
+    ].filter(Boolean).join('\n')
+}
+
+function academicSubjectFocusScore(query: string, sourceUrl: string, result: KnowledgeSearchResult) {
+    const focuses = extractAcademicSubjectFocuses(query)
+    if (focuses.length === 0) return 0
+
+    const titleLike = academicTitleLikeText(result, sourceUrl)
+    const searchable = `${result.document_title}\n${result.content}\n${sourceUrl}`
+    const hasStrictEvidenceIntent = isInternshipEvidenceQuery(query)
+    if (!hasStrictEvidenceIntent) return 0
+    let score = 0
+
+    for (const focus of focuses) {
+        const titleLikeMatches = academicSubjectFocusMatches(focus, titleLike)
+        const searchableMatches = academicSubjectFocusMatches(focus, searchable)
+
+        if (titleLikeMatches) {
+            score += 0.64
+            continue
+        }
+
+        if (searchableMatches) {
+            score += 0.08
+            if (hasStrictEvidenceIntent) score -= 0.74
+            if (isInternshipEvidenceQuery(query) && normalizeSearchText(searchable).includes('yaz staji')) {
+                score -= 0.56
+            }
+            continue
+        }
+
+        if (hasAcademicUnitSignal(titleLike)) {
+            score -= hasStrictEvidenceIntent ? 0.96 : 0.42
+        }
+    }
+
+    return score
+}
+
+function shouldSuppressAcademicSubjectMismatch(query: string, result: KnowledgeSearchResult) {
+    const focuses = extractAcademicSubjectFocuses(query)
+    if (focuses.length === 0) return false
+    if (!isInternshipEvidenceQuery(query)) return false
+
+    const sourceUrl = sourceUrlFromResult(result) ?? ''
+    const titleLike = academicTitleLikeText(result, sourceUrl)
+    if (!hasAcademicUnitSignal(titleLike)) return false
+
+    return !focuses.some((focus) => academicSubjectFocusMatches(focus, titleLike))
 }
 
 function isAddressLookupQuery(query: string) {
@@ -2838,6 +3227,76 @@ async function searchKnowledgeBaseByProgramContactEvidence(
                 )
             }
         })
+}
+
+async function searchKnowledgeBaseByUnitContactEvidence(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    if (!isLibraryContactQuery(query)) return []
+
+    const rows = await searchKnowledgeBaseByRequiredEvidenceFilters(
+        'Library unit contact',
+        ['Kütüphane ve Dokümantasyon Daire Başkanlığı', 'kutuphane@yuksekihtisas.edu.tr'],
+        organizationId,
+        limit,
+        options
+    )
+
+    return rows
+        .map((row) => buildKeywordResultFromRow(row, 2.65))
+        .filter((result) => hasLibraryContactEvidence(`${result.document_title}\n${result.content}`))
+        .map((result) => ({
+            ...result,
+            similarity: Math.max(
+                0.2,
+                2.65 + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
+            )
+        }))
+        .sort((left, right) => scoreKnowledgeResult(query, right) - scoreKnowledgeResult(query, left))
+        .slice(0, limit)
+}
+
+async function searchKnowledgeBaseByErasmusEligibilityEvidence(
+    query: string,
+    organizationId: string,
+    limit: number,
+    options?: {
+        collectionId?: string | null
+        type?: string | null
+        language?: string | null
+        supabase?: SupabaseClientLike
+    }
+) {
+    if (!isErasmusEligibilityQuery(query)) return []
+
+    const rows = await searchKnowledgeBaseByRequiredEvidenceFilters(
+        'Erasmus preparation eligibility',
+        ['hazırlık sınıfı öğrencileri', 'programdan yararlanamaz'],
+        organizationId,
+        limit,
+        options
+    )
+
+    return rows
+        .map((row) => buildKeywordResultFromRow(row, 2.65))
+        .filter((result) => hasErasmusPreparationDenialEvidence(`${result.document_title}\n${result.content}`))
+        .map((result) => ({
+            ...result,
+            similarity: Math.max(
+                0.2,
+                2.65 + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.08
+            )
+        }))
+        .sort((left, right) => scoreKnowledgeResult(query, right) - scoreKnowledgeResult(query, left))
+        .slice(0, limit)
 }
 
 function isTltDoubleMajorQuery(query: string) {
@@ -3659,6 +4118,29 @@ function hasAnnualPaidLeaveIntent(normalizedQuery: string) {
         && !normalizedQuery.includes('hastalik')
 }
 
+function annualPaidLeaveEvidenceFilters(query: string) {
+    const normalized = normalizeSearchText(query)
+
+    if (/\b15\b/.test(normalized) || normalized.includes('on bes')) {
+        return {
+            requiredFilters: ['15 yıl', '26 iş günü'],
+            expectedDuration: '26 is gunu'
+        }
+    }
+
+    if (normalized.includes('5 yildan fazla') || normalized.includes('bes yildan fazla')) {
+        return {
+            requiredFilters: ['5 yıldan fazla', '20 iş günü'],
+            expectedDuration: '20 is gunu'
+        }
+    }
+
+    return {
+        requiredFilters: ['5 yıldan fazla 15 yıldan az'],
+        expectedDuration: null
+    }
+}
+
 async function searchKnowledgeBaseByAnnualPaidLeaveEvidence(
     query: string,
     organizationId: string,
@@ -3672,9 +4154,10 @@ async function searchKnowledgeBaseByAnnualPaidLeaveEvidence(
 ) {
     if (!isAnnualPaidLeaveQuery(query)) return []
 
+    const { requiredFilters, expectedDuration } = annualPaidLeaveEvidenceFilters(query)
     const rows = await searchKnowledgeBaseByRequiredEvidenceFilters(
         'Annual paid leave evidence',
-        ['5 yıldan fazla 15 yıldan az'],
+        requiredFilters,
         organizationId,
         limit,
         options
@@ -3687,7 +4170,11 @@ async function searchKnowledgeBaseByAnnualPaidLeaveEvidence(
 
             return searchable.includes('yillik')
                 && searchable.includes('izin')
-                && searchable.includes('20 is gunu')
+                && (
+                    expectedDuration
+                        ? searchable.includes(expectedDuration)
+                        : (searchable.includes('14 is gunu') || searchable.includes('20 is gunu') || searchable.includes('26 is gunu'))
+                )
         })
 }
 
@@ -4071,8 +4558,10 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + pageTypeScore(query, sourceUrl)
         + directIntentScore(query, sourceUrl, result)
         + rootContactInformationScore(query, sourceUrl, result)
+        + libraryContactEvidenceScore(query, sourceUrl, result)
         + addressEvidenceScore(query, sourceUrl, result)
         + lectureNotesAccessEvidenceScore(query, sourceUrl, result)
+        + erasmusEligibilityEvidenceScore(query, sourceUrl, result)
         + healthReportExamPolicyScore(query, sourceUrl, result)
         + medicalSchoolExamPolicyScore(query, sourceUrl, result)
         + policyPdfSourceScore(query, sourceUrl, result)
@@ -4082,6 +4571,7 @@ function scoreKnowledgeResult(query: string, result: KnowledgeSearchResult) {
         + abbreviationLookupScore(query, result)
         + abbreviationInitialismScore(query, result.document_title)
         + directiveDetailScore(query, sourceUrl, result)
+        + academicSubjectFocusScore(query, sourceUrl, result)
 }
 
 function tltDoubleMajorResponsibleScore(query: string, result: KnowledgeSearchResult) {
@@ -4150,6 +4640,8 @@ function mergeSearchResults(
 
     for (const rawResult of [...vectorResults, ...keywordResults]) {
         const result = enrichKnowledgeSearchResult(rawResult)
+        if (shouldSuppressAcademicSubjectMismatch(query, result)) continue
+
         const existing = byChunk.get(result.chunk_id)
         if (!existing || scoreKnowledgeResult(query, result) > scoreKnowledgeResult(query, existing)) {
             byChunk.set(result.chunk_id, result)
@@ -4180,6 +4672,8 @@ function shouldReturnFocusedEvidenceResultsEarly(query: string, results: Knowled
         || isFinalExamPolicyQuery(query)
         || isMedicalSchoolExamPolicyQuery(query)
         || isHealthReportExcuseExamQuery(query)
+        || isErasmusEligibilityQuery(query)
+        || isLibraryContactQuery(query)
         || isMedicalSchoolTrainingQuery(query)
         || isLectureNotesAccessQuery(query)
         || isElectiveCourseRequirementQuery(query)
@@ -4190,6 +4684,8 @@ function shouldReturnFocusedEvidenceResultsEarly(query: string, results: Knowled
 function shouldProbeLexicalEvidenceBeforeVector(query: string) {
     return isPolicyRuleQuery(query)
         || isContactInfoQuery(query)
+        || isErasmusEligibilityQuery(query)
+        || isLibraryContactQuery(query)
         || isAddressLookupQuery(query)
         || isLectureNotesAccessQuery(query)
         || isInternshipEvidenceQuery(query)

@@ -4,6 +4,7 @@ import { after } from 'next/server'
 import { matchSkills } from '@/lib/skills/actions'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { decideKnowledgeBaseRoute, type ConversationTurn } from '@/lib/knowledge-base/router'
+import type { KnowledgeSearchQueryPlan } from '@/lib/knowledge-base/query-planner'
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
 import { buildFallbackResponse } from '@/lib/ai/fallback'
@@ -115,6 +116,67 @@ function isRagNoAnswerResponse(response: string | null | undefined) {
     } catch {
         return false
     }
+}
+
+function normalizeKnowledgeSearchQuery(value: string) {
+    return value.replace(/\s+/g, ' ').trim()
+}
+
+function knowledgeSearchQueryKey(value: string) {
+    return normalizeKnowledgeSearchQuery(value).toLocaleLowerCase('tr-TR')
+}
+
+function looksLikeStandaloneKnowledgeSearch(message: string) {
+    const normalized = knowledgeSearchQueryKey(message)
+    if (!normalized) return false
+    if (normalized.includes('?')) return true
+
+    return /\b(?:nedir|ne demek|ne kadar|kac|kaç|hangi|nasil|nasıl|nerede|kim|sure|süre|gun|gün|yil|yıl|izin|ders|staj|sinav|sınav|kampus|kampüs|yerleske|yerleşke|adres|mail|e-?posta|telefon|cift anadal|çift anadal)\b/iu.test(normalized)
+}
+
+function buildKnowledgeSearchQueries(primaryQuery: string, originalMessage: string, history: ConversationTurn[]) {
+    const primary = normalizeKnowledgeSearchQuery(primaryQuery)
+    const original = normalizeKnowledgeSearchQuery(originalMessage)
+    const shouldPreferOriginal = history.length === 0 && looksLikeStandaloneKnowledgeSearch(original)
+    const ordered = shouldPreferOriginal
+        ? [original, primary]
+        : history.length > 0
+            ? [primary, original]
+            : [primary]
+    const seen = new Set<string>()
+    const queries: string[] = []
+
+    for (const query of ordered) {
+        if (!query) continue
+        const key = knowledgeSearchQueryKey(query)
+        if (seen.has(key)) continue
+        seen.add(key)
+        queries.push(query)
+    }
+
+    return queries
+}
+
+function knowledgeResultKey(result: RagChunk) {
+    return result.chunk_id
+        ?? `${result.document_id ?? 'unknown'}:${result.content.replace(/\s+/g, ' ').trim().slice(0, 180)}`
+}
+
+function mergeKnowledgeSearchResultGroups<T extends RagChunk>(groups: T[][], limit: number) {
+    const seen = new Set<string>()
+    const merged: T[] = []
+
+    for (const group of groups) {
+        for (const result of group) {
+            const key = knowledgeResultKey(result)
+            if (seen.has(key)) continue
+            seen.add(key)
+            merged.push(result)
+            if (merged.length >= limit) return merged
+        }
+    }
+
+    return merged
 }
 
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
@@ -1351,10 +1413,46 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
         if (decision.route_to_kb) {
             const query = decision.rewritten_query || options.text
-            let kbResults = await searchKnowledgeBase(query, orgId, kbThreshold, 6, { supabase: options.supabase })
+            const searchQueries = buildKnowledgeSearchQueries(query, options.text, history)
+            let queryPlannerUsageRecorded = false
+            const recordQueryPlannerUsage = async (plan: KnowledgeSearchQueryPlan) => {
+                if (queryPlannerUsageRecorded || !plan.usage) return
+                queryPlannerUsageRecorded = true
+
+                await recordInboundAiUsage({
+                    organizationId: orgId,
+                    category: 'router',
+                    model: plan.model,
+                    inputTokens: plan.usage.inputTokens,
+                    outputTokens: plan.usage.outputTokens,
+                    totalTokens: plan.usage.totalTokens,
+                    metadata: {
+                        conversation_id: conversation.id,
+                        stage: 'rag_query_planner',
+                        reason: plan.reason,
+                        search_query_count: Array.isArray(plan.searchQueries) ? plan.searchQueries.length : 0,
+                        must_have_term_count: Array.isArray(plan.mustHaveTerms) ? plan.mustHaveTerms.length : 0
+                    },
+                    supabase: options.supabase
+                }, options.logPrefix)
+            }
+            const knowledgeSearchOptions = {
+                supabase: options.supabase,
+                queryPlannerUsage: recordQueryPlannerUsage
+            }
+
+            const runKnowledgeSearch = async (threshold: number) => {
+                const resultGroups = []
+                for (const searchQuery of searchQueries) {
+                    resultGroups.push(await searchKnowledgeBase(searchQuery, orgId, threshold, 6, knowledgeSearchOptions))
+                }
+                return mergeKnowledgeSearchResultGroups(resultGroups, 6)
+            }
+
+            let kbResults = await runKnowledgeSearch(kbThreshold)
             if (!kbResults || kbResults.length === 0) {
                 const fallbackThreshold = Math.max(0.1, kbThreshold - 0.15)
-                kbResults = await searchKnowledgeBase(query, orgId, fallbackThreshold, 6, { supabase: options.supabase })
+                kbResults = await runKnowledgeSearch(fallbackThreshold)
             }
 
             if (kbResults && kbResults.length > 0) {
@@ -1393,6 +1491,7 @@ For campus, address, or where questions, copy the exact address/postal code if p
 If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base.
 For can/cannot, eligibility, permission, exam, application, deadline, or policy-right questions, answer from the specific rule sentence. Do not start with a blanket denial when the context includes a conditional right, exception, or eligibility path; state the condition and right together.
 Before finalizing, check your answer for internal contradictions against the context. If one sentence says "cannot / no right / not possible" but another context sentence says the user can under stated conditions, remove the unsupported denial and answer with the grounded condition.
+You may add at most one short, topic-related engagement question after the factual answer if it helps the user learn a relevant adjacent detail from the same context. Keep it role-neutral: do not assume the user is a student, applicant, personnel member, or admin unless the user said so. Do not ask what the user studies or which role/status they have; if clarification is useful, ask for the topic, program, unit, or document to look up without implying the user's identity. Instead, you can offer to explain related requirements, deadlines, exceptions, required documents, eligibility, or next steps for the same topic/source. Do not add generic closers like "anything else", "başka bir sorunuz var mı", "daha fazla bilgiye ihtiyacın var mı", or "daha fazla bilgi istersen yardımcı olurum".
 When answering with three or more items, use one plain dash bullet per line.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.

@@ -3,6 +3,438 @@ import { describe, expect, it } from 'vitest'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 
 describe('repairLinkOnlyRagAnswer', () => {
+    it('removes generic assistant closing text from otherwise grounded RAG answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıp Fakültesinde eğitim süresi altı yıldır. Daha fazla bilgi istersen yardımcı olabilirim!',
+            userMessage: 'Tıp fakültesinde eğitim süresi ne kadar?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Tıp Fakültesinde eğitim süresi altı yıldır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıp Fakültesinde eğitim süresi altı yıldır.')
+    })
+
+    it('removes generic engagement questions from grounded RAG answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık Bilimleri Fakültesi adresi: Oğuzlar Mahallesi, 1375. Sk. No: 8, Çankaya / Ankara. Başka bir konuda yardımcı olabilir miyim?',
+            userMessage: 'SBF kampüsü nerede?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Yerleşke Konumları',
+                    content: 'Sağlık Bilimleri Fakültesi adresi: Oğuzlar Mahallesi, 1375. Sk. No: 8, Çankaya / Ankara.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Oğuzlar Mahallesi, 1375. Sk. No: 8, Çankaya / Ankara.')
+    })
+
+    it('removes broader generic closing variants from grounded RAG answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca. Daha fazla bilgiye ihtiyacın olursa sormaktan çekinme!',
+            userMessage: 'Sağlık Bilimleri Fakültesi adresini açık yazar mısın?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Yerleşke Konumları',
+                    content: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
+    })
+
+    it('keeps role-neutral topic-related engagement questions that ask about adjacent grounded details', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıp Fakültesi müfredatında yer alan seçmeli derslerden Dönem VI sonuna kadar başarılı olunmalıdır. Bu konuyla ilgili final ve bütünleme şartlarını da öğrenmek ister misin?',
+            userMessage: 'Tıp Fakültesinde seçmeli dersleri ne zamana kadar geçmem gerekiyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Seçmeli derslerden Dönem VI sonuna kadar başarılı olmalıdır. Final ve bütünleme şartları aynı yönergede düzenlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıp Fakültesi müfredatında yer alan seçmeli derslerden Dönem VI sonuna kadar başarılı olunmalıdır. Bu konuyla ilgili final ve bütünleme şartlarını da öğrenmek ister misin?')
+    })
+
+    it('keeps role-neutral engagement offers about related topic details', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır. Bu konuyla ilgili gerekli belgeler ve kurul onayı süreci hakkında da bilgi verebilirim.',
+            userMessage: 'Sağlık raporu vermeden mazeret sınavına giremez miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Mazeret Sınavı Yönergesi',
+                    content: 'Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır. Gerekli belgeler ve kurul onayı süreci aynı yönergede yer alır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır. Bu konuyla ilgili gerekli belgeler ve kurul onayı süreci hakkında da bilgi verebilirim.')
+    })
+
+    it('removes generic personal-help closing variants from grounded RAG answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '"TLT", Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır. Daha fazla bilgi istersen, sana yardımcı olabilirim!',
+            userMessage: 'TLT hangi programın kısaltması olabilir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri',
+                    content: 'TLT, Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('"TLT", Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır.')
+    })
+
+    it('removes generic polite-help closing variants from grounded RAG answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıp Fakültesi seçmeli derslerinden Dönem VI sonuna kadar başarılı olmalısın. Başka bir sorunuz varsa yardımcı olmaktan memnuniyet duyarım!',
+            userMessage: 'Tıp Fakültesinde seçmeli dersleri ne zamana kadar geçmem gerekiyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Tıp Fakültesi seçmeli derslerinden Dönem VI sonuna kadar başarılı olmalısın.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıp Fakültesi seçmeli derslerinden Dönem VI sonuna kadar başarılı olmalısın.')
+    })
+
+    it('removes generic please-specify closings while preserving the grounded answer', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders notlarına MEDU platformu üzerinden ulaşabilirsin. Eğer daha fazla bilgiye ihtiyacın varsa, lütfen belirt!',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanımı',
+                    content: 'Ders notlarına MEDU platformu üzerinden ulaşabilirsin.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarına MEDU platformu üzerinden ulaşabilirsin.')
+    })
+
+    it('removes generic need-more-information question closings', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca. Daha fazla bilgiye ihtiyacın var mı?',
+            userMessage: 'Sağlık Bilimleri Fakültesi adresini açık yazar mısın?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Yerleşke Konumları',
+                    content: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
+    })
+
+    it('removes generic need-anything-else closings', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir. Başka bir bilgiye ihtiyacın var mı?',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri hangi yerleşkede?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Program Yerleşkeleri',
+                    content: 'Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir.')
+    })
+
+    it('removes generic more-detail question closings', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ve final/bütünleme notunun %40’ı ile hesaplanır. Daha fazla detay ister misin?',
+            userMessage: 'Tıp fakültesinde sınıf geçme notu nasıl hesaplanıyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ve final/bütünleme notunun %40’ı ile hesaplanır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ve final/bütünleme notunun %40’ı ile hesaplanır.')
+    })
+
+    it('removes generic more-information question closings without stripping topic-specific offers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir. Başka bir bilgi ister misin?',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri hangi yerleşkede?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Program Yerleşkeleri',
+                    content: 'Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir.')
+    })
+
+    it('removes role-assumptive education-status clarification tails from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders notlarına MEDU platformu üzerinden ulaşabilirsin. Daha fazla bilgiye ihtiyacın olursa, hangi bölümde eğitim aldığını belirtirsen yardımcı olabilirim!',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanımı',
+                    content: 'Ders notlarına MEDU platformu üzerinden ulaşılabilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarına MEDU platformu üzerinden ulaşabilirsin.')
+    })
+
+    it('removes role-assumptive department-status clarification tails from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır. Daha fazla bilgi isterseniz, hangi bölümde olduğunuzu öğrenebilir miyim?',
+            userMessage: 'Tıp fakültesinde kurul sınavına hasta olduğum için giremedim. Başka sınav hakkım var mı?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Mazeret Sınavı Yönergesi',
+                    content: 'Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır.')
+    })
+
+    it('removes role-assumptive education-intent prompts from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli derslerin sayısı Yüksekokul Kurulu tarafından belirlenir. Detaylı bilgi almak istersen, hangi bölümde eğitim almak istediğini söyleyebilirsin.',
+            userMessage: 'SHMYO seçmeli ders sayısı nasıl belirleniyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli derslerin sayısı Yüksekokul Kurulu tarafından belirlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli derslerin sayısı Yüksekokul Kurulu tarafından belirlenir.')
+    })
+
+    it('removes role-assumptive education-status question tails from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders notlarına MEDU platformu üzerinden ulaşabilirsin. Daha fazla bilgiye ihtiyaç duyarsan, hangi bölümde eğitim aldığını belirtebilir misin?',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanımı',
+                    content: 'Ders notlarına MEDU platformu üzerinden ulaşılabilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarına MEDU platformu üzerinden ulaşabilirsin.')
+    })
+
+    it('removes generic helper closings that ask about another topic', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'TLT 216 Yaz Stajı 20 iş günü sürmektedir. Daha fazla bilgi istersen, başka bir konu hakkında yardımcı olabilir miyim?',
+            userMessage: 'TLT yaz stajı kaç iş günü?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Staj',
+                    content: 'TLT 216 Yaz Stajı 20 iş günü sürmektedir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('TLT 216 Yaz Stajı 20 iş günü sürmektedir.')
+    })
+
+    it('removes generic helper closings about unspecified program details', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '"TLT", Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır. Daha fazla bilgi istersen, programın detayları hakkında yardımcı olabilirim!',
+            userMessage: 'TLT hangi programın kısaltması?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri',
+                    content: 'TLT, Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('"TLT", Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır.')
+    })
+
+    it('removes generic share-more closings about unspecified program details', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '"TLT", Tıbbi Laboratuvar Teknikleri Programı’nın kısaltmasıdır. Daha fazla bilgi istersen, programın detaylarını paylaşabilirim!',
+            userMessage: 'TLT hangi programın kısaltması?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri',
+                    content: 'TLT, Tıbbi Laboratuvar Teknikleri programının kısaltmasıdır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('"TLT", Tıbbi Laboratuvar Teknikleri Programı’nın kısaltmasıdır.')
+    })
+
+    it('removes generic help-needed contact deferrals from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders materyallerine MEDU platformunda ilgili ders sayfasından erişilebilir. Eğer daha fazla yardıma ihtiyacınız olursa, öğrenci işleriyle iletişime geçebilirsiniz. İletişim bilgileri için buraya bakabilirsiniz: https://example.edu.tr/ogrenci-isleri',
+            userMessage: 'MEDU ders materyallerine nereden ulaşırım?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanımı',
+                    content: 'Ders materyallerine MEDU platformunda ilgili ders sayfasından erişilebilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders materyallerine MEDU platformunda ilgili ders sayfasından erişilebilir.')
+    })
+
+    it('removes generic role-assumptive contact deferrals after grounded elective answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir. Bu nedenle, hangi programda olduğuna bağlı olarak alman gereken seçmeli ders sayısını öğrenmek için ilgili bölümle iletişime geçmeni öneririm. Hangi bölümle ilgilendiğini belirtirsen, daha fazla yardımcı olabilirim!',
+            userMessage: 'SHMYO seçmeli ders sayısı nasıl belirleniyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir.')
+    })
+
+    it('removes role-assumptive program-dependent deferrals after grounded elective answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir. Bu nedenle, hangi programda olduğuna bağlı olarak değişebilir. Hangi bölümle ilgilendiğini belirtirsen, daha fazla bilgi verebilirim.',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir.')
+    })
+
+    it('removes generic more-information navigation tails that assume the user owns the course', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders notlarına MEDU platformu üzerinden ulaşılabilir. Daha fazla bilgi istersen, platforma giriş yaparak derslerinle ilgili içeriklere ulaşabilirsin.',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanımı',
+                    content: 'Ders notlarına MEDU platformu üzerinden ulaşılabilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarına MEDU platformu üzerinden ulaşılabilir.')
+    })
+
+    it('removes generic academic-advisor deferral tails from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir. Bu konuda kesin bilgi almak için ilgili bölümünüzün akademik danışmanıyla görüşmenizi öneririm.',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir.')
+    })
+
+    it('removes a generic contact deferral once a trailing assistant closing is stripped', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık raporu Fakülte Yönetim Kurulu tarafından kabul edilirse mazeret sınavı açılır. Daha fazla bilgi isterseniz, ilgili birimle iletişime geçebilirsiniz. Yardımcı olmamı istediğiniz başka bir konu var mı?',
+            userMessage: 'Sağlık raporu vermeden mazeret sınavına giremez miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Sağlık raporu Fakülte Yönetim Kurulu tarafından kabul edilirse mazeret sınavı açılır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık raporu Fakülte Yönetim Kurulu tarafından kabul edilirse mazeret sınavı açılır.')
+    })
+
+    it('removes generic link-preface tails from grounded factual answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'TLT 216 Yaz Stajı 20 iş günü sürmektedir. Daha fazla bilgi için buraya göz atabilirsin: https://example.edu.tr/tlt-staj.pdf',
+            userMessage: 'TLT yaz stajı kaç iş günü?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Staj',
+                    content: 'TLT 216 Yaz Stajı 20 iş günü sürmektedir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('TLT 216 Yaz Stajı 20 iş günü sürmektedir.')
+    })
+
+    it('removes generic need-more-information link-preface tails from grounded factual answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca. Daha fazla bilgiye ihtiyacın olursa buradan ulaşabilirsin: https://example.edu.tr/yerleske',
+            userMessage: 'Sağlık Bilimleri Fakültesi adresini açık yazar mısın?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Yerleşke Konumları',
+                    content: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
+    })
+
     it('repairs link-only purpose answers from the retrieved regulation article', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Daha fazla bilgi için buraya göz atabilirsin: https://example.edu.tr/etik.pdf',
@@ -57,6 +489,24 @@ describe('repairLinkOnlyRagAnswer', () => {
 
         expect(repaired).toContain('mal ve hizmet')
         expect(repaired).toContain('usul ve esasları')
+    })
+
+    it('repairs link-only eligibility answers from retrieved denial evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Erasmus programı ile ilgili detaylar için uluslararası öğrenci koordinatörlüğü ile iletişime geçmeni öneririm. Daha fazla bilgi için: https://example.edu.tr/uluslararasi-ogrenci-koordinatorlugu',
+            userMessage: 'Hazırlık öğrencisi erasmustan yararlanır mı',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Erasmus + Yönergesi',
+                    content: 'Page Title: Erasmus + Yönergesi\nSource URL: https://example.edu.tr/erasmus-yonergesi.pdf\n\nErasmus+ Programı kapsamında hazırlık sınıfı öğrencileri programdan yararlanamaz.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Erasmus+ Programı kapsamında hazırlık sınıfı öğrencileri programdan yararlanamaz.')
+        expect(repaired).not.toContain('iletişime geç')
+        expect(repaired).not.toContain('https://')
     })
 
     it('repairs link-only scope answers from the retrieved regulation article', () => {
@@ -224,6 +674,66 @@ describe('repairLinkOnlyRagAnswer', () => {
         })
 
         expect(repaired).toBe('Mazeret sınavı başvurusu, sınav tarihinden itibaren en geç 5 (beş) iş günü içinde yapılır.')
+    })
+
+    it('repairs policy duration answers from matching list items when the model selected nearby unrelated policy text', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır ve görevlendirmede geçen süreler fiilen kendi mesleklerinde geçirilmiş olarak kabul edilir.',
+            userMessage: '15 yıl çalışan personelin yıllık izin hakkı kaç gün?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: [
+                        'Page Title: İzin Kullanımı Yönergesi',
+                        'Source URL: https://example.edu.tr/izin.pdf',
+                        'Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri aşağıda belirtilmiştir.',
+                        'Hizmet süresi;',
+                        '• 1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü.',
+                        '• 5 yıldan fazla 15 yıldan az olanlara 20 iş günü.',
+                        '• 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toBe('15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.')
+    })
+
+    it('repairs threshold duration answers when the response repeats the threshold but misses the answer duration', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '15 yıl ve daha fazla çalışan personel yıllık ücretli izin kapsamında değerlendirilir.',
+            userMessage: '15 yıl çalışan personelin yıllık izin hakkı kaç gün?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Yıllık Ücretli İzin Süreleri\n- 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.')
+    })
+
+    it('does not replace an already correct duration answer with a later unrelated duration sentence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '15 yıl (dahil) ve daha fazla çalışan personelin yıllık izin hakkı 26 iş günüdür. Başka bir konuda yardımcı olabilir miyim?',
+            userMessage: '15 yıl çalışan personelin yıllık izin hakkı kaç gün?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Yıllık Ücretli İzin Süreleri\n- 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                },
+                {
+                    document_title: 'Yükseköğretim Kanunu',
+                    content: 'Üyelerin görev süresi üç yıldır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('15 yıl (dahil) ve daha fazla çalışan personelin yıllık izin hakkı 26 iş günüdür.')
     })
 
     it('repairs medicine elective-course answers from the Dönem VI completion rule', () => {
@@ -469,6 +979,31 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('E-posta: tlt@yiu.edu.tr')
         expect(repaired).toContain('Telefon: +90 312 329 10 10')
         expect(repaired).not.toContain('kutuphane@yuksekihtisas.edu.tr')
+    })
+
+    it('chooses the requested unit email instead of an unrelated staff email', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'İlgili program iletişim bilgisi: E-posta: busraaydos@yiu.edu.tr. https://example.edu.tr/kutuphane',
+            userMessage: 'Kütüphane maili neydi',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İletişim',
+                    content: [
+                        'Sürekli Eğitim Merkezi Telefon: (+90 312) 329 1010 E-posta: sem@yiu.edu.tr',
+                        'Kütüphane ve Dokümantasyon Daire Başkanlığı',
+                        '(+90 312) 329 1010 (+90 312) 286 3608',
+                        '115',
+                        'kutuphane@yuksekihtisas.edu.tr'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Kütüphane ve Dokümantasyon Daire Başkanlığı')
+        expect(repaired).toContain('E-posta: kutuphane@yuksekihtisas.edu.tr')
+        expect(repaired).not.toContain('busraaydos@yiu.edu.tr')
+        expect(repaired).not.toContain('sem@yiu.edu.tr')
     })
 
     it('repairs TLT double-major answers that omit the paired Eczane Hizmetleri program', () => {
@@ -1093,6 +1628,24 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Evet, sağlık mazereti nedeniyle kurul sınavına giremeyen öğrenciler için mazeret sınavı düzenlenir. Ancak sağlık raporunuzun Fakülte Yönetim Kurulu tarafından kabul edilmesi gerekmektedir.')
     })
 
+    it('removes generic deferral tails when a factual policy answer is already present', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli derslerin hangi derslerden oluşacağı, yarıyıllara dağılımı ve öğrenci tarafından alınması gereken seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir. Daha fazla bilgi almak istersen, ilgili birimle iletişime geçmeni öneririm. https://example.edu.tr/secmeli-ders.pdf',
+            userMessage: 'mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Seçmeli derslerin hangi derslerden oluşacağı, yarıyıllara dağılımı ve öğrenci tarafından alınması gereken seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli derslerin hangi derslerden oluşacağı, yarıyıllara dağılımı ve öğrenci tarafından alınması gereken seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir.')
+        expect(repaired).not.toContain('iletişime geç')
+        expect(repaired).not.toContain('https://')
+    })
+
     it('removes unsolicited inline email sentences from non-contact answers', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Evet, Tıbbi Laboratuvar Teknikleri Programı öğrencileri Eczane Hizmetleri Programında çift anadal yapabilir. İlgili e-posta adresi: esmasariuzek@yiu.edu.tr. Başka bir sorunuz var mı?',
@@ -1101,7 +1654,7 @@ describe('repairLinkOnlyRagAnswer', () => {
             chunks: []
         })
 
-        expect(repaired).toBe('Evet, Tıbbi Laboratuvar Teknikleri Programı öğrencileri Eczane Hizmetleri Programında çift anadal yapabilir. Başka bir sorunuz var mı?')
+        expect(repaired).toBe('Evet, Tıbbi Laboratuvar Teknikleri Programı öğrencileri Eczane Hizmetleri Programında çift anadal yapabilir.')
     })
 
     it('cleans leading punctuation left after stripping contradictory openings', () => {

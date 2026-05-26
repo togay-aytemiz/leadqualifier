@@ -37,6 +37,8 @@ export function estimateTokenCount(text) {
 function normalizeWhitespace(text) {
     return String(text ?? '')
         .replace(/\r\n/g, '\n')
+        .replace(/(https?:\/\/[^\s]+)\s+\.(?=[a-z]{2,}\b)/gi, '$1.')
+        .replace(/(https?:\/\/[^\s]+)\.\s+(?=[a-z]{2,}\/?)/gi, '$1.')
         .replace(/\n{3,}/g, '\n\n')
         .trim()
 }

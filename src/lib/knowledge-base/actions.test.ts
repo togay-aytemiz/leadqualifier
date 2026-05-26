@@ -11,7 +11,8 @@ const {
     formatEmbeddingForPgvectorMock,
     appendServiceCatalogCandidatesMock,
     appendOfferingProfileSuggestionMock,
-    appendRequiredIntakeFieldsMock
+    appendRequiredIntakeFieldsMock,
+    planKnowledgeSearchQueryMock
 } = vi.hoisted(() => ({
     createClientMock: vi.fn(),
     revalidatePathMock: vi.fn(),
@@ -23,7 +24,8 @@ const {
     formatEmbeddingForPgvectorMock: vi.fn(() => '[0.1,0.2,0.3]'),
     appendServiceCatalogCandidatesMock: vi.fn(async () => {}),
     appendOfferingProfileSuggestionMock: vi.fn(async () => {}),
-    appendRequiredIntakeFieldsMock: vi.fn(async () => {})
+    appendRequiredIntakeFieldsMock: vi.fn(async () => {}),
+    planKnowledgeSearchQueryMock: vi.fn()
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -53,6 +55,10 @@ vi.mock('@/lib/leads/offering-profile', () => ({
     appendServiceCatalogCandidates: appendServiceCatalogCandidatesMock,
     appendOfferingProfileSuggestion: appendOfferingProfileSuggestionMock,
     appendRequiredIntakeFields: appendRequiredIntakeFieldsMock
+}))
+
+vi.mock('@/lib/knowledge-base/query-planner', () => ({
+    planKnowledgeSearchQuery: planKnowledgeSearchQueryMock
 }))
 
 import {
@@ -449,6 +455,7 @@ function createHybridSearchSupabase(options?: {
         content: string
         similarity: number
     }>
+    rpcError?: Error
     fallbackRows?: Array<{
         id: string
         document_id: string
@@ -528,7 +535,7 @@ function createHybridSearchSupabase(options?: {
                 similarity: 0.55
             }
         ],
-        error: null
+        error: options?.rpcError ?? null
     }))
 
     const fallbackRows = options?.fallbackRows ?? [
@@ -940,6 +947,13 @@ describe('generateKnowledgeBaseDraft', () => {
 describe('searchKnowledgeBase', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        planKnowledgeSearchQueryMock.mockImplementation(async (query: string) => ({
+            enabled: false,
+            model: 'gpt-4o-mini',
+            reason: 'disabled',
+            searchQueries: [query],
+            mustHaveTerms: []
+        }))
     })
 
     it('merges vector and keyword matches so title or URL-specific pages are not hidden by broad semantic results', async () => {
@@ -966,6 +980,167 @@ describe('searchKnowledgeBase', () => {
             document_id: 'doc-kw-1'
         })
         expect(results.map((result) => result.chunk_id)).toEqual(['kw-1', 'vec-1', 'vec-2'])
+    })
+
+    it('logs vector timeout errors as recoverable warnings while continuing with lexical evidence', async () => {
+        const timeoutError = new Error('The operation was aborted due to timeout')
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            rpcError: timeoutError
+        })
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        try {
+            const results = await searchKnowledgeBase(
+                'Tıp Fakültesi kurulları kimlerden oluşuyor?',
+                'org-1',
+                0.5,
+                3,
+                { supabase }
+            )
+
+            expect(results[0]).toMatchObject({
+                chunk_id: 'kw-1',
+                document_id: 'doc-kw-1'
+            })
+            expect(warnSpy).toHaveBeenCalledWith(
+                'Knowledge vector search timed out; continuing with lexical evidence:',
+                timeoutError
+            )
+            expect(errorSpy).not.toHaveBeenCalledWith('RAG Search failed:', timeoutError)
+        } finally {
+            errorSpy.mockRestore()
+            warnSpy.mockRestore()
+        }
+    })
+
+    it('keeps high-signal query terms even when a conversational prefix comes first', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: []
+        })
+
+        await searchKnowledgeBase(
+            'Merhaba arkadaşlar bugün hızlıca şunu soracağım: Tıbbi Laboratuvar Teknikleri iletişim eposta telefon',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        const filters = orMock.mock.calls
+            .map((call) => String(call[0] ?? ''))
+            .join('\n')
+            .toLocaleLowerCase('tr-TR')
+
+        expect(filters).toMatch(/content\.ilike\.%laboratuvar%/)
+        expect(filters).toMatch(/content\.ilike\.%teknik/)
+        expect(filters).toMatch(/content\.ilike\.%iletisim%/)
+    })
+
+    it('uses query planner variants to retrieve evidence without hardcoded customer phrases', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'laboratuvar',
+                rows: [{
+                    id: 'planner-kw-1',
+                    document_id: 'doc-planner-1',
+                    content: 'Document Title: Tıbbi Laboratuvar Teknikleri\n\nProgram sorumlusu ve staj bilgileri.',
+                    knowledge_documents: {
+                        title: 'Tıbbi Laboratuvar Teknikleri',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }]
+        })
+        const plannerUsage = vi.fn()
+
+        planKnowledgeSearchQueryMock.mockResolvedValueOnce({
+            enabled: true,
+            model: 'gpt-4o-mini',
+            reason: 'planned',
+            searchQueries: [
+                'Bu programda staj var mı?',
+                'Tıbbi Laboratuvar Teknikleri yaz stajı'
+            ],
+            mustHaveTerms: ['staj', 'Tıbbi Laboratuvar Teknikleri'],
+            usage: {
+                inputTokens: 30,
+                outputTokens: 8,
+                totalTokens: 38
+            }
+        })
+
+        const results = await searchKnowledgeBase(
+            'Bu programda staj var mı?',
+            'org-1',
+            0.5,
+            3,
+            { supabase, queryPlannerUsage: plannerUsage }
+        )
+
+        const filters = orMock.mock.calls
+            .map((call) => String(call[0] ?? ''))
+            .join('\n')
+            .toLocaleLowerCase('tr-TR')
+
+        expect(planKnowledgeSearchQueryMock).toHaveBeenCalledWith('Bu programda staj var mı?', [], expect.any(Object))
+        expect(filters).toContain('laboratuvar')
+        expect(results[0]).toMatchObject({
+            chunk_id: 'planner-kw-1',
+            document_id: 'doc-planner-1'
+        })
+        expect(plannerUsage).toHaveBeenCalledWith(expect.objectContaining({
+            model: 'gpt-4o-mini',
+            usage: {
+                inputTokens: 30,
+                outputTokens: 8,
+                totalTokens: 38
+            }
+        }))
+    })
+
+    it('falls back to original-query retrieval when query planning fails', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [{
+                id: 'original-kw-1',
+                document_id: 'doc-original-1',
+                content: 'Document Title: Final policy\n\nFinale girmeyen öğrenciler bütünleme sınavına girebilir.',
+                knowledge_documents: {
+                    title: 'Final policy',
+                    type: 'pdf',
+                    status: 'ready'
+                }
+            }]
+        })
+
+        planKnowledgeSearchQueryMock.mockResolvedValueOnce({
+            enabled: true,
+            model: 'gpt-4o-mini',
+            reason: 'planner_error',
+            searchQueries: ['Finale girmeden bütünlemeye girebilir miyim?'],
+            mustHaveTerms: [],
+            usage: {
+                inputTokens: 20,
+                outputTokens: 2,
+                totalTokens: 22
+            }
+        })
+
+        const results = await searchKnowledgeBase(
+            'Finale girmeden bütünlemeye girebilir miyim?',
+            'org-1',
+            0.5,
+            3,
+            { supabase }
+        )
+
+        expect(results.map((result) => result.chunk_id)).toContain('original-kw-1')
     })
 
     it('starts independent lexical fallbacks before the first fallback query resolves', async () => {
@@ -1921,7 +2096,7 @@ describe('searchKnowledgeBase', () => {
             ],
             fallbackRows: [],
             fallbackRowsByFilter: [{
-                includes: '5 yıldan fazla 15 yıldan az',
+                includes: '20 iş günü',
                 rows: [{
                     id: 'annual-paid-leave-five-plus-1',
                     document_id: 'doc-leave-policy-2',
@@ -1947,6 +2122,49 @@ describe('searchKnowledgeBase', () => {
         expect(results[0]).toMatchObject({
             chunk_id: 'annual-paid-leave-five-plus-1',
             document_id: 'doc-leave-policy-2'
+        })
+    })
+
+    it('prefers the annual paid leave bracket when the user asks about fifteen years of service', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'staff-assignment-noise-1',
+                    document_id: 'doc-staff-assignment-noise-1',
+                    document_title: 'Personel Görevlendirme',
+                    document_type: 'pdf',
+                    content: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır ve görevlendirmede geçen süreler fiilen kendi mesleklerinde geçirilmiş olarak kabul edilir.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: '26 iş günü',
+                rows: [{
+                    id: 'annual-paid-leave-fifteen-plus-1',
+                    document_id: 'doc-leave-policy-3',
+                    content: 'Page Title: İzin Kullanımı Yönergesi\nSource URL: https://example.edu.tr/izin-kullanimi-yonergesi.pdf\n\nYıllık Ücretli İzin Süreleri Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri; 1 yıldan 5 yıla kadar olanlar için 14 iş günü, 5 yıldan fazla 15 yıldan az olanlar için 20 iş günü, 15 yıl ve daha fazla olanlar için 26 iş günüdür.',
+                    knowledge_documents: {
+                        title: 'İzin Kullanımı Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            '15 yıl çalışan personelin yıllık izin hakkı kaç gün?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'annual-paid-leave-fifteen-plus-1',
+            document_id: 'doc-leave-policy-3'
         })
     })
 
@@ -3011,7 +3229,7 @@ describe('searchKnowledgeBase', () => {
         expect(context).toContain('yarıyıl sonu sınavına girmeyen öğrencilere uygulanır')
     })
 
-    it('runs a focused medical-school training search for medicine internship questions', async () => {
+    it('runs a focused medical-school training search for medicine clinical internship questions', async () => {
         const { supabase } = createHybridSearchSupabase({
             rpcRows: [
                 {
@@ -3041,7 +3259,7 @@ describe('searchKnowledgeBase', () => {
         })
 
         const results = await searchKnowledgeBase(
-            'Tıp fakültesinde yaz stajı var mı?',
+            'Tıp fakültesinde klinik stajlar hangi dönemlerde?',
             'org-1',
             0.6,
             6,
@@ -3055,6 +3273,48 @@ describe('searchKnowledgeBase', () => {
         })
         expect(context).toContain('Dönem IV ve V’te stajlardan')
         expect(context).toContain('Dönem VI’da İntörnlük Stajlarından')
+    })
+
+    it('does not answer a focused academic-unit internship query from another program with incidental wording', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'shmyo-tlt-summer-internship-noise-1',
+                    document_id: 'doc-shmyo-tlt-info-1',
+                    document_title: 'Sağlık Hizmetleri Meslek Yüksekokulu Bilgi Paketi',
+                    document_type: 'article',
+                    content: 'Page Title: Sağlık Hizmetleri Meslek Yüksekokulu\nSource URL: https://example.edu.tr/saglik-hizmetleri-meslek-yuksekokulu\n\nTıbbi Laboratuvar Teknikleri Programı öğrencileri Tıp Fakültesi Hastaneleri ve özel hastanelerde klinik uygulama alır. Birinci yıl sonunda zorunlu yaz stajı bulunmaktadır.',
+                    similarity: 0.99
+                },
+                {
+                    chunk_id: 'medicine-training-staj-focused-1',
+                    document_id: 'doc-medicine-training-policy-1',
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    document_type: 'pdf',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-fakultesi-egitim-ogretim-ve-sinav-yonergesi.pdf\n\nTıp eğitim- öğretimi; Dönem I, II ve III’te temel olarak ders kurullarından, Dönem IV ve V’te stajlardan oluşan Klinik Tıp Bilimleri eğitim-öğretimi ve Dönem VI’da İntörnlük Stajlarından oluşan İntörnlük eğitim- öğretimi esasına göre yapılır.',
+                    similarity: 0.72
+                }
+            ],
+            fallbackRows: [],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tıp fakültesinde yaz stajı var mı?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+        const { context } = buildRagContext(results)
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-training-staj-focused-1',
+            document_id: 'doc-medicine-training-policy-1'
+        })
+        expect(context).toContain('Dönem IV ve V’te stajlardan')
+        expect(context).not.toContain('Tıbbi Laboratuvar Teknikleri Programı öğrencileri')
+        expect(context).not.toContain('zorunlu yaz stajı bulunmaktadır')
     })
 
     it('runs a focused learning-platform search when the user asks where lecture notes are shared', async () => {
@@ -3721,6 +3981,104 @@ describe('searchKnowledgeBase', () => {
         expect(results[0]).toMatchObject({
             chunk_id: 'erasmus-directive-1',
             document_id: 'doc-erasmus-directive-1'
+        })
+    })
+
+    it('uses eligibility evidence instead of a coordinator page for informal Erasmus preparation questions', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'erasmus-coordinator-page-1',
+                    document_id: 'doc-erasmus-coordinator-page-1',
+                    document_title: 'Uluslararası Öğrenci Koordinatörlüğü',
+                    document_type: 'article',
+                    content: 'Page Title: Uluslararası Öğrenci Koordinatörlüğü\nSource URL: https://example.edu.tr/sayfa/kurumsal/idari-birimler/koordinatorlukler/uluslararasi-ogrenci-koordinatorlugu\n\nErasmus programı hakkında bilgi almak için uluslararası öğrenci koordinatörlüğü ile iletişime geçebilirsiniz.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'hazırlık sınıfı öğrencileri',
+                rows: [
+                    {
+                        id: 'erasmus-directive-informal-1',
+                        document_id: 'doc-erasmus-directive-informal-1',
+                        content: 'Page Title: Erasmus + Yönergesi\nSource URL: https://example.edu.tr/erasmus-yonergesi.pdf\n\nErasmus+ Programı kapsamında hazırlık sınıfı öğrencileri programdan yararlanamaz.',
+                        knowledge_documents: {
+                            title: 'Erasmus + Yönergesi',
+                            type: 'pdf',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Hazırlık öğrencisi erasmustan yararlanır mı',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'erasmus-directive-informal-1',
+            document_id: 'doc-erasmus-directive-informal-1'
+        })
+    })
+
+    it('uses root contact evidence for unit email questions instead of unrelated staff emails', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'library-staff-page-1',
+                    document_id: 'doc-library-staff-page-1',
+                    document_title: 'Kütüphane Hizmetleri Raporu',
+                    document_type: 'article',
+                    content: 'Page Title: Kütüphane Hizmetleri Raporu\nSource URL: https://example.edu.tr/sayfa/kurumsal/idari-birimler/daire-baskanliklari/kutuphane-ve-dokumantasyon-daire-baskanligi\n\nİlgili program iletişim bilgisi: E-posta: busraaydos@yiu.edu.tr.',
+                    similarity: 0.99
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'kutuphane@yuksekihtisas.edu.tr',
+                rows: [
+                    {
+                        id: 'root-contact-library-1',
+                        document_id: 'doc-root-contact-library-1',
+                        content: [
+                            'Page Title: İletişim',
+                            'Source URL: https://example.edu.tr/iletisim',
+                            '',
+                            'Kütüphane ve Dokümantasyon Daire Başkanlığı',
+                            '(+90 312) 329 1010 (+90 312) 286 3608',
+                            '115',
+                            'kutuphane@yuksekihtisas.edu.tr'
+                        ].join('\n'),
+                        knowledge_documents: {
+                            title: 'İletişim',
+                            type: 'article',
+                            status: 'ready'
+                        }
+                    }
+                ]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Kütüphane maili neydi',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'root-contact-library-1',
+            document_id: 'doc-root-contact-library-1'
         })
     })
 

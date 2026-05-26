@@ -67,6 +67,37 @@ function stripGenericAssistantContinuation(value: string) {
         .trim()
 }
 
+const GENERIC_ASSISTANT_CLOSING_TAIL_PATTERNS = [
+    /\s*(?:Başka bir konuda yardımcı olabilir miyim|Başka bir sorunuz var mı|Başka bir bilgi ister misin(?:iz)?|Başka bir bilgiye ihtiyac(?:ın|ınız) var mı|Yardımcı olabileceğim başka bir konu var mı|Yardımcı olmamı istediğiniz başka bir konu var mı|İstersen(?:iz)? başka bir konuda yardımcı olayım mı|Başka bir sorunuz(?: olursa| varsa)?\s+(?:yardımcı olabilir miyim|yardımcı olmaktan memnuniyet duyarım))\??[.!?]?\s*$/iu,
+    /\s*(?:Eğer\s+)?(?:Daha fazla|Detaylı)\s+(?:bilgi|detay|yardım)(?: almak)?\s+istersen(?:iz)?[\s,]+[\s\S]{0,180}?\b(?:yardımcı olabilir(?:im|iz| miyim)|paylaşabilir(?:im|iz))\??[.!?]?\s*$/iu,
+    /\s*(?:Bu nedenle|Bu yüzden|Bunun için),?\s*$/iu,
+    /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*$/iu,
+    /\s*(?:Eğer\s+)?(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?|Daha fazla bilgiye ihtiya[çc](?:ın|ınız) (?:olursa|varsa)|Detaylı bilgi(?: almak)? istersen(?:iz)?),?\s*(?:(?:sana|size)\s+)?(?:yardımcı olabilir(?:im|iz)|yardımcı olurum|belirtebilir(?:sin|siniz)|lütfen belirt(?:in)?|sormaktan çekinme(?:yin)?|buradayım|memnuniyetle yardımcı olurum)[.!?]?\s*$/iu,
+    /\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız) var mı|Daha fazla bilgi(?: almak)? ister misin(?:iz)?|Daha fazla detay ister misin(?:iz)?|Detaylı bilgi(?: almak)? ister misin(?:iz)?)\??[.!?]?\s*$/iu,
+    /\s*Hangi\s+(?:bölüm|program)[\s\S]{0,140}?(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)[\s\S]{0,120}?(?:yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz))[.!?]?\s*$/iu,
+    /\s*(?:Bu konuda\s+)?(?:daha (?:net|fazla) bilgi(?:ye ihtiya[çc](?:ın|ınız) olursa| almak istersen(?:iz)?)?,?\s*)?hangi\s+[\s\S]{0,120}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)\s+[\s\S]{0,120}?(?:yardımcı olabilir(?:im|iz)|yardımcı olurum|bakabilir(?:im|iz))[.!?]?\s*$/iu,
+    /\s*(?:Eğer\s+)?(?:Daha fazla\s+)?(?:bilgiye|yardıma)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*hangi\s+[\s\S]{0,140}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
+    /\s*(?:Daha fazla|Detaylı)\s+bilgi(?: almak)?\s+istersen(?:iz)?[\s,]+hangi\s+bölümde\s+eğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
+    /\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?,?\s*)?hangi\s+bölümde\s+(?:olduğunu|olduğunuzu|okuduğunu|okuduğunuzu)\s+(?:öğrenebilir miyim|belirtirsen(?:iz)?\s+yardımcı olabilir(?:im|iz)?|söylersen(?:iz)?\s+yardımcı olabilir(?:im|iz)?)[.!?]?\s*$/iu,
+    /\s*(?:For more information|If you need more information),?\s*(?:I can help|feel free to ask|I am here to help)[.!?]?\s*$/iu,
+    /\s*(?:Do you need more information|Would you like more information)\??[.!?]?\s*$/iu,
+    /\s*(?:Can I help with anything else|Is there anything else I can help with)\??[.!?]?\s*$/iu
+]
+
+function stripGenericAssistantClosingTail(response: string) {
+    let stripped = response.trim()
+
+    for (const pattern of GENERIC_ASSISTANT_CLOSING_TAIL_PATTERNS) {
+        stripped = stripped.replace(pattern, '').trim()
+    }
+
+    if (!stripped || stripped === response.trim()) return response
+    return stripped
+        .replace(/\s+([,.;!?])/g, '$1')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
 function requestedArticleNumber(userMessage: string) {
     const normalized = normalizeSearch(userMessage)
     if (isAbbreviationExpansionQuestion(normalized)) return null
@@ -298,10 +329,33 @@ function stripUnrequestedContactDetails(response: string, userMessage: string) {
     return stripped.length >= 40 ? stripped : response
 }
 
+function stripGenericDeferralTail(response: string, userMessage: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    if (asksForContactInfo(normalizedUserMessage)) return response
+
+    const stripped = response
+        .replace(/\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?|Daha fazla bilgiye ihtiya[çc](?:ın|ınız) (?:olursa|varsa)|Detaylı bilgi(?: almak)? istersen(?:iz)?|Bu konuda detaylı bilgi(?: almak)? istersen(?:iz)?)[\s\S]{0,280}?(?:iletişime geç(?:meni|menizi|ebilir(?:sin|siniz)?|in|iniz)?(?:i|izi)? öneririm|iletişime geç(?:ebilir(?:sin|siniz)?|in|iniz)|başvur(?:abilir|abilirsiniz)|danış(?:abilir|abilirsiniz))\.?\s*(?:https?:\/\/\S+)?\s*$/iu, '')
+        .replace(/\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?|Daha fazla bilgiye ihtiya[çc](?:ın|ınız) (?:olursa|varsa)|Detaylı bilgi(?: almak)? istersen(?:iz)?|Bu konuda detaylı bilgi(?: almak)? istersen(?:iz)?)[\s\S]{0,220}?(?:ulaşabilir(?:sin|siniz)|görebilir(?:sin|siniz)|inceleyebilir(?:sin|siniz))\.?\s*$/iu, '')
+        .replace(/\s*(?:Bu nedenle|Bu yüzden|Bunun için),?\s*hangi\s+(?:program|bölüm)[\s\S]{0,180}?(?:olduğuna|olduğunuza|ilgili olduğuna|ilgili olduğunuza)[\s\S]{0,120}?(?:değişebilir|farklılık gösterebilir)\.?\s*(?:Hangi\s+(?:bölüm|program)[\s\S]{0,140}?(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)[\s\S]{0,100}?(?:yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz))[.!?]?)?\s*$/iu, '')
+        .replace(/\s*(?:Bu nedenle|Bu yüzden|Bunun için),?[\s\S]{0,260}?(?:ilgili\s+(?:bölüm|birim)|öğrenci işleri)[\s\S]{0,140}?(?:iletişime geç(?:meni|menizi)|danışmanı(?:zı)?|başvurmanı(?:zı)?)\s+öneririm\.?\s*(?:Hangi\s+(?:bölüm|program)[\s\S]{0,140}?(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)[\s\S]{0,100}?yardımcı olabilir(?:im|iz)[.!?]?)?\s*$/iu, '')
+        .replace(/\s*(?:Eğer\s+)?(?:daha fazla\s+)?(?:yardıma|bilgiye)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa)[\s\S]{0,280}?(?:iletişime geç(?:meni|menizi|ebilir(?:sin|siniz)?|in|iniz)?(?:i|izi)? öneririm|iletişime geç(?:ebilir(?:sin|siniz)?|in|iniz)|başvur(?:abilir|abilirsiniz)|danış(?:abilir|abilirsiniz)|bak(?:abilir(?:sin|siniz)?|ın|iniz))\.?\s*(?:İletişim bilgileri için[\s\S]{0,80}?:?\s*https?:\/\/\S+)?\s*$/iu, '')
+        .replace(/\s*(?:Bu konuda\s+)?(?:kesin|net|detaylı|daha fazla)\s+bilgi(?: almak)?\s+için\s+ilgili\s+bölüm(?:ünüz|ünüzün|ün|un)?\s+akademik danışman(?:ı|ıyla|inizle)?\s+(?:görüşmeni(?:zi)?|iletişime geçmeni(?:zi)?)\s+öneririm\.?\s*$/iu, '')
+        .replace(/\s*(?:Daha fazla bilgi(?: almak)? (?:için|istersen(?:iz)?)|Detaylı bilgi(?: almak)? için)[\s\S]{0,180}?:?\s*https?:\/\/\S+\s*$/iu, '')
+        .replace(/\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız) olursa|Daha fazla bilgi(?: almak)? istersen(?:iz)?),?\s*(?:buradan|şu bağlantıdan|bu bağlantıdan|linkten)?\s*(?:ulaşabilir(?:sin|siniz)|göz atabilir(?:sin|siniz))?:?\s*https?:\/\/\S+\s*$/iu, '')
+        .replace(/\s*(?:İletişim bilgileri için|Detaylı bilgi için)[\s\S]{0,120}?:?\s*https?:\/\/\S+\s*$/iu, '')
+        .trim()
+
+    return stripped.length >= 40 ? stripped : response
+}
+
 function sanitizeRagAnswerForReturn(response: string, userMessage: string) {
-    return stripUnrequestedContactDetails(
-        stripContradictoryNoInformationLead(response),
-        userMessage
+    const withoutContradiction = stripContradictoryNoInformationLead(response)
+    const withoutUnrequestedContact = stripUnrequestedContactDetails(withoutContradiction, userMessage)
+    const withoutClosing = stripGenericAssistantClosingTail(withoutUnrequestedContact)
+    const withoutDeferral = stripGenericDeferralTail(withoutClosing, userMessage)
+
+    return stripGenericAssistantClosingTail(
+        withoutDeferral
     )
         .replace(/^[\s,.;:!?]+/u, '')
         .replace(/^(?:Ancak|Ama),?\s+/iu, '')
@@ -333,6 +387,10 @@ const DURATION_QUERY_SUBJECT_STOPWORDS = new Set([
     'kadar',
     'kac',
     'kaç',
+    'hak',
+    'hakk',
+    'hakki',
+    'hakkı',
     'azami',
     'fazla',
     'cok',
@@ -420,8 +478,19 @@ function durationSubjectTokens(value: string) {
 }
 
 function asksForPolicyDuration(normalizedUserMessage: string) {
-    return normalizedUserMessage.includes('sure')
+    const asksAmount = includesAny(normalizedUserMessage, [
+        'ne kadar',
+        'nedir',
+        'kac',
+        'kaç',
+        'azami',
+        'en fazla',
+        'en cok'
+    ])
+    const mentionsDurationTopic = normalizedUserMessage.includes('sure')
         || normalizedUserMessage.includes('suresi')
+
+    return (mentionsDurationTopic && asksAmount)
         || normalizedUserMessage.includes('azami')
         || normalizedUserMessage.includes('en fazla')
         || normalizedUserMessage.includes('en cok')
@@ -434,18 +503,65 @@ function compactDurationEvidence(value: string) {
     return normalizeSearch(value).replace(/[^\p{L}\p{N}]+/gu, '')
 }
 
+function normalizeCompactDurationValue(value: string) {
+    return value.replace(/(isgunu|gunu|gun|hafta|ay|yil|saat|dakika)(?:dur|dir|tir)$/iu, '$1')
+}
+
 function extractDurationValues(value: string) {
     DURATION_VALUE_REGEX.lastIndex = 0
     return Array.from(normalizeSearch(value).matchAll(DURATION_VALUE_REGEX))
-        .map((match) => compactDurationEvidence(match[0] ?? ''))
+        .map((match) => normalizeCompactDurationValue(compactDurationEvidence(match[0] ?? '')))
         .filter(Boolean)
 }
 
-function responseHasEvidenceDuration(response: string, evidenceSentence: string) {
-    const compactResponse = compactDurationEvidence(response)
+function likelyAnswerDurationValues(evidenceSentence: string, userMessage: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    const userDurations = new Set(extractDurationValues(userMessage))
     const evidenceDurations = extractDurationValues(evidenceSentence)
+    const nonQuestionDurations = evidenceDurations.filter((duration) => !userDurations.has(duration))
+    const asksForDayCountFromYearThreshold = (
+        (normalizedUserMessage.includes('gun') || normalizedUserMessage.includes('is gunu'))
+        && normalizedUserMessage.includes('yil')
+    )
+        || /\b(?:kac|ne kadar)\b[\s\S]{0,80}\b(?:gun|is gunu)\b/i.test(normalizedUserMessage)
 
-    return evidenceDurations.some((duration) => compactResponse.includes(duration))
+    const answerDurations = asksForDayCountFromYearThreshold
+        ? nonQuestionDurations.filter((duration) => duration.includes('gun'))
+        : nonQuestionDurations
+
+    return answerDurations.length > 0 ? answerDurations : evidenceDurations
+}
+
+function responseAnswerDurationValues(response: string, userMessage: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    const userDurations = new Set(extractDurationValues(userMessage))
+    const responseDurations = extractDurationValues(response)
+        .filter((duration) => !userDurations.has(duration))
+    const asksForDayCountFromYearThreshold = (
+        (normalizedUserMessage.includes('gun') || normalizedUserMessage.includes('is gunu'))
+        && normalizedUserMessage.includes('yil')
+    )
+        || /\b(?:kac|ne kadar)\b[\s\S]{0,80}\b(?:gun|is gunu)\b/i.test(normalizedUserMessage)
+
+    return asksForDayCountFromYearThreshold
+        ? responseDurations.filter((duration) => duration.includes('gun'))
+        : responseDurations
+}
+
+function retrievedEvidenceSupportsAnswerDuration(response: string, userMessage: string, chunks: RagAnswerRepairChunk[]) {
+    const answerDurations = responseAnswerDurationValues(response, userMessage)
+    if (answerDurations.length === 0) return false
+
+    return chunks.some((chunk) => {
+        const compactContent = compactDurationEvidence(chunk.content)
+        return answerDurations.some((duration) => compactContent.includes(duration))
+    })
+}
+
+function responseHasAnswerDuration(response: string, evidenceSentence: string, userMessage: string) {
+    const compactResponse = compactDurationEvidence(response)
+    return likelyAnswerDurationValues(evidenceSentence, userMessage)
+        .some((duration) => compactResponse.includes(duration))
 }
 
 function durationSubjectCoverage(tokens: string[], value: string) {
@@ -504,6 +620,29 @@ function splitDurationCandidateSentences(content: string) {
         .filter((sentence) => sentence.length >= 24)
 }
 
+function splitDurationListCandidates(content: string) {
+    return content
+        .replace(/^(?:Page|Document) Title:\s*.*$/gim, ' ')
+        .replace(/^Source URL:\s*.*$/gim, ' ')
+        .replace(/^Section:\s*.*$/gim, ' ')
+        .split(/\r?\n|(?<=[.!?])\s+|(?=\s*(?:[•*]|[-–—])\s+)|(?=\s+[a-zçğıöşü]\)\s+)/iu)
+        .map((line) => cleanDurationEvidenceSentence(line.replace(/^\s*(?:[•*]|[-–—])\s*/u, '')))
+        .filter((line) => line.length >= 12)
+}
+
+function finishDurationEvidenceSentence(value: string) {
+    let cleaned = cleanDurationEvidenceSentence(value)
+    if (/\biş günü$/iu.test(cleaned)) {
+        cleaned = `${cleaned}dür`
+    } else if (/\bgün$/iu.test(cleaned)) {
+        cleaned = `${cleaned}dür`
+    } else if (/\byıl$/iu.test(cleaned)) {
+        cleaned = `${cleaned}dır`
+    }
+
+    return /[.!?]$/u.test(cleaned) ? cleaned : `${cleaned}.`
+}
+
 function extractPolicyDurationEvidenceSentence(content: string, subjectTokens: string[], requiredSubjectTokens: string[]) {
     for (const sentence of splitDurationCandidateSentences(content)) {
         const normalizedSentence = normalizeSearch(sentence)
@@ -513,6 +652,31 @@ function extractPolicyDurationEvidenceSentence(content: string, subjectTokens: s
         if (subjectTokens.length > 0 && durationSubjectCoverage(subjectTokens, sentence) < 0.6) continue
 
         return `${sentence}.`
+    }
+
+    return null
+}
+
+function extractPolicyDurationListEvidenceSentence(
+    content: string,
+    userMessage: string,
+    subjectTokens: string[],
+    requiredSubjectTokens: string[]
+) {
+    if (!durationHasRequiredSubjectTokens(requiredSubjectTokens, content)) return null
+    if (subjectTokens.length > 0 && durationSubjectCoverage(subjectTokens, content) < 0.45) return null
+
+    const userDurations = new Set(extractDurationValues(userMessage))
+    for (const candidate of splitDurationListCandidates(content)) {
+        const normalizedCandidate = normalizeSearch(candidate)
+        DURATION_VALUE_REGEX.lastIndex = 0
+        if (!DURATION_VALUE_REGEX.test(normalizedCandidate)) continue
+
+        const candidateDurations = extractDurationValues(candidate)
+        if (userDurations.size > 0 && !candidateDurations.some((duration) => userDurations.has(duration))) continue
+        if (likelyAnswerDurationValues(candidate, userMessage).length === 0) continue
+
+        return finishDurationEvidenceSentence(candidate)
     }
 
     return null
@@ -534,14 +698,18 @@ function repairPolicyDurationAnswer(input: {
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForPolicyDuration(normalizedUserMessage)) return null
+    if (retrievedEvidenceSupportsAnswerDuration(input.response, input.userMessage, input.chunks)) return null
 
     const subjectTokens = durationSubjectTokens(normalizedUserMessage)
     const requiredSubjectTokens = durationRequiredSubjectTokens(subjectTokens)
     const evidenceSentence = input.chunks
+        .map((chunk) => extractPolicyDurationListEvidenceSentence(chunk.content, input.userMessage, subjectTokens, requiredSubjectTokens))
+        .find((value): value is string => Boolean(value))
+        ?? input.chunks
         .map((chunk) => extractPolicyDurationEvidenceSentence(chunk.content, subjectTokens, requiredSubjectTokens))
         .find((value): value is string => Boolean(value))
     if (!evidenceSentence) return null
-    if (responseHasEvidenceDuration(input.response, evidenceSentence)) return null
+    if (responseHasAnswerDuration(input.response, evidenceSentence, input.userMessage)) return null
 
     if (input.responseLanguage === 'en') {
         return `According to the retrieved policy: ${evidenceSentence}`
@@ -853,6 +1021,10 @@ function contactSubjectFromContent(content: string, userMessage: string) {
     const normalizedContent = normalizeSearch(content)
     const normalizedUserMessage = normalizeSearch(userMessage)
 
+    if (normalizedUserMessage.includes('kutuphane')) {
+        return 'Kütüphane ve Dokümantasyon Daire Başkanlığı'
+    }
+
     if (
         normalizedContent.includes('tibbi laboratuvar teknikleri programi')
         || normalizedUserMessage.includes('tibbi laboratuvar teknikleri')
@@ -869,6 +1041,15 @@ function targetProgramEmail(userMessage: string, content: string) {
     if (!contactSubjectFromContent(content, userMessage).includes('Tıbbi Laboratuvar Teknikleri')) return null
 
     return content.match(/tlt@yiu\.edu\.tr/i)?.[0] ?? null
+}
+
+function targetUnitEmail(userMessage: string, content: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    if (normalizedUserMessage.includes('kutuphane')) {
+        return content.match(/kutuphane@yuksekihtisas\.edu\.tr/i)?.[0] ?? null
+    }
+
+    return null
 }
 
 function extractTltDoubleMajorResponsibleContact(content: string, userMessage: string): ContactEvidence | null {
@@ -913,7 +1094,7 @@ function extractContactEvidence(chunk: RagAnswerRepairChunk, userMessage: string
     const responsibleContact = extractTltDoubleMajorResponsibleContact(chunk.content, userMessage)
     if (responsibleContact) return responsibleContact
 
-    const targetEmail = targetProgramEmail(userMessage, chunk.content)
+    const targetEmail = targetProgramEmail(userMessage, chunk.content) ?? targetUnitEmail(userMessage, chunk.content)
     const email = targetEmail ?? chunk.content.match(EMAIL_REGEX)?.[0] ?? null
     const phone = extractPhoneNearEmail(chunk.content, email)
     if (!email && !phone) return null
@@ -1413,13 +1594,13 @@ function groundingSubjectCoverage(tokens: string[], value: string) {
 function hasEligibilityDenial(value: string) {
     const normalized = normalizeSearch(value)
 
-    return /\b(?:giremez|giremezsin|giremezsiniz|yapamaz|yapamazsin|yapilamaz|alamaz|alamazsin|alinamaz|mumkun degil|hakki yok|hak yok|bulunmamaktadir|yoktur)\b/i.test(normalized)
+    return /\b(?:giremez|giremezsin|giremezsiniz|yapamaz|yapamazsin|yapilamaz|alamaz|alamazsin|alinamaz|yararlanamaz|faydalanamaz|mumkun degil|hakki yok|hak yok|bulunmamaktadir|yoktur)\b/i.test(normalized)
 }
 
 function hasAffirmativeEligibility(value: string) {
     const normalized = normalizeSearch(value)
 
-    return /\b(?:girebilir|girer|yapabilir|yapilir|alabilir|talep edebilir|mumkundur|hakki vardir|hakkin var|uygulanir|acilir|kabul edilir)\b/i.test(normalized)
+    return /\b(?:girebilir|girer|yapabilir|yapilir|alabilir|yararlanabilir|faydalanabilir|talep edebilir|mumkundur|hakki vardir|hakkin var|uygulanir|acilir|kabul edilir)\b/i.test(normalized)
 }
 
 function asksForEligibilityOrPermission(normalizedUserMessage: string) {
@@ -1434,6 +1615,8 @@ function asksForEligibilityOrPermission(normalizedUserMessage: string) {
         'yapabilirim',
         'alabilir',
         'alabilirim',
+        'yararlan',
+        'faydalan',
         'hak',
         'mumkun',
         'izin'
@@ -1484,12 +1667,75 @@ function extractAffirmativeEligibilityEvidence(content: string, userMessage: str
     return candidates[0]?.text ?? null
 }
 
+function extractEligibilityDecisionEvidence(content: string, userMessage: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    const tokens = groundingSubjectTokens(userMessage)
+    const sentences = splitGroundingCandidateSentences(content)
+    const requiresErasmus = normalizedUserMessage.includes('erasmus')
+    const minimumCoverage = requiresErasmus ? 0.3 : 0.4
+
+    const candidates = sentences
+        .map((sentence, index) => {
+            const hasDecision = hasEligibilityDenial(sentence) || hasAffirmativeEligibility(sentence)
+            if (!hasDecision) return null
+
+            const normalizedSentence = normalizeSearch(sentence)
+            if (requiresErasmus && !normalizedSentence.includes('erasmus')) return null
+
+            const coverage = groundingSubjectCoverage(tokens, sentence)
+            if (tokens.length > 0 && coverage < minimumCoverage) return null
+
+            const nextSentence = sentences[index + 1]
+            const shouldAppendNext = nextSentence
+                && !hasEligibilityDenial(nextSentence)
+                && !hasAffirmativeEligibility(nextSentence)
+                && groundingSubjectCoverage(tokens, nextSentence) >= 0.25
+            const text = shouldAppendNext ? `${sentence} ${nextSentence}` : sentence
+
+            return { text: cleanExtractedInlineValue(text), coverage }
+        })
+        .filter((candidate): candidate is { text: string; coverage: number } => Boolean(candidate))
+        .sort((left, right) => right.coverage - left.coverage)
+
+    return candidates[0]?.text ?? null
+}
+
+function repairEligibilityDecisionAnswer(input: {
+    response: string
+    userMessage: string
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (asksForPolicyDuration(normalizedUserMessage)) return null
+    if (!asksForEligibilityOrPermission(normalizedUserMessage)) return null
+    if (shouldSkipContradictoryEligibilityRepair(normalizedUserMessage)) return null
+
+    const normalizedResponse = normalizeSearch(stripGenericAssistantContinuation(input.response))
+    const responseHasDecision = hasEligibilityDenial(input.response) || hasAffirmativeEligibility(input.response)
+    const weakResponse = isLikelyLinkOnlyResponse(input.response)
+        || isGenericNoInformationResponse(input.response)
+        || !responseHasDecision
+        || (normalizedResponse.includes('iletisim') && /https?:\/\/\S+/i.test(input.response))
+    if (!weakResponse) return null
+
+    const evidence = input.chunks
+        .map((chunk) => extractEligibilityDecisionEvidence(chunk.content, input.userMessage))
+        .find((value): value is string => Boolean(value))
+    if (!evidence) return null
+
+    const normalizedEvidence = normalizeSearch(evidence)
+    if (normalizedResponse.includes(normalizedEvidence)) return null
+
+    return evidence.endsWith('.') ? evidence : `${evidence}.`
+}
+
 function repairContradictoryEligibilityAnswer(input: {
     response: string
     userMessage: string
     chunks: RagAnswerRepairChunk[]
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (asksForPolicyDuration(normalizedUserMessage)) return null
     if (!asksForEligibilityOrPermission(normalizedUserMessage)) return null
     if (shouldSkipContradictoryEligibilityRepair(normalizedUserMessage)) return null
     if (!hasEligibilityDenial(input.response)) return null
@@ -1621,6 +1867,12 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (medicineFinalExemptionRepair) return medicineFinalExemptionRepair
+
+    const eligibilityDecisionRepair = repairEligibilityDecisionAnswer({
+        ...input,
+        response
+    })
+    if (eligibilityDecisionRepair) return eligibilityDecisionRepair
 
     const addressRepair = repairAddressAnswer({
         ...input,

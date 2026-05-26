@@ -2114,6 +2114,179 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
     })
 
+    it('searches the original standalone user question before a drifted router rewrite', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+        const originalQuestion = '15 yıl çalışan personelin yıllık izin hakkı kaç gün?'
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'annual leave entitlement for employees with 15 years of service',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockImplementation(async (query: string) => {
+            if (query === originalQuestion) {
+                return [{
+                    chunk_id: 'leave-15-years',
+                    document_id: 'doc-leave',
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: '15 yıl (dahil) ve daha fazla olanlara 26 iş günü.',
+                    source_url: 'https://example.edu.tr/izin.pdf'
+                }]
+            }
+
+            return [{
+                chunk_id: 'staff-assignment-noise',
+                document_id: 'doc-noise',
+                document_title: 'Yükseköğretim Kanunu',
+                content: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır.',
+                source_url: 'https://example.edu.tr/noise.pdf'
+            }]
+        })
+        buildRagContextMock.mockImplementation((chunks: Array<{ content: string }>) => ({
+            context: chunks.map((chunk) => chunk.content).join('\n---\n'),
+            chunks,
+            tokenCount: 20
+        }))
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: '15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.' } }],
+            usage: {
+                prompt_tokens: 120,
+                completion_tokens: 20,
+                total_tokens: 140
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: originalQuestion })
+        )
+
+        expect(searchKnowledgeBaseMock.mock.calls[0]?.[0]).toBe(originalQuestion)
+        expect(searchKnowledgeBaseMock.mock.calls[1]?.[0]).toBe('annual leave entitlement for employees with 15 years of service')
+        expect(buildRagContextMock).toHaveBeenCalledWith(expect.arrayContaining([
+            expect.objectContaining({ chunk_id: 'leave-15-years' })
+        ]))
+        expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('26 iş günüdür'))
+    })
+
+    it('repairs a RAG completion that selects nearby unrelated policy text despite stronger duration evidence', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: '15 yıl çalışan personelin yıllık izin hakkı kaç gün?',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                chunk_id: 'leave-15-years',
+                document_id: 'doc-leave',
+                document_title: 'İzin Kullanımı Yönergesi',
+                content: [
+                    'Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri aşağıda belirtilmiştir.',
+                    '• 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                ].join('\n'),
+                source_url: 'https://example.edu.tr/izin.pdf'
+            },
+            {
+                chunk_id: 'staff-assignment-noise',
+                document_id: 'doc-noise',
+                document_title: 'Yükseköğretim Kanunu',
+                content: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır.',
+                source_url: 'https://example.edu.tr/noise.pdf'
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: [
+                'Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri aşağıda belirtilmiştir.',
+                '• 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.',
+                '---',
+                'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır.'
+            ].join('\n'),
+            chunks: [
+                {
+                    chunk_id: 'leave-15-years',
+                    document_id: 'doc-leave',
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: [
+                        'Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri aşağıda belirtilmiştir.',
+                        '• 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                    ].join('\n'),
+                    source_url: 'https://example.edu.tr/izin.pdf'
+                },
+                {
+                    chunk_id: 'staff-assignment-noise',
+                    document_id: 'doc-noise',
+                    document_title: 'Yükseköğretim Kanunu',
+                    content: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır.',
+                    source_url: 'https://example.edu.tr/noise.pdf'
+                }
+            ],
+            tokenCount: 30
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır.' } }],
+            usage: {
+                prompt_tokens: 120,
+                completion_tokens: 20,
+                total_tokens: 140
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: '15 yıl çalışan personelin yıllık izin hakkı kaç gün?' })
+        )
+
+        expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.'))
+        expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('https://example.edu.tr/izin.pdf'))
+        expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringContaining('https://example.edu.tr/noise.pdf'))
+    })
+
     it('uses extractive RAG recovery instead of generic fallback when RAG completion times out with clear evidence', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 
@@ -2555,6 +2728,13 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(systemPrompt).toContain('For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, or email addresses, copy only the value explicitly shown in the context')
         expect(systemPrompt).toContain('For campus, address, or where questions, copy the exact address/postal code if present')
         expect(systemPrompt).toContain('If the user asks who/kim and the context only explains a role without naming a person, say the person name is not in the knowledge base')
+        expect(systemPrompt).toContain('You may add at most one short, topic-related engagement question')
+        expect(systemPrompt).toContain('Keep it role-neutral')
+        expect(systemPrompt).toContain('do not assume the user is a student, applicant, personnel member, or admin')
+        expect(systemPrompt).toContain('Do not ask what the user studies or which role/status they have')
+        expect(systemPrompt).toContain('ask for the topic, program, unit, or document to look up without implying the user\'s identity')
+        expect(systemPrompt).toContain('can offer to explain related requirements, deadlines, exceptions, required documents, eligibility, or next steps')
+        expect(systemPrompt).toContain('Do not add generic closers like "anything else"')
         expect(systemPrompt).toContain('When answering with three or more items, use one plain dash bullet per line')
         expect(sendOutbound).toHaveBeenCalledWith('Newborn paket başlangıç fiyatı 1000 TL.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
@@ -2625,6 +2805,106 @@ describe('processInboundAiPipeline guardrails', () => {
         }))
         expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
             category: 'router',
+            model: 'gpt-4o-mini'
+        }))
+    })
+
+    it('records query planner usage from RAG retrieval without changing the answer model', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder(null)
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Bu programda staj var mı?',
+            reason: 'knowledge_base',
+            usage: {
+                inputTokens: 11,
+                outputTokens: 2,
+                totalTokens: 13
+            }
+        })
+        searchKnowledgeBaseMock.mockImplementationOnce(async (
+            _query: string,
+            _organizationId: string,
+            _threshold: number,
+            _limit: number,
+            searchOptions?: {
+                queryPlannerUsage?: (plan: {
+                    model: string
+                    reason: string
+                    usage: {
+                        inputTokens: number
+                        outputTokens: number
+                        totalTokens: number
+                    }
+                }) => Promise<void>
+            }
+        ) => {
+            expect(searchOptions?.queryPlannerUsage).toEqual(expect.any(Function))
+            await searchOptions?.queryPlannerUsage?.({
+                model: 'gpt-4o-mini',
+                reason: 'planned',
+                usage: {
+                    inputTokens: 30,
+                    outputTokens: 8,
+                    totalTokens: 38
+                }
+            })
+
+            return [{
+                document_id: 'doc-1',
+                content: 'Programda yaz stajı uygulaması bulunur.'
+            }]
+        })
+        buildRagContextMock.mockReturnValue({
+            context: 'Programda yaz stajı uygulaması bulunur.',
+            chunks: [{ document_id: 'doc-1', content: 'Programda yaz stajı uygulaması bulunur.' }],
+            tokenCount: 6
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Programda yaz stajı uygulaması bulunur.' } }],
+            usage: {
+                prompt_tokens: 100,
+                completion_tokens: 15,
+                total_tokens: 115
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        await processInboundAiPipeline(buildInput(supabase, sendOutbound))
+
+        expect(openAiCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+            model: 'gpt-4o-mini'
+        }))
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            category: 'router',
+            model: 'gpt-4o-mini',
+            inputTokens: 30,
+            outputTokens: 8,
+            totalTokens: 38,
+            metadata: expect.objectContaining({
+                stage: 'rag_query_planner',
+                reason: 'planned'
+            })
+        }))
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            category: 'rag',
             model: 'gpt-4o-mini'
         }))
     })
