@@ -25,18 +25,22 @@ describe('knowledge query planner', () => {
     const originalOpenAiKey = process.env.OPENAI_API_KEY
     const originalPlannerEnabled = process.env.KNOWLEDGE_QUERY_PLANNER_ENABLED
     const originalPlannerModel = process.env.OPENAI_QUERY_PLANNER_MODEL
+    const originalPlannerTimeout = process.env.KNOWLEDGE_QUERY_PLANNER_TIMEOUT_MS
 
     beforeEach(() => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
         process.env.KNOWLEDGE_QUERY_PLANNER_ENABLED = 'always'
         delete process.env.OPENAI_QUERY_PLANNER_MODEL
+        delete process.env.KNOWLEDGE_QUERY_PLANNER_TIMEOUT_MS
         createCompletionMock.mockReset()
     })
 
     afterEach(() => {
+        vi.useRealTimers()
         process.env.OPENAI_API_KEY = originalOpenAiKey
         process.env.KNOWLEDGE_QUERY_PLANNER_ENABLED = originalPlannerEnabled
         process.env.OPENAI_QUERY_PLANNER_MODEL = originalPlannerModel
+        process.env.KNOWLEDGE_QUERY_PLANNER_TIMEOUT_MS = originalPlannerTimeout
     })
 
     it('returns normalized retrieval variants from JSON without answer facts', async () => {
@@ -85,10 +89,16 @@ describe('knowledge query planner', () => {
             totalTokens: 62
         })
         expect(JSON.stringify(plan)).not.toContain('Bu cevap kullanılmamalı')
-        expect(createCompletionMock).toHaveBeenCalledWith(expect.objectContaining({
-            model: 'gpt-4o-mini',
-            response_format: { type: 'json_object' }
-        }))
+        expect(createCompletionMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'gpt-4o-mini',
+                response_format: { type: 'json_object' }
+            }),
+            expect.objectContaining({
+                timeout: 2500,
+                maxRetries: 0
+            })
+        )
     })
 
     it('does not call OpenAI when planning is disabled', async () => {
@@ -131,6 +141,22 @@ describe('knowledge query planner', () => {
             inputTokens: 20,
             outputTokens: 3,
             totalTokens: 23
+        })
+    })
+
+    it('falls back to the original query when planner work exceeds its latency budget', async () => {
+        vi.useFakeTimers()
+        createCompletionMock.mockImplementationOnce(() => new Promise(() => undefined))
+
+        const planPromise = planKnowledgeSearchQuery('SBF kampüsü nerede?')
+        await vi.advanceTimersByTimeAsync(2501)
+        const plan = await planPromise
+
+        expect(plan).toMatchObject({
+            enabled: true,
+            reason: 'planner_error',
+            searchQueries: ['SBF kampüsü nerede?'],
+            mustHaveTerms: []
         })
     })
 

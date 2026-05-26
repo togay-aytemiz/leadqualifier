@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { withAiTimeout } from '@/lib/ai/deadline'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 
 export interface KnowledgeSearchPlanningTurn {
@@ -29,6 +30,7 @@ interface PlannerOptions {
 }
 
 const DEFAULT_QUERY_PLANNER_MODEL = 'gpt-4o-mini'
+const DEFAULT_QUERY_PLANNER_TIMEOUT_MS = 2500
 const QUERY_PLANNER_MAX_OUTPUT_TOKENS = 220
 const MAX_HISTORY_TURNS = 4
 const MAX_QUERY_VARIANTS = 4
@@ -79,6 +81,12 @@ function resolvePlannerMode(mode?: KnowledgeQueryPlannerMode): KnowledgeQueryPla
     if (['always', 'true', 'on', '1', 'enabled', 'enable'].includes(raw)) return 'always'
 
     return 'auto'
+}
+
+function resolveQueryPlannerTimeoutMs() {
+    const raw = Number.parseInt(process.env.KNOWLEDGE_QUERY_PLANNER_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 500) return raw
+    return DEFAULT_QUERY_PLANNER_TIMEOUT_MS
 }
 
 function normalizeDedupeKey(value: string) {
@@ -274,8 +282,9 @@ JSON schema:
     let lastUsage: KnowledgeSearchQueryPlanUsage | undefined
 
     try {
+        const timeoutMs = resolveQueryPlannerTimeoutMs()
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-        const completion = await openai.chat.completions.create({
+        const completion = await withAiTimeout(openai.chat.completions.create({
             model,
             temperature: 0.1,
             max_tokens: QUERY_PLANNER_MAX_OUTPUT_TOKENS,
@@ -284,6 +293,12 @@ JSON schema:
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
             ]
+        }, {
+            timeout: timeoutMs,
+            maxRetries: 0
+        }), {
+            stage: 'rag_query_planner',
+            timeoutMs
         })
         const content = completion.choices[0]?.message?.content ?? ''
         const completionUsage = normalizeUsage(completion.usage)
