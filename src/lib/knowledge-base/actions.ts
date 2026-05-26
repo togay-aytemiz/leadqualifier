@@ -2677,6 +2677,17 @@ function extractAcademicSubjectFocuses(query: string): AcademicSubjectFocus[] {
 
 function academicTokenMatches(token: string, value: string, tokenSet: Set<string>) {
     if (tokenSet.has(token) || tokenSet.has(stemSearchToken(token))) return true
+    if (/^[a-z]{2,6}$/.test(token)) {
+        const valueTokens = allMeaningfulSearchTokens(value)
+        for (let start = 0; start <= valueTokens.length - token.length; start += 1) {
+            const initials = valueTokens
+                .slice(start, start + token.length)
+                .map((valueToken) => valueToken[0] ?? '')
+                .join('')
+            if (initials === token) return true
+        }
+    }
+
     return token.length >= 5 && value.includes(token)
 }
 

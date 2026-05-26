@@ -2822,6 +2822,39 @@ describe('searchKnowledgeBase', () => {
         })
     })
 
+    it('matches academic-unit acronym focuses to expanded program names for internship evidence', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'iş günü',
+                rows: [{
+                    id: 'tlt-expanded-staj-1',
+                    document_id: 'doc-tlt-expanded-staj-1',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri Programı Öz Değerlendirme\nSource URL: https://example.edu.tr/laboratuvar-teknikleri-oz-degerlendirme.pdf\n\nTıbbi Laboratuvar Teknikleri Programı öğrencileri Yaz Stajı dersini 20 iş günü süresince tamamlar.',
+                    knowledge_documents: {
+                        title: 'Tıbbi Laboratuvar Teknikleri Programı Öz Değerlendirme',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBaseFocusedEvidence(
+            'TLT programında yaz stajı var mı, kaç gün?',
+            'org-1',
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-expanded-staj-1',
+            document_id: 'doc-tlt-expanded-staj-1'
+        })
+    })
+
     it('does not run broad lexical fallbacks when policy-duration evidence already fills the result set', async () => {
         const { supabase, limitMock } = createHybridSearchSupabase({
             rpcRows: [],
