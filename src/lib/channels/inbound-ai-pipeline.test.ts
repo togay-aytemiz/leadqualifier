@@ -2191,6 +2191,107 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('26 iş günüdür'))
     })
 
+    it('skips additional router search queries when the first query already returns strong evidence', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'Health Sciences Faculty campus location',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockImplementation(async (query: string) => {
+            if (query === 'SBF kampüsü nerede?') {
+                return [
+                    {
+                        chunk_id: 'sbf-campus-1',
+                        document_id: 'doc-sbf-campus',
+                        document_title: 'Yerleşke Konumları',
+                        content: 'SBF kampüsü Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca adresindedir.',
+                        source_url: 'https://example.edu.tr/yerleske',
+                        similarity: 1.6
+                    },
+                    {
+                        chunk_id: 'sbf-campus-2',
+                        document_id: 'doc-sbf-campus',
+                        document_title: 'Yerleşke Konumları',
+                        content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesi bilgisidir.',
+                        source_url: 'https://example.edu.tr/yerleske',
+                        similarity: 1.4
+                    },
+                    {
+                        chunk_id: 'sbf-campus-3',
+                        document_id: 'doc-sbf-campus',
+                        document_title: 'Yerleşke Konumları',
+                        content: 'Bağlıca yerleşkesi SBF için listelenmiştir.',
+                        source_url: 'https://example.edu.tr/yerleske',
+                        similarity: 1.3
+                    }
+                ]
+            }
+
+            return [{
+                chunk_id: 'rewrite-noise',
+                document_id: 'doc-noise',
+                document_title: 'Generic campus',
+                content: 'Router rewrite should not be needed when the original query is already grounded.',
+                source_url: 'https://example.edu.tr/noise',
+                similarity: 0.5
+            }]
+        })
+        buildRagContextMock.mockImplementation((chunks: Array<{ content: string }>) => ({
+            context: chunks.map((chunk) => chunk.content).join('\n---\n'),
+            chunks,
+            tokenCount: 24
+        }))
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'SBF kampüsü Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca adresindedir.' } }],
+            usage: {
+                prompt_tokens: 120,
+                completion_tokens: 20,
+                total_tokens: 140
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'SBF kampüsü nerede?' })
+        )
+
+        expect(searchKnowledgeBaseMock).toHaveBeenCalledTimes(1)
+        expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
+            'SBF kampüsü nerede?',
+            'org-1',
+            expect.any(Number),
+            6,
+            expect.any(Object)
+        )
+        expect(buildRagContextMock).toHaveBeenCalledWith(expect.arrayContaining([
+            expect.objectContaining({ chunk_id: 'sbf-campus-1' })
+        ]))
+    })
+
     it('repairs a RAG completion that selects nearby unrelated policy text despite stronger duration evidence', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 
@@ -2325,7 +2426,9 @@ describe('processInboundAiPipeline guardrails', () => {
             }],
             tokenCount: 10
         })
-        openAiCreateMock.mockRejectedValueOnce(new Error('AI stage "rag_completion" exceeded 12000ms timeout'))
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Model completion should not be needed for this direct address evidence.' } }]
+        })
 
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
@@ -2344,7 +2447,71 @@ describe('processInboundAiPipeline guardrails', () => {
             expect.stringContaining('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
         )
         expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('https://example.edu.tr/yerleske'))
+        expect(openAiCreateMock).not.toHaveBeenCalled()
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('uses extractive RAG directly for clear address evidence before spending completion latency', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'SBF kampüsü nerede',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([
+            {
+                document_id: 'doc-sbf',
+                content: 'SAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca',
+                source_url: 'https://example.edu.tr/yerleske',
+                similarity: 1.6
+            }
+        ])
+        buildRagContextMock.mockReturnValue({
+            context: 'SAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca',
+            chunks: [{
+                document_id: 'doc-sbf',
+                content: 'SAĞLIK BİLİMLERİ FAKÜLTESİ\nBAĞLICA YERLEŞKESİ: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca',
+                source_url: 'https://example.edu.tr/yerleske'
+            }],
+            tokenCount: 10
+        })
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'Model completion should not be needed.' } }]
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'SBF kampüsü nerede' })
+        )
+
+        expect(openAiCreateMock).not.toHaveBeenCalled()
+        expect(sendOutbound).toHaveBeenCalledWith(
+            expect.stringContaining('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
+        )
+        expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('https://example.edu.tr/yerleske'))
     })
 
     it('formats RAG inline bullets before sending and persisting the bot reply', async () => {

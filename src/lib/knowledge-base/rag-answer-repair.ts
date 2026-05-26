@@ -842,6 +842,7 @@ function asksForAddressOrCampus(normalizedUserMessage: string) {
 function cleanExtractedInlineValue(value: string) {
     return value
         .replace(/\s+/g, ' ')
+        .replace(/\bNo\s+:\s*/giu, 'No:')
         .replace(/\s+([,.;!?])/g, '$1')
         .replace(/[;,:.\s]+$/g, '')
         .trim()

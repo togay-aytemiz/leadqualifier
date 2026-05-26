@@ -842,7 +842,7 @@ describe('repairLinkOnlyRagAnswer', () => {
             ]
         })
 
-        expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No :1 Bağlıca.')
+        expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
     })
 
     it('repairs SHMYO abbreviation campus answers from current campus listing evidence', () => {

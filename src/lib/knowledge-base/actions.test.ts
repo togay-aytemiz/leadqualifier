@@ -1185,6 +1185,7 @@ describe('searchKnowledgeBase', () => {
             chunk_id: 'campus-1',
             document_id: 'doc-campus-1'
         })
+        expect(planKnowledgeSearchQueryMock).not.toHaveBeenCalled()
         expect(filters).toContain('sbf')
         expect(filters).not.toContain('baglica')
     })

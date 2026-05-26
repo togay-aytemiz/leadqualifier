@@ -31,7 +31,8 @@ import type { OutboundMessageInput, OutboundReplyButton, OutboundSendResult } fr
 import {
     isMvpResponseLanguageAmbiguous,
     resolveMvpResponseLanguage,
-    resolveMvpResponseLanguageName
+    resolveMvpResponseLanguageName,
+    type MvpResponseLanguage
 } from '@/lib/ai/language'
 import { applyBotMessageDisclaimer } from '@/lib/ai/bot-disclaimer'
 import { buildReplyButtonsForSkill, sanitizeSkillActions } from '@/lib/skills/skill-actions'
@@ -48,6 +49,8 @@ import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 const RAG_MAX_OUTPUT_TOKENS = 320
 const RAG_REASONING_MAX_COMPLETION_TOKENS = 1024
 const DEFAULT_RAG_COMPLETION_MODEL = 'gpt-4o-mini'
+const KNOWLEDGE_SEARCH_QUERY_SHORT_CIRCUIT_MIN_RESULTS = 3
+const KNOWLEDGE_SEARCH_QUERY_SHORT_CIRCUIT_MIN_SIMILARITY = 1.2
 
 function resolveRagCompletionModel() {
     return process.env.OPENAI_RAG_MODEL?.trim() || DEFAULT_RAG_COMPLETION_MODEL
@@ -118,6 +121,12 @@ function isRagNoAnswerResponse(response: string | null | undefined) {
     }
 }
 
+function buildNoInformationSeed(responseLanguage: MvpResponseLanguage) {
+    return responseLanguage === 'tr'
+        ? 'Bu konuda elimde net bilgi yok.'
+        : 'I do not have clear information about this in the knowledge base.'
+}
+
 function normalizeKnowledgeSearchQuery(value: string) {
     return value.replace(/\s+/g, ' ').trim()
 }
@@ -177,6 +186,34 @@ function mergeKnowledgeSearchResultGroups<T extends RagChunk>(groups: T[][], lim
     }
 
     return merged
+}
+
+function shouldSkipAdditionalKnowledgeSearchQueries(results: RagChunk[], limit: number) {
+    if (results.length === 0) return false
+
+    const requiredResultCount = Math.min(
+        Math.max(1, limit),
+        KNOWLEDGE_SEARCH_QUERY_SHORT_CIRCUIT_MIN_RESULTS
+    )
+    if (results.length < requiredResultCount) return false
+
+    const topSimilarity = results.reduce((best, result) => {
+        const similarity = typeof result.similarity === 'number' && Number.isFinite(result.similarity)
+            ? result.similarity
+            : 0
+        return Math.max(best, similarity)
+    }, 0)
+
+    return topSimilarity >= KNOWLEDGE_SEARCH_QUERY_SHORT_CIRCUIT_MIN_SIMILARITY
+}
+
+function shouldUseExtractiveRagBeforeCompletion(userMessage: string, extractiveResponse: string) {
+    const normalizedQuestion = knowledgeSearchQueryKey(userMessage)
+    const normalizedResponse = knowledgeSearchQueryKey(extractiveResponse)
+    const asksForLocationOrAddress = /\b(?:adres|kampus|kampusu|yerleske|konum|ulasim|nerede|nerde)\b/u.test(normalizedQuestion)
+    const responseHasAddressShape = /\b(?:adresi|yerleskesi|mahallesi|caddesi|bulvari|sokak|no:)\b/u.test(normalizedResponse)
+
+    return asksForLocationOrAddress && responseHasAddressShape
 }
 
 const INSTAGRAM_REQUEST_TAG = 'instagram_request'
@@ -1443,8 +1480,18 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
 
             const runKnowledgeSearch = async (threshold: number) => {
                 const resultGroups = []
-                for (const searchQuery of searchQueries) {
-                    resultGroups.push(await searchKnowledgeBase(searchQuery, orgId, threshold, 6, knowledgeSearchOptions))
+                for (let index = 0; index < searchQueries.length; index += 1) {
+                    const searchQuery = searchQueries[index]!
+                    const results = await searchKnowledgeBase(searchQuery, orgId, threshold, 6, knowledgeSearchOptions)
+                    resultGroups.push(results)
+
+                    if (
+                        index === 0
+                        && searchQueries.length > 1
+                        && shouldSkipAdditionalKnowledgeSearchQueries(results, 6)
+                    ) {
+                        break
+                    }
                 }
                 return mergeKnowledgeSearchResultGroups(resultGroups, 6)
             }
@@ -1463,6 +1510,49 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 if (!fallbackKnowledgeContext) {
                     fallbackKnowledgeContext = context.replace(/\s+/g, ' ').trim().slice(0, 1500)
                     fallbackKnowledgeChunks = chunks
+                }
+
+                const extractiveSeed = buildNoInformationSeed(responseLanguage)
+                const extractiveRagResponse = repairLinkOnlyRagAnswer({
+                    response: extractiveSeed,
+                    userMessage: options.text,
+                    responseLanguage,
+                    chunks
+                })
+                if (
+                    extractiveRagResponse
+                    && extractiveRagResponse !== extractiveSeed
+                    && !isRagNoAnswerResponse(extractiveRagResponse)
+                    && shouldUseExtractiveRagBeforeCompletion(options.text, extractiveRagResponse)
+                ) {
+                    const extractiveRagWithSources = appendCanonicalRagSourceLinks(extractiveRagResponse, chunks, {
+                        force: true,
+                        limit: 1
+                    })
+                    const formattedExtractiveRagReply = formatOutboundBotMessage(extractiveRagWithSources)
+                    const outboundMetadata = await sendOutboundAndCollectMetadata(formattedExtractiveRagReply)
+                    await persistBotMessage(formattedExtractiveRagReply, {
+                        ...outboundMetadata,
+                        is_rag: true,
+                        rag_extractive: true,
+                        sources: chunks.map((chunk) => chunk.document_id).filter(Boolean)
+                    })
+                    await recordAiLatencyEvent({
+                        organizationId: orgId,
+                        conversationId: conversation.id,
+                        metricKey: 'llm_response',
+                        durationMs: Date.now() - llmResponseStartedAt,
+                        source: options.source,
+                        metadata: {
+                            response_kind: 'rag_extractive',
+                            platform: options.platform,
+                            document_count: kbResults.length
+                        }
+                    }, {
+                        supabase: options.supabase
+                    })
+                    await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
+                    return
                 }
 
                 const noAnswerToken = 'NO_ANSWER'
@@ -1603,9 +1693,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
         console.error(`${options.logPrefix}: RAG error`, error)
 
         if (fallbackKnowledgeChunks?.length) {
-            const noInformationSeed = responseLanguage === 'tr'
-                ? 'Bu konuda elimde net bilgi yok.'
-                : 'I do not have clear information about this in the knowledge base.'
+            const noInformationSeed = buildNoInformationSeed(responseLanguage)
             const extractiveRagFallback = repairLinkOnlyRagAnswer({
                 response: noInformationSeed,
                 userMessage: options.text,

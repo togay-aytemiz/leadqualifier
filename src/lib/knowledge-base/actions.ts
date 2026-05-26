@@ -794,7 +794,7 @@ function dedupePlannedSearchQueries(originalQuery: string, plannedQueries: strin
     const addQuery = (value: string) => {
         const trimmed = value.replace(/\s+/g, ' ').trim()
         if (!trimmed) return
-        const key = trimmed.toLocaleLowerCase('tr-TR')
+        const key = plannedSearchQueryKey(trimmed)
         if (seen.has(key)) return
         seen.add(key)
         queries.push(trimmed)
@@ -804,6 +804,10 @@ function dedupePlannedSearchQueries(originalQuery: string, plannedQueries: strin
     plannedQueries.forEach(addQuery)
 
     return queries.slice(0, 4)
+}
+
+function plannedSearchQueryKey(value: string) {
+    return value.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
 }
 
 function shouldSkipPlannedSearchVariants(
@@ -860,16 +864,8 @@ export async function searchKnowledgeBase(
         language: options?.language ?? null,
         supabase
     }
-    const plan = await resolveKnowledgeSearchPlan(query, options)
-    const searchQueries = dedupePlannedSearchQueries(query, plan.searchQueries)
-
-    if (searchQueries.length <= 1) {
-        return searchKnowledgeBaseSingleQuery(query, organizationId, threshold, limit, executionOptions)
-    }
-
-    const [originalSearchQuery, ...plannedSearchQueries] = searchQueries
     const originalResults = await searchKnowledgeBaseSingleQuery(
-        originalSearchQuery ?? query,
+        query,
         organizationId,
         threshold,
         limit,
@@ -877,6 +873,17 @@ export async function searchKnowledgeBase(
     )
 
     if (shouldSkipPlannedSearchVariants(query, originalResults, limit)) {
+        return originalResults
+    }
+
+    const plan = await resolveKnowledgeSearchPlan(query, options)
+    const searchQueries = dedupePlannedSearchQueries(query, plan.searchQueries)
+    const originalSearchQueryKey = plannedSearchQueryKey(query)
+    const plannedSearchQueries = searchQueries.filter(
+        (searchQuery) => plannedSearchQueryKey(searchQuery) !== originalSearchQueryKey
+    )
+
+    if (plannedSearchQueries.length === 0) {
         return originalResults
     }
 
