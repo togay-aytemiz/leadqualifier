@@ -7,6 +7,9 @@ import { createDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { getScopedMessages } from '@/i18n/messages'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const UNIVERSITY_DEMO_LOGO_URL = '/yuksek-ihtisas-universitesi.png'
 
 type DemoChatPageProps = {

@@ -23,4 +23,11 @@ describe('public demo chat page source', () => {
         expect(source).toContain("'yiu-qualy-ai-demo'")
         expect(source).toContain('channel.logoUrl || defaultLogoUrl')
     })
+
+    it('forces a fresh server render so the signed demo API token cannot be served stale from cache', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("export const dynamic = 'force-dynamic'")
+        expect(source).toContain('export const revalidate = 0')
+    })
 })
