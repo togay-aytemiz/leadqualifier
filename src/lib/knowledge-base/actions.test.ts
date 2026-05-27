@@ -69,6 +69,7 @@ import {
     getSidebarData,
     getSidebarFilesPage,
     processKnowledgeDocument,
+    rebuildKnowledgeDocumentChunks,
     searchKnowledgeBase,
     searchKnowledgeBaseFocusedEvidence
 } from '@/lib/knowledge-base/actions'
@@ -4443,5 +4444,98 @@ describe('processKnowledgeDocument', () => {
         expect(embeddedContents).toHaveLength(2)
         expect(embeddedContents[0]).toContain('Section: BAŞVURU ŞARTLARI')
         expect(embeddedContents[1]).toContain('Section: İLETİŞİM BİLGİLERİ')
+    })
+
+    it('indexes table rows as standalone evidence chunks with section metadata', async () => {
+        generateEmbeddingsMock.mockImplementationOnce(async (texts: string[]) => (
+            texts.map(() => [0.1, 0.2, 0.3])
+        ))
+        const { supabase } = createProcessKnowledgeDocumentSupabase({
+            title: 'Tıbbi Laboratuvar Teknikleri Ders Planı',
+            content: [
+                'YAZ STAJI',
+                '| Ders Kodu | Ders Adı | Süre | AKTS |',
+                '| --- | --- | --- | --- |',
+                '| TLT 216 | Yaz Stajı | 20 iş günü | 4 |',
+                '| TLT 214 | Klinik Uygulama | 10 iş günü | 3 |'
+            ].join('\n')
+        })
+
+        await processKnowledgeDocument('doc-1', supabase)
+
+        const embeddedContents = generateEmbeddingsMock.mock.calls.at(-1)?.[0] as string[]
+        const tableRowChunk = embeddedContents.find((content) => (
+            content.includes('Evidence Type: table-row')
+            && content.includes('Evidence Label: TLT 216')
+        ))
+
+        expect(tableRowChunk).toBeTruthy()
+        expect(tableRowChunk).toContain('Document Title: Tıbbi Laboratuvar Teknikleri Ders Planı')
+        expect(tableRowChunk).toContain('Section: YAZ STAJI')
+        expect(tableRowChunk).toContain('Ders Kodu: TLT 216')
+        expect(tableRowChunk).toContain('Ders Adı: Yaz Stajı')
+        expect(tableRowChunk).toContain('Süre: 20 iş günü')
+        expect(tableRowChunk).not.toContain('TLT 214')
+    })
+
+    it('indexes high-signal contact lines as standalone evidence chunks', async () => {
+        generateEmbeddingsMock.mockImplementationOnce(async (texts: string[]) => (
+            texts.map(() => [0.1, 0.2, 0.3])
+        ))
+        const { supabase } = createProcessKnowledgeDocumentSupabase({
+            title: 'Program Bilgi Notu',
+            content: [
+                'İLETİŞİM BİLGİLERİ',
+                'Tıbbi Laboratuvar Teknikleri Programı Telefon: +90 312 329 10 10 E-posta: tlt@yiu.edu.tr',
+                '',
+                'Program hakkında genel açıklamalar burada yer alır.'
+            ].join('\n')
+        })
+
+        await processKnowledgeDocument('doc-1', supabase)
+
+        const embeddedContents = generateEmbeddingsMock.mock.calls.at(-1)?.[0] as string[]
+        const evidenceRowChunk = embeddedContents.find((content) => (
+            content.includes('Evidence Type: evidence-row')
+            && content.includes('tlt@yiu.edu.tr')
+        ))
+
+        expect(evidenceRowChunk).toBeTruthy()
+        expect(evidenceRowChunk).toContain('Document Title: Program Bilgi Notu')
+        expect(evidenceRowChunk).toContain('Section: İLETİŞİM BİLGİLERİ')
+        expect(evidenceRowChunk).toContain('+90 312 329 10 10')
+    })
+})
+
+describe('rebuildKnowledgeDocumentChunks', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('rebuilds chunks without requiring tenant-user authorization when caller already owns authorization', async () => {
+        generateEmbeddingsMock.mockImplementationOnce(async (texts: string[]) => (
+            texts.map(() => [0.1, 0.2, 0.3])
+        ))
+        const { supabase, insertMock } = createProcessKnowledgeDocumentSupabase({
+            title: 'Program Bilgi Notu',
+            content: [
+                'İLETİŞİM BİLGİLERİ',
+                'Tıbbi Laboratuvar Teknikleri Programı Telefon: +90 312 329 10 10 E-posta: tlt@yiu.edu.tr'
+            ].join('\n')
+        })
+
+        const result = await rebuildKnowledgeDocumentChunks('doc-1', supabase)
+
+        expect(assertTenantWriteAllowedMock).not.toHaveBeenCalled()
+        expect(result).toMatchObject({
+            documentId: 'doc-1',
+            organizationId: 'org-1'
+        })
+        expect(result.chunkCount).toBeGreaterThan(1)
+        expect(insertMock).toHaveBeenCalledWith(expect.arrayContaining([
+            expect.objectContaining({
+                content: expect.stringContaining('Evidence Type: evidence-row')
+            })
+        ]))
     })
 })

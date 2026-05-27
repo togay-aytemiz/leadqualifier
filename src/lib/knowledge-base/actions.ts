@@ -146,6 +146,8 @@ interface IndexedSourceChunk {
     content: string
     tokenCount: number
     sectionTitle?: string
+    evidenceType?: 'table-row' | 'evidence-row'
+    evidenceLabel?: string
 }
 
 type AbortableQuery<T> = PromiseLike<T> & {
@@ -455,6 +457,53 @@ export async function processKnowledgeDocument(
 ) {
     const supabase = supabaseOverride ?? await createClient()
     await assertTenantWriteAllowed(supabase)
+    const result = await rebuildKnowledgeDocumentChunks(documentId, supabase)
+    const finalDoc = result.document as KnowledgeBaseEntry
+    const profileContent = buildProfileContextContent(finalDoc.title, finalDoc.content)
+
+    try {
+        await appendServiceCatalogCandidates({
+            organizationId: finalDoc.organization_id,
+            sourceType: 'knowledge',
+            sourceId: finalDoc.id,
+            content: profileContent,
+            supabase
+        })
+    } catch (error) {
+        console.error('Failed to propose knowledge-based services:', error)
+    }
+
+    try {
+        await appendOfferingProfileSuggestion({
+            organizationId: finalDoc.organization_id,
+            sourceType: 'knowledge',
+            sourceId: finalDoc.id,
+            content: profileContent,
+            supabase
+        })
+    } catch (error) {
+        console.error('Failed to propose knowledge-based offering profile suggestion:', error)
+    }
+
+    try {
+        await appendRequiredIntakeFields({
+            organizationId: finalDoc.organization_id,
+            sourceType: 'knowledge',
+            content: profileContent,
+            supabase
+        })
+    } catch (error) {
+        console.error('Failed to propose knowledge-based required intake fields:', error)
+    }
+
+    revalidatePath('/knowledge')
+    return finalDoc
+}
+
+export async function rebuildKnowledgeDocumentChunks(
+    documentId: string,
+    supabase: SupabaseClientLike
+) {
     const { data, error } = await supabase
         .from('knowledge_documents')
         .select('id, organization_id, title, content')
@@ -467,7 +516,7 @@ export async function processKnowledgeDocument(
 
     try {
         await supabase.from('knowledge_chunks').delete().eq('document_id', data.id)
-        await buildAndStoreChunks(supabase, data.organization_id, data.id, data.title ?? '', data.content ?? '')
+        const chunkCount = await buildAndStoreChunks(supabase, data.organization_id, data.id, data.title ?? '', data.content ?? '')
         const { data: readyDoc } = await supabase
             .from('knowledge_documents')
             .update({ status: 'ready' })
@@ -475,46 +524,12 @@ export async function processKnowledgeDocument(
             .select()
             .single()
 
-        const finalDoc = (readyDoc ?? data) as KnowledgeBaseEntry
-        const profileContent = buildProfileContextContent(finalDoc.title, finalDoc.content)
-
-        try {
-            await appendServiceCatalogCandidates({
-                organizationId: finalDoc.organization_id,
-                sourceType: 'knowledge',
-                sourceId: finalDoc.id,
-                content: profileContent,
-                supabase
-            })
-        } catch (error) {
-            console.error('Failed to propose knowledge-based services:', error)
+        return {
+            documentId: data.id,
+            organizationId: data.organization_id,
+            chunkCount,
+            document: readyDoc ?? data
         }
-
-        try {
-            await appendOfferingProfileSuggestion({
-                organizationId: finalDoc.organization_id,
-                sourceType: 'knowledge',
-                sourceId: finalDoc.id,
-                content: profileContent,
-                supabase
-            })
-        } catch (error) {
-            console.error('Failed to propose knowledge-based offering profile suggestion:', error)
-        }
-
-        try {
-            await appendRequiredIntakeFields({
-                organizationId: finalDoc.organization_id,
-                sourceType: 'knowledge',
-                content: profileContent,
-                supabase
-            })
-        } catch (error) {
-            console.error('Failed to propose knowledge-based required intake fields:', error)
-        }
-
-        revalidatePath('/knowledge')
-        return finalDoc
     } catch (err) {
         console.error('Failed to build knowledge chunks:', err)
         await supabase.from('knowledge_documents').update({ status: 'error' }).eq('id', data.id)
@@ -5683,7 +5698,7 @@ function splitStructuredDocumentSections(content: string) {
         if (title) headings.push({ index, title })
     }
 
-    if (headings.length < 2) return []
+    if (headings.length === 0) return []
 
     const sections: Array<{ sectionTitle?: string; content: string }> = []
     if (headings[0]?.index && headings[0].index > 0) {
@@ -5709,16 +5724,162 @@ function splitStructuredDocumentSections(content: string) {
     return sections
 }
 
+function splitTableCells(line: string) {
+    const trimmed = line.trim()
+    if (!trimmed.includes('|')) return []
+
+    return trimmed
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell) => cell.replace(/\s+/g, ' ').trim())
+}
+
+function isMarkdownTableSeparator(line: string) {
+    const cells = splitTableCells(line)
+    return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+}
+
+function hasMeaningfulTableCells(cells: string[]) {
+    return cells.filter((cell) => cell && !/^:?-{3,}:?$/.test(cell)).length >= 2
+}
+
+function evidenceLabelFromText(value: string) {
+    return value
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 90)
+        .trim()
+}
+
+function buildTableRowEvidence(headers: string[], cells: string[], sectionTitle?: string): IndexedSourceChunk | null {
+    if (!hasMeaningfulTableCells(cells)) return null
+
+    const pairs = cells
+        .map((cell, index) => {
+            const header = headers[index]?.trim()
+            if (!cell) return null
+            return header ? `${header}: ${cell}` : cell
+        })
+        .filter((value): value is string => Boolean(value))
+
+    const content = pairs.join(' | ')
+    if (!content) return null
+
+    return {
+        content,
+        tokenCount: estimateTokenCount(content),
+        sectionTitle,
+        evidenceType: 'table-row',
+        evidenceLabel: evidenceLabelFromText(cells.find(Boolean) ?? content)
+    }
+}
+
+function extractTableRowEvidenceChunks(content: string, sectionTitle?: string): IndexedSourceChunk[] {
+    const lines = content
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+    const chunks: IndexedSourceChunk[] = []
+
+    for (let index = 0; index < lines.length - 1; index += 1) {
+        const headerCells = splitTableCells(lines[index] ?? '')
+        if (headerCells.length < 2 || !isMarkdownTableSeparator(lines[index + 1] ?? '')) continue
+
+        let rowIndex = index + 2
+        for (; rowIndex < lines.length; rowIndex += 1) {
+            const rowCells = splitTableCells(lines[rowIndex] ?? '')
+            if (rowCells.length < 2) break
+
+            const rowChunk = buildTableRowEvidence(headerCells, rowCells, sectionTitle)
+            if (rowChunk) chunks.push(rowChunk)
+        }
+        index = Math.max(index, rowIndex - 1)
+    }
+
+    return chunks
+}
+
+function isHighSignalEvidenceLine(line: string) {
+    const rawLine = line.trim()
+    const normalized = rawLine.replace(/\s+/g, ' ').trim()
+    if (normalized.length < 12 || normalized.length > 360) return false
+    if (!hasTurkishOrLatinLetter(normalized)) return false
+    if (normalized.includes('|') || isMarkdownTableSeparator(normalized)) return false
+    if (extractStructuredHeading(normalized, '', 'body')) return false
+
+    const hasContactValue = /[\w.+-]+@[\w.-]+\.[A-Za-zÇĞİÖŞÜçğıöşü]{2,}/u.test(normalized)
+        || /(?:\+?\d[\d\s().-]{7,}\d)/.test(normalized)
+    const hasAddressValue = /\b(?:no|no:|numara|cadde|caddesi|sokak|sokağı|bulvar|bulvarı|mahallesi)\b/iu.test(normalized)
+    const hasCourseCode = /\b[A-ZÇĞİÖŞÜ]{2,}\s*\d{3}\b/u.test(normalized)
+    const hasCompactValue = /\b\d+(?:[.,]\d+)?\s*(?:iş\s*günü|gün|hafta|ay|yıl|saat|akts|kredi)\b/iu.test(normalized)
+        || /%\s*\d+|\d+\s*%/.test(normalized)
+        || /\b\d+[.,]\d+\s*\/\s*\d+\b/.test(normalized)
+    const looksLikeRow = /^[-*•]\s+/.test(rawLine)
+        || /^\d+[.)]\s+/.test(rawLine)
+        || /^\(?[A-Za-zÇĞİÖŞÜçğıöşü]\)?[.)]\s+/.test(rawLine)
+        || /\t/.test(rawLine)
+        || /\S\s{2,}\S/.test(rawLine)
+
+    return hasContactValue
+        || hasAddressValue
+        || hasCourseCode
+        || (looksLikeRow && hasCompactValue)
+}
+
+function extractEvidenceLineChunks(content: string, sectionTitle?: string): IndexedSourceChunk[] {
+    return content
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map((line) => line.replace(/\s+/g, ' ').trim())
+        .filter(isHighSignalEvidenceLine)
+        .map((line) => ({
+            content: line,
+            tokenCount: estimateTokenCount(line),
+            sectionTitle,
+            evidenceType: 'evidence-row' as const,
+            evidenceLabel: evidenceLabelFromText(line)
+        }))
+}
+
+function dedupeIndexedChunks(chunks: IndexedSourceChunk[]) {
+    const seen = new Set<string>()
+    const deduped: IndexedSourceChunk[] = []
+
+    for (const chunk of chunks) {
+        const key = [
+            chunk.sectionTitle ?? '',
+            chunk.evidenceType ?? 'section',
+            chunk.content.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
+        ].join('::')
+        if (seen.has(key)) continue
+        seen.add(key)
+        deduped.push(chunk)
+    }
+
+    return deduped
+}
+
 function chunkKnowledgeDocumentContent(content: string): IndexedSourceChunk[] {
     const sections = splitStructuredDocumentSections(content)
-    if (sections.length === 0) return chunkText(content)
+    const sourceSections = sections.length > 0 ? sections : [{ content }]
 
-    const chunks = sections.flatMap((section) => (
-        chunkText(section.content).map((chunk) => ({
+    const chunks = dedupeIndexedChunks(sourceSections.flatMap((section) => {
+        const evidenceChunks = [
+            ...extractTableRowEvidenceChunks(section.content, section.sectionTitle),
+            ...extractEvidenceLineChunks(section.content, section.sectionTitle)
+        ]
+        const sectionChunks = chunkText(section.content).map((chunk) => ({
             ...chunk,
             sectionTitle: section.sectionTitle
         }))
-    ))
+
+        return [
+            ...evidenceChunks,
+            ...sectionChunks
+        ]
+    }))
 
     if (chunks.length > 200) {
         throw new Error(`Content too large for indexing (chunks=${chunks.length}, max=200).`)
@@ -5727,7 +5888,13 @@ function chunkKnowledgeDocumentContent(content: string): IndexedSourceChunk[] {
     return chunks
 }
 
-function buildIndexedChunkContent(title: string, content: string, sectionTitle?: string) {
+function buildIndexedChunkContent(
+    title: string,
+    content: string,
+    sectionTitle?: string,
+    evidenceType?: IndexedSourceChunk['evidenceType'],
+    evidenceLabel?: string
+) {
     const normalizedTitle = title.trim()
     const normalizedContent = content.trim()
     const normalizedSectionTitle = normalizeSectionHeading(sectionTitle ?? '')
@@ -5739,6 +5906,15 @@ function buildIndexedChunkContent(title: string, content: string, sectionTitle?:
 
     if (normalizedSectionTitle && !chunkContentHasSectionMetadata(normalizedContent)) {
         metadataLines.push(`Section: ${normalizedSectionTitle}`)
+    }
+
+    if (evidenceType) {
+        metadataLines.push(`Evidence Type: ${evidenceType}`)
+    }
+
+    const normalizedEvidenceLabel = evidenceLabelFromText(evidenceLabel ?? '')
+    if (normalizedEvidenceLabel) {
+        metadataLines.push(`Evidence Label: ${normalizedEvidenceLabel}`)
     }
 
     if (metadataLines.length === 0) return normalizedContent
@@ -5754,9 +5930,15 @@ async function buildAndStoreChunks(
     content: string
 ) {
     const chunks = chunkKnowledgeDocumentContent(content)
-    if (chunks.length === 0) return
+    if (chunks.length === 0) return 0
     const indexedChunks = chunks.map((chunk) => {
-        const indexedContent = buildIndexedChunkContent(title, chunk.content, chunk.sectionTitle)
+        const indexedContent = buildIndexedChunkContent(
+            title,
+            chunk.content,
+            chunk.sectionTitle,
+            chunk.evidenceType,
+            chunk.evidenceLabel
+        )
         return {
             ...chunk,
             content: indexedContent,
@@ -5790,6 +5972,8 @@ async function buildAndStoreChunks(
         console.error('Failed to insert knowledge chunks:', error)
         throw new Error(error.message)
     }
+
+    return rows.length
 }
 
 export async function deleteCollection(id: string) {

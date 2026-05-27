@@ -156,6 +156,58 @@ Aday öğrenci ofisine telefon ve e-posta ile ulaşılabilir.`
         expect(chunks[1].sectionTitle).toBe('İLETİŞİM BİLGİLERİ')
     })
 
+    it('creates standalone evidence chunks for table rows in crawled pages', () => {
+        const chunks = createWebsiteChunks({
+            title: 'Tıbbi Laboratuvar Teknikleri Ders Planı',
+            sourceUrl: 'https://example.edu.tr/tlt.pdf',
+            content: `YAZ STAJI
+| Ders Kodu | Ders Adı | Süre | AKTS |
+| --- | --- | --- | --- |
+| TLT 216 | Yaz Stajı | 20 iş günü | 4 |
+| TLT 214 | Klinik Uygulama | 10 iş günü | 3 |`
+        }, {
+            maxTokens: 120,
+            overlapTokens: 8
+        })
+
+        const tableRowChunk = chunks.find((chunk) => (
+            chunk.content.includes('Evidence Type: table-row')
+            && chunk.content.includes('Evidence Label: TLT 216')
+        ))
+
+        expect(tableRowChunk).toBeTruthy()
+        expect(tableRowChunk.content).toContain('Page Title: Tıbbi Laboratuvar Teknikleri Ders Planı')
+        expect(tableRowChunk.content).toContain('Section: YAZ STAJI')
+        expect(tableRowChunk.content).toContain('Ders Kodu: TLT 216')
+        expect(tableRowChunk.content).toContain('Ders Adı: Yaz Stajı')
+        expect(tableRowChunk.content).toContain('Süre: 20 iş günü')
+        expect(tableRowChunk.content).not.toContain('TLT 214')
+    })
+
+    it('creates standalone evidence chunks for high-signal contact rows in crawled pages', () => {
+        const chunks = createWebsiteChunks({
+            title: 'Program Bilgi Notu',
+            sourceUrl: 'https://example.edu.tr/program.pdf',
+            content: `İLETİŞİM BİLGİLERİ
+Tıbbi Laboratuvar Teknikleri Programı Telefon: +90 312 329 10 10 E-posta: tlt@yiu.edu.tr
+
+Program hakkında genel açıklamalar burada yer alır.`
+        }, {
+            maxTokens: 120,
+            overlapTokens: 8
+        })
+
+        const evidenceRowChunk = chunks.find((chunk) => (
+            chunk.content.includes('Evidence Type: evidence-row')
+            && chunk.content.includes('tlt@yiu.edu.tr')
+        ))
+
+        expect(evidenceRowChunk).toBeTruthy()
+        expect(evidenceRowChunk.content).toContain('Page Title: Program Bilgi Notu')
+        expect(evidenceRowChunk.content).toContain('Section: İLETİŞİM BİLGİLERİ')
+        expect(evidenceRowChunk.content).toContain('+90 312 329 10 10')
+    })
+
     it('builds a dry-run report from a copied crawler output without database writes', async () => {
         const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
 
@@ -328,8 +380,8 @@ Kayit tarihleri ve ders baslangic bilgileri.
             expect(report.organizationId).toBe('org-1')
             expect(report.collectionId).toBe('collection-1')
             expect(report.pagesImported).toBe(1)
-            expect(report.chunksImported).toBe(1)
-            expect(report.databaseWrites).toBe(3)
+            expect(report.chunksImported).toBe(2)
+            expect(report.databaseWrites).toBe(4)
             expect(calls.createdCollections[0]).toMatchObject({
                 organization_id: 'org-1',
                 name: 'Website Crawl - example.edu.tr',
@@ -528,6 +580,194 @@ Scholarship detail for page B.
                 }
             })
             expect(report.databaseWrites).toBe(5)
+        } finally {
+            await rm(tempDir, { recursive: true, force: true })
+        }
+    })
+
+    it('splits embedded chunk inserts into bounded database batches', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
+        const insertedChunkBatchSizes = []
+        const repository = {
+            getOrganization: async (organizationId) => ({ id: organizationId, name: 'Test Org' }),
+            findCollection: async () => null,
+            createCollection: async () => ({ id: 'collection-1', name: 'Website Crawl - example.edu.tr' }),
+            deleteDocumentsByCollection: async () => {},
+            insertDocuments: async (rows) => rows.map((row, index) => ({
+                id: `doc-${index + 1}`,
+                title: row.title
+            })),
+            insertChunks: async (rows) => {
+                insertedChunkBatchSizes.push(rows.length)
+            },
+            updateDocumentsStatus: async () => {},
+            recordEmbeddingUsage: async () => {}
+        }
+
+        try {
+            await mkdir(path.join(tempDir, 'corpus'), { recursive: true })
+            await writeFile(path.join(tempDir, 'corpus-report.json'), JSON.stringify({
+                corpusPages: Array.from({ length: 5 }, (_, index) => ({
+                    url: `https://example.edu.tr/page-${index + 1}`,
+                    title: `Page ${index + 1}`,
+                    corpusPath: `corpus/page-${index + 1}.md`
+                }))
+            }), 'utf8')
+            for (let index = 1; index <= 5; index += 1) {
+                await writeFile(path.join(tempDir, 'corpus', `page-${index}.md`), `# Page ${index}
+
+Source URL: https://example.edu.tr/page-${index}
+
+## Content
+
+Page ${index} content for import batching.
+`, 'utf8')
+            }
+
+            await importCrawlCorpus({
+                crawlOutputDir: tempDir,
+                organizationId: 'org-1',
+                repository,
+                embedTexts: async (texts) => ({
+                    embeddings: texts.map(() => [0.1, 0.2, 0.3]),
+                    promptTokens: 5
+                }),
+                maxTokens: 80,
+                overlapTokens: 6,
+                batchSize: 10,
+                embeddingBatchSize: 10,
+                chunkInsertBatchSize: 2
+            })
+
+            expect(insertedChunkBatchSizes).toEqual([2, 2, 1])
+        } finally {
+            await rm(tempDir, { recursive: true, force: true })
+        }
+    })
+
+    it('bisects chunk insert batches when the database rejects a large vector insert', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
+        const insertedChunkBatchSizes = []
+        const repository = {
+            getOrganization: async (organizationId) => ({ id: organizationId, name: 'Test Org' }),
+            findCollection: async () => null,
+            createCollection: async () => ({ id: 'collection-1', name: 'Website Crawl - example.edu.tr' }),
+            deleteDocumentsByCollection: async () => {},
+            insertDocuments: async (rows) => rows.map((row, index) => ({
+                id: `doc-${index + 1}`,
+                title: row.title
+            })),
+            insertChunks: async (rows) => {
+                if (rows.length > 2) {
+                    throw new Error('canceling statement due to statement timeout')
+                }
+                insertedChunkBatchSizes.push(rows.length)
+            },
+            updateDocumentsStatus: async () => {},
+            recordEmbeddingUsage: async () => {}
+        }
+
+        try {
+            await mkdir(path.join(tempDir, 'corpus'), { recursive: true })
+            await writeFile(path.join(tempDir, 'corpus-report.json'), JSON.stringify({
+                corpusPages: Array.from({ length: 5 }, (_, index) => ({
+                    url: `https://example.edu.tr/retry-${index + 1}`,
+                    title: `Retry ${index + 1}`,
+                    corpusPath: `corpus/retry-${index + 1}.md`
+                }))
+            }), 'utf8')
+            for (let index = 1; index <= 5; index += 1) {
+                await writeFile(path.join(tempDir, 'corpus', `retry-${index}.md`), `# Retry ${index}
+
+Source URL: https://example.edu.tr/retry-${index}
+
+## Content
+
+Retry ${index} content.
+`, 'utf8')
+            }
+
+            await importCrawlCorpus({
+                crawlOutputDir: tempDir,
+                organizationId: 'org-1',
+                repository,
+                embedTexts: async (texts) => ({
+                    embeddings: texts.map(() => [0.1, 0.2, 0.3]),
+                    promptTokens: 5
+                }),
+                maxTokens: 80,
+                overlapTokens: 6,
+                batchSize: 10,
+                embeddingBatchSize: 10,
+                chunkInsertBatchSize: 5
+            })
+
+            expect(insertedChunkBatchSizes).toEqual([2, 1, 2])
+        } finally {
+            await rm(tempDir, { recursive: true, force: true })
+        }
+    })
+
+    it('falls back to lexical-only chunks when a single vector row times out', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'crawl-corpus-'))
+        const insertedRows = []
+        const repository = {
+            getOrganization: async (organizationId) => ({ id: organizationId, name: 'Test Org' }),
+            findCollection: async () => null,
+            createCollection: async () => ({ id: 'collection-1', name: 'Website Crawl - example.edu.tr' }),
+            deleteDocumentsByCollection: async () => {},
+            insertDocuments: async (rows) => rows.map((row, index) => ({
+                id: `doc-${index + 1}`,
+                title: row.title
+            })),
+            insertChunks: async (rows) => {
+                if (rows.some((row) => row.embedding !== null)) {
+                    throw new Error('canceling statement due to statement timeout')
+                }
+                insertedRows.push(...rows)
+            },
+            updateDocumentsStatus: async () => {},
+            recordEmbeddingUsage: async () => {}
+        }
+
+        try {
+            await mkdir(path.join(tempDir, 'corpus'), { recursive: true })
+            await writeFile(path.join(tempDir, 'corpus-report.json'), JSON.stringify({
+                corpusPages: [{
+                    url: 'https://example.edu.tr/vector-timeout',
+                    title: 'Vector Timeout',
+                    corpusPath: 'corpus/vector-timeout.md'
+                }]
+            }), 'utf8')
+            await writeFile(path.join(tempDir, 'corpus', 'vector-timeout.md'), `# Vector Timeout
+
+Source URL: https://example.edu.tr/vector-timeout
+
+## Content
+
+This chunk should survive as lexical-only evidence if vector insert times out.
+`, 'utf8')
+
+            await importCrawlCorpus({
+                crawlOutputDir: tempDir,
+                organizationId: 'org-1',
+                repository,
+                embedTexts: async (texts) => ({
+                    embeddings: texts.map(() => [0.1, 0.2, 0.3]),
+                    promptTokens: 5
+                }),
+                maxTokens: 80,
+                overlapTokens: 6,
+                batchSize: 10,
+                embeddingBatchSize: 10,
+                chunkInsertBatchSize: 1
+            })
+
+            expect(insertedRows).toHaveLength(1)
+            expect(insertedRows[0]).toMatchObject({
+                embedding: null,
+                content: expect.stringContaining('lexical-only evidence')
+            })
         } finally {
             await rm(tempDir, { recursive: true, force: true })
         }

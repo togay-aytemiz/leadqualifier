@@ -87,6 +87,12 @@ function parseArgs(argv) {
             continue
         }
 
+        if (arg === '--chunk-insert-batch-size') {
+            args.chunkInsertBatchSize = Number(argv[index + 1])
+            index += 1
+            continue
+        }
+
         if (arg === '--replace') {
             args.replace = true
             continue
@@ -118,6 +124,7 @@ Options:
   --replace           Delete previous documents in the same crawl collection before importing
   --batch-size        Optional page insert batch size, default 50
   --embedding-batch-size Optional OpenAI embedding batch size, default 64
+  --chunk-insert-batch-size Optional DB chunk insert batch size, default 32
   --skip-usage        Do not write embedding usage rows`)
 }
 
@@ -239,6 +246,7 @@ async function main() {
             overlapTokens: args.overlapTokens,
             batchSize: args.batchSize,
             embeddingBatchSize: args.embeddingBatchSize,
+            chunkInsertBatchSize: args.chunkInsertBatchSize,
             skipUsage: args.skipUsage,
             repository: createSupabaseImportRepository(createSupabaseClientFromEnv()),
             embedTexts: createOpenAIEmbedder(),

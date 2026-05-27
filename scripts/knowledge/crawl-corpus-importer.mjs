@@ -6,6 +6,7 @@ const DEFAULT_OVERLAP_TOKENS = 100
 const DEFAULT_SAMPLE_LIMIT = 5
 const DEFAULT_IMPORT_BATCH_SIZE = 50
 const DEFAULT_EMBEDDING_BATCH_SIZE = 64
+const DEFAULT_CHUNK_INSERT_BATCH_SIZE = 32
 const DEFAULT_BOILERPLATE_LINES = new Set([
     'Kapat',
     'Web Asistan Menü',
@@ -215,7 +216,7 @@ function splitIntoSections(content) {
         if (title) headings.push({ index, title })
     }
 
-    if (headings.length < 2) {
+    if (headings.length === 0) {
         const normalizedContent = normalizeWhitespace(content)
         return normalizedContent
             ? [{ title: 'Main content', lines: [normalizedContent] }]
@@ -247,6 +248,137 @@ function splitIntoSections(content) {
     return sections
 }
 
+function splitTableCells(line) {
+    const trimmed = String(line ?? '').trim()
+    if (!trimmed.includes('|')) return []
+
+    return trimmed
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell) => normalizeWhitespace(cell).replace(/\s+/g, ' '))
+}
+
+function isMarkdownTableSeparator(line) {
+    const cells = splitTableCells(line)
+    return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+}
+
+function hasMeaningfulTableCells(cells) {
+    return cells.filter((cell) => cell && !/^:?-{3,}:?$/.test(cell)).length >= 2
+}
+
+function evidenceLabelFromText(value) {
+    return normalizeWhitespace(value)
+        .replace(/\s+/g, ' ')
+        .slice(0, 90)
+        .trim()
+}
+
+function buildTableRowEvidence(headers, cells, sectionTitle) {
+    if (!hasMeaningfulTableCells(cells)) return null
+
+    const pairs = cells
+        .map((cell, index) => {
+            const header = headers[index]?.trim()
+            if (!cell) return null
+            return header ? `${header}: ${cell}` : cell
+        })
+        .filter(Boolean)
+    const content = pairs.join(' | ')
+    if (!content) return null
+
+    return {
+        sectionTitle,
+        content,
+        evidenceType: 'table-row',
+        evidenceLabel: evidenceLabelFromText(cells.find(Boolean) || content)
+    }
+}
+
+function extractTableRowEvidenceBlocks(section) {
+    const lines = section.lines.join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+    const chunks = []
+
+    for (let index = 0; index < lines.length - 1; index += 1) {
+        const headerCells = splitTableCells(lines[index])
+        if (headerCells.length < 2 || !isMarkdownTableSeparator(lines[index + 1])) continue
+
+        let rowIndex = index + 2
+        for (; rowIndex < lines.length; rowIndex += 1) {
+            const rowCells = splitTableCells(lines[rowIndex])
+            if (rowCells.length < 2) break
+
+            const evidence = buildTableRowEvidence(headerCells, rowCells, section.title)
+            if (evidence) chunks.push(evidence)
+        }
+        index = Math.max(index, rowIndex - 1)
+    }
+
+    return chunks
+}
+
+function isHighSignalEvidenceLine(line) {
+    const rawLine = String(line ?? '').trim()
+    const normalized = normalizeWhitespace(rawLine).replace(/\s+/g, ' ')
+    if (normalized.length < 12 || normalized.length > 360) return false
+    if (!hasLetter(normalized)) return false
+    if (normalized.includes('|') || isMarkdownTableSeparator(normalized)) return false
+    if (extractStructuredHeading(normalized, '', 'body')) return false
+
+    const hasContactValue = /[\w.+-]+@[\w.-]+\.[A-Za-zÇĞİÖŞÜçğıöşü]{2,}/u.test(normalized)
+        || /(?:\+?\d[\d\s().-]{7,}\d)/.test(normalized)
+    const hasAddressValue = /\b(?:no|no:|numara|cadde|caddesi|sokak|sokağı|bulvar|bulvarı|mahallesi)\b/iu.test(normalized)
+    const hasCourseCode = /\b[A-ZÇĞİÖŞÜ]{2,}\s*\d{3}\b/u.test(normalized)
+    const hasCompactValue = /\b\d+(?:[.,]\d+)?\s*(?:iş\s*günü|gün|hafta|ay|yıl|saat|akts|kredi)\b/iu.test(normalized)
+        || /%\s*\d+|\d+\s*%/.test(normalized)
+        || /\b\d+[.,]\d+\s*\/\s*\d+\b/.test(normalized)
+    const looksLikeRow = /^[-*•]\s+/.test(rawLine)
+        || /^\d+[.)]\s+/.test(rawLine)
+        || /^\(?[A-Za-zÇĞİÖŞÜçğıöşü]\)?[.)]\s+/.test(rawLine)
+        || /\t/.test(rawLine)
+        || /\S\s{2,}\S/.test(rawLine)
+
+    return hasContactValue
+        || hasAddressValue
+        || hasCourseCode
+        || (looksLikeRow && hasCompactValue)
+}
+
+function extractEvidenceLineBlocks(section) {
+    return section.lines
+        .join('\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map((line) => normalizeWhitespace(line).replace(/\s+/g, ' '))
+        .filter(isHighSignalEvidenceLine)
+        .map((line) => ({
+            sectionTitle: section.title,
+            content: line,
+            evidenceType: 'evidence-row',
+            evidenceLabel: evidenceLabelFromText(line)
+        }))
+}
+
+function dedupeChunkBlocks(blocks) {
+    const seen = new Set()
+    const deduped = []
+
+    for (const block of blocks) {
+        const key = [
+            block.sectionTitle || '',
+            block.evidenceType || 'section',
+            normalizeWhitespace(block.content).toLocaleLowerCase('tr-TR')
+        ].join('::')
+        if (seen.has(key)) continue
+        seen.add(key)
+        deduped.push(block)
+    }
+
+    return deduped
+}
+
 function splitLongBlock(block, maxTokens) {
     const words = wordsFromText(block)
     if (words.length <= maxTokens) return [normalizeWhitespace(block)]
@@ -274,11 +406,13 @@ function lastWords(text, count) {
     return words.slice(Math.max(0, words.length - count)).join(' ')
 }
 
-function buildChunkContent({ title, sourceUrl, sectionTitle, body }) {
+function buildChunkContent({ title, sourceUrl, sectionTitle, body, evidenceType, evidenceLabel }) {
     const header = [
         `Page Title: ${title}`,
         sourceUrl ? `Source URL: ${sourceUrl}` : null,
-        `Section: ${sectionTitle}`
+        `Section: ${sectionTitle}`,
+        evidenceType ? `Evidence Type: ${evidenceType}` : null,
+        evidenceLabel ? `Evidence Label: ${evidenceLabelFromText(evidenceLabel)}` : null
     ].filter(Boolean).join('\n')
 
     return `${header}\n\n${normalizeWhitespace(body)}`.trim()
@@ -305,6 +439,33 @@ export function createWebsiteChunks(page, options = {}) {
         const bodyBudget = Math.max(12, safeMaxTokens - prefixTokens - overlapTokens)
         const blocks = sectionBlocks(section, bodyBudget)
         let currentBody = ''
+
+        const evidenceBlocks = dedupeChunkBlocks([
+            ...extractTableRowEvidenceBlocks(section),
+            ...extractEvidenceLineBlocks(section)
+        ])
+        for (const evidenceBlock of evidenceBlocks) {
+            const content = buildChunkContent({
+                title,
+                sourceUrl,
+                sectionTitle: section.title,
+                body: evidenceBlock.content,
+                evidenceType: evidenceBlock.evidenceType,
+                evidenceLabel: evidenceBlock.evidenceLabel
+            })
+
+            chunks.push({
+                pageTitle: title,
+                sourceUrl,
+                sectionTitle: section.title,
+                chunkIndex,
+                content,
+                tokenCount: estimateTokenCount(content),
+                evidenceType: evidenceBlock.evidenceType,
+                evidenceLabel: evidenceBlock.evidenceLabel
+            })
+            chunkIndex += 1
+        }
 
         const flush = () => {
             const trimmedBody = normalizeWhitespace(currentBody)
@@ -586,6 +747,33 @@ function assertRepository(repository) {
     }
 }
 
+function isStatementTimeoutError(error) {
+    const message = error instanceof Error ? error.message : String(error ?? '')
+    return /statement timeout|canceling statement due to statement timeout/i.test(message)
+}
+
+async function insertChunkRowsWithBisect(repository, rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return
+
+    try {
+        await repository.insertChunks(rows)
+    } catch (error) {
+        if (rows.length === 1) {
+            if (!isStatementTimeoutError(error)) throw error
+
+            await repository.insertChunks(rows.map((row) => ({
+                ...row,
+                embedding: null
+            })))
+            return
+        }
+
+        const midpoint = Math.ceil(rows.length / 2)
+        await insertChunkRowsWithBisect(repository, rows.slice(0, midpoint))
+        await insertChunkRowsWithBisect(repository, rows.slice(midpoint))
+    }
+}
+
 async function resolveImportCollection({ repository, organizationId, collectionName, replace }) {
     const existingCollection = await repository.findCollection({
         organizationId,
@@ -620,7 +808,8 @@ async function importPageBatch({
     collectionId,
     language,
     embedTexts,
-    embeddingBatchSize
+    embeddingBatchSize,
+    chunkInsertBatchSize
 }) {
     const documentRows = batch.map(({ page }) => ({
         organization_id: organizationId,
@@ -671,7 +860,9 @@ async function importPageBatch({
                 ...chunk,
                 embedding: formatEmbeddingForPgvector(embeddingResult.embeddings[index] ?? [])
             }))
-            await repository.insertChunks(rows)
+            for (const insertBatch of chunkArray(rows, chunkInsertBatchSize)) {
+                await insertChunkRowsWithBisect(repository, insertBatch)
+            }
             chunksImported += rows.length
             embeddingPromptTokens += embeddingResult.promptTokens
             embeddingBatchCount += 1
@@ -723,6 +914,10 @@ export async function importCrawlCorpus(options = {}) {
     })
     const batchSize = Number(options.batchSize ?? DEFAULT_IMPORT_BATCH_SIZE)
     const embeddingBatchSize = Number(options.embeddingBatchSize ?? DEFAULT_EMBEDDING_BATCH_SIZE)
+    const rawChunkInsertBatchSize = Number(options.chunkInsertBatchSize ?? DEFAULT_CHUNK_INSERT_BATCH_SIZE)
+    const chunkInsertBatchSize = Number.isFinite(rawChunkInsertBatchSize) && rawChunkInsertBatchSize > 0
+        ? Math.min(rawChunkInsertBatchSize, embeddingBatchSize)
+        : Math.min(DEFAULT_CHUNK_INSERT_BATCH_SIZE, embeddingBatchSize)
     let pagesImported = 0
     let chunksImported = 0
     let usageRows = 0
@@ -738,7 +933,8 @@ export async function importCrawlCorpus(options = {}) {
             collectionId: collection.id,
             language: options.language,
             embedTexts: options.embedTexts,
-            embeddingBatchSize
+            embeddingBatchSize,
+            chunkInsertBatchSize
         })
         pagesImported += batchResult.pagesImported
         chunksImported += batchResult.chunksImported
@@ -834,13 +1030,36 @@ export function createSupabaseImportRepository(supabase) {
             return assertNoSupabaseError(result, 'Failed to create collection')
         },
         async deleteDocumentsByCollection({ organizationId, collectionId }) {
-            const result = await supabase
-                .from('knowledge_documents')
-                .delete()
-                .eq('organization_id', organizationId)
-                .eq('collection_id', collectionId)
+            const deleteBatchSize = 25
 
-            assertNoSupabaseError(result, 'Failed to delete previous collection documents')
+            while (true) {
+                const documentsResult = await supabase
+                    .from('knowledge_documents')
+                    .select('id')
+                    .eq('organization_id', organizationId)
+                    .eq('collection_id', collectionId)
+                    .limit(deleteBatchSize)
+
+                const documents = assertNoSupabaseError(documentsResult, 'Failed to list previous collection documents') ?? []
+                const documentIds = documents.map((document) => document.id).filter(Boolean)
+                if (documentIds.length === 0) break
+
+                const chunkDeleteResult = await supabase
+                    .from('knowledge_chunks')
+                    .delete()
+                    .eq('organization_id', organizationId)
+                    .in('document_id', documentIds)
+
+                assertNoSupabaseError(chunkDeleteResult, 'Failed to delete previous collection chunks')
+
+                const documentDeleteResult = await supabase
+                    .from('knowledge_documents')
+                    .delete()
+                    .eq('organization_id', organizationId)
+                    .in('id', documentIds)
+
+                assertNoSupabaseError(documentDeleteResult, 'Failed to delete previous collection documents')
+            }
         },
         async insertDocuments(rows) {
             const result = await supabase

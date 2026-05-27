@@ -51,6 +51,38 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
     })
 
+    it('removes generic adjacent-topic help closings after a grounded answer', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir. Daha fazla bilgiye ihtiyacın olursa, başka bir konu hakkında yardımcı olabilirim!',
+            userMessage: 'Tıpta dönem içi kurul notu başarı notuna nasıl yansıyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.')
+    })
+
+    it('removes generic more-detail-or-other-topic questions after a grounded answer', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Her stajın sonunda başarılı olmak için staj notunun 100 üzerinden en az 60 olması zorunludur. Daha fazla detay veya başka bir konu hakkında bilgi ister misin?',
+            userMessage: 'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Her stajın sonunda başarılı olmak için staj notunun 100 üzerinden en az 60 olması zorunludur.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Her stajın sonunda başarılı olmak için staj notunun 100 üzerinden en az 60 olması zorunludur.')
+    })
+
     it('keeps role-neutral topic-related engagement questions that ask about adjacent grounded details', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Tıp Fakültesi müfredatında yer alan seçmeli derslerden Dönem VI sonuna kadar başarılı olunmalıdır. Bu konuyla ilgili final ve bütünleme şartlarını da öğrenmek ister misin?',
