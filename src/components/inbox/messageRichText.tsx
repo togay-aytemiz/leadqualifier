@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from 'react'
 
 type MessageRichTextProps = {
   content: string
-  standaloneUrlLabel?: string
+  standaloneUrlLabel?: string | ((index: number, total: number) => string)
 }
 
 const TOKEN_PATTERN =
@@ -104,7 +104,27 @@ function parseInlineText(text: string, keyPrefix: string): ReactNode[] {
   return nodes
 }
 
-function renderLine(line: string, index: number, standaloneUrlLabel?: string) {
+function isStandaloneUrlLine(line: string) {
+  return STANDALONE_URL_PATTERN.test(line.trim())
+}
+
+function resolveStandaloneUrlLabel(
+  standaloneUrlLabel: MessageRichTextProps['standaloneUrlLabel'],
+  index: number,
+  total: number
+) {
+  return typeof standaloneUrlLabel === 'function'
+    ? standaloneUrlLabel(index, total)
+    : standaloneUrlLabel
+}
+
+function renderLine(
+  line: string,
+  index: number,
+  standaloneUrlLabel?: MessageRichTextProps['standaloneUrlLabel'],
+  standaloneUrlIndex = -1,
+  standaloneUrlTotal = 0
+) {
   const quoteMatch = line.match(/^\s*>\s?(.*)$/)
   if (quoteMatch) {
     return (
@@ -120,10 +140,11 @@ function renderLine(line: string, index: number, standaloneUrlLabel?: string) {
 
   if (standaloneUrlLabel) {
     const trimmedLine = line.trim()
-    if (STANDALONE_URL_PATTERN.test(trimmedLine)) {
+    if (isStandaloneUrlLine(trimmedLine)) {
+      const label = resolveStandaloneUrlLabel(standaloneUrlLabel, standaloneUrlIndex, standaloneUrlTotal)
       return (
         <span key={`line-${index}`}>
-          {renderLink(standaloneUrlLabel, trimmedLine, `line-${index}-standalone-url`)}
+          {renderLink(label ?? trimmedLine, trimmedLine, `line-${index}-standalone-url`)}
         </span>
       )
     }
@@ -135,11 +156,24 @@ function renderLine(line: string, index: number, standaloneUrlLabel?: string) {
 export function MessageRichText({ content, standaloneUrlLabel }: MessageRichTextProps) {
   const normalized = content.replace(/\r\n/g, '\n')
   const lines = normalized.split('\n')
+  const standaloneUrlTotal = standaloneUrlLabel
+    ? lines.filter(isStandaloneUrlLine).length
+    : 0
+  let standaloneUrlIndex = 0
 
   return (
     <>
       {lines.map((line, index) => {
-        const renderedLine = renderLine(line, index, standaloneUrlLabel)
+        const currentStandaloneUrlIndex = standaloneUrlLabel && isStandaloneUrlLine(line)
+          ? standaloneUrlIndex++
+          : -1
+        const renderedLine = renderLine(
+          line,
+          index,
+          standaloneUrlLabel,
+          currentStandaloneUrlIndex,
+          standaloneUrlTotal
+        )
         const shouldAddBreak = index < lines.length - 1 && !/^\s*>\s?/.test(lines[index + 1] ?? '')
         return (
           <Fragment key={`message-line-wrapper-${index}`}>

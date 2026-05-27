@@ -219,7 +219,9 @@ describe('pickMessageNamespaces', () => {
   })
 
   it('keeps the public demo source link label short', () => {
-    expect(trMessages.demoChat.sourceLinkLabel).toBe('Daha fazla oku')
-    expect(enMessages.demoChat.sourceLinkLabel).toBe('Read more')
+    expect(trMessages.demoChat.sourceLinkLabel).toBe('Kaynağı aç')
+    expect(enMessages.demoChat.sourceLinkLabel).toBe('Open source')
+    expect(trMessages.demoChat.sourceLinkLabelNumbered).toBe('Kaynak {number}')
+    expect(enMessages.demoChat.sourceLinkLabelNumbered).toBe('Source {number}')
   })
 })

@@ -7,7 +7,10 @@ const {
     buildDemoChatContactIdMock,
     buildRagContextMock,
     createClientMock,
+    getOrgAiSettingsMock,
+    polishGroundedRagAnswerMock,
     processInboundAiPipelineMock,
+    recordAiUsageMock,
     repairLinkOnlyRagAnswerMock,
     resolveDemoChatChannelMock,
     searchKnowledgeBaseFocusedEvidenceMock,
@@ -17,7 +20,10 @@ const {
     buildDemoChatContactIdMock: vi.fn(),
     buildRagContextMock: vi.fn(),
     createClientMock: vi.fn(),
+    getOrgAiSettingsMock: vi.fn(),
+    polishGroundedRagAnswerMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
+    recordAiUsageMock: vi.fn(),
     repairLinkOnlyRagAnswerMock: vi.fn(),
     resolveDemoChatChannelMock: vi.fn(),
     searchKnowledgeBaseFocusedEvidenceMock: vi.fn(),
@@ -37,6 +43,14 @@ vi.mock('@/lib/channels/inbound-ai-pipeline', () => ({
     processInboundAiPipeline: processInboundAiPipelineMock,
 }))
 
+vi.mock('@/lib/ai/settings', () => ({
+    getOrgAiSettings: getOrgAiSettingsMock,
+}))
+
+vi.mock('@/lib/ai/usage', () => ({
+    recordAiUsage: recordAiUsageMock,
+}))
+
 vi.mock('@/lib/knowledge-base/actions', () => ({
     searchKnowledgeBaseFocusedEvidence: searchKnowledgeBaseFocusedEvidenceMock,
     searchKnowledgeBase: searchKnowledgeBaseMock,
@@ -52,6 +66,10 @@ vi.mock('@/lib/knowledge-base/rag-answer-repair', () => ({
 
 vi.mock('@/lib/knowledge-base/rag-source-links', () => ({
     appendCanonicalRagSourceLinks: appendCanonicalRagSourceLinksMock,
+}))
+
+vi.mock('@/lib/knowledge-base/rag-answer-polish', () => ({
+    polishGroundedRagAnswer: polishGroundedRagAnswerMock,
 }))
 
 import { GET, POST } from '@/app/api/demo/[slug]/chat/route'
@@ -115,6 +133,18 @@ describe('demo chat API route', () => {
         processInboundAiPipelineMock.mockImplementation(async (input) => {
             await input.sendOutbound('Merhaba, nasıl yardımcı olabilirim?')
         })
+        getOrgAiSettingsMock.mockResolvedValue({
+            prompt: 'Samimi cevap ver.',
+            bot_name: 'Qualy',
+        })
+        polishGroundedRagAnswerMock.mockImplementation(async ({ answer }) => ({
+            answer,
+            usedPolish: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
+        }))
+        recordAiUsageMock.mockResolvedValue(undefined)
         searchKnowledgeBaseMock.mockResolvedValue([])
         searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValue([])
         buildRagContextMock.mockReturnValue({ context: '', chunks: [], tokenCount: 0 })
@@ -554,6 +584,143 @@ describe('demo chat API route', () => {
                 rag_extractive: true,
                 sources: ['doc-1'],
             }),
+        }))
+    })
+
+    it('polishes deterministic demo RAG replies and can append multiple canonical source URLs', async () => {
+        const chunks = [
+            {
+                content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
+                document_id: 'doc-sbf',
+                document_title: 'Sağlık Bilimleri Fakültesi',
+                source_url: 'https://example.edu.tr/sbf.pdf',
+            },
+            {
+                content: 'Tıbbi Laboratuvar Teknikleri Programı öğrencileri Eczane Hizmetleri Programında çift anadal yapabilir.',
+                document_id: 'doc-tlt-cap',
+                document_title: 'TLT Çift Anadal',
+                source_url: 'https://example.edu.tr/tlt-cap.pdf',
+            }
+        ]
+        searchKnowledgeBaseMock.mockResolvedValueOnce(chunks)
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunks.map((chunk) => chunk.content).join('\n---\n'),
+            chunks,
+            tokenCount: 32,
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Tıbbi Laboratuvar Teknikleri Programında çift anadal mümkündür.'
+        )
+        polishGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Tıbbi Laboratuvar Teknikleri Programında da Eczane Hizmetleri ile çift anadal yapılabiliyor.\n\nİstersen çift anadal başvuru koşullarını da kısaca çıkarabilirim.',
+            usedPolish: true,
+            addedEngagement: true,
+            usage: { inputTokens: 80, outputTokens: 30, totalTokens: 110 },
+            model: 'gpt-4o-mini',
+        })
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Tıbbi Laboratuvar Teknikleri Programında da Eczane Hizmetleri ile çift anadal yapılabiliyor.\n\nİstersen çift anadal başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/tlt-cap.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain]
+        let messageSelectCount = 0
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                messageSelectCount += 1
+                if (messageSelectCount === 1) return completedMessagesChain
+                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesinde yer alıyor. Tıbbi Laboratuvar Teknikleri Programında da Eczane Hizmetleri ile çift anadal yapılabiliyor.\n\nİstersen çift anadal başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/sbf.pdf\nhttps://example.edu.tr/tlt-cap.pdf',
+            skillImage: null,
+        })
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir. Tıbbi Laboratuvar Teknikleri Programında çift anadal mümkündür.',
+            userMessage: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+            chunks,
+        }))
+        expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
+            expect.stringContaining('İstersen çift anadal başvuru koşullarını'),
+            chunks,
+            expect.objectContaining({ force: true, limit: 2 })
+        )
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            category: 'rag',
+            model: 'gpt-4o-mini',
+            inputTokens: 80,
+            outputTokens: 30,
+            totalTokens: 110,
+            metadata: expect.objectContaining({ source: 'demo_chat_rag_polish' })
         }))
     })
 

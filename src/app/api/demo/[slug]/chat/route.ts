@@ -10,9 +10,12 @@ import { processInboundAiPipeline } from '@/lib/channels/inbound-ai-pipeline'
 import { verifyDemoChatAccessToken } from '@/lib/demo-chat/access'
 import { buildDemoChatContactId, resolveDemoChatChannel } from '@/lib/demo-chat/channel'
 import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/language'
+import { getOrgAiSettings } from '@/lib/ai/settings'
+import { recordAiUsage } from '@/lib/ai/usage'
 import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/knowledge-base/actions'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
+import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
 
 export const runtime = 'nodejs'
@@ -440,7 +443,7 @@ async function buildExtractiveDemoChatReply(input: {
     const message = readMessageText(input.message)
     if (!message) return null
 
-    const buildReplyFromResults = (kbResults: RagChunk[]): DemoChatExtractiveReply | null => {
+    const buildReplyFromResults = async (kbResults: RagChunk[]): Promise<DemoChatExtractiveReply | null> => {
         if (!kbResults || kbResults.length === 0) return null
 
         const { context, chunks } = buildRagContext(kbResults)
@@ -456,10 +459,42 @@ async function buildExtractiveDemoChatReply(input: {
         })
         if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
 
+        const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
+            supabase: input.supabase
+        })
+        const polishedAnswer = await polishGroundedRagAnswer({
+            answer: repairedAnswer,
+            userMessage: message,
+            responseLanguage,
+            chunks,
+            settings: aiSettings
+        })
+
+        if (polishedAnswer.usage) {
+            try {
+                await recordAiUsage({
+                    organizationId: input.channel.organizationId,
+                    category: 'rag',
+                    model: polishedAnswer.model,
+                    inputTokens: polishedAnswer.usage.inputTokens,
+                    outputTokens: polishedAnswer.usage.outputTokens,
+                    totalTokens: polishedAnswer.usage.totalTokens,
+                    metadata: {
+                        source: 'demo_chat_rag_polish',
+                        demo_chat_channel_id: input.channel.id,
+                        document_count: chunks.length
+                    },
+                    supabase: input.supabase
+                })
+            } catch (error) {
+                console.error('Demo Chat: RAG polish usage recording failed; continuing reply flow', error)
+            }
+        }
+
         return {
-            replyText: appendCanonicalRagSourceLinks(repairedAnswer, chunks, {
+            replyText: appendCanonicalRagSourceLinks(polishedAnswer.answer, chunks, {
                 force: true,
-                limit: 1
+                limit: 2
             }),
             skillImage: null,
             chunks
@@ -472,7 +507,7 @@ async function buildExtractiveDemoChatReply(input: {
         FAST_RAG_RESULT_LIMIT,
         { supabase: input.supabase }
     )
-    const focusedReply = buildReplyFromResults(focusedResults)
+    const focusedReply = await buildReplyFromResults(focusedResults)
     if (focusedReply) return focusedReply
 
     const kbResults = await searchKnowledgeBase(

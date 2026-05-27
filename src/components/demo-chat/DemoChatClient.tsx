@@ -139,6 +139,9 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
     }, [t])
     const currentThinkingMessage = thinkingMessages[thinkingIndex % thinkingMessages.length] ?? t('thinking')
     const isDark = theme === 'dark'
+    const demoSourceLinkLabel = useCallback((index: number, total: number) => (
+        total > 1 ? t('sourceLinkLabelNumbered', { number: index + 1 }) : t('sourceLinkLabel')
+    ), [t])
 
     useEffect(() => {
         try {
@@ -429,7 +432,7 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
                                     <div className="whitespace-pre-wrap">
                                         <MessageRichText
                                             content={message.content}
-                                            standaloneUrlLabel={isUser ? undefined : t('sourceLinkLabel')}
+                                            standaloneUrlLabel={isUser ? undefined : demoSourceLinkLabel}
                                         />
                                     </div>
                                     {message.imageUrl ? (

@@ -129,6 +129,7 @@ describe('DemoChatClient source guards', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 
         expect(source).toContain("t('sourceLinkLabel')")
+        expect(source).toContain("t('sourceLinkLabelNumbered'")
         expect(source).toContain('standaloneUrlLabel=')
     })
 })

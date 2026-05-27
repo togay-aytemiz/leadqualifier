@@ -45,12 +45,17 @@ import {
     isLikelySourceLinkRequest
 } from '@/lib/knowledge-base/rag-source-links'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
+import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 
 const RAG_MAX_OUTPUT_TOKENS = 320
 const RAG_REASONING_MAX_COMPLETION_TOKENS = 1024
 const DEFAULT_RAG_COMPLETION_MODEL = 'gpt-4o-mini'
 const KNOWLEDGE_SEARCH_QUERY_SHORT_CIRCUIT_MIN_RESULTS = 3
 const KNOWLEDGE_SEARCH_QUERY_SHORT_CIRCUIT_MIN_SIMILARITY = 1.2
+
+function resolveRagSourceLinkLimit(platform: InboundAiPipelineInput['platform']) {
+    return platform === 'demo_chat' ? 2 : 1
+}
 
 function resolveRagCompletionModel() {
     return process.env.OPENAI_RAG_MODEL?.trim() || DEFAULT_RAG_COMPLETION_MODEL
@@ -1550,9 +1555,35 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     && !isRagNoAnswerResponse(extractiveRagResponse)
                     && shouldUseExtractiveRagBeforeCompletion(options.text, extractiveRagResponse)
                 ) {
-                    const extractiveRagWithSources = appendCanonicalRagSourceLinks(extractiveRagResponse, repairChunks, {
+                    const polishedExtractiveRagResponse = await polishGroundedRagAnswer({
+                        answer: extractiveRagResponse,
+                        userMessage: options.text,
+                        responseLanguage,
+                        chunks: repairChunks,
+                        settings: aiSettings
+                    })
+                    if (polishedExtractiveRagResponse.usage) {
+                        await recordInboundAiUsage({
+                            organizationId: orgId,
+                            category: 'rag',
+                            model: polishedExtractiveRagResponse.model,
+                            inputTokens: polishedExtractiveRagResponse.usage.inputTokens,
+                            outputTokens: polishedExtractiveRagResponse.usage.outputTokens,
+                            totalTokens: polishedExtractiveRagResponse.usage.totalTokens,
+                            metadata: {
+                                conversation_id: conversation.id,
+                                source: 'rag_extractive_polish',
+                                response_kind: 'rag_extractive_polish',
+                                platform: options.platform,
+                                document_count: repairChunks.length
+                            },
+                            supabase: options.supabase
+                        }, options.logPrefix)
+                    }
+
+                    const extractiveRagWithSources = appendCanonicalRagSourceLinks(polishedExtractiveRagResponse.answer, repairChunks, {
                         force: true,
-                        limit: 1
+                        limit: resolveRagSourceLinkLimit(options.platform)
                     })
                     const formattedExtractiveRagReply = formatOutboundBotMessage(extractiveRagWithSources)
                     const outboundMetadata = await sendOutboundAndCollectMetadata(formattedExtractiveRagReply)
@@ -1651,7 +1682,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                 const hasRepairedRagResponse = Boolean(repairedRagResponse?.trim())
                 const finalRagResponse = appendCanonicalRagSourceLinks(repairedRagResponse, repairChunks, {
                     force: sourceLinkRequested || (hasRepairedRagResponse && !isRagNoAnswerResponse(repairedRagResponse)),
-                    limit: 1
+                    limit: resolveRagSourceLinkLimit(options.platform)
                 })
                 const historyTokenCount = historyMessages.reduce((total, item) => total + estimateTokenCount(item.content), 0)
                 const ragUsage = completion.usage
@@ -1729,7 +1760,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
             if (extractiveRagFallback && extractiveRagFallback !== noInformationSeed && !isRagNoAnswerResponse(extractiveRagFallback)) {
                 const extractiveRagWithSources = appendCanonicalRagSourceLinks(extractiveRagFallback, fallbackKnowledgeChunks, {
                     force: true,
-                    limit: 1
+                    limit: resolveRagSourceLinkLimit(options.platform)
                 })
                 const formattedExtractiveRagReply = formatOutboundBotMessage(extractiveRagWithSources)
                 const outboundMetadata = await sendOutboundAndCollectMetadata(formattedExtractiveRagReply)
@@ -1782,7 +1813,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
     const fallbackWithSourceLinks = fallbackKnowledgeChunks?.length
         ? appendCanonicalRagSourceLinks(fallbackText, fallbackKnowledgeChunks, {
             force: !isRagNoAnswerResponse(fallbackText),
-            limit: 1
+            limit: resolveRagSourceLinkLimit(options.platform)
         })
         : fallbackText
     const formattedFallbackReply = formatOutboundBotMessage(fallbackWithSourceLinks)

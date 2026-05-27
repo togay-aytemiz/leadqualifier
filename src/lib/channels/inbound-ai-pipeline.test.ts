@@ -14,6 +14,7 @@ const {
     maybeHandleSchedulingRequestMock,
     matchSkillsSafelyMock,
     openAiCreateMock,
+    polishGroundedRagAnswerMock,
     recordAiUsageMock,
     resolveOrganizationUsageEntitlementMock,
     resolveBotModeActionMock,
@@ -36,6 +37,7 @@ const {
     maybeHandleSchedulingRequestMock: vi.fn(),
     matchSkillsSafelyMock: vi.fn(),
     openAiCreateMock: vi.fn(),
+    polishGroundedRagAnswerMock: vi.fn(),
     recordAiUsageMock: vi.fn(),
     resolveOrganizationUsageEntitlementMock: vi.fn(),
     resolveBotModeActionMock: vi.fn(),
@@ -74,6 +76,10 @@ vi.mock('@/lib/knowledge-base/router', () => ({
 
 vi.mock('@/lib/knowledge-base/rag', () => ({
     buildRagContext: buildRagContextMock
+}))
+
+vi.mock('@/lib/knowledge-base/rag-answer-polish', () => ({
+    polishGroundedRagAnswer: polishGroundedRagAnswerMock
 }))
 
 vi.mock('@/lib/knowledge-base/actions', () => ({
@@ -406,6 +412,13 @@ describe('processInboundAiPipeline guardrails', () => {
                 total_tokens: 150
             }
         })
+        polishGroundedRagAnswerMock.mockImplementation(async ({ answer }) => ({
+            answer,
+            usedPolish: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini'
+        }))
         recordAiUsageMock.mockResolvedValue(undefined)
         decideHumanEscalationMock.mockReturnValue({ shouldEscalate: false })
         buildFallbackResponseMock.mockResolvedValue('Fallback response')
@@ -2620,6 +2633,10 @@ describe('processInboundAiPipeline guardrails', () => {
             expect.stringContaining('Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.')
         )
         expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('https://example.edu.tr/yerleske'))
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: expect.stringContaining('Sağlık Bilimleri Fakültesi adresi'),
+            userMessage: 'SBF kampüsü nerede'
+        }))
     })
 
     it('formats RAG inline bullets before sending and persisting the bot reply', async () => {

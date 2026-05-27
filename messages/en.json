@@ -834,7 +834,8 @@
     "themeToggleLight": "Switch to light mode",
     "themeToggleDark": "Switch to dark mode",
     "composerDisclaimer": "This demo is informational; live use can be tailored to your institution's workflows.",
-    "sourceLinkLabel": "Read more",
+    "sourceLinkLabel": "Open source",
+    "sourceLinkLabelNumbered": "Source {number}",
     "thinking": "Preparing an answer...",
     "thinkingMessages": [
       "Thinking...",

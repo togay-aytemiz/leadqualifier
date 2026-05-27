@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { MessageRichText } from './messageRichText'
 
-function render(content: string, standaloneUrlLabel?: string) {
+function render(content: string, standaloneUrlLabel?: string | ((index: number, total: number) => string)) {
   return renderToStaticMarkup(
     <MessageRichText content={content} standaloneUrlLabel={standaloneUrlLabel} />
   )
@@ -49,19 +49,35 @@ describe('MessageRichText', () => {
 
   it('can render a standalone source URL line with a short display label', () => {
     const url = 'https://yuksekihtisasuniversitesi.edu.tr/Uploads/demo.pdf'
-    const html = render(`Cevap burada.\n${url}`, 'Daha fazla oku')
+    const html = render(`Cevap burada.\n${url}`, 'Kaynağı aç')
 
     expect(html).toContain(`href="${url}"`)
-    expect(html).toContain('>Daha fazla oku</a>')
+    expect(html).toContain('>Kaynağı aç</a>')
     expect(html).not.toContain(`>${url}</a>`)
+  })
+
+  it('can number multiple standalone source URL lines', () => {
+    const firstUrl = 'https://example.edu.tr/kaynak-1.pdf'
+    const secondUrl = 'https://example.edu.tr/kaynak-2.pdf'
+    const html = render(
+      `Cevap burada.\n${firstUrl}\n${secondUrl}`,
+      (index, total) => total > 1 ? `Kaynak ${index + 1}` : 'Kaynağı aç'
+    )
+
+    expect(html).toContain(`href="${firstUrl}"`)
+    expect(html).toContain(`href="${secondUrl}"`)
+    expect(html).toContain('>Kaynak 1</a>')
+    expect(html).toContain('>Kaynak 2</a>')
+    expect(html).not.toContain(`>${firstUrl}</a>`)
+    expect(html).not.toContain(`>${secondUrl}</a>`)
   })
 
   it('keeps inline raw URLs visible even when standalone URL labels are enabled', () => {
     const url = 'https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim'
-    const html = render(`Takvime buradan bakabilirsiniz: ${url}`, 'Daha fazla oku')
+    const html = render(`Takvime buradan bakabilirsiniz: ${url}`, 'Kaynağı aç')
 
     expect(html).toContain(`href="${url}"`)
     expect(html).toContain(`>${url}</a>`)
-    expect(html).not.toContain('>Daha fazla oku</a>')
+    expect(html).not.toContain('>Kaynağı aç</a>')
   })
 })

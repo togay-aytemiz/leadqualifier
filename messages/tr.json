@@ -834,7 +834,8 @@
     "themeToggleLight": "Açık temaya geç",
     "themeToggleDark": "Koyu temaya geç",
     "composerDisclaimer": "Bu demo bilgi amaçlıdır; canlı kullanım kurum süreçlerinize göre uyarlanabilir.",
-    "sourceLinkLabel": "Daha fazla oku",
+    "sourceLinkLabel": "Kaynağı aç",
+    "sourceLinkLabelNumbered": "Kaynak {number}",
     "thinking": "Cevap hazırlanıyor...",
     "thinkingMessages": [
       "Düşünüyorum...",
