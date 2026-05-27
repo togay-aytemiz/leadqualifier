@@ -140,13 +140,37 @@ function looksLikeStandaloneKnowledgeSearch(message: string) {
     if (!normalized) return false
     if (normalized.includes('?')) return true
 
-    return /\b(?:nedir|ne demek|ne kadar|kac|kaç|hangi|nasil|nasıl|nerede|kim|sure|süre|gun|gün|yil|yıl|izin|ders|staj|sinav|sınav|kampus|kampüs|yerleske|yerleşke|adres|mail|e-?posta|telefon|cift anadal|çift anadal)\b/iu.test(normalized)
+    return /\b(?:nedir|ne demek|ne anlama|neyi ifade|açılım|acilim|kısaltma|kisaltma|ne kadar|kac|kaç|hangi|nasil|nasıl|nerede|kim|sure|süre|gun|gün|yil|yıl|izin|ders|staj|sinav|sınav|kampus|kampüs|yerleske|yerleşke|adres|mail|e-?posta|telefon|cift anadal|çift anadal)\b/iu.test(normalized)
+}
+
+function hasStandaloneSubjectCue(message: string) {
+    const normalized = knowledgeSearchQueryKey(message)
+    const hasAbbreviationSignal = /\b(?:kısaltma|kisaltma|açılım|acilim|ne demek|ne anlama|neyi ifade|ifade ediyor)\b/iu.test(normalized)
+    const hasRawAcronym = /\b[\p{Lu}ÇĞİÖŞÜ]{2,6}\b/u.test(message)
+    const hasTitleCaseAbbreviationQuestion = hasAbbreviationSignal
+        && /^\s*[\p{Lu}ÇĞİÖŞÜ][\p{Ll}çğıöşü]{1,5}\b/u.test(message)
+    const hasNamedUnitPhrase = /\b(?:programı|programi|fakültesi|fakultesi|yüksekokulu|yuksekokulu|dairesi|başkanlığı|baskanligi|yerleşkesi|yerleskesi|kampüsü|kampusu)\b/iu.test(normalized)
+    const hasNumberedPolicySubject = /\d/.test(normalized)
+        && /\b(?:personel|çalışan|calisan|öğrenci|ogrenci|izin|ders|staj|sınav|sinav|gün|gun|yıl|yil)\b/iu.test(normalized)
+
+    return hasAbbreviationSignal
+        || hasRawAcronym
+        || hasTitleCaseAbbreviationQuestion
+        || hasNamedUnitPhrase
+        || hasNumberedPolicySubject
+}
+
+function shouldPreferOriginalKnowledgeSearch(message: string, history: ConversationTurn[]) {
+    if (!looksLikeStandaloneKnowledgeSearch(message)) return false
+    if (history.length === 0) return true
+
+    return hasStandaloneSubjectCue(message)
 }
 
 function buildKnowledgeSearchQueries(primaryQuery: string, originalMessage: string, history: ConversationTurn[]) {
     const primary = normalizeKnowledgeSearchQuery(primaryQuery)
     const original = normalizeKnowledgeSearchQuery(originalMessage)
-    const shouldPreferOriginal = history.length === 0 && looksLikeStandaloneKnowledgeSearch(original)
+    const shouldPreferOriginal = shouldPreferOriginalKnowledgeSearch(original, history)
     const ordered = shouldPreferOriginal
         ? [original, primary]
         : history.length > 0
@@ -1583,6 +1607,7 @@ If the user asks who/kim and the context only explains a role without naming a p
 For can/cannot, eligibility, permission, exam, application, deadline, or policy-right questions, answer from the specific rule sentence. Do not start with a blanket denial when the context includes a conditional right, exception, or eligibility path; state the condition and right together.
 Before finalizing, check your answer for internal contradictions against the context. If one sentence says "cannot / no right / not possible" but another context sentence says the user can under stated conditions, remove the unsupported denial and answer with the grounded condition.
 You may add at most one short, topic-related engagement question after the factual answer if it helps the user learn a relevant adjacent detail from the same context. Keep it role-neutral: do not assume the user is a student, applicant, personnel member, or admin unless the user said so. Do not ask what the user studies or which role/status they have; if clarification is useful, ask for the topic, program, unit, or document to look up without implying the user's identity. Instead, you can offer to explain related requirements, deadlines, exceptions, required documents, eligibility, or next steps for the same topic/source. Do not add generic closers like "anything else", "başka bir sorunuz var mı", "daha fazla bilgiye ihtiyacın var mı", or "daha fazla bilgi istersen yardımcı olurum".
+If you add an engagement question, ask the concrete adjacent detail directly. Do not start it with generic prefaces such as "Daha fazla bilgiye ihtiyaç duyarsan", "Daha fazla bilgi istersen", or "Detaylı bilgi almak istersen".
 When answering with three or more items, use one plain dash bullet per line.
 If the answer is not in the context, respond with "${noAnswerToken}" and do not make up facts.
 Reply language policy (MVP): use ${responseLanguageName} only. If the user message is not Turkish, use English.

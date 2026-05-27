@@ -671,6 +671,7 @@ function createHybridSearchSupabase(options?: {
         },
         rpcMock,
         orMock: keywordChain.or,
+        ilikeMock: keywordChain.ilike,
         limitMock,
         releaseHeldFallbackLimits,
         titleDocumentOrMock: titleDocumentChain.or,
@@ -1044,6 +1045,82 @@ describe('searchKnowledgeBase', () => {
         expect(combinedFilters).not.toContain('Adres')
     })
 
+    it('uses required named-campus evidence before broad current-campus listing scans', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'SBF',
+                rows: [{
+                    id: 'campus-required-1',
+                    document_id: 'doc-campus-required-1',
+                    content: 'Page Title: Yerleşke Konumları Güncellendi\nSource URL: https://example.edu.tr/yerleske-konumlari\n\nSağlık Bilimleri Fakültesi BAĞLICA YERLEŞKESİ içindedir. Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.',
+                    knowledge_documents: {
+                        title: 'Yerleşke Konumları Güncellendi',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }]
+            }]
+        })
+
+        const results = await searchKnowledgeBaseFocusedEvidence(
+            'SBF kampüsü nerede?',
+            'org-1',
+            3,
+            { supabase }
+        )
+
+        const broadFilters = orMock.mock.calls
+            .map((call) => String(call[0] ?? ''))
+            .join('\n')
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'campus-required-1',
+            document_id: 'doc-campus-required-1'
+        })
+        expect(broadFilters).not.toContain('Yerleşke Konumları')
+        expect(broadFilters).not.toContain('BAĞLICA YERLEŞKESİ')
+    })
+
+    it('uses required medicine policy evidence before broad medical-school scans', async () => {
+        const { supabase, orMock } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'dönem sonu başarı',
+                rows: [{
+                    id: 'medicine-required-1',
+                    document_id: 'doc-medicine-required-1',
+                    content: 'Page Title: Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi\nSource URL: https://example.edu.tr/tip-yonerge.pdf\n\nDönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir. Dönem içi kurul notu ders kurulu sınavlarının not ortalamasının %96’sı ile hesaplanır.',
+                    knowledge_documents: {
+                        title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }]
+        })
+
+        const results = await searchKnowledgeBaseFocusedEvidence(
+            'Tıpta dönem içi kurul notu başarı notuna nasıl yansıyor?',
+            'org-1',
+            3,
+            { supabase }
+        )
+
+        const broadFilters = orMock.mock.calls
+            .map((call) => String(call[0] ?? ''))
+            .join('\n')
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'medicine-required-1',
+            document_id: 'doc-medicine-required-1'
+        })
+        expect(broadFilters).not.toContain('dönem sonu başarı')
+        expect(broadFilters).not.toContain('Dönem içi kurul notunun %60')
+    })
+
     it('logs vector timeout errors as recoverable warnings while continuing with lexical evidence', async () => {
         const timeoutError = new Error('The operation was aborted due to timeout')
         const { supabase } = createHybridSearchSupabase({
@@ -1244,8 +1321,8 @@ describe('searchKnowledgeBase', () => {
             .toLocaleLowerCase('tr-TR')
 
         expect(results[0]).toMatchObject({
-            chunk_id: 'campus-1',
-            document_id: 'doc-campus-1'
+            chunk_id: 'campus-2',
+            document_id: 'doc-campus-2'
         })
         expect(planKnowledgeSearchQueryMock).not.toHaveBeenCalled()
         expect(filters).toContain('sbf')
@@ -3007,6 +3084,48 @@ describe('searchKnowledgeBase', () => {
         expect(results[0]).toMatchObject({
             chunk_id: 'contact-tlt-1',
             document_id: 'doc-contact-tlt-1'
+        })
+    })
+
+    it('prioritizes title initialism expansions for abbreviation questions over generic keyword matches', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [],
+            fallbackRows: [
+                {
+                    id: 'generic-program-1',
+                    document_id: 'doc-generic-program-1',
+                    content: 'Page Title: Bilgisayar Programcılığı Programı\nSource URL: https://example.edu.tr/bp.pdf\n\nProgram öz değerlendirme raporu ve genel bilgiler.',
+                    knowledge_documents: {
+                        title: 'Bilgisayar Programcılığı Programı',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                },
+                {
+                    id: 'initialism-tlt-1',
+                    document_id: 'doc-initialism-tlt-1',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri Programı\nSource URL: https://example.edu.tr/tlt.pdf\n\nTLT 216 Yaz Stajı ve program ders kodları.',
+                    knowledge_documents: {
+                        title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                        type: 'article',
+                        status: 'ready'
+                    }
+                }
+            ],
+            titleRows: []
+        })
+
+        const results = await searchKnowledgeBase(
+            'Tlt hangi programın kısaltması olabilir?',
+            'org-1',
+            0.6,
+            3,
+            { supabase }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'initialism-tlt-1',
+            document_id: 'doc-initialism-tlt-1'
         })
     })
 

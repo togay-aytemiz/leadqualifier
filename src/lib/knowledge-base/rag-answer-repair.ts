@@ -70,9 +70,13 @@ function stripGenericAssistantContinuation(value: string) {
 const GENERIC_ASSISTANT_CLOSING_TAIL_PATTERNS = [
     /\s*(?:Başka bir konuda yardımcı olabilir miyim|Başka bir sorunuz var mı|Başka bir bilgi ister misin(?:iz)?|Başka bir bilgiye ihtiyac(?:ın|ınız) var mı|Yardımcı olabileceğim başka bir konu var mı|Yardımcı olmamı istediğiniz başka bir konu var mı|İstersen(?:iz)? başka bir konuda yardımcı olayım mı|Başka bir sorunuz(?: olursa| varsa)?\s+(?:yardımcı olabilir miyim|yardımcı olmaktan memnuniyet duyarım))\??[.!?]?\s*$/iu,
     /\s*(?:Eğer\s+)?(?:Daha fazla|Detaylı)\s+(?:bilgi|detay|yardım)(?: almak)?\s+istersen(?:iz)?[\s,]+[\s\S]{0,180}?\b(?:yardımcı olabilir(?:im|iz| miyim)|paylaşabilir(?:im|iz))\??[.!?]?\s*$/iu,
+    /\s*(?:Daha fazla|Detaylı)\s+(?:detay|bilgi)(?: almak)?\s+istersen(?:iz)?,?\s*(?:belirli\s+bir\s+)?[\p{L}\p{N}\s]{0,80}?(?:dönem|konu|program|birim)[\s\S]{0,120}?hakkında\s+bilgi\s+verebilir(?:im|iz)[.!?]?\s*$/iu,
+    /\s*(?:Daha fazla|Detaylı)\s+(?:detay|bilgi)(?: almak)?\s+istersen(?:iz)?,?\s*hangi\s+[\s\S]{0,160}?(?:bilgi almak istediğini(?:z)?|hakkında merak ettiğini(?:z)?|ilgili olduğunu)[\s\S]{0,100}?(?:söyleyebilir|belirtebilir|söyle|belirt)[\p{L}]*[.!?]?\s*$/iu,
     /\s*(?:Bu nedenle|Bu yüzden|Bunun için),?\s*$/iu,
     /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*$/iu,
+    /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:duyarsan(?:ız)?|olursa|varsa),?\s*hangi\s+[\s\S]{0,120}?\s+hakkında\s+merak\s+ettiğini(?:z)?\s+belirtebilir(?:sin|siniz)[.!?]?\s*$/iu,
     /\s*(?:Eğer\s+)?(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?|Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa)|Detaylı bilgi(?: almak)? istersen(?:iz)?),?\s+(?:(?:başka|farklı|ilgili)\s+[\s\S]{0,120}?\s+)?(?:hakkında\s+)?(?:yardımcı olabilir(?:im|iz)|yardımcı olurum|bilgi verebilir(?:im|iz))\??[.!?]?\s*$/iu,
+    /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:duyarsan(?:ız)?|olursa|varsa),?\s*(?:belirli\s+bir\s+konu|[\p{L}\p{N}\s]{0,100}?(?:başka|farklı)\s+bir\s+konu)[\s\S]{0,160}?(?:hakkında\s+)?(?:yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz)|var mı)\??[.!?]?\s*$/iu,
     /\s*(?:Eğer\s+)?(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?|Daha fazla bilgiye ihtiya[çc](?:ın|ınız) (?:olursa|varsa)|Detaylı bilgi(?: almak)? istersen(?:iz)?),?\s*(?:(?:sana|size)\s+)?(?:yardımcı olabilir(?:im|iz)|yardımcı olurum|belirtebilir(?:sin|siniz)|lütfen belirt(?:in)?|sormaktan çekinme(?:yin)?|buradayım|memnuniyetle yardımcı olurum)[.!?]?\s*$/iu,
     /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?:\s+(?:veya|ya da)\s+(?:başka|farklı|ilgili)\s+[\s\S]{0,120}?\s+bilgi)?\s+ister misin(?:iz)?\??[.!?]?\s*$/iu,
     /\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız) var mı|Daha fazla bilgi(?: almak)? ister misin(?:iz)?|Daha fazla detay ister misin(?:iz)?|Detaylı bilgi(?: almak)? ister misin(?:iz)?)\??[.!?]?\s*$/iu,
@@ -80,8 +84,19 @@ const GENERIC_ASSISTANT_CLOSING_TAIL_PATTERNS = [
     /\s*(?:Bu konuda\s+)?(?:daha (?:net|fazla) bilgi(?:ye ihtiya[çc](?:ın|ınız) olursa| almak istersen(?:iz)?)?,?\s*)?hangi\s+[\s\S]{0,120}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)\s+[\s\S]{0,120}?(?:yardımcı olabilir(?:im|iz)|yardımcı olurum|bakabilir(?:im|iz))[.!?]?\s*$/iu,
     /\s*(?:Eğer\s+)?(?:Daha fazla\s+)?(?:bilgiye|yardıma)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*hangi\s+[\s\S]{0,140}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
     /\s*(?:Daha fazla|Detaylı)\s+bilgi(?: almak)?\s+istersen(?:iz)?[\s,]+hangi\s+bölümde\s+eğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
+    /\s*hangi\s+(?:bölüm|program)[\s\S]{0,140}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
     /\s*Hangi\s+(?:bölüm|program)[\s\S]{0,140}?\beğitim\s+al(?:ıyorsun|ıyorsunuz|dığını|dığınızı|mak istediğini|mak istediğinizi)[\s\S]{0,140}?(?:bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|daha spesifik bilgi verebilir(?:im|iz))[.!?]?\s*$/iu,
+    /\s*(?:Bu konuda\s+)?(?:daha\s+(?:net|spesifik)|detaylı|daha fazla)\s+bilgi(?: almak)?\s+için\s+hangi\s+(?:bölümde|programda)[\s\S]{0,140}?(?:belirtir|belirtir misin|belirtir misiniz|söyleyebilir|söyleyebilir misin|söyleyebilir misiniz)[\p{L}\s]*\??[.!?]?\s*$/iu,
     /\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?,?\s*)?hangi\s+bölümde\s+(?:olduğunu|olduğunuzu|okuduğunu|okuduğunuzu)\s+(?:öğrenebilir miyim|belirtirsen(?:iz)?\s+yardımcı olabilir(?:im|iz)?|söylersen(?:iz)?\s+yardımcı olabilir(?:im|iz)?)[.!?]?\s*$/iu,
+    /\s*hangi\s+(?:bölümde|programda)\s+(?:okuduğunu(?:z)?|olduğunu(?:z)?)[\s\S]{0,80}?öğrenebilir miyim\??(?:\s*(?:Böylece|Bu sayede)[\s\S]{0,140}?(?:daha\s+)?(?:spesifik|net)[\s\S]{0,100}?(?:bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz))[.!?]?)?\s*$/iu,
+    /\s*hangi\s+[\s\S]{0,120}?\s+ilgilen(?:diğini|diğinizi)\s+belirtmek\s+ister misin(?:iz)?\??[.!?]?\s*$/iu,
+    /\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*)?hangi\s+[\s\S]{0,140}?\s+ilgili\s+olduğunu\s+belirtirsen(?:iz)?\s+yardımcı olabilir(?:im|iz)?[.!?]?\s*$/iu,
+    /\s*(?:Daha spesifik|Daha fazla|Detaylı)\s+bilgi(?: almak)?\s+(?:için|istersen(?:iz)?),?\s+hangi\s+(?:bölümde\s+okuduğunu(?:z)?|programla\s+ilgilendiğini(?:z)?)[\s\S]{0,180}?(?:belirtir|belirtir misin(?:iz)?|söyler|söyler misin(?:iz)?)[.!?]?\s*$/iu,
+    /\s*(?:Bu nedenle|Bu yüzden|Bu sebeple),?\s*hangi\s+(?:bölümde|programda|bölümle|programla)[\s\S]{0,180}?(?:daha spesifik bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz))[.!?]?(?:\s*Hangi\s+(?:bölüm|program)(?:le| ile)?\s+ilgileniyorsun(?:uz)?\??[.!?]?)?\s*$/iu,
+    /\s*Hangi\s+(?:bölüm|program)(?:le| ile)?\s+ilgileniyorsun(?:uz)?\??[.!?]?\s*$/iu,
+    /\s*[\p{L}\p{N}\s]{0,120}?(?:ilgili|hakkında)\s+(?:başka|farklı)\s+bir\s+konu\s+var mı\??[.!?]?\s*$/iu,
+    /\s*(?:Eğer\s+)?başka\s+bir\s+konuda\s+yardımcı\s+olmamı\s+istersen(?:iz)?,?\s+lütfen\s+belirt(?:in|iniz)?[.!?]?\s*$/iu,
+    /\s*(?:başka|farklı)\s+bir\s+konu\s+hakkında\s+yardımcı olabilir miyim\??[.!?]?\s*$/iu,
     /\s*(?:For more information|If you need more information),?\s*(?:I can help|feel free to ask|I am here to help)[.!?]?\s*$/iu,
     /\s*(?:Do you need more information|Would you like more information)\??[.!?]?\s*$/iu,
     /\s*(?:Can I help with anything else|Is there anything else I can help with)\??[.!?]?\s*$/iu
@@ -93,12 +108,61 @@ function stripGenericAssistantClosingTail(response: string) {
     for (const pattern of GENERIC_ASSISTANT_CLOSING_TAIL_PATTERNS) {
         stripped = stripped.replace(pattern, '').trim()
     }
+    stripped = stripGenericTailSentences(stripped)
 
     if (!stripped || stripped === response.trim()) return response
     return stripped
         .replace(/\s+([,.;!?])/g, '$1')
         .replace(/\s+/g, ' ')
         .trim()
+}
+
+function isGenericTailSentence(sentence: string) {
+    const normalized = normalizeSearch(sentence)
+    const asksRoleOrTopic = normalized.includes('hangi')
+        && includesAny(normalized, ['bolum', 'program', 'donem', 'konu', 'birim'])
+        && includesAny(normalized, ['okudug', 'ilgilend', 'belirt', 'ogrenebilir', 'soyle'])
+    const offersGenericHelp = includesAny(normalized, ['yardimci', 'bilgi verebilir', 'spesifik bilgi', 'net bilgi'])
+
+    if (asksRoleOrTopic && offersGenericHelp) return true
+    if (/^(?:daha fazla|detayli)\s+(?:bilgi|detay)/i.test(normalized)
+        && includesAny(normalized, ['istersen', 'ihtiyacin', 'ihtiyaciniz', 'duyarsan', 'olursa'])
+        && includesAny(normalized, ['yardimci', 'bilgi verebilir', 'belirt', 'soyle', 'ulasabilir', 'erisebilir', 'ziyaret edebilir', 'goz atabilir'])) {
+        return true
+    }
+    if (normalized.includes('baska bir konu')
+        && includesAny(normalized, ['yardimci', 'belirt', 'var mi'])) {
+        return true
+    }
+    if (/^(?:boylece|bu sayede)\b/i.test(normalized)
+        && includesAny(normalized, ['spesifik bilgi', 'net bilgi', 'yardimci'])) {
+        return true
+    }
+
+    return false
+}
+
+function stripGenericTailSentences(response: string) {
+    let stripped = response.trim()
+
+    for (let index = 0; index < 4; index += 1) {
+        const match = stripped.match(/(?:^|[.!?]\s+)([^.!?\n]{8,260}[.!?]?)\s*$/u)
+        const sentence = match?.[1]?.trim()
+        if (!sentence || !isGenericTailSentence(sentence)) break
+
+        const start = stripped.lastIndexOf(sentence)
+        if (start < 0) break
+        stripped = stripped.slice(0, start).trim()
+    }
+
+    return stripped
+}
+
+function stripGenericEngagementLead(response: string) {
+    return response
+        .replace(/(^|[.!?]\s+)(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s+([\p{L}\p{N}][^.!?\n]{12,220}\?)/giu, '$1$2')
+        .replace(/(^|[.!?]\s+)(?:Eğer\s+)?Daha fazla bilgi(?: almak)?\s+istersen(?:iz)?,?\s+([\p{L}\p{N}][^.!?\n]{12,220}\?)/giu, '$1$2')
+        .replace(/(^|[.!?]\s+)(?:Detaylı|Daha fazla)\s+(?:bilgi|detay)(?: almak)?\s+istersen(?:iz)?,?\s+([\p{L}\p{N}][^.!?\n]{12,220}\?)/giu, '$1$2')
 }
 
 function requestedArticleNumber(userMessage: string) {
@@ -116,6 +180,75 @@ function isAbbreviationExpansionQuestion(normalizedUserMessage: string) {
 function asksForAbbreviationTitle(normalizedUserMessage: string) {
     return isAbbreviationExpansionQuestion(normalizedUserMessage)
         && /\b(baslik\w*|basliginda|basligi|yonerge basligi)\b/i.test(normalizedUserMessage)
+}
+
+function extractAbbreviationRequestCandidate(userMessage: string) {
+    if (!isAbbreviationExpansionQuestion(normalizeSearch(userMessage))) return null
+
+    const stopwords = new Set([
+        'hangi',
+        'program',
+        'programin',
+        'programın',
+        'birim',
+        'birimi',
+        'kisaltma',
+        'kısaltma',
+        'kisaltmasi',
+        'kısaltması',
+        'olabilir',
+        'nedir',
+        'ne',
+        'demek',
+        'anlama',
+        'ifade',
+        'ediyor'
+    ].map(normalizeSearch))
+    const tokens = userMessage.match(/[\p{L}\p{N}]{2,8}/gu) ?? []
+
+    for (const token of tokens) {
+        const normalized = normalizeSearch(token)
+        const compact = normalized.replace(/[^\p{L}\p{N}]+/gu, '')
+        if (compact.length < 2 || compact.length > 6) continue
+        if (stopwords.has(compact)) continue
+
+        return {
+            raw: token,
+            compact
+        }
+    }
+
+    return null
+}
+
+function titleInitialismExpansion(candidateCompact: string, title: string) {
+    const words = title.match(/[\p{L}\p{N}]{2,}/gu) ?? []
+    const normalizedWords = words
+        .map((word) => ({
+            raw: word,
+            normalized: normalizeSearch(word).replace(/[^\p{L}\p{N}]+/gu, '')
+        }))
+        .filter((word) => word.normalized.length >= 2)
+
+    for (let start = 0; start <= normalizedWords.length - candidateCompact.length; start += 1) {
+        const window = normalizedWords.slice(start, start + candidateCompact.length)
+        const initials = window.map((word) => word.normalized[0] ?? '').join('')
+        if (initials === candidateCompact) {
+            return window.map((word) => word.raw).join(' ')
+        }
+    }
+
+    return null
+}
+
+function formatExpansionDisplay(value: string) {
+    return value
+        .split(/\s+/)
+        .map((word) => {
+            const lower = word.toLocaleLowerCase('tr-TR')
+            return `${lower.slice(0, 1).toLocaleUpperCase('tr-TR')}${lower.slice(1)}`
+        })
+        .join(' ')
 }
 
 function extractChunkTitle(chunk: RagAnswerRepairChunk) {
@@ -235,6 +368,41 @@ function repairAbbreviationTitleAnswer(input: {
     return `Bu kısaltma "${title}" başlığında geçiyor.`
 }
 
+function repairAbbreviationExpansionAnswer(input: {
+    response: string
+    userMessage: string
+    responseLanguage: MvpResponseLanguage
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const candidate = extractAbbreviationRequestCandidate(input.userMessage)
+    if (!candidate) return null
+
+    const titleMatch = input.chunks
+        .map(extractChunkTitle)
+        .filter((value): value is string => Boolean(value))
+        .map((title) => ({
+            title,
+            expansion: titleInitialismExpansion(candidate.compact, title)
+        }))
+        .find((item): item is { title: string; expansion: string } => Boolean(item.expansion))
+
+    if (!titleMatch) return null
+
+    const expansion = formatExpansionDisplay(titleMatch.expansion)
+    if (normalizeSearch(input.response).includes(normalizeSearch(expansion))) return null
+    if (!isGenericNoInformationResponse(input.response) && normalizeSearch(input.response).length >= 120) return null
+
+    if (input.responseLanguage === 'en') {
+        return `"${candidate.raw.toLocaleUpperCase('tr-TR')}" may stand for "${expansion}" in this context.`
+    }
+
+    const programSuffix = normalizeSearch(titleMatch.title).includes('program')
+        ? ' programının'
+        : ''
+
+    return `"${candidate.raw.toLocaleUpperCase('tr-TR')}", ${expansion}${programSuffix} kısaltması olabilir.`
+}
+
 function extractSenatoMeetingNumber(content: string) {
     const normalized = content.replace(/\s+/g, ' ').trim()
     const directMatch = normalized.match(/(\d{1,3})\s+sayılı\s+Senato\s+toplantısında/i)
@@ -344,8 +512,10 @@ function stripGenericDeferralTail(response: string, userMessage: string) {
         .replace(/\s*(?:Eğer\s+)?(?:daha fazla\s+)?(?:yardıma|bilgiye)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa)[\s\S]{0,280}?(?:iletişime geç(?:meni|menizi|ebilir(?:sin|siniz)?|in|iniz)?(?:i|izi)? öneririm|iletişime geç(?:ebilir(?:sin|siniz)?|in|iniz)|başvur(?:abilir|abilirsiniz)|danış(?:abilir|abilirsiniz)|bak(?:abilir(?:sin|siniz)?|ın|iniz))\.?\s*(?:İletişim bilgileri için[\s\S]{0,80}?:?\s*https?:\/\/\S+)?\s*$/iu, '')
         .replace(/\s*(?:Bu konuda\s+)?(?:kesin|net|detaylı|daha fazla)\s+bilgi(?:ye ulaşmak| almak)?\s+için\s+ilgili\s+(?:bölüm|fakülte|birim)(?:\s+veya\s+(?:bölüm|fakülte|birim))*[\s\S]{0,140}?(?:iletişime geç(?:meni|menizi)|görüşmeni(?:zi)?|başvurmanı(?:zı)?)\s+öneririm\.?\s*$/iu, '')
         .replace(/\s*(?:Bu konuda\s+)?(?:kesin|net|detaylı|daha fazla)\s+bilgi(?: almak)?\s+için\s+ilgili\s+bölüm(?:ünüz|ünüzün|ün|un)?\s+akademik danışman(?:ı|ıyla|inizle)?\s+(?:görüşmeni(?:zi)?|iletişime geçmeni(?:zi)?)\s+öneririm\.?\s*$/iu, '')
+        .replace(/\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?,?\s*)?(?:platforma|sisteme|MEDU'ya|MEDU’ya)[\s\S]{0,180}?(?:derslerinle|ilgili\s+ders)[\s\S]{0,140}?(?:ulaşabilir|erişebilir)[\p{L}]*[.!?]?(?:\s*(?:Eğer\s+)?başka\s+bir\s+konuda[\s\S]{0,120}?lütfen\s+belirt(?:in|iniz)?[.!?]?)?\s*$/iu, '')
         .replace(/\s*(?:Daha fazla bilgi(?: almak)? (?:için|istersen(?:iz)?)|Detaylı bilgi(?: almak)? için)[\s\S]{0,180}?:?\s*https?:\/\/\S+\s*$/iu, '')
         .replace(/\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız) olursa|Daha fazla bilgi(?: almak)? istersen(?:iz)?),?\s*(?:buradan|şu bağlantıdan|bu bağlantıdan|linkten)?\s*(?:ulaşabilir(?:sin|siniz)|göz atabilir(?:sin|siniz))?:?\s*https?:\/\/\S+\s*$/iu, '')
+        .replace(/\s*(?:Eğer\s+)?(?:daha fazla\s+)?(?:yardıma|bilgiye)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*[\s\S]{0,180}?(?:iletişime geç(?:ebilir(?:sin|siniz)?|in|iniz)|göz atabilir(?:sin|siniz)|inceleyebilir(?:sin|siniz)|ziyaret edebilir(?:sin|siniz))\.?:?\s*(?:[\p{L}\p{N}\s]+hakkında\s+)?https?:\/\/\S+\s*$/iu, '')
         .replace(/\s*(?:İletişim bilgileri için|Detaylı bilgi için)[\s\S]{0,120}?:?\s*https?:\/\/\S+\s*$/iu, '')
         .trim()
 
@@ -355,7 +525,8 @@ function stripGenericDeferralTail(response: string, userMessage: string) {
 function sanitizeRagAnswerForReturn(response: string, userMessage: string) {
     const withoutContradiction = stripContradictoryNoInformationLead(response)
     const withoutUnrequestedContact = stripUnrequestedContactDetails(withoutContradiction, userMessage)
-    const withoutClosing = stripGenericAssistantClosingTail(withoutUnrequestedContact)
+    const withoutGenericEngagementLead = stripGenericEngagementLead(withoutUnrequestedContact)
+    const withoutClosing = stripGenericAssistantClosingTail(withoutGenericEngagementLead)
     const withoutDeferral = stripGenericDeferralTail(withoutClosing, userMessage)
 
     return stripGenericAssistantClosingTail(
@@ -1390,6 +1561,14 @@ function repairGradeCalculationAnswer(input: {
     const formulaEvidence = input.chunks
         .map((chunk) => extractMedicineGradeFormula(chunk.content) ?? buildMedicineGradeFormulaFromEvidence(chunk.content))
         .find((value): value is string => Boolean(value))
+    const asksForInYearBoardGrade = includesAny(normalizedUserMessage, ['donem ici kurul', 'kurul notu'])
+    if (formulaEvidence
+        && asksForInYearBoardGrade
+        && (!normalizedResponse.includes('96')
+            || !normalizedResponse.includes('hekimlige uyum')
+            || !normalizedResponse.includes('kanita dayali'))) {
+        return formulaEvidence
+    }
     if (formulaEvidence && (!normalizedResponse.includes('60') || !normalizedResponse.includes('40') || normalizedResponse.includes('ogrenci isleri'))) {
         return formulaEvidence
     }
@@ -1565,6 +1744,11 @@ function repairFinalExamAnswer(input: {
     const responseStatesMissedFinalEligibility = normalizedResponse.includes('final sinavina girmediysen')
         && normalizedResponse.includes('butunleme')
         && includesAny(normalizedResponse, ['hakkin var', 'katilma hakkin', 'girebilirsin', 'girebilirsiniz'])
+    const responseDriftsToFinalExemption = asksAboutMakeupExam
+        && normalizedResponse.includes('butunleme')
+        && normalizedResponse.includes('donem ici kurul not')
+        && normalizedResponse.includes('80')
+        && !normalizedResponse.includes('final sinavina girmesi gerektigi halde')
     const startsWithNoDespiteEligibility = /^\s*(?:yiu\s+ai\W*)?(?:kisa\s+cevap\W*)?hayir\b/iu.test(normalizedResponse)
         && normalizedUserMessage.includes('butunleme')
         && (responseStatesMissingFinalEligibility || responseStatesShortFinalEligibility || responseStatesMissedFinalEligibility)
@@ -1589,6 +1773,7 @@ function repairFinalExamAnswer(input: {
 
     if (!contradictsRetrievedMedicinePolicy
         && !isGenericNoInformationResponse(input.response)
+        && !responseDriftsToFinalExemption
         && normalizedResponse.includes('final')
         && normalizedResponse.includes('butunleme')) {
         return null
@@ -1958,6 +2143,12 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (abbreviationTitleRepair) return abbreviationTitleRepair
+
+    const abbreviationExpansionRepair = repairAbbreviationExpansionAnswer({
+        ...input,
+        response
+    })
+    if (abbreviationExpansionRepair) return abbreviationExpansionRepair
 
     const documentCodeRepair = repairDocumentCodeAnswer({
         ...input,

@@ -99,6 +99,182 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Tıp Fakültesi müfredatında yer alan seçmeli derslerden Dönem VI sonuna kadar başarılı olunmalıdır. Bu konuyla ilgili final ve bütünleme şartlarını da öğrenmek ister misin?')
     })
 
+    it('removes generic prefaces from otherwise topic-related engagement questions', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'SHMYO ders materyallerine MEDU Uzaktan Eğitim Yönetim Sistemi üzerinden erişebilirsin. MEDU platformuna giriş yaptıktan sonra ilgili dersin sayfasında materyalleri bulabilirsin. Daha fazla bilgiye ihtiyaç duyarsan, MEDU sistemine erişimle ilgili detayları öğrenmek ister misin?',
+            userMessage: 'SHMYO ders materyallerini MEDU’da nereden göreceğim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'SHMYO MEDU Kullanım Kılavuzu',
+                    content: 'SHMYO ders materyallerine MEDU Uzaktan Eğitim Yönetim Sistemi üzerinden erişilir. MEDU sistemine erişim detayları aynı kılavuzda yer alır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('SHMYO ders materyallerine MEDU Uzaktan Eğitim Yönetim Sistemi üzerinden erişebilirsin. MEDU platformuna giriş yaptıktan sonra ilgili dersin sayfasında materyalleri bulabilirsin. MEDU sistemine erişimle ilgili detayları öğrenmek ister misin?')
+    })
+
+    it('removes generic unspecified-topic help tails after grounded abbreviation answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '"Tlt" kısaltması, genellikle "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir. Daha fazla bilgiye ihtiyaç duyarsan, belirli bir konu hakkında yardımcı olabilirim!',
+            userMessage: 'Tlt hangi programın kısaltması olabilir',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                    content: 'Tıbbi Laboratuvar Teknikleri programı TLT kısaltmasıyla anılır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('"Tlt" kısaltması, genellikle "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir.')
+    })
+
+    it('removes generic another-topic questions after grounded policy lists', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür. Daha fazla bilgiye ihtiyaç duyarsan, izin kullanımıyla ilgili başka bir konu var mı?',
+            userMessage: 'Personelin yıllık izin hakkı ne kadar?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür.')
+    })
+
+    it('removes generic which-period clarification tails after grounded medicine answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Dönem içi kurul notu 80 ve üzerinde olan öğrenciler final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir. hangi dönemle ilgilendiğini belirtmek ister misin?',
+            userMessage: 'Finale girmeden sınıf geçebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim Öğretim ve Sınav Yönergesi',
+                    content: 'Dönem içi kurul notu 80 ve üzerinde olan öğrenciler final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Dönem içi kurul notu 80 ve üzerinde olan öğrenciler final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir.')
+    })
+
+    it('removes truncated generic detail-clarification tails after grounded medicine answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir. Daha fazla detay istersen, hangi dönemle ilgili bilgi almak istediğini söyleyebilirs',
+            userMessage: 'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim Öğretim ve Sınav Yönergesi',
+                    content: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.')
+    })
+
+    it('removes generic specific-topic detail offers after grounded medicine answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir. Daha fazla detay istersen, belirli bir dönem veya konu hakkında bilgi verebilirim!',
+            userMessage: 'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim Öğretim ve Sınav Yönergesi',
+                    content: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.')
+    })
+
+    it('removes generic clarification tails from grounded policy answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir. Daha fazla bilgiye ihtiyacın olursa, hangi dönemle ilgili olduğunu belirtirsen yardımcı olabilirim!',
+            userMessage: 'Tıp fakültesinde sınıf geçmek için not hesaplama nasıl yapılıyor',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim Öğretim ve Sınav Yönergesi',
+                    content: 'Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ile final veya bütünleme notunun %40’ı toplanarak elde edilir.')
+    })
+
+    it('removes role-assumptive program clarification tails from grounded elective answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli derslerin sayısı Yüksekokul Kurulu kararına göre belirlenir. Daha spesifik bilgi almak isterseniz, hangi bölümde okuduğunuzu belirtir misiniz?',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Dersler Yönergesi',
+                    content: 'Seçmeli derslerin sayısı Yüksekokul Kurulu kararına göre belirlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli derslerin sayısı Yüksekokul Kurulu kararına göre belirlenir.')
+    })
+
+    it('removes generic support-and-link tails from grounded MEDU answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'MEDU Uzaktan Eğitim Yönetim Sistemi’nde ders materyallerine erişmek için ilgili ders sayfasına girilir. Eğer daha fazla yardıma ihtiyacın olursa, teknik destek için YİUZEM ile iletişime geçebilirsin. MEDU hakkında https://example.edu.tr/medu.pdf',
+            userMessage: 'SHMYO ders materyallerini MEDU’da nereden göreceğim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanım Kılavuzu',
+                    content: 'MEDU Uzaktan Eğitim Yönetim Sistemi’nde ders materyallerine erişmek için ilgili ders sayfasına girilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('MEDU Uzaktan Eğitim Yönetim Sistemi’nde ders materyallerine erişmek için ilgili ders sayfasına girilir.')
+    })
+
+    it('removes generic visit-the-page tails from grounded MEDU answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'SHMYO ders materyallerine MEDU Uzaktan Eğitim Yönetim Sistemi üzerinden erişebilirsin. Daha fazla bilgiye ihtiyacın olursa, MEDU sisteminin genel sayfasını ziyaret edebilirsin: https://example.edu.tr/medu.pdf',
+            userMessage: 'SHMYO ders materyallerini MEDU’da nereden göreceğim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanım Kılavuzu',
+                    content: 'SHMYO ders materyallerine MEDU Uzaktan Eğitim Yönetim Sistemi üzerinden erişilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('SHMYO ders materyallerine MEDU Uzaktan Eğitim Yönetim Sistemi üzerinden erişebilirsin.')
+    })
+
+    it('repairs no-information abbreviation answers from retrieved title initialisms', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '"Tlt" kısaltmasıyla ilgili elimde net bir bilgi yok. Ancak, Yüksek İhtisas Üniversitesi’nde https://example.edu.tr/tlt.pdf',
+            userMessage: 'Tlt hangi programın kısaltması olabilir',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                    content: 'Page Title: TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU\nSource URL: https://example.edu.tr/tlt.pdf\n\nTLT 216 Yaz Stajı.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('"TLT", Tıbbi Laboratuvar Teknikleri programının kısaltması olabilir.')
+    })
+
     it('keeps role-neutral engagement offers about related topic details', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Mazeret sınavı için sağlık raporu üç iş günü içinde ilgili birime sunulmalıdır. Bu konuyla ilgili gerekli belgeler ve kurul onayı süreci hakkında da bilgi verebilirim.',
@@ -403,6 +579,54 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Seçmeli ders sayısı, Yüksekokul Kurulu tarafından belirlenir ve eğitim-öğretim planında belirtilir.')
     })
 
+    it('removes role-assumptive which-department followups after grounded elective answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli ders sayısı, programınıza göre değişiklik gösterebilir. Genel olarak, hangi derslerin alınacağına ve yarıyıllara dağılımına Fakülte Kurulu karar verir. Bu nedenle, hangi bölümde okuduğunuzu belirtirseniz, daha spesifik bilgi verebilirim. Hangi bölümle ilgileniyorsunuz?',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli derslerin hangi derslerden oluşacağına ve yarıyıllara dağılımına Fakülte Kurulu karar verir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli ders sayısı, programınıza göre değişiklik gösterebilir. Genel olarak, hangi derslerin alınacağına ve yarıyıllara dağılımına Fakülte Kurulu karar verir.')
+    })
+
+    it('removes role-assumptive which-department detail requests after grounded elective answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli ders sayısı, programınıza ve fakültenize bağlı olarak değişir. Genel olarak alınması gereken sayıya Fakülte Kurulu karar verir. Bu konuda daha net bilgi almak için hangi bölümde okuduğunuzu belirtir misiniz?',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli derslerin alınması gereken sayısına Fakülte Kurulu karar verir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli ders sayısı, programınıza ve fakültenize bağlı olarak değişir. Genel olarak alınması gereken sayıya Fakülte Kurulu karar verir.')
+    })
+
+    it('removes role-assumptive which-department question variants after grounded elective answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli derslerin sayısına Fakülte Kurulu karar verir. Hangi bölümde okuduğunuzu öğrenebilir miyim? Böylece daha spesifik bilgi verebilirim.',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Seçmeli Ders Yönergesi',
+                    content: 'Seçmeli derslerin alınması gereken sayısına Fakülte Kurulu karar verir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli derslerin sayısına Fakülte Kurulu karar verir.')
+    })
+
     it('removes generic more-information navigation tails that assume the user owns the course', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Ders notlarına MEDU platformu üzerinden ulaşılabilir. Daha fazla bilgi istersen, platforma giriş yaparak derslerinle ilgili içeriklere ulaşabilirsin.',
@@ -417,6 +641,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         })
 
         expect(repaired).toBe('Ders notlarına MEDU platformu üzerinden ulaşılabilir.')
+    })
+
+    it('removes generic platform-navigation tails plus assistant helper prompts from grounded MEDU answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders notlarına MEDU platformu üzerinden ulaşabilirsin. Daha fazla bilgi istersen, platforma giriş yaparak derslerinle ilgili içeriklere ulaşabilirsin. Eğer başka bir konuda yardımcı olmamı istersen, lütfen belirt!',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MEDU Kullanımı',
+                    content: 'Ders notlarına MEDU platformu üzerinden ulaşılabilir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarına MEDU platformu üzerinden ulaşabilirsin.')
     })
 
     it('removes generic academic-advisor deferral tails from grounded answers', () => {
@@ -1350,6 +1590,24 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('ders kurulu sınavlarının not ortalamasının %96')
     })
 
+    it('repairs medicine board-grade answers that omit the in-year board-grade formula', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: "Dönem içi kurul notu dönem sonu başarı notuna %60 oranında yansır. Final veya bütünleme notu ise %40 oranında etkilidir.",
+            userMessage: 'Tıpta dönem içi kurul notu başarı notuna nasıl yansıyor?',
+            responseLanguage: 'tr',
+            chunks: [{
+                document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                content: 'Dönem I, II ve III’te dönem sonu başarı notu dönem içi kurul notunun %60’ı ve final sınavı veya bütünleme sınavı notunun %40’ı toplanarak hesaplanır. Dönem içi kurul notu ders kurulu sınavlarının not ortalamasının %96’sı ile dönemde varsa Hekimliğe Uyum Kurulu ve Kanıta Dayalı Tıp Kurulu notlarının her birinin %2’si, yoksa birinin %4’ü toplanarak hesaplanır.'
+            }]
+        })
+
+        expect(repaired).toContain('Dönem içi kurul notunun %60')
+        expect(repaired).toContain('final/bütünleme notunun %40')
+        expect(repaired).toContain('ders kurulu sınavlarının not ortalamasının %96')
+        expect(repaired).toContain('Hekimliğe Uyum')
+        expect(repaired).toContain('Kanıta Dayalı Tıp')
+    })
+
     it('repairs blank RAG completions from retrieved grade-calculation evidence', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: '',
@@ -1392,6 +1650,22 @@ describe('repairLinkOnlyRagAnswer', () => {
                 {
                     document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
                     content: 'MADDE 23- (1) Fakültede Dönem I, Dönem II ve Dönem III’te Dönem sonunda, final sınavından en erken 14 gün sonra bütün ders kurullarının içeriğini kapsayan ve bütünleme sınavı olarak adlandırılan sınav yapılır. (2) Final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrenciler bu sınava girer. (4) Teorik, pratik/ uygulama sınavlarını içeren bütünleme sınavından alınan puanın %100’ü bütünleme notunu oluşturur. (5) Bütünleme sınavından alınan not final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
+    it('repairs final-makeup answers that drift into final exemption conditions', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Evet, Tıp Fakültesi’nde final sınavına girmeden bütünleme sınavına girebilirsin. Ancak dönem içi kurul notun en az 80 olmalı.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrenciler bütünleme sınavına girer. Bütünleme notunu oluşturur. Bütünleme sınavında alınan not final notu yerine geçer.'
                 }
             ]
         })

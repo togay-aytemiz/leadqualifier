@@ -1737,7 +1737,7 @@ function abbreviationInitialismScore(query: string, title?: string | null) {
                 .join('')
 
             if (initials === candidate.compact) {
-                score += start === 0 ? 0.58 : 0.44
+                score += start === 0 ? 1.24 : 0.92
                 break
             }
         }
@@ -3214,6 +3214,21 @@ async function searchKnowledgeBaseByCurrentCampusListingEvidence(
             )
         }))
 
+    const groups = campusLocationRequiredFilterGroups(query)
+    if (groups.length > 0) {
+        const rowGroups = await Promise.all(
+            groups.map((filters) => searchKnowledgeBaseByRequiredEvidenceFilters(
+                'Current campus listing evidence',
+                filters,
+                organizationId,
+                limit,
+                options
+            ))
+        )
+        const requiredResults = buildCurrentCampusResults(rowGroups.flat())
+        if (requiredResults.length > 0) return requiredResults
+    }
+
     const listingRows = await searchKnowledgeBaseByEvidenceFilters('Current campus listing evidence', [
         'Yerleşke Konumları',
         'Konumları Güncellendi',
@@ -3222,23 +3237,8 @@ async function searchKnowledgeBaseByCurrentCampusListingEvidence(
         'BALGAT YERLEŞKESİ',
         'BAĞLUM YERLEŞKESİ'
     ], organizationId, Math.max(limit * 4, 96), options)
-    const listingResults = buildCurrentCampusResults(listingRows)
-    if (listingResults.length > 0) return listingResults
 
-    const groups = campusLocationRequiredFilterGroups(query)
-    if (groups.length === 0) return []
-
-    const rowGroups = await Promise.all(
-        groups.map((filters) => searchKnowledgeBaseByRequiredEvidenceFilters(
-            'Current campus listing evidence',
-            filters,
-            organizationId,
-            limit,
-            options
-        ))
-    )
-
-    return buildCurrentCampusResults(rowGroups.flat())
+    return buildCurrentCampusResults(listingRows)
 }
 
 async function searchKnowledgeBaseByEvidenceFilters(
@@ -3671,6 +3671,55 @@ function medicalSchoolExamPolicyEvidenceFilters(query: string) {
     return [...filters]
 }
 
+function medicalSchoolExamPolicyRequiredFilterGroups(query: string) {
+    if (!isMedicalSchoolExamPolicyQuery(query)) return []
+
+    const normalized = normalizeSearchText(query)
+    const groups: string[][] = []
+    const seen = new Set<string>()
+    const addGroup = (filters: string[]) => {
+        const normalizedFilters = filters
+            .map((filter) => filter.trim())
+            .filter(Boolean)
+        if (normalizedFilters.length === 0) return
+
+        const key = normalizedFilters
+            .map((filter) => normalizeSearchText(filter))
+            .join('\u0000')
+        if (seen.has(key)) return
+        seen.add(key)
+        groups.push(normalizedFilters)
+    }
+
+    if (normalized.includes('not hesap')
+        || normalized.includes('hesaplama')
+        || normalized.includes('sinif gec')
+        || normalized.includes('donem gec')
+        || normalized.includes('kurul not')
+        || normalized.includes('basari not')) {
+        addGroup(['dönem sonu başarı', 'dönem içi kurul'])
+        addGroup(['Dönem içi kurul notunun', 'final veya bütünleme'])
+        addGroup(['ders kurulu sınavlarının not ortalamasının', '96'])
+    }
+    if (normalized.includes('final') && (normalized.includes('girmeden') || normalized.includes('girmeksizin'))) {
+        addGroup(['final sınavına girmeksizin', 'dönem içi kurul notu'])
+        addGroup(['Ders kurulu sınav notlarının her biri', '80'])
+    }
+    if (normalized.includes('final') || normalized.includes('butunleme')) {
+        addGroup(['Bütünleme sınavında alınan not', 'final'])
+        addGroup(['Final sınavına girmesi gerektiği halde girmeyen', 'bütünleme'])
+    }
+    if (normalized.includes('mazeret') || normalized.includes('hasta') || normalized.includes('rapor')) {
+        addGroup(['mazeret sınavı', 'sağlık rapor'])
+        addGroup(['Fakülte Yönetim Kurulu', 'mazeret'])
+    }
+    if (normalized.includes('egitim suresi') || normalized.includes('eğitim süresi')) {
+        addGroup(['eğitim- öğretim süresi', 'altı yıldır'])
+    }
+
+    return groups.slice(0, 5)
+}
+
 function isMedicalSchoolTrainingQuery(query: string) {
     const normalized = normalizeSearchText(query)
     const medicineSignal = normalized.includes('tip fakultesi') || normalized.includes('tip fakultesinde')
@@ -4069,9 +4118,9 @@ async function searchKnowledgeBaseByMedicalSchoolExamPolicyEvidence(
     }
 ) {
     const filters = medicalSchoolExamPolicyEvidenceFilters(query)
-    const rows = await searchKnowledgeBaseByEvidenceFilters('Medical-school policy', filters, organizationId, limit, options)
+    if (filters.length === 0) return []
 
-    return rows
+    const buildMedicalSchoolResults = (rows: KeywordSearchRow[]) => rows
         .map((row) => buildKeywordResultFromRow(row, 0.82))
         .filter((result) => {
             const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
@@ -4088,6 +4137,25 @@ async function searchKnowledgeBaseByMedicalSchoolExamPolicyEvidence(
                     + lexicalMatchScore(query, `${result.document_title}\n${result.content}`) * 0.1
             )
         }))
+
+    const requiredFilterGroups = medicalSchoolExamPolicyRequiredFilterGroups(query)
+    if (requiredFilterGroups.length > 0) {
+        const requiredRows = (await Promise.all(
+            requiredFilterGroups.map((requiredFilters) => searchKnowledgeBaseByRequiredEvidenceFilters(
+                'Medical-school policy',
+                requiredFilters,
+                organizationId,
+                limit,
+                options
+            ))
+        )).flat()
+        const requiredResults = buildMedicalSchoolResults(requiredRows)
+        if (requiredResults.length > 0) return requiredResults
+    }
+
+    const rows = await searchKnowledgeBaseByEvidenceFilters('Medical-school policy', filters, organizationId, limit, options)
+
+    return buildMedicalSchoolResults(rows)
 }
 
 async function searchKnowledgeBaseByHealthReportExamPolicyEvidence(

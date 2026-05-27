@@ -26,6 +26,127 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).not.toContain('Başka bir konuda')
     })
 
+    it('removes bare generic question closings before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('TLT yaz stajı 20 iş günü sürmektedir. Başka bir sorunuz var mı?', [{
+            source_url: 'https://example.edu.tr/tlt.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('TLT yaz stajı 20 iş günü sürmektedir.\nhttps://example.edu.tr/tlt.pdf')
+    })
+
+    it('removes unspecified-topic help closings before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('"Tlt" kısaltması, "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir. Daha fazla bilgiye ihtiyaç duyarsan, belirli bir konu hakkında yardımcı olabilirim!', [{
+            source_url: 'https://example.edu.tr/tlt.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('"Tlt" kısaltması, "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir.\nhttps://example.edu.tr/tlt.pdf')
+    })
+
+    it('removes another-topic help questions before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür. Daha fazla bilgiye ihtiyaç duyarsan, izin kullanımıyla ilgili başka bir konu var mı?', [{
+            source_url: 'https://example.edu.tr/izin.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür.\nhttps://example.edu.tr/izin.pdf')
+    })
+
+    it('removes generic which-period clarification questions before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Dönem içi kurul notu 80 ve üzerinde olanlar finale girmeden geçebilir. hangi dönemle ilgilendiğini belirtmek ister misin?', [{
+            source_url: 'https://example.edu.tr/tip.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Dönem içi kurul notu 80 ve üzerinde olanlar finale girmeden geçebilir.\nhttps://example.edu.tr/tip.pdf')
+    })
+
+    it('removes truncated generic detail-clarification tails before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Dönem sonu başarı notu dönem içi kurul notunun %60ı ile final veya bütünleme notunun %40ıdır. Daha fazla detay istersen, hangi dönemle ilgili bilgi almak istediğini söyleyebilirs', [{
+            source_url: 'https://example.edu.tr/tip.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Dönem sonu başarı notu dönem içi kurul notunun %60ı ile final veya bütünleme notunun %40ıdır.\nhttps://example.edu.tr/tip.pdf')
+    })
+
+    it('removes generic specific-topic detail offers before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Dönem sonu başarı notu dönem içi kurul notunun %60ı ile final veya bütünleme notunun %40ıdır. Daha fazla detay istersen, belirli bir dönem veya konu hakkında bilgi verebilirim!', [{
+            source_url: 'https://example.edu.tr/tip.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Dönem sonu başarı notu dönem içi kurul notunun %60ı ile final veya bütünleme notunun %40ıdır.\nhttps://example.edu.tr/tip.pdf')
+    })
+
+    it('removes generic visit-page tails before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('MEDU platformuna giriş yaptıktan sonra ilgili dersin sayfasından materyallere ulaşabilirsin. Daha fazla bilgiye ihtiyacın olursa, MEDU sisteminin genel sayfasını ziyaret edebilirsin:', [{
+            source_url: 'https://example.edu.tr/medu.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('MEDU platformuna giriş yaptıktan sonra ilgili dersin sayfasından materyallere ulaşabilirsin.\nhttps://example.edu.tr/medu.pdf')
+    })
+
+    it('removes role-assumptive department followups before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Seçmeli ders sayısı, programınıza göre değişiklik gösterebilir. Genel olarak, hangi derslerin alınacağına ve yarıyıllara dağılımına Fakülte Kurulu karar verir. Bu nedenle, hangi bölümde okuduğunuzu belirtirseniz, daha spesifik bilgi verebilirim. Hangi bölümle ilgileniyorsunuz?', [{
+            source_url: 'https://example.edu.tr/secmeli.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Seçmeli ders sayısı, programınıza göre değişiklik gösterebilir. Genel olarak, hangi derslerin alınacağına ve yarıyıllara dağılımına Fakülte Kurulu karar verir.\nhttps://example.edu.tr/secmeli.pdf')
+    })
+
+    it('removes role-assumptive detail requests before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Seçmeli ders sayısı, programınıza ve fakültenize bağlı olarak değişir. Genel olarak alınması gereken sayıya Fakülte Kurulu karar verir. Bu konuda daha net bilgi almak için hangi bölümde okuduğunuzu belirtir misiniz?', [{
+            source_url: 'https://example.edu.tr/secmeli.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Seçmeli ders sayısı, programınıza ve fakültenize bağlı olarak değişir. Genel olarak alınması gereken sayıya Fakülte Kurulu karar verir.\nhttps://example.edu.tr/secmeli.pdf')
+    })
+
+    it('removes role-assumptive which-department question variants before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Seçmeli derslerin sayısına Fakülte Kurulu karar verir. Hangi bölümde okuduğunuzu öğrenebilir miyim? Böylece daha spesifik bilgi verebilirim.', [{
+            source_url: 'https://example.edu.tr/secmeli.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Seçmeli derslerin sayısına Fakülte Kurulu karar verir.\nhttps://example.edu.tr/secmeli.pdf')
+    })
+
+    it('removes generic platform-navigation tails before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('Ders notlarına MEDU üzerinden ulaşabilirsin. Daha fazla bilgi istersen, platforma giriş yaparak derslerinle ilgili içeriklere ulaşabilirsin. Eğer başka bir konuda yardımcı olmamı istersen, lütfen belirt!', [{
+            source_url: 'https://example.edu.tr/medu.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Ders notlarına MEDU üzerinden ulaşabilirsin.\nhttps://example.edu.tr/medu.pdf')
+    })
+
     it('removes dangling more-info prefaces before source links', () => {
         const formatted = appendCanonicalRagSourceLinks('Evet, TLT programında yaz stajı vardır ve 20 iş günüdür. Daha fazla bilgi istersen,', [{
             source_url: 'https://example.edu.tr/tlt.pdf'

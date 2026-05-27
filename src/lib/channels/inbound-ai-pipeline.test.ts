@@ -2191,6 +2191,114 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('26 iş günüdür'))
     })
 
+    it('keeps abbreviation questions anchored to the original message even with prior history', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'TLT yaz stajı kaç gün?',
+                created_at: '2026-05-27T09:00:00.000Z'
+            },
+            {
+                sender_type: 'bot',
+                content: 'TLT yaz stajı 20 iş günüdür.',
+                created_at: '2026-05-27T09:00:05.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+        const originalQuestion = 'Tlt hangi programın kısaltması olabilir'
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: '1-Teknik Şartname Elektrik İşleri',
+            reason: 'knowledge_question'
+        })
+        searchKnowledgeBaseMock.mockImplementation(async (query: string) => {
+            if (query === originalQuestion) {
+                return [
+                    {
+                        chunk_id: 'tlt-expansion',
+                        document_id: 'doc-tlt',
+                        document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                        content: 'Tıbbi Laboratuvar Teknikleri Programı ders kodlarında TLT kısaltmasını kullanır.',
+                        source_url: 'https://example.edu.tr/tlt.pdf',
+                        similarity: 1.4
+                    },
+                    {
+                        chunk_id: 'tlt-expansion-2',
+                        document_id: 'doc-tlt',
+                        document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                        content: 'Tıbbi Laboratuvar Teknikleri Programı başlığı TLT kodlarıyla birlikte geçer.',
+                        source_url: 'https://example.edu.tr/tlt.pdf',
+                        similarity: 1.3
+                    },
+                    {
+                        chunk_id: 'tlt-expansion-3',
+                        document_id: 'doc-tlt',
+                        document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                        content: 'Program dokümanlarında TLT ders kodu öneki Tıbbi Laboratuvar Teknikleri bağlamındadır.',
+                        source_url: 'https://example.edu.tr/tlt.pdf',
+                        similarity: 1.2
+                    }
+                ]
+            }
+
+            return [{
+                chunk_id: 'drifted-router-noise',
+                document_id: 'doc-noise',
+                document_title: '1-Teknik Şartname Elektrik İşleri',
+                content: 'Elektrik işleri teknik şartname maddeleri.',
+                source_url: 'https://example.edu.tr/noise.pdf',
+                similarity: 1.7
+            }]
+        })
+        buildRagContextMock.mockImplementation((chunks: Array<{ content: string }>) => ({
+            context: chunks.map((chunk) => chunk.content).join('\n---\n'),
+            chunks,
+            tokenCount: 18
+        }))
+        openAiCreateMock.mockResolvedValue({
+            choices: [{ message: { content: 'TLT, Tıbbi Laboratuvar Teknikleri Programı için kullanılan kısaltmadır.' } }],
+            usage: {
+                prompt_tokens: 120,
+                completion_tokens: 20,
+                total_tokens: 140
+            }
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: originalQuestion })
+        )
+
+        expect(searchKnowledgeBaseMock.mock.calls[0]?.[0]).toBe(originalQuestion)
+        expect(searchKnowledgeBaseMock).toHaveBeenCalledTimes(1)
+        expect(buildRagContextMock).toHaveBeenCalledWith(expect.arrayContaining([
+            expect.objectContaining({ chunk_id: 'tlt-expansion' })
+        ]))
+        expect(sendOutbound).toHaveBeenCalledWith(expect.stringContaining('Tıbbi Laboratuvar Teknikleri'))
+    })
+
     it('skips additional router search queries when the first query already returns strong evidence', async () => {
         process.env.OPENAI_API_KEY = 'test-openai-key'
 

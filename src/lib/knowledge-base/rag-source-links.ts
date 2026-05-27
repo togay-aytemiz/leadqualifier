@@ -187,25 +187,105 @@ function stripGenericSourceLinkPrefaceTail(response: string) {
     let stripped = response.trim()
 
     const patterns = [
-        /\s*(?:Başka bir (?:konuda|sorunuz(?: varsa)?|bilgi(?:ye)?)[\s\S]{0,160}?(?:yardımcı olabilir(?:im|iz| miyim)|ihtiyac(?:ın|ınız) var mı|ister misin(?:iz)?)\??[.!?]?)\s*$/iu,
+        /\s*(?:Başka bir (?:konuda|sorunuz(?: varsa| var mı)?|bilgi(?:ye)?)[\s\S]{0,160}?(?:yardımcı olabilir(?:im|iz| miyim)|ihtiyac(?:ın|ınız) var mı|ister misin(?:iz)?)\??[.!?]?|Başka bir sorunuz var mı\??[.!?]?)\s*$/iu,
         /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?: almak)?\s+istersen(?:iz)?[\s,]*$/iu,
+        /\s*(?:Daha fazla|Detaylı)\s+(?:detay|bilgi)(?: almak)?\s+istersen(?:iz)?,?\s*(?:belirli\s+bir\s+)?[\p{L}\p{N}\s]{0,80}?(?:dönem|konu|program|birim)[\s\S]{0,120}?hakkında\s+bilgi\s+verebilir(?:im|iz)[.!?]?\s*$/iu,
+        /\s*(?:Daha fazla|Detaylı)\s+(?:detay|bilgi)(?: almak)?\s+istersen(?:iz)?,?\s*hangi\s+[\s\S]{0,160}?(?:bilgi almak istediğini(?:z)?|hakkında merak ettiğini(?:z)?|ilgili olduğunu)[\s\S]{0,100}?(?:söyleyebilir|belirtebilir|söyle|belirt)[\p{L}]*[.!?]?\s*$/iu,
         /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?: almak)?\s+istersen(?:iz)?[\s\S]{0,220}?(?:yardımcı olabilir(?:im|iz)|söyleyebilir(?:sin|siniz)|belirtebilir(?:sin|siniz)|paylaşabilir(?:im|iz)|iletişime geçebilir(?:sin|siniz)|iletişime geç(?:in|iniz))\??[.!?]?\s*$/iu,
+        /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:duyarsan(?:ız)?|olursa|varsa),?\s*hangi\s+[\s\S]{0,120}?\s+hakkında\s+merak\s+ettiğini(?:z)?\s+belirtebilir(?:sin|siniz)[.!?]?\s*$/iu,
+        /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:duyarsan(?:ız)?|olursa|varsa),?\s*[\s\S]{0,180}?(?:sayfasını\s+)?ziyaret edebilir(?:sin|siniz)\.?:?\s*$/iu,
+        /\s*(?:Eğer\s+)?Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:duyarsan(?:ız)?|olursa|varsa),?\s*(?:belirli\s+bir\s+konu|[\p{L}\p{N}\s]{0,100}?(?:başka|farklı)\s+bir\s+konu)[\s\S]{0,160}?(?:hakkında\s+)?(?:yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz)|var mı)\??[.!?]?\s*$/iu,
+        /\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?,?\s*)?(?:platforma|sisteme|MEDU'ya|MEDU’ya)[\s\S]{0,180}?(?:derslerinle|ilgili\s+ders)[\s\S]{0,140}?(?:ulaşabilir|erişebilir)[\p{L}]*[.!?]?(?:\s*(?:Eğer\s+)?başka\s+bir\s+konuda[\s\S]{0,120}?lütfen\s+belirt(?:in|iniz)?[.!?]?)?\s*$/iu,
         /\s*(?:Detaylı|Daha fazla)\s+bilgi(?:\s+veya\s+başvuru)?\s+için\s+ilgili\s+(?:birim|bölüm|fakülte)[\s\S]{0,180}?(?:yardımcı olabilir(?:im|iz)|iletişime geç(?:meni|menizi|mek istersen(?:iz)?))\??[.!?]?\s*$/iu,
         /\s*Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+duyarsan(?:ız)?[\s,]+hangi\s+konuda\s+yardımcı olabilir(?:im|iz)\??[.!?]?\s*$/iu,
         /\s*(?:Eğer\s+)?(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa))[\s\S]{0,260}?(?:yardımcı olabilir(?:im|iz)|söyleyebilir(?:sin|siniz)|paylaşabilir(?:im|iz)|iletişime geç(?:meni|menizi|ebilir(?:sin|siniz)?))\s*(?:öneririm)?\.?(?:\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)[\s\S]{0,120}?(?:buraya|linke|bağlantıya)\s+göz atabilir(?:sin|siniz)?:?)?\s*$/iu,
         /\s*Hangi\s+(?:bölüm|program)[\s\S]{0,140}?\beğitim\s+al(?:ıyorsun|ıyorsunuz|dığını|dığınızı|mak istediğini|mak istediğinizi)[\s\S]{0,140}?(?:bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|daha spesifik bilgi verebilir(?:im|iz))\.?\s*$/iu,
+        /\s*(?:Bu konuda\s+)?(?:daha\s+(?:net|spesifik)|detaylı|daha fazla)\s+bilgi(?: almak)?\s+için\s+hangi\s+(?:bölümde|programda)[\s\S]{0,140}?(?:belirtir|belirtir misin|belirtir misiniz|söyleyebilir|söyleyebilir misin|söyleyebilir misiniz)[\p{L}\s]*\??[.!?]?\s*$/iu,
+        /\s*hangi\s+(?:bölümde|programda)\s+(?:okuduğunu(?:z)?|olduğunu(?:z)?)[\s\S]{0,80}?öğrenebilir miyim\??(?:\s*(?:Böylece|Bu sayede)[\s\S]{0,140}?(?:daha\s+)?(?:spesifik|net)[\s\S]{0,100}?(?:bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz))[.!?]?)?\s*$/iu,
         /\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*)?hangi\s+(?:bölüm|program)[\s\S]{0,160}?\bilgilendi(?:ğinizi|ğini)[\s\S]{0,120}?(?:söyleyebilir|belirtebilir)(?:\s+misin(?:iz)?)?\??[.!?]?\s*$/iu,
+        /\s*hangi\s+[\s\S]{0,120}?\s+ilgilen(?:diğini|diğinizi)\s+belirtmek\s+ister misin(?:iz)?\??[.!?]?\s*$/iu,
+        /\s*(?:Bu nedenle|Bu yüzden|Bu sebeple),?\s*hangi\s+(?:bölümde|programda|bölümle|programla)[\s\S]{0,180}?(?:daha spesifik bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz))[.!?]?(?:\s*Hangi\s+(?:bölüm|program)(?:le| ile)?\s+ilgileniyorsun(?:uz)?\??[.!?]?)?\s*$/iu,
+        /\s*Hangi\s+(?:bölüm|program)(?:le| ile)?\s+ilgileniyorsun(?:uz)?\??[.!?]?\s*$/iu,
+        /\s*[\p{L}\p{N}\s]{0,120}?(?:ilgili|hakkında)\s+(?:başka|farklı)\s+bir\s+konu\s+var mı\??[.!?]?\s*$/iu,
+        /\s*(?:Eğer\s+)?başka\s+bir\s+konuda\s+yardımcı\s+olmamı\s+istersen(?:iz)?,?\s+lütfen\s+belirt(?:in|iniz)?[.!?]?\s*$/iu,
         /\s*İlgilendiğin(?:iz)?\s+(?:bölüm|program|ders|konu)[\s\S]{0,140}?\s*$/iu
     ]
 
     for (const pattern of patterns) {
         stripped = stripped.replace(pattern, '').trim()
     }
+    stripped = stripGenericTailSentencesBeforeSource(stripped)
 
     return stripped
         .replace(/\s+([,.;!?])/g, '$1')
         .replace(/\s+$/u, '')
         .trim()
+}
+
+function normalizeTailSentence(value: string) {
+    return value
+        .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => ({
+            ı: 'i',
+            İ: 'i',
+            ğ: 'g',
+            Ğ: 'g',
+            ü: 'u',
+            Ü: 'u',
+            ş: 's',
+            Ş: 's',
+            ö: 'o',
+            Ö: 'o',
+            ç: 'c',
+            Ç: 'c'
+        }[char] ?? char))
+        .normalize('NFKD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+}
+
+function tailIncludesAny(value: string, terms: string[]) {
+    return terms.some((term) => value.includes(term))
+}
+
+function isGenericTailSentenceBeforeSource(sentence: string) {
+    const normalized = normalizeTailSentence(sentence)
+    const asksRoleOrTopic = normalized.includes('hangi')
+        && tailIncludesAny(normalized, ['bolum', 'program', 'donem', 'konu', 'birim'])
+        && tailIncludesAny(normalized, ['okudug', 'ilgilend', 'belirt', 'ogrenebilir', 'soyle'])
+    const offersGenericHelp = tailIncludesAny(normalized, ['yardimci', 'bilgi verebilir', 'spesifik bilgi', 'net bilgi'])
+
+    if (asksRoleOrTopic && offersGenericHelp) return true
+    if (/^(?:daha fazla|detayli)\s+(?:bilgi|detay)/i.test(normalized)
+        && tailIncludesAny(normalized, ['istersen', 'ihtiyacin', 'ihtiyaciniz', 'duyarsan', 'olursa'])
+        && tailIncludesAny(normalized, ['yardimci', 'bilgi verebilir', 'belirt', 'soyle', 'ulasabilir', 'erisebilir', 'ziyaret edebilir', 'goz atabilir'])) {
+        return true
+    }
+    if (normalized.includes('baska bir konu')
+        && tailIncludesAny(normalized, ['yardimci', 'belirt', 'var mi'])) {
+        return true
+    }
+    if (/^(?:boylece|bu sayede)\b/i.test(normalized)
+        && tailIncludesAny(normalized, ['spesifik bilgi', 'net bilgi', 'yardimci'])) {
+        return true
+    }
+
+    return false
+}
+
+function stripGenericTailSentencesBeforeSource(response: string) {
+    let stripped = response.trim()
+
+    for (let index = 0; index < 4; index += 1) {
+        const match = stripped.match(/(?:^|[.!?]\s+)([^.!?\n]{8,260}[.!?]?)\s*$/u)
+        const sentence = match?.[1]?.trim()
+        if (!sentence || !isGenericTailSentenceBeforeSource(sentence)) break
+
+        const start = stripped.lastIndexOf(sentence)
+        if (start < 0) break
+        stripped = stripped.slice(0, start).trim()
+    }
+
+    return stripped
 }
 
 const TURKISH_SOURCE_LINK_CHAR_MAP: Record<string, string> = {
