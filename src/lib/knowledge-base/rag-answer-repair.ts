@@ -677,6 +677,30 @@ function finishDurationEvidenceSentence(value: string) {
     return /[.!?]$/u.test(cleaned) ? cleaned : `${cleaned}.`
 }
 
+function compactInternshipDurationTableCandidate(value: string, userMessage: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    const normalizedValue = normalizeSearch(value)
+    if (!/\bstaj\w*\b/i.test(normalizedUserMessage)) return null
+    if (!/\byaz\s+staj/i.test(normalizedValue)) return null
+
+    const normalizedCandidate = cleanDurationEvidenceSentence(value)
+    const courseDurationMatch = normalizedCandidate.match(
+        /((?:[\p{Lu}ÇĞİÖŞÜ]{2,12}\s*)?\d{2,4}\s+Yaz\s+Stajı)\s*\(\s*(\d+\s+iş\s+günü)\s*\)/u
+    )
+    if (courseDurationMatch?.[1] && courseDurationMatch[2]) {
+        return finishDurationEvidenceSentence(`${courseDurationMatch[1].trim()} ${courseDurationMatch[2].trim()}`)
+    }
+
+    const labelledDurationMatch = normalizedCandidate.match(
+        /((?:[\p{L}\p{N}]+\s+){0,5}Yaz\s+Stajı)\s*[:：-]?\s*(?:dersi\s*)?(?:\(?\s*)?(\d+\s+iş\s+günü)\)?/iu
+    )
+    if (labelledDurationMatch?.[1] && labelledDurationMatch[2]) {
+        return finishDurationEvidenceSentence(`${labelledDurationMatch[1].trim()} ${labelledDurationMatch[2].trim()}`)
+    }
+
+    return null
+}
+
 function extractPolicyDurationEvidenceSentence(content: string, subjectTokens: string[], requiredSubjectTokens: string[]) {
     for (const sentence of splitDurationCandidateSentences(content)) {
         const normalizedSentence = normalizeSearch(sentence)
@@ -710,7 +734,8 @@ function extractPolicyDurationListEvidenceSentence(
         if (userDurations.size > 0 && !candidateDurations.some((duration) => userDurations.has(duration))) continue
         if (likelyAnswerDurationValues(candidate, userMessage).length === 0) continue
 
-        return finishDurationEvidenceSentence(candidate)
+        return compactInternshipDurationTableCandidate(candidate, userMessage)
+            ?? finishDurationEvidenceSentence(candidate)
     }
 
     return null

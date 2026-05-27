@@ -692,6 +692,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Tıbbi Laboratuvar Teknikleri Programı öğrencileri Yaz Stajı dersini 20 iş günü süresince tamamlar.')
     })
 
+    it('compacts long course-table internship rows when repairing duration answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'TLT programında yaz stajı var mı, kaç gün?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı Öz Değerlendirme',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri Programı Öz Değerlendirme\nSource URL: https://example.edu.tr/laboratuvar-teknikleri.pdf\n\nTürk Dili II 75 %100 İNG 104 İngilizce II 67 %100 TLT 215 Biyokimya 87 %100 TLT 217 Biyokimya Laboratuvarı 81 %100 TLT 216 Yaz Stajı (20 iş günü) 74 %100 TLT ASEC 111 Anatomi 74 %25 Genel Mikrobiyoloji 47 %100'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('TLT 216 Yaz Stajı 20 iş günüdür.')
+    })
+
     it('repairs policy duration answers from matching list items when the model selected nearby unrelated policy text', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Bu şekilde görevlendirilen personel, kurumlarından aylıklı izinli sayılır ve görevlendirmede geçen süreler fiilen kendi mesleklerinde geçirilmiş olarak kabul edilir.',
