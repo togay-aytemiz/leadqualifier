@@ -58,6 +58,15 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('encodeURIComponent(sessionId)')
     })
 
+    it('refreshes stale signed access tokens before sending demo API requests', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain('readAccessTokenExpiryMs')
+        expect(source).toContain('isAccessTokenStale')
+        expect(source).toContain('window.location.reload()')
+        expect(source).toContain("t('sessionExpired')")
+    })
+
     it('keeps the header and composer fixed while only the message timeline scrolls', () => {
         const source = fs.readFileSync(SOURCE_PATH, 'utf8')
 

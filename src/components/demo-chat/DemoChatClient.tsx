@@ -21,6 +21,7 @@ const MAX_STORED_MESSAGES = 80
 const COMPOSER_MAX_HEIGHT_PX = 156
 const REPLY_POLL_INTERVAL_MS = 1500
 const REPLY_POLL_ATTEMPTS = 40
+const ACCESS_TOKEN_REFRESH_BUFFER_MS = 10_000
 
 interface DemoChatClientProps {
     slug: string
@@ -71,6 +72,30 @@ function sleep(ms: number) {
     return new Promise((resolve) => {
         window.setTimeout(resolve, ms)
     })
+}
+
+function readAccessTokenExpiryMs(accessToken: string) {
+    const payloadSegment = accessToken.split('.')[1]
+    if (!payloadSegment) return null
+
+    try {
+        const paddedPayload = payloadSegment
+            .replace(/-/g, '+')
+            .replace(/_/g, '/')
+            .padEnd(Math.ceil(payloadSegment.length / 4) * 4, '=')
+        const payload = JSON.parse(window.atob(paddedPayload)) as { exp?: unknown }
+
+        return typeof payload.exp === 'number' ? payload.exp : null
+    } catch {
+        return null
+    }
+}
+
+function isAccessTokenStale(accessToken: string) {
+    const expiryMs = readAccessTokenExpiryMs(accessToken)
+    if (!expiryMs) return true
+
+    return expiryMs <= Date.now() + ACCESS_TOKEN_REFRESH_BUFFER_MS
 }
 
 function readDemoChatReplyPayload(data: unknown) {
@@ -214,6 +239,14 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
         event.preventDefault()
         const message = input.trim()
         if (!message || !sessionId || isSending) return
+
+        if (isAccessTokenStale(accessToken)) {
+            setErrorMessage(t('sessionExpired'))
+            window.setTimeout(() => {
+                window.location.reload()
+            }, 150)
+            return
+        }
 
         const userMessage: DemoChatMessage = {
             id: createSessionId(),

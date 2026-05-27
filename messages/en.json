@@ -850,6 +850,7 @@
       "Running one last check...",
       "Putting the answer together, almost there..."
     ],
+    "sessionExpired": "Refreshing the demo session. Please send your message again in a moment.",
     "sendFailed": "The message could not be sent. Please try again.",
     "emptyReply": "I could not prepare a clear answer right now. Please try another question.",
     "imageAlt": "Demo response visual"
