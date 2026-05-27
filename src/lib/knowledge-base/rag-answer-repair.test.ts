@@ -732,6 +732,30 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.')
     })
 
+    it('keeps all duration brackets when the user asks a broad policy-duration question', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günüdür.',
+            userMessage: 'Personelin yıllık izin hakkı ne kadar?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: [
+                        'Page Title: İzin Kullanımı Yönergesi',
+                        'Source URL: https://example.edu.tr/izin.pdf',
+                        'Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri aşağıda belirtilmiştir.',
+                        'Hizmet süresi;',
+                        '• 1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü.',
+                        '• 5 yıldan fazla 15 yıldan az olanlara 20 iş günü.',
+                        '• 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toBe('1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü; 5 yıldan fazla 15 yıldan az olanlara 20 iş günü; 15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.')
+    })
+
     it('repairs threshold duration answers when the response repeats the threshold but misses the answer duration', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: '15 yıl ve daha fazla çalışan personel yıllık ücretli izin kapsamında değerlendirilir.',

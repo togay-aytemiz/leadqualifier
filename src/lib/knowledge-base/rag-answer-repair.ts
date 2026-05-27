@@ -574,8 +574,15 @@ function retrievedEvidenceSupportsAnswerDuration(response: string, userMessage: 
 
 function responseHasAnswerDuration(response: string, evidenceSentence: string, userMessage: string) {
     const compactResponse = compactDurationEvidence(response)
-    return likelyAnswerDurationValues(evidenceSentence, userMessage)
-        .some((duration) => compactResponse.includes(duration))
+    const answerDurations = Array.from(new Set(likelyAnswerDurationValues(evidenceSentence, userMessage)))
+    if (answerDurations.length === 0) return false
+
+    const userDurations = extractDurationValues(userMessage)
+    if (userDurations.length === 0 && answerDurations.length > 1) {
+        return answerDurations.every((duration) => compactResponse.includes(duration))
+    }
+
+    return answerDurations.some((duration) => compactResponse.includes(duration))
 }
 
 function durationSubjectCoverage(tokens: string[], value: string) {
@@ -677,6 +684,16 @@ function finishDurationEvidenceSentence(value: string) {
     return /[.!?]$/u.test(cleaned) ? cleaned : `${cleaned}.`
 }
 
+function finishDurationEvidenceList(values: string[]) {
+    const cleanedValues = values
+        .map(cleanDurationEvidenceSentence)
+        .map((value) => value.replace(/[.!?]+$/u, '').trim())
+        .filter(Boolean)
+    if (cleanedValues.length === 0) return null
+
+    return finishDurationEvidenceSentence(cleanedValues.join('; '))
+}
+
 function compactInternshipDurationTableCandidate(value: string, userMessage: string) {
     const normalizedUserMessage = normalizeSearch(userMessage)
     const normalizedValue = normalizeSearch(value)
@@ -725,6 +742,7 @@ function extractPolicyDurationListEvidenceSentence(
     if (subjectTokens.length > 0 && durationSubjectCoverage(subjectTokens, content) < 0.45) return null
 
     const userDurations = new Set(extractDurationValues(userMessage))
+    const matchingCandidates: string[] = []
     for (const candidate of splitDurationListCandidates(content)) {
         const normalizedCandidate = normalizeSearch(candidate)
         DURATION_VALUE_REGEX.lastIndex = 0
@@ -734,11 +752,15 @@ function extractPolicyDurationListEvidenceSentence(
         if (userDurations.size > 0 && !candidateDurations.some((duration) => userDurations.has(duration))) continue
         if (likelyAnswerDurationValues(candidate, userMessage).length === 0) continue
 
-        return compactInternshipDurationTableCandidate(candidate, userMessage)
-            ?? finishDurationEvidenceSentence(candidate)
+        matchingCandidates.push(compactInternshipDurationTableCandidate(candidate, userMessage) ?? candidate)
     }
 
-    return null
+    if (matchingCandidates.length === 0) return null
+    if (userDurations.size === 0 && matchingCandidates.length > 1) {
+        return finishDurationEvidenceList(matchingCandidates)
+    }
+
+    return finishDurationEvidenceSentence(matchingCandidates[0] ?? '')
 }
 
 function personalizeDurationEvidenceSentence(sentence: string, normalizedUserMessage: string) {
@@ -757,7 +779,6 @@ function repairPolicyDurationAnswer(input: {
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForPolicyDuration(normalizedUserMessage)) return null
-    if (retrievedEvidenceSupportsAnswerDuration(input.response, input.userMessage, input.chunks)) return null
 
     const subjectTokens = durationSubjectTokens(normalizedUserMessage)
     const requiredSubjectTokens = durationRequiredSubjectTokens(subjectTokens)
@@ -767,6 +788,7 @@ function repairPolicyDurationAnswer(input: {
         ?? input.chunks
         .map((chunk) => extractPolicyDurationEvidenceSentence(chunk.content, subjectTokens, requiredSubjectTokens))
         .find((value): value is string => Boolean(value))
+    if (!evidenceSentence && retrievedEvidenceSupportsAnswerDuration(input.response, input.userMessage, input.chunks)) return null
     if (!evidenceSentence) return null
     if (responseHasAnswerDuration(input.response, evidenceSentence, input.userMessage)) return null
 
