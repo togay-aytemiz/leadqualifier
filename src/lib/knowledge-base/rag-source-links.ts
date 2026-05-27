@@ -183,6 +183,31 @@ function stripRagUrlArtifacts(response: string) {
         .trim()
 }
 
+function stripGenericSourceLinkPrefaceTail(response: string) {
+    let stripped = response.trim()
+
+    const patterns = [
+        /\s*(?:Başka bir (?:konuda|sorunuz(?: varsa)?|bilgi(?:ye)?)[\s\S]{0,160}?(?:yardımcı olabilir(?:im|iz| miyim)|ihtiyac(?:ın|ınız) var mı|ister misin(?:iz)?)\??[.!?]?)\s*$/iu,
+        /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?: almak)?\s+istersen(?:iz)?[\s,]*$/iu,
+        /\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)(?: almak)?\s+istersen(?:iz)?[\s\S]{0,220}?(?:yardımcı olabilir(?:im|iz)|söyleyebilir(?:sin|siniz)|belirtebilir(?:sin|siniz)|paylaşabilir(?:im|iz)|iletişime geçebilir(?:sin|siniz)|iletişime geç(?:in|iniz))\??[.!?]?\s*$/iu,
+        /\s*(?:Detaylı|Daha fazla)\s+bilgi(?:\s+veya\s+başvuru)?\s+için\s+ilgili\s+(?:birim|bölüm|fakülte)[\s\S]{0,180}?(?:yardımcı olabilir(?:im|iz)|iletişime geç(?:meni|menizi|mek istersen(?:iz)?))\??[.!?]?\s*$/iu,
+        /\s*Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+duyarsan(?:ız)?[\s,]+hangi\s+konuda\s+yardımcı olabilir(?:im|iz)\??[.!?]?\s*$/iu,
+        /\s*(?:Eğer\s+)?(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa))[\s\S]{0,260}?(?:yardımcı olabilir(?:im|iz)|söyleyebilir(?:sin|siniz)|paylaşabilir(?:im|iz)|iletişime geç(?:meni|menizi|ebilir(?:sin|siniz)?))\s*(?:öneririm)?\.?(?:\s*(?:Daha fazla|Detaylı)\s+(?:bilgi|detay)[\s\S]{0,120}?(?:buraya|linke|bağlantıya)\s+göz atabilir(?:sin|siniz)?:?)?\s*$/iu,
+        /\s*Hangi\s+(?:bölüm|program)[\s\S]{0,140}?\beğitim\s+al(?:ıyorsun|ıyorsunuz|dığını|dığınızı|mak istediğini|mak istediğinizi)[\s\S]{0,140}?(?:bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|daha spesifik bilgi verebilir(?:im|iz))\.?\s*$/iu,
+        /\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*)?hangi\s+(?:bölüm|program)[\s\S]{0,160}?\bilgilendi(?:ğinizi|ğini)[\s\S]{0,120}?(?:söyleyebilir|belirtebilir)(?:\s+misin(?:iz)?)?\??[.!?]?\s*$/iu,
+        /\s*İlgilendiğin(?:iz)?\s+(?:bölüm|program|ders|konu)[\s\S]{0,140}?\s*$/iu
+    ]
+
+    for (const pattern of patterns) {
+        stripped = stripped.replace(pattern, '').trim()
+    }
+
+    return stripped
+        .replace(/\s+([,.;!?])/g, '$1')
+        .replace(/\s+$/u, '')
+        .trim()
+}
+
 const TURKISH_SOURCE_LINK_CHAR_MAP: Record<string, string> = {
     ı: 'i',
     İ: 'i',
@@ -224,9 +249,10 @@ export function appendCanonicalRagSourceLinks(
     const responseWithoutUrlArtifacts = hasUrlArtifact
         ? stripRagUrlArtifacts(response)
         : response.trim()
+    const cleanedResponse = stripGenericSourceLinkPrefaceTail(responseWithoutUrlArtifacts)
 
     return [
-        responseWithoutUrlArtifacts,
+        cleanedResponse,
         ...urls
     ]
         .filter(Boolean)

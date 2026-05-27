@@ -179,6 +179,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Dönem sonu başarı notu, dönem içi kurul notunun %60’ı ve final/bütünleme notunun %40’ı ile hesaplanır.')
     })
 
+    it('removes generic contact-the-unit deferrals from grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Seçmeli derslerin sayısı, Yüksekokul Kurulu tarafından belirlenir. Bu konuda kesin bilgiye ulaşmak için ilgili bölüm veya fakülte ile iletişime geçmeni öneririm.',
+            userMessage: 'Mezun olana kadar kaç seçmeli ders almalıyım',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'MYO Eğitim Öğretim Yönergesi',
+                    content: 'Seçmeli derslerin sayısı, Yüksekokul Kurulu tarafından belirlenir.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Seçmeli derslerin sayısı, Yüksekokul Kurulu tarafından belirlenir.')
+    })
+
     it('removes generic more-information question closings without stripping topic-specific offers', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Tıbbi Laboratuvar Teknikleri programı Balgat Yerleşkesi’nde eğitim vermektedir. Başka bir bilgi ister misin?',
@@ -756,6 +772,32 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü; 5 yıldan fazla 15 yıldan az olanlara 20 iş günü; 15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.')
     })
 
+    it('prefers annual-leave duration brackets over nearby leave-request deadline sentences', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Yıllık izin talepleri en az 15 gün önceden izin talep formu doldurularak talep edilir.',
+            userMessage: 'Personelin yıllık izin hakkı ne kadar?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: 'Yıllık izin talepleri en az 15 (on beş) gün önceden izin talep formu doldurularak talep edilir.'
+                },
+                {
+                    document_title: 'İzin Kullanımı Yönergesi',
+                    content: [
+                        'Madde 6- Akademik ve İdari personelin, yıllık hizmetlerine göre kullanabilecekleri izin süreleri aşağıda belirtilmiştir.',
+                        'Hizmet süresi;',
+                        '• 1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü.',
+                        '• 5 yıldan fazla 15 yıldan az olanlara 20 iş günü.',
+                        '• 15 yıl (dahil) ve daha fazla olanlara 26 iş günü.'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toBe('1 yıldan 5 yıla kadar (5 yıl dahil) olanlara 14 iş günü; 5 yıldan fazla 15 yıldan az olanlara 20 iş günü; 15 yıl (dahil) ve daha fazla olanlara 26 iş günüdür.')
+    })
+
     it('repairs threshold duration answers when the response repeats the threshold but misses the answer duration', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: '15 yıl ve daha fazla çalışan personel yıllık ücretli izin kapsamında değerlendirilir.',
@@ -859,6 +901,47 @@ describe('repairLinkOnlyRagAnswer', () => {
         })
 
         expect(repaired).toBe('Ders kurulu sınav notlarının her biri en az 60 ve dönem içi kurul notu 80 veya üzerindeyse öğrenci isterse dönem sonu final sınavına girmeden dönemi başarıyla tamamlamış kabul edilir.')
+    })
+
+    it('keeps pass-without-final intent on the final exemption rule instead of makeup eligibility', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.',
+            userMessage: 'Tıpta hangi şartlarda finale girmeden geçebilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Ders kurulu sınav notlarının her biri en az 60 olmak şartı ile dönem içi kurul notunun 80 ve üzerinde olan öğrenciler isterlerse dönem sonu final sınavına\ngirmeksizin dönemi başarıyla tamamlamış kabul edilir.'
+                },
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer. Bütünleme notu final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders kurulu sınav notlarının her biri en az 60 ve dönem içi kurul notu 80 veya üzerindeyse öğrenci isterse dönem sonu final sınavına girmeden dönemi başarıyla tamamlamış kabul edilir.')
+    })
+
+    it('does not overwrite grounded pass-without-final answers with makeup eligibility evidence', () => {
+        const response = 'Tıp Fakültesinde finale girmeden geçebilmek için ders kurulu sınav notlarının her biri en az 60 ve dönem içi kurul notu 80 veya üzeri olmalıdır.'
+        const repaired = repairLinkOnlyRagAnswer({
+            response,
+            userMessage: 'Tıpta hangi şartlarda finale girmeden geçebilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Ders kurulu sınav notlarının her biri en az 60 olmak şartı ile dönem içi kurul notu 80 ve üzerinde olan öğrenciler isterlerse dönem sonu final sınavına girmeksizin dönemi başarıyla tamamlamış kabul edilir.'
+                },
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer. Bütünleme notu final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe(response)
     })
 
     it('repairs vague campus answers from campus-location evidence instead of PDF footer addresses', () => {

@@ -10,8 +10,75 @@ describe('appendCanonicalRagSourceLinks', () => {
             source_url: 'https://yuksekihtisasuniversitesi.edu.tr/iletisim'
         }])
 
-        expect(formatted).toBe('Başka bir konuda yardımcı olabilir miyim?\nhttps://yuksekihtisasuniversitesi.edu.tr/iletisim')
+        expect(formatted).toBe('https://yuksekihtisasuniversitesi.edu.tr/iletisim')
         expect(formatted).not.toContain('edu. tr')
+    })
+
+    it('removes generic helper closings before appending the canonical source link', () => {
+        const formatted = appendCanonicalRagSourceLinks('TLT yaz stajı 20 iş günü sürüyor. Başka bir konuda yardımcı olabilir miyim?', [{
+            source_url: 'https://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/yuksekokul_view/icerik_yonetimi_view/ae23c350141ceaa4573f25d8fb58d1ba.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('TLT yaz stajı 20 iş günü sürüyor.\nhttps://yuksekihtisasuniversitesi.edu.tr/Uploads/akademik_view/yuksekokul_view/icerik_yonetimi_view/ae23c350141ceaa4573f25d8fb58d1ba.pdf')
+        expect(formatted).not.toContain('Başka bir konuda')
+    })
+
+    it('removes dangling more-info prefaces before source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Evet, TLT programında yaz stajı vardır ve 20 iş günüdür. Daha fazla bilgi istersen,', [{
+            source_url: 'https://example.edu.tr/tlt.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Evet, TLT programında yaz stajı vardır ve 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf')
+    })
+
+    it('removes role-assumptive program-status prompts before source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir. Hangi programda eğitim alıyorsun? Bu sayede daha spesifik bilgi verebilirim.', [{
+            source_url: 'https://example.edu.tr/myo.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Seçmeli ders sayısı Yüksekokul Kurulu tarafından belirlenir.\nhttps://example.edu.tr/myo.pdf')
+    })
+
+    it('removes generic student-affairs deferrals before source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Ders notlarına MEDU üzerinden ulaşabilirsin. Eğer daha fazla bilgiye ihtiyacın varsa, üniversitenin öğrenci işleri ile iletişime geçmeni öneririm. Daha fazla detay için buraya göz atabilirsin:', [{
+            source_url: 'https://example.edu.tr/medu.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Ders notlarına MEDU üzerinden ulaşabilirsin.\nhttps://example.edu.tr/medu.pdf')
+    })
+
+    it('removes generic application/contact helper closings before source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Mazeretiniz kabul edilirse mazeret sınavına girebilirsiniz. Detaylı bilgi veya başvuru için ilgili birimle iletişime geçmek isterseniz, yardımcı olabilirim.', [{
+            source_url: 'https://example.edu.tr/mazeret.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Mazeretiniz kabul edilirse mazeret sınavına girebilirsiniz.\nhttps://example.edu.tr/mazeret.pdf')
+    })
+
+    it('removes generic which-topic helper questions before source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür. Daha fazla bilgiye ihtiyaç duyarsan, hangi konuda yardımcı olabilirim?', [{
+            source_url: 'https://example.edu.tr/izin.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Yıllık izin hakkı hizmet süresine göre 14, 20 veya 26 iş günüdür.\nhttps://example.edu.tr/izin.pdf')
     })
 
     it('can limit forced source-link answers to the single best source', () => {

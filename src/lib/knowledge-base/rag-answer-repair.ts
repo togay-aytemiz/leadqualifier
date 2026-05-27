@@ -78,6 +78,7 @@ const GENERIC_ASSISTANT_CLOSING_TAIL_PATTERNS = [
     /\s*(?:Bu konuda\s+)?(?:daha (?:net|fazla) bilgi(?:ye ihtiya[çc](?:ın|ınız) olursa| almak istersen(?:iz)?)?,?\s*)?hangi\s+[\s\S]{0,120}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)\s+[\s\S]{0,120}?(?:yardımcı olabilir(?:im|iz)|yardımcı olurum|bakabilir(?:im|iz))[.!?]?\s*$/iu,
     /\s*(?:Eğer\s+)?(?:Daha fazla\s+)?(?:bilgiye|yardıma)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa),?\s*hangi\s+[\s\S]{0,140}?\beğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi|gördüğünü|gördüğünüzü)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
     /\s*(?:Daha fazla|Detaylı)\s+bilgi(?: almak)?\s+istersen(?:iz)?[\s,]+hangi\s+bölümde\s+eğitim\s+(?:aldığını|aldığınızı|almak istediğini|almak istediğinizi)\s+(?:belirtebilir|belirtebilir misin|belirtebilir misiniz|söyleyebilir|söyleyebilirsin|söyleyebilirsiniz)[.!?]?\s*$/iu,
+    /\s*Hangi\s+(?:bölüm|program)[\s\S]{0,140}?\beğitim\s+al(?:ıyorsun|ıyorsunuz|dığını|dığınızı|mak istediğini|mak istediğinizi)[\s\S]{0,140}?(?:bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|daha spesifik bilgi verebilir(?:im|iz))[.!?]?\s*$/iu,
     /\s*(?:Daha fazla bilgi(?: almak)? istersen(?:iz)?,?\s*)?hangi\s+bölümde\s+(?:olduğunu|olduğunuzu|okuduğunu|okuduğunuzu)\s+(?:öğrenebilir miyim|belirtirsen(?:iz)?\s+yardımcı olabilir(?:im|iz)?|söylersen(?:iz)?\s+yardımcı olabilir(?:im|iz)?)[.!?]?\s*$/iu,
     /\s*(?:For more information|If you need more information),?\s*(?:I can help|feel free to ask|I am here to help)[.!?]?\s*$/iu,
     /\s*(?:Do you need more information|Would you like more information)\??[.!?]?\s*$/iu,
@@ -339,6 +340,7 @@ function stripGenericDeferralTail(response: string, userMessage: string) {
         .replace(/\s*(?:Bu nedenle|Bu yüzden|Bunun için),?\s*hangi\s+(?:program|bölüm)[\s\S]{0,180}?(?:olduğuna|olduğunuza|ilgili olduğuna|ilgili olduğunuza)[\s\S]{0,120}?(?:değişebilir|farklılık gösterebilir)\.?\s*(?:Hangi\s+(?:bölüm|program)[\s\S]{0,140}?(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)[\s\S]{0,100}?(?:yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz))[.!?]?)?\s*$/iu, '')
         .replace(/\s*(?:Bu nedenle|Bu yüzden|Bunun için),?[\s\S]{0,260}?(?:ilgili\s+(?:bölüm|birim)|öğrenci işleri)[\s\S]{0,140}?(?:iletişime geç(?:meni|menizi)|danışmanı(?:zı)?|başvurmanı(?:zı)?)\s+öneririm\.?\s*(?:Hangi\s+(?:bölüm|program)[\s\S]{0,140}?(?:belirtirsen|belirtirseniz|söylersen|söylerseniz)[\s\S]{0,100}?yardımcı olabilir(?:im|iz)[.!?]?)?\s*$/iu, '')
         .replace(/\s*(?:Eğer\s+)?(?:daha fazla\s+)?(?:yardıma|bilgiye)\s+ihtiya[çc](?:ın|ınız)?\s+(?:olursa|duyarsan(?:ız)?|varsa)[\s\S]{0,280}?(?:iletişime geç(?:meni|menizi|ebilir(?:sin|siniz)?|in|iniz)?(?:i|izi)? öneririm|iletişime geç(?:ebilir(?:sin|siniz)?|in|iniz)|başvur(?:abilir|abilirsiniz)|danış(?:abilir|abilirsiniz)|bak(?:abilir(?:sin|siniz)?|ın|iniz))\.?\s*(?:İletişim bilgileri için[\s\S]{0,80}?:?\s*https?:\/\/\S+)?\s*$/iu, '')
+        .replace(/\s*(?:Bu konuda\s+)?(?:kesin|net|detaylı|daha fazla)\s+bilgi(?:ye ulaşmak| almak)?\s+için\s+ilgili\s+(?:bölüm|fakülte|birim)(?:\s+veya\s+(?:bölüm|fakülte|birim))*[\s\S]{0,140}?(?:iletişime geç(?:meni|menizi)|görüşmeni(?:zi)?|başvurmanı(?:zı)?)\s+öneririm\.?\s*$/iu, '')
         .replace(/\s*(?:Bu konuda\s+)?(?:kesin|net|detaylı|daha fazla)\s+bilgi(?: almak)?\s+için\s+ilgili\s+bölüm(?:ünüz|ünüzün|ün|un)?\s+akademik danışman(?:ı|ıyla|inizle)?\s+(?:görüşmeni(?:zi)?|iletişime geçmeni(?:zi)?)\s+öneririm\.?\s*$/iu, '')
         .replace(/\s*(?:Daha fazla bilgi(?: almak)? (?:için|istersen(?:iz)?)|Detaylı bilgi(?: almak)? için)[\s\S]{0,180}?:?\s*https?:\/\/\S+\s*$/iu, '')
         .replace(/\s*(?:Daha fazla bilgiye ihtiya[çc](?:ın|ınız) olursa|Daha fazla bilgi(?: almak)? istersen(?:iz)?),?\s*(?:buradan|şu bağlantıdan|bu bağlantıdan|linkten)?\s*(?:ulaşabilir(?:sin|siniz)|göz atabilir(?:sin|siniz))?:?\s*https?:\/\/\S+\s*$/iu, '')
@@ -585,6 +587,30 @@ function responseHasAnswerDuration(response: string, evidenceSentence: string, u
     return answerDurations.some((duration) => compactResponse.includes(duration))
 }
 
+function durationEvidencePriority(userMessage: string, evidenceSentence: string) {
+    const normalizedUserMessage = normalizeSearch(userMessage)
+    const normalizedEvidence = normalizeSearch(evidenceSentence)
+    let score = 0
+
+    if (normalizedUserMessage.includes('yillik') && normalizedUserMessage.includes('izin')) {
+        if (
+            normalizedEvidence.includes('14 is gunu')
+            && normalizedEvidence.includes('20 is gunu')
+            && normalizedEvidence.includes('26 is gunu')
+        ) {
+            score += 8
+        }
+        if (normalizedEvidence.includes('hizmet') && normalizedEvidence.includes('yil')) {
+            score += 1.5
+        }
+        if (normalizedEvidence.includes('talep formu') || normalizedEvidence.includes('onceden')) {
+            score -= 4
+        }
+    }
+
+    return score
+}
+
 function durationSubjectCoverage(tokens: string[], value: string) {
     if (tokens.length === 0) return 0
     const normalized = normalizeSearch(value)
@@ -782,12 +808,17 @@ function repairPolicyDurationAnswer(input: {
 
     const subjectTokens = durationSubjectTokens(normalizedUserMessage)
     const requiredSubjectTokens = durationRequiredSubjectTokens(subjectTokens)
-    const evidenceSentence = input.chunks
+    const evidenceCandidates = [
+        ...input.chunks
         .map((chunk) => extractPolicyDurationListEvidenceSentence(chunk.content, input.userMessage, subjectTokens, requiredSubjectTokens))
-        .find((value): value is string => Boolean(value))
-        ?? input.chunks
+        .filter((value): value is string => Boolean(value)),
+        ...input.chunks
         .map((chunk) => extractPolicyDurationEvidenceSentence(chunk.content, subjectTokens, requiredSubjectTokens))
-        .find((value): value is string => Boolean(value))
+        .filter((value): value is string => Boolean(value))
+    ]
+    const evidenceSentence = evidenceCandidates
+        .sort((left, right) => durationEvidencePriority(input.userMessage, right) - durationEvidencePriority(input.userMessage, left))
+        [0]
     if (!evidenceSentence && retrievedEvidenceSupportsAnswerDuration(input.response, input.userMessage, input.chunks)) return null
     if (!evidenceSentence) return null
     if (responseHasAnswerDuration(input.response, evidenceSentence, input.userMessage)) return null
@@ -889,11 +920,20 @@ function asksForPassWithoutFinal(normalizedUserMessage: string) {
 }
 
 function hasMedicineFinalExemptionEvidence(content: string) {
-    const normalized = normalizeSearch(content)
+    const normalized = normalizeSearch(content).replace(/\s+/g, ' ')
+    const hasSixtyEachBoardExam = normalized.includes('ders kurulu sinav')
+        && normalized.includes('en az 60')
+    const hasEightyBoardScore = /donem ici kurul not\w*(?:\s+\w+){0,16}\s+80/i.test(normalized)
+        || /80(?:\s+\w+){0,16}\s+donem ici kurul not/i.test(normalized)
+    const hasFinalExemptionAction = includesAny(normalized, [
+        'final sinavina girmeksizin',
+        'final sinavina girmeden',
+        'final sinavina girmeyebilir',
+        'final sinavina girmek zorunda degil',
+        'final sinavindan muaf'
+    ])
 
-    return normalized.includes('ders kurulu sinav notlarinin her biri en az 60')
-        && normalized.includes('donem ici kurul notu 80')
-        && (normalized.includes('final sinavina girmeksizin') || normalized.includes('final sinavina girmeden'))
+    return hasSixtyEachBoardExam && hasEightyBoardScore && hasFinalExemptionAction
 }
 
 function repairMedicineFinalExemptionAnswer(input: {
@@ -1475,6 +1515,7 @@ function repairFinalExamAnswer(input: {
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForFinalExamPolicy(normalizedUserMessage)) return null
+    const asksAboutMakeupExam = normalizedUserMessage.includes('butunleme')
 
     const normalizedResponse = normalizeSearch(stripGenericAssistantContinuation(input.response))
     const contradictsMakeupEligibility = normalizedUserMessage.includes('butunleme')
@@ -1536,6 +1577,13 @@ function repairFinalExamAnswer(input: {
             : null
     }
     const contradictsRetrievedMedicinePolicy = (contradictsMakeupEligibility || startsWithNoDespiteEligibility) && evidence.kind === 'medicine-final'
+
+    if (!asksAboutMakeupExam
+        && !isGenericNoInformationResponse(input.response)
+        && !contradictsMakeupEligibility
+        && !startsWithNoDespiteEligibility) {
+        return null
+    }
 
     if (!contradictsRetrievedMedicinePolicy
         && !isGenericNoInformationResponse(input.response)
@@ -1951,6 +1999,12 @@ export function repairLinkOnlyRagAnswer(input: {
     })
     if (medicineFinalExemptionRepair) return medicineFinalExemptionRepair
 
+    const tltDoubleMajorRepair = repairTltDoubleMajorAnswer({
+        ...input,
+        response
+    })
+    if (tltDoubleMajorRepair) return tltDoubleMajorRepair
+
     const eligibilityDecisionRepair = repairEligibilityDecisionAnswer({
         ...input,
         response
@@ -1968,12 +2022,6 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (contactRepair) return contactRepair
-
-    const tltDoubleMajorRepair = repairTltDoubleMajorAnswer({
-        ...input,
-        response
-    })
-    if (tltDoubleMajorRepair) return tltDoubleMajorRepair
 
     const lectureNotesRepair = repairLectureNotesAnswer({
         ...input,

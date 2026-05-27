@@ -3634,7 +3634,9 @@ function medicalSchoolExamPolicyEvidenceFilters(query: string) {
     }
     if (normalized.includes('final') && (normalized.includes('girmeden') || normalized.includes('girmeksizin'))) {
         filters.add('final sınavına girmeksizin')
+        filters.add('final sınavına girmeyebilir')
         filters.add('dönem içi kurul notu 80')
+        filters.add('dönem içi kurul notunun 80')
         filters.add('Ders kurulu sınav notlarının her biri')
     }
     if (normalized.includes('final') || normalized.includes('butunleme')) {
@@ -3920,7 +3922,9 @@ async function searchKnowledgeBaseByFinalExemptionPolicyEvidence(
 
     const rows = await searchKnowledgeBaseByEvidenceFilters('Final-exemption policy', [
         'final sınavına girmeksizin',
+        'final sınavına girmeyebilir',
         'dönem içi kurul notu 80',
+        'dönem içi kurul notunun 80',
         'Ders kurulu sınav notlarının her biri'
     ], organizationId, limit, options)
 
@@ -3930,8 +3934,14 @@ async function searchKnowledgeBaseByFinalExemptionPolicyEvidence(
             const searchable = normalizeSearchText(`${result.document_title}\n${result.content}`)
 
             return searchable.includes('final sinavina girmeksizin')
-                || (searchable.includes('donem ici kurul notu 80')
-                    && searchable.includes('ders kurulu sinav notlarinin her biri'))
+                || searchable.includes('final sinavina girmeyebilir')
+                || (
+                    (
+                        searchable.includes('donem ici kurul notu 80')
+                        || searchable.includes('donem ici kurul notunun 80')
+                    )
+                    && searchable.includes('ders kurulu sinav notlarinin her biri')
+                )
         })
         .map((result) => ({
             ...result,

@@ -1507,9 +1507,10 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 if (!context) {
                     throw new Error('RAG context is empty')
                 }
+                const repairChunks = kbResults.length > chunks.length ? kbResults : chunks
                 if (!fallbackKnowledgeContext) {
                     fallbackKnowledgeContext = context.replace(/\s+/g, ' ').trim().slice(0, 1500)
-                    fallbackKnowledgeChunks = chunks
+                    fallbackKnowledgeChunks = repairChunks
                 }
 
                 const extractiveSeed = buildNoInformationSeed(responseLanguage)
@@ -1517,7 +1518,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     response: extractiveSeed,
                     userMessage: options.text,
                     responseLanguage,
-                    chunks
+                    chunks: repairChunks
                 })
                 if (
                     extractiveRagResponse
@@ -1525,7 +1526,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     && !isRagNoAnswerResponse(extractiveRagResponse)
                     && shouldUseExtractiveRagBeforeCompletion(options.text, extractiveRagResponse)
                 ) {
-                    const extractiveRagWithSources = appendCanonicalRagSourceLinks(extractiveRagResponse, chunks, {
+                    const extractiveRagWithSources = appendCanonicalRagSourceLinks(extractiveRagResponse, repairChunks, {
                         force: true,
                         limit: 1
                     })
@@ -1535,7 +1536,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         ...outboundMetadata,
                         is_rag: true,
                         rag_extractive: true,
-                        sources: chunks.map((chunk) => chunk.document_id).filter(Boolean)
+                        sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
                     await recordAiLatencyEvent({
                         organizationId: orgId,
@@ -1619,11 +1620,11 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     response: guardedRagResponse,
                     userMessage: options.text,
                     responseLanguage,
-                    chunks
+                    chunks: repairChunks
                 })
                 const sourceLinkRequested = isLikelySourceLinkRequest(options.text)
                 const hasRepairedRagResponse = Boolean(repairedRagResponse?.trim())
-                const finalRagResponse = appendCanonicalRagSourceLinks(repairedRagResponse, chunks, {
+                const finalRagResponse = appendCanonicalRagSourceLinks(repairedRagResponse, repairChunks, {
                     force: sourceLinkRequested || (hasRepairedRagResponse && !isRagNoAnswerResponse(repairedRagResponse)),
                     limit: 1
                 })
@@ -1664,7 +1665,7 @@ ${context}${requiredIntakeGuidance ? `\n\n${requiredIntakeGuidance}` : ''}${cont
                     await persistBotMessage(formattedRagReply, {
                         ...outboundMetadata,
                         is_rag: true,
-                        sources: chunks.map((chunk) => chunk.document_id).filter(Boolean)
+                        sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
                     await recordAiLatencyEvent({
                         organizationId: orgId,
