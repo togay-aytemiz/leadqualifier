@@ -427,7 +427,10 @@ export function DemoChatClient({ slug, displayName, accessToken, logoUrl }: Demo
                             <div key={message.id} className={messageContainerClassName}>
                                 <div className={messageBodyClassName}>
                                     <div className="whitespace-pre-wrap">
-                                        <MessageRichText content={message.content} />
+                                        <MessageRichText
+                                            content={message.content}
+                                            standaloneUrlLabel={isUser ? undefined : t('sourceLinkLabel')}
+                                        />
                                     </div>
                                     {message.imageUrl ? (
                                         // eslint-disable-next-line @next/next/no-img-element

@@ -2,8 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { MessageRichText } from './messageRichText'
 
-function render(content: string) {
-  return renderToStaticMarkup(<MessageRichText content={content} />)
+function render(content: string, standaloneUrlLabel?: string) {
+  return renderToStaticMarkup(
+    <MessageRichText content={content} standaloneUrlLabel={standaloneUrlLabel} />
+  )
 }
 
 describe('MessageRichText', () => {
@@ -43,5 +45,23 @@ describe('MessageRichText', () => {
     expect(html).toContain('<blockquote')
     expect(html).toContain('&gt;')
     expect(html).toContain('Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+  })
+
+  it('can render a standalone source URL line with a short display label', () => {
+    const url = 'https://yuksekihtisasuniversitesi.edu.tr/Uploads/demo.pdf'
+    const html = render(`Cevap burada.\n${url}`, 'Daha fazla oku')
+
+    expect(html).toContain(`href="${url}"`)
+    expect(html).toContain('>Daha fazla oku</a>')
+    expect(html).not.toContain(`>${url}</a>`)
+  })
+
+  it('keeps inline raw URLs visible even when standalone URL labels are enabled', () => {
+    const url = 'https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim'
+    const html = render(`Takvime buradan bakabilirsiniz: ${url}`, 'Daha fazla oku')
+
+    expect(html).toContain(`href="${url}"`)
+    expect(html).toContain(`>${url}</a>`)
+    expect(html).not.toContain('>Daha fazla oku</a>')
   })
 })

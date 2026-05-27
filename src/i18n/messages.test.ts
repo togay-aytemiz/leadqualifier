@@ -217,4 +217,9 @@ describe('pickMessageNamespaces', () => {
     expect(trMessages.demoChat.thinkingMessages[0]).toBe('Düşünüyorum...')
     expect(enMessages.demoChat.thinkingMessages[0]).toBe('Thinking...')
   })
+
+  it('keeps the public demo source link label short', () => {
+    expect(trMessages.demoChat.sourceLinkLabel).toBe('Daha fazla oku')
+    expect(enMessages.demoChat.sourceLinkLabel).toBe('Read more')
+  })
 })

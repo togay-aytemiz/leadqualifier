@@ -2,11 +2,13 @@ import { Fragment, type ReactNode } from 'react'
 
 type MessageRichTextProps = {
   content: string
+  standaloneUrlLabel?: string
 }
 
 const TOKEN_PATTERN =
   /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+)|([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})|(\+90[\d\s().-]{8,}\d|0\d[\d\s().-]{8,}\d)|(\b(?:[A-Z0-9-]+\.)+[A-Z]{2,}(?:\/[^\s<]*)?)/gi
 const BOLD_PATTERN = /(\*\*([^*\n]+)\*\*|\*([^*\n]+)\*)/g
+const STANDALONE_URL_PATTERN = /^https?:\/\/[^\s<]+$/i
 const TRAILING_URL_PUNCTUATION = /[.,!?;:]+$/
 
 function splitTrailingUrlPunctuation(value: string) {
@@ -102,7 +104,7 @@ function parseInlineText(text: string, keyPrefix: string): ReactNode[] {
   return nodes
 }
 
-function renderLine(line: string, index: number) {
+function renderLine(line: string, index: number, standaloneUrlLabel?: string) {
   const quoteMatch = line.match(/^\s*>\s?(.*)$/)
   if (quoteMatch) {
     return (
@@ -116,17 +118,28 @@ function renderLine(line: string, index: number) {
     )
   }
 
+  if (standaloneUrlLabel) {
+    const trimmedLine = line.trim()
+    if (STANDALONE_URL_PATTERN.test(trimmedLine)) {
+      return (
+        <span key={`line-${index}`}>
+          {renderLink(standaloneUrlLabel, trimmedLine, `line-${index}-standalone-url`)}
+        </span>
+      )
+    }
+  }
+
   return <span key={`line-${index}`}>{parseInlineText(line, `line-${index}`)}</span>
 }
 
-export function MessageRichText({ content }: MessageRichTextProps) {
+export function MessageRichText({ content, standaloneUrlLabel }: MessageRichTextProps) {
   const normalized = content.replace(/\r\n/g, '\n')
   const lines = normalized.split('\n')
 
   return (
     <>
       {lines.map((line, index) => {
-        const renderedLine = renderLine(line, index)
+        const renderedLine = renderLine(line, index, standaloneUrlLabel)
         const shouldAddBreak = index < lines.length - 1 && !/^\s*>\s?/.test(lines[index + 1] ?? '')
         return (
           <Fragment key={`message-line-wrapper-${index}`}>

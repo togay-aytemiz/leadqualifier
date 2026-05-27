@@ -124,4 +124,11 @@ describe('DemoChatClient source guards', () => {
         expect(source).toContain('demo-chat-assistant-reveal')
         expect(source).toContain('assistant text remains unframed')
     })
+
+    it('renders standalone source URLs in assistant replies with a short demo link label', () => {
+        const source = fs.readFileSync(SOURCE_PATH, 'utf8')
+
+        expect(source).toContain("t('sourceLinkLabel')")
+        expect(source).toContain('standaloneUrlLabel=')
+    })
 })

@@ -41,8 +41,29 @@ type DemoTrace = {
     sourceUrls: string[]
 }
 
-type SupabaseAnyClient = {
-    from: (table: string) => any
+type SupabaseQueryError = {
+    message: string
+}
+
+type SupabaseQueryResult = {
+    data: unknown
+    error: SupabaseQueryError | null
+}
+
+type SupabaseQuery = PromiseLike<SupabaseQueryResult> & {
+    eq: (column: string, value: unknown) => SupabaseQuery
+    maybeSingle: () => PromiseLike<SupabaseQueryResult>
+    order: (column: string, options: { ascending: boolean }) => SupabaseQuery
+    limit: (count: number) => SupabaseQuery
+    in: (column: string, values: readonly string[]) => SupabaseQuery
+}
+
+type SupabaseTableBuilder = {
+    select: (columns: string) => SupabaseQuery
+}
+
+type SupabaseClientLike = {
+    from: (table: string) => SupabaseTableBuilder
 }
 
 type BotMessageRow = {
@@ -261,7 +282,7 @@ function extractSourceUrl(content: string | null | undefined) {
 }
 
 async function loadDemoTrace(input: {
-    supabase: SupabaseAnyClient
+    supabase: SupabaseClientLike
     channel: DemoChannel
     sessionId: string
     messageId: string | null
@@ -497,7 +518,7 @@ async function main() {
                 fetchTimeoutMs
             })
             const trace = await loadDemoTrace({
-                supabase,
+                supabase: supabase as unknown as SupabaseClientLike,
                 channel,
                 sessionId,
                 messageId
