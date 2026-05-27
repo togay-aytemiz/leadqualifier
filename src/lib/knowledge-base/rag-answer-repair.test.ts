@@ -1268,6 +1268,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('finale girmeden doğrudan sınıf geçme')
     })
 
+    it('repairs no-information medicine final-makeup answers when the evidence uses "bu sınava girer" after naming the makeup exam', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Tıp fakültesinde finale girmeden bütünlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'MADDE 23- (1) Fakültede Dönem I, Dönem II ve Dönem III’te Dönem sonunda, final sınavından en erken 14 gün sonra bütün ders kurullarının içeriğini kapsayan ve bütünleme sınavı olarak adlandırılan sınav yapılır. (2) Final sınavına girmesi gerektiği halde girmeyen, final sınav puanı 50’nin altında olan veya final sınavına göre hesaplanan dönem sonu başarı notu 60’ın altında olan öğrenciler bu sınava girer. (4) Teorik, pratik/ uygulama sınavlarını içeren bütünleme sınavından alınan puanın %100’ü bütünleme notunu oluşturur. (5) Bütünleme sınavından alınan not final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
     it('repairs contradictory medicine final-to-makeup answers with the retrieved policy wording', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Final sınavına girmeden bütünleme sınavına giremezsin.',

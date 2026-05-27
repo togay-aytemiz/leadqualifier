@@ -1448,6 +1448,7 @@ function extractFinalMakeupEvidence(content: string) {
     const flattened = content.replace(/\s+/g, ' ').trim()
     const medicineFinal = flattened.match(/Final sınavına girmesi gerektiği halde girmeyen,[\s\S]{0,260}?bütünleme sınavına gir(?:er|ebilir)\.[\s\S]{0,180}?bütünleme notunu oluşturur\.[\s\S]{0,120}?final notu yerine geçer\./iu)
         ?? flattened.match(/Final sınavına girmesi gerektiği halde girmeyen,[\s\S]{0,260}?bütünleme sınavına gir(?:er|ebilir)\./iu)
+        ?? flattened.match(/bütünleme sınavı olarak adlandırılan sınav yapılır\.[\s\S]{0,260}?Final sınavına girmesi gerektiği halde girmeyen,[\s\S]{0,260}?öğrenciler bu sınava gir(?:er|ebilir)\.[\s\S]{0,260}?bütünleme notunu oluşturur\.[\s\S]{0,160}?final notu yerine geçer\./iu)
     if (medicineFinal?.[0]) {
         return {
             kind: 'medicine-final' as const,
