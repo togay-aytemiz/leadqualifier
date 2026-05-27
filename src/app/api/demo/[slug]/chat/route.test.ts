@@ -602,7 +602,10 @@ describe('demo chat API route', () => {
                 source_url: 'https://example.edu.tr/tlt-cap.pdf',
             }
         ]
-        searchKnowledgeBaseMock.mockResolvedValueOnce(chunks)
+        searchKnowledgeBaseMock.mockImplementation(async (query: string) => {
+            if (query.includes('TLT') || query.includes('Tıbbi Laboratuvar')) return [chunks[1]!]
+            return [chunks[0]!]
+        })
         buildRagContextMock.mockReturnValueOnce({
             context: chunks.map((chunk) => chunk.content).join('\n---\n'),
             chunks,
@@ -708,6 +711,20 @@ describe('demo chat API route', () => {
             userMessage: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
             chunks,
         }))
+        expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
+            'SBF kampüsü nerede?',
+            'org-1',
+            0.5,
+            6,
+            expect.objectContaining({ supabase: expect.any(Object) })
+        )
+        expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
+            'TLT çift anadal yapabilir mi?',
+            'org-1',
+            0.5,
+            6,
+            expect.objectContaining({ supabase: expect.any(Object) })
+        )
         expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
             expect.stringContaining('İstersen çift anadal başvuru koşullarını'),
             chunks,

@@ -1471,6 +1471,46 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toContain('2,72/4,0')
     })
 
+    it('combines grounded repairs for multi-intent questions only when each part has evidence', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'SBF kampüsü nerede ve Tıbbi Laboratuvar Teknikleri programında çift anadal yapabilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'SBF Sağlık Bilimleri Fakültesi',
+                    content: 'Sağlık Bilimleri Fakültesi\nAdres: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca Telefon: 0312 329 10 10'
+                },
+                {
+                    document_title: 'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI - 2025 ÖZ DEĞERLENDİRME RAPORU',
+                    content: '*Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında ve Eczane Hizmetleri Programı öğrencileri ise Tıbbi Laboratuvar Teknikleri Programında çift anadal programına kayıt yaptırabilirler. Her iki programa kaydedilecek öğrenci kontenjanları, her yıl Eğitim-Öğretim yılı başlamadan önce yüksekokul tarafından belirlenir. Kontenjanları belirlenen ve yayınlanan çift anadal programına öğrenciler, üçüncü yarıyılın başında başvurabilir. Koşullarda genel ağırlıklı not ortalaması en az 2,72/4,0 ve/veya başarı sıralaması ya da taban puan şartı belirtilmiştir.'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Sağlık Bilimleri Fakültesi adresi')
+        expect(repaired).toContain('Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca')
+        expect(repaired).toContain('Tıbbi Laboratuvar Teknikleri Programı')
+        expect(repaired).toContain('Eczane Hizmetleri Programında')
+        expect(repaired).toContain('2,72/4,0')
+    })
+
+    it('does not partially repair multi-intent questions from only one supported clause', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'SBF kampüsü nerede ve Tıbbi Laboratuvar Teknikleri programında çift anadal yapabilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Sağlık Bilimleri Fakültesi',
+                    content: 'Sağlık Bilimleri Fakültesi adresi: Bağlıca Mahallesi Höyük Caddesi No:1 Bağlıca.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Bu konuda elimde net bilgi yok.')
+    })
+
     it('keeps TLT double-major answers deterministic instead of adding unrequested contacts', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Evet, Tıbbi Laboratuvar Teknikleri Programı öğrencileri, Eczane Hizmetleri Programında çift anadal yapabilirler. İlgili kişi: Doç. Dr. Esma SARI ÜZEK.',

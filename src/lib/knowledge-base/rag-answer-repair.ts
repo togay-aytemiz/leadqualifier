@@ -1463,6 +1463,122 @@ function repairTltDoubleMajorAnswer(input: {
     return 'Evet. Tıbbi Laboratuvar Teknikleri Programı öğrencileri Eczane Hizmetleri Programında çift anadal programına kayıt yaptırabilir. Kontenjanlar her yıl eğitim-öğretim yılı başlamadan önce belirlenir; başvurular üçüncü yarıyılın başında alınır. Koşullarda genel ağırlıklı not ortalaması en az 2,72/4,0 ve/veya başarı sıralaması ya da taban puan şartı belirtilmiştir.'
 }
 
+function hasCompoundQuestionSignal(part: string) {
+    const normalized = normalizeSearch(part)
+    const tokenCount = (normalized.match(/[\p{L}\p{N}]{2,}/gu) ?? []).length
+    if (tokenCount < 3) return false
+
+    return includesAny(normalized, [
+        'adres',
+        'anadal',
+        'basvuru',
+        'cift',
+        'cap',
+        'ders',
+        'egitim',
+        'e-posta',
+        'eposta',
+        'final',
+        'gecebilir',
+        'girebilir',
+        'hak',
+        'hangi',
+        'iletisim',
+        'izin',
+        'kac',
+        'kampus',
+        'kim',
+        'mail',
+        'mazeret',
+        'nerede',
+        'not',
+        'program',
+        'rapor',
+        'sinav',
+        'sorumlu',
+        'staj',
+        'telefon',
+        'var mi',
+        'yapabilir'
+    ])
+}
+
+function splitCompoundKnowledgeQuestion(userMessage: string) {
+    const trimmed = userMessage.trim()
+    if (!/\s+(?:ve|ayrıca|ayrica|and)\s+/iu.test(trimmed)) return []
+
+    const hasQuestionMark = /[?？]\s*$/.test(trimmed)
+    const parts = trimmed
+        .replace(/[?？]\s*$/u, '')
+        .split(/\s+(?:ve|ayrıca|ayrica|and)\s+/iu)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => hasQuestionMark && !/[?？]\s*$/.test(part) ? `${part}?` : part)
+        .filter(hasCompoundQuestionSignal)
+
+    return parts.length >= 2 ? parts : []
+}
+
+function normalizeAnswerForDedupe(value: string) {
+    return normalizeSearch(value)
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function dedupeCompoundAnswers(answers: string[]) {
+    const unique: string[] = []
+    const seen = new Set<string>()
+
+    for (const answer of answers) {
+        const normalized = normalizeAnswerForDedupe(answer)
+        if (!normalized || seen.has(normalized)) continue
+        if (unique.some((existing) => {
+            const normalizedExisting = normalizeAnswerForDedupe(existing)
+            return normalizedExisting.includes(normalized) || normalized.includes(normalizedExisting)
+        })) continue
+
+        seen.add(normalized)
+        unique.push(answer.trim())
+    }
+
+    return unique
+}
+
+function repairCompoundKnowledgeAnswer(input: {
+    response: string
+    userMessage: string
+    responseLanguage: MvpResponseLanguage
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const parts = splitCompoundKnowledgeQuestion(input.userMessage)
+    if (parts.length < 2) return null
+
+    const seed = input.responseLanguage === 'en'
+        ? 'I do not have clear information about this in the knowledge base.'
+        : 'Bu konuda elimde net bilgi yok.'
+    const answers = parts
+        .map((part) => repairLinkOnlyRagAnswer({
+            ...input,
+            response: seed,
+            userMessage: part,
+            allowCompoundRepair: false
+        }))
+        .filter((answer): answer is string => Boolean(
+            answer?.trim()
+            && answer.trim() !== seed
+            && !isGenericNoInformationResponse(answer)
+        ))
+    const uniqueAnswers = dedupeCompoundAnswers(answers)
+
+    if (uniqueAnswers.length < parts.length) return null
+
+    return uniqueAnswers
+        .map((answer) => answer.replace(/\s+$/u, '').replace(/([.!?])$/u, '$1'))
+        .join(' ')
+        .trim()
+}
+
 function asksForMedicineTraining(normalizedUserMessage: string) {
     return (normalizedUserMessage.includes('tip fakultesi') || normalizedUserMessage.includes('tip fakultesinde'))
         && includesAny(normalizedUserMessage, ['staj', 'intorn', 'klinik', 'egitim'])
@@ -2130,13 +2246,26 @@ export function repairLinkOnlyRagAnswer(input: {
     userMessage: string
     responseLanguage: MvpResponseLanguage
     chunks: RagAnswerRepairChunk[]
+    allowCompoundRepair?: boolean
 }) {
     const originalResponse = input.response.trim()
     const response = originalResponse || (
         input.responseLanguage === 'en'
             ? 'I do not have clear information about this in the knowledge base.'
-            : 'Bu konuda elimde net bilgi yok.'
+        : 'Bu konuda elimde net bilgi yok.'
     )
+
+    if (input.allowCompoundRepair !== false) {
+        const compoundRepair = repairCompoundKnowledgeAnswer({
+            ...input,
+            response
+        })
+        if (compoundRepair) return compoundRepair
+
+        if (splitCompoundKnowledgeQuestion(input.userMessage).length >= 2 && isGenericNoInformationResponse(response)) {
+            return originalResponse
+        }
+    }
 
     const abbreviationTitleRepair = repairAbbreviationTitleAnswer({
         ...input,

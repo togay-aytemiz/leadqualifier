@@ -110,6 +110,75 @@ function readMessageText(value: unknown) {
     return value.trim()
 }
 
+function normalizeDemoKnowledgeQuery(value: string) {
+    return value.replace(/\s+/g, ' ').trim()
+}
+
+function demoKnowledgeQueryKey(value: string) {
+    return normalizeDemoKnowledgeQuery(value).toLocaleLowerCase('tr-TR')
+}
+
+function hasDemoCompoundQuestionSignal(part: string) {
+    const normalized = demoKnowledgeQueryKey(part)
+    const tokenCount = (normalized.match(/[\p{L}\p{N}]{2,}/gu) ?? []).length
+    if (tokenCount < 3) return false
+
+    return /\b(?:adres|anadal|başvuru|basvuru|çap|cap|çift|cift|ders|e-?posta|eğitim|egitim|final|hak|hangi|iletişim|iletisim|izin|kaç|kac|kampüs|kampus|kim|mail|mazeret|nerede|not|program|rapor|sınav|sinav|sorumlu|staj|telefon|var mı|var mi|yapabilir)\b/iu.test(normalized)
+}
+
+function splitDemoCompoundKnowledgeQueries(message: string) {
+    const trimmed = normalizeDemoKnowledgeQuery(message)
+    if (!/\s+(?:ve|ayrıca|ayrica|and)\s+/iu.test(trimmed)) return []
+
+    const hasQuestionMark = /[?？]\s*$/.test(trimmed)
+    const parts = trimmed
+        .replace(/[?？]\s*$/u, '')
+        .split(/\s+(?:ve|ayrıca|ayrica|and)\s+/iu)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => hasQuestionMark && !/[?？]\s*$/.test(part) ? `${part}?` : part)
+        .filter(hasDemoCompoundQuestionSignal)
+
+    return parts.length >= 2 ? parts : []
+}
+
+function buildDemoKnowledgeSearchQueries(message: string) {
+    const queries = [
+        normalizeDemoKnowledgeQuery(message),
+        ...splitDemoCompoundKnowledgeQueries(message)
+    ]
+    const seen = new Set<string>()
+
+    return queries.filter((query) => {
+        const key = demoKnowledgeQueryKey(query)
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
+function demoRagChunkKey(chunk: RagChunk) {
+    return chunk.chunk_id
+        ?? `${chunk.document_id ?? 'unknown'}:${chunk.content.replace(/\s+/g, ' ').trim().slice(0, 180)}`
+}
+
+function mergeDemoRagResultGroups(groups: RagChunk[][], limit: number) {
+    const seen = new Set<string>()
+    const merged: RagChunk[] = []
+
+    for (const group of groups) {
+        for (const chunk of group) {
+            const key = demoRagChunkKey(chunk)
+            if (seen.has(key)) continue
+            seen.add(key)
+            merged.push(chunk)
+            if (merged.length >= limit) return merged
+        }
+    }
+
+    return merged
+}
+
 function readDemoChatAccessToken(req: NextRequest) {
     const authorization = req.headers.get('authorization')?.trim()
     if (authorization?.toLowerCase().startsWith('bearer ')) {
@@ -510,12 +579,16 @@ async function buildExtractiveDemoChatReply(input: {
     const focusedReply = await buildReplyFromResults(focusedResults)
     if (focusedReply) return focusedReply
 
-    const kbResults = await searchKnowledgeBase(
-        message,
-        input.channel.organizationId,
-        FAST_RAG_MATCH_THRESHOLD,
-        FAST_RAG_RESULT_LIMIT,
-        { supabase: input.supabase }
+    const searchQueries = buildDemoKnowledgeSearchQueries(message)
+    const kbResults = mergeDemoRagResultGroups(
+        await Promise.all(searchQueries.map((query) => searchKnowledgeBase(
+            query,
+            input.channel.organizationId,
+            FAST_RAG_MATCH_THRESHOLD,
+            FAST_RAG_RESULT_LIMIT,
+            { supabase: input.supabase }
+        ))),
+        FAST_RAG_RESULT_LIMIT
     )
 
     return buildReplyFromResults(kbResults)

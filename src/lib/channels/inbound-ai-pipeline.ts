@@ -165,6 +165,30 @@ function hasStandaloneSubjectCue(message: string) {
         || hasNumberedPolicySubject
 }
 
+function hasCompoundKnowledgeQuestionSignal(part: string) {
+    const normalized = knowledgeSearchQueryKey(part)
+    const tokenCount = (normalized.match(/[\p{L}\p{N}]{2,}/gu) ?? []).length
+    if (tokenCount < 3) return false
+
+    return /\b(?:adres|anadal|başvuru|basvuru|çap|cap|çift|cift|ders|e-?posta|eğitim|egitim|final|hak|hangi|iletişim|iletisim|izin|kaç|kac|kampüs|kampus|kim|mail|mazeret|nerede|not|program|rapor|sınav|sinav|sorumlu|staj|telefon|var mı|var mi|yapabilir)\b/iu.test(normalized)
+}
+
+function splitCompoundKnowledgeSearchQueries(message: string) {
+    const normalized = normalizeKnowledgeSearchQuery(message)
+    if (!/\s+(?:ve|ayrıca|ayrica|and)\s+/iu.test(normalized)) return []
+
+    const hasQuestionMark = /[?？]\s*$/.test(normalized)
+    const parts = normalized
+        .replace(/[?？]\s*$/u, '')
+        .split(/\s+(?:ve|ayrıca|ayrica|and)\s+/iu)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => hasQuestionMark && !/[?？]\s*$/.test(part) ? `${part}?` : part)
+        .filter(hasCompoundKnowledgeQuestionSignal)
+
+    return parts.length >= 2 ? parts : []
+}
+
 function shouldPreferOriginalKnowledgeSearch(message: string, history: ConversationTurn[]) {
     if (!looksLikeStandaloneKnowledgeSearch(message)) return false
     if (history.length === 0) return true
@@ -176,11 +200,12 @@ function buildKnowledgeSearchQueries(primaryQuery: string, originalMessage: stri
     const primary = normalizeKnowledgeSearchQuery(primaryQuery)
     const original = normalizeKnowledgeSearchQuery(originalMessage)
     const shouldPreferOriginal = shouldPreferOriginalKnowledgeSearch(original, history)
+    const compoundParts = splitCompoundKnowledgeSearchQueries(original)
     const ordered = shouldPreferOriginal
-        ? [original, primary]
+        ? [original, ...compoundParts, primary]
         : history.length > 0
-            ? [primary, original]
-            : [primary]
+            ? [primary, original, ...compoundParts]
+            : [primary, ...compoundParts]
     const seen = new Set<string>()
     const queries: string[] = []
 
@@ -1517,6 +1542,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     if (
                         index === 0
                         && searchQueries.length > 1
+                        && splitCompoundKnowledgeSearchQueries(searchQueries[0] ?? '').length === 0
                         && shouldSkipAdditionalKnowledgeSearchQueries(results, 6)
                     ) {
                         break
