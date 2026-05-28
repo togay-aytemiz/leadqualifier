@@ -1219,7 +1219,14 @@ describe('searchKnowledgeBase', () => {
             'org-1',
             0.5,
             3,
-            { supabase, queryPlannerUsage: plannerUsage }
+            {
+                supabase,
+                plannerHistory: [{
+                    role: 'assistant',
+                    content: 'Tıbbi Laboratuvar Teknikleri programını konuşuyorduk.'
+                }],
+                queryPlannerUsage: plannerUsage
+            }
         )
 
         const filters = orMock.mock.calls
@@ -1227,7 +1234,14 @@ describe('searchKnowledgeBase', () => {
             .join('\n')
             .toLocaleLowerCase('tr-TR')
 
-        expect(planKnowledgeSearchQueryMock).toHaveBeenCalledWith('Bu programda staj var mı?', [], expect.any(Object))
+        expect(planKnowledgeSearchQueryMock).toHaveBeenCalledWith(
+            'Bu programda staj var mı?',
+            [{
+                role: 'assistant',
+                content: 'Tıbbi Laboratuvar Teknikleri programını konuşuyorduk.'
+            }],
+            expect.any(Object)
+        )
         expect(filters).toContain('laboratuvar')
         expect(results[0]).toMatchObject({
             chunk_id: 'planner-kw-1',

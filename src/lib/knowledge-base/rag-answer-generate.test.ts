@@ -27,6 +27,8 @@ describe('generateGroundedRagAnswer', () => {
             expect(systemPrompt).toContain('organization-specific AI assistant instructions above as the voice and behavior contract')
             expect(systemPrompt).toContain('support_quotes')
             expect(systemPrompt).toContain('Do not answer from memory')
+            expect(systemPrompt).toContain('Recent conversation:')
+            expect(systemPrompt).toContain('Assistant: Tıbbi Laboratuvar Teknikleri hakkında konuşuyorduk.')
 
             return {
                 choices: [{
@@ -51,6 +53,10 @@ describe('generateGroundedRagAnswer', () => {
                 prompt: 'Samimi, canlı ve güven veren bir dil kullan.',
                 bot_name: 'Qualy'
             },
+            conversationHistory: [{
+                role: 'assistant',
+                content: 'Tıbbi Laboratuvar Teknikleri hakkında konuşuyorduk.'
+            }],
             createCompletion
         })
 

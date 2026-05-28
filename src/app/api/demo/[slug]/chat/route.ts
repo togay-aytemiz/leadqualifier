@@ -875,6 +875,34 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
             }
 
+            const recoveryPromise = recoverPendingDemoChatReply({
+                supabase,
+                channel,
+                sessionId,
+                messageId,
+                fallbackMessage: message
+            })
+            const recoveryResult = await waitForPipelineResult(
+                recoveryPromise,
+                readFastRagReplyTimeoutMs()
+            )
+            if (recoveryResult.status === 'timeout') {
+                scheduleAfterResponse('pending reply recovery', async () => {
+                    await recoveryPromise
+                })
+
+                return NextResponse.json({ pending: true }, { status: 202 })
+            }
+
+            const recoveredReply = recoveryResult.result
+            if (recoveredReply?.replyText || recoveredReply?.skillImage) {
+                return NextResponse.json({
+                    pending: false,
+                    response: recoveredReply.replyText,
+                    skillImage: recoveredReply.skillImage
+                })
+            }
+
             const extractiveRecoveryPromise = recoverPendingDemoChatReplyExtractively({
                 supabase,
                 channel,
@@ -884,7 +912,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
             })
             const extractiveRecoveryResult = await waitForPipelineResult(
                 extractiveRecoveryPromise,
-                readFastRagReplyTimeoutMs()
+                readSyncReplyTimeoutMs()
             )
             if (extractiveRecoveryResult.status === 'timeout') {
                 scheduleAfterResponse('extractive pending reply recovery', async () => {
@@ -895,39 +923,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
             }
 
             const extractiveReply = extractiveRecoveryResult.result
-            if (extractiveReply) {
-                return NextResponse.json({
-                    pending: false,
-                    response: extractiveReply.replyText,
-                    skillImage: extractiveReply.skillImage
-                })
-            }
-
-            const recoveryPromise = recoverPendingDemoChatReply({
-                supabase,
-                channel,
-                sessionId,
-                messageId,
-                fallbackMessage: message
-            })
-            const recoveryResult = await waitForPipelineResult(recoveryPromise, readSyncReplyTimeoutMs())
-            if (recoveryResult.status === 'timeout') {
-                scheduleAfterResponse('pending reply recovery', async () => {
-                    await recoveryPromise
-                })
-
-                return NextResponse.json({ pending: true }, { status: 202 })
-            }
-
-            const recoveredReply = recoveryResult.result
-            if (!recoveredReply) {
+            if (!extractiveReply) {
                 return NextResponse.json({ pending: true }, { status: 202 })
             }
 
             return NextResponse.json({
                 pending: false,
-                response: recoveredReply.replyText,
-                skillImage: recoveredReply.skillImage
+                response: extractiveReply.replyText,
+                skillImage: extractiveReply.skillImage
             })
         }
 

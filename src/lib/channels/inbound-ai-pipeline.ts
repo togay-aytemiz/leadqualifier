@@ -1531,6 +1531,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
             }
             const knowledgeSearchOptions = {
                 supabase: options.supabase,
+                plannerHistory: history,
                 queryPlannerUsage: recordQueryPlannerUsage
             }
 
@@ -1568,6 +1569,70 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                 if (!fallbackKnowledgeContext) {
                     fallbackKnowledgeContext = context.replace(/\s+/g, ' ').trim().slice(0, 1500)
                     fallbackKnowledgeChunks = repairChunks
+                }
+
+                const groundedGeneratedRagResponse = await generateGroundedRagAnswer({
+                    userMessage: options.text,
+                    responseLanguage,
+                    chunks: repairChunks,
+                    settings: aiSettings,
+                    conversationHistory: history
+                })
+                if (groundedGeneratedRagResponse.usage) {
+                    await recordInboundAiUsage({
+                        organizationId: orgId,
+                        category: 'rag',
+                        model: groundedGeneratedRagResponse.model,
+                        inputTokens: groundedGeneratedRagResponse.usage.inputTokens,
+                        outputTokens: groundedGeneratedRagResponse.usage.outputTokens,
+                        totalTokens: groundedGeneratedRagResponse.usage.totalTokens,
+                        metadata: {
+                            conversation_id: conversation.id,
+                            source: 'rag_grounded_generate',
+                            response_kind: 'rag_grounded_generate',
+                            platform: options.platform,
+                            document_count: repairChunks.length
+                        },
+                        supabase: options.supabase
+                    }, options.logPrefix)
+                }
+                if (
+                    groundedGeneratedRagResponse.usedGeneration
+                    && groundedGeneratedRagResponse.answer.trim()
+                    && !isRagNoAnswerResponse(groundedGeneratedRagResponse.answer)
+                ) {
+                    const generatedRagWithSources = appendCanonicalRagSourceLinks(groundedGeneratedRagResponse.answer, repairChunks, {
+                        force: true,
+                        limit: resolveRagSourceLinkLimit(options.platform)
+                    })
+                    const formattedGeneratedRagReply = formatOutboundBotMessage(generatedRagWithSources)
+                    const outboundMetadata = await sendOutboundAndCollectMetadata(formattedGeneratedRagReply)
+                    await persistBotMessage(formattedGeneratedRagReply, {
+                        ...outboundMetadata,
+                        is_rag: true,
+                        rag_generate: {
+                            usedGeneration: groundedGeneratedRagResponse.usedGeneration,
+                            addedEngagement: groundedGeneratedRagResponse.addedEngagement,
+                            model: groundedGeneratedRagResponse.model
+                        },
+                        sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
+                    })
+                    await recordAiLatencyEvent({
+                        organizationId: orgId,
+                        conversationId: conversation.id,
+                        metricKey: 'llm_response',
+                        durationMs: Date.now() - llmResponseStartedAt,
+                        source: options.source,
+                        metadata: {
+                            response_kind: 'rag_grounded_generate',
+                            platform: options.platform,
+                            document_count: kbResults.length
+                        }
+                    }, {
+                        supabase: options.supabase
+                    })
+                    await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
+                    return
                 }
 
                 const extractiveSeed = buildNoInformationSeed(responseLanguage)
@@ -1634,69 +1699,6 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         source: options.source,
                         metadata: {
                             response_kind: 'rag_extractive',
-                            platform: options.platform,
-                            document_count: kbResults.length
-                        }
-                    }, {
-                        supabase: options.supabase
-                    })
-                    await applyEscalationAfterReply({ skillRequiresHumanHandover: false })
-                    return
-                }
-
-                const groundedGeneratedRagResponse = await generateGroundedRagAnswer({
-                    userMessage: options.text,
-                    responseLanguage,
-                    chunks: repairChunks,
-                    settings: aiSettings
-                })
-                if (groundedGeneratedRagResponse.usage) {
-                    await recordInboundAiUsage({
-                        organizationId: orgId,
-                        category: 'rag',
-                        model: groundedGeneratedRagResponse.model,
-                        inputTokens: groundedGeneratedRagResponse.usage.inputTokens,
-                        outputTokens: groundedGeneratedRagResponse.usage.outputTokens,
-                        totalTokens: groundedGeneratedRagResponse.usage.totalTokens,
-                        metadata: {
-                            conversation_id: conversation.id,
-                            source: 'rag_grounded_generate',
-                            response_kind: 'rag_grounded_generate',
-                            platform: options.platform,
-                            document_count: repairChunks.length
-                        },
-                        supabase: options.supabase
-                    }, options.logPrefix)
-                }
-                if (
-                    groundedGeneratedRagResponse.usedGeneration
-                    && groundedGeneratedRagResponse.answer.trim()
-                    && !isRagNoAnswerResponse(groundedGeneratedRagResponse.answer)
-                ) {
-                    const generatedRagWithSources = appendCanonicalRagSourceLinks(groundedGeneratedRagResponse.answer, repairChunks, {
-                        force: true,
-                        limit: resolveRagSourceLinkLimit(options.platform)
-                    })
-                    const formattedGeneratedRagReply = formatOutboundBotMessage(generatedRagWithSources)
-                    const outboundMetadata = await sendOutboundAndCollectMetadata(formattedGeneratedRagReply)
-                    await persistBotMessage(formattedGeneratedRagReply, {
-                        ...outboundMetadata,
-                        is_rag: true,
-                        rag_generate: {
-                            usedGeneration: groundedGeneratedRagResponse.usedGeneration,
-                            addedEngagement: groundedGeneratedRagResponse.addedEngagement,
-                            model: groundedGeneratedRagResponse.model
-                        },
-                        sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
-                    })
-                    await recordAiLatencyEvent({
-                        organizationId: orgId,
-                        conversationId: conversation.id,
-                        metricKey: 'llm_response',
-                        durationMs: Date.now() - llmResponseStartedAt,
-                        source: options.source,
-                        metadata: {
-                            response_kind: 'rag_grounded_generate',
                             platform: options.platform,
                             document_count: kbResults.length
                         }

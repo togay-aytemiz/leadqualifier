@@ -2083,6 +2083,11 @@ describe('processInboundAiPipeline guardrails', () => {
                 sender_type: 'contact',
                 content: 'hizmetleriniz hakkında bilgi almak istiyorum',
                 created_at: '2026-02-10T12:00:00.000Z'
+            },
+            {
+                sender_type: 'bot',
+                content: 'Güzellik merkezimizin hizmetlerini konuşuyorduk.',
+                created_at: '2026-02-10T11:59:00.000Z'
             }
         ])
         const botInsert = createInsertBuilder()
@@ -2208,7 +2213,8 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(generateGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
             userMessage: 'hizmetleriniz hakkında bilgi almak istiyorum',
             responseLanguage: 'tr',
-            chunks: [chunk]
+            chunks: [chunk],
+            conversationHistory: expect.any(Array)
         }))
         expect(openAiCreateMock).not.toHaveBeenCalledWith(expect.objectContaining({
             messages: expect.arrayContaining([

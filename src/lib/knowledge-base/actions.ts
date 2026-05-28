@@ -21,6 +21,7 @@ import {
 } from '@/lib/knowledge-base/pagination'
 import {
     planKnowledgeSearchQuery,
+    type KnowledgeSearchPlanningTurn,
     type KnowledgeSearchQueryPlan
 } from '@/lib/knowledge-base/query-planner'
 import { assertTenantWriteAllowed, resolveActiveOrganizationContext } from '@/lib/organizations/active-context'
@@ -105,6 +106,8 @@ interface KnowledgeSearchOptions {
     type?: string | null
     language?: string | null
     supabase?: SupabaseClientLike
+    plannerHistory?: KnowledgeSearchPlanningTurn[]
+    skipQueryPlanner?: boolean
     queryPlannerUsage?: (plan: KnowledgeSearchQueryPlan) => void | Promise<void>
 }
 
@@ -869,7 +872,7 @@ function shouldSkipPlannedSearchVariants(
 
 async function resolveKnowledgeSearchPlan(query: string, options?: KnowledgeSearchOptions) {
     try {
-        const plan = await planKnowledgeSearchQuery(query, [], {})
+        const plan = await planKnowledgeSearchQuery(query, options?.plannerHistory ?? [], {})
         if (plan.usage && options?.queryPlannerUsage) {
             await options.queryPlannerUsage(plan)
         }
@@ -909,6 +912,10 @@ export async function searchKnowledgeBase(
     )
 
     if (shouldSkipPlannedSearchVariants(query, originalResults, limit)) {
+        return originalResults
+    }
+
+    if (options?.skipQueryPlanner) {
         return originalResults
     }
 

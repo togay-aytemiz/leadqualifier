@@ -9,6 +9,11 @@ type RagAnswerGenerateSettings = {
     bot_name?: string | null
 }
 
+type RagConversationTurn = {
+    role: 'user' | 'assistant'
+    content: string
+}
+
 type CompletionUsage = {
     prompt_tokens?: number
     completion_tokens?: number
@@ -399,12 +404,14 @@ function buildSystemPrompt(input: {
     settings?: RagAnswerGenerateSettings
     responseLanguage: MvpResponseLanguage
     context: string
+    conversationHistory?: RagConversationTurn[]
 }) {
     const basePrompt = withBotNamePrompt(
         input.settings?.prompt || DEFAULT_FLEXIBLE_PROMPT,
         input.settings?.bot_name
     )
     const languageName = input.responseLanguage === 'tr' ? 'Turkish' : 'English'
+    const history = formatConversationHistory(input.conversationHistory ?? [])
 
     return `${basePrompt}
 
@@ -412,14 +419,17 @@ You are generating a grounded RAG answer. Keep the answer in ${languageName}.
 Treat the organization-specific AI assistant instructions above as the voice and behavior contract for tone, warmth, and style.
 Do not answer from memory. Use only the provided context.
 Answer naturally and helpfully, not like a rule-based extractor, but preserve exact factual values from the context.
+Use a warm conversational tone that matches the organization instructions. Avoid robotic bare extractions when a short human sentence would be clearer.
 If the context does not contain enough evidence to answer, return answer as "NO_ANSWER" with an empty support_quotes array.
 Do not add facts, names, dates, numbers, contact details, rules, links, eligibility claims, or next steps that are not in the context.
 Do not include source URLs in the answer; source links are added by the application.
 Every factual answer must include at least one exact support quote copied from the context in support_quotes.
 For exact fields such as person names, fees, dates, document numbers, quotas, phone numbers, email addresses, addresses, durations, and percentages, copy values exactly.
 If sources conflict, answer only the part supported by the best matching quote and avoid unsupported certainty.
+Use recent conversation only to resolve references such as "this program", "there", or "it"; the factual answer must still be grounded in the context quotes.
+If the user asks a context-dependent follow-up and recent conversation does not identify the missing subject, return answer as "NO_ANSWER" instead of guessing from unrelated chunks.
 
-You may include exactly one short role-neutral engagement question or offer when the context contains a directly related adjacent detail. It must be supported by engagement_evidence copied exactly from the context.
+Prefer to include exactly one short role-neutral engagement question or offer when the context contains a directly related adjacent detail. It must be supported by engagement_evidence copied exactly from the context.
 Do not ask about the user's role, status, department, or identity. Do not add generic closers such as "anything else", "başka bir konuda yardımcı olabilir miyim", or "daha fazla bilgi istersen yardımcı olurum".
 
 Return JSON only:
@@ -430,8 +440,27 @@ Return JSON only:
   "engagement_evidence": "exact quote from the context supporting the engagement"
 }
 
+Recent conversation:
+${history}
+
 Context:
 ${input.context}`
+}
+
+function formatConversationHistory(history: RagConversationTurn[]) {
+    const turns = history
+        .filter((turn) => turn.content.trim())
+        .slice(-6)
+
+    if (turns.length === 0) return 'No recent history.'
+
+    return turns
+        .map((turn, index) => {
+            const role = turn.role === 'assistant' ? 'Assistant' : 'User'
+            const content = turn.content.replace(/\s+/g, ' ').trim().slice(0, 320)
+            return `${index + 1}. ${role}: ${content}`
+        })
+        .join('\n')
 }
 
 function fallbackResult(model: string, usage: RagAnswerGenerateUsage | null = null): RagAnswerGenerateResult {
@@ -449,6 +478,7 @@ export async function generateGroundedRagAnswer(input: {
     responseLanguage: MvpResponseLanguage
     chunks: RagChunk[]
     settings?: RagAnswerGenerateSettings
+    conversationHistory?: RagConversationTurn[]
     model?: string
     createCompletion?: CreateCompletion
 }): Promise<RagAnswerGenerateResult> {
@@ -461,7 +491,8 @@ export async function generateGroundedRagAnswer(input: {
     const systemPrompt = buildSystemPrompt({
         settings: input.settings,
         responseLanguage: input.responseLanguage,
-        context
+        context,
+        conversationHistory: input.conversationHistory
     })
     const userPrompt = `User question: ${input.userMessage}`
 

@@ -367,7 +367,7 @@ describe('demo chat API route', () => {
         expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
     })
 
-    it('uses focused evidence recovery before broad knowledge search during polling', async () => {
+    it('falls back to focused evidence recovery before broad knowledge search when the full pipeline has no reply', async () => {
         const chunk = {
             content: 'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU\nBAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören',
             document_id: 'doc-shmyo',
@@ -433,13 +433,11 @@ describe('demo chat API route', () => {
             eq: vi.fn(async () => ({ error: null })),
         }
 
-        const conversations = [conversationChain, conversationChain, conversationChain]
-        let messageSelectCount = 0
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                messageSelectCount += 1
-                if (messageSelectCount === 1) return completedMessagesChain
-                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
             }),
@@ -455,6 +453,7 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -475,10 +474,10 @@ describe('demo chat API route', () => {
             expect.objectContaining({ supabase: expect.any(Object) })
         )
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalled()
     })
 
-    it('returns deterministic knowledge replies during polling without running the full AI pipeline', async () => {
+    it('falls back to deterministic knowledge replies during polling when the full AI pipeline has no reply', async () => {
         const chunk = {
             content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
             document_id: 'doc-1',
@@ -542,13 +541,11 @@ describe('demo chat API route', () => {
             eq: vi.fn(async () => ({ error: null })),
         }
 
-        const conversations = [conversationChain, conversationChain, conversationChain]
-        let messageSelectCount = 0
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                messageSelectCount += 1
-                if (messageSelectCount === 1) return completedMessagesChain
-                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
             }),
@@ -564,6 +561,7 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -584,7 +582,7 @@ describe('demo chat API route', () => {
             6,
             expect.objectContaining({ supabase: expect.any(Object) })
         )
-        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).toHaveBeenCalled()
         expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
             conversation_id: 'conversation-1',
             organization_id: 'org-1',
@@ -684,13 +682,11 @@ describe('demo chat API route', () => {
             eq: vi.fn(async () => ({ error: null })),
         }
 
-        const conversations = [conversationChain, conversationChain, conversationChain]
-        let messageSelectCount = 0
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                messageSelectCount += 1
-                if (messageSelectCount === 1) return completedMessagesChain
-                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
             }),
@@ -706,6 +702,7 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -859,13 +856,11 @@ describe('demo chat API route', () => {
             eq: vi.fn(async () => ({ error: null })),
         }
 
-        const conversations = [conversationChain, conversationChain, conversationChain]
-        let messageSelectCount = 0
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                messageSelectCount += 1
-                if (messageSelectCount === 1) return completedMessagesChain
-                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
             }),
@@ -881,6 +876,7 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -1001,13 +997,11 @@ describe('demo chat API route', () => {
             eq: vi.fn(async () => ({ error: null })),
         }
 
-        const conversations = [conversationChain, conversationChain, conversationChain]
-        let messageSelectCount = 0
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                messageSelectCount += 1
-                if (messageSelectCount === 1) return completedMessagesChain
-                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
             }),
@@ -1023,6 +1017,7 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -1108,13 +1103,11 @@ describe('demo chat API route', () => {
             eq: vi.fn(async () => ({ error: null })),
         }
 
-        const conversations = [conversationChain, conversationChain, conversationChain]
-        let messageSelectCount = 0
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain, conversationChain]
         const messagesTable = {
             select: vi.fn((columns: string) => {
-                messageSelectCount += 1
-                if (messageSelectCount === 1) return completedMessagesChain
-                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns.includes('id, content')) return inboundMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
                 if (columns === 'id') return duplicateReplyChain
                 return completedMessagesChain
             }),
@@ -1130,6 +1123,7 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
 
         const res = await GET(createGetRequest({
             sessionId: 'session-1',
@@ -1150,6 +1144,7 @@ describe('demo chat API route', () => {
     it('keeps polling pending when recovery processing is slower than the sync reply budget', async () => {
         vi.useFakeTimers()
         vi.stubEnv('DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS', '1000')
+        vi.stubEnv('DEMO_CHAT_FAST_RAG_REPLY_TIMEOUT_MS', '1000')
         const createConversationChain = () => {
             const chain = {
                 eq: vi.fn(),
