@@ -1623,18 +1623,46 @@ function formatPhoneNumber(value: string) {
     return cleanExtractedInlineValue(value).replace(/^\(+/, '').replace(/\(\s*\+/g, '+')
 }
 
+function findPhoneMatches(value: string) {
+    return Array.from(value.matchAll(new RegExp(PHONE_REGEX.source, 'gi')))
+}
+
+function hasPhoneLabelBefore(value: string, index: number) {
+    const before = value.slice(Math.max(0, index - 36), index)
+    return /(?:telefon|tel\.?)\s*:?[\s\S]{0,24}$/iu.test(before)
+}
+
+function hasFaxLabelBefore(value: string, index: number) {
+    const before = value.slice(Math.max(0, index - 28), index)
+    return /(?:fax|faks)\s*:?[\s\S]{0,18}$/iu.test(before)
+}
+
+function extractPreferredPhone(value: string, options?: { preferLast?: boolean }) {
+    const matches = findPhoneMatches(value)
+    if (matches.length === 0) return null
+
+    const labeledPhones = matches.filter((match) => {
+        const index = match.index ?? 0
+        return hasPhoneLabelBefore(value, index) && !hasFaxLabelBefore(value, index)
+    })
+    const nonFaxPhones = matches.filter((match) => !hasFaxLabelBefore(value, match.index ?? 0))
+    const candidates = labeledPhones.length > 0 ? labeledPhones : (nonFaxPhones.length > 0 ? nonFaxPhones : matches)
+    const selected = options?.preferLast ? candidates[candidates.length - 1] : candidates[0]
+
+    return selected?.[0] ? formatPhoneNumber(selected[0]) : null
+}
+
 function extractPhoneNearEmail(content: string, email: string | null) {
     if (email) {
         const emailIndex = content.toLocaleLowerCase('tr-TR').indexOf(email.toLocaleLowerCase('tr-TR'))
         if (emailIndex >= 0) {
-            const nearby = content.slice(Math.max(0, emailIndex - 180), Math.min(content.length, emailIndex + 120))
-            const nearbyPhone = nearby.match(PHONE_REGEX)?.[0]
-            if (nearbyPhone) return formatPhoneNumber(nearbyPhone)
+            const nearby = content.slice(Math.max(0, emailIndex - 420), Math.min(content.length, emailIndex + 120))
+            const nearbyPhone = extractPreferredPhone(nearby, { preferLast: true })
+            if (nearbyPhone) return nearbyPhone
         }
     }
 
-    const phone = content.match(PHONE_REGEX)?.[0]
-    return phone ? formatPhoneNumber(phone) : null
+    return extractPreferredPhone(content)
 }
 
 function extractContactEvidence(chunk: RagAnswerRepairChunk, userMessage: string): ContactEvidence | null {
