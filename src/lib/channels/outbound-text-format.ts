@@ -59,7 +59,7 @@ function normalizeRawUrlsForPlainChat(content: string) {
 function normalizeEmailWhitespaceForPlainChat(content: string) {
     return content
         .replace(
-            /\b([A-Z0-9._%+-]+)@((?:[A-Z0-9-]+\s*\.\s*)+[A-Z]{2,24})(?!\s*\.)/gi,
+            /\b([A-Z0-9._%+-]+)@((?:[A-Z0-9-]+\s*\.\s*)+[A-Z]{2,24})(?!\s*[.:/])/gi,
             (_match, localPart: string, rawDomain: string) => {
                 const domain = rawDomain
                     .replace(/\s*\.\s*/g, '.')
@@ -76,7 +76,7 @@ function normalizeEmailWhitespaceForPlainChat(content: string) {
 function normalizeEmailSentenceSpacingForPlainChat(content: string) {
     return content
         .replace(
-            /\b([A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,24})\.(?=[A-ZÇĞİÖŞÜ])/gi,
+            /\b([A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,24})\.(?!\s*https?:\/\/)(?=[A-ZÇĞİÖŞÜ])/gi,
             '$1. '
         )
         .replace(
@@ -106,6 +106,10 @@ function stripOrphanDomainFragmentsForPlainChat(content: string) {
 
 function normalizeUrlLineBreaks(content: string) {
     return content
+        .replace(
+            /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:tr|com|net|org|edu|gov|io|ai))\.\s*(?=https?:\/\/)/gi,
+            '$1.\n'
+        )
         .replace(/[ \t]*\n[ \t]*/g, '\n')
         .replace(/\n[.,;:!?]+(?=\n|$)/g, '')
         .replace(/\n{3,}/g, '\n\n')
@@ -185,20 +189,21 @@ export function formatOutboundTextForChannel(content: string, options: OutboundT
         normalizeEmailWhitespaceForPlainChat(withPlainLinks)
     )
     const withCleanDomains = normalizeTurkishDomainWhitespaceForPlainChat(withCleanEmails)
+    const withStableSourceLines = normalizeUrlLineBreaks(withCleanDomains)
 
     if (options.platform === 'whatsapp') {
-        return normalizeBotDisclaimerFooter(convertDoubleStarToSingleStar(withCleanDomains), {
+        return normalizeBotDisclaimerFooter(convertDoubleStarToSingleStar(withStableSourceLines), {
             quoteFooter: true
         })
     }
 
     if (options.platform === 'demo_chat') {
-        return normalizeBotDisclaimerFooter(withCleanDomains, {
+        return normalizeBotDisclaimerFooter(withStableSourceLines, {
             quoteFooter: true
         })
     }
 
-    const plainText = stripPlainTextMarkdown(withCleanDomains)
+    const plainText = stripPlainTextMarkdown(withStableSourceLines)
     if (options.platform === 'telegram') {
         return normalizeBotDisclaimerFooter(plainText, {
             quoteFooter: true

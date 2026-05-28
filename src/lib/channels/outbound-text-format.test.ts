@@ -106,6 +106,23 @@ describe('formatOutboundTextForChannel', () => {
         )
     })
 
+    it('keeps canonical source URL lines separate after an email sentence in demo chat', () => {
+        const formatted = formatOutboundTextForChannel(
+            [
+                'Tıbbi Laboratuvar Teknikleri iletişim bilgisi: E-posta: tlt@yiu.edu.tr.',
+                'https://example.edu.tr/tlt.pdf',
+                'https://example.edu.tr/iletisim'
+            ].join('\n'),
+            { platform: 'demo_chat' }
+        )
+
+        expect(formatted).toBe([
+            'Tıbbi Laboratuvar Teknikleri iletişim bilgisi: E-posta: tlt@yiu.edu.tr.',
+            'https://example.edu.tr/tlt.pdf',
+            'https://example.edu.tr/iletisim'
+        ].join('\n'))
+    })
+
     it('removes orphan domain fragments left by upstream response guards', () => {
         const formatted = formatOutboundTextForChannel(
             'edu. tr. Buradan devam ederek uygun seçenekleri netleştirebiliriz.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.',

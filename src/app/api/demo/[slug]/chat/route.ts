@@ -23,8 +23,10 @@ export const runtime = 'nodejs'
 
 const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
-const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 8000
-const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 22000
+const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 5000
+const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 10000
+const MAX_SYNC_REPLY_TIMEOUT_MS = 6000
+const MAX_FAST_RAG_REPLY_TIMEOUT_MS = 12000
 const DEMO_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000
 const DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE = 20
 const FAST_RAG_MATCH_THRESHOLD = 0.5
@@ -106,13 +108,13 @@ function normalizeSessionId(value: unknown) {
 
 function readSyncReplyTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS ?? '', 10)
-    if (Number.isFinite(raw) && raw >= 1000) return raw
+    if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, MAX_SYNC_REPLY_TIMEOUT_MS)
     return DEFAULT_SYNC_REPLY_TIMEOUT_MS
 }
 
 function readFastRagReplyTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_FAST_RAG_REPLY_TIMEOUT_MS ?? '', 10)
-    if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, 28000)
+    if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, MAX_FAST_RAG_REPLY_TIMEOUT_MS)
     return DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS
 }
 

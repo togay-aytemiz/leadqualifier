@@ -2196,6 +2196,13 @@ describe('processInboundAiPipeline guardrails', () => {
             usage: { inputTokens: 90, outputTokens: 18, totalTokens: 108 },
             model: 'gpt-4o-mini'
         })
+        polishGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Elbette, cilt bakımı ve lazer epilasyon hizmetleri mevcut.\n\nİstersen bu hizmetlerin kapsamını da kısaca anlatabilirim.',
+            usedPolish: true,
+            addedEngagement: true,
+            usage: { inputTokens: 80, outputTokens: 24, totalTokens: 104 },
+            model: 'gpt-4o-mini'
+        })
 
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
@@ -2222,7 +2229,13 @@ describe('processInboundAiPipeline guardrails', () => {
                 expect.objectContaining({ role: 'user', content: 'hizmetleriniz hakkında bilgi almak istiyorum' })
             ])
         }))
-        expect(sendOutbound).toHaveBeenCalledWith('Tabii, cilt bakımı ve lazer epilasyon hizmetleri mevcut.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            answer: 'Tabii, cilt bakımı ve lazer epilasyon hizmetleri mevcut.',
+            userMessage: 'hizmetleriniz hakkında bilgi almak istiyorum',
+            responseLanguage: 'tr',
+            chunks: [chunk]
+        }))
+        expect(sendOutbound).toHaveBeenCalledWith('Elbette, cilt bakımı ve lazer epilasyon hizmetleri mevcut.\n\nİstersen bu hizmetlerin kapsamını da kısaca anlatabilirim.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
             organizationId: 'org-1',
             category: 'rag',
@@ -2235,11 +2248,28 @@ describe('processInboundAiPipeline guardrails', () => {
                 response_kind: 'rag_grounded_generate'
             })
         }))
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            category: 'rag',
+            model: 'gpt-4o-mini',
+            inputTokens: 80,
+            outputTokens: 24,
+            totalTokens: 104,
+            metadata: expect.objectContaining({
+                source: 'rag_grounded_generate_polish',
+                response_kind: 'rag_grounded_generate_polish'
+            })
+        }))
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
                 rag_generate: {
                     usedGeneration: true,
                     addedEngagement: false,
+                    model: 'gpt-4o-mini'
+                },
+                rag_polish: {
+                    usedPolish: true,
+                    addedEngagement: true,
                     model: 'gpt-4o-mini'
                 }
             })
@@ -3747,7 +3777,7 @@ describe('processInboundAiPipeline guardrails', () => {
             buildInput(supabase, sendOutbound, { text: 'Bilgi İşlem Birimi iletişim bilgisi nedir?' })
         )
 
-        const expectedReply = 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr. https://yuksekihtisasuniversitesi.edu.tr/iletisim\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
+        const expectedReply = 'Bilgi İşlem Birimi telefon numarası +90 312 329 10 10, dahili 256-258 ve e-posta adresi bilgiislem@yuksekihtisas.edu.tr.\nhttps://yuksekihtisasuniversitesi.edu.tr/iletisim\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
         expect(sendOutbound).toHaveBeenCalledWith(expectedReply)
         expect(sendOutbound).not.toHaveBeenCalledWith(expect.stringMatching(/^edu\./i))
         expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({

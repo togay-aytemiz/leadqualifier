@@ -1601,7 +1601,54 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                     && groundedGeneratedRagResponse.answer.trim()
                     && !isRagNoAnswerResponse(groundedGeneratedRagResponse.answer)
                 ) {
-                    const generatedRagWithSources = appendCanonicalRagSourceLinks(groundedGeneratedRagResponse.answer, repairChunks, {
+                    let generatedAnswerForReply = groundedGeneratedRagResponse.answer
+                    let generatedRagPolishMetadata: {
+                        usedPolish: boolean
+                        addedEngagement: boolean
+                        model: string
+                    } | null = null
+
+                    if (!groundedGeneratedRagResponse.addedEngagement) {
+                        const polishedGeneratedRagResponse = await polishGroundedRagAnswer({
+                            answer: groundedGeneratedRagResponse.answer,
+                            userMessage: options.text,
+                            responseLanguage,
+                            chunks: repairChunks,
+                            settings: aiSettings
+                        })
+                        if (polishedGeneratedRagResponse.usage) {
+                            await recordInboundAiUsage({
+                                organizationId: orgId,
+                                category: 'rag',
+                                model: polishedGeneratedRagResponse.model,
+                                inputTokens: polishedGeneratedRagResponse.usage.inputTokens,
+                                outputTokens: polishedGeneratedRagResponse.usage.outputTokens,
+                                totalTokens: polishedGeneratedRagResponse.usage.totalTokens,
+                                metadata: {
+                                    conversation_id: conversation.id,
+                                    source: 'rag_grounded_generate_polish',
+                                    response_kind: 'rag_grounded_generate_polish',
+                                    platform: options.platform,
+                                    document_count: repairChunks.length
+                                },
+                                supabase: options.supabase
+                            }, options.logPrefix)
+                        }
+                        generatedRagPolishMetadata = {
+                            usedPolish: polishedGeneratedRagResponse.usedPolish,
+                            addedEngagement: polishedGeneratedRagResponse.addedEngagement,
+                            model: polishedGeneratedRagResponse.model
+                        }
+                        if (
+                            polishedGeneratedRagResponse.usedPolish
+                            && polishedGeneratedRagResponse.answer.trim()
+                            && !isRagNoAnswerResponse(polishedGeneratedRagResponse.answer)
+                        ) {
+                            generatedAnswerForReply = polishedGeneratedRagResponse.answer
+                        }
+                    }
+
+                    const generatedRagWithSources = appendCanonicalRagSourceLinks(generatedAnswerForReply, repairChunks, {
                         force: true,
                         limit: resolveRagSourceLinkLimit(options.platform)
                     })
@@ -1615,6 +1662,7 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                             addedEngagement: groundedGeneratedRagResponse.addedEngagement,
                             model: groundedGeneratedRagResponse.model
                         },
+                        rag_polish: generatedRagPolishMetadata,
                         sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
                     await recordAiLatencyEvent({
