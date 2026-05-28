@@ -42,7 +42,7 @@ describe('repairLinkOnlyRagAnswer', () => {
 
     it('keeps general institution contact answers generic and prefers labeled phone values over fax values', () => {
         const repaired = repairLinkOnlyRagAnswer({
-            response: 'Bilgi İşlem Daire Başkanlığı iletişim bilgisi: Telefon: +90 312 329 10 15 - E-posta: yiu@yiu.edu.tr.',
+            response: 'Bilgi İşlem Daire Başkanlığı iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.',
             userMessage: 'Yuksek Ihtisas Universitesi genel telefon numarasi nedir?',
             responseLanguage: 'tr',
             chunks: [

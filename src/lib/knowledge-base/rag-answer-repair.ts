@@ -1694,6 +1694,27 @@ function extractContactEvidence(chunk: RagAnswerRepairChunk, userMessage: string
     }
 }
 
+function hasGenericContactSubjectMismatch(response: string, evidence: ContactEvidence, userMessage: string) {
+    if (evidence.subject !== 'Kurum') return false
+    if (contactFocusTokens(userMessage).length > 0) return false
+
+    const normalizedResponse = normalizeSearch(response)
+    if (normalizedResponse.includes('kurum iletisim')) return false
+
+    return normalizedResponse.includes('iletisim bilgisi')
+        && includesAny(normalizedResponse, [
+            'bilgi islem',
+            'baskanligi',
+            'dairesi',
+            'fakultesi',
+            'koordinatorlugu',
+            'mudurlugu',
+            'programi',
+            'sekreterligi',
+            'yuksekokulu'
+        ])
+}
+
 function repairContactAnswer(input: {
     response: string
     userMessage: string
@@ -1711,8 +1732,9 @@ function repairContactAnswer(input: {
     const emailMissing = evidence.email ? !normalizedResponse.includes(normalizeSearch(evidence.email)) : false
     const phoneMissing = evidence.phone ? !normalizeSearch(input.response).includes(normalizeSearch(evidence.phone).replace(/\s+/g, ' ')) : false
     const deniesDirectContact = normalizedResponse.includes('dogrudan') && (normalizedResponse.includes('bulunmuyor') || normalizedResponse.includes('yok'))
+    const subjectMismatch = hasGenericContactSubjectMismatch(input.response, evidence, input.userMessage)
 
-    if (!emailMissing && !phoneMissing && !deniesDirectContact) return null
+    if (!emailMissing && !phoneMissing && !deniesDirectContact && !subjectMismatch) return null
 
     const parts = [
         evidence.personName ? `Sorumlu: ${evidence.personName}` : null,
