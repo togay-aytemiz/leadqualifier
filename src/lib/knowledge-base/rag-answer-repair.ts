@@ -1374,13 +1374,59 @@ function repairAddressAnswer(input: {
 }
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
+const EMAIL_REGEX_GLOBAL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
 const PHONE_REGEX = /(?:\+?\s*90\s*)?\(?\s*312\s*\)?[\s.-]*\d{3}[\s.-]*\d{2}\s*\d{2}|444\s*9\s*844/i
+const PHONE_REGEX_GLOBAL = /(?:\+?\s*90\s*)?\(?\s*312\s*\)?[\s.-]*\d{3}[\s.-]*\d{2}\s*\d{2}|444\s*9\s*844/gi
+
+const CONTACT_FOCUS_STOPWORDS = new Set([
+    'adres',
+    'adresi',
+    'bana',
+    'baskan',
+    'baskani',
+    'bilgileri',
+    'bilgisi',
+    'birim',
+    'birimi',
+    'dahili',
+    'email',
+    'eposta',
+    'fakulte',
+    'fakultesi',
+    'genel',
+    'hangi',
+    'iletisim',
+    'kim',
+    'mail',
+    'midir',
+    'nedir',
+    'neydi',
+    'numara',
+    'numarasi',
+    'program',
+    'programi',
+    'sorumlu',
+    'sorumlusu',
+    'telefon',
+    'universite',
+    'universitesi',
+    'var',
+    'yuksek',
+    'ihtisas'
+].map(normalizeSearch))
 
 type ContactEvidence = {
     email: string | null
     phone: string | null
     subject: string
     personName: string | null
+}
+
+type FocusedContactCandidate = {
+    email: string | null
+    phone: string | null
+    score: number
+    window: string
 }
 
 function asksForContactInfo(normalizedUserMessage: string) {
@@ -1398,25 +1444,140 @@ function asksForContactInfo(normalizedUserMessage: string) {
         || /\bkim\b/u.test(normalizedUserMessage)
 }
 
-function contactSubjectFromContent(content: string, userMessage: string) {
-    const normalizedContent = normalizeSearch(content)
-    const normalizedUserMessage = normalizeSearch(userMessage)
+function contactFocusTokens(userMessage: string) {
+    const normalized = normalizeSearch(userMessage)
+    const rawTokens = normalized.match(/[\p{L}\p{N}]{2,}/gu) ?? []
 
-    const metadataTitle = extractChunkTitle({ content })
-    if (metadataTitle && normalizeSearch(metadataTitle).includes('iletisim')) {
-        return 'Kurum'
+    return Array.from(new Set(rawTokens
+        .map((token) => token.replace(/[^\p{L}\p{N}]+/gu, ''))
+        .filter((token) => token.length >= 3 && !CONTACT_FOCUS_STOPWORDS.has(token))))
+}
+
+function contactFocusAcronyms(tokens: string[]) {
+    const acronym = tokens
+        .filter((token) => token.length >= 3)
+        .map((token) => token[0] ?? '')
+        .join('')
+
+    return acronym.length >= 2 && acronym.length <= 6 ? [acronym] : []
+}
+
+function compactContactText(value: string) {
+    return normalizeSearch(value).replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function contactEvidenceSegment(content: string, index: number, length: number) {
+    const start = Math.max(0, index - 220)
+    const end = Math.min(content.length, index + length)
+    return content.slice(start, end)
+}
+
+function scoreFocusedContactCandidate(input: {
+    userMessage: string
+    evidenceText: string
+    email?: string | null
+}) {
+    const tokens = contactFocusTokens(input.userMessage)
+    if (tokens.length === 0) return 0
+
+    const normalizedEvidence = normalizeSearch(input.evidenceText)
+    const compactEvidence = compactContactText(input.evidenceText)
+    const compactEmail = compactContactText(input.email ?? '')
+    const joinedTokens = tokens.join('')
+    const acronyms = contactFocusAcronyms(tokens)
+    let score = 0
+
+    for (const token of tokens) {
+        const compactToken = compactContactText(token)
+        if (normalizedEvidence.includes(token)) score += 2
+        if (compactEvidence.includes(compactToken)) score += 0.6
+        if (compactEmail.includes(compactToken)) score += 2
     }
+
+    if (joinedTokens.length >= 5 && (compactEvidence.includes(joinedTokens) || compactEmail.includes(joinedTokens))) {
+        score += 2.5
+    }
+
+    for (const acronym of acronyms) {
+        if (compactEvidence.includes(acronym) || compactEmail.includes(acronym)) score += 2.5
+    }
+
+    return score
+}
+
+function findFocusedContactCandidate(content: string, userMessage: string): FocusedContactCandidate | null {
+    if (contactFocusTokens(userMessage).length === 0) return null
+
+    const candidates: FocusedContactCandidate[] = []
+
+    EMAIL_REGEX_GLOBAL.lastIndex = 0
+    let emailMatch: RegExpExecArray | null
+    while ((emailMatch = EMAIL_REGEX_GLOBAL.exec(content))) {
+        const email = cleanExtractedInlineValue(emailMatch[0])
+        const window = contactEvidenceSegment(content, emailMatch.index, emailMatch[0].length)
+        const score = scoreFocusedContactCandidate({
+            userMessage,
+            evidenceText: window,
+            email
+        })
+        candidates.push({
+            email,
+            phone: extractPhoneNearEmail(content, email),
+            score,
+            window
+        })
+    }
+
+    PHONE_REGEX_GLOBAL.lastIndex = 0
+    let phoneMatch: RegExpExecArray | null
+    while ((phoneMatch = PHONE_REGEX_GLOBAL.exec(content))) {
+        const window = contactEvidenceSegment(content, phoneMatch.index, phoneMatch[0].length)
+        const score = scoreFocusedContactCandidate({
+            userMessage,
+            evidenceText: window
+        })
+        candidates.push({
+            email: null,
+            phone: formatPhoneNumber(phoneMatch[0]),
+            score,
+            window
+        })
+    }
+
+    const best = candidates
+        .filter((candidate) => candidate.score >= 2)
+        .sort((left, right) => right.score - left.score)[0]
+
+    return best ?? null
+}
+
+function contactSubjectFromContent(content: string, userMessage: string, evidenceText = content) {
+    const normalizedEvidence = normalizeSearch(evidenceText)
+    const normalizedUserMessage = normalizeSearch(userMessage)
 
     if (normalizedUserMessage.includes('kutuphane')) {
         return 'Kütüphane ve Dokümantasyon Daire Başkanlığı'
     }
 
     if (
-        normalizedContent.includes('tibbi laboratuvar teknikleri programi')
+        normalizedUserMessage.includes('bilgi islem')
+        || normalizedUserMessage.includes('bidb')
+        || normalizedEvidence.includes('bilgi islem daire')
+    ) {
+        return 'Bilgi İşlem Daire Başkanlığı'
+    }
+
+    if (
+        normalizedEvidence.includes('tibbi laboratuvar teknikleri programi')
         || normalizedUserMessage.includes('tibbi laboratuvar teknikleri')
         || normalizedUserMessage.includes('tlt')
     ) {
         return 'Tıbbi Laboratuvar Teknikleri Programı'
+    }
+
+    const metadataTitle = extractChunkTitle({ content })
+    if (metadataTitle && normalizeSearch(metadataTitle).includes('iletisim')) {
+        return 'Kurum'
     }
 
     const titleMatch = content.match(/^\s*([^\n\r]{6,90}Program[^\n\r]*)$/imu)
@@ -1479,6 +1640,18 @@ function extractPhoneNearEmail(content: string, email: string | null) {
 function extractContactEvidence(chunk: RagAnswerRepairChunk, userMessage: string): ContactEvidence | null {
     const responsibleContact = extractTltDoubleMajorResponsibleContact(chunk.content, userMessage)
     if (responsibleContact) return responsibleContact
+
+    const focusedCandidate = findFocusedContactCandidate(chunk.content, userMessage)
+    if (focusedCandidate) {
+        return {
+            email: focusedCandidate.email,
+            phone: focusedCandidate.phone,
+            subject: contactSubjectFromContent(chunk.content, userMessage, focusedCandidate.window),
+            personName: null
+        }
+    }
+
+    if (contactFocusTokens(userMessage).length > 0) return null
 
     const targetEmail = targetProgramEmail(userMessage, chunk.content) ?? targetUnitEmail(userMessage, chunk.content)
     const email = targetEmail ?? chunk.content.match(EMAIL_REGEX)?.[0] ?? null

@@ -1490,6 +1490,64 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).not.toContain('kutuphane@yuksekihtisas.edu.tr')
     })
 
+    it('skips unrelated contact rows before using the retrieved subject-matched program contact chunk', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: kutuphane@yuksekihtisas.edu.tr.',
+            userMessage: 'Tibbi Laboratuvar Teknikleri program sorumlusu iletisim bilgisi nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İletişim',
+                    content: [
+                        'Page Title: İletişim',
+                        'Kütüphane ve Dokümantasyon Daire Başkanlığı',
+                        'Telefon: (+90 312) 329 1010 E-posta: kutuphane@yuksekihtisas.edu.tr'
+                    ].join('\n')
+                },
+                {
+                    document_title: 'Program Bilgi Notu',
+                    content: [
+                        'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI',
+                        'Telefon: +90 312 329 1010',
+                        'E-Mail: tlt@yiu.edu.tr'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Tıbbi Laboratuvar Teknikleri Programı')
+        expect(repaired).toContain('E-posta: tlt@yiu.edu.tr')
+        expect(repaired).toContain('Telefon: +90 312 329 10 10')
+        expect(repaired).not.toContain('kutuphane@yuksekihtisas.edu.tr')
+    })
+
+    it('uses the requested administrative unit contact instead of the generic university contact', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Kurum iletişim bilgisi: Telefon: +90 312 329 10 15 - E-posta: yiu@yiu.edu.tr.',
+            userMessage: 'Yuksek Ihtisas Universitesi Bilgi Islem birimi iletisim bilgileri nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'İletişim',
+                    content: [
+                        'Page Title: İletişim',
+                        'Rektörlük Telefon +90 312 329 10 10 Fax +90 312 329 10 15 E-Posta yiu@yiu.edu.tr',
+                        'Bilgi İşlem Daire Başkanlığı Telefon: (+90 312) 329 1010 E-posta: bilgiislem@yuksekihtisas.edu.tr'
+                    ].join('\n')
+                },
+                {
+                    document_title: 'Yeni Kablosuz Ağ Yapılanması hakkında.',
+                    content: 'E-posta: bilgiislem@yuksekihtisas.edu.tr'
+                }
+            ]
+        })
+
+        expect(repaired).toContain('Bilgi İşlem')
+        expect(repaired).toContain('E-posta: bilgiislem@yuksekihtisas.edu.tr')
+        expect(repaired).toContain('Telefon: +90 312 329 10 10')
+        expect(repaired).not.toContain('yiu@yiu.edu.tr')
+    })
+
     it('chooses the requested unit email instead of an unrelated staff email', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'İlgili program iletişim bilgisi: E-posta: busraaydos@yiu.edu.tr. https://example.edu.tr/kutuphane',
