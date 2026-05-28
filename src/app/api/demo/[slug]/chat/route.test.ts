@@ -367,7 +367,7 @@ describe('demo chat API route', () => {
         expect(inboundMessagesChain.eq).toHaveBeenCalledWith('metadata->>demo_chat_message_id', 'message-1')
     })
 
-    it('falls back to focused evidence recovery before broad knowledge search when the full pipeline has no reply', async () => {
+    it('recovers from focused evidence before the shared pipeline during polling', async () => {
         const chunk = {
             content: 'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU\nBAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören',
             document_id: 'doc-shmyo',
@@ -474,10 +474,10 @@ describe('demo chat API route', () => {
             expect.objectContaining({ supabase: expect.any(Object) })
         )
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
-        expect(processInboundAiPipelineMock).toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
-    it('falls back to deterministic knowledge replies during polling when the full AI pipeline has no reply', async () => {
+    it('falls back to broader knowledge search during polling before the shared pipeline', async () => {
         const chunk = {
             content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',
             document_id: 'doc-1',
@@ -582,7 +582,7 @@ describe('demo chat API route', () => {
             6,
             expect.objectContaining({ supabase: expect.any(Object) })
         )
-        expect(processInboundAiPipelineMock).toHaveBeenCalled()
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
         expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
             conversation_id: 'conversation-1',
             organization_id: 'org-1',
@@ -898,6 +898,7 @@ describe('demo chat API route', () => {
                 prompt: 'Samimi cevap ver.',
                 bot_name: 'Qualy',
             },
+            timeoutMs: 3500,
         }))
         expect(repairLinkOnlyRagAnswerMock).not.toHaveBeenCalled()
         expect(polishGroundedRagAnswerMock).not.toHaveBeenCalled()
@@ -1036,6 +1037,9 @@ describe('demo chat API route', () => {
             [chunk],
             expect.objectContaining({ force: true, limit: 2 })
         )
+        expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            timeoutMs: 1800,
+        }))
     })
 
     it('does not insert a duplicate deterministic demo reply if another poll already persisted it', async () => {
@@ -1194,8 +1198,8 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
-        processInboundAiPipelineMock.mockImplementationOnce(async () => {
-            await new Promise<void>(() => {})
+        searchKnowledgeBaseFocusedEvidenceMock.mockImplementationOnce(async () => {
+            await new Promise<never>(() => {})
         })
 
         const responsePromise = GET(createGetRequest({
@@ -1215,11 +1219,12 @@ describe('demo chat API route', () => {
         const res = await responsePromise
         expect(res.status).toBe(202)
         await expect(res.json()).resolves.toEqual({ pending: true })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
     it('caps slow polling recovery below the production platform timeout even when env is too high', async () => {
         vi.useFakeTimers()
-        vi.stubEnv('DEMO_CHAT_FAST_RAG_REPLY_TIMEOUT_MS', '28000')
+        vi.stubEnv('DEMO_CHAT_SYNC_REPLY_TIMEOUT_MS', '28000')
         const createConversationChain = () => {
             const chain = {
                 eq: vi.fn(),
@@ -1269,8 +1274,8 @@ describe('demo chat API route', () => {
             throw new Error(`Unexpected table ${table}`)
         })
         createClientMock.mockReturnValueOnce({ from: fromMock })
-        processInboundAiPipelineMock.mockImplementationOnce(async () => {
-            await new Promise<void>(() => {})
+        searchKnowledgeBaseFocusedEvidenceMock.mockImplementationOnce(async () => {
+            await new Promise<never>(() => {})
         })
 
         const responsePromise = GET(createGetRequest({
@@ -1284,13 +1289,14 @@ describe('demo chat API route', () => {
         })
 
         await vi.advanceTimersByTimeAsync(0)
-        await vi.advanceTimersByTimeAsync(12_000)
+        await vi.advanceTimersByTimeAsync(6_000)
         await Promise.resolve()
 
         expect(settled).toBe(true)
         const res = await responsePromise
         expect(res.status).toBe(202)
         await expect(res.json()).resolves.toEqual({ pending: true })
+        expect(processInboundAiPipelineMock).not.toHaveBeenCalled()
     })
 
     it('keeps parallel testers isolated with distinct pending message ids', async () => {

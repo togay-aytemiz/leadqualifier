@@ -225,9 +225,10 @@ async function createDefaultCompletion(args: Record<string, unknown>, options?: 
 async function createCompletionWithTimeout(
     createCompletion: CreateCompletion,
     args: Record<string, unknown>,
-    stage: string
+    stage: string,
+    timeoutMs?: number
 ) {
-    const timeoutMs = resolveAiTimeoutMs(stage)
+    const resolvedTimeoutMs = resolveAiTimeoutMs(stage, timeoutMs)
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -237,8 +238,8 @@ async function createCompletionWithTimeout(
             new Promise<never>((_, reject) => {
                 timeoutId = setTimeout(() => {
                     controller?.abort()
-                    reject(new AiTimeoutError(stage, timeoutMs))
-                }, timeoutMs)
+                    reject(new AiTimeoutError(stage, resolvedTimeoutMs))
+                }, resolvedTimeoutMs)
             })
         ])
     } finally {
@@ -402,6 +403,7 @@ export async function polishGroundedRagAnswer(input: {
     chunks: RagChunk[]
     settings?: RagAnswerPolishSettings
     model?: string
+    timeoutMs?: number
     createCompletion?: CreateCompletion
 }): Promise<RagAnswerPolishResult> {
     const originalAnswer = input.answer.trim()
@@ -432,7 +434,7 @@ export async function polishGroundedRagAnswer(input: {
             ],
             response_format: { type: 'json_object' },
             ...buildRagPolishCompletionParameters(model)
-        }, 'rag_polish')
+        }, 'rag_polish', input.timeoutMs)
     } catch (error) {
         console.error('RAG answer polish failed; using original extractive answer', error)
         return fallbackResult(originalAnswer, model)

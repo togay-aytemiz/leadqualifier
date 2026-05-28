@@ -231,9 +231,10 @@ async function createDefaultCompletion(args: Record<string, unknown>, options?: 
 async function createCompletionWithTimeout(
     createCompletion: CreateCompletion,
     args: Record<string, unknown>,
-    stage: string
+    stage: string,
+    timeoutMs?: number
 ) {
-    const timeoutMs = resolveAiTimeoutMs(stage)
+    const resolvedTimeoutMs = resolveAiTimeoutMs(stage, timeoutMs)
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -243,8 +244,8 @@ async function createCompletionWithTimeout(
             new Promise<never>((_, reject) => {
                 timeoutId = setTimeout(() => {
                     controller?.abort()
-                    reject(new AiTimeoutError(stage, timeoutMs))
-                }, timeoutMs)
+                    reject(new AiTimeoutError(stage, resolvedTimeoutMs))
+                }, resolvedTimeoutMs)
             })
         ])
     } finally {
@@ -480,6 +481,7 @@ export async function generateGroundedRagAnswer(input: {
     settings?: RagAnswerGenerateSettings
     conversationHistory?: RagConversationTurn[]
     model?: string
+    timeoutMs?: number
     createCompletion?: CreateCompletion
 }): Promise<RagAnswerGenerateResult> {
     const model = resolveRagGenerateModel(input.model)
@@ -507,7 +509,7 @@ export async function generateGroundedRagAnswer(input: {
             ],
             response_format: { type: 'json_object' },
             ...buildRagGenerateCompletionParameters(model)
-        }, 'rag_answer_generate')
+        }, 'rag_answer_generate', input.timeoutMs)
     } catch (error) {
         console.error('Grounded RAG answer generation failed; falling back to existing RAG path', error)
         return fallbackResult(model)

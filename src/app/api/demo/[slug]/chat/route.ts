@@ -25,8 +25,12 @@ const MAX_MESSAGE_CHARS = 2000
 const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 5000
 const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 10000
+const DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS = 3500
+const DEFAULT_FAST_RAG_POLISH_TIMEOUT_MS = 1800
 const MAX_SYNC_REPLY_TIMEOUT_MS = 6000
 const MAX_FAST_RAG_REPLY_TIMEOUT_MS = 12000
+const MAX_FAST_RAG_GENERATE_TIMEOUT_MS = 5000
+const MAX_FAST_RAG_POLISH_TIMEOUT_MS = 3000
 const DEMO_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000
 const DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE = 20
 const FAST_RAG_MATCH_THRESHOLD = 0.5
@@ -116,6 +120,18 @@ function readFastRagReplyTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_FAST_RAG_REPLY_TIMEOUT_MS ?? '', 10)
     if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, MAX_FAST_RAG_REPLY_TIMEOUT_MS)
     return DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS
+}
+
+function readFastRagGenerateTimeoutMs() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_FAST_RAG_GENERATE_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, MAX_FAST_RAG_GENERATE_TIMEOUT_MS)
+    return DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS
+}
+
+function readFastRagPolishTimeoutMs() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_FAST_RAG_POLISH_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 750) return Math.min(raw, MAX_FAST_RAG_POLISH_TIMEOUT_MS)
+    return DEFAULT_FAST_RAG_POLISH_TIMEOUT_MS
 }
 
 function readMessageText(value: unknown) {
@@ -525,7 +541,8 @@ async function buildExtractiveDemoChatReply(input: {
             userMessage: message,
             responseLanguage,
             chunks,
-            settings: aiSettings
+            settings: aiSettings,
+            timeoutMs: readFastRagGenerateTimeoutMs()
         })
 
         if (generatedAnswer.usage) {
@@ -585,7 +602,8 @@ async function buildExtractiveDemoChatReply(input: {
             userMessage: message,
             responseLanguage,
             chunks,
-            settings: aiSettings
+            settings: aiSettings,
+            timeoutMs: readFastRagPolishTimeoutMs()
         })
 
         if (polishedAnswer.usage) {
@@ -861,34 +879,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 return NextResponse.json({ error: 'Demo rate limit exceeded' }, { status: 429 })
             }
 
-            const recoveryPromise = recoverPendingDemoChatReply({
-                supabase,
-                channel,
-                sessionId,
-                messageId,
-                fallbackMessage: message
-            })
-            const recoveryResult = await waitForPipelineResult(
-                recoveryPromise,
-                readFastRagReplyTimeoutMs()
-            )
-            if (recoveryResult.status === 'timeout') {
-                void recoveryPromise.catch((error) => {
-                    console.error('Demo Chat: Timed-out pending reply recovery failed', error)
-                })
-
-                return NextResponse.json({ pending: true }, { status: 202 })
-            }
-
-            const recoveredReply = recoveryResult.result
-            if (recoveredReply?.replyText || recoveredReply?.skillImage) {
-                return NextResponse.json({
-                    pending: false,
-                    response: recoveredReply.replyText,
-                    skillImage: recoveredReply.skillImage
-                })
-            }
-
             const extractiveRecoveryPromise = recoverPendingDemoChatReplyExtractively({
                 supabase,
                 channel,
@@ -909,14 +899,42 @@ export async function GET(req: NextRequest, context: RouteContext) {
             }
 
             const extractiveReply = extractiveRecoveryResult.result
-            if (!extractiveReply) {
+            if (extractiveReply?.replyText || extractiveReply?.skillImage) {
+                return NextResponse.json({
+                    pending: false,
+                    response: extractiveReply.replyText,
+                    skillImage: extractiveReply.skillImage
+                })
+            }
+
+            const recoveryPromise = recoverPendingDemoChatReply({
+                supabase,
+                channel,
+                sessionId,
+                messageId,
+                fallbackMessage: message
+            })
+            const recoveryResult = await waitForPipelineResult(
+                recoveryPromise,
+                readFastRagReplyTimeoutMs()
+            )
+            if (recoveryResult.status === 'timeout') {
+                void recoveryPromise.catch((error) => {
+                    console.error('Demo Chat: Timed-out pending reply recovery failed', error)
+                })
+
+                return NextResponse.json({ pending: true }, { status: 202 })
+            }
+
+            const recoveredReply = recoveryResult.result
+            if (!recoveredReply) {
                 return NextResponse.json({ pending: true }, { status: 202 })
             }
 
             return NextResponse.json({
                 pending: false,
-                response: extractiveReply.replyText,
-                skillImage: extractiveReply.skillImage
+                response: recoveredReply.replyText,
+                skillImage: recoveredReply.skillImage
             })
         }
 
