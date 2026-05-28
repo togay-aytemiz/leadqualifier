@@ -1848,6 +1848,31 @@ function formatLectureNotePlatformList(platforms: LectureNotePlatform[]) {
     return platforms.map((platform) => platform.label).join('/')
 }
 
+function repairUnsupportedLectureNoteObjectTerminology(input: {
+    response: string
+    userMessage: string
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!asksForLectureNotesAccess(normalizedUserMessage)) return null
+
+    const normalizedResponse = normalizeSearch(input.response)
+    if (!normalizedResponse.includes('ders not')) return null
+
+    const evidenceText = input.chunks.map((chunk) => chunk.content).join('\n')
+    const normalizedEvidence = normalizeSearch(evidenceText)
+    if (normalizedEvidence.includes('ders not')) return null
+    if (!normalizedEvidence.includes('ders icerigi')) return null
+
+    const repaired = input.response
+        .replace(/Ders\s+notlarına/giu, 'Ders içeriklerine')
+        .replace(/ders\s+notlarına/giu, 'ders içeriklerine')
+        .replace(/Ders\s+notlarının/giu, 'Ders içeriklerinin')
+        .replace(/ders\s+notlarının/giu, 'ders içeriklerinin')
+
+    return normalizeSearch(repaired) === normalizedResponse ? null : repaired
+}
+
 function repairUnsupportedLectureNotePlatforms(input: {
     response: string
     userMessage: string
@@ -2494,6 +2519,12 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (contactRepair) return contactRepair
+
+    const unsupportedLectureNoteObjectRepair = repairUnsupportedLectureNoteObjectTerminology({
+        ...input,
+        response
+    })
+    if (unsupportedLectureNoteObjectRepair) return unsupportedLectureNoteObjectRepair
 
     const unsupportedLectureNotePlatformRepair = repairUnsupportedLectureNotePlatforms({
         ...input,
