@@ -963,6 +963,47 @@ export async function searchKnowledgeBaseFocusedEvidence(
         language: options?.language ?? null,
         supabase
     }
+    const hasPlannerHistory = (options?.plannerHistory ?? []).some((turn) => turn.content.trim())
+    const plan = !options?.skipQueryPlanner && hasPlannerHistory
+        ? await resolveKnowledgeSearchPlan(query, options)
+        : null
+    const searchQueries = plan
+        ? dedupePlannedSearchQueries(query, plan.searchQueries)
+        : [query]
+    const originalSearchQueryKey = plannedSearchQueryKey(query)
+    const plannedSearchQueries = searchQueries.filter(
+        (searchQuery) => plannedSearchQueryKey(searchQuery) !== originalSearchQueryKey
+    )
+    const rankingQuery = hasPlannerHistory && plannedSearchQueries[0]
+        ? plannedSearchQueries[0]
+        : query
+
+    const resultGroups: KnowledgeSearchResult[][] = []
+    for (const searchQuery of searchQueries) {
+        resultGroups.push(await searchKnowledgeBaseFocusedEvidenceSingleQuery(
+            searchQuery,
+            organizationId,
+            limit,
+            executionOptions
+        ))
+    }
+    const plannedResults = hasPlannerHistory && plannedSearchQueries.length > 0
+        ? resultGroups.slice(1).flat()
+        : []
+    const results = plannedResults.length > 0
+        ? plannedResults
+        : resultGroups.flat()
+    if (results.length === 0) return []
+
+    return mergeSearchResults(rankingQuery, [], results, limit)
+}
+
+async function searchKnowledgeBaseFocusedEvidenceSingleQuery(
+    query: string,
+    organizationId: string,
+    limit: number,
+    executionOptions: KnowledgeSearchExecutionOptions
+) {
     const focusedEvidenceLimit = Math.max(limit * 4, 16)
 
     const currentCampusResults = await searchKnowledgeBaseByCurrentCampusListingEvidence(

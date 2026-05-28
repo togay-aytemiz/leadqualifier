@@ -13,6 +13,7 @@ import { resolveMvpResponseLanguage, type MvpResponseLanguage } from '@/lib/ai/l
 import { getOrgAiSettings } from '@/lib/ai/settings'
 import { recordAiUsage } from '@/lib/ai/usage'
 import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/knowledge-base/actions'
+import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
@@ -60,6 +61,15 @@ type DemoChatMessageRow = {
     id?: string | null
     content: string | null
     metadata: Record<string, unknown> | null
+}
+
+type DemoChatHistoryMessageRow = DemoChatMessageRow & {
+    sender_type: string | null
+}
+
+type DemoChatPendingInboundLookup = {
+    message: DemoChatMessageRow | null
+    conversationId: string | null
 }
 
 type DemoChatConversationRow = {
@@ -333,6 +343,19 @@ function isNoAnswerReply(response: string | null | undefined) {
     }
 }
 
+function shouldUseDemoConversationHistoryForRag(message: string) {
+    const normalized = message
+        .toLocaleLowerCase('tr-TR')
+        .normalize('NFKD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    return /\b(?:bu|su|o|ayni)\s+(?:program|bolum|fakulte|kampus|yerleske|ders|sinav|konu|belge|dokuman|yonetmelik|surec|birim)\b/u.test(normalized)
+        || /\b(?:bu|su|o)\s+(?:programda|bolumde|fakultede|kampuste|yerleskede|derste|sinavda|konuda|belgede|dokumanda|yonetmelikte|surecte|birimde)\b/u.test(normalized)
+        || /\b(?:bunda|bundaki|ondaki|orada|burada|bunun|onun|az onceki|onceki)\b/u.test(normalized)
+}
+
 async function runDemoChatPipeline(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
@@ -460,7 +483,7 @@ async function findPendingDemoChatInboundMessage(input: {
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
     sessionId: string
     messageId: string
-}): Promise<DemoChatMessageRow | null> {
+}): Promise<DemoChatPendingInboundLookup> {
     const contactId = buildDemoChatContactId(input.channel.id, input.sessionId)
     const { data: conversation, error: conversationError } = await input.supabase
         .from('conversations')
@@ -473,7 +496,7 @@ async function findPendingDemoChatInboundMessage(input: {
     if (conversationError) throw conversationError
 
     const conversationRow = conversation as DemoChatConversationRow | null
-    if (!conversationRow?.id) return null
+    if (!conversationRow?.id) return { message: null, conversationId: null }
 
     const { data: message, error: messageError } = await input.supabase
         .from('messages')
@@ -485,7 +508,42 @@ async function findPendingDemoChatInboundMessage(input: {
 
     if (messageError) throw messageError
 
-    return (message ?? null) as DemoChatMessageRow | null
+    return {
+        message: (message ?? null) as DemoChatMessageRow | null,
+        conversationId: conversationRow.id
+    }
+}
+
+async function readRecentDemoChatHistory(input: {
+    supabase: DemoChatServiceClient
+    conversationId: string | null
+    messageId: string
+}): Promise<KnowledgeSearchPlanningTurn[]> {
+    if (!input.conversationId) return []
+
+    const { data: messages, error } = await input.supabase
+        .from('messages')
+        .select('content, sender_type, metadata')
+        .eq('conversation_id', input.conversationId)
+        .order('created_at', { ascending: false })
+        .limit(8)
+
+    if (error) throw error
+
+    return ((messages ?? []) as DemoChatHistoryMessageRow[])
+        .filter((message) => {
+            const metadata = message.metadata ?? {}
+            return metadata.demo_chat_message_id !== input.messageId
+                && metadata.demo_chat_reply_to_message_id !== input.messageId
+        })
+        .reverse()
+        .map((message) => {
+            const content = message.content?.trim() ?? ''
+            const role = message.sender_type === 'bot' ? 'assistant' : 'user'
+            return { role, content } satisfies KnowledgeSearchPlanningTurn
+        })
+        .filter((turn) => turn.content && !/^\[[^\]]+\]$/.test(turn.content))
+        .slice(-6)
 }
 
 async function ingestDemoChatInboundOnly(input: {
@@ -521,9 +579,11 @@ async function buildExtractiveDemoChatReply(input: {
     supabase: DemoChatServiceClient
     channel: NonNullable<Awaited<ReturnType<typeof resolveDemoChatChannel>>>
     message: string
+    conversationHistory?: KnowledgeSearchPlanningTurn[]
 }): Promise<DemoChatExtractiveReply | null> {
     const message = readMessageText(input.message)
     if (!message) return null
+    const conversationHistory = input.conversationHistory ?? []
 
     const buildReplyFromResults = async (kbResults: RagChunk[]): Promise<DemoChatExtractiveReply | null> => {
         if (!kbResults || kbResults.length === 0) return null
@@ -542,6 +602,7 @@ async function buildExtractiveDemoChatReply(input: {
             responseLanguage,
             chunks,
             settings: aiSettings,
+            conversationHistory,
             timeoutMs: readFastRagGenerateTimeoutMs()
         })
 
@@ -657,31 +718,41 @@ async function buildExtractiveDemoChatReply(input: {
     const focusedSearchQueries = compoundSearchQueries.length > 0
         ? compoundSearchQueries
         : [message]
+    const hasConversationHistory = conversationHistory.some((turn) => turn.content.trim())
+    const buildBroadSearchReply = async () => {
+        const searchQueries = buildDemoKnowledgeSearchQueries(message)
+        const kbResults = mergeDemoRagResultGroups(
+            await Promise.all(searchQueries.map((query) => searchKnowledgeBase(
+                query,
+                input.channel.organizationId,
+                FAST_RAG_MATCH_THRESHOLD,
+                FAST_RAG_RESULT_LIMIT,
+                { supabase: input.supabase, plannerHistory: conversationHistory }
+            ))),
+            FAST_RAG_RESULT_LIMIT
+        )
+
+        return buildReplyFromResults(kbResults)
+    }
+
+    if (hasConversationHistory) {
+        const broadReply = await buildBroadSearchReply()
+        if (broadReply) return broadReply
+    }
+
     const focusedResults = mergeDemoRagResultGroups(
         await Promise.all(focusedSearchQueries.map((query) => searchKnowledgeBaseFocusedEvidence(
             query,
             input.channel.organizationId,
             FAST_RAG_RESULT_LIMIT,
-            { supabase: input.supabase }
+            { supabase: input.supabase, plannerHistory: conversationHistory }
         ))),
         FAST_RAG_RESULT_LIMIT
     )
     const focusedReply = await buildReplyFromResults(focusedResults)
     if (focusedReply) return focusedReply
 
-    const searchQueries = buildDemoKnowledgeSearchQueries(message)
-    const kbResults = mergeDemoRagResultGroups(
-        await Promise.all(searchQueries.map((query) => searchKnowledgeBase(
-            query,
-            input.channel.organizationId,
-            FAST_RAG_MATCH_THRESHOLD,
-            FAST_RAG_RESULT_LIMIT,
-            { supabase: input.supabase }
-        ))),
-        FAST_RAG_RESULT_LIMIT
-    )
-
-    return buildReplyFromResults(kbResults)
+    return hasConversationHistory ? null : buildBroadSearchReply()
 }
 
 async function persistDemoChatExtractiveReply(input: {
@@ -747,14 +818,23 @@ async function recoverPendingDemoChatReplyExtractively(input: {
     messageId: string
     fallbackMessage: string
 }): Promise<DemoChatPipelineResult | null> {
-    const inboundMessage = await findPendingDemoChatInboundMessage(input)
+    const pendingInbound = await findPendingDemoChatInboundMessage(input)
+    const inboundMessage = pendingInbound.message
     const message = (readMessageText(inboundMessage?.content) || input.fallbackMessage).slice(0, MAX_MESSAGE_CHARS)
     if (!message) return null
+    const conversationHistory = shouldUseDemoConversationHistoryForRag(message)
+        ? await readRecentDemoChatHistory({
+            supabase: input.supabase,
+            conversationId: pendingInbound.conversationId,
+            messageId: input.messageId
+        })
+        : []
 
     const reply = await buildExtractiveDemoChatReply({
         supabase: input.supabase,
         channel: input.channel,
-        message
+        message,
+        conversationHistory
     })
     if (!reply) return null
 
@@ -789,7 +869,8 @@ async function recoverPendingDemoChatReply(input: {
     messageId: string
     fallbackMessage: string
 }): Promise<DemoChatPipelineResult | null> {
-    const inboundMessage = await findPendingDemoChatInboundMessage(input)
+    const pendingInbound = await findPendingDemoChatInboundMessage(input)
+    const inboundMessage = pendingInbound.message
     const message = (readMessageText(inboundMessage?.content) || input.fallbackMessage).slice(0, MAX_MESSAGE_CHARS)
     if (!message) return null
 
