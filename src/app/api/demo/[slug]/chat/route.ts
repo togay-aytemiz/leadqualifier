@@ -737,7 +737,7 @@ async function buildExtractiveDemoChatReply(input: {
 
     if (hasConversationHistory) {
         const broadReply = await buildBroadSearchReply()
-        if (broadReply) return broadReply
+        return broadReply
     }
 
     const focusedResults = mergeDemoRagResultGroups(
