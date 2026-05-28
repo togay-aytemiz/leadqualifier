@@ -24,6 +24,7 @@ describe('polishGroundedRagAnswer', () => {
             const systemPrompt = messages.find((message) => message.role === 'system')?.content ?? ''
             expect(systemPrompt).toContain('Samimi, canlı ve güven veren bir dil kullan.')
             expect(systemPrompt).toContain('organization-specific AI assistant instructions above as the voice and behavior contract')
+            expect(systemPrompt).toContain('Try to include exactly one role-neutral engagement question or offer')
 
             return {
             choices: [{
