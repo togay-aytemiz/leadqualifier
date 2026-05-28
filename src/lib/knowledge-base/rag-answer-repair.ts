@@ -1559,11 +1559,7 @@ function contactSubjectFromContent(content: string, userMessage: string, evidenc
         return 'Kütüphane ve Dokümantasyon Daire Başkanlığı'
     }
 
-    if (
-        normalizedUserMessage.includes('bilgi islem')
-        || normalizedUserMessage.includes('bidb')
-        || normalizedEvidence.includes('bilgi islem daire')
-    ) {
+    if (normalizedUserMessage.includes('bilgi islem') || normalizedUserMessage.includes('bidb')) {
         return 'Bilgi İşlem Daire Başkanlığı'
     }
 
@@ -1694,6 +1690,21 @@ function extractContactEvidence(chunk: RagAnswerRepairChunk, userMessage: string
     }
 }
 
+function selectContactEvidence(evidences: ContactEvidence[], userMessage: string) {
+    if (evidences.length === 0) return null
+    if (contactFocusTokens(userMessage).length > 0) return evidences[0] ?? null
+
+    return [...evidences].sort((left, right) => {
+        const leftGeneric = left.subject === 'Kurum' ? 1 : 0
+        const rightGeneric = right.subject === 'Kurum' ? 1 : 0
+        if (leftGeneric !== rightGeneric) return rightGeneric - leftGeneric
+
+        const leftCompleteness = (left.phone ? 1 : 0) + (left.email ? 1 : 0)
+        const rightCompleteness = (right.phone ? 1 : 0) + (right.email ? 1 : 0)
+        return rightCompleteness - leftCompleteness
+    })[0] ?? null
+}
+
 function hasGenericContactSubjectMismatch(response: string, evidence: ContactEvidence, userMessage: string) {
     if (evidence.subject !== 'Kurum') return false
     if (contactFocusTokens(userMessage).length > 0) return false
@@ -1723,9 +1734,9 @@ function repairContactAnswer(input: {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForContactInfo(normalizedUserMessage)) return null
 
-    const evidence = input.chunks
+    const evidence = selectContactEvidence(input.chunks
         .map((chunk) => extractContactEvidence(chunk, input.userMessage))
-        .find((value): value is ContactEvidence => Boolean(value))
+        .filter((value): value is ContactEvidence => Boolean(value)), input.userMessage)
     if (!evidence) return null
 
     const normalizedResponse = normalizeSearch(input.response)

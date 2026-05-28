@@ -68,6 +68,27 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).not.toContain('+90 312 329 10 15')
     })
 
+    it('prefers generic institution contact evidence over unit footer evidence for general contact questions', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bilgi İşlem Daire Başkanlığı iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.',
+            userMessage: 'Yuksek Ihtisas Universitesi genel telefon numarasi nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'BİDB Bilgisayar, Ağ ve Bilişim Kaynakları Kullanım Yönergesi',
+                    content: 'Hazırlayan Bilgi İşlem Daire Başkanlığı Adres : Yüksek İhtisas Üniversitesi Rektörlüğü 06530 Telefon : 0312 329 10 10'
+                },
+                {
+                    document_title: 'İletişim',
+                    content: 'Page Title: İletişim\nRektörlük ve Tıp Fakültesi Telefon +90 312 329 10 10 Fax +90 312 329 10 15 E-Posta yiu@yiu.edu.tr'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.')
+        expect(repaired).not.toContain('Bilgi İşlem Daire Başkanlığı')
+    })
+
     it('still repairs document numbers when the question is explicitly about a document code', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Bu konuda elimde net bilgi yok.',
