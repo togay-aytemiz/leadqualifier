@@ -26,6 +26,8 @@ describe('polishGroundedRagAnswer', () => {
             expect(systemPrompt).toContain('organization-specific AI assistant instructions above as the voice and behavior contract')
             expect(systemPrompt).toContain('Try to include exactly one role-neutral engagement question or offer')
             expect(systemPrompt).toContain('Use a conversational, helpful voice instead of sounding like a policy excerpt')
+            expect(systemPrompt).toContain('Apply explicit organization tone/personality/style instructions more strongly than the terse original answer')
+            expect(systemPrompt).toContain('Do not simply mirror the original extractive wording when a warmer organization voice can preserve the same facts')
 
             return {
             choices: [{

@@ -752,6 +752,15 @@ describe('demo chat API route', () => {
             chunks,
             expect.objectContaining({ force: true, limit: 2 })
         )
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                rag_polish: {
+                    usedPolish: true,
+                    addedEngagement: true,
+                    model: 'gpt-4o-mini',
+                }
+            })
+        }))
         expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
             organizationId: 'org-1',
             category: 'rag',

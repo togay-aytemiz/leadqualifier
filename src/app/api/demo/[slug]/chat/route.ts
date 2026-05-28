@@ -61,6 +61,11 @@ type DemoChatConversationRow = {
 
 type DemoChatExtractiveReply = DemoChatPipelineResult & {
     chunks: RagChunk[]
+    polish: {
+        usedPolish: boolean
+        addedEngagement: boolean
+        model: string
+    }
 }
 
 const demoChatRateLimitBuckets = new Map<string, { windowStartMs: number; count: number }>()
@@ -567,7 +572,12 @@ async function buildExtractiveDemoChatReply(input: {
                 limit: 2
             }),
             skillImage: null,
-            chunks
+            chunks,
+            polish: {
+                usedPolish: polishedAnswer.usedPolish,
+                addedEngagement: polishedAnswer.addedEngagement,
+                model: polishedAnswer.model
+            }
         }
     }
 
@@ -638,6 +648,7 @@ async function persistDemoChatExtractiveReply(input: {
                 demo_chat_reply_kind: 'text',
                 is_rag: true,
                 rag_extractive: true,
+                rag_polish: input.reply.polish,
                 sources: input.reply.chunks.map((chunk) => chunk.document_id).filter(Boolean)
             }
         })

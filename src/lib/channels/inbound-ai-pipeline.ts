@@ -1618,6 +1618,11 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
                         ...outboundMetadata,
                         is_rag: true,
                         rag_extractive: true,
+                        rag_polish: {
+                            usedPolish: polishedExtractiveRagResponse.usedPolish,
+                            addedEngagement: polishedExtractiveRagResponse.addedEngagement,
+                            model: polishedExtractiveRagResponse.model
+                        },
                         sources: repairChunks.map((chunk) => chunk.document_id).filter(Boolean)
                     })
                     await recordAiLatencyEvent({

@@ -368,6 +368,8 @@ Treat the organization-specific AI assistant instructions above as the voice and
 Use only the provided context. Do not add facts, names, dates, numbers, contact details, rules, links, or eligibility claims that are not in the context.
 Make the wording warmer, more natural, and concise, while preserving every factual value from the original answer.
 Use a conversational, helpful voice instead of sounding like a policy excerpt. A short natural acknowledgement is okay when it fits, but vary the wording and do not add filler.
+Apply explicit organization tone/personality/style instructions more strongly than the terse original answer.
+Do not simply mirror the original extractive wording when a warmer organization voice can preserve the same facts.
 
 Try to include exactly one role-neutral engagement question or offer when the context contains a directly related adjacent detail the user could reasonably want next. Leave it empty only when no safe adjacent detail exists. It must be supported by an exact sentence or phrase from the context.
 Do not ask about the user's role, status, department, or identity. Do not add generic closers such as "anything else", "başka bir konuda yardımcı olabilir miyim", or "daha fazla bilgi istersen yardımcı olurum".

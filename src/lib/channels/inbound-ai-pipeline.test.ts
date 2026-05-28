@@ -2615,6 +2615,13 @@ describe('processInboundAiPipeline guardrails', () => {
         openAiCreateMock.mockResolvedValue({
             choices: [{ message: { content: 'Model completion should not be needed.' } }]
         })
+        polishGroundedRagAnswerMock.mockImplementationOnce(async ({ answer }) => ({
+            answer,
+            usedPolish: true,
+            addedEngagement: true,
+            usage: null,
+            model: 'gpt-4o-mini'
+        }))
 
         const supabase = createSupabaseMock({
             messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
@@ -2637,6 +2644,15 @@ describe('processInboundAiPipeline guardrails', () => {
         expect(polishGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
             answer: expect.stringContaining('Sağlık Bilimleri Fakültesi adresi'),
             userMessage: 'SBF kampüsü nerede'
+        }))
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                rag_polish: {
+                    usedPolish: true,
+                    addedEngagement: true,
+                    model: 'gpt-4o-mini'
+                }
+            })
         }))
     })
 
