@@ -170,6 +170,26 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).toBe('Ders notlarına MEDU üzerinden ulaşabilirsin.\nhttps://example.edu.tr/medu.pdf')
     })
 
+    it('uses short platform names such as UZEM and MEDU as source evidence signals', () => {
+        const formatted = appendCanonicalRagSourceLinks('Ders notlarına UZEM/MEDU sistemleri üzerinden ulaşabilirsin.', [
+            {
+                source_url: 'https://example.edu.tr/uzem-accessibility.pdf',
+                content: 'Ders notlarına UZEM sistemi üzerinden ulaşabilirsin. UZEM üzerinden paylaşılan içerikler erişilebilir olmalıdır.'
+            },
+            {
+                source_url: 'https://example.edu.tr/uzem-medu-learning.pdf',
+                content: 'UZEM/MEDU sistemleri üzerinden ders notlarının paylaşımı sağlanmıştır.'
+            }
+        ], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe(
+            'Ders notlarına UZEM/MEDU sistemleri üzerinden ulaşabilirsin.\nhttps://example.edu.tr/uzem-medu-learning.pdf'
+        )
+    })
+
     it('removes dangling more-info prefaces before source links', () => {
         const formatted = appendCanonicalRagSourceLinks('Evet, TLT programında yaz stajı vardır ve 20 iş günüdür. Daha fazla bilgi istersen,', [{
             source_url: 'https://example.edu.tr/tlt.pdf'

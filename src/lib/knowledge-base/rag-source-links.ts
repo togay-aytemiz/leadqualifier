@@ -106,6 +106,9 @@ function sourceEvidenceScore(response: string, chunk: unknown) {
         const compactPhone = phone.replace(/\D/g, '')
         if (compactPhone && searchable.replace(/\D/g, '').includes(compactPhone)) score += 5
     }
+    for (const platform of ['uzem', 'medu', 'obs']) {
+        if (normalizedResponse.includes(platform) && searchable.includes(platform)) score += 2.2
+    }
 
     const terms = answerEvidenceTerms(response)
     for (const term of terms) {
