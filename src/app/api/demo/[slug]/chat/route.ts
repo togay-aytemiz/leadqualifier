@@ -39,6 +39,7 @@ const DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE = 20
 const FAST_RAG_MATCH_THRESHOLD = 0.5
 const FAST_RAG_RESULT_LIMIT = 6
 const MAX_CONTEXTUAL_SEARCH_QUERY_CHARS = 500
+const MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE = 2
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -220,6 +221,7 @@ function buildDemoContextualKnowledgeSearchQueries(
         .filter((turn) => turn.role === 'user')
         .map((turn) => normalizeDemoKnowledgeQuery(turn.content))
         .filter((content) => content && demoKnowledgeQueryKey(content) !== demoKnowledgeQueryKey(normalizedMessage))
+        .filter((content) => !shouldUseDemoConversationHistoryForRag(content))
         .slice(-2)
         .reverse()
 
@@ -238,6 +240,87 @@ function buildDemoContextualKnowledgeSearchQueries(
         if (!key || seen.has(key)) return false
         seen.add(key)
         return true
+    })
+}
+
+function normalizeDemoAnchorText(value: string) {
+    return value
+        .toLocaleLowerCase('tr-TR')
+        .normalize('NFKD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/[ıİğĞüÜşŞöÖçÇ]/g, (char) => ({
+            ı: 'i',
+            İ: 'i',
+            ğ: 'g',
+            Ğ: 'g',
+            ü: 'u',
+            Ü: 'u',
+            ş: 's',
+            Ş: 's',
+            ö: 'o',
+            Ö: 'o',
+            ç: 'c'
+        }[char] ?? char))
+}
+
+function extractDemoAnchorTokens(value: string) {
+    const stopwords = new Set([
+        'acaba',
+        'bilgi',
+        'bolum',
+        'ders',
+        'egitim',
+        'fakulte',
+        'hangi',
+        'hakkinda',
+        'icin',
+        'is',
+        'kac',
+        'kampus',
+        'konu',
+        'misin',
+        'miyim',
+        'nerede',
+        'program',
+        'sinav',
+        'staj',
+        'sure',
+        'var',
+        'yaz',
+        'yerleske',
+        'gunu'
+    ])
+
+    return Array.from(new Set(normalizeDemoAnchorText(value)
+        .split(/[^a-z0-9]+/i)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 4)
+        .filter((token) => !stopwords.has(token))))
+}
+
+function contextualChunksContainHistoryAnchor(
+    chunks: RagChunk[],
+    conversationHistory: KnowledgeSearchPlanningTurn[]
+) {
+    const anchors = conversationHistory
+        .filter((turn) => turn.role === 'user')
+        .map((turn) => normalizeDemoKnowledgeQuery(turn.content))
+        .filter((content) => content && !shouldUseDemoConversationHistoryForRag(content))
+        .map(extractDemoAnchorTokens)
+        .filter((tokens) => tokens.length >= MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE)
+
+    if (anchors.length === 0) return false
+
+    return chunks.some((chunk) => {
+        const searchable = normalizeDemoAnchorText([
+            chunk.document_title ?? '',
+            chunk.source_url ?? '',
+            chunk.content ?? ''
+        ].join('\n'))
+
+        return anchors.some((tokens) => (
+            tokens.filter((token) => searchable.includes(token)).length >= MIN_CONTEXTUAL_ANCHOR_TOKEN_COVERAGE
+        ))
     })
 }
 
@@ -696,7 +779,9 @@ async function buildExtractiveDemoChatReply(input: {
             }
         }
 
-        if (hasConversationHistory) return null
+        if (hasConversationHistory && !contextualChunksContainHistoryAnchor(chunks, conversationHistory)) {
+            return null
+        }
 
         const noInformationSeed = buildNoInformationSeed(responseLanguage)
         const repairedAnswer = repairLinkOnlyRagAnswer({
