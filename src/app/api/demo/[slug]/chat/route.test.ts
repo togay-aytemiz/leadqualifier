@@ -772,6 +772,121 @@ describe('demo chat API route', () => {
         }))
     })
 
+    it('repairs polished deterministic demo replies before appending sources', async () => {
+        const chunk = {
+            content: 'Page Title: İletişim\nTelefon +90 312 329 10 10 Fax +90 312 329 10 15 E-Posta yiu@yiu.edu.tr',
+            document_id: 'doc-contact',
+            document_title: 'İletişim',
+            source_url: 'https://example.edu.tr/iletisim',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 18,
+        })
+        repairLinkOnlyRagAnswerMock
+            .mockReturnValueOnce('Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.')
+            .mockReturnValueOnce('Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.')
+        polishGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Bilgi İşlem Daire Başkanlığı iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.',
+            usedPolish: true,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
+        })
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.\nhttps://example.edu.tr/iletisim'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Yuksek Ihtisas Universitesi genel telefon numarasi nedir?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain]
+        let messageSelectCount = 0
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                messageSelectCount += 1
+                if (messageSelectCount === 1) return completedMessagesChain
+                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Yuksek Ihtisas Universitesi genel telefon numarasi nedir?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.\nhttps://example.edu.tr/iletisim',
+            skillImage: null,
+        })
+        expect(appendCanonicalRagSourceLinksMock).toHaveBeenCalledWith(
+            'Kurum iletişim bilgisi: Telefon: +90 312 329 10 10 - E-posta: yiu@yiu.edu.tr.',
+            [chunk],
+            expect.objectContaining({ force: true, limit: 2 })
+        )
+    })
+
     it('does not insert a duplicate deterministic demo reply if another poll already persisted it', async () => {
         const chunk = {
             content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesindedir.',

@@ -566,8 +566,18 @@ async function buildExtractiveDemoChatReply(input: {
             }
         }
 
+        const repairedPolishedAnswer = repairLinkOnlyRagAnswer({
+            response: polishedAnswer.answer,
+            userMessage: message,
+            responseLanguage,
+            chunks
+        })
+        const answerForSources = repairedPolishedAnswer && !isNoAnswerReply(repairedPolishedAnswer)
+            ? repairedPolishedAnswer
+            : polishedAnswer.answer
+
         return {
-            replyText: appendCanonicalRagSourceLinks(polishedAnswer.answer, chunks, {
+            replyText: appendCanonicalRagSourceLinks(answerForSources, chunks, {
                 force: true,
                 limit: 2
             }),
