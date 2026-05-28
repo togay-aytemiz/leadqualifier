@@ -355,4 +355,25 @@ describe('appendCanonicalRagSourceLinks', () => {
 
         expect(formatted).toBe('Tıbbi Laboratuvar Teknikleri e-posta adresi: tlt@yiu.edu.tr.\nhttps://yuksekihtisasuniversitesi.edu.tr/iletisim')
     })
+
+    it('does not append weak extra sources when concrete answer values only exist in the primary evidence', () => {
+        const formatted = appendCanonicalRagSourceLinks('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü süresince uygulanmaktadır.', [
+            {
+                source_url: 'https://example.edu.tr/tlt-oz-degerlendirme.pdf',
+                document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                content: 'Tıbbi Laboratuvar Teknikleri programında zorunlu yaz stajı 20 iş günü olarak uygulanır.'
+            },
+            {
+                source_url: 'https://example.edu.tr/landing',
+                document_title: 'Aday Öğrenci',
+                content: 'Tıbbi Laboratuvar Teknikleri programı hakkında genel aday öğrenci bilgilendirmesi.'
+            }
+        ], {
+            force: true,
+            limit: 2
+        })
+
+        expect(formatted).toBe('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü süresince uygulanmaktadır.\nhttps://example.edu.tr/tlt-oz-degerlendirme.pdf')
+        expect(formatted).not.toContain('/landing')
+    })
 })

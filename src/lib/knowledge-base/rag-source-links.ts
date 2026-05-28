@@ -65,6 +65,33 @@ function extractPhoneEvidence(value: string) {
     return value.match(/(?:\+?\s*90\s*)?(?:0\s*)?312[\s)./-]*329[\s)./-]*10[\s)./-]*10|(?:\+?\s*90\s*)?(?:0\s*)?312[\s)./-]*[0-9][0-9\s)./-]{5,}/gi) ?? []
 }
 
+function normalizeConcreteEvidenceValue(value: string) {
+    return normalizeEvidenceText(value)
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function extractConcreteValueEvidence(value: string) {
+    return Array.from(new Set([
+        ...(value.match(/\d+(?:[.,]\d+)?\s*(?:iş\s*günü|is\s*gunu|gün|gun|ay|yıl|yil|saat|dakika|akts|kredi|puan)/giu) ?? []),
+        ...(value.match(/%\s*\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s*%/gu) ?? [])
+    ].map(normalizeConcreteEvidenceValue).filter(Boolean)))
+}
+
+function chunkContainsConcreteEvidence(response: string, chunk: unknown) {
+    if (!isRecord(chunk)) return false
+    const concreteValues = extractConcreteValueEvidence(response)
+    if (concreteValues.length === 0) return true
+
+    const searchable = normalizeEvidenceText([
+        readTrimmedString(chunk.document_title ?? chunk.documentTitle) ?? '',
+        readTrimmedString(chunk.source_url ?? chunk.sourceUrl) ?? '',
+        readTrimmedString(chunk.content) ?? ''
+    ].join('\n'))
+
+    return concreteValues.some((value) => searchable.includes(value))
+}
+
 function answerEvidenceTerms(response: string) {
     const normalized = normalizeEvidenceText(response)
     return Array.from(new Set(normalized
@@ -105,6 +132,9 @@ function sourceEvidenceScore(response: string, chunk: unknown) {
     for (const phone of extractPhoneEvidence(response)) {
         const compactPhone = phone.replace(/\D/g, '')
         if (compactPhone && searchable.replace(/\D/g, '').includes(compactPhone)) score += 5
+    }
+    for (const concreteValue of extractConcreteValueEvidence(response)) {
+        if (searchable.includes(concreteValue)) score += 4
     }
     for (const platform of ['uzem', 'medu', 'obs']) {
         if (normalizedResponse.includes(platform) && searchable.includes(platform)) score += 2.2
@@ -153,11 +183,13 @@ function collectRagSourceUrlsByResponseEvidence(response: string, chunks: unknow
     const rankedChunks = hasPositiveScore
         ? indexedChunks.sort((left, right) => right.score - left.score || left.index - right.index).map((item) => item.chunk)
         : chunks
-    const directChunks = rankedChunks.filter((chunk) => !isListingOrIndexSource(chunk))
+    const concreteEvidenceChunks = rankedChunks.filter((chunk) => chunkContainsConcreteEvidence(response, chunk))
+    const evidenceRankedChunks = concreteEvidenceChunks.length > 0 ? concreteEvidenceChunks : rankedChunks
+    const directChunks = evidenceRankedChunks.filter((chunk) => !isListingOrIndexSource(chunk))
     const directUrls = collectRagSourceUrls(directChunks, limit)
     if (directUrls.length > 0) return directUrls
 
-    return collectRagSourceUrls(rankedChunks, limit)
+    return collectRagSourceUrls(evidenceRankedChunks, limit)
 }
 
 const SPACED_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi
