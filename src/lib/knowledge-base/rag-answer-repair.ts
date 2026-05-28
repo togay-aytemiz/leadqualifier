@@ -295,8 +295,11 @@ function extractDocumentCode(content: string) {
 }
 
 function asksForDocumentCode(normalizedUserMessage: string) {
-    return /\b(?:dokuman|belge)\s+(?:numara\w*|no(?:su)?)\b/i.test(normalizedUserMessage)
-        || /\b(?:numara\w*|no(?:su)?)\s+(?:nedir|ne)\b/i.test(normalizedUserMessage)
+    if (asksForContactInfo(normalizedUserMessage)) return false
+
+    return /\b(?:dokuman|belge|evrak|kilavuz|form|yonerge|prosedur|talimat)\s+(?:kod\w*|numara\w*|no(?:su)?)\b/i.test(normalizedUserMessage)
+        || /\b(?:kod\w*|numara\w*|no(?:su)?)\s+(?:nedir|ne)\b/i.test(normalizedUserMessage)
+            && includesAny(normalizedUserMessage, ['dokuman', 'belge', 'evrak', 'kilavuz', 'form', 'yonerge', 'prosedur', 'talimat'])
 }
 
 function repairDocumentCodeAnswer(input: {
@@ -528,7 +531,8 @@ function stripGenericDeferralTail(response: string, userMessage: string) {
 }
 
 function sanitizeRagAnswerForReturn(response: string, userMessage: string) {
-    const withoutContradiction = stripContradictoryNoInformationLead(response)
+    const withoutEnglishBoilerplate = stripEnglishRetrievalBoilerplate(response)
+    const withoutContradiction = stripContradictoryNoInformationLead(withoutEnglishBoilerplate)
     const withoutUnrequestedContact = stripUnrequestedContactDetails(withoutContradiction, userMessage)
     const withoutGenericEngagementLead = stripGenericEngagementLead(withoutUnrequestedContact)
     const withoutClosing = stripGenericAssistantClosingTail(withoutGenericEngagementLead)
@@ -539,6 +543,13 @@ function sanitizeRagAnswerForReturn(response: string, userMessage: string) {
     )
         .replace(/^[\s,.;:!?]+/u, '')
         .replace(/^(?:Ancak|Ama),?\s+/iu, '')
+        .trim()
+}
+
+function stripEnglishRetrievalBoilerplate(response: string) {
+    return response
+        .replace(/^\s*(?:According to|Based on)\s+the\s+retrieved\s+(?:policy|context|source|evidence|document)s?\s*[:,]\s*/iu, '')
+        .replace(/^\s*(?:The retrieved\s+(?:policy|context|source|evidence|document)\s+(?:states|says)\s+that)\s*[:,]?\s*/iu, '')
         .trim()
 }
 
@@ -1391,6 +1402,11 @@ function contactSubjectFromContent(content: string, userMessage: string) {
     const normalizedContent = normalizeSearch(content)
     const normalizedUserMessage = normalizeSearch(userMessage)
 
+    const metadataTitle = extractChunkTitle({ content })
+    if (metadataTitle && normalizeSearch(metadataTitle).includes('iletisim')) {
+        return 'Kurum'
+    }
+
     if (normalizedUserMessage.includes('kutuphane')) {
         return 'Kütüphane ve Dokümantasyon Daire Başkanlığı'
     }
@@ -1961,9 +1977,10 @@ function asksForFinalExamPolicy(normalizedUserMessage: string) {
 
 function extractFinalMakeupEvidence(content: string) {
     const flattened = content.replace(/\s+/g, ' ').trim()
-    const medicineFinal = flattened.match(/Final sınavına girmesi gerektiği halde girmeyen,[\s\S]{0,260}?bütünleme sınavına gir(?:er|ebilir)\.[\s\S]{0,180}?bütünleme notunu oluşturur\.[\s\S]{0,120}?final notu yerine geçer\./iu)
-        ?? flattened.match(/Final sınavına girmesi gerektiği halde girmeyen,[\s\S]{0,260}?bütünleme sınavına gir(?:er|ebilir)\./iu)
-        ?? flattened.match(/bütünleme sınavı olarak adlandırılan sınav yapılır\.[\s\S]{0,260}?Final sınavına girmesi gerektiği halde girmeyen,[\s\S]{0,260}?öğrenciler bu sınava gir(?:er|ebilir)\.[\s\S]{0,260}?bütünleme notunu oluşturur\.[\s\S]{0,160}?final notu yerine geçer\./iu)
+    const medicineFinal = flattened.match(/Final sınavına girmesi gerektiği halde girmeyen,?[\s\S]{0,260}?bütünleme sınavına gir(?:er|ebilir)\.[\s\S]{0,180}?bütünleme notunu oluşturur\.[\s\S]{0,120}?final notu yerine geçer\./iu)
+        ?? flattened.match(/Final sınavına girmesi gerektiği halde girmeyen,?[\s\S]{0,260}?bütünleme sınavına gir(?:er|ebilir)\./iu)
+        ?? flattened.match(/bütünleme sınavı olarak adlandırılan sınav yapılır\.[\s\S]{0,260}?Final sınavına girmesi gerektiği halde girmeyen,?[\s\S]{0,260}?öğrenciler bu sınava gir(?:er|ebilir)\.[\s\S]{0,260}?bütünleme notunu oluşturur\.[\s\S]{0,160}?final notu yerine geçer\./iu)
+        ?? flattened.match(/bütünleme sınavı olarak adlandırılan sınav yapılır\.[\s\S]{0,260}?Final sınavına girmesi gerektiği halde girmeyen,?[\s\S]{0,260}?öğrenciler bu sınava gir(?:er|ebilir)\.[\s\S]{0,220}?bütünleme notu[\s\S]{0,120}?final notu yerine geçer\./iu)
     if (medicineFinal?.[0]) {
         return {
             kind: 'medicine-final' as const,
@@ -2457,6 +2474,12 @@ export function repairLinkOnlyRagAnswer(input: {
     })
     if (abbreviationExpansionRepair) return abbreviationExpansionRepair
 
+    const contactRepair = repairContactAnswer({
+        ...input,
+        response
+    })
+    if (contactRepair) return contactRepair
+
     const documentCodeRepair = repairDocumentCodeAnswer({
         ...input,
         response
@@ -2516,12 +2539,6 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (addressRepair) return addressRepair
-
-    const contactRepair = repairContactAnswer({
-        ...input,
-        response
-    })
-    if (contactRepair) return contactRepair
 
     const unsupportedLectureNoteObjectRepair = repairUnsupportedLectureNoteObjectTerminology({
         ...input,

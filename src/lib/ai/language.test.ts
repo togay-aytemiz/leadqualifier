@@ -38,6 +38,12 @@ describe('ai language helpers', () => {
         expect(resolveMvpResponseLanguageName('yardimci olabilir misiniz')).toBe('Turkish')
     })
 
+    it('treats ascii Turkish education and policy questions as Turkish', () => {
+        expect(resolveMvpResponseLanguage('Tibbi Laboratuvar Teknikleri programinda yaz staji kac is gunu?')).toBe('tr')
+        expect(resolveMvpResponseLanguage('Tip fakultesinde finale girmeden butunlemeye girebilir miyim?')).toBe('tr')
+        expect(resolveMvpResponseLanguage('Yuksek Ihtisas Universitesi genel telefon numarasi nedir?')).toBe('tr')
+    })
+
     it('uses history when current message language is ambiguous', () => {
         expect(isMvpResponseLanguageAmbiguous('ok')).toBe(true)
         expect(resolveMvpResponseLanguage('ok', {

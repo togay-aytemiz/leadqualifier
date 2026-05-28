@@ -19,6 +19,79 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Tıp Fakültesinde eğitim süresi altı yıldır.')
     })
 
+    it('prefers contact evidence over document codes when the user asks for a phone number', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Yuksek Ihtisas Universitesi genel telefon numarasi nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Öğretim Elemanı ve Personel Bilgilendirme Kılavuzu',
+                    content: 'Doküman No: EÖB.KLV.0001'
+                },
+                {
+                    document_title: 'İletişim',
+                    content: 'Page Title: İletişim\nTelefon: +90 312 329 10 10'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Kurum iletişim bilgisi: Telefon: +90 312 329 10 10.')
+        expect(repaired).not.toContain('EÖB.KLV.0001')
+    })
+
+    it('still repairs document numbers when the question is explicitly about a document code', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Bu kılavuzun doküman numarası nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Öğretim Elemanı ve Personel Bilgilendirme Kılavuzu',
+                    content: 'Doküman No: EÖB.KLV.0001'
+                },
+                {
+                    document_title: 'İletişim',
+                    content: 'Page Title: İletişim\nTelefon: +90 312 329 10 10'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('"Öğretim Elemanı ve Personel Bilgilendirme Kılavuzu" doküman numarası EÖB.KLV.0001\'dir.')
+    })
+
+    it('removes English retrieval boilerplate from Turkish grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'According to the retrieved policy: TLT 216 Yaz Stajı 20 iş günüdür.',
+            userMessage: 'Tibbi Laboratuvar Teknikleri programinda yaz staji kac is gunu?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Ders İçerikleri',
+                    content: 'TLT 216 Yaz Stajı 20 iş günüdür.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('TLT 216 Yaz Stajı 20 iş günüdür.')
+    })
+
+    it('rewrites raw final and makeup-exam article snippets into a direct answer', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: '(2) Final sınavına girmesi gerektiği halde girmeyen öğrenciler bu sınava girer.',
+            userMessage: 'Tip fakultesinde finale girmeden butunlemeye girebilir miyim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Bütünleme sınavı olarak adlandırılan sınav yapılır. Final sınavına girmesi gerektiği halde girmeyen öğrenciler bu sınava girer. Bütünleme notu final notu yerine geçer.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer; bütünleme notu final notu yerine geçer.')
+    })
+
     it('removes generic engagement questions from grounded RAG answers', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Sağlık Bilimleri Fakültesi adresi: Oğuzlar Mahallesi, 1375. Sk. No: 8, Çankaya / Ankara. Başka bir konuda yardımcı olabilir miyim?',

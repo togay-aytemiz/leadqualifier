@@ -36,6 +36,14 @@ describe('MessageRichText', () => {
     expect(html).toContain('>www.askqualy.com</a>')
   })
 
+  it('does not turn document codes into fake domain links', () => {
+    const html = render('Doküman numarası EÖB.KLV.0001 olarak geçiyor.')
+
+    expect(html).toContain('EÖB.KLV.0001')
+    expect(html).not.toContain('href="https://B.KLV"')
+    expect(html).not.toContain('href="https://b.klv"')
+  })
+
   it('renders trailing disclaimer quote as a separated blockquote', () => {
     const html = render(
       'Cevap burada.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.'
