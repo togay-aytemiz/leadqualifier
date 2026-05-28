@@ -1812,6 +1812,81 @@ function responseMentionsLectureNotePlatform(response: string) {
     ])
 }
 
+type LectureNotePlatform = {
+    key: 'uzem' | 'medu' | 'obs'
+    label: string
+    aliases: string[]
+}
+
+const LECTURE_NOTE_PLATFORMS: LectureNotePlatform[] = [
+    { key: 'uzem', label: 'UZEM', aliases: ['uzem'] },
+    { key: 'medu', label: 'MEDU', aliases: ['medu'] },
+    { key: 'obs', label: 'ÖBS', aliases: ['obs', 'ogrenci bilgi sistemi'] }
+]
+
+function lectureNotePlatformsIn(value: string) {
+    const normalized = normalizeSearch(value)
+    return LECTURE_NOTE_PLATFORMS.filter((platform) => (
+        platform.aliases.some((alias) => normalized.includes(alias))
+    ))
+}
+
+function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function mentionedLectureNotePlatformTokens(value: string) {
+    return LECTURE_NOTE_PLATFORMS.filter((platform) => (
+        platform.aliases.some((alias) => {
+            const tokenPattern = escapeRegExp(alias).replace(/\s+/g, '\\s+')
+            return new RegExp(`(?<![\\p{L}\\p{N}])${tokenPattern}(?![\\p{L}\\p{N}])`, 'iu').test(value)
+        })
+    ))
+}
+
+function formatLectureNotePlatformList(platforms: LectureNotePlatform[]) {
+    return platforms.map((platform) => platform.label).join('/')
+}
+
+function repairUnsupportedLectureNotePlatforms(input: {
+    response: string
+    userMessage: string
+    chunks: RagAnswerRepairChunk[]
+}) {
+    const normalizedUserMessage = normalizeSearch(input.userMessage)
+    if (!asksForLectureNotesAccess(normalizedUserMessage)) return null
+    if (isGenericNoInformationResponse(input.response) || hasDanglingLectureNoteLinkLabel(input.response)) return null
+
+    const mentionedPlatforms = mentionedLectureNotePlatformTokens(input.response)
+    if (mentionedPlatforms.length === 0) return null
+
+    const evidenceText = input.chunks.map((chunk) => chunk.content).join('\n')
+    const supportedPlatforms = lectureNotePlatformsIn(evidenceText)
+    if (supportedPlatforms.length === 0) return null
+
+    const supportedKeys = new Set(supportedPlatforms.map((platform) => platform.key))
+    if (mentionedPlatforms.every((platform) => supportedKeys.has(platform.key))) return null
+
+    const replacement = formatLectureNotePlatformList(supportedPlatforms)
+    let repaired = input.response
+        .replace(/(?<![\p{L}\p{N}])(?:UZEM|MEDU|ÖBS|OBS)(?:\s*\/\s*(?:UZEM|MEDU|ÖBS|OBS))+(?![\p{L}\p{N}])/giu, replacement)
+
+    for (const platform of mentionedPlatforms) {
+        if (supportedKeys.has(platform.key)) continue
+        repaired = repaired.replace(/(?<![\p{L}\p{N}])(?:UZEM|MEDU|ÖBS|OBS)(?![\p{L}\p{N}])/giu, (match) => (
+            normalizeSearch(match) === platform.key ? replacement : match
+        ))
+    }
+
+    repaired = repaired
+        .replace(/\b(UZEM|MEDU|ÖBS)\s+sistemleri\b/giu, '$1 sistemi')
+        .replace(/\b(ÖBS)\s+platformu\b/giu, '$1')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+
+    return normalizeSearch(repaired) === normalizeSearch(input.response) ? null : repaired
+}
+
 function repairLectureNotesAnswer(input: {
     response: string
     userMessage: string
@@ -2419,6 +2494,12 @@ export function repairLinkOnlyRagAnswer(input: {
         response
     })
     if (contactRepair) return contactRepair
+
+    const unsupportedLectureNotePlatformRepair = repairUnsupportedLectureNotePlatforms({
+        ...input,
+        response
+    })
+    if (unsupportedLectureNotePlatformRepair) return unsupportedLectureNotePlatformRepair
 
     const lectureNotesRepair = repairLectureNotesAnswer({
         ...input,

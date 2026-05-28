@@ -2089,6 +2089,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Ders notlarının paylaşımı UZEM/MEDU sistemleri üzerinden sağlanmıştır.')
     })
 
+    it('removes unsupported lecture-note platform names from otherwise grounded answers', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Ders notlarına UZEM/MEDU sistemleri üzerinden ulaşabilirsin.',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Öğretim Elemanı ve Personel Bilgilendirme Kılavuzu',
+                    content: 'Ders notlarının sadeleştirilmiş, açık ve anlaşılır biçimde hazırlanması gerekir. UZEM üzerinden paylaşılan içeriklerin ekran okuyucularla uyumlu olması sağlanır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders notlarına UZEM sistemi üzerinden ulaşabilirsin.')
+    })
+
     it('repairs multiple inline dangling lecture-note link labels', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: "Ders notlarına öğrenci bilgi sistemi üzerinden erişebilirsiniz. Daha fazla bilgi için şu linkleri kontrol edebilirsiniz: - Temel Bilgi Teknolojileri Ders içeriği: - Staj rehberleri ve diğer kaynaklar: Başka bir konuda yardımcı olabilir miyim?",
