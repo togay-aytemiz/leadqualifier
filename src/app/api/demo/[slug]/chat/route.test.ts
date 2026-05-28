@@ -711,6 +711,24 @@ describe('demo chat API route', () => {
             userMessage: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
             chunks,
         }))
+        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalledWith(
+            'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
+            expect.any(String),
+            expect.any(Number),
+            expect.any(Object)
+        )
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
+            'SBF kampüsü nerede?',
+            'org-1',
+            6,
+            expect.objectContaining({ supabase: expect.any(Object) })
+        )
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
+            'TLT çift anadal yapabilir mi?',
+            'org-1',
+            6,
+            expect.objectContaining({ supabase: expect.any(Object) })
+        )
         expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
             'SBF kampüsü nerede?',
             'org-1',

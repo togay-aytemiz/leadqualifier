@@ -570,11 +570,18 @@ async function buildExtractiveDemoChatReply(input: {
         }
     }
 
-    const focusedResults = await searchKnowledgeBaseFocusedEvidence(
-        message,
-        input.channel.organizationId,
-        FAST_RAG_RESULT_LIMIT,
-        { supabase: input.supabase }
+    const compoundSearchQueries = splitDemoCompoundKnowledgeQueries(message)
+    const focusedSearchQueries = compoundSearchQueries.length > 0
+        ? compoundSearchQueries
+        : [message]
+    const focusedResults = mergeDemoRagResultGroups(
+        await Promise.all(focusedSearchQueries.map((query) => searchKnowledgeBaseFocusedEvidence(
+            query,
+            input.channel.organizationId,
+            FAST_RAG_RESULT_LIMIT,
+            { supabase: input.supabase }
+        ))),
+        FAST_RAG_RESULT_LIMIT
     )
     const focusedReply = await buildReplyFromResults(focusedResults)
     if (focusedReply) return focusedReply

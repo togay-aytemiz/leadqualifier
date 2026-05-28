@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 
 const chunks = [
@@ -14,6 +14,10 @@ const chunks = [
 ]
 
 describe('polishGroundedRagAnswer', () => {
+    afterEach(() => {
+        vi.unstubAllEnvs()
+    })
+
     it('adds a source-grounded engagement question selected by the model', async () => {
         const createCompletion = vi.fn(async () => ({
             choices: [{
@@ -103,6 +107,35 @@ describe('polishGroundedRagAnswer', () => {
             createCompletion
         })
 
+        expect(result.answer).toBe('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
+        expect(result.usedPolish).toBe(false)
+    })
+
+    it('aborts timed-out polish calls before falling back to the original answer', async () => {
+        vi.stubEnv('AI_REQUEST_TIMEOUT_MS', '5')
+        let aborted = false
+        const createCompletion = vi.fn((_args: Record<string, unknown>, options?: { signal?: AbortSignal }) => (
+            new Promise<never>((_resolve, reject) => {
+                options?.signal?.addEventListener('abort', () => {
+                    aborted = true
+                    reject(new Error('aborted'))
+                })
+            })
+        ))
+
+        const result = await polishGroundedRagAnswer({
+            answer: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks,
+            settings: {
+                prompt: 'Samimi, canlı ve güven veren bir dil kullan.',
+                bot_name: 'Qualy'
+            },
+            createCompletion
+        })
+
+        expect(aborted).toBe(true)
         expect(result.answer).toBe('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
         expect(result.usedPolish).toBe(false)
     })

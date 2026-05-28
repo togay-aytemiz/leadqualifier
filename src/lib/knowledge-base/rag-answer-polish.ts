@@ -1,5 +1,5 @@
 import { DEFAULT_FLEXIBLE_PROMPT, withBotNamePrompt } from '@/lib/ai/prompts'
-import { withAiTimeout } from '@/lib/ai/deadline'
+import { AiTimeoutError, resolveAiTimeoutMs } from '@/lib/ai/deadline'
 import type { MvpResponseLanguage } from '@/lib/ai/language'
 import { estimateTokenCount } from '@/lib/knowledge-base/chunking'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
@@ -24,7 +24,14 @@ type CompletionResponse = {
     usage?: CompletionUsage
 }
 
-type CreateCompletion = (args: Record<string, unknown>) => Promise<CompletionResponse>
+type CreateCompletionOptions = {
+    signal?: AbortSignal
+}
+
+type CreateCompletion = (
+    args: Record<string, unknown>,
+    options?: CreateCompletionOptions
+) => Promise<CompletionResponse>
 
 export type RagAnswerPolishUsage = {
     inputTokens: number
@@ -205,14 +212,38 @@ function buildRagPolishCompletionParameters(model: string) {
     }
 }
 
-async function createDefaultCompletion(args: Record<string, unknown>) {
+async function createDefaultCompletion(args: Record<string, unknown>, options?: CreateCompletionOptions) {
     if (!process.env.OPENAI_API_KEY) {
         throw new Error('Missing OPENAI_API_KEY for RAG answer polish')
     }
 
     const { default: OpenAI } = await import('openai')
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    return openai.chat.completions.create(args as never) as Promise<CompletionResponse>
+    return openai.chat.completions.create(args as never, options?.signal ? { signal: options.signal } : undefined) as Promise<CompletionResponse>
+}
+
+async function createCompletionWithTimeout(
+    createCompletion: CreateCompletion,
+    args: Record<string, unknown>,
+    stage: string
+) {
+    const timeoutMs = resolveAiTimeoutMs(stage)
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    try {
+        return await Promise.race([
+            createCompletion(args, controller?.signal ? { signal: controller.signal } : undefined),
+            new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    controller?.abort()
+                    reject(new AiTimeoutError(stage, timeoutMs))
+                }, timeoutMs)
+            })
+        ])
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId)
+    }
 }
 
 function extractEmails(value: string) {
@@ -389,7 +420,7 @@ export async function polishGroundedRagAnswer(input: {
     let completion: CompletionResponse
     try {
         const createCompletion = input.createCompletion ?? createDefaultCompletion
-        completion = await withAiTimeout(createCompletion({
+        completion = await createCompletionWithTimeout(createCompletion, {
             model,
             messages: [
                 { role: 'system', content: systemPrompt },
@@ -397,7 +428,7 @@ export async function polishGroundedRagAnswer(input: {
             ],
             response_format: { type: 'json_object' },
             ...buildRagPolishCompletionParameters(model)
-        }), { stage: 'rag_polish' })
+        }, 'rag_polish')
     } catch (error) {
         console.error('RAG answer polish failed; using original extractive answer', error)
         return fallbackResult(originalAnswer, model)
