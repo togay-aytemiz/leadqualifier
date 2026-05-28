@@ -27,15 +27,18 @@ const MAX_SESSION_ID_CHARS = 128
 const DEFAULT_SYNC_REPLY_TIMEOUT_MS = 5000
 const DEFAULT_FAST_RAG_REPLY_TIMEOUT_MS = 10000
 const DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS = 3500
+const DEFAULT_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 5500
 const DEFAULT_FAST_RAG_POLISH_TIMEOUT_MS = 1800
 const MAX_SYNC_REPLY_TIMEOUT_MS = 6000
 const MAX_FAST_RAG_REPLY_TIMEOUT_MS = 12000
 const MAX_FAST_RAG_GENERATE_TIMEOUT_MS = 5000
+const MAX_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS = 8000
 const MAX_FAST_RAG_POLISH_TIMEOUT_MS = 3000
 const DEMO_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000
 const DEFAULT_DEMO_CHAT_RATE_LIMIT_PER_MINUTE = 20
 const FAST_RAG_MATCH_THRESHOLD = 0.5
 const FAST_RAG_RESULT_LIMIT = 6
+const MAX_CONTEXTUAL_SEARCH_QUERY_CHARS = 500
 
 type RouteContext = {
     params: Promise<{ slug: string }>
@@ -138,6 +141,12 @@ function readFastRagGenerateTimeoutMs() {
     return DEFAULT_FAST_RAG_GENERATE_TIMEOUT_MS
 }
 
+function readContextualFastRagGenerateTimeoutMs() {
+    const raw = Number.parseInt(process.env.DEMO_CHAT_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS ?? '', 10)
+    if (Number.isFinite(raw) && raw >= 1000) return Math.min(raw, MAX_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS)
+    return DEFAULT_CONTEXTUAL_FAST_RAG_GENERATE_TIMEOUT_MS
+}
+
 function readFastRagPolishTimeoutMs() {
     const raw = Number.parseInt(process.env.DEMO_CHAT_FAST_RAG_POLISH_TIMEOUT_MS ?? '', 10)
     if (Number.isFinite(raw) && raw >= 750) return Math.min(raw, MAX_FAST_RAG_POLISH_TIMEOUT_MS)
@@ -185,6 +194,42 @@ function buildDemoKnowledgeSearchQueries(message: string) {
     const queries = [
         normalizeDemoKnowledgeQuery(message),
         ...splitDemoCompoundKnowledgeQueries(message)
+    ]
+    const seen = new Set<string>()
+
+    return queries.filter((query) => {
+        const key = demoKnowledgeQueryKey(query)
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
+function truncateDemoKnowledgeQuery(value: string) {
+    const normalized = normalizeDemoKnowledgeQuery(value)
+    if (normalized.length <= MAX_CONTEXTUAL_SEARCH_QUERY_CHARS) return normalized
+    return normalized.slice(0, MAX_CONTEXTUAL_SEARCH_QUERY_CHARS).trim()
+}
+
+function buildDemoContextualKnowledgeSearchQueries(
+    message: string,
+    conversationHistory: KnowledgeSearchPlanningTurn[]
+) {
+    const normalizedMessage = normalizeDemoKnowledgeQuery(message)
+    const previousUserTurns = conversationHistory
+        .filter((turn) => turn.role === 'user')
+        .map((turn) => normalizeDemoKnowledgeQuery(turn.content))
+        .filter((content) => content && demoKnowledgeQueryKey(content) !== demoKnowledgeQueryKey(normalizedMessage))
+        .slice(-2)
+        .reverse()
+
+    const contextualQueries = previousUserTurns.map((previousQuestion) => (
+        truncateDemoKnowledgeQuery(`${previousQuestion} ${normalizedMessage}`)
+    ))
+
+    const queries = [
+        ...contextualQueries,
+        ...buildDemoKnowledgeSearchQueries(message)
     ]
     const seen = new Set<string>()
 
@@ -603,7 +648,9 @@ async function buildExtractiveDemoChatReply(input: {
             chunks,
             settings: aiSettings,
             conversationHistory,
-            timeoutMs: readFastRagGenerateTimeoutMs()
+            timeoutMs: hasConversationHistory
+                ? readContextualFastRagGenerateTimeoutMs()
+                : readFastRagGenerateTimeoutMs()
         })
 
         if (generatedAnswer.usage) {
@@ -648,6 +695,8 @@ async function buildExtractiveDemoChatReply(input: {
                 }
             }
         }
+
+        if (hasConversationHistory) return null
 
         const noInformationSeed = buildNoInformationSeed(responseLanguage)
         const repairedAnswer = repairLinkOnlyRagAnswer({
@@ -720,7 +769,9 @@ async function buildExtractiveDemoChatReply(input: {
         : [message]
     const hasConversationHistory = conversationHistory.some((turn) => turn.content.trim())
     const buildBroadSearchReply = async () => {
-        const searchQueries = buildDemoKnowledgeSearchQueries(message)
+        const searchQueries = hasConversationHistory
+            ? buildDemoContextualKnowledgeSearchQueries(message, conversationHistory)
+            : buildDemoKnowledgeSearchQueries(message)
         const kbResults = mergeDemoRagResultGroups(
             await Promise.all(searchQueries.map((query) => searchKnowledgeBase(
                 query,

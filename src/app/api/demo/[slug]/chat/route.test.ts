@@ -619,7 +619,7 @@ describe('demo chat API route', () => {
             },
         ]
         expect(searchKnowledgeBaseMock).toHaveBeenCalledWith(
-            'Bu programda staj kaç iş günü?',
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı? Bu programda staj kaç iş günü?',
             'org-1',
             0.5,
             6,
@@ -633,6 +633,121 @@ describe('demo chat API route', () => {
             userMessage: 'Bu programda staj kaç iş günü?',
             conversationHistory: expectedHistory,
         }))
+    })
+
+    it('does not answer contextual follow-ups with deterministic repair when grounded generation cannot validate evidence', async () => {
+        const erasmusChunk = {
+            content: 'Erasmus staj hareketliliği 2 ile 12 ay arasında yapılabilir.',
+            document_id: 'doc-erasmus',
+            document_title: 'Erasmus Staj Hareketliliği',
+            source_url: 'https://example.edu.tr/erasmus.pdf',
+        }
+        searchKnowledgeBaseMock.mockResolvedValueOnce([erasmusChunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: erasmusChunk.content,
+            chunks: [erasmusChunk],
+            tokenCount: 12,
+        })
+        generateGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'NO_ANSWER',
+            usedGeneration: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Erasmus staj hareketliliği 2 ile 12 ay arasında yapılabilir.')
+
+        const createConversationChain = () => {
+            const chain = {
+                eq: vi.fn(),
+                maybeSingle: vi.fn(async () => ({
+                    data: { id: 'conversation-1' },
+                    error: null,
+                })),
+            }
+            chain.eq.mockReturnValue(chain)
+            return chain
+        }
+
+        const emptyCompletedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        emptyCompletedMessagesChain.eq.mockReturnValue(emptyCompletedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Bu programda staj kaç iş günü?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const historyMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(),
+            limit: vi.fn(async () => ({
+                data: [
+                    {
+                        content: 'Bu programda staj kaç iş günü?',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'message-1' },
+                    },
+                    {
+                        content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'previous-message' },
+                    },
+                ],
+                error: null,
+            })),
+        }
+        historyMessagesChain.eq.mockReturnValue(historyMessagesChain)
+        historyMessagesChain.order.mockReturnValue(historyMessagesChain)
+
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns === 'id, content') return inboundMessagesChain
+                if (columns === 'content, sender_type, metadata') return historyMessagesChain
+                if (columns.includes('content, metadata')) return emptyCompletedMessagesChain
+                return emptyCompletedMessagesChain
+            }),
+        }
+        const conversations = [
+            createConversationChain(),
+            createConversationChain(),
+            createConversationChain(),
+            createConversationChain(),
+        ]
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) throw new Error('Unexpected conversation lookup')
+                return { select: vi.fn(() => chain) }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+        processInboundAiPipelineMock.mockImplementationOnce(async () => undefined)
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Bu programda staj kaç iş günü?',
+        }), createContext())
+
+        expect(res.status).toBe(202)
+        await expect(res.json()).resolves.toEqual({ pending: true })
+        expect(repairLinkOnlyRagAnswerMock).not.toHaveBeenCalled()
+        expect(appendCanonicalRagSourceLinksMock).not.toHaveBeenCalled()
     })
 
     it('falls back to broader knowledge search during polling before the shared pipeline', async () => {
