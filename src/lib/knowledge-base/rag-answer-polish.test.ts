@@ -19,7 +19,13 @@ describe('polishGroundedRagAnswer', () => {
     })
 
     it('adds a source-grounded engagement question selected by the model', async () => {
-        const createCompletion = vi.fn(async () => ({
+        const createCompletion = vi.fn(async (args: Record<string, unknown>) => {
+            const messages = args.messages as Array<{ role: string; content: string }>
+            const systemPrompt = messages.find((message) => message.role === 'system')?.content ?? ''
+            expect(systemPrompt).toContain('Samimi, canlı ve güven veren bir dil kullan.')
+            expect(systemPrompt).toContain('organization-specific AI assistant instructions above as the voice and behavior contract')
+
+            return {
             choices: [{
                 message: {
                     content: JSON.stringify({
@@ -30,7 +36,8 @@ describe('polishGroundedRagAnswer', () => {
                 }
             }],
             usage: { prompt_tokens: 120, completion_tokens: 45, total_tokens: 165 }
-        }))
+            }
+        })
 
         const result = await polishGroundedRagAnswer({
             answer: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',

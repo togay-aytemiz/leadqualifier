@@ -529,7 +529,8 @@ async function buildExtractiveDemoChatReply(input: {
         if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
 
         const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
-            supabase: input.supabase
+            supabase: input.supabase,
+            locale: responseLanguage
         })
         const polishedAnswer = await polishGroundedRagAnswer({
             answer: repairedAnswer,

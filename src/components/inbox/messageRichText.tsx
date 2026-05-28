@@ -153,6 +153,48 @@ function renderLine(
   return <span key={`line-${index}`}>{parseInlineText(line, `line-${index}`)}</span>
 }
 
+function renderStandaloneUrlGroup(input: {
+  lines: string[]
+  startIndex: number
+  standaloneUrlLabel: NonNullable<MessageRichTextProps['standaloneUrlLabel']>
+  standaloneUrlStartIndex: number
+  standaloneUrlTotal: number
+}) {
+  const urls: Array<{ lineIndex: number; url: string; label: string }> = []
+  let index = input.startIndex
+
+  while (index < input.lines.length) {
+    const trimmedLine = input.lines[index]?.trim() ?? ''
+    if (!isStandaloneUrlLine(trimmedLine)) break
+
+    const urlIndex = input.standaloneUrlStartIndex + urls.length
+    urls.push({
+      lineIndex: index,
+      url: trimmedLine,
+      label: resolveStandaloneUrlLabel(input.standaloneUrlLabel, urlIndex, input.standaloneUrlTotal) ?? trimmedLine,
+    })
+    index += 1
+  }
+
+  return {
+    nextIndex: index,
+    consumedUrlCount: urls.length,
+    node: (
+      <span
+        key={`line-${input.startIndex}-standalone-url-group`}
+        className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 align-baseline"
+      >
+        {urls.map((source, sourceIndex) => (
+          <Fragment key={`line-${source.lineIndex}-standalone-url-item`}>
+            {sourceIndex > 0 ? <span aria-hidden={true}> · </span> : null}
+            {renderLink(source.label, source.url, `line-${source.lineIndex}-standalone-url`)}
+          </Fragment>
+        ))}
+      </span>
+    ),
+  }
+}
+
 export function MessageRichText({ content, standaloneUrlLabel }: MessageRichTextProps) {
   const normalized = content.replace(/\r\n/g, '\n')
   const lines = normalized.split('\n')
@@ -160,28 +202,45 @@ export function MessageRichText({ content, standaloneUrlLabel }: MessageRichText
     ? lines.filter(isStandaloneUrlLine).length
     : 0
   let standaloneUrlIndex = 0
+  const nodes: ReactNode[] = []
 
-  return (
-    <>
-      {lines.map((line, index) => {
-        const currentStandaloneUrlIndex = standaloneUrlLabel && isStandaloneUrlLine(line)
-          ? standaloneUrlIndex++
-          : -1
-        const renderedLine = renderLine(
-          line,
-          index,
-          standaloneUrlLabel,
-          currentStandaloneUrlIndex,
-          standaloneUrlTotal
-        )
-        const shouldAddBreak = index < lines.length - 1 && !/^\s*>\s?/.test(lines[index + 1] ?? '')
-        return (
-          <Fragment key={`message-line-wrapper-${index}`}>
-            {renderedLine}
-            {shouldAddBreak ? <br /> : null}
-          </Fragment>
-        )
-      })}
-    </>
-  )
+  for (let index = 0; index < lines.length;) {
+    if (standaloneUrlLabel && isStandaloneUrlLine(lines[index] ?? '')) {
+      const group = renderStandaloneUrlGroup({
+        lines,
+        startIndex: index,
+        standaloneUrlLabel,
+        standaloneUrlStartIndex: standaloneUrlIndex,
+        standaloneUrlTotal,
+      })
+      standaloneUrlIndex += group.consumedUrlCount
+      const shouldAddBreak = group.nextIndex < lines.length && !/^\s*>\s?/.test(lines[group.nextIndex] ?? '')
+      nodes.push(
+        <Fragment key={`message-line-wrapper-${index}`}>
+          {group.node}
+          {shouldAddBreak ? <br /> : null}
+        </Fragment>
+      )
+      index = group.nextIndex
+      continue
+    }
+
+    const renderedLine = renderLine(
+      lines[index] ?? '',
+      index,
+      standaloneUrlLabel,
+      -1,
+      standaloneUrlTotal
+    )
+    const shouldAddBreak = index < lines.length - 1 && !/^\s*>\s?/.test(lines[index + 1] ?? '')
+    nodes.push(
+      <Fragment key={`message-line-wrapper-${index}`}>
+        {renderedLine}
+        {shouldAddBreak ? <br /> : null}
+      </Fragment>
+    )
+    index += 1
+  }
+
+  return <>{nodes}</>
 }

@@ -711,6 +711,10 @@ describe('demo chat API route', () => {
             userMessage: 'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
             chunks,
         }))
+        expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
+            supabase: expect.any(Object),
+            locale: 'tr'
+        })
         expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalledWith(
             'SBF kampüsü nerede ve TLT çift anadal yapabilir mi?',
             expect.any(String),

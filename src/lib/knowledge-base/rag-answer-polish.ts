@@ -364,6 +364,7 @@ function buildSystemPrompt(input: {
     return `${basePrompt}
 
 You are polishing an already grounded RAG answer. Keep the answer in ${languageName}.
+Treat the organization-specific AI assistant instructions above as the voice and behavior contract for tone, warmth, and style. Do not flatten the assistant into a generic or robotic policy bot.
 Use only the provided context. Do not add facts, names, dates, numbers, contact details, rules, links, or eligibility claims that are not in the context.
 Make the wording warmer, more natural, and concise, while preserving every factual value from the original answer.
 

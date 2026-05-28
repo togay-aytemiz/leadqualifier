@@ -72,6 +72,20 @@ describe('MessageRichText', () => {
     expect(html).not.toContain(`>${secondUrl}</a>`)
   })
 
+  it('groups consecutive standalone source URL labels inline to save vertical space', () => {
+    const firstUrl = 'https://example.edu.tr/kaynak-1.pdf'
+    const secondUrl = 'https://example.edu.tr/kaynak-2.pdf'
+    const html = render(
+      `Cevap burada.\n${firstUrl}\n${secondUrl}\nSonraki satır.`,
+      (index, total) => total > 1 ? `Kaynak ${index + 1}` : 'Kaynağı aç'
+    )
+
+    expect(html).toContain('class="inline-flex flex-wrap items-center gap-x-2')
+    expect(html).toContain('>Kaynak 1</a><span')
+    expect(html).toContain('> · </span><a')
+    expect(html).toContain('>Kaynak 2</a></span><br/><span>Sonraki satır.</span>')
+  })
+
   it('keeps inline raw URLs visible even when standalone URL labels are enabled', () => {
     const url = 'https://yuksekihtisasuniversitesi.edu.tr/akademik-takvim'
     const html = render(`Takvime buradan bakabilirsiniz: ${url}`, 'Kaynağı aç')

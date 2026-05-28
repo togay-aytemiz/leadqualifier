@@ -770,7 +770,8 @@ export async function processInboundAiPipeline(options: InboundAiPipelineInput) 
     })
     const aiSettings = await getOrgAiSettings(orgId, {
         supabase: options.supabase,
-        failClosedBotMode: true
+        failClosedBotMode: true,
+        locale: responseLanguage
     })
     const formatOutboundBotMessage = (content: string) => {
         const disclaimerSettings = options.platform === 'demo_chat'

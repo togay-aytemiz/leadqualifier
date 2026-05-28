@@ -499,7 +499,8 @@ describe('processInboundAiPipeline guardrails', () => {
 
         expect(getOrgAiSettingsMock).toHaveBeenCalledWith('org-1', {
             supabase,
-            failClosedBotMode: true
+            failClosedBotMode: true,
+            locale: 'tr'
         })
         expect(resolveLeadExtractionAllowanceMock).toHaveBeenCalledWith({
             botMode: 'shadow',
