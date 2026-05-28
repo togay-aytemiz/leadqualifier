@@ -7,6 +7,11 @@ type RagAnswerRepairChunk = {
     sourceUrl?: string | null
 }
 
+type CampusAddressEntry = {
+    campusName: string
+    address: string
+}
+
 const URL_PATTERN = /https?:\/\/\S+/gi
 
 const LINK_ONLY_FILLER_PATTERNS = [
@@ -1195,6 +1200,33 @@ function extractSbfCampusAddress(content: string) {
     return null
 }
 
+function formatCampusName(value: string) {
+    return value
+        .toLocaleLowerCase('tr-TR')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word) => `${word.slice(0, 1).toLocaleUpperCase('tr-TR')}${word.slice(1)}`)
+        .join(' ')
+}
+
+function extractNamedCampusAddressEntries(content: string, subjectPattern: RegExp): CampusAddressEntry[] {
+    const entries: CampusAddressEntry[] = []
+    const pattern = new RegExp(
+        `${subjectPattern.source}[\\s\\S]{0,650}?((?:BAĞLUM|BALGAT|BAĞLICA)\\s+YERLEŞKESİ)\\s*:?\\s*([\\s\\S]{8,220}?)(?=\\s+(?:SAĞLIK\\s+HİZMETLERİ\\s+MESLEK\\s+YÜKSEKOKULU|SAĞLIK\\s+BİLİMLERİ\\s+FAKÜLTESİ|SPOR\\s+BİLİMLERİ\\s+FAKÜLTESİ|MESLEK\\s+YÜKSEKOKULU|Page\\s+Title:|Source\\s+URL:|Evidence\\s+Type:|Evidence\\s+Label:|Son\\s+Duyurular)|$)`,
+        'giu'
+    )
+    let match: RegExpExecArray | null
+
+    while ((match = pattern.exec(content))) {
+        const campusName = formatCampusName(match[1] ?? '')
+        const address = cleanExtractedInlineValue(match[2] ?? '')
+        if (!campusName || address.length < 12) continue
+        entries.push({ campusName, address })
+    }
+
+    return entries
+}
+
 function extractShmyoCampusAddress(content: string) {
     const updateMatch = content.match(/SAĞLIK\s+HİZMETLERİ\s+MESLEK\s+YÜKSEKOKULU[\s\S]{0,500}?BAĞLUM\s+YERLEŞKESİ\s*:?\s*([\s\S]{8,180}?)(?=\n\s*\n|SPOR\s+BİLİMLERİ|MESLEK\s+YÜKSEKOKULU|SAĞLIK\s+BİLİMLERİ|Son\s+Duyurular|$)/iu)
     if (updateMatch?.[1]) {
@@ -1203,6 +1235,31 @@ function extractShmyoCampusAddress(content: string) {
     }
 
     return null
+}
+
+function extractCampusAddressEntries(content: string, normalizedUserMessage: string) {
+    if (normalizedUserMessage.includes('sbf') || normalizedUserMessage.includes('saglik bilimleri')) {
+        return extractNamedCampusAddressEntries(content, /SAĞLIK\s+BİLİMLERİ\s+FAKÜLTESİ/iu)
+    }
+    if (normalizedUserMessage.includes('shmyo') || normalizedUserMessage.includes('saglik hizmetleri')) {
+        return extractNamedCampusAddressEntries(content, /SAĞLIK\s+HİZMETLERİ\s+MESLEK\s+YÜKSEKOKULU/iu)
+    }
+
+    return []
+}
+
+function dedupeCampusAddressEntries(entries: CampusAddressEntry[]) {
+    const seen = new Set<string>()
+    const deduped: CampusAddressEntry[] = []
+
+    for (const entry of entries) {
+        const key = `${normalizeSearch(entry.campusName)}\n${normalizeSearch(entry.address)}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        deduped.push(entry)
+    }
+
+    return deduped
 }
 
 function extractCampusAddress(content: string, normalizedUserMessage: string) {
@@ -1263,6 +1320,16 @@ function responseContainsAddress(response: string, address: string) {
     return hits / addressTokens.length >= 0.9
 }
 
+function responseContainsCampusAddressEntries(response: string, entries: CampusAddressEntry[]) {
+    return entries.every((entry) => responseContainsAddress(response, entry.address))
+}
+
+function formatCampusAddressEntries(subject: string, entries: CampusAddressEntry[]) {
+    return `${subject} yerleşkeleri: ${entries
+        .map((entry) => `${entry.campusName}: ${entry.address}`)
+        .join('; ')}.`
+}
+
 function repairAddressAnswer(input: {
     response: string
     userMessage: string
@@ -1270,6 +1337,14 @@ function repairAddressAnswer(input: {
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForAddressOrCampus(normalizedUserMessage)) return null
+
+    const campusAddressEntries = dedupeCampusAddressEntries(input.chunks.flatMap((chunk) => (
+        extractCampusAddressEntries(chunk.content, normalizedUserMessage)
+    )))
+    if (campusAddressEntries.length > 1) {
+        if (responseContainsCampusAddressEntries(input.response, campusAddressEntries)) return null
+        return formatCampusAddressEntries(addressSubject(input.userMessage, input.chunks), campusAddressEntries)
+    }
 
     const campusAddress = input.chunks
         .map((chunk) => extractCampusAddress(chunk.content, normalizedUserMessage))

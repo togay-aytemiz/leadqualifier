@@ -120,12 +120,39 @@ function sourceEvidenceScore(response: string, chunk: unknown) {
     return score
 }
 
+function isListingOrIndexSource(chunk: unknown) {
+    if (!isRecord(chunk)) return false
+
+    const sourceUrl = readTrimmedString(chunk.source_url ?? chunk.sourceUrl) ?? ''
+    const title = normalizeEvidenceText(readTrimmedString(chunk.document_title ?? chunk.documentTitle) ?? '')
+    let pathname = sourceUrl
+    try {
+        pathname = new URL(sourceUrl).pathname
+    } catch {
+        // Keep the raw value for schemeless or malformed test inputs.
+    }
+    const normalizedPath = normalizeEvidenceText(pathname)
+
+    return (
+        /\/(?:haberler|duyurular|announcements|news)\/index(?:\/|$)/i.test(pathname)
+        || normalizedPath.includes('/haberler/index')
+        || normalizedPath.includes('/duyurular/index')
+        || title === 'tum haberler'
+        || title === 'tum duyurular'
+        || title === 'all news'
+        || title === 'all announcements'
+    )
+}
+
 function collectRagSourceUrlsByResponseEvidence(response: string, chunks: unknown[], limit: number) {
     const indexedChunks = chunks.map((chunk, index) => ({ chunk, index, score: sourceEvidenceScore(response, chunk) }))
     const hasPositiveScore = indexedChunks.some((item) => item.score > 0)
     const rankedChunks = hasPositiveScore
         ? indexedChunks.sort((left, right) => right.score - left.score || left.index - right.index).map((item) => item.chunk)
         : chunks
+    const directChunks = rankedChunks.filter((chunk) => !isListingOrIndexSource(chunk))
+    const directUrls = collectRagSourceUrls(directChunks, limit)
+    if (directUrls.length > 0) return directUrls
 
     return collectRagSourceUrls(rankedChunks, limit)
 }

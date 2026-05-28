@@ -1272,6 +1272,31 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.')
     })
 
+    it('keeps multiple campus addresses when one academic unit has several campus entries', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.',
+            userMessage: 'SHMYO kampüsü nerede?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Yerleşke Konumları',
+                    content: [
+                        'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU',
+                        'Elektronörofizyoloji Biyomedikal Cihaz Teknolojisi Fizyoterapi Tıbbi Laboratuvar Teknikleri',
+                        'BALGAT YERLEŞKESİ: Oğuzlar Mahallesi 1375 Sokak No:8 06520 Balgat',
+                        'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU',
+                        'Anestezi Ameliyathane Hizmetleri İlk ve Acil Yardım Optisyenlik',
+                        'BAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toBe(
+            'Sağlık Hizmetleri Meslek Yüksekokulu yerleşkeleri: Balgat Yerleşkesi: Oğuzlar Mahallesi 1375 Sokak No:8 06520 Balgat; Bağlum Yerleşkesi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.'
+        )
+    })
+
     it('repairs TLT campus answers from explicit program yerleşke evidence', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Tıbbi Laboratuvar Teknikleri programı Sağlık Hizmetleri Meslek Yüksekokulu bünyesindedir.',

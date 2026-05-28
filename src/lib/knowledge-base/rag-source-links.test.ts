@@ -3,6 +3,29 @@ import { describe, expect, it } from 'vitest'
 import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
 
 describe('appendCanonicalRagSourceLinks', () => {
+    it('prefers direct evidence pages over listing/index source pages', () => {
+        const formatted = appendCanonicalRagSourceLinks('Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesi’nde yer alıyor.', [
+            {
+                document_title: 'Tüm Haberler',
+                source_url: 'https://example.edu.tr/haberler/index/21',
+                content: 'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesi duyurusu.'
+            },
+            {
+                document_title: 'Sağlık Bilimleri Fakültemiz Bağlıca Yerleşkesine Taşındı',
+                source_url: 'https://example.edu.tr/haber/saglik-bilimleri-fakultemiz-baglica-yerleskesine-tasindi',
+                content: 'Sağlık Bilimleri Fakültemiz Bağlıca Yerleşkesine taşındı.'
+            }
+        ], {
+            force: true,
+            limit: 2
+        })
+
+        expect(formatted).toBe(
+            'Sağlık Bilimleri Fakültesi Bağlıca Yerleşkesi’nde yer alıyor.\nhttps://example.edu.tr/haber/saglik-bilimleri-fakultemiz-baglica-yerleskesine-tasindi'
+        )
+        expect(formatted).not.toContain('/haberler/index/21')
+    })
+
     it('removes malformed spaced source URL fragments before appending canonical source links', () => {
         const response = 'https://yuksekihtisasuniversitesi. edu. tr/iletisim Başka bir konuda yardımcı olabilir miyim?'
 
