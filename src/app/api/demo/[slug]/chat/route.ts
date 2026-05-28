@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { v4 as uuidv4 } from 'uuid'
 import {
@@ -266,22 +266,6 @@ function waitForPipelineResult<T>(promise: Promise<T>, timeoutMs: number) {
             reject(error)
         })
     })
-}
-
-function scheduleAfterResponse(label: string, task: () => Promise<void>) {
-    const runTask = async () => {
-        try {
-            await task()
-        } catch (error) {
-            console.error(`Demo Chat: Deferred ${label} failed`, error)
-        }
-    }
-
-    try {
-        after(runTask)
-    } catch {
-        void runTask()
-    }
 }
 
 function readMetadataString(metadata: Record<string, unknown> | null, key: string) {
@@ -889,8 +873,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 readFastRagReplyTimeoutMs()
             )
             if (recoveryResult.status === 'timeout') {
-                scheduleAfterResponse('pending reply recovery', async () => {
-                    await recoveryPromise
+                void recoveryPromise.catch((error) => {
+                    console.error('Demo Chat: Timed-out pending reply recovery failed', error)
                 })
 
                 return NextResponse.json({ pending: true }, { status: 202 })
@@ -917,8 +901,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 readSyncReplyTimeoutMs()
             )
             if (extractiveRecoveryResult.status === 'timeout') {
-                scheduleAfterResponse('extractive pending reply recovery', async () => {
-                    await extractiveRecoveryPromise
+                void extractiveRecoveryPromise.catch((error) => {
+                    console.error('Demo Chat: Timed-out extractive pending reply recovery failed', error)
                 })
 
                 return NextResponse.json({ pending: true }, { status: 202 })
