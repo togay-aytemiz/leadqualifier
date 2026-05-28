@@ -1257,6 +1257,94 @@ describe('searchKnowledgeBase', () => {
         }))
     })
 
+    it('does not short-circuit history-aware planned retrieval when an ambiguous follow-up has misleading original-query hits', async () => {
+        const { supabase } = createHybridSearchSupabase({
+            rpcRows: [
+                {
+                    chunk_id: 'erasmus-1',
+                    document_id: 'doc-erasmus-1',
+                    document_title: 'Erasmus Staj Hareketliliği',
+                    document_type: 'pdf',
+                    content: 'Faaliyet süresi her bir öğrenim kademesi için 2 ile 12 ay arasındadır.',
+                    similarity: 0.92
+                },
+                {
+                    chunk_id: 'erasmus-2',
+                    document_id: 'doc-erasmus-2',
+                    document_title: 'Erasmus Başvuru Koşulları',
+                    document_type: 'pdf',
+                    content: 'Mezuniyet sonrası staj hareketliliği 12 ay içinde tamamlanır.',
+                    similarity: 0.9
+                },
+                {
+                    chunk_id: 'erasmus-3',
+                    document_id: 'doc-erasmus-3',
+                    document_title: 'Erasmus Programı',
+                    document_type: 'pdf',
+                    content: 'Staj süresi ay olarak hesaplanır.',
+                    similarity: 0.89
+                }
+            ],
+            fallbackRows: [],
+            fallbackRowsByFilter: [{
+                includes: 'laboratuvar',
+                rows: [{
+                    id: 'tlt-1',
+                    document_id: 'doc-tlt',
+                    content: 'Document Title: Tıbbi Laboratuvar Teknikleri\n\nTıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+                    knowledge_documents: {
+                        title: 'Tıbbi Laboratuvar Teknikleri',
+                        type: 'pdf',
+                        status: 'ready'
+                    }
+                }]
+            }]
+        })
+
+        planKnowledgeSearchQueryMock.mockResolvedValueOnce({
+            enabled: true,
+            model: 'gpt-4o-mini',
+            reason: 'planned',
+            searchQueries: [
+                'Bu programda staj kaç iş günü?',
+                'Tıbbi Laboratuvar Teknikleri yaz stajı 20 iş günü'
+            ],
+            mustHaveTerms: ['Tıbbi Laboratuvar Teknikleri', 'staj'],
+            usage: {
+                inputTokens: 42,
+                outputTokens: 10,
+                totalTokens: 52
+            }
+        })
+
+        const results = await searchKnowledgeBase(
+            'Bu programda staj kaç iş günü?',
+            'org-1',
+            0.5,
+            3,
+            {
+                supabase,
+                plannerHistory: [{
+                    role: 'assistant',
+                    content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajından bahsettik.'
+                }]
+            }
+        )
+
+        expect(results[0]).toMatchObject({
+            chunk_id: 'tlt-1',
+            document_id: 'doc-tlt'
+        })
+        expect(planKnowledgeSearchQueryMock).toHaveBeenCalledWith(
+            'Bu programda staj kaç iş günü?',
+            [{
+                role: 'assistant',
+                content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajından bahsettik.'
+            }],
+            expect.any(Object)
+        )
+    })
+
     it('does not run planned variants when the original query already returns strong evidence', async () => {
         const { supabase, orMock } = createHybridSearchSupabase({
             rpcRows: [],

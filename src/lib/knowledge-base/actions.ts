@@ -911,7 +911,8 @@ export async function searchKnowledgeBase(
         executionOptions
     )
 
-    if (shouldSkipPlannedSearchVariants(query, originalResults, limit)) {
+    const hasPlannerHistory = (options?.plannerHistory ?? []).some((turn) => turn.content.trim())
+    if (!hasPlannerHistory && shouldSkipPlannedSearchVariants(query, originalResults, limit)) {
         return originalResults
     }
 
@@ -942,7 +943,11 @@ export async function searchKnowledgeBase(
         mergedResults.push(...results)
     }
 
-    return mergeSearchResults(query, [], mergedResults, limit)
+    const rankingQuery = hasPlannerHistory && plannedSearchQueries[0]
+        ? plannedSearchQueries[0]
+        : query
+
+    return mergeSearchResults(rankingQuery, [], mergedResults, limit)
 }
 
 export async function searchKnowledgeBaseFocusedEvidence(
