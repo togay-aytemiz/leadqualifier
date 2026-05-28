@@ -2121,6 +2121,22 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Ders içeriklerine UZEM/MEDU sistemleri üzerinden ulaşabilirsin.')
     })
 
+    it('repairs no-information lecture-note answers with broader course-content wording when that is the only supported object', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Ders notlarına nereden ulaşabilirim?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Uzaktan Eğitim Politikası',
+                    content: 'Öğrenme Yönetim Sistemi MEDU platformu kullanılır. YİUZEM, Öğrenme Yönetim Sistemi ile ders içeriği paylaşımı hizmetini sunar.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Ders içeriklerinin paylaşımı UZEM/MEDU sistemleri üzerinden sağlanmıştır.')
+    })
+
     it('repairs multiple inline dangling lecture-note link labels', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: "Ders notlarına öğrenci bilgi sistemi üzerinden erişebilirsiniz. Daha fazla bilgi için şu linkleri kontrol edebilirsiniz: - Temel Bilgi Teknolojileri Ders içeriği: - Staj rehberleri ve diğer kaynaklar: Başka bir konuda yardımcı olabilir miyim?",

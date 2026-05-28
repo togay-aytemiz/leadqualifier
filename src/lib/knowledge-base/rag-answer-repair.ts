@@ -1935,6 +1935,9 @@ function repairLectureNotesAnswer(input: {
     if (!evidence) return null
 
     if (evidence.includes('uzem') && evidence.includes('medu')) {
+        if (!evidence.includes('ders not') && (evidence.includes('ders icerigi') || evidence.includes('ders materyal'))) {
+            return 'Ders içeriklerinin paylaşımı UZEM/MEDU sistemleri üzerinden sağlanmıştır.'
+        }
         return 'Ders notlarının paylaşımı UZEM/MEDU sistemleri üzerinden sağlanmıştır.'
     }
     if (evidence.includes('obs') || evidence.includes('erisime acilir')) {
