@@ -7,6 +7,7 @@ const {
     buildDemoChatContactIdMock,
     buildRagContextMock,
     createClientMock,
+    generateGroundedRagAnswerMock,
     getOrgAiSettingsMock,
     polishGroundedRagAnswerMock,
     processInboundAiPipelineMock,
@@ -20,6 +21,7 @@ const {
     buildDemoChatContactIdMock: vi.fn(),
     buildRagContextMock: vi.fn(),
     createClientMock: vi.fn(),
+    generateGroundedRagAnswerMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     polishGroundedRagAnswerMock: vi.fn(),
     processInboundAiPipelineMock: vi.fn(),
@@ -70,6 +72,10 @@ vi.mock('@/lib/knowledge-base/rag-source-links', () => ({
 
 vi.mock('@/lib/knowledge-base/rag-answer-polish', () => ({
     polishGroundedRagAnswer: polishGroundedRagAnswerMock,
+}))
+
+vi.mock('@/lib/knowledge-base/rag-answer-generate', () => ({
+    generateGroundedRagAnswer: generateGroundedRagAnswerMock,
 }))
 
 import { GET, POST } from '@/app/api/demo/[slug]/chat/route'
@@ -136,6 +142,13 @@ describe('demo chat API route', () => {
         getOrgAiSettingsMock.mockResolvedValue({
             prompt: 'Samimi cevap ver.',
             bot_name: 'Qualy',
+        })
+        generateGroundedRagAnswerMock.mockResolvedValue({
+            answer: '',
+            usedGeneration: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini',
         })
         polishGroundedRagAnswerMock.mockImplementation(async ({ answer }) => ({
             answer,
@@ -769,6 +782,149 @@ describe('demo chat API route', () => {
             outputTokens: 30,
             totalTokens: 110,
             metadata: expect.objectContaining({ source: 'demo_chat_rag_polish' })
+        }))
+    })
+
+    it('uses grounded answer generation before deterministic repair in demo recovery', async () => {
+        const chunk = {
+            content: [
+                'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+                'Staj uygulamasına ilişkin dönem ve başvuru koşulları program dokümanında açıklanır.',
+            ].join('\n'),
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            source_url: 'https://example.edu.tr/tlt.pdf',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 20,
+        })
+        generateGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.',
+            usedGeneration: true,
+            addedEngagement: true,
+            usage: { inputTokens: 120, outputTokens: 45, totalTokens: 165 },
+            model: 'gpt-4o-mini',
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.')
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/tlt.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain]
+        let messageSelectCount = 0
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                messageSelectCount += 1
+                if (messageSelectCount === 1) return completedMessagesChain
+                if (messageSelectCount === 2) return inboundMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        await expect(res.json()).resolves.toEqual({
+            pending: false,
+            response: 'Evet, Tıbbi Laboratuvar Teknikleri programında yaz stajı var; süresi 20 iş günü.\n\nİstersen stajın dönem ve başvuru koşullarını da kısaca çıkarabilirim.\nhttps://example.edu.tr/tlt.pdf',
+            skillImage: null,
+        })
+        expect(generateGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks: [chunk],
+            settings: {
+                prompt: 'Samimi cevap ver.',
+                bot_name: 'Qualy',
+            },
+        }))
+        expect(repairLinkOnlyRagAnswerMock).not.toHaveBeenCalled()
+        expect(polishGroundedRagAnswerMock).not.toHaveBeenCalled()
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            category: 'rag',
+            model: 'gpt-4o-mini',
+            inputTokens: 120,
+            outputTokens: 45,
+            totalTokens: 165,
+            metadata: expect.objectContaining({
+                source: 'demo_chat_rag_generate',
+                response_kind: 'rag_grounded_generate',
+            })
+        }))
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                rag_generate: {
+                    usedGeneration: true,
+                    addedEngagement: true,
+                    model: 'gpt-4o-mini',
+                }
+            })
         }))
     })
 

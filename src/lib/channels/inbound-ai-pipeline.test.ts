@@ -8,6 +8,7 @@ const {
     buildFallbackResponseMock,
     decideHumanEscalationMock,
     decideKnowledgeBaseRouteMock,
+    generateGroundedRagAnswerMock,
     getOrgAiSettingsMock,
     getRequiredIntakeFieldsMock,
     isOperatorActiveMock,
@@ -31,6 +32,7 @@ const {
     buildFallbackResponseMock: vi.fn(),
     decideHumanEscalationMock: vi.fn(),
     decideKnowledgeBaseRouteMock: vi.fn(),
+    generateGroundedRagAnswerMock: vi.fn(),
     getOrgAiSettingsMock: vi.fn(),
     getRequiredIntakeFieldsMock: vi.fn(),
     isOperatorActiveMock: vi.fn(),
@@ -80,6 +82,10 @@ vi.mock('@/lib/knowledge-base/rag', () => ({
 
 vi.mock('@/lib/knowledge-base/rag-answer-polish', () => ({
     polishGroundedRagAnswer: polishGroundedRagAnswerMock
+}))
+
+vi.mock('@/lib/knowledge-base/rag-answer-generate', () => ({
+    generateGroundedRagAnswer: generateGroundedRagAnswerMock
 }))
 
 vi.mock('@/lib/knowledge-base/actions', () => ({
@@ -419,6 +425,13 @@ describe('processInboundAiPipeline guardrails', () => {
             usage: null,
             model: 'gpt-4o-mini'
         }))
+        generateGroundedRagAnswerMock.mockResolvedValue({
+            answer: '',
+            usedGeneration: false,
+            addedEngagement: false,
+            usage: null,
+            model: 'gpt-4o-mini'
+        })
         recordAiUsageMock.mockResolvedValue(undefined)
         decideHumanEscalationMock.mockReturnValue({ shouldEscalate: false })
         buildFallbackResponseMock.mockResolvedValue('Fallback response')
@@ -2126,6 +2139,105 @@ describe('processInboundAiPipeline guardrails', () => {
 
         expect(sendOutbound).toHaveBeenCalledWith('Elbette, cilt bakımı ve lazer epilasyon hizmetlerimiz mevcut.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
         expect(buildFallbackResponseMock).not.toHaveBeenCalled()
+    })
+
+    it('uses grounded RAG generation before free-form RAG completion when support evidence is valid', async () => {
+        process.env.OPENAI_API_KEY = 'test-openai-key'
+
+        const sendOutbound = vi.fn(async () => undefined)
+        const dedupe = createDedupeBuilder(null)
+        const lookup = createConversationLookupBuilder(createConversation())
+        const inboundInsert = createInsertBuilder()
+        const historySelect = createMessageHistoryBuilder([
+            {
+                sender_type: 'contact',
+                content: 'hizmetleriniz hakkında bilgi almak istiyorum',
+                created_at: '2026-02-10T12:00:00.000Z'
+            }
+        ])
+        const botInsert = createInsertBuilder()
+        const latencyInsert = createInsertBuilder()
+        const conversationUpdateAfterInbound = createUpdateBuilder()
+        const conversationUpdateAfterBotReply = createUpdateBuilder()
+        const leadSnapshot = createLeadSnapshotBuilder({
+            service_type: null,
+            extracted_fields: {}
+        })
+        const chunk = {
+            document_id: 'doc-1',
+            content: 'Güzellik merkezimizde cilt bakımı ve lazer epilasyon hizmetleri sunuyoruz.'
+        }
+
+        decideKnowledgeBaseRouteMock.mockResolvedValue({
+            route_to_kb: true,
+            rewritten_query: 'hizmet bilgisi',
+            reason: 'knowledge_question',
+            usage: {
+                inputTokens: 10,
+                outputTokens: 4,
+                totalTokens: 14
+            }
+        })
+        searchKnowledgeBaseMock.mockResolvedValue([chunk])
+        buildRagContextMock.mockReturnValue({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 10
+        })
+        generateGroundedRagAnswerMock.mockResolvedValueOnce({
+            answer: 'Tabii, cilt bakımı ve lazer epilasyon hizmetleri mevcut.',
+            usedGeneration: true,
+            addedEngagement: false,
+            usage: { inputTokens: 90, outputTokens: 18, totalTokens: 108 },
+            model: 'gpt-4o-mini'
+        })
+
+        const supabase = createSupabaseMock({
+            messages: [dedupe.builder, inboundInsert.builder, historySelect.builder, botInsert.builder],
+            conversations: [lookup.builder, conversationUpdateAfterInbound.builder, conversationUpdateAfterBotReply.builder],
+            leads: [leadSnapshot.builder],
+            organization_ai_latency_events: [latencyInsert.builder]
+        })
+
+        matchSkillsSafelyMock.mockResolvedValueOnce([])
+
+        await processInboundAiPipeline(
+            buildInput(supabase, sendOutbound, { text: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+        )
+
+        expect(generateGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+            userMessage: 'hizmetleriniz hakkında bilgi almak istiyorum',
+            responseLanguage: 'tr',
+            chunks: [chunk]
+        }))
+        expect(openAiCreateMock).not.toHaveBeenCalledWith(expect.objectContaining({
+            messages: expect.arrayContaining([
+                expect.objectContaining({ role: 'system' }),
+                expect.objectContaining({ role: 'user', content: 'hizmetleriniz hakkında bilgi almak istiyorum' })
+            ])
+        }))
+        expect(sendOutbound).toHaveBeenCalledWith('Tabii, cilt bakımı ve lazer epilasyon hizmetleri mevcut.\n\n> Bu mesaj AI bot tarafından oluşturuldu, hata içerebilir.')
+        expect(recordAiUsageMock).toHaveBeenCalledWith(expect.objectContaining({
+            organizationId: 'org-1',
+            category: 'rag',
+            model: 'gpt-4o-mini',
+            inputTokens: 90,
+            outputTokens: 18,
+            totalTokens: 108,
+            metadata: expect.objectContaining({
+                source: 'rag_grounded_generate',
+                response_kind: 'rag_grounded_generate'
+            })
+        }))
+        expect(botInsert.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                rag_generate: {
+                    usedGeneration: true,
+                    addedEngagement: false,
+                    model: 'gpt-4o-mini'
+                }
+            })
+        }))
     })
 
     it('searches the original standalone user question before a drifted router rewrite', async () => {

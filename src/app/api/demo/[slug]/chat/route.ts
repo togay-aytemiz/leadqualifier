@@ -16,6 +16,7 @@ import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/k
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
+import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
 import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
 
 export const runtime = 'nodejs'
@@ -61,6 +62,11 @@ type DemoChatConversationRow = {
 
 type DemoChatExtractiveReply = DemoChatPipelineResult & {
     chunks: RagChunk[]
+    generation: {
+        usedGeneration: boolean
+        addedEngagement: boolean
+        model: string
+    } | null
     polish: {
         usedPolish: boolean
         addedEngagement: boolean
@@ -524,6 +530,61 @@ async function buildExtractiveDemoChatReply(input: {
         if (!context || chunks.length === 0) return null
 
         const responseLanguage = resolveMvpResponseLanguage(message)
+        const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
+            supabase: input.supabase,
+            locale: responseLanguage
+        })
+
+        const generatedAnswer = await generateGroundedRagAnswer({
+            userMessage: message,
+            responseLanguage,
+            chunks,
+            settings: aiSettings
+        })
+
+        if (generatedAnswer.usage) {
+            try {
+                await recordAiUsage({
+                    organizationId: input.channel.organizationId,
+                    category: 'rag',
+                    model: generatedAnswer.model,
+                    inputTokens: generatedAnswer.usage.inputTokens,
+                    outputTokens: generatedAnswer.usage.outputTokens,
+                    totalTokens: generatedAnswer.usage.totalTokens,
+                    metadata: {
+                        source: 'demo_chat_rag_generate',
+                        response_kind: 'rag_grounded_generate',
+                        demo_chat_channel_id: input.channel.id,
+                        document_count: chunks.length
+                    },
+                    supabase: input.supabase
+                })
+            } catch (error) {
+                console.error('Demo Chat: grounded RAG generation usage recording failed; continuing reply flow', error)
+            }
+        }
+
+        if (generatedAnswer.usedGeneration && generatedAnswer.answer.trim() && !isNoAnswerReply(generatedAnswer.answer)) {
+            return {
+                replyText: appendCanonicalRagSourceLinks(generatedAnswer.answer, chunks, {
+                    force: true,
+                    limit: 2
+                }),
+                skillImage: null,
+                chunks,
+                generation: {
+                    usedGeneration: generatedAnswer.usedGeneration,
+                    addedEngagement: generatedAnswer.addedEngagement,
+                    model: generatedAnswer.model
+                },
+                polish: {
+                    usedPolish: false,
+                    addedEngagement: false,
+                    model: generatedAnswer.model
+                }
+            }
+        }
+
         const noInformationSeed = buildNoInformationSeed(responseLanguage)
         const repairedAnswer = repairLinkOnlyRagAnswer({
             response: noInformationSeed,
@@ -533,10 +594,6 @@ async function buildExtractiveDemoChatReply(input: {
         })
         if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
 
-        const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
-            supabase: input.supabase,
-            locale: responseLanguage
-        })
         const polishedAnswer = await polishGroundedRagAnswer({
             answer: repairedAnswer,
             userMessage: message,
@@ -583,6 +640,7 @@ async function buildExtractiveDemoChatReply(input: {
             }),
             skillImage: null,
             chunks,
+            generation: null,
             polish: {
                 usedPolish: polishedAnswer.usedPolish,
                 addedEngagement: polishedAnswer.addedEngagement,
@@ -658,6 +716,7 @@ async function persistDemoChatExtractiveReply(input: {
                 demo_chat_reply_kind: 'text',
                 is_rag: true,
                 rag_extractive: true,
+                rag_generate: input.reply.generation,
                 rag_polish: input.reply.polish,
                 sources: input.reply.chunks.map((chunk) => chunk.document_id).filter(Boolean)
             }
