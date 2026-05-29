@@ -1836,10 +1836,10 @@ describe('repairLinkOnlyRagAnswer', () => {
             ]
         })
 
-        expect(repaired).toContain('Dönem IV ve V’te stajlardan')
-        expect(repaired).toContain('Dönem VI’da İntörnlük Stajlarından')
+        expect(repaired).toContain('Dönem IV-V’te klinik stajlar')
+        expect(repaired).toContain('Dönem VI’da intörnlük')
         expect(repaired).toContain('ayrı bir "yaz stajı" ifadesi geçmiyor')
-        expect(repaired).toContain('Tıp Fakültesinde')
+        expect(repaired).toContain('Tıp Fakültesi')
     })
 
     it('repairs reordered no-information medicine staj answers when training evidence is explicit', () => {
@@ -1855,9 +1855,9 @@ describe('repairLinkOnlyRagAnswer', () => {
             ]
         })
 
-        expect(repaired).toContain('Dönem IV ve V’te stajlardan')
-        expect(repaired).toContain('Dönem VI’da İntörnlük Stajlarından')
-        expect(repaired).toContain('Kaynakta ayrı bir "yaz stajı" ifadesi geçmiyor')
+        expect(repaired).toContain('Dönem IV-V’te klinik stajlar')
+        expect(repaired).toContain('Dönem VI’da intörnlük')
+        expect(repaired).toContain('ayrı bir "yaz stajı" ifadesi geçmiyor')
     })
 
     it('repairs too-broad medicine duration answers when period and staj evidence is explicit', () => {
@@ -1873,8 +1873,9 @@ describe('repairLinkOnlyRagAnswer', () => {
             ]
         })
 
-        expect(repaired).toContain('Dönem IV ve V’te stajlardan')
-        expect(repaired).toContain('Dönem VI’da İntörnlük Stajlarından')
+        expect(repaired).toContain('eğitim-öğretim süresi altı yıldır')
+        expect(repaired).toContain('Dönem IV-V’te klinik stajlar')
+        expect(repaired).toContain('Dönem VI’da intörnlük')
     })
 
     it('keeps the six-year duration when repairing detailed medicine training answers', () => {
@@ -1890,8 +1891,41 @@ describe('repairLinkOnlyRagAnswer', () => {
             ]
         })
 
-        expect(repaired).toContain('eğitim- öğretim süresi altı yıldır')
-        expect(repaired).toContain('Dönem VI’da İntörnlük Stajlarından')
+        expect(repaired).toContain('eğitim-öğretim süresi altı yıldır')
+        expect(repaired).toContain('Dönem IV-V’te klinik stajlar')
+        expect(repaired).toContain('Dönem VI’da intörnlük')
+    })
+
+    it('compacts medicine training duration answers while preserving the six-year and period structure facts', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Tıp Fakültesinde eğitim süresi ne kadar?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'MADDE 5 – (1) Tıp Fakültesinde eğitim- öğretim süresi altı yıldır. Tıp eğitim- öğretimi; Dönem I, II ve III’te temel olarak ders kurullarından oluşan Harmanlanmış/Hibrit Preklinik Tıp Bilimleri eğitim-öğretimi, Dönem IV ve V’te stajlardan oluşan Klinik Tıp Bilimleri eğitimöğretimi ve Dönem VI’da İntörnlük Stajlarından oluşan İntörnlük eğitim- öğretimi esasına göre yapılır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. Eğitim Dönem I-III’te preklinik ders kurulları, Dönem IV-V’te klinik stajlar ve Dönem VI’da intörnlük şeklinde yürütülür.')
+    })
+
+    it('compacts medicine summer-internship answers without implying a separate summer internship exists', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Tıp fakültesinde yaz stajı var mı?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'MADDE 5 – (1) Tıp eğitim- öğretimi; Dönem I, II ve III’te temel olarak ders kurullarından oluşan Harmanlanmış/Hibrit Preklinik Tıp Bilimleri eğitim-öğretimi, Dönem IV ve V’te stajlardan oluşan Klinik Tıp Bilimleri eğitimöğretimi ve Dönem VI’da İntörnlük Stajlarından oluşan İntörnlük eğitim- öğretimi esasına göre yapılır.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Kaynakta Tıp Fakültesi için ayrı bir "yaz stajı" ifadesi geçmiyor. Eğitim Dönem IV-V’te klinik stajlar ve Dönem VI’da intörnlük şeklinde yürütülür.')
     })
 
     it('keeps makeup exam wording in grade-calculation answers when the evidence uses final/makeup together', () => {

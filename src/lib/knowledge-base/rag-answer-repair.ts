@@ -2111,6 +2111,14 @@ function repairMedicineTrainingAnswer(input: {
         ? ' Kaynakta ayrı bir "yaz stajı" ifadesi geçmiyor.'
         : ''
 
+    if (asksSummerInternship && yazStajiNote) {
+        return 'Kaynakta Tıp Fakültesi için ayrı bir "yaz stajı" ifadesi geçmiyor. Eğitim Dönem IV-V’te klinik stajlar ve Dönem VI’da intörnlük şeklinde yürütülür.'
+    }
+
+    if (asksDuration) {
+        return 'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. Eğitim Dönem I-III’te preklinik ders kurulları, Dönem IV-V’te klinik stajlar ve Dönem VI’da intörnlük şeklinde yürütülür.'
+    }
+
     const subjectEvidence = /^Tıp eğitim/iu.test(evidence)
         ? `Tıp Fakültesinde ${evidence}`
         : evidence

@@ -91,7 +91,7 @@ type DemoChatExtractiveReply = DemoChatPipelineResult & {
         usedPolish: boolean
         addedEngagement: boolean
         model: string
-    }
+    } | null
 }
 
 const demoChatRateLimitBuckets = new Map<string, { windowStartMs: number; count: number }>()
@@ -791,6 +791,37 @@ async function buildExtractiveDemoChatReply(input: {
         if (!context || chunks.length === 0) return null
 
         const responseLanguage = resolveMvpResponseLanguage(message)
+
+        if (hasConversationHistory && !contextualChunksContainHistoryAnchor(chunks, conversationHistory)) {
+            return null
+        }
+
+        const noInformationSeed = buildNoInformationSeed(responseLanguage)
+        const repairedAnswer = repairLinkOnlyRagAnswer({
+            response: noInformationSeed,
+            userMessage: message,
+            responseLanguage,
+            chunks
+        })
+        const hasDeterministicAnswer = Boolean(
+            repairedAnswer
+            && repairedAnswer !== noInformationSeed
+            && !isNoAnswerReply(repairedAnswer)
+        )
+
+        if (hasDeterministicAnswer && repairedAnswer) {
+            return {
+                replyText: appendCanonicalRagSourceLinks(repairedAnswer, chunks, {
+                    force: true,
+                    limit: 2
+                }),
+                skillImage: null,
+                chunks,
+                generation: null,
+                polish: null
+            }
+        }
+
         const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
             supabase: input.supabase,
             locale: responseLanguage
@@ -921,17 +952,6 @@ async function buildExtractiveDemoChatReply(input: {
             }
         }
 
-        if (hasConversationHistory && !contextualChunksContainHistoryAnchor(chunks, conversationHistory)) {
-            return null
-        }
-
-        const noInformationSeed = buildNoInformationSeed(responseLanguage)
-        const repairedAnswer = repairLinkOnlyRagAnswer({
-            response: noInformationSeed,
-            userMessage: message,
-            responseLanguage,
-            chunks
-        })
         if (!repairedAnswer || repairedAnswer === noInformationSeed || isNoAnswerReply(repairedAnswer)) return null
 
         const polishedAnswer = await polishGroundedRagAnswer({
