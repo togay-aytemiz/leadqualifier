@@ -1142,8 +1142,9 @@ async function buildExtractiveDemoChatReply(input: {
     }
 
     if (hasConversationHistory) {
+        const contextualSearchQueries = buildDemoContextualKnowledgeSearchQueries(message, conversationHistory)
         const contextualFocusedReply = await searchFocusedQueries(
-            buildDemoContextualKnowledgeSearchQueries(message, conversationHistory),
+            contextualSearchQueries.slice(0, 1),
             'contextual_focused'
         )
         if (contextualFocusedReply) return contextualFocusedReply

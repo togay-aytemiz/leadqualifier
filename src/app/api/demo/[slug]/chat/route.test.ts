@@ -769,6 +769,7 @@ describe('demo chat API route', () => {
                 plannerHistory: expect.any(Array),
             })
         )
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledTimes(1)
         expect(repairLinkOnlyRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
             userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı? Bu programda staj kaç iş günü?',
             allowCompoundRepair: false,
