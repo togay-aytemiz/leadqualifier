@@ -1327,6 +1327,11 @@ function extractShmyoCampusAddress(content: string) {
     return null
 }
 
+function extractTltCampusAddress(content: string) {
+    const match = content.match(/Yerleşke\s*[:：]\s*(Balgat\s+Yerleşkesi|Bağlum\s+Yerleşkesi|Bağlıca\s+Yerleşkesi)/iu)
+    return match?.[1] ? cleanExtractedInlineValue(match[1]) : null
+}
+
 function extractCampusAddressEntries(content: string, normalizedUserMessage: string) {
     if (normalizedUserMessage.includes('sbf') || normalizedUserMessage.includes('saglik bilimleri')) {
         return extractNamedCampusAddressEntries(content, /SAĞLIK\s+BİLİMLERİ\s+FAKÜLTESİ/iu)
@@ -1363,11 +1368,55 @@ function extractCampusAddress(content: string, normalizedUserMessage: string) {
         normalizedUserMessage.includes('tlt')
         || (normalizedUserMessage.includes('tibbi') && normalizedUserMessage.includes('laboratuvar') && normalizedUserMessage.includes('teknik'))
     ) {
-        const match = content.match(/Yerleşke\s*[:：]\s*(Balgat\s+Yerleşkesi|Bağlum\s+Yerleşkesi|Bağlıca\s+Yerleşkesi)/iu)
-        if (match?.[1]) return cleanExtractedInlineValue(match[1])
+        return extractTltCampusAddress(content)
     }
 
     return null
+}
+
+function requestedCampusSubjects(normalizedUserMessage: string) {
+    const subjects: Array<{
+        subject: string
+        extract: (content: string) => string | null
+    }> = []
+
+    if (normalizedUserMessage.includes('sbf') || normalizedUserMessage.includes('saglik bilimleri')) {
+        subjects.push({ subject: 'Sağlık Bilimleri Fakültesi', extract: extractSbfCampusAddress })
+    }
+    if (normalizedUserMessage.includes('shmyo') || normalizedUserMessage.includes('saglik hizmetleri')) {
+        subjects.push({ subject: 'Sağlık Hizmetleri Meslek Yüksekokulu', extract: extractShmyoCampusAddress })
+    }
+    if (
+        normalizedUserMessage.includes('tlt')
+        || (normalizedUserMessage.includes('tibbi') && normalizedUserMessage.includes('laboratuvar') && normalizedUserMessage.includes('teknik'))
+    ) {
+        subjects.push({ subject: 'Tıbbi Laboratuvar Teknikleri Programı', extract: extractTltCampusAddress })
+    }
+
+    return subjects
+}
+
+function extractRequestedCampusSubjectAnswers(chunks: RagAnswerRepairChunk[], normalizedUserMessage: string) {
+    return requestedCampusSubjects(normalizedUserMessage)
+        .map(({ subject, extract }) => {
+            const address = chunks
+                .map((chunk) => extract(chunk.content))
+                .find((value): value is string => Boolean(value))
+            if (!address) return null
+
+            return {
+                subject,
+                address,
+                label: !hasStreetAddressShape(address) ? 'yerleşkesi' : 'adresi'
+            }
+        })
+        .filter((entry): entry is { subject: string; address: string; label: string } => Boolean(entry))
+}
+
+function formatRequestedCampusSubjectAnswers(entries: Array<{ subject: string; address: string; label: string }>) {
+    return entries
+        .map((entry) => `${entry.subject} ${entry.label}: ${entry.address}.`)
+        .join(' ')
 }
 
 function addressSubject(userMessage: string, chunks: RagAnswerRepairChunk[]) {
@@ -1427,6 +1476,12 @@ function repairAddressAnswer(input: {
 }) {
     const normalizedUserMessage = normalizeSearch(input.userMessage)
     if (!asksForAddressOrCampus(normalizedUserMessage)) return null
+
+    const requestedSubjectAnswers = extractRequestedCampusSubjectAnswers(input.chunks, normalizedUserMessage)
+    if (requestedSubjectAnswers.length > 1) {
+        if (requestedSubjectAnswers.every((entry) => responseContainsAddress(input.response, entry.address))) return null
+        return formatRequestedCampusSubjectAnswers(requestedSubjectAnswers)
+    }
 
     const campusAddressEntries = dedupeCampusAddressEntries(input.chunks.flatMap((chunk) => (
         extractCampusAddressEntries(chunk.content, normalizedUserMessage)

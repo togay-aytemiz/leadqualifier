@@ -1448,6 +1448,26 @@ describe('repairLinkOnlyRagAnswer', () => {
         )
     })
 
+    it('repairs multi-subject campus answers when one requested subject is omitted', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Sağlık Bilimleri Fakültesi yerleşkesi: Bağlıca Yerleşkesi.',
+            userMessage: 'SBF ve SHMYO kampüsleri nerede?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'SBF Taşınma Duyurusu',
+                    content: 'Sağlık Bilimleri Fakültemiz Bağlıca Yerleşkesine taşındı ve eğitimini burada sürdürecek.'
+                },
+                {
+                    document_title: 'Yerleşke Konumları',
+                    content: 'SAĞLIK HİZMETLERİ MESLEK YÜKSEKOKULU\nBAĞLUM YERLEŞKESİ: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Sağlık Bilimleri Fakültesi yerleşkesi: Bağlıca Yerleşkesi. Sağlık Hizmetleri Meslek Yüksekokulu adresi: Karakaya Mahallesi Bağlum Bulvarı No:1 06291 Keçiören.')
+    })
+
     it('repairs TLT campus answers from explicit program yerleşke evidence', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Tıbbi Laboratuvar Teknikleri programı Sağlık Hizmetleri Meslek Yüksekokulu bünyesindedir.',
