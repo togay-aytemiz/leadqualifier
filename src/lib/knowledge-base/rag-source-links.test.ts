@@ -416,4 +416,30 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).toBe('Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günü süresince uygulanmaktadır.\nhttps://example.edu.tr/tlt-oz-degerlendirme.pdf')
         expect(formatted).not.toContain('/landing')
     })
+
+    it('keeps multiple source links when separate compound-answer facts have distinct evidence values', () => {
+        const formatted = appendCanonicalRagSourceLinks(
+            'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. TLT 216 Yaz Stajı 20 iş günüdür.',
+            [
+                {
+                    source_url: 'https://example.edu.tr/tip-yonerge.pdf',
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır.'
+                },
+                {
+                    source_url: 'https://example.edu.tr/tlt-oz-degerlendirme.pdf',
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                    content: 'TLT 216 Yaz Stajı 20 iş günüdür.'
+                }
+            ],
+            {
+                force: true,
+                limit: 2
+            }
+        )
+
+        expect(formatted).toBe(
+            'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. TLT 216 Yaz Stajı 20 iş günüdür.\nhttps://example.edu.tr/tip-yonerge.pdf\nhttps://example.edu.tr/tlt-oz-degerlendirme.pdf'
+        )
+    })
 })

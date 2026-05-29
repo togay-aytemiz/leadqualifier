@@ -72,9 +72,15 @@ function normalizeConcreteEvidenceValue(value: string) {
 }
 
 function extractConcreteValueEvidence(value: string) {
+    const normalized = normalizeEvidenceText(value)
+    const turkishNumberWordDurations = normalized.match(
+        /\b(?:bir|iki|uc|dort|bes|alti|yedi|sekiz|dokuz|on|on\s+bir|on\s+iki|on\s+uc|on\s+dort|on\s+bes|on\s+alti|on\s+yedi|on\s+sekiz|on\s+dokuz|yirmi|otuz|kirk|elli|altmis|yetmis|seksen|doksan|yuz)\s+(?:is\s*gunu|gun(?:dur|luk)?|ay(?:dir|lik)?|yil(?:dir|lik)?|saat|dakika)\b/giu
+    ) ?? []
+
     return Array.from(new Set([
         ...(value.match(/\d+(?:[.,]\d+)?\s*(?:iş\s*günü|is\s*gunu|gün|gun|ay|yıl|yil|saat|dakika|akts|kredi|puan)/giu) ?? []),
-        ...(value.match(/%\s*\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s*%/gu) ?? [])
+        ...(value.match(/%\s*\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s*%/gu) ?? []),
+        ...turkishNumberWordDurations
     ].map(normalizeConcreteEvidenceValue).filter(Boolean)))
 }
 

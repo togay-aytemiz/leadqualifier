@@ -797,10 +797,12 @@ async function buildExtractiveDemoChatReply(input: {
 
     const buildReplyFromResults = async (
         kbResults: RagChunk[],
-        searchDiagnostics: Omit<DemoChatRagDiagnostics, 'retrieved_chunk_count' | 'deterministic_fast_path' | 'used_micro_polish'>
+        searchDiagnostics: Omit<DemoChatRagDiagnostics, 'retrieved_chunk_count' | 'deterministic_fast_path' | 'used_micro_polish'>,
+        options: { evidenceQuestion?: string } = {}
     ): Promise<DemoChatExtractiveReply | null> => {
         const buildStartedAt = Date.now()
         if (!kbResults || kbResults.length === 0) return null
+        const evidenceQuestion = options.evidenceQuestion?.trim() || message
         const buildDiagnostics = (input: {
             deterministicFastPath: boolean
             usedMicroPolish: boolean
@@ -835,7 +837,7 @@ async function buildExtractiveDemoChatReply(input: {
         const noInformationSeed = buildNoInformationSeed(responseLanguage)
         const repairedAnswer = repairLinkOnlyRagAnswer({
             response: noInformationSeed,
-            userMessage: message,
+            userMessage: evidenceQuestion,
             responseLanguage,
             chunks
         })
@@ -848,7 +850,7 @@ async function buildExtractiveDemoChatReply(input: {
         if (hasDeterministicAnswer && repairedAnswer) {
             const microPolishedAnswer = microPolishDeterministicRagAnswer({
                 answer: repairedAnswer,
-                userMessage: message,
+                userMessage: evidenceQuestion,
                 responseLanguage,
                 chunks
             })
@@ -913,7 +915,7 @@ async function buildExtractiveDemoChatReply(input: {
         if (generatedAnswer.usedGeneration && generatedAnswer.answer.trim() && !isNoAnswerReply(generatedAnswer.answer)) {
             const repairedGeneratedAnswer = repairLinkOnlyRagAnswer({
                 response: generatedAnswer.answer,
-                userMessage: message,
+                userMessage: evidenceQuestion,
                 responseLanguage,
                 chunks
             })
@@ -976,7 +978,7 @@ async function buildExtractiveDemoChatReply(input: {
                 ) {
                     const repairedPolishedGeneratedAnswer = repairLinkOnlyRagAnswer({
                         response: polishedGeneratedAnswer.answer,
-                        userMessage: message,
+                        userMessage: evidenceQuestion,
                         responseLanguage,
                         chunks
                     })
@@ -1044,7 +1046,7 @@ async function buildExtractiveDemoChatReply(input: {
 
         const repairedPolishedAnswer = repairLinkOnlyRagAnswer({
             response: polishedAnswer.answer,
-            userMessage: message,
+            userMessage: evidenceQuestion,
             responseLanguage,
             chunks
         })
@@ -1102,6 +1104,8 @@ async function buildExtractiveDemoChatReply(input: {
             timings_ms: {
                 search: elapsedMs(searchStartedAt)
             }
+        }, {
+            evidenceQuestion: hasConversationHistory ? queries[0] : message
         })
     }
 
@@ -1127,6 +1131,8 @@ async function buildExtractiveDemoChatReply(input: {
             timings_ms: {
                 search: elapsedMs(searchStartedAt)
             }
+        }, {
+            evidenceQuestion: hasConversationHistory ? searchQueries[0] : message
         })
     }
 
