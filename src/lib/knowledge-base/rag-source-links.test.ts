@@ -82,6 +82,24 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.\nhttps://example.edu.tr/ders-icerikleri.pdf')
     })
 
+    it('does not append contact sources that do not support the concrete email or phone in the answer', () => {
+        const formatted = appendCanonicalRagSourceLinks('Tıbbi Laboratuvar Teknikleri Programı iletişim bilgisi: E-posta: tlt@yiu.edu.tr.', [
+            {
+                source_url: 'https://example.edu.tr/tlt-program.pdf',
+                content: 'Tıbbi Laboratuvar Teknikleri Programı E-Mail: tlt@yiu.edu.tr'
+            },
+            {
+                source_url: 'https://example.edu.tr/iletisim',
+                content: 'Rektörlük Telefon: +90 312 329 10 10 E-posta: yiu@yiu.edu.tr'
+            }
+        ], {
+            force: true,
+            limit: 2
+        })
+
+        expect(formatted).toBe('Tıbbi Laboratuvar Teknikleri Programı iletişim bilgisi: E-posta: tlt@yiu.edu.tr.\nhttps://example.edu.tr/tlt-program.pdf')
+    })
+
     it('removes unspecified-topic help closings before appending the canonical source link', () => {
         const formatted = appendCanonicalRagSourceLinks('"Tlt" kısaltması, "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir. Daha fazla bilgiye ihtiyaç duyarsan, belirli bir konu hakkında yardımcı olabilirim!', [{
             source_url: 'https://example.edu.tr/tlt.pdf'

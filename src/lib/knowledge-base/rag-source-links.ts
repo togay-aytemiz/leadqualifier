@@ -92,6 +92,33 @@ function chunkContainsConcreteEvidence(response: string, chunk: unknown) {
     return concreteValues.some((value) => searchable.includes(value))
 }
 
+function chunkSearchableText(chunk: unknown) {
+    if (!isRecord(chunk)) return ''
+
+    return [
+        readTrimmedString(chunk.document_title ?? chunk.documentTitle) ?? '',
+        readTrimmedString(chunk.source_url ?? chunk.sourceUrl) ?? '',
+        readTrimmedString(chunk.content) ?? ''
+    ].join('\n')
+}
+
+function chunkContainsContactEvidence(response: string, chunk: unknown) {
+    if (!isRecord(chunk)) return false
+
+    const emails = extractEmailEvidence(response).map(normalizeEvidenceText)
+    const phoneDigits = extractPhoneEvidence(response)
+        .map((phone) => phone.replace(/\D/g, ''))
+        .filter((phone) => phone.length >= 8)
+    if (emails.length === 0 && phoneDigits.length === 0) return true
+
+    const searchableRaw = chunkSearchableText(chunk)
+    const searchable = normalizeEvidenceText(searchableRaw)
+    const searchableDigits = searchableRaw.replace(/\D/g, '')
+
+    return emails.some((email) => searchable.includes(email))
+        || phoneDigits.some((phone) => searchableDigits.includes(phone))
+}
+
 function answerEvidenceTerms(response: string) {
     const normalized = normalizeEvidenceText(response)
     return Array.from(new Set(normalized
@@ -183,8 +210,10 @@ function collectRagSourceUrlsByResponseEvidence(response: string, chunks: unknow
     const rankedChunks = hasPositiveScore
         ? indexedChunks.sort((left, right) => right.score - left.score || left.index - right.index).map((item) => item.chunk)
         : chunks
-    const concreteEvidenceChunks = rankedChunks.filter((chunk) => chunkContainsConcreteEvidence(response, chunk))
-    const evidenceRankedChunks = concreteEvidenceChunks.length > 0 ? concreteEvidenceChunks : rankedChunks
+    const contactEvidenceChunks = rankedChunks.filter((chunk) => chunkContainsContactEvidence(response, chunk))
+    const contactRankedChunks = contactEvidenceChunks.length > 0 ? contactEvidenceChunks : rankedChunks
+    const concreteEvidenceChunks = contactRankedChunks.filter((chunk) => chunkContainsConcreteEvidence(response, chunk))
+    const evidenceRankedChunks = concreteEvidenceChunks.length > 0 ? concreteEvidenceChunks : contactRankedChunks
     const directChunks = evidenceRankedChunks.filter((chunk) => !isListingOrIndexSource(chunk))
     const directUrls = collectRagSourceUrls(directChunks, limit)
     if (directUrls.length > 0) return directUrls
