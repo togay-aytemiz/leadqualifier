@@ -628,10 +628,160 @@ describe('demo chat API route', () => {
                 plannerHistory: expectedHistory,
             })
         )
-        expect(searchKnowledgeBaseFocusedEvidenceMock).not.toHaveBeenCalled()
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı? Bu programda staj kaç iş günü?',
+            'org-1',
+            6,
+            expect.objectContaining({
+                supabase: expect.any(Object),
+                plannerHistory: expectedHistory,
+            })
+        )
         expect(generateGroundedRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
             userMessage: 'Bu programda staj kaç iş günü?',
             conversationHistory: expectedHistory,
+        }))
+    })
+
+    it('tries contextual focused evidence before broad search for ambiguous follow-up questions', async () => {
+        const chunk = {
+            content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.',
+            document_id: 'doc-tlt',
+            document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+            source_url: 'https://example.edu.tr/tlt.pdf',
+        }
+        searchKnowledgeBaseFocusedEvidenceMock.mockResolvedValueOnce([chunk])
+        buildRagContextMock.mockReturnValueOnce({
+            context: chunk.content,
+            chunks: [chunk],
+            tokenCount: 12,
+        })
+        repairLinkOnlyRagAnswerMock.mockReturnValueOnce(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.'
+        )
+        appendCanonicalRagSourceLinksMock.mockReturnValueOnce(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı 20 iş günüdür.\nhttps://example.edu.tr/tlt.pdf'
+        )
+
+        const conversationChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: { id: 'conversation-1' },
+                error: null,
+            })),
+        }
+        conversationChain.eq.mockReturnValue(conversationChain)
+
+        const completedMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(async () => ({
+                data: [],
+                error: null,
+            })),
+        }
+        completedMessagesChain.eq.mockReturnValue(completedMessagesChain)
+
+        const inboundMessagesChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: {
+                    id: 'contact-message-1',
+                    content: 'Bu programda staj kaç iş günü?',
+                },
+                error: null,
+            })),
+        }
+        inboundMessagesChain.eq.mockReturnValue(inboundMessagesChain)
+
+        const historyMessagesChain = {
+            eq: vi.fn(),
+            order: vi.fn(),
+            limit: vi.fn(async () => ({
+                data: [
+                    {
+                        content: 'Bu programda staj kaç iş günü?',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'message-1' },
+                    },
+                    {
+                        content: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı?',
+                        sender_type: 'contact',
+                        metadata: { demo_chat_message_id: 'previous-message' },
+                    },
+                ],
+                error: null,
+            })),
+        }
+        historyMessagesChain.eq.mockReturnValue(historyMessagesChain)
+        historyMessagesChain.order.mockReturnValue(historyMessagesChain)
+
+        const botInsertChain = {
+            insert: vi.fn(async () => ({ error: null })),
+        }
+        const duplicateReplyChain = {
+            eq: vi.fn(),
+            maybeSingle: vi.fn(async () => ({
+                data: null,
+                error: null,
+            })),
+        }
+        duplicateReplyChain.eq.mockReturnValue(duplicateReplyChain)
+        const conversationUpdateChain = {
+            update: vi.fn(() => conversationUpdateChain),
+            eq: vi.fn(async () => ({ error: null })),
+        }
+
+        const conversations = [conversationChain, conversationChain, conversationChain, conversationChain]
+        const messagesTable = {
+            select: vi.fn((columns: string) => {
+                if (columns === 'id, content') return inboundMessagesChain
+                if (columns === 'content, sender_type, metadata') return historyMessagesChain
+                if (columns.includes('content, metadata')) return completedMessagesChain
+                if (columns === 'id') return duplicateReplyChain
+                return completedMessagesChain
+            }),
+            insert: botInsertChain.insert,
+        }
+        const fromMock = vi.fn((table: string) => {
+            if (table === 'conversations') {
+                const chain = conversations.shift()
+                if (!chain) return conversationUpdateChain
+                return { select: vi.fn(() => chain), update: conversationUpdateChain.update }
+            }
+            if (table === 'messages') return messagesTable
+            throw new Error(`Unexpected table ${table}`)
+        })
+        createClientMock.mockReturnValueOnce({ from: fromMock })
+
+        const res = await GET(createGetRequest({
+            sessionId: 'session-1',
+            messageId: 'message-1',
+            message: 'Bu programda staj kaç iş günü?',
+        }), createContext())
+
+        expect(res.status).toBe(200)
+        expect(searchKnowledgeBaseFocusedEvidenceMock).toHaveBeenCalledWith(
+            'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı? Bu programda staj kaç iş günü?',
+            'org-1',
+            6,
+            expect.objectContaining({
+                supabase: expect.any(Object),
+                plannerHistory: expect.any(Array),
+            })
+        )
+        expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
+        expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+            metadata: expect.objectContaining({
+                rag_diagnostics: expect.objectContaining({
+                    search_strategy: 'contextual_focused',
+                    deterministic_fast_path: true,
+                    retrieved_chunk_count: 1,
+                    timings_ms: expect.objectContaining({
+                        search: expect.any(Number),
+                        total: expect.any(Number),
+                    }),
+                }),
+            })
         }))
     })
 

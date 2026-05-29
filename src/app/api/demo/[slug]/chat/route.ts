@@ -16,6 +16,7 @@ import { searchKnowledgeBase, searchKnowledgeBaseFocusedEvidence } from '@/lib/k
 import type { KnowledgeSearchPlanningTurn } from '@/lib/knowledge-base/query-planner'
 import { buildRagContext, type RagChunk } from '@/lib/knowledge-base/rag'
 import { repairLinkOnlyRagAnswer } from '@/lib/knowledge-base/rag-answer-repair'
+import { microPolishDeterministicRagAnswer } from '@/lib/knowledge-base/rag-answer-micro-polish'
 import { polishGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-polish'
 import { generateGroundedRagAnswer } from '@/lib/knowledge-base/rag-answer-generate'
 import { appendCanonicalRagSourceLinks } from '@/lib/knowledge-base/rag-source-links'
@@ -92,6 +93,16 @@ type DemoChatExtractiveReply = DemoChatPipelineResult & {
         addedEngagement: boolean
         model: string
     } | null
+    diagnostics: DemoChatRagDiagnostics
+}
+
+type DemoChatRagDiagnostics = {
+    search_strategy: 'focused' | 'broad' | 'contextual_focused' | 'contextual_broad'
+    search_query_count: number
+    retrieved_chunk_count: number
+    deterministic_fast_path: boolean
+    used_micro_polish: boolean
+    timings_ms: Record<string, number>
 }
 
 const demoChatRateLimitBuckets = new Map<string, { windowStartMs: number; count: number }>()
@@ -488,6 +499,10 @@ function waitForPipelineResult<T>(promise: Promise<T>, timeoutMs: number) {
     })
 }
 
+function elapsedMs(startedAt: number) {
+    return Math.max(0, Date.now() - startedAt)
+}
+
 function readMetadataString(metadata: Record<string, unknown> | null, key: string) {
     const value = metadata?.[key]
     return typeof value === 'string' && value.trim() ? value.trim() : null
@@ -778,9 +793,30 @@ async function buildExtractiveDemoChatReply(input: {
     const message = readMessageText(input.message)
     if (!message) return null
     const conversationHistory = input.conversationHistory ?? []
+    const replyStartedAt = Date.now()
 
-    const buildReplyFromResults = async (kbResults: RagChunk[]): Promise<DemoChatExtractiveReply | null> => {
+    const buildReplyFromResults = async (
+        kbResults: RagChunk[],
+        searchDiagnostics: Omit<DemoChatRagDiagnostics, 'retrieved_chunk_count' | 'deterministic_fast_path' | 'used_micro_polish'>
+    ): Promise<DemoChatExtractiveReply | null> => {
+        const buildStartedAt = Date.now()
         if (!kbResults || kbResults.length === 0) return null
+        const buildDiagnostics = (input: {
+            deterministicFastPath: boolean
+            usedMicroPolish: boolean
+            timingsMs?: Record<string, number>
+        }): DemoChatRagDiagnostics => ({
+            ...searchDiagnostics,
+            retrieved_chunk_count: kbResults.length,
+            deterministic_fast_path: input.deterministicFastPath,
+            used_micro_polish: input.usedMicroPolish,
+            timings_ms: {
+                ...searchDiagnostics.timings_ms,
+                ...(input.timingsMs ?? {}),
+                build_reply: elapsedMs(buildStartedAt),
+                total: elapsedMs(replyStartedAt)
+            }
+        })
 
         const anchoredResults = hasConversationHistory
             ? filterChunksByHistoryAnchor(kbResults, conversationHistory)
@@ -810,23 +846,36 @@ async function buildExtractiveDemoChatReply(input: {
         )
 
         if (hasDeterministicAnswer && repairedAnswer) {
+            const microPolishedAnswer = microPolishDeterministicRagAnswer({
+                answer: repairedAnswer,
+                userMessage: message,
+                responseLanguage,
+                chunks
+            })
             return {
-                replyText: appendCanonicalRagSourceLinks(repairedAnswer, chunks, {
+                replyText: appendCanonicalRagSourceLinks(microPolishedAnswer.answer, chunks, {
                     force: true,
                     limit: 2
                 }),
                 skillImage: null,
                 chunks,
                 generation: null,
-                polish: null
+                polish: null,
+                diagnostics: buildDiagnostics({
+                    deterministicFastPath: true,
+                    usedMicroPolish: microPolishedAnswer.usedMicroPolish
+                })
             }
         }
 
+        const settingsStartedAt = Date.now()
         const aiSettings = await getOrgAiSettings(input.channel.organizationId, {
             supabase: input.supabase,
             locale: responseLanguage
         })
+        const settingsMs = elapsedMs(settingsStartedAt)
 
+        const generationStartedAt = Date.now()
         const generatedAnswer = await generateGroundedRagAnswer({
             userMessage: message,
             responseLanguage,
@@ -837,6 +886,7 @@ async function buildExtractiveDemoChatReply(input: {
                 ? readContextualFastRagGenerateTimeoutMs()
                 : readFastRagGenerateTimeoutMs()
         })
+        const generationMs = elapsedMs(generationStartedAt)
 
         if (generatedAnswer.usage) {
             try {
@@ -948,7 +998,15 @@ async function buildExtractiveDemoChatReply(input: {
                     addedEngagement: generatedAnswer.addedEngagement,
                     model: generatedAnswer.model
                 },
-                polish: generatedPolishMetadata
+                polish: generatedPolishMetadata,
+                diagnostics: buildDiagnostics({
+                    deterministicFastPath: false,
+                    usedMicroPolish: false,
+                    timingsMs: {
+                        settings: settingsMs,
+                        generation: generationMs
+                    }
+                })
             }
         }
 
@@ -1006,7 +1064,15 @@ async function buildExtractiveDemoChatReply(input: {
                 usedPolish: polishedAnswer.usedPolish,
                 addedEngagement: polishedAnswer.addedEngagement,
                 model: polishedAnswer.model
-            }
+            },
+            diagnostics: buildDiagnostics({
+                deterministicFastPath: false,
+                usedMicroPolish: false,
+                timingsMs: {
+                    settings: settingsMs,
+                    generation: generationMs
+                }
+            })
         }
     }
 
@@ -1015,10 +1081,35 @@ async function buildExtractiveDemoChatReply(input: {
         ? compoundSearchQueries
         : [message]
     const hasConversationHistory = conversationHistory.some((turn) => turn.content.trim())
+    const searchFocusedQueries = async (
+        queries: string[],
+        strategy: DemoChatRagDiagnostics['search_strategy']
+    ) => {
+        const searchStartedAt = Date.now()
+        const results = mergeDemoRagResultGroups(
+            await Promise.all(queries.map((query) => searchKnowledgeBaseFocusedEvidence(
+                query,
+                input.channel.organizationId,
+                FAST_RAG_RESULT_LIMIT,
+                { supabase: input.supabase, plannerHistory: conversationHistory }
+            ))),
+            FAST_RAG_RESULT_LIMIT
+        )
+
+        return buildReplyFromResults(results, {
+            search_strategy: strategy,
+            search_query_count: queries.length,
+            timings_ms: {
+                search: elapsedMs(searchStartedAt)
+            }
+        })
+    }
+
     const buildBroadSearchReply = async () => {
         const searchQueries = hasConversationHistory
             ? buildDemoContextualKnowledgeSearchQueries(message, conversationHistory)
             : buildDemoKnowledgeSearchQueries(message)
+        const searchStartedAt = Date.now()
         const kbResults = mergeDemoRagResultGroups(
             await Promise.all(searchQueries.map((query) => searchKnowledgeBase(
                 query,
@@ -1030,24 +1121,26 @@ async function buildExtractiveDemoChatReply(input: {
             FAST_RAG_RESULT_LIMIT
         )
 
-        return buildReplyFromResults(kbResults)
+        return buildReplyFromResults(kbResults, {
+            search_strategy: hasConversationHistory ? 'contextual_broad' : 'broad',
+            search_query_count: searchQueries.length,
+            timings_ms: {
+                search: elapsedMs(searchStartedAt)
+            }
+        })
     }
 
     if (hasConversationHistory) {
+        const contextualFocusedReply = await searchFocusedQueries(
+            buildDemoContextualKnowledgeSearchQueries(message, conversationHistory),
+            'contextual_focused'
+        )
+        if (contextualFocusedReply) return contextualFocusedReply
         const broadReply = await buildBroadSearchReply()
         return broadReply
     }
 
-    const focusedResults = mergeDemoRagResultGroups(
-        await Promise.all(focusedSearchQueries.map((query) => searchKnowledgeBaseFocusedEvidence(
-            query,
-            input.channel.organizationId,
-            FAST_RAG_RESULT_LIMIT,
-            { supabase: input.supabase, plannerHistory: conversationHistory }
-        ))),
-        FAST_RAG_RESULT_LIMIT
-    )
-    const focusedReply = await buildReplyFromResults(focusedResults)
+    const focusedReply = await searchFocusedQueries(focusedSearchQueries, 'focused')
     if (focusedReply) return focusedReply
 
     return hasConversationHistory ? null : buildBroadSearchReply()
@@ -1091,6 +1184,7 @@ async function persistDemoChatExtractiveReply(input: {
                 rag_extractive: true,
                 rag_generate: input.reply.generation,
                 rag_polish: input.reply.polish,
+                rag_diagnostics: input.reply.diagnostics,
                 sources: input.reply.chunks.map((chunk) => chunk.document_id).filter(Boolean)
             }
         })
