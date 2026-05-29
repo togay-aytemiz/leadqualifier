@@ -98,6 +98,18 @@ function chunkContainsConcreteEvidence(response: string, chunk: unknown) {
     return concreteValues.some((value) => searchable.includes(value))
 }
 
+function chunkContainsConcreteValue(chunk: unknown, value: string) {
+    if (!isRecord(chunk)) return false
+
+    const searchable = normalizeEvidenceText([
+        readTrimmedString(chunk.document_title ?? chunk.documentTitle) ?? '',
+        readTrimmedString(chunk.source_url ?? chunk.sourceUrl) ?? '',
+        readTrimmedString(chunk.content) ?? ''
+    ].join('\n'))
+
+    return searchable.includes(value)
+}
+
 function chunkSearchableText(chunk: unknown) {
     if (!isRecord(chunk)) return ''
 
@@ -210,6 +222,66 @@ function isListingOrIndexSource(chunk: unknown) {
     )
 }
 
+function sourceUrlFromChunk(chunk: unknown) {
+    if (!isRecord(chunk)) return null
+
+    return normalizeSourceUrl(chunk.source_url ?? chunk.sourceUrl)
+        ?? extractSourceUrlFromText(chunk.content)
+}
+
+function mergeSourceUrls(limit: number, ...urlGroups: string[][]) {
+    const urls: string[] = []
+    const seen = new Set<string>()
+
+    for (const group of urlGroups) {
+        for (const url of group) {
+            if (!url || seen.has(url)) continue
+
+            seen.add(url)
+            urls.push(url)
+            if (urls.length >= limit) return urls
+        }
+    }
+
+    return urls
+}
+
+function collectConcreteCoverageSourceUrls(response: string, chunks: unknown[], limit: number) {
+    const normalizedResponse = normalizeEvidenceText(response)
+    const concreteValues = extractConcreteValueEvidence(response)
+        .sort((left, right) => {
+            const leftIndex = normalizedResponse.indexOf(left)
+            const rightIndex = normalizedResponse.indexOf(right)
+            return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex)
+                - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex)
+        })
+    const urls: string[] = []
+    const seen = new Set<string>()
+
+    for (const value of concreteValues) {
+        const valueChunks = chunks.filter((chunk) => chunkContainsConcreteValue(chunk, value))
+        if (valueChunks.length === 0) continue
+
+        const directValueChunks = valueChunks.filter((chunk) => !isListingOrIndexSource(chunk))
+        const rankedValueChunks = (directValueChunks.length > 0 ? directValueChunks : valueChunks)
+            .map((chunk, index) => ({ chunk, index, score: sourceEvidenceScore(response, chunk) }))
+            .sort((left, right) => right.score - left.score || left.index - right.index)
+
+        for (const item of rankedValueChunks) {
+            const sourceUrl = sourceUrlFromChunk(item.chunk)
+            if (!sourceUrl || seen.has(sourceUrl)) continue
+
+            seen.add(sourceUrl)
+            urls.push(sourceUrl)
+            break
+        }
+
+        if (urls.length >= limit) break
+    }
+
+    return urls
+}
+
 function collectRagSourceUrlsByResponseEvidence(response: string, chunks: unknown[], limit: number) {
     const indexedChunks = chunks.map((chunk, index) => ({ chunk, index, score: sourceEvidenceScore(response, chunk) }))
     const hasPositiveScore = indexedChunks.some((item) => item.score > 0)
@@ -222,9 +294,15 @@ function collectRagSourceUrlsByResponseEvidence(response: string, chunks: unknow
     const evidenceRankedChunks = concreteEvidenceChunks.length > 0 ? concreteEvidenceChunks : contactRankedChunks
     const directChunks = evidenceRankedChunks.filter((chunk) => !isListingOrIndexSource(chunk))
     const directUrls = collectRagSourceUrls(directChunks, limit)
-    if (directUrls.length > 0) return directUrls
+    const coverageUrls = collectConcreteCoverageSourceUrls(response, evidenceRankedChunks, limit)
+    const directCoverageUrls = mergeSourceUrls(limit, coverageUrls, directUrls)
+    if (directCoverageUrls.length > 0) return directCoverageUrls
 
-    return collectRagSourceUrls(evidenceRankedChunks, limit)
+    return mergeSourceUrls(
+        limit,
+        coverageUrls,
+        collectRagSourceUrls(evidenceRankedChunks, limit)
+    )
 }
 
 const SPACED_RAW_URL_PATTERN = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+(?:(?:\s+(?=[/?#])|(?<=[-_/=&#?%.])\s+)[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)*/gi

@@ -771,6 +771,7 @@ describe('demo chat API route', () => {
         )
         expect(repairLinkOnlyRagAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
             userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı? Bu programda staj kaç iş günü?',
+            allowCompoundRepair: false,
         }))
         expect(searchKnowledgeBaseMock).not.toHaveBeenCalled()
         expect(botInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({

@@ -835,11 +835,13 @@ async function buildExtractiveDemoChatReply(input: {
         }
 
         const noInformationSeed = buildNoInformationSeed(responseLanguage)
+        const allowCompoundRepair = evidenceQuestion === message
         const repairedAnswer = repairLinkOnlyRagAnswer({
             response: noInformationSeed,
             userMessage: evidenceQuestion,
             responseLanguage,
-            chunks
+            chunks,
+            allowCompoundRepair
         })
         const hasDeterministicAnswer = Boolean(
             repairedAnswer
@@ -917,7 +919,8 @@ async function buildExtractiveDemoChatReply(input: {
                 response: generatedAnswer.answer,
                 userMessage: evidenceQuestion,
                 responseLanguage,
-                chunks
+                chunks,
+                allowCompoundRepair
             })
             const generatedAnswerWasRepaired = Boolean(
                 repairedGeneratedAnswer
@@ -980,7 +983,8 @@ async function buildExtractiveDemoChatReply(input: {
                         response: polishedGeneratedAnswer.answer,
                         userMessage: evidenceQuestion,
                         responseLanguage,
-                        chunks
+                        chunks,
+                        allowCompoundRepair
                     })
                     generatedAnswerForReply = repairedPolishedGeneratedAnswer && !isNoAnswerReply(repairedPolishedGeneratedAnswer)
                         ? repairedPolishedGeneratedAnswer
@@ -1048,7 +1052,8 @@ async function buildExtractiveDemoChatReply(input: {
             response: polishedAnswer.answer,
             userMessage: evidenceQuestion,
             responseLanguage,
-            chunks
+            chunks,
+            allowCompoundRepair
         })
         const answerForSources = repairedPolishedAnswer && !isNoAnswerReply(repairedPolishedAnswer)
             ? repairedPolishedAnswer

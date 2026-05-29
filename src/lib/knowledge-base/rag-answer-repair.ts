@@ -598,6 +598,7 @@ const DURATION_QUERY_SUBJECT_STOPWORDS = new Set([
     'programı',
     'programinda',
     'programında',
+    'programda',
     'bolum',
     'bölüm',
     'bolumu',

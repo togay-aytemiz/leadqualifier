@@ -442,4 +442,35 @@ describe('appendCanonicalRagSourceLinks', () => {
             'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. TLT 216 Yaz Stajı 20 iş günüdür.\nhttps://example.edu.tr/tip-yonerge.pdf\nhttps://example.edu.tr/tlt-oz-degerlendirme.pdf'
         )
     })
+
+    it('covers distinct concrete values before adding a second source for the same value', () => {
+        const formatted = appendCanonicalRagSourceLinks(
+            'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. Eğitim Dönem IV-V’te klinik stajlar şeklinde yürütülür. TLT 216 Yaz Stajı 20 iş günüdür.',
+            [
+                {
+                    source_url: 'https://example.edu.tr/tip-yonerge-primary.pdf',
+                    document_title: 'Tıp Fakültesi Eğitim-Öğretim ve Sınav Yönergesi',
+                    content: 'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. Eğitim Dönem IV-V’te klinik stajlar şeklinde yürütülür.'
+                },
+                {
+                    source_url: 'https://example.edu.tr/tip-yonerge-secondary.pdf',
+                    document_title: 'Tıp Fakültesi Staj Yönergesi',
+                    content: 'Tıp Fakültesinde eğitim-öğretim süresi altı yıldır. Klinik staj ve intörnlük hükümleri burada açıklanır.'
+                },
+                {
+                    source_url: 'https://example.edu.tr/tlt-oz-degerlendirme.pdf',
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                    content: 'TLT 216 Yaz Stajı 20 iş günüdür.'
+                }
+            ],
+            {
+                force: true,
+                limit: 2
+            }
+        )
+
+        expect(formatted).toContain('https://example.edu.tr/tip-yonerge-primary.pdf')
+        expect(formatted).toContain('https://example.edu.tr/tlt-oz-degerlendirme.pdf')
+        expect(formatted).not.toContain('https://example.edu.tr/tip-yonerge-secondary.pdf')
+    })
 })

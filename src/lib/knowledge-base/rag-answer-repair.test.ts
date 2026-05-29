@@ -125,6 +125,23 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('TLT 216 Yaz Stajı 20 iş günüdür.')
     })
 
+    it('uses document titles for contextual duration repair subject coverage', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Bu konuda elimde net bilgi yok.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri programında yaz stajı var mı? Bu programda staj kaç iş günü?',
+            responseLanguage: 'tr',
+            allowCompoundRepair: false,
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                    content: 'Page Title: Tıbbi Laboratuvar Teknikleri Programı\nSource URL: https://example.edu.tr/tlt.pdf\n\nTLT 216 Yaz Stajı 20 iş günüdür.'
+                }
+            ]
+        })
+
+        expect(repaired).toBe('TLT 216 Yaz Stajı 20 iş günüdür.')
+    })
+
     it('rewrites raw final and makeup-exam article snippets into a direct answer', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: '(2) Final sınavına girmesi gerektiği halde girmeyen öğrenciler bu sınava girer.',
