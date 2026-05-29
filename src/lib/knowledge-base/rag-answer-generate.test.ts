@@ -152,4 +152,36 @@ describe('generateGroundedRagAnswer', () => {
         expect(result.usedGeneration).toBe(true)
         expect(result.addedEngagement).toBe(false)
     })
+
+    it('keeps the answer but drops personal-profile engagement questions', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                        support_quotes: ['Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'],
+                        engagement_question: 'Hangi bölümde eğitim almayı düşünüyorsun?',
+                        engagement_evidence: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 100, completion_tokens: 40, total_tokens: 140 }
+        }))
+
+        const result = await generateGroundedRagAnswer({
+            userMessage: 'Ders içerikleri hangi sistemlerde paylaşılıyor?',
+            responseLanguage: 'tr',
+            chunks: [{
+                content: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                document_id: 'doc-medu',
+                document_title: 'Ders İçerikleri',
+                source_url: 'https://example.edu.tr/ders-icerikleri.pdf'
+            }],
+            createCompletion
+        })
+
+        expect(result.answer).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.')
+        expect(result.usedGeneration).toBe(true)
+        expect(result.addedEngagement).toBe(false)
+    })
 })

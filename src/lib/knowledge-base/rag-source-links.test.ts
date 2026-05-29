@@ -71,6 +71,17 @@ describe('appendCanonicalRagSourceLinks', () => {
         expect(formatted).toBe('Final sınavına girmesi gerektiği halde girmeyen öğrenciler bütünleme sınavına girer.\nhttps://example.edu.tr/tip.pdf')
     })
 
+    it('removes personal-profile engagement questions before appending source links', () => {
+        const formatted = appendCanonicalRagSourceLinks('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır. Hangi bölümde eğitim almayı düşünüyorsun?', [{
+            source_url: 'https://example.edu.tr/ders-icerikleri.pdf'
+        }], {
+            force: true,
+            limit: 1
+        })
+
+        expect(formatted).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.\nhttps://example.edu.tr/ders-icerikleri.pdf')
+    })
+
     it('removes unspecified-topic help closings before appending the canonical source link', () => {
         const formatted = appendCanonicalRagSourceLinks('"Tlt" kısaltması, "Tıbbi Laboratuvar Teknikleri" programını ifade edebilir. Daha fazla bilgiye ihtiyaç duyarsan, belirli bir konu hakkında yardımcı olabilirim!', [{
             source_url: 'https://example.edu.tr/tlt.pdf'

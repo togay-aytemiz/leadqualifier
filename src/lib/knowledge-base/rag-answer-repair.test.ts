@@ -1619,6 +1619,27 @@ describe('repairLinkOnlyRagAnswer', () => {
         expect(repaired).toBe('Tıbbi Laboratuvar Teknikleri Programı iletişim bilgisi: E-posta: tlt@yiu.edu.tr.')
     })
 
+    it('does not borrow a footer phone into a focused program email contact answer', () => {
+        const repaired = repairLinkOnlyRagAnswer({
+            response: 'Tıbbi Laboratuvar Teknikleri Programı iletişim bilgileri: Telefon: +90 312 329 10 10 - E-posta: tlt@yiu.edu.tr.',
+            userMessage: 'Tıbbi Laboratuvar Teknikleri program sorumlusu iletişim bilgisi nedir?',
+            responseLanguage: 'tr',
+            chunks: [
+                {
+                    document_title: 'Tıbbi Laboratuvar Teknikleri Programı',
+                    content: [
+                        'TIBBİ LABORATUVAR TEKNİKLERİ PROGRAMI',
+                        'Program e-posta adresi: tlt@yiu.edu.tr',
+                        'Sayfa alt bilgi alanı',
+                        'Telefon: +90 312 329 10 10'
+                    ].join('\n')
+                }
+            ]
+        })
+
+        expect(repaired).toBe('Tıbbi Laboratuvar Teknikleri Programı iletişim bilgisi: E-posta: tlt@yiu.edu.tr.')
+    })
+
     it('uses the requested administrative unit contact instead of the generic university contact', () => {
         const repaired = repairLinkOnlyRagAnswer({
             response: 'Kurum iletişim bilgisi: Telefon: +90 312 329 10 15 - E-posta: yiu@yiu.edu.tr.',

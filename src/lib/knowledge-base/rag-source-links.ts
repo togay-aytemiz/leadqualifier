@@ -269,6 +269,7 @@ function stripGenericSourceLinkPrefaceTail(response: string) {
         /\s*hangi\s+[\s\S]{0,120}?\s+ilgilen(?:diğini|diğinizi)\s+belirtmek\s+ister misin(?:iz)?\??[.!?]?\s*$/iu,
         /\s*(?:Bu nedenle|Bu yüzden|Bu sebeple),?\s*hangi\s+(?:bölümde|programda|bölümle|programla)[\s\S]{0,180}?(?:daha spesifik bilgi verebilir(?:im|iz)|yardımcı olabilir(?:im|iz)|bilgi verebilir(?:im|iz))[.!?]?(?:\s*Hangi\s+(?:bölüm|program)(?:le| ile)?\s+ilgileniyorsun(?:uz)?\??[.!?]?)?\s*$/iu,
         /\s*Hangi\s+(?:bölüm|program)(?:le| ile)?\s+ilgileniyorsun(?:uz)?\??[.!?]?\s*$/iu,
+        /\s*Hangi\s+(?:bölüm|program)\w*\s+(?:eğitim\s+al|okuyor|okuduğ|olduğ|ilgilen|düşün)[\s\S]{0,160}\??[.!?]?\s*$/iu,
         /\s*[\p{L}\p{N}\s]{0,120}?(?:ilgili|hakkında)\s+(?:başka|farklı)\s+bir\s+konu\s+var mı\??[.!?]?\s*$/iu,
         /\s*(?:Eğer\s+)?başka\s+bir\s+konuda\s+yardımcı\s+olmamı\s+istersen(?:iz)?,?\s+lütfen\s+belirt(?:in|iniz)?[.!?]?\s*$/iu,
         /\s*İlgilendiğin(?:iz)?\s+(?:bölüm|program|ders|konu)[\s\S]{0,140}?\s*$/iu

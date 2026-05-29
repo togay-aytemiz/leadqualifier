@@ -92,6 +92,41 @@ describe('polishGroundedRagAnswer', () => {
         expect(result.addedEngagement).toBe(false)
     })
 
+    it('drops personal-profile engagement even when the evidence quote is present', async () => {
+        const createCompletion = vi.fn(async () => ({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        answer: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                        engagement_question: 'Hangi bölümde eğitim almayı düşünüyorsun?',
+                        engagement_evidence: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.'
+                    })
+                }
+            }],
+            usage: { prompt_tokens: 100, completion_tokens: 36, total_tokens: 136 }
+        }))
+
+        const result = await polishGroundedRagAnswer({
+            answer: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+            userMessage: 'Ders içerikleri hangi sistemlerde paylaşılıyor?',
+            responseLanguage: 'tr',
+            chunks: [{
+                content: 'Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.',
+                document_id: 'doc-medu',
+                document_title: 'Ders İçerikleri',
+                source_url: 'https://example.edu.tr/ders-icerikleri.pdf'
+            }],
+            settings: {
+                prompt: 'Samimi, canlı ve güven veren bir dil kullan.',
+                bot_name: 'Qualy'
+            },
+            createCompletion
+        })
+
+        expect(result.answer).toBe('Ders içerikleri MEDU Öğrenme Yönetim Sistemi üzerinden paylaşılır.')
+        expect(result.addedEngagement).toBe(false)
+    })
+
     it('keeps grounded engagement when the evidence relates to the polished answer even if the user question is terse', async () => {
         const createCompletion = vi.fn(async () => ({
             choices: [{

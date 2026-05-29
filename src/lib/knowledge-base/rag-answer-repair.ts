@@ -1601,7 +1601,7 @@ function findFocusedContactCandidate(content: string, userMessage: string): Focu
         })
         candidates.push({
             email,
-            phone: extractPhoneNearEmail(content, email),
+            phone: extractFocusedPhoneNearEmail(content, email),
             score,
             window
         })
@@ -1727,7 +1727,7 @@ function extractPreferredPhone(value: string, options?: { preferLast?: boolean }
     return selected?.[0] ? formatPhoneNumber(selected[0]) : null
 }
 
-function extractPhoneNearEmail(content: string, email: string | null) {
+function extractPhoneNearEmail(content: string, email: string | null, options?: { fallbackToAnyPhone?: boolean }) {
     if (email) {
         const emailIndex = content.toLocaleLowerCase('tr-TR').indexOf(email.toLocaleLowerCase('tr-TR'))
         if (emailIndex >= 0) {
@@ -1737,7 +1737,33 @@ function extractPhoneNearEmail(content: string, email: string | null) {
         }
     }
 
+    if (options?.fallbackToAnyPhone === false) return null
+
     return extractPreferredPhone(content)
+}
+
+function extractFocusedPhoneNearEmail(content: string, email: string | null) {
+    if (!email) return null
+
+    const emailIndex = content.toLocaleLowerCase('tr-TR').indexOf(email.toLocaleLowerCase('tr-TR'))
+    if (emailIndex < 0) return null
+
+    const lineStart = content.lastIndexOf('\n', emailIndex) + 1
+    const nextBreak = content.indexOf('\n', emailIndex)
+    const lineEnd = nextBreak >= 0 ? nextBreak : content.length
+    const sameLine = content.slice(lineStart, lineEnd)
+    const sameLinePhone = extractPreferredPhone(sameLine, { preferLast: true })
+    if (sameLinePhone) return sameLinePhone
+
+    const previousBreak = content.lastIndexOf('\n', Math.max(0, lineStart - 2))
+    const previousLine = previousBreak >= 0
+        ? content.slice(previousBreak + 1, Math.max(0, lineStart - 1))
+        : content.slice(0, Math.max(0, lineStart - 1))
+    if (/telefon|tel\.?/iu.test(previousLine)) {
+        return extractPreferredPhone(previousLine, { preferLast: true })
+    }
+
+    return null
 }
 
 function extractContactEvidence(chunk: RagAnswerRepairChunk, userMessage: string): ContactEvidence | null {

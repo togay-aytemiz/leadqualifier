@@ -87,6 +87,7 @@ const GENERIC_ENGAGEMENT_PATTERNS = [
     /\bdaha\s+fazla\s+bilgiye\s+ihtiyac/i,
     /\bdaha\s+fazla\s+bilgi\s+istersen(?:iz)?\s+yardimci/i,
     /\bdetayli\s+bilgi\s+almak\s+istersen(?:iz)?\s+yardimci/i,
+    /\bhangi\s+(?:bolum|program)\w*\s+(?:egitim\s+al|okuyor|okudug|oldug|ilgilen|dusun)/i,
     /\bogrenci\s+misin/i
 ]
 
